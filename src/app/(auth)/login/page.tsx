@@ -7,7 +7,6 @@ import {
   Users,
 } from "lucide-react";
 import { LoginForm } from "@/components/auth/LoginForm";
-import { getPublicTenants } from "@/lib/auth/tenants";
 
 const features = [
   {
@@ -38,8 +37,6 @@ export const metadata: Metadata = {
 };
 
 export default function LoginPage() {
-  const tenants = getPublicTenants();
-
   return (
     <div className="flex min-h-screen">
       {/* Brand panel */}
@@ -62,8 +59,8 @@ export default function LoginPage() {
               Manage every client relationship, securely.
             </h1>
             <p className="mt-3 max-w-sm text-sm leading-relaxed text-violet-100">
-              Sign in to your organization workspace to access dashboards,
-              sales pipelines, finance reports, and team tools.
+              Sign in to access dashboards, sales pipelines, finance reports,
+              and team tools.
             </p>
           </div>
 
@@ -110,7 +107,7 @@ export default function LoginPage() {
                 Welcome back
               </h2>
               <p className="mt-1 text-sm text-gray-500">
-                Enter your organization and credentials to continue
+                Click below to continue to your dashboard
               </p>
             </div>
 
@@ -121,7 +118,7 @@ export default function LoginPage() {
                 </div>
               }
             >
-              <LoginForm tenants={tenants} />
+              <LoginForm />
             </Suspense>
           </div>
 

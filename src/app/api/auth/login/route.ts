@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { authenticateUser } from "@/lib/auth/tenants";
+import { getDefaultSession } from "@/lib/auth/tenants";
 import {
   createSessionToken,
   getSessionCookieOptions,
@@ -10,25 +10,18 @@ import { loginSchema } from "@/lib/auth/validation";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const parsed = loginSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.issues[0]?.message ?? "Invalid credentials" },
+        { error: parsed.error.issues[0]?.message ?? "Invalid request" },
         { status: 400 },
       );
     }
 
-    const { tenantSlug, email, password, rememberMe } = parsed.data;
-    const result = authenticateUser(tenantSlug, email, password);
-
-    if (!result) {
-      return NextResponse.json(
-        { error: "Invalid organization, email, or password" },
-        { status: 401 },
-      );
-    }
+    const { rememberMe } = parsed.data;
+    const result = getDefaultSession();
 
     const token = await createSessionToken(
       {
