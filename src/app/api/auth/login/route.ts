@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { getDefaultSession } from "@/lib/auth/tenants";
+import { createSessionToken } from "@/lib/auth/session";
 import {
-  createSessionToken,
   getSessionCookieOptions,
   SESSION_COOKIE,
-} from "@/lib/auth/session";
+} from "@/lib/auth/constants";
 import { loginSchema } from "@/lib/auth/validation";
 
 export async function POST(request: Request) {
@@ -36,18 +35,20 @@ export async function POST(request: Request) {
       rememberMe,
     );
 
-    const cookieStore = await cookies();
-    cookieStore.set(
+    const response = NextResponse.json({
+      user: result.user,
+      tenant: result.tenant,
+    });
+
+    response.cookies.set(
       SESSION_COOKIE,
       token,
       getSessionCookieOptions(rememberMe),
     );
 
-    return NextResponse.json({
-      user: result.user,
-      tenant: result.tenant,
-    });
-  } catch {
+    return response;
+  } catch (error) {
+    console.error("[auth/login]", error);
     return NextResponse.json(
       { error: "Something went wrong. Please try again." },
       { status: 500 },

@@ -1,24 +1,16 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
-import { SESSION_COOKIE } from "@/lib/auth/session";
+import { getAuthSecretKey, SESSION_COOKIE } from "@/lib/auth/constants";
 
 const PUBLIC_PATHS = ["/login"];
-
-function getSecretKey() {
-  const secret = process.env.AUTH_SECRET;
-  if (!secret) {
-    return new TextEncoder().encode("finconnex-dev-secret-change-in-production");
-  }
-  return new TextEncoder().encode(secret);
-}
 
 async function isAuthenticated(request: NextRequest): Promise<boolean> {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   if (!token) return false;
 
   try {
-    await jwtVerify(token, getSecretKey());
+    await jwtVerify(token, getAuthSecretKey());
     return true;
   } catch {
     return false;
