@@ -69,7 +69,10 @@ export function AddTaskModal({
             className="h-12 w-full rounded-xl border border-gray-200 px-4 text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
           />
 
-          <Select value={category} onValueChange={setCategory}>
+          <Select
+            value={category}
+            onValueChange={(value) => setCategory(value ?? "Default")}
+          >
             <SelectTrigger className="h-12 w-full rounded-xl border-gray-200 px-4 text-sm text-gray-700">
               <SelectValue placeholder="Default" />
             </SelectTrigger>
