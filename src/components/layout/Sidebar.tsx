@@ -42,9 +42,10 @@ const workItems: NavItem[] = [
 
 interface SidebarProps {
   collapsed?: boolean;
+  tenantName?: string;
 }
 
-export function Sidebar({ collapsed = false }: SidebarProps) {
+export function Sidebar({ collapsed = false, tenantName }: SidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -57,12 +58,17 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
       <Link
         href="/"
         className={cn(
-          "mb-8 px-1 text-xl font-semibold text-gray-900",
+          "mb-2 px-1 text-xl font-semibold text-gray-900",
           collapsed && "text-center text-base",
         )}
       >
         {collapsed ? "FinC" : "FinConnex"}
       </Link>
+
+      {!collapsed && tenantName && (
+        <p className="mb-6 truncate px-1 text-xs text-gray-400">{tenantName}</p>
+      )}
+      {collapsed && <div className="mb-6" />}
 
       {/* Dashboard section */}
       {!collapsed && (
