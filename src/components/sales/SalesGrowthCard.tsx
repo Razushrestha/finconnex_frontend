@@ -7,7 +7,7 @@ import {
   YAxis,
   ResponsiveContainer,
   Tooltip,
-  TooltipProps,
+  TooltipContentProps,
 } from "recharts";
 import { MoreHorizontal } from "lucide-react";
 
@@ -34,7 +34,7 @@ function CustomTooltip({
   active,
   payload,
   label,
-}: TooltipProps<number, string>) {
+}: Pick<TooltipContentProps<number, string>, "active" | "payload" | "label">) {
   if (!active || !payload || payload.length === 0) return null;
 
   const sales = payload[0]?.value as number;
@@ -104,7 +104,11 @@ export function SalesGrowthCard() {
               tickFormatter={formatCurrency}
             />
 
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip
+              content={({ active, payload, label }) => (
+                <CustomTooltip active={active} payload={payload} label={label} />
+              )}
+            />
 
             <Area
               type="monotone"

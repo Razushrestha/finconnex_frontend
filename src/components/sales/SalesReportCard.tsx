@@ -9,7 +9,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  TooltipProps,
+  TooltipContentProps,
 } from "recharts";
 
 type Period = "Today" | "Week" | "Month";
@@ -63,7 +63,7 @@ function CustomTooltip({
   active,
   payload,
   label,
-}: TooltipProps<number, string>) {
+}: Pick<TooltipContentProps<number, string>, "active" | "payload" | "label">) {
   if (!active || !payload || payload.length === 0) return null;
 
   const income = payload.find((p) => p.dataKey === "income")?.value as
@@ -202,7 +202,11 @@ export function SalesReportCard() {
               tickFormatter={formatCurrency}
             />
 
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip
+              content={({ active, payload, label }) => (
+                <CustomTooltip active={active} payload={payload} label={label} />
+              )}
+            />
 
             {visibleSeries.income && (
               <Area

@@ -9,7 +9,7 @@ import {
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
-  TooltipProps,
+  TooltipContentProps,
 } from "recharts";
 import { ChevronDown } from "lucide-react";
 
@@ -41,7 +41,7 @@ function CustomTooltip({
   active,
   payload,
   label,
-}: TooltipProps<number, string>) {
+}: Pick<TooltipContentProps<number, string>, "active" | "payload" | "label">) {
   if (!active || !payload || payload.length === 0) return null;
 
   const revenue = payload.find((p) => p.dataKey === "revenue")?.value as number;
@@ -144,7 +144,11 @@ export function RevenueExpensesChart() {
               width={44}
             />
 
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip
+              content={({ active, payload, label }) => (
+                <CustomTooltip active={active} payload={payload} label={label} />
+              )}
+            />
 
             <Line
               type="monotone"

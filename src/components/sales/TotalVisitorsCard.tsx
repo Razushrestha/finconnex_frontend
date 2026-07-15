@@ -7,7 +7,7 @@ import {
   ResponsiveContainer,
   Cell,
   Tooltip,
-  TooltipProps,
+  TooltipContentProps,
 } from "recharts";
 import { MoreHorizontal } from "lucide-react";
 
@@ -30,7 +30,7 @@ function CustomTooltip({
   active,
   payload,
   label,
-}: TooltipProps<number, string>) {
+}: Pick<TooltipContentProps<number, string>, "active" | "payload" | "label">) {
   if (!active || !payload || payload.length === 0) return null;
 
   const current = payload.find((p) => p.dataKey === "current")?.value as number;
@@ -97,7 +97,12 @@ export function TotalVisitorsCard() {
               dy={10}
             />
 
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f8fafc" }} />
+            <Tooltip
+              content={({ active, payload, label }) => (
+                <CustomTooltip active={active} payload={payload} label={label} />
+              )}
+              cursor={{ fill: "#f8fafc" }}
+            />
 
             <Bar dataKey="current" radius={[6, 6, 0, 0]} barSize={32}>
               {data.map((entry) => (
