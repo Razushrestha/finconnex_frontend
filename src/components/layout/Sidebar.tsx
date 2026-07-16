@@ -48,7 +48,7 @@ const dashboardItems: NavItem[] = [
     label: "Activities",
     icon: Notebook,
     children: [
-      { label: "Tasks", href: "/activities" },
+      { label: "Tasks", href: "/activities/tasks" },
       { label: "Calls", href: "/activities/calls" },
       { label: "Messages", href: "/activities/messages" },
       { label: "Emails", href: "/activities/emails" },
