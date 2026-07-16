@@ -157,9 +157,9 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
           {dashboardItems.map((item) => {
             const hasChildren = !!item.children?.length;
             const isActive =
-              pathname === item.href ||
+              (item.href && pathname === item.href) ||
               (hasChildren &&
-                item.children!.some((c) => pathname.startsWith(c.href)));
+                item.children!.some((c) => pathname.startsWith(c.href!)));
             const isOpen = expanded.has(item.label);
             const Icon = item.icon!;
 
@@ -199,7 +199,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
                   </button>
                 ) : (
                   <Link
-                    href={item.href}
+                    href={item.href!}
                     title={collapsed ? item.label : undefined}
                     className={cn(
                       "flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors",
@@ -227,7 +227,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
                       return (
                         <Link
                           key={child.href}
-                          href={child.href}
+                          href={child.href!}
                           className={cn(
                             "rounded-lg px-2.5 py-1.5 text-sm transition-colors",
                             childActive
@@ -252,7 +252,7 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
           {workItems.map((item) => (
             <Link
               key={item.label}
-              href={item.href}
+              href={item.href!}
               title={collapsed ? item.label : undefined}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm text-gray-700 hover:bg-gray-50",
