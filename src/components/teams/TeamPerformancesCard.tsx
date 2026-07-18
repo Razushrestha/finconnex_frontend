@@ -8,7 +8,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  TooltipProps,
+  TooltipContentProps,
 } from "recharts";
 import { MoreHorizontal } from "lucide-react";
 
@@ -38,15 +38,15 @@ function CustomTooltip({
   active,
   payload,
   label,
-}: TooltipProps<number, string>) {
+}: Pick<TooltipContentProps<number, string>, "active" | "payload" | "label">) {
   if (!active || !payload || payload.length === 0) return null;
 
   return (
     <div className="rounded-lg bg-slate-100 px-4 py-3 shadow-md">
       <p className="mb-2 text-sm font-medium text-slate-500">{label}</p>
-      {payload.map((entry) => (
+      {payload.map((entry, index) => (
         <div
-          key={entry.dataKey}
+          key={String(entry.dataKey ?? index)}
           className="mb-1 flex items-center gap-2 text-sm last:mb-0"
         >
           <span
@@ -107,7 +107,12 @@ export function TeamPerformancesCard() {
               ticks={[0, 20, 40, 60, 80, 100]}
             />
 
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f8fafc" }} />
+            <Tooltip
+              content={({ active, payload, label }) => (
+                <CustomTooltip active={active} payload={payload} label={label} />
+              )}
+              cursor={{ fill: "#f8fafc" }}
+            />
 
             <Bar
               dataKey="team1"

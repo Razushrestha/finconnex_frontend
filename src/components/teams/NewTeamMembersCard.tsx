@@ -6,7 +6,7 @@ import {
   ResponsiveContainer,
   Cell,
   Tooltip,
-  TooltipProps,
+  TooltipContentProps,
 } from "recharts";
 
 interface BarPoint {
@@ -34,7 +34,10 @@ const subStats: SubStat[] = [
   { label: "Converted Leads", value: "192", delta: "+9.1%" },
 ];
 
-function ChartTooltip({ active, payload }: TooltipProps<number, string>) {
+function ChartTooltip({
+  active,
+  payload,
+}: Pick<TooltipContentProps<number, string>, "active" | "payload">) {
   if (!active || !payload || payload.length === 0) return null;
 
   const value = payload[0]?.value as number;
@@ -82,7 +85,9 @@ export function NewTeamMembersCard() {
               </defs>
 
               <Tooltip
-                content={<ChartTooltip />}
+                content={({ active, payload }) => (
+                  <ChartTooltip active={active} payload={payload} />
+                )}
                 cursor={{ fill: "#f8fafc" }}
               />
 

@@ -23,13 +23,18 @@ import {
   Settings,
 } from "lucide-react";
 
+type NavChildItem = {
+  label: string;
+  href: string;
+};
+
 type NavItem = {
   label: string;
   href?: string;
   icon?: React.ElementType;
   swatch?: string;
   badge?: string;
-  children?: NavItem[];
+  children?: NavChildItem[];
 };
 
 const dashboardItems: NavItem[] = [
@@ -166,7 +171,7 @@ export function Sidebar({ collapsed = false, tenantName }: SidebarProps) {
             const isActive =
               (item.href && pathname === item.href) ||
               (hasChildren &&
-                item.children!.some((c) => pathname.startsWith(c.href!)));
+                item.children!.some((c) => pathname.startsWith(c.href)));
             const isOpen = expanded.has(item.label);
             const Icon = item.icon!;
 
@@ -234,7 +239,7 @@ export function Sidebar({ collapsed = false, tenantName }: SidebarProps) {
                       return (
                         <Link
                           key={child.href}
-                          href={child.href!}
+                          href={child.href}
                           className={cn(
                             "rounded-lg px-2.5 py-1.5 text-sm transition-colors",
                             childActive
