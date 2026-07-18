@@ -20,23 +20,6 @@ export function DashboardBreadcrumb() {
   );
 }
 
-export function ActiveDealsCard() {
-  return (
-    <Card>
-      <CardHeader title="Active Deals" />
-      <div className="flex items-center gap-2">
-        <span className="text-3xl font-bold text-gray-900">1,249</span>
-        <ChangeBadge value={2.57} />
-      </div>
-      <div className="mt-14" />
-      <div className="mt-auto flex items-center justify-between border-t border-gray-100 pt-3 text-sm">
-        <span className="text-gray-500">Vs last month: 1,195</span>
-        <ArrowRight className="h-4 w-4 text-violet-600" />
-      </div>
-    </Card>
-  );
-}
-
 const orderByTimeHours = ["4pm", "2pm", "12pm", "10am", "8am"];
 const orderByTimeDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const orderByTimeGrid = [
