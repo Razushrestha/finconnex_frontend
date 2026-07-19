@@ -1,37 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import {
-  taskColumns as initialColumns,
-  type TaskColumn,
-} from "@/lib/tasks/types";
-import { KanbanColumn } from "./KanbanColumn";
+import { NotesKanbanColumn } from "./NotesKanbanColumn";
+import { NoteColumn, noteColumns } from "@/lib/notes/types";
 
 interface DragInfo {
-  taskId: string;
+  noteId: string;
   sourceColumnId: string;
 }
 
-export function KanbanBoard() {
-  const [columns, setColumns] = useState<TaskColumn[]>(initialColumns);
+export function NotesKanbanBoard() {
+  const [columns, setColumns] = useState<NoteColumn[]>(noteColumns);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
 
-  function handleDragStartTask(
+  function handleDragStartNote(
     e: React.DragEvent<HTMLDivElement>,
-    taskId: string,
+    noteId: string,
     columnId: string,
   ) {
-    setDragInfo({ taskId, sourceColumnId: columnId });
+    setDragInfo({ noteId, sourceColumnId: columnId });
     e.dataTransfer.effectAllowed = "move";
   }
 
-  function handleDragEndTask() {
+  function handleDragEndNote() {
     setDragInfo(null);
   }
 
-  function handleDropTask(targetColumnId: string) {
+  function handleDropNote(targetColumnId: string) {
     if (!dragInfo) return;
-    const { taskId, sourceColumnId } = dragInfo;
+    const { noteId, sourceColumnId } = dragInfo;
 
     if (sourceColumnId === targetColumnId) {
       setDragInfo(null);
@@ -40,21 +37,21 @@ export function KanbanBoard() {
 
     setColumns((prev) => {
       const sourceColumn = prev.find((c) => c.id === sourceColumnId);
-      const task = sourceColumn?.tasks.find((t) => t.taskId === taskId);
-      if (!task) return prev;
+      const note = sourceColumn?.notes.find((n) => n.id === noteId);
+      if (!note) return prev;
 
       return prev.map((col) => {
         if (col.id === sourceColumnId) {
           return {
             ...col,
-            tasks: col.tasks.filter((t) => t.taskId !== taskId),
+            notes: col.notes.filter((n) => n.id !== noteId),
             count: col.count - 1,
           };
         }
         if (col.id === targetColumnId) {
           return {
             ...col,
-            tasks: [task, ...col.tasks],
+            notes: [{ ...note, noteType: col.title }, ...col.notes],
             count: col.count + 1,
           };
         }
@@ -68,13 +65,13 @@ export function KanbanBoard() {
   return (
     <div className="flex h-full items-stretch gap-4">
       {columns.map((column) => (
-        <KanbanColumn
+        <NotesKanbanColumn
           key={column.id}
           column={column}
-          draggingTaskId={dragInfo?.taskId ?? null}
-          onDragStartTask={handleDragStartTask}
-          onDragEndTask={handleDragEndTask}
-          onDropTask={handleDropTask}
+          draggingNoteId={dragInfo?.noteId ?? null}
+          onDragStartNote={handleDragStartNote}
+          onDragEndNote={handleDragEndNote}
+          onDropNote={handleDropNote}
         />
       ))}
     </div>

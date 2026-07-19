@@ -28,7 +28,8 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    "src/components/activities/notes/NotesListView.tsx"
   ],
   "exclude": ["node_modules"]
 }

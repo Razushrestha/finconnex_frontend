@@ -24,33 +24,30 @@ const filterSections: FilterSection[] = [
     id: "by-fields",
     title: "Filter By Fields",
     fields: [
-      "Call Agenda",
-      "Call Duration",
-      "Call Duration (in seconds)",
-      "Call Owner",
-      "Call Purpose",
-      "Call Result",
-      "Call Start Time",
-      "Call Type",
-      "Caller ID",
-      "Contact Name",
+      "Meeting Title",
+      "Meeting Type",
+      "Meeting Status",
+      "Host",
+      "Participants",
+      "Start Time",
+      "End Time",
+      "Duration",
+      "Location",
+      "Agenda",
       "Created By",
       "Created Time",
-      "Dialled Number",
-      "From Number",
-      "Last Activity Time",
       "Modified By",
       "Modified Time",
-      "Outgoing Call Status",
+      "Outcome",
     ],
   },
 ];
 
-interface CallsFilterPanelProps {
+interface MeetingsFilterPanelProps {
   onClose?: () => void;
 }
 
-export function MessagesFilterPanel({ onClose }: CallsFilterPanelProps) {
+export function MeetingsFilterPanel({ onClose }: MeetingsFilterPanelProps) {
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [checked, setChecked] = useState<Record<string, boolean>>({});
@@ -80,7 +77,7 @@ export function MessagesFilterPanel({ onClose }: CallsFilterPanelProps) {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
         <h3 className="text-sm font-semibold text-slate-900">
-          Filter Messages by
+          Filter Meetings by
         </h3>
         {onClose && (
           <button

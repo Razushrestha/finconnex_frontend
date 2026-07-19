@@ -59,10 +59,10 @@ export function CallsListTable({
         data-filter-open={filterOpen}
         className="min-h-0 flex-1 overflow-y-auto overflow-x-auto [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100"
       >
-        <table className="w-full min-w-[1100px] border-collapse text-left text-xs">
+        <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
           <thead className="sticky top-0 z-10 bg-white">
             <tr className="border-b border-slate-100 text-slate-500">
-              <th className="w-10 px-4 py-2.5">
+              <th className="w-10 px-4 py-1">
                 <input
                   type="checkbox"
                   checked={allSelected}
@@ -73,7 +73,7 @@ export function CallsListTable({
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  className={`px-4 py-2.5 font-medium ${
+                  className={`px-4 py-1 font-medium ${
                     col.key === "callStartTime" && sortActive
                       ? "text-indigo-600"
                       : ""
@@ -109,9 +109,7 @@ export function CallsListTable({
                   </div>
                 </td>
                 <td className="px-4 py-2 text-slate-500">{call.callOwner}</td>
-                <td className="max-w-[220px] px-4 py-2 text-slate-500">
-                  {call.subject}
-                </td>
+                <td className=" px-4 py-2 text-slate-500">{call.subject}</td>
                 <td className="px-4 py-2 text-slate-500">{call.callType}</td>
                 <td className="whitespace-nowrap px-4 py-2 text-slate-500">
                   {call.callStartTime}
