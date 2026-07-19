@@ -24,33 +24,25 @@ const filterSections: FilterSection[] = [
     id: "by-fields",
     title: "Filter By Fields",
     fields: [
-      "Call Agenda",
-      "Call Duration",
-      "Call Duration (in seconds)",
-      "Call Owner",
-      "Call Purpose",
-      "Call Result",
-      "Call Start Time",
-      "Call Type",
-      "Caller ID",
-      "Contact Name",
       "Created By",
       "Created Time",
-      "Dialled Number",
-      "From Number",
-      "Last Activity Time",
+      "Is Pinned",
+      "Is Private",
       "Modified By",
       "Modified Time",
-      "Outgoing Call Status",
+      "Note Type",
+      "Owner",
+      "Related To",
+      "Title",
     ],
   },
 ];
 
-interface CallsFilterPanelProps {
+interface NotesFilterPanelProps {
   onClose?: () => void;
 }
 
-export function MessagesFilterPanel({ onClose }: CallsFilterPanelProps) {
+export function NotesFilterPanel({ onClose }: NotesFilterPanelProps) {
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [checked, setChecked] = useState<Record<string, boolean>>({});
@@ -76,11 +68,11 @@ export function MessagesFilterPanel({ onClose }: CallsFilterPanelProps) {
   }, [search]);
 
   return (
-    <div className="flex h-full w-56 shrink-0 flex-col rounded-2xl border border-slate-100 bg-white shadow-sm">
+    <div className="flex h-full w-64 shrink-0 flex-col rounded-2xl border border-slate-100 bg-white shadow-sm">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
         <h3 className="text-sm font-semibold text-slate-900">
-          Filter Messages by
+          Filter Notes by
         </h3>
         {onClose && (
           <button
@@ -109,7 +101,7 @@ export function MessagesFilterPanel({ onClose }: CallsFilterPanelProps) {
       </div>
 
       {/* Sections */}
-      <div className="flex-1 overflow-y-auto px-3 py-2 ">
+      <div className="flex-1 overflow-y-auto px-3 py-2 [scrollbar-color:#94a3b8_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300">
         {filteredSections.map((section) => {
           const isCollapsed = collapsed[section.id];
           return (

@@ -1,26 +1,59 @@
 "use client";
 
+import { useState } from "react";
+import {
+  ArrowRightLeft,
+  Trash2,
+  RefreshCw,
+  Tags,
+  ShieldCheck,
+  Download,
+} from "lucide-react";
 import { FilterPanel } from "@/components/activities/tasks/Filterpanel";
 import { KanbanBoard } from "@/components/activities/tasks/KanbanBoard";
 import { TaskListView } from "@/components/activities/tasks/TaskListView";
 import {
-  TasksToolbar,
-  TaskView,
-} from "@/components/activities/tasks/TasksToolBar";
-import { useState } from "react";
+  ActivityToolbar,
+  type ActivityView,
+} from "@/components/activities/ActivityToolbar";
+
+const moreMenuItems = [
+  { key: "mass-transfer", icon: ArrowRightLeft, label: "Mass Transfer" },
+  { key: "mass-delete", icon: Trash2, label: "Mass Delete" },
+  { key: "mass-update", icon: RefreshCw, label: "Mass Update" },
+  { key: "manage-tags", icon: Tags, label: "Manage Tags" },
+  { key: "assignment-rules", icon: ShieldCheck, label: "Assignment Rules" },
+  { key: "export-tasks", icon: Download, label: "Export Tasks" },
+];
+
+const printViewItems = [
+  { key: "print-default", label: "Print Default view" },
+  { key: "print-canvas", label: "Print Using Canvas", premium: true },
+];
 
 export default function TasksPage() {
-  const [view, setView] = useState<TaskView>("kanban");
+  const [view, setView] = useState<ActivityView>("kanban");
   const [filterOpen, setFilterOpen] = useState(false);
 
   return (
-    <div className="flex h-full w-full min-w-0 flex-col overflow-hidden bg-slate-50/50  lg:p-4">
+    <div className="flex min-h-full w-full min-w-0 flex-col overflow-hidden bg-slate-50/50  lg:p-4">
       <div className="shrink-0">
-        <TasksToolbar
+        <ActivityToolbar
+          entityLabel="Task"
+          createRoute="/activities/tasks/create"
+          tabs={["All Tasks", "My Overdue Tasks"]}
           view={view}
           onViewChange={setView}
           filterOpen={filterOpen}
           onToggleFilter={() => setFilterOpen((v) => !v)}
+          showRefresh
+          moreMenuItems={moreMenuItems}
+          printViewItems={printViewItems}
+          savedViews={[
+            "Tasks by Status",
+            "Tasks by Assignee",
+            "Tasks by Priority",
+          ]}
         />
       </div>
 

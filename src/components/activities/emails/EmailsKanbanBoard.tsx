@@ -2,36 +2,36 @@
 
 import { useState } from "react";
 import {
-  taskColumns as initialColumns,
-  type TaskColumn,
-} from "@/lib/tasks/types";
-import { KanbanColumn } from "./KanbanColumn";
+  emailColumns as initialColumns,
+  type EmailColumn,
+} from "@/lib/emails/types";
+import { EmailsKanbanColumn } from "./EmailsKanbanColumn";
 
 interface DragInfo {
-  taskId: string;
+  emailId: string;
   sourceColumnId: string;
 }
 
-export function KanbanBoard() {
-  const [columns, setColumns] = useState<TaskColumn[]>(initialColumns);
+export function EmailsKanbanBoard() {
+  const [columns, setColumns] = useState<EmailColumn[]>(initialColumns);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
 
-  function handleDragStartTask(
+  function handleDragStartEmail(
     e: React.DragEvent<HTMLDivElement>,
-    taskId: string,
+    emailId: string,
     columnId: string,
   ) {
-    setDragInfo({ taskId, sourceColumnId: columnId });
+    setDragInfo({ emailId, sourceColumnId: columnId });
     e.dataTransfer.effectAllowed = "move";
   }
 
-  function handleDragEndTask() {
+  function handleDragEndEmail() {
     setDragInfo(null);
   }
 
-  function handleDropTask(targetColumnId: string) {
+  function handleDropEmail(targetColumnId: string) {
     if (!dragInfo) return;
-    const { taskId, sourceColumnId } = dragInfo;
+    const { emailId, sourceColumnId } = dragInfo;
 
     if (sourceColumnId === targetColumnId) {
       setDragInfo(null);
@@ -40,21 +40,21 @@ export function KanbanBoard() {
 
     setColumns((prev) => {
       const sourceColumn = prev.find((c) => c.id === sourceColumnId);
-      const task = sourceColumn?.tasks.find((t) => t.taskId === taskId);
-      if (!task) return prev;
+      const email = sourceColumn?.emails.find((e) => e.id === emailId);
+      if (!email) return prev;
 
       return prev.map((col) => {
         if (col.id === sourceColumnId) {
           return {
             ...col,
-            tasks: col.tasks.filter((t) => t.taskId !== taskId),
+            emails: col.emails.filter((e) => e.id !== emailId),
             count: col.count - 1,
           };
         }
         if (col.id === targetColumnId) {
           return {
             ...col,
-            tasks: [task, ...col.tasks],
+            emails: [email, ...col.emails],
             count: col.count + 1,
           };
         }
@@ -68,13 +68,13 @@ export function KanbanBoard() {
   return (
     <div className="flex h-full items-stretch gap-4">
       {columns.map((column) => (
-        <KanbanColumn
+        <EmailsKanbanColumn
           key={column.id}
           column={column}
-          draggingTaskId={dragInfo?.taskId ?? null}
-          onDragStartTask={handleDragStartTask}
-          onDragEndTask={handleDragEndTask}
-          onDropTask={handleDropTask}
+          draggingEmailId={dragInfo?.emailId ?? null}
+          onDragStartEmail={handleDragStartEmail}
+          onDragEndEmail={handleDragEndEmail}
+          onDropEmail={handleDropEmail}
         />
       ))}
     </div>
