@@ -88,14 +88,14 @@ export function ActivityToolbar({
 
   return (
     <div className="mb-2">
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-slate-200 px-1">
+      {/* Tabs - Added horizontal scrollable container for mobile */}
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200 px-1 scrollbar-none">
         {tabs.map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => setActiveTab(tab)}
-            className={`-mb-px rounded-t-md px-3 py-2 text-sm font-medium transition-colors ${
+            className={`whitespace-nowrap -mb-px rounded-t-md px-3 py-2 text-sm font-medium transition-colors ${
               activeTab === tab
                 ? "border-b-2 border-indigo-600 bg-indigo-50 text-indigo-700"
                 : "text-slate-500 hover:text-slate-700"
@@ -107,15 +107,15 @@ export function ActivityToolbar({
         <button
           type="button"
           aria-label="More tabs"
-          className="px-2 py-2 text-slate-400 hover:text-slate-600"
+          className="px-2 py-2 text-slate-400 hover:text-slate-600 shrink-0"
         >
           <MoreHorizontal className="h-4 w-4" />
         </button>
       </div>
 
-      {/* Toolbar row */}
+      {/* Toolbar row — wraps gracefully on small screens */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-1 py-2.5">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           <button
             type="button"
             onClick={onToggleFilter}
@@ -127,7 +127,7 @@ export function ActivityToolbar({
             }`}
           >
             <Filter className="h-4 w-4" />
-            Filter
+            <span className="hidden sm:inline">Filter</span>
           </button>
 
           <div className="flex items-center gap-1">
@@ -136,7 +136,7 @@ export function ActivityToolbar({
               className="flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900"
             >
               <ArrowUpDown className="h-4 w-4" />
-              Sort
+              <span className="hidden sm:inline">Sort</span>
             </button>
             {showSortClear && sortActive && (
               <button
@@ -150,7 +150,7 @@ export function ActivityToolbar({
             )}
           </div>
 
-          <span className="h-5 w-px bg-slate-200" />
+          <span className="hidden h-5 w-px bg-slate-200 sm:block" />
 
           {/* View switcher */}
           <div className="flex items-center gap-1">
@@ -205,9 +205,9 @@ export function ActivityToolbar({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-auto sm:ml-0">
           {/* Create split button */}
-          <div className="flex overflow-hidden rounded-lg bg-indigo-600">
+          <div className="flex overflow-hidden rounded-lg bg-indigo-600 text-xs sm:text-sm">
             <button
               type="button"
               onClick={() =>
@@ -215,9 +215,9 @@ export function ActivityToolbar({
                   `${createRoute}?layoutid=${DEFAULT_LAYOUT_ID}&redirect=false`,
                 )
               }
-              className="px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+              className="px-3 sm:px-4 py-2 font-medium text-white hover:bg-indigo-700 whitespace-nowrap"
             >
-              Create {entityLabel}
+              Create <span className="hidden md:inline">{entityLabel}</span>
             </button>
             <button
               type="button"
@@ -295,7 +295,7 @@ export function ActivityToolbar({
         </div>
       </div>
 
-      {/* Saved view selector — only rendered when savedViews is provided */}
+      {/* Saved view selector */}
       {savedViews && savedViews.length > 0 && (
         <div className="flex items-center gap-2 px-1 py-2.5">
           <div className="relative">
