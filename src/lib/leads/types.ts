@@ -29,8 +29,6 @@ export interface KanbanColumn {
   cards: ContactCardData[];
 }
 
-/** A column's `title` doubles as its status value — this is what the filter
- * panel's "Status" section filters against. */
 export const LEAD_STATUSES = [
   "Contacted",
   "Not Contacted",
