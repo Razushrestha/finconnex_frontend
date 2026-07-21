@@ -46,7 +46,7 @@ const dashboardItems: NavItem[] = [
     label: "Sales",
     icon: BadgePercent,
     children: [
-      { label: "Leads", href: "/sales" },
+      { label: "Leads", href: "/sales/leads" },
       { label: "Contacts", href: "/sales/contacts" },
       { label: "Deals", href: "/sales/deals" },
     ],
