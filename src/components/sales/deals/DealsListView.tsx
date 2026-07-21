@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import {
-  DollarSign,
   Building2,
   Calendar,
   MoreVertical,
@@ -104,7 +103,6 @@ export function DealsListView({
                 {/* Value */}
                 <td className="px-5 py-1 whitespace-nowrap font-medium text-slate-900">
                   <div className="flex items-center gap-1.5">
-                    <DollarSign className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                     <span>{deal.value}</span>
                   </div>
                 </td>

@@ -9,6 +9,7 @@ import {
   EMPTY_LEAD_FILTERS,
   type LeadFilters,
 } from "@/components/sales/leads/FilterLeadsPanel";
+import { LEAD_COLUMNS } from "@/lib/leads/types";
 
 export default function LeadsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -26,12 +27,17 @@ export default function LeadsPage() {
     });
   }
 
+  const totalLeads = LEAD_COLUMNS.reduce(
+    (sum, column) => sum + column.cards.length,
+    0,
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 p-2 pr-4">
       <EntityHeader
         entityLabel="Lead"
         createRoute="/sales/leads/create"
-        totalCount={125}
+        totalCount={totalLeads}
         viewMode={viewMode}
         onViewChange={setViewMode}
         isFilterOpen={isFilterOpen}

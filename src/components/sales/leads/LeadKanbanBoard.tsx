@@ -1,126 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  Plus,
-  MoreVertical,
-  DollarSign,
-  Mail,
-  Phone,
-  MapPin,
-  PhoneCall,
-  RefreshCw,
-  Layers,
-  Globe,
-} from "lucide-react";
-import {
-  LEAD_COLUMNS,
-  type ContactCardData,
-  type KanbanColumn,
-} from "@/lib/leads/types";
+import { Plus, MoreVertical } from "lucide-react";
+import { LEAD_COLUMNS, type KanbanColumn } from "@/lib/leads/types";
 import type { LeadFilters } from "./FilterLeadsPanel";
-
-interface ContactCardProps {
-  card: ContactCardData;
-  isDragging: boolean;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragEnd: () => void;
-}
-
-function ContactCard({
-  card,
-  isDragging,
-  onDragStart,
-  onDragEnd,
-}: ContactCardProps) {
-  return (
-    <div
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      className={`w-full cursor-grab rounded-md border border-slate-200/80 bg-white p-4 shadow-2xs transition-all active:cursor-grabbing ${
-        isDragging ? "opacity-40" : "hover:shadow-md"
-      }`}
-    >
-      <div
-        className={`mb-3.5 h-1.5 w-full rounded-full ${card.accentColorClass}`}
-      />
-
-      <div className="mb-3.5 flex items-center gap-3">
-        <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${card.avatarBgClass}`}
-        >
-          {card.initials}
-        </div>
-        <h3 className="text-sm font-semibold text-slate-800 truncate">
-          {card.name}
-        </h3>
-      </div>
-
-      {/* Details List */}
-      <div className="space-y-2 text-xs text-slate-500">
-        <div className="flex items-center gap-2">
-          <DollarSign className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-          <span className="font-medium text-slate-700">{card.amount}</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Mail className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-          <span className="truncate">{card.email}</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Phone className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-          <span>{card.phone}</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-          <span>{card.location}</span>
-        </div>
-      </div>
-
-      <div className="my-3.5 border-t border-slate-100" />
-
-      {/* Footer Actions */}
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          aria-label="Status icon"
-          className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-100 bg-slate-50 text-blue-600 shadow-2xs hover:bg-slate-100 transition-colors"
-        >
-          <Globe className="h-3.5 w-3.5" />
-        </button>
-
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            aria-label="Call"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-          >
-            <PhoneCall className="h-3.5 w-3.5" />
-          </button>
-
-          <button
-            type="button"
-            aria-label="Refresh / Sync"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-          </button>
-
-          <button
-            type="button"
-            aria-label="Layers / Options"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-          >
-            <Layers className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { LeadCard } from "./LeadCard";
 
 interface DragInfo {
   cardId: string;
@@ -128,7 +12,6 @@ interface DragInfo {
 }
 
 interface LeadKanbanBoardProps {
-  /** When omitted (or both arrays empty), every column/card is shown. */
   filters?: LeadFilters;
 }
 
@@ -137,9 +20,6 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const [overColumnId, setOverColumnId] = useState<string | null>(null);
 
-  // Filtering only changes what's rendered — the underlying `columns` state
-  // (and therefore card positions) is untouched, so toggling a filter off
-  // doesn't lose any drag-and-drop moves made while it was on.
   const visibleColumns = useMemo(() => {
     const hasStatusFilter = !!filters?.statuses.length;
     const hasSourceFilter = !!filters?.sources.length;
@@ -183,8 +63,15 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
 
     setColumns((prev) => {
       const sourceColumn = prev.find((col) => col.id === sourceColumnId);
+      const targetColumn = prev.find((col) => col.id === targetColumnId);
       const card = sourceColumn?.cards.find((c) => c.id === cardId);
-      if (!card) return prev;
+
+      if (!card || !targetColumn) return prev;
+
+      const updatedCard = {
+        ...card,
+        accentColorClass: targetColumn.dotColorClass,
+      };
 
       return prev.map((col) => {
         if (col.id === sourceColumnId) {
@@ -197,7 +84,7 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
         if (col.id === targetColumnId) {
           return {
             ...col,
-            cards: [card, ...col.cards],
+            cards: [updatedCard, ...col.cards],
             leadCount: col.leadCount + 1,
           };
         }
@@ -274,7 +161,7 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
               {/* Cards Stack */}
               <div className="flex flex-col gap-3">
                 {column.cards.map((card) => (
-                  <ContactCard
+                  <LeadCard
                     key={card.id}
                     card={card}
                     isDragging={dragInfo?.cardId === card.id}

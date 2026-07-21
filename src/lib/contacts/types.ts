@@ -27,8 +27,6 @@ export interface ContactGroup {
   contacts: ContactRecord[];
 }
 
-/** A group's `title` doubles as its type value — this is what the filter
- * panel's "Type" section filters against. */
 export const CONTACT_TYPES = [
   "Customer",
   "Prospect",
