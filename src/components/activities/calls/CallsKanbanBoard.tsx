@@ -66,7 +66,7 @@ export function CallsKanbanBoard() {
   }
 
   return (
-    <div className="flex h-full items-stretch gap-4">
+    <div className="flex h-full min-h-0 gap-4 overflow-x-auto p-1">
       {columns.map((column) => (
         <CallsKanbanColumn
           key={column.id}

@@ -109,7 +109,7 @@ export function MessagesFilterPanel({ onClose }: CallsFilterPanelProps) {
       </div>
 
       {/* Sections */}
-      <div className="flex-1 overflow-y-auto px-3 py-2 [scrollbar-color:#94a3b8_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300">
+      <div className="flex-1 overflow-y-auto px-3 py-2 ">
         {filteredSections.map((section) => {
           const isCollapsed = collapsed[section.id];
           return (

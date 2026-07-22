@@ -21,6 +21,8 @@ import {
   LibraryBig,
   Calculator,
   Settings,
+  Menu,
+  X,
 } from "lucide-react";
 
 type NavChildItem = {
@@ -44,7 +46,7 @@ const dashboardItems: NavItem[] = [
     label: "Sales",
     icon: BadgePercent,
     children: [
-      { label: "Leads", href: "/sales" },
+      { label: "Leads", href: "/sales/leads" },
       { label: "Contacts", href: "/sales/contacts" },
       { label: "Deals", href: "/sales/deals" },
     ],
@@ -110,9 +112,16 @@ const workItems: NavItem[] = [
 interface SidebarProps {
   collapsed?: boolean;
   tenantName?: string;
+  mobileOpen?: boolean;
+  onMobileOpenChange?: (open: boolean) => void;
 }
 
-export function Sidebar({ collapsed = false, tenantName }: SidebarProps) {
+export function Sidebar({
+  collapsed = false,
+  tenantName,
+  mobileOpen: mobileOpenProp,
+  onMobileOpenChange,
+}: SidebarProps) {
   const pathname = usePathname();
 
   const [expanded, setExpanded] = React.useState<Set<string>>(() => {
@@ -125,6 +134,18 @@ export function Sidebar({ collapsed = false, tenantName }: SidebarProps) {
     return initial;
   });
 
+  const [internalMobileOpen, setInternalMobileOpen] = React.useState(false);
+  const mobileOpen = mobileOpenProp ?? internalMobileOpen;
+  const setMobileOpen = React.useCallback(
+    (open: boolean) => {
+      onMobileOpenChange?.(open);
+      if (mobileOpenProp === undefined) {
+        setInternalMobileOpen(open);
+      }
+    },
+    [onMobileOpenChange, mobileOpenProp],
+  );
+
   const toggle = (label: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -133,158 +154,241 @@ export function Sidebar({ collapsed = false, tenantName }: SidebarProps) {
     });
   };
 
+  // Close the drawer on navigation so it never stays "open" after a link tap.
+  React.useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  // Close the drawer if the viewport grows past the md breakpoint while open.
+  React.useEffect(() => {
+    const mql = window.matchMedia("(min-width: 768px)");
+    const handleChange = () => setMobileOpen(false);
+    mql.addEventListener("change", handleChange);
+    return () => mql.removeEventListener("change", handleChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Prevent background scroll while the mobile drawer is open.
+  React.useEffect(() => {
+    if (!mobileOpen) return;
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = original;
+    };
+  }, [mobileOpen]);
+
+  // Icon-only rail only applies on md+; the mobile drawer always shows labels.
+  const hideLabel = collapsed ? "md:hidden" : undefined;
+  const iconOnly = collapsed ? "md:justify-center md:px-0" : undefined;
+
   return (
-    <aside
-      className={cn(
-        "sticky top-0 left-0 flex h-screen shrink-0 flex-col bg-white py-6 transition-[width] duration-200",
-        collapsed ? "w-[72px] px-3" : "w-64 px-5",
+    <>
+      {/* Mobile trigger — hidden once the drawer is open (drawer has its own close button) */}
+      {!mobileOpen && (
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open menu"
+          className="fixed left-3 top-3 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-600 shadow-md md:hidden"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
       )}
-    >
-      <Link
-        href="/"
+
+      {/* Backdrop, mobile only */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+          className="fixed inset-0 z-40 bg-gray-900/50 md:hidden"
+        />
+      )}
+
+      <aside
         className={cn(
-          "mb-2 px-1 text-xl font-semibold text-gray-900",
-          collapsed && "text-center text-base",
+          // Mobile: fixed off-canvas drawer, slides in from the left.
+          "fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[85vw] shrink-0 flex-col overflow-hidden bg-white px-5 py-6 shadow-xl transition-transform duration-200 ease-in-out",
+          mobileOpen ? "translate-x-0" : "-translate-x-full",
+          // Desktop (md+): back to a normal in-flow sticky sidebar, width driven by `collapsed`.
+          "md:sticky md:top-0 md:z-0 md:w-64 md:max-w-none md:translate-x-0 md:shadow-none md:transition-[width]",
+          collapsed && "md:w-[72px] md:px-3",
         )}
       >
-        {collapsed ? "FinC" : "FinConnex"}
-      </Link>
+        <div className="mb-2 flex items-center justify-between px-1">
+          <Link
+            href="/"
+            className={cn(
+              "text-xl font-semibold text-gray-900",
+              collapsed && "md:text-base",
+            )}
+          >
+            <span className={collapsed ? "md:hidden" : undefined}>
+              FinConnex
+            </span>
+            {collapsed && <span className="hidden md:inline">FinC</span>}
+          </Link>
 
-      {!collapsed && tenantName && (
-        <p className="mb-6 truncate px-1 text-xs text-gray-400">{tenantName}</p>
-      )}
-      {collapsed && <div className="mb-6" />}
+          <button
+            type="button"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Close menu"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-50 md:hidden"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
 
-      {/* Dashboard section */}
-      {!collapsed && (
-        <div className="mb-2 px-1">
+        {tenantName && (
+          <p
+            className={cn(
+              "mb-6 truncate px-1 text-xs text-gray-400",
+              hideLabel,
+            )}
+          >
+            {tenantName}
+          </p>
+        )}
+        {collapsed && <div className="hidden md:mb-6 md:block" />}
+
+        {/* Dashboard section */}
+        <div className={cn("mb-2 px-1", hideLabel)}>
           <span className="text-[11px] font-semibold tracking-wider text-violet-600">
             DASHBOARD
           </span>
         </div>
-      )}
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto no-scrollbar">
-        <nav className="flex flex-col gap-0.5">
-          {dashboardItems.map((item) => {
-            const hasChildren = !!item.children?.length;
-            const isActive =
-              (item.href && pathname === item.href) ||
-              (hasChildren &&
-                item.children!.some((c) => pathname.startsWith(c.href)));
-            const isOpen = expanded.has(item.label);
-            const Icon = item.icon!;
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto no-scrollbar">
+          <nav className="flex flex-col gap-0.5">
+            {dashboardItems.map((item) => {
+              const hasChildren = !!item.children?.length;
+              const isActive =
+                (item.href && pathname === item.href) ||
+                (hasChildren &&
+                  item.children!.some((c) => pathname.startsWith(c.href)));
+              const isOpen = expanded.has(item.label);
+              const Icon = item.icon!;
 
-            return (
-              <div key={item.label}>
-                {hasChildren ? (
-                  <button
-                    type="button"
-                    onClick={() => toggle(item.label)}
-                    title={collapsed ? item.label : undefined}
+              return (
+                <div key={item.label}>
+                  {hasChildren ? (
+                    <button
+                      type="button"
+                      onClick={() => toggle(item.label)}
+                      title={collapsed ? item.label : undefined}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm transition-colors md:py-2",
+                        iconOnly,
+                        isActive
+                          ? "text-violet-600 font-medium"
+                          : "text-gray-700 hover:bg-gray-50",
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          "h-[18px] w-[18px] shrink-0",
+                          isActive ? "text-violet-600" : "text-gray-500",
+                        )}
+                        strokeWidth={1.75}
+                      />
+                      <span className={cn("flex-1 text-left", hideLabel)}>
+                        {item.label}
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform",
+                          isOpen && "rotate-180",
+                          hideLabel,
+                        )}
+                      />
+                    </button>
+                  ) : (
+                    <Link
+                      href={item.href!}
+                      title={collapsed ? item.label : undefined}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm transition-colors md:py-2",
+                        iconOnly,
+                        isActive
+                          ? "text-violet-600 font-medium"
+                          : "text-gray-700 hover:bg-gray-50",
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          "h-[18px] w-[18px] shrink-0",
+                          isActive ? "text-violet-600" : "text-gray-500",
+                        )}
+                        strokeWidth={1.75}
+                      />
+                      <span className={hideLabel}>{item.label}</span>
+                    </Link>
+                  )}
+
+                  {hasChildren && isOpen && (
+                    <div
+                      className={cn(
+                        "ml-[27px] flex flex-col gap-0.5 border-l border-gray-100 pl-3.5",
+                        collapsed && "md:hidden",
+                      )}
+                    >
+                      {item.children!.map((child) => {
+                        const childActive = pathname === child.href;
+                        return (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            className={cn(
+                              "rounded-lg px-2.5 py-2 text-sm transition-colors md:py-1.5",
+                              childActive
+                                ? "text-violet-600 font-medium"
+                                : "text-gray-600 hover:bg-gray-50",
+                            )}
+                          >
+                            {child.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+
+          <div className="my-4 border-t border-gray-100" />
+
+          <nav className="flex flex-col gap-0.5">
+            {workItems.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href!}
+                title={collapsed ? item.label : undefined}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 md:py-2",
+                  iconOnly,
+                )}
+              >
+                <span
+                  className={cn("h-4 w-4 shrink-0 rounded-[5px]", item.swatch)}
+                />
+                <span className={cn("flex-1", hideLabel)}>{item.label}</span>
+                {item.badge && (
+                  <Badge
                     className={cn(
-                      "flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors",
-                      collapsed && "justify-center px-0",
-                      isActive
-                        ? "text-violet-600 font-medium"
-                        : "text-gray-700 hover:bg-gray-50",
+                      "bg-emerald-500 px-2 py-0 text-[11px] font-medium text-white hover:bg-emerald-500",
+                      hideLabel,
                     )}
                   >
-                    <Icon
-                      className={cn(
-                        "h-[18px] w-[18px] shrink-0",
-                        isActive ? "text-violet-600" : "text-gray-500",
-                      )}
-                      strokeWidth={1.75}
-                    />
-                    {!collapsed && (
-                      <>
-                        <span className="flex-1 text-left">{item.label}</span>
-                        <ChevronDown
-                          className={cn(
-                            "h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform",
-                            isOpen && "rotate-180",
-                          )}
-                        />
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <Link
-                    href={item.href!}
-                    title={collapsed ? item.label : undefined}
-                    className={cn(
-                      "flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition-colors",
-                      collapsed && "justify-center px-0",
-                      isActive
-                        ? "text-violet-600 font-medium"
-                        : "text-gray-700 hover:bg-gray-50",
-                    )}
-                  >
-                    <Icon
-                      className={cn(
-                        "h-[18px] w-[18px] shrink-0",
-                        isActive ? "text-violet-600" : "text-gray-500",
-                      )}
-                      strokeWidth={1.75}
-                    />
-                    {!collapsed && item.label}
-                  </Link>
+                    {item.badge}
+                  </Badge>
                 )}
-
-                {hasChildren && !collapsed && isOpen && (
-                  <div className="ml-[27px] flex flex-col gap-0.5 border-l border-gray-100 pl-3.5">
-                    {item.children!.map((child) => {
-                      const childActive = pathname === child.href;
-                      return (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          className={cn(
-                            "rounded-lg px-2.5 py-1.5 text-sm transition-colors",
-                            childActive
-                              ? "text-violet-600 font-medium"
-                              : "text-gray-600 hover:bg-gray-50",
-                          )}
-                        >
-                          {child.label}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </nav>
-
-        <div className="my-4 border-t border-gray-100" />
-
-        <nav className="flex flex-col gap-0.5">
-          {workItems.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href!}
-              title={collapsed ? item.label : undefined}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm text-gray-700 hover:bg-gray-50",
-                collapsed && "justify-center px-0",
-              )}
-            >
-              <span
-                className={cn("h-4 w-4 shrink-0 rounded-[5px]", item.swatch)}
-              />
-              {!collapsed && <span className="flex-1">{item.label}</span>}
-              {!collapsed && item.badge && (
-                <Badge className="bg-emerald-500 px-2 py-0 text-[11px] font-medium text-white hover:bg-emerald-500">
-                  {item.badge}
-                </Badge>
-              )}
-            </Link>
-          ))}
-        </nav>
-      </div>
-    </aside>
+              </Link>
+            ))}
+          </nav>
+        </div>
+      </aside>
+    </>
   );
 }
 
