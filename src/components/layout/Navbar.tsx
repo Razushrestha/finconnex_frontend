@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -21,7 +23,6 @@ import { SearchModal } from "@/components/layout/SearchModal";
 
 interface NavbarProps {
   onToggleSidebar?: () => void;
-  /** Opens the mobile drawer (shown < md instead of the desktop collapse button). */
   onOpenMobileMenu?: () => void;
   collapsed?: boolean;
   newLeadsCount?: number;
@@ -41,11 +42,16 @@ export function Navbar({
   newLeadsCount = 27,
   user = { name: "John Smith", role: "Manager" },
 }: NavbarProps) {
-  const [theme, setTheme] = React.useState<"light" | "dark">("light");
+  const router = useRouter();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
+
+  // Avoid hydration mismatch — theme isn't known until mounted on the client
+  React.useEffect(() => setMounted(true), []);
 
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -69,14 +75,15 @@ export function Navbar({
     }
   }
 
+  const activeTheme = mounted ? theme : "light";
+
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center gap-2 bg-white px-3 sm:gap-3 sm:px-4 md:gap-4">
-      {/* Desktop: collapse the in-flow sidebar rail */}
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center gap-2 bg-background px-3 sm:gap-3 sm:px-4 md:gap-4">
       <button
         type="button"
         onClick={onToggleSidebar}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 md:flex"
+        className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted md:flex"
       >
         <ChevronsLeft
           className={cn(
@@ -91,7 +98,7 @@ export function Navbar({
         type="button"
         onClick={onOpenMobileMenu}
         aria-label="Open menu"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 md:hidden"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted md:hidden"
       >
         <Menu className="h-5 w-5" />
       </button>
@@ -100,10 +107,10 @@ export function Navbar({
         type="button"
         onClick={() => setSearchOpen(true)}
         aria-label="Search"
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 sm:w-auto sm:flex-1 sm:max-w-xs sm:justify-start sm:gap-2 sm:px-4"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted sm:w-auto sm:flex-1 sm:max-w-xs sm:justify-start sm:gap-2 sm:px-4"
       >
-        <Search className="h-4 w-4 shrink-0 text-gray-400" />
-        <span className="hidden w-full truncate text-left text-sm text-gray-400 sm:inline">
+        <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <span className="hidden w-full truncate text-left text-sm text-muted-foreground sm:inline">
           Search anything&apos;s
         </span>
       </button>
@@ -111,33 +118,35 @@ export function Navbar({
       <SearchModal open={searchOpen} onOpenChange={setSearchOpen} />
 
       {user.tenantName && (
-        <div className="hidden h-10 shrink-0 items-center gap-2 rounded-full border border-violet-100 bg-violet-50 px-4 lg:flex">
-          <Building2 className="h-3.5 w-3.5 text-violet-600" />
-          <span className="max-w-[140px] truncate text-sm font-medium text-violet-700">
+        <div className="hidden h-10 shrink-0 items-center gap-2 rounded-full border border-violet-100 bg-violet-50 px-4 lg:flex dark:border-violet-900 dark:bg-violet-950">
+          <Building2 className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+          <span className="max-w-[140px] truncate text-sm font-medium text-violet-700 dark:text-violet-300">
             {user.tenantName}
           </span>
         </div>
       )}
 
-      <div className="hidden h-10 shrink-0 items-center gap-2 rounded-full border border-gray-200 px-4 md:flex">
-        <span className="text-sm font-medium text-gray-800 whitespace-nowrap">
+      <div className="hidden h-10 shrink-0 items-center gap-2 rounded-full border border-border px-4 md:flex">
+        <span className="text-sm font-medium text-foreground whitespace-nowrap">
           Today New Leads
         </span>
-        <Badge className="rounded-full bg-violet-100 px-2 py-0 text-xs font-semibold text-violet-600 hover:bg-violet-100">
+        <Badge className="rounded-full bg-violet-100 px-2 py-0 text-xs font-semibold text-violet-600 hover:bg-violet-100 dark:bg-violet-900 dark:text-violet-300">
           {newLeadsCount}
         </Badge>
       </div>
 
       <div className="flex-1" />
 
-      <div className="hidden h-10 shrink-0 items-center gap-1 rounded-full bg-gray-100 p-1 sm:flex">
+      <div className="hidden h-10 shrink-0 items-center gap-1 rounded-full bg-muted p-1 sm:flex">
         <button
           type="button"
           onClick={() => setTheme("light")}
           aria-label="Light mode"
           className={cn(
             "flex h-8 w-8 items-center justify-center rounded-full",
-            theme === "light" ? "bg-white shadow-sm" : "text-gray-400",
+            activeTheme === "light"
+              ? "bg-background shadow-sm text-foreground"
+              : "text-muted-foreground",
           )}
         >
           <Sun className="h-4 w-4" />
@@ -148,7 +157,9 @@ export function Navbar({
           aria-label="Dark mode"
           className={cn(
             "flex h-8 w-8 items-center justify-center rounded-full",
-            theme === "dark" ? "bg-white shadow-sm" : "text-gray-400",
+            activeTheme === "dark"
+              ? "bg-background shadow-sm text-foreground"
+              : "text-muted-foreground",
           )}
         >
           <Moon className="h-4 w-4" />
@@ -159,7 +170,7 @@ export function Navbar({
         <button
           type="button"
           aria-label="Messages"
-          className="relative flex h-9 w-9 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 sm:h-10 sm:w-10"
+          className="relative flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted sm:h-10 sm:w-10"
         >
           <MessageSquare className="h-[18px] w-[18px]" />
           <span className="absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full bg-violet-600" />
@@ -167,14 +178,14 @@ export function Navbar({
         <button
           type="button"
           aria-label="Notifications"
-          className="flex h-9 w-9 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 sm:h-10 sm:w-10"
+          className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted sm:h-10 sm:w-10"
         >
           <Bell className="h-[18px] w-[18px]" />
         </button>
         <button
           type="button"
           aria-label="Calendar"
-          className="hidden h-10 w-10 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 sm:flex"
+          className="hidden h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-muted sm:flex"
         >
           <Calendar className="h-[18px] w-[18px]" />
         </button>
@@ -184,11 +195,11 @@ export function Navbar({
         <button
           type="button"
           onClick={() => setMenuOpen((v) => !v)}
-          className="flex shrink-0 items-center gap-2 rounded-full pl-1 hover:bg-gray-50 sm:pl-2"
+          className="flex shrink-0 items-center gap-2 rounded-full pl-1 hover:bg-muted sm:pl-2"
         >
           <div className="hidden text-right leading-tight lg:block">
-            <p className="text-sm font-semibold text-gray-900">{user.name}</p>
-            <span className="flex items-center justify-end gap-1 text-xs text-gray-500">
+            <p className="text-sm font-semibold text-foreground">{user.name}</p>
+            <span className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
               <ChevronDown
                 className={cn(
                   "h-3 w-3 transition-transform",
@@ -208,19 +219,23 @@ export function Navbar({
                   .join("")}
               </AvatarFallback>
             </Avatar>
-            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
+            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-card bg-emerald-500" />
           </div>
         </button>
 
         {menuOpen && (
-          <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1.5rem)] rounded-xl border border-gray-100 bg-white py-1 shadow-lg">
-            <div className="border-b border-gray-100 px-4 py-3">
-              <p className="text-sm font-semibold text-gray-900">{user.name}</p>
+          <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-1.5rem)] rounded-xl border border-border bg-card py-1 shadow-lg">
+            <div className="border-b border-border px-4 py-3">
+              <p className="text-sm font-semibold text-foreground">
+                {user.name}
+              </p>
               {user.email && (
-                <p className="truncate text-xs text-gray-500">{user.email}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {user.email}
+                </p>
               )}
               {user.tenantName && (
-                <p className="mt-1 truncate text-xs text-violet-600">
+                <p className="mt-1 truncate text-xs text-violet-600 dark:text-violet-400">
                   {user.tenantName}
                 </p>
               )}
@@ -229,7 +244,7 @@ export function Navbar({
               type="button"
               onClick={handleLogout}
               disabled={isLoggingOut}
-              className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-950"
             >
               <LogOut className="h-4 w-4" />
               {isLoggingOut ? "Signing out..." : "Sign out"}
