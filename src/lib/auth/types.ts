@@ -22,8 +22,7 @@ export interface SessionPayload {
 }
 
 export interface LoginCredentials {
-  tenantSlug: string;
-  email: string;
+  username: string;
   password: string;
   rememberMe?: boolean;
 }

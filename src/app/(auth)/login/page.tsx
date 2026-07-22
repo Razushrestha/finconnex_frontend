@@ -107,7 +107,7 @@ export default function LoginPage() {
                 Welcome back
               </h2>
               <p className="mt-1 text-sm text-gray-500">
-                Click below to continue to your dashboard
+                Enter your username and password to continue
               </p>
             </div>
 

@@ -9,6 +9,7 @@ export default async function DashboardLayout({
 }) {
   const session = await getSession();
 
+  // No session → never render dashboard chrome; send to login
   if (!session) {
     redirect("/login");
   }

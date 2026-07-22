@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { getAuthSecretKey, SESSION_COOKIE } from "@/lib/auth/constants";
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = new Set(["/login"]);
 
 async function isAuthenticated(request: NextRequest): Promise<boolean> {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
@@ -17,25 +17,33 @@ async function isAuthenticated(request: NextRequest): Promise<boolean> {
   }
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const authenticated = await isAuthenticated(request);
 
+  // Auth API routes handle their own logic
   if (pathname.startsWith("/api/auth")) {
     return NextResponse.next();
   }
 
-  if (PUBLIC_PATHS.some((path) => pathname === path)) {
-    if (authenticated) {
-      return NextResponse.redirect(new URL("/", request.url));
+  const authenticated = await isAuthenticated(request);
+  const isPublicPath = PUBLIC_PATHS.has(pathname);
+
+  // Logged-out users may only see the login page
+  if (!authenticated) {
+    if (isPublicPath) {
+      return NextResponse.next();
     }
-    return NextResponse.next();
+
+    const loginUrl = new URL("/login", request.url);
+    if (pathname !== "/") {
+      loginUrl.searchParams.set("callbackUrl", pathname);
+    }
+    return NextResponse.redirect(loginUrl);
   }
 
-  if (!authenticated) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(loginUrl);
+  // Logged-in users should not stay on the login page — send them to the dashboard
+  if (isPublicPath) {
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   return NextResponse.next();

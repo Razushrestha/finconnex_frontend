@@ -312,17 +312,22 @@ function SalesPipelineOverviewCard() {
   );
 }
 
-export function DashboardAnalyticsSection() {
+export function DashboardChartRow() {
   return (
-    <>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="lg:col-span-2">
         <RevenueCard />
-        <RetentionRateCard />
       </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <DealsOverviewCard />
-        <SalesPipelineOverviewCard />
-      </div>
-    </>
+      <RetentionRateCard />
+    </div>
+  );
+}
+
+export function DashboardDealsRow() {
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <DealsOverviewCard />
+      <SalesPipelineOverviewCard />
+    </div>
   );
 }

@@ -67,9 +67,9 @@ export function Navbar({
     setIsLoggingOut(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
-      router.push("/login");
-      router.refresh();
-    } finally {
+      // Hard navigation so login loads without any leftover dashboard state
+      window.location.assign("/login");
+    } catch {
       setIsLoggingOut(false);
       setMenuOpen(false);
     }
