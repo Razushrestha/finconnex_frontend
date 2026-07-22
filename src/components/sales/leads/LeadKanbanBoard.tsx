@@ -97,7 +97,7 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
 
   return (
     <div className="w-full overflow-x-auto bg-slate-50/50">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 min-w-[1100px] items-start">
+      <div className="grid min-w-[1300px] grid-cols-1 items-start gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {visibleColumns.map((column) => {
           const isOver = overColumnId === column.id;
 

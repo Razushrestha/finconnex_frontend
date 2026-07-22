@@ -40,8 +40,11 @@ export function KanbanBoard() {
 
     setColumns((prev) => {
       const sourceColumn = prev.find((c) => c.id === sourceColumnId);
+      const targetColumn = prev.find((c) => c.id === targetColumnId);
       const task = sourceColumn?.tasks.find((t) => t.taskId === taskId);
-      if (!task) return prev;
+      if (!task || !targetColumn) return prev;
+
+      const moved = { ...task, status: targetColumn.title };
 
       return prev.map((col) => {
         if (col.id === sourceColumnId) {
@@ -54,7 +57,7 @@ export function KanbanBoard() {
         if (col.id === targetColumnId) {
           return {
             ...col,
-            tasks: [task, ...col.tasks],
+            tasks: [moved, ...col.tasks],
             count: col.count + 1,
           };
         }

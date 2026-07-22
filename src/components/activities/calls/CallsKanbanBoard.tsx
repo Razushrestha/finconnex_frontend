@@ -40,8 +40,11 @@ export function CallsKanbanBoard() {
 
     setColumns((prev) => {
       const sourceColumn = prev.find((c) => c.id === sourceColumnId);
+      const targetColumn = prev.find((c) => c.id === targetColumnId);
       const call = sourceColumn?.calls.find((c) => c.id === callId);
-      if (!call) return prev;
+      if (!call || !targetColumn) return prev;
+
+      const moved = { ...call, status: targetColumn.title };
 
       return prev.map((col) => {
         if (col.id === sourceColumnId) {
@@ -54,7 +57,7 @@ export function CallsKanbanBoard() {
         if (col.id === targetColumnId) {
           return {
             ...col,
-            calls: [call, ...col.calls],
+            calls: [moved, ...col.calls],
             count: col.count + 1,
           };
         }

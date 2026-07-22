@@ -10,13 +10,12 @@ import {
   ChevronsRight,
 } from "lucide-react";
 import { taskColumns, type Task } from "@/lib/tasks/types";
+import { formatRelatedTo } from "@/lib/activities/shared";
 
 interface FlatTask extends Task {
-  status: string;
   statusColorClass: string;
 }
 
-// Flattening task data for list view
 const flatTasks: FlatTask[] = taskColumns.flatMap((column) =>
   column.tasks.map((task) => ({
     ...task,
@@ -27,12 +26,13 @@ const flatTasks: FlatTask[] = taskColumns.flatMap((column) =>
 
 const columns = [
   { key: "taskId", label: "Task ID", sortable: true },
-  { key: "title", label: "Title", sortable: true },
-  { key: "category", label: "Category", sortable: false },
-  { key: "project", label: "Project", sortable: true },
+  { key: "title", label: "Task Name", sortable: true },
+  { key: "taskType", label: "Type", sortable: true },
+  { key: "priority", label: "Priority", sortable: true },
+  { key: "relatedTo", label: "Related To", sortable: false },
   { key: "dueDate", label: "Due Date", sortable: true },
   { key: "status", label: "Status", sortable: false },
-  { key: "assignee", label: "Assignee", sortable: false },
+  { key: "assignedTo", label: "Assigned To", sortable: true },
 ] as const;
 
 export function TaskListView() {
@@ -43,28 +43,32 @@ export function TaskListView() {
     direction: "asc" | "desc";
   } | null>(null);
 
-  const itemsPerPage = 6;
+  const itemsPerPage = 8;
 
-  // Search and Sort Logic
   const processedData = useMemo(() => {
     let data = [...flatTasks];
 
-    // Search
     if (search) {
+      const q = search.toLowerCase();
       data = data.filter(
         (t) =>
-          t.title.toLowerCase().includes(search.toLowerCase()) ||
-          t.taskId.toLowerCase().includes(search.toLowerCase()) ||
-          t.project.toLowerCase().includes(search.toLowerCase()),
+          t.title.toLowerCase().includes(q) ||
+          t.taskId.toLowerCase().includes(q) ||
+          t.assignedTo.toLowerCase().includes(q) ||
+          formatRelatedTo(t.relatedTo).toLowerCase().includes(q),
       );
     }
 
     if (sortConfig) {
-      data.sort((a: any, b: any) => {
-        if (a[sortConfig.key] < b[sortConfig.key])
-          return sortConfig.direction === "asc" ? -1 : 1;
-        if (a[sortConfig.key] > b[sortConfig.key])
-          return sortConfig.direction === "asc" ? 1 : -1;
+      data.sort((a, b) => {
+        const av = String(
+          (a as unknown as Record<string, unknown>)[sortConfig.key] ?? "",
+        );
+        const bv = String(
+          (b as unknown as Record<string, unknown>)[sortConfig.key] ?? "",
+        );
+        if (av < bv) return sortConfig.direction === "asc" ? -1 : 1;
+        if (av > bv) return sortConfig.direction === "asc" ? 1 : -1;
         return 0;
       });
     }
@@ -97,146 +101,139 @@ export function TaskListView() {
 
   return (
     <div className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
-      {/* Search Input */}
-      <div className="mb-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 focus-within:bg-white focus-within:ring-2 focus-within:ring-violet-500/20">
-        <Search className="h-4 w-4 text-slate-400" />
-        <input
-          type="text"
-          placeholder="Search by title, ID, or project..."
-          className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="relative max-w-sm flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search tasks…"
+            className="h-9 w-full rounded-xl border border-slate-200 bg-white pr-3 pl-9 text-[12px] outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
+          />
+        </div>
+        <p className="text-[11px] text-slate-400">
+          {processedData.length} tasks
+        </p>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto pb-3">
-        <table className="w-full min-w-[900px] border-collapse text-left text-sm">
-          <thead>
-            <tr className="bg-slate-50 text-slate-500">
-              {columns.map((col, idx) => (
-                <th
-                  key={col.key}
-                  className="px-4 py-3 font-medium first:rounded-l-lg last:rounded-r-lg"
-                >
-                  <button
-                    onClick={() => col.sortable && handleSort(col.key)}
-                    className="flex items-center gap-1.5 hover:text-slate-800 transition-colors"
-                  >
-                    {col.label}
-                    {col.sortable && (
-                      <ArrowUpDown className="h-3 w-3 text-slate-400" />
-                    )}
-                  </button>
+      <div className="min-h-0 flex-1 overflow-auto">
+        <table className="w-full min-w-[900px] text-left text-[12px]">
+          <thead className="sticky top-0 border-b border-slate-100 bg-slate-50/90 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+            <tr>
+              {columns.map((col) => (
+                <th key={col.key} className="px-3 py-2.5">
+                  {col.sortable ? (
+                    <button
+                      type="button"
+                      onClick={() => handleSort(col.key)}
+                      className="inline-flex items-center gap-1 hover:text-slate-700"
+                    >
+                      {col.label}
+                      <ArrowUpDown className="h-3 w-3" />
+                    </button>
+                  ) : (
+                    col.label
+                  )}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-50 text-slate-700">
             {paginatedData.map((task) => (
               <tr
                 key={task.taskId}
-                className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors"
+                className="transition-colors hover:bg-slate-50/80"
               >
-                <td className="px-4 py-3 font-medium text-slate-700">
+                <td className="px-3 py-2.5 font-medium text-slate-500">
                   {task.taskId}
                 </td>
-                <td className="px-4 py-3 font-medium text-slate-700">
+                <td className="px-3 py-2.5 font-semibold text-slate-900">
                   {task.title}
                 </td>
-                <td className="px-4 py-3 text-slate-500">{task.category}</td>
-                <td className="px-4 py-3 text-slate-500">{task.project}</td>
-                <td className="px-4 py-3">
-                  <span
-                    className={
-                      task.overdue
-                        ? "font-medium text-rose-500"
-                        : "text-slate-500"
-                    }
-                  >
-                    {task.dueDate ?? "—"}
-                  </span>
+                <td className="px-3 py-2.5">{task.taskType}</td>
+                <td className="px-3 py-2.5">{task.priority}</td>
+                <td className="px-3 py-2.5 text-slate-500">
+                  {formatRelatedTo(task.relatedTo)}
                 </td>
-                <td className="px-4 py-3">
+                <td
+                  className={`px-3 py-2.5 ${task.overdue ? "font-medium text-rose-500" : ""}`}
+                >
+                  {task.dueDate}
+                </td>
+                <td className="px-3 py-2.5">
                   <span
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${task.statusColorClass}`}
+                    className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${task.statusColorClass}`}
                   >
                     {task.status}
                   </span>
                 </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold ${task.assignee.colorClass}`}
-                  >
-                    {task.assignee.initials}
-                  </span>
+                <td className="px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold ${task.assignee.colorClass}`}
+                    >
+                      {task.assignee.initials}
+                    </span>
+                    {task.assignedTo}
+                  </div>
                 </td>
               </tr>
             ))}
-            {paginatedData.length === 0 && (
-              <tr>
-                <td
-                  colSpan={columns.length}
-                  className="px-4 py-8 text-center text-slate-400"
-                >
-                  No tasks found.
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>
 
-      {/* Pagination Footer */}
-      <div className="flex items-center justify-between border-t border-slate-100 pt-4">
-        <span className="text-xs text-slate-500">
-          Showing{" "}
-          <span className="font-semibold text-slate-700">
-            {(page - 1) * itemsPerPage + 1}
-          </span>{" "}
-          to{" "}
-          <span className="font-semibold text-slate-700">
-            {Math.min(page * itemsPerPage, processedData.length)}
-          </span>{" "}
-          of{" "}
-          <span className="font-semibold text-slate-700">
-            {processedData.length}
-          </span>{" "}
-          tasks
-        </span>
+      <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+        <p className="text-[11px] text-slate-400">
+          Page {page} of {totalPages}
+        </p>
         <div className="flex items-center gap-1">
-          <button
+          <PagerBtn
             onClick={() => setPage(1)}
             disabled={page === 1}
-            className="p-1.5 hover:bg-slate-100 rounded-lg disabled:opacity-30 transition-colors"
-          >
-            <ChevronsLeft className="h-4 w-4" />
-          </button>
-          <button
+            icon={<ChevronsLeft className="h-3.5 w-3.5" />}
+          />
+          <PagerBtn
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="p-1.5 hover:bg-slate-100 rounded-lg disabled:opacity-30 transition-colors"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
+            icon={<ChevronLeft className="h-3.5 w-3.5" />}
+          />
+          <PagerBtn
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
-            className="p-1.5 hover:bg-slate-100 rounded-lg disabled:opacity-30 transition-colors"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-          <button
+            icon={<ChevronRight className="h-3.5 w-3.5" />}
+          />
+          <PagerBtn
             onClick={() => setPage(totalPages)}
             disabled={page === totalPages}
-            className="p-1.5 hover:bg-slate-100 rounded-lg disabled:opacity-30 transition-colors"
-          >
-            <ChevronsRight className="h-4 w-4" />
-          </button>
+            icon={<ChevronsRight className="h-3.5 w-3.5" />}
+          />
         </div>
       </div>
     </div>
+  );
+}
+
+function PagerBtn({
+  onClick,
+  disabled,
+  icon,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  icon: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40"
+    >
+      {icon}
+    </button>
   );
 }

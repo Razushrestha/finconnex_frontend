@@ -93,7 +93,7 @@ export function DealsKanbanBoard({ pipeline, filters }: DealsKanbanBoardProps) {
 
   return (
     <div className="w-full overflow-x-auto bg-slate-50/50">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 min-w-[1100px] items-start">
+      <div className="grid min-w-[1400px] grid-cols-1 items-start gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {visibleStages.map((stage) => {
           const isOver = overStageId === stage.id;
 
@@ -149,10 +149,12 @@ export function DealsKanbanBoard({ pipeline, filters }: DealsKanbanBoardProps) {
                 </div>
               </div>
 
-              {/* Stage total value */}
-              <div className="mb-3 px-1 text-xs text-slate-500 font-medium">
+              <div className="mb-3 px-1 text-xs font-medium text-slate-500">
                 {stage.deals.length > 0
-                  ? `${stage.deals.length} deal${stage.deals.length === 1 ? "" : "s"}`
+                  ? `${stage.deals.length} deal${stage.deals.length === 1 ? "" : "s"} · avg ${Math.round(
+                      stage.deals.reduce((s, d) => s + d.probability, 0) /
+                        stage.deals.length,
+                    )}%`
                   : "No deals"}
               </div>
 

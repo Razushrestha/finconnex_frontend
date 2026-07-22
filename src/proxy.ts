@@ -3,7 +3,32 @@ import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { getAuthSecretKey, SESSION_COOKIE } from "@/lib/auth/constants";
 
-const PUBLIC_PATHS = new Set(["/login"]);
+/** Exact paths anyone can open (logged-out or logged-in). */
+const PUBLIC_EXACT = new Set(["/login"]);
+
+/**
+ * Prefixes for client-facing surfaces — must work without CRM login.
+ * Authenticated brokers may also open these (no force-redirect to dashboard).
+ */
+const PUBLIC_PREFIXES = [
+  "/p/", // Client portal
+  "/sign/", // E-signature
+  "/book/", // Public booking
+  "/f/", // Marketing forms
+  "/l/", // Linktree
+] as const;
+
+function isPublicPath(pathname: string): boolean {
+  if (PUBLIC_EXACT.has(pathname)) return true;
+  return PUBLIC_PREFIXES.some(
+    (prefix) => pathname === prefix.slice(0, -1) || pathname.startsWith(prefix),
+  );
+}
+
+/** Only these should bounce logged-in users away (stay on CRM, not auth screen). */
+function isAuthEntryPath(pathname: string): boolean {
+  return pathname === "/login";
+}
 
 async function isAuthenticated(request: NextRequest): Promise<boolean> {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
@@ -20,17 +45,15 @@ async function isAuthenticated(request: NextRequest): Promise<boolean> {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Auth API routes handle their own logic
   if (pathname.startsWith("/api/auth")) {
     return NextResponse.next();
   }
 
   const authenticated = await isAuthenticated(request);
-  const isPublicPath = PUBLIC_PATHS.has(pathname);
+  const publicPath = isPublicPath(pathname);
 
-  // Logged-out users may only see the login page
   if (!authenticated) {
-    if (isPublicPath) {
+    if (publicPath) {
       return NextResponse.next();
     }
 
@@ -41,8 +64,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Logged-in users should not stay on the login page — send them to the dashboard
-  if (isPublicPath) {
+  // Logged-in users leaving the login screen → dashboard
+  if (isAuthEntryPath(pathname)) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 

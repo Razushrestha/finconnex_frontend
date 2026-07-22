@@ -1,9 +1,19 @@
+/** SRS §7.6 Notes */
+
 export type NoteType =
   | "General"
   | "Call Summary"
   | "Meeting Notes"
   | "Follow-up"
   | "Other";
+
+export const NOTE_TYPES: NoteType[] = [
+  "General",
+  "Call Summary",
+  "Meeting Notes",
+  "Follow-up",
+  "Other",
+];
 
 export interface Note {
   id: string;
@@ -30,9 +40,9 @@ export const notes: Note[] = [
     id: "n1",
     title: "Project Alpha: Backend Strategy",
     body: "Focus on implementing Django REST Framework with Next.js for the main dashboard. Need to ensure OAuth validation is handled via the SSO endpoint.",
-    relatedTo: "Meta - Tronix",
+    relatedTo: "Company: Meta - Tronix",
     noteType: "Meeting Notes",
-    createdBy: "Bishnu",
+    createdBy: "Bishnu Aryal",
     isPrivate: false,
     isPinned: true,
     createdAt: "17/07/2026 10:00 AM",
@@ -41,7 +51,7 @@ export const notes: Note[] = [
     id: "n2",
     title: "Client Feedback: UI Aesthetic",
     body: "The client requested a shift from Inter to Geist font for a sharper, modern feel. Also emphasized high-density UI elements for the stock management dashboard.",
-    relatedTo: "Meta - Tronix",
+    relatedTo: "Company: Meta - Tronix",
     noteType: "Call Summary",
     createdBy: "Deepak Shrestha",
     isPrivate: true,
@@ -52,9 +62,9 @@ export const notes: Note[] = [
     id: "n3",
     title: "Follow-up: Vendor Payouts",
     body: "Reviewing the revenue tracking charts. Need to verify why the recharts integration is lagging on high-volume data sets.",
-    relatedTo: "Vendor Management",
+    relatedTo: "Deal: Vendor Management",
     noteType: "Follow-up",
-    createdBy: "Shiva Khadka",
+    createdBy: "Shiva Kadhka",
     isPrivate: false,
     isPinned: false,
     createdAt: "15/07/2026 09:15 AM",
@@ -63,7 +73,7 @@ export const notes: Note[] = [
     id: "n4",
     title: "Innovator-App Architecture",
     body: "Need to structure the reels and comments component directory. Currently encountering issues with .next/dev/static/chunks pathing.",
-    relatedTo: "Innovator-App",
+    relatedTo: "Deal: Innovator-App",
     noteType: "General",
     createdBy: "Deepak Shrestha",
     isPrivate: true,
@@ -74,49 +84,41 @@ export const notes: Note[] = [
     id: "n5",
     title: "Q3 Strategy Meeting",
     body: "Discussing role-based access control (RBAC) tiers: Super Admin, Marketing, Accountant, and Front-Desk. Need to finalize menu permissions by next week.",
-    relatedTo: "Administration",
+    relatedTo: "Company: Administration",
     noteType: "Meeting Notes",
-    createdBy: "Bishnu",
+    createdBy: "Bishnu Aryal",
+    isPrivate: false,
+    isPinned: true,
+    createdAt: "12/07/2026 11:30 AM",
+  },
+  {
+    id: "n6",
+    title: "Atlas demo talking points",
+    body: "Cover pricing tiers, migration timeline, and support SLAs. Bring competitive comparison sheet.",
+    relatedTo: "Deal: Atlas CRM Rollout",
+    noteType: "Other",
+    createdBy: "Tejas Gokhe",
     isPrivate: false,
     isPinned: false,
-    createdAt: "12/07/2026 11:30 AM",
+    createdAt: "18/07/2026 03:20 PM",
   },
 ];
 
-export const noteColumns: NoteColumn[] = [
-  {
-    id: "general",
-    title: "General",
-    count: 38,
-    badgeColorClass: "bg-slate-400 text-white",
-    notes: notes.filter((n) => n.noteType === "General"),
-  },
-  {
-    id: "call-summary",
-    title: "Call Summary",
-    count: 64,
-    badgeColorClass: "bg-sky-500 text-white",
-    notes: notes.filter((n) => n.noteType === "Call Summary"),
-  },
-  {
-    id: "meeting-notes",
-    title: "Meeting Notes",
-    count: 52,
-    badgeColorClass: "bg-indigo-500 text-white",
-    notes: notes.filter((n) => n.noteType === "Meeting Notes"),
-  },
-  {
-    id: "follow-up",
-    title: "Follow-up",
-    count: 27,
-    badgeColorClass: "bg-amber-400 text-white",
-    notes: notes.filter((n) => n.noteType === "Follow-up"),
-  },
-  {
-    id: "other",
-    title: "Other",
-    count: 9,
-    badgeColorClass: "bg-emerald-400 text-white",
-    notes: notes.filter((n) => n.noteType === "Other"),
-  },
-];
+const COLUMN_COLORS: Record<NoteType, string> = {
+  General: "bg-slate-500 text-white",
+  "Call Summary": "bg-sky-500 text-white",
+  "Meeting Notes": "bg-violet-500 text-white",
+  "Follow-up": "bg-amber-500 text-white",
+  Other: "bg-emerald-500 text-white",
+};
+
+export const noteColumns: NoteColumn[] = NOTE_TYPES.map((type) => {
+  const items = notes.filter((n) => n.noteType === type);
+  return {
+    id: type.toLowerCase().replace(/\s+/g, "-"),
+    title: type,
+    count: items.length,
+    badgeColorClass: COLUMN_COLORS[type],
+    notes: items,
+  };
+});

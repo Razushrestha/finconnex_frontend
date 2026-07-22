@@ -16,6 +16,7 @@ import {
   Folder,
   Megaphone,
   HelpCircle,
+  Globe,
   LineChartIcon,
   TrendingUp,
   LibraryBig,
@@ -23,6 +24,7 @@ import {
   Settings,
   Menu,
   X,
+  CalendarClock,
 } from "lucide-react";
 
 type NavChildItem = {
@@ -48,7 +50,9 @@ const dashboardItems: NavItem[] = [
     children: [
       { label: "Leads", href: "/sales/leads" },
       { label: "Contacts", href: "/sales/contacts" },
+      { label: "Companies", href: "/sales/companies" },
       { label: "Deals", href: "/sales/deals" },
+      { label: "Forecasting", href: "/sales/forecasting" },
     ],
   },
   {
@@ -62,13 +66,17 @@ const dashboardItems: NavItem[] = [
       { label: "Meetings", href: "/activities/meetings" },
       { label: "Notes", href: "/activities/notes" },
       { label: "Reminders", href: "/activities/reminders" },
+      { label: "Calendar", href: "/activities/calendar" },
+      { label: "Team Chat", href: "/activities/team-chat" },
     ],
   },
+  { label: "Booking", href: "/booking", icon: CalendarClock },
   {
     label: "Documents",
     icon: Folder,
     children: [
-      { label: "Document Requests", href: "/documents/request" },
+      { label: "Library", href: "/documents/library" },
+      { label: "Document Requests", href: "/documents/requests" },
       { label: "E-Signature", href: "/documents/signature" },
     ],
   },
@@ -78,6 +86,8 @@ const dashboardItems: NavItem[] = [
     children: [
       { label: "Email Campaigns", href: "/marketing/email" },
       { label: "SMS Campaigns", href: "/marketing/sms" },
+      { label: "WhatsApp Campaigns", href: "/marketing/whatsapp" },
+      { label: "Unified Inbox", href: "/marketing/inbox" },
       { label: "Forms", href: "/marketing/forms" },
       { label: "Linktree", href: "/marketing/linktree" },
     ],
@@ -86,15 +96,17 @@ const dashboardItems: NavItem[] = [
     label: "Finance",
     icon: LineChart,
     children: [
-      { label: "Estimates", href: "/finance" },
-      { label: "Quotations", href: "/finance//quotations" },
+      { label: "Overview", href: "/finance" },
+      { label: "Estimates", href: "/finance/estimates" },
+      { label: "Quotations", href: "/finance/quotations" },
       { label: "Invoices", href: "/finance/invoices" },
       { label: "Payments", href: "/finance/payments" },
-      { label: "Products & Services", href: "/finance/ps" },
+      { label: "Products & Services", href: "/finance/products" },
     ],
   },
   { label: "Team Management", href: "/team", icon: UserCog },
   { label: "Support", href: "/support", icon: HelpCircle },
+  { label: "Client Portal", href: "/portals", icon: Globe },
   { label: "Reports", href: "/reports", icon: LineChartIcon },
   { label: "Analytics", href: "/analytics", icon: TrendingUp },
   { label: "Resources", href: "/resources", icon: LibraryBig },
@@ -103,10 +115,10 @@ const dashboardItems: NavItem[] = [
 ];
 
 const workItems: NavItem[] = [
-  { label: "Tasks & Projects", href: "/tasks", swatch: "bg-red-500" },
-  { label: "User Management", href: "/users", swatch: "bg-violet-600" },
-  { label: "Activities", href: "/activities", swatch: "bg-amber-500" },
-  { label: "Deals", href: "/deals", swatch: "bg-indigo-500", badge: "+24%" },
+  { label: "Tasks & Projects", href: "/activities/tasks", swatch: "bg-red-500" },
+  { label: "User Management", href: "/team", swatch: "bg-violet-600" },
+  { label: "Activities", href: "/activities/calendar", swatch: "bg-amber-500" },
+  { label: "Deals", href: "/sales/deals", swatch: "bg-indigo-500", badge: "+24%" },
 ];
 
 interface SidebarProps {

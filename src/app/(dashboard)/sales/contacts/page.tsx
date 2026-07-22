@@ -16,9 +16,9 @@ export default function ContactsPage() {
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [filters, setFilters] = useState<ContactFilters>(EMPTY_CONTACT_FILTERS);
 
-  function toggleFilterField(section: "source" | "type", field: string) {
+  function toggleFilterField(section: "source" | "status", field: string) {
     setFilters((prev) => {
-      const key = section === "source" ? "sources" : "types";
+      const key = section === "source" ? "sources" : "statuses";
       const current = prev[key];
       const next = current.includes(field)
         ? current.filter((f) => f !== field)
@@ -55,7 +55,6 @@ export default function ContactsPage() {
           </div>
         )}
 
-        {/* Dynamic View Display */}
         <div className="flex-1 overflow-x-auto">
           {viewMode === "kanban" ? (
             <ContactsKanbanBoard filters={filters} />

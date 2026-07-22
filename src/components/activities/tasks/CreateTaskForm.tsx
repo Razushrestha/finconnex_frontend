@@ -2,296 +2,315 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, User, Search } from "lucide-react";
-import { ToggleSwitch } from "./ToggleSwitch";
+import {
+  CheckSquare,
+  User,
+  Calendar,
+  Users,
+  Link2,
+} from "lucide-react";
+import {
+  TASK_OWNERS,
+  TASK_PRIORITIES,
+  TASK_STATUSES,
+  TASK_TYPES,
+  type Priority,
+  type TaskStatus,
+  type TaskType,
+} from "@/lib/tasks/types";
+import {
+  RELATED_ENTITY_KINDS,
+  RELATED_RECORD_OPTIONS,
+  type RelatedEntityKind,
+} from "@/lib/activities/shared";
+import {
+  CreateEntityFormShell,
+  Field,
+  InputShell,
+  TextAreaShell,
+  elevatedInputClass,
+  elevatedSelectClass,
+  elevatedTextareaClass,
+} from "@/components/sales/CreateEntityForm";
 
 interface CreateTaskFormProps {
   layoutId: string;
   redirect: boolean;
 }
 
-interface TaskFormState {
-  taskOwner: string;
-  subject: string;
-  fileHandler: string;
+interface FormState {
+  title: string;
+  relatedKind: RelatedEntityKind | "";
+  relatedName: string;
+  taskType: TaskType | "";
+  priority: Priority | "";
+  status: TaskStatus | "";
   dueDate: string;
-  contact: string;
-  account: string;
-  status: string;
-  priority: string;
-  repeat: boolean;
-  notifyOwner: boolean;
-  reminder: boolean;
+  reminderDate: string;
+  assignedTo: string;
   description: string;
+  notes: string;
+  collaborators: string;
 }
 
-const initialState: TaskFormState = {
-  taskOwner: "",
-  subject: "",
-  fileHandler: "-None-",
-  dueDate: "",
-  contact: "",
-  account: "",
+const initialState: FormState = {
+  title: "",
+  relatedKind: "",
+  relatedName: "",
+  taskType: "Follow-up",
+  priority: "Medium",
   status: "Not Started",
-  priority: "High",
-  repeat: false,
-  notifyOwner: false,
-  reminder: false,
+  dueDate: "",
+  reminderDate: "",
+  assignedTo: "John Smith",
   description: "",
+  notes: "",
+  collaborators: "",
 };
-
-function FieldRow({
-  label,
-  required,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="grid grid-cols-[140px_1fr] items-center gap-4 border-b border-slate-100 py-3 sm:grid-cols-[180px_1fr]">
-      <label className="text-sm text-slate-500">
-        {label}
-        {required && <span className="ml-0.5 text-rose-500">*</span>}
-      </label>
-      <div>{children}</div>
-    </div>
-  );
-}
 
 export function CreateTaskForm({ layoutId, redirect }: CreateTaskFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState<TaskFormState>(initialState);
-  const [subjectTouched, setSubjectTouched] = useState(false);
+  const [form, setForm] = useState<FormState>(initialState);
+  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
+    {},
+  );
+  const [submitted, setSubmitted] = useState(false);
 
-  function update<K extends keyof TaskFormState>(
-    key: K,
-    value: TaskFormState[K],
-  ) {
+  function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleCancel() {
-    router.back();
+  const relatedOptions = form.relatedKind
+    ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === form.relatedKind)
+    : RELATED_RECORD_OPTIONS;
+
+  function validate() {
+    const next: Partial<Record<keyof FormState, string>> = {};
+    if (!form.title.trim()) next.title = "Task name is required";
+    if (!form.taskType) next.taskType = "Task type is required";
+    if (!form.priority) next.priority = "Priority is required";
+    if (!form.status) next.status = "Status is required";
+    if (!form.dueDate) next.dueDate = "Due date is required";
+    if (!form.assignedTo.trim()) next.assignedTo = "Assigned to is required";
+    setErrors(next);
+    return Object.keys(next).length === 0;
   }
 
   function handleSave(createAnother: boolean) {
-    setSubjectTouched(true);
-    if (!form.subject.trim()) return;
-
-    // TODO: wire to your actual create-task API/mutation.
+    setSubmitted(true);
+    if (!validate()) return;
     console.log("Saving task", { layoutId, redirect, ...form });
-
     if (createAnother) {
-      setForm(initialState);
-      setSubjectTouched(false);
-    } else {
-      router.push("/activities/tasks");
+      setForm({ ...initialState, assignedTo: form.assignedTo });
+      setErrors({});
+      setSubmitted(false);
+      return;
     }
+    router.push("/activities/tasks");
   }
 
-  const subjectInvalid = subjectTouched && !form.subject.trim();
-
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
-        <div className="flex items-center gap-3">
-          <h1 className="text-base font-semibold text-slate-900">
-            Create Task
-          </h1>
-          <button
-            type="button"
-            className="text-sm font-medium text-indigo-600 hover:underline"
-          >
-            Edit Page Layout
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="rounded-lg px-3.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSave(true)}
-            className="rounded-lg border border-slate-300 px-3.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Save &amp; New
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSave(false)}
-            className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
-          >
-            Save
-          </button>
-        </div>
-      </div>
-
-      {/* Form */}
-      <div className="max-w-2xl px-4 py-6 sm:px-6">
-        <h2 className="mb-2 text-sm font-semibold text-slate-900">
-          Task Information
-        </h2>
-
-        <FieldRow label="Task Owner">
-          {/*
-            TODO: replace this plain text input with an employee lookup —
-            once you have an endpoint for company employees, swap this for
-            a searchable dropdown/combobox (e.g. filter-as-you-type against
-            GET /api/employees) that sets form.taskOwner to the selected
-            employee's name/id instead of freeform text.
-          */}
-          <div className="flex items-center justify-between border-b border-slate-100 pb-1">
-            <input
-              type="text"
-              value={form.taskOwner}
-              onChange={(e) => update("taskOwner", e.target.value)}
-              placeholder="Type a name"
-              className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-300 outline-none"
-            />
-            <div className="flex items-center gap-2 text-slate-400">
-              <ChevronDown className="h-4 w-4" />
-              <User className="h-4 w-4" />
-            </div>
-          </div>
-        </FieldRow>
-
-        <FieldRow label="Subject" required>
+    <CreateEntityFormShell
+      breadcrumbParent={{ label: "Tasks", href: "/activities/tasks" }}
+      badge="New task"
+      title="Create Task"
+      subtitle="Anything actionable becomes a task — assign an owner, due date, and priority."
+      tip="Tip: Name, type, priority, status, due date & assignee are required."
+      cardIcon={CheckSquare}
+      cardTitle="Task Information"
+      cardDescription="Fields marked required are needed to save (SRS §7.1)"
+      listHref="/activities/tasks"
+      saveLabel="Save Task"
+      onSave={handleSave}
+    >
+      <Field
+        label="Task Name"
+        required
+        error={submitted ? errors.title : undefined}
+        className="sm:col-span-2 lg:col-span-3"
+      >
+        <InputShell
+          icon={CheckSquare}
+          error={!!(submitted && errors.title)}
+        >
           <input
-            type="text"
-            value={form.subject}
-            onChange={(e) => update("subject", e.target.value)}
-            onBlur={() => setSubjectTouched(true)}
-            className={`w-full border-b bg-transparent pb-1 text-sm text-slate-800 outline-none ${
-              subjectInvalid
-                ? "border-rose-400"
-                : "border-transparent focus:border-indigo-400"
-            }`}
+            className={elevatedInputClass(true)}
+            value={form.title}
+            onChange={(e) => update("title", e.target.value)}
+            placeholder="What needs to be done?"
           />
-          {subjectInvalid && (
-            <p className="mt-1 text-xs text-rose-500">Subject is required.</p>
-          )}
-        </FieldRow>
+        </InputShell>
+      </Field>
 
-        <FieldRow label="File Handler">
+      <Field label="Related Entity">
+        <InputShell icon={Link2}>
           <select
-            value={form.fileHandler}
-            onChange={(e) => update("fileHandler", e.target.value)}
-            className="w-full bg-transparent text-sm text-slate-800 outline-none"
+            className={elevatedSelectClass(true)}
+            value={form.relatedKind}
+            onChange={(e) => {
+              update("relatedKind", e.target.value as RelatedEntityKind | "");
+              update("relatedName", "");
+            }}
           >
-            <option>-None-</option>
-            <option>Handler A</option>
-            <option>Handler B</option>
+            <option value="">None</option>
+            {RELATED_ENTITY_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
           </select>
-        </FieldRow>
-
-        <FieldRow label="Due Date">
+        </InputShell>
+      </Field>
+      <Field label="Related Record">
+        <InputShell>
+          <select
+            className={elevatedSelectClass(false)}
+            value={form.relatedName}
+            onChange={(e) => update("relatedName", e.target.value)}
+            disabled={!form.relatedKind}
+          >
+            <option value="">Select record</option>
+            {relatedOptions.map((r) => (
+              <option key={`${r.kind}-${r.name}`} value={r.name}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </InputShell>
+      </Field>
+      <Field
+        label="Task Type"
+        required
+        error={submitted ? errors.taskType : undefined}
+      >
+        <InputShell error={!!(submitted && errors.taskType)}>
+          <select
+            className={elevatedSelectClass(false)}
+            value={form.taskType}
+            onChange={(e) => update("taskType", e.target.value as TaskType)}
+          >
+            {TASK_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </InputShell>
+      </Field>
+      <Field
+        label="Priority"
+        required
+        error={submitted ? errors.priority : undefined}
+      >
+        <InputShell error={!!(submitted && errors.priority)}>
+          <select
+            className={elevatedSelectClass(false)}
+            value={form.priority}
+            onChange={(e) => update("priority", e.target.value as Priority)}
+          >
+            {TASK_PRIORITIES.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </InputShell>
+      </Field>
+      <Field
+        label="Status"
+        required
+        error={submitted ? errors.status : undefined}
+      >
+        <InputShell error={!!(submitted && errors.status)}>
+          <select
+            className={elevatedSelectClass(false)}
+            value={form.status}
+            onChange={(e) => update("status", e.target.value as TaskStatus)}
+          >
+            {TASK_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </InputShell>
+      </Field>
+      <Field
+        label="Due Date"
+        required
+        error={submitted ? errors.dueDate : undefined}
+      >
+        <InputShell
+          icon={Calendar}
+          error={!!(submitted && errors.dueDate)}
+        >
           <input
-            type="text"
-            placeholder="DD/MM/YYYY"
+            type="datetime-local"
+            className={elevatedInputClass(true)}
             value={form.dueDate}
             onChange={(e) => update("dueDate", e.target.value)}
-            className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-300 outline-none"
           />
-        </FieldRow>
-
-        <FieldRow label="Contact">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-1">
-            <input
-              type="text"
-              value={form.contact}
-              onChange={(e) => update("contact", e.target.value)}
-              className="w-full bg-transparent text-sm text-slate-800 outline-none"
-            />
-            <Search className="h-4 w-4 shrink-0 text-slate-400" />
-          </div>
-        </FieldRow>
-
-        <FieldRow label="Account">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-1">
-            <input
-              type="text"
-              value={form.account}
-              onChange={(e) => update("account", e.target.value)}
-              className="w-full bg-transparent text-sm text-slate-800 outline-none"
-            />
-            <Search className="h-4 w-4 shrink-0 text-slate-400" />
-          </div>
-        </FieldRow>
-
-        <FieldRow label="Status">
-          <select
-            value={form.status}
-            onChange={(e) => update("status", e.target.value)}
-            className="w-full bg-transparent text-sm text-slate-800 outline-none"
-          >
-            <option>Not Started</option>
-            <option>In Progress</option>
-            <option>Completed</option>
-            <option>Deferred</option>
-          </select>
-        </FieldRow>
-
-        <FieldRow label="Priority">
-          <select
-            value={form.priority}
-            onChange={(e) => update("priority", e.target.value)}
-            className="w-full bg-transparent text-sm text-slate-800 outline-none"
-          >
-            <option>High</option>
-            <option>Medium</option>
-            <option>Low</option>
-          </select>
-        </FieldRow>
-
-        <FieldRow label="Repeat">
-          <ToggleSwitch
-            checked={form.repeat}
-            onChange={(v) => update("repeat", v)}
-            label="Repeat"
-          />
-        </FieldRow>
-
-        <FieldRow label={`Notify ${form.taskOwner}`}>
+        </InputShell>
+      </Field>
+      <Field label="Reminder Date">
+        <InputShell icon={Calendar}>
           <input
-            type="checkbox"
-            checked={form.notifyOwner}
-            onChange={(e) => update("notifyOwner", e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-indigo-500 focus:ring-indigo-300"
+            type="datetime-local"
+            className={elevatedInputClass(true)}
+            value={form.reminderDate}
+            onChange={(e) => update("reminderDate", e.target.value)}
           />
-        </FieldRow>
-
-        <FieldRow label="Reminder">
-          <ToggleSwitch
-            checked={form.reminder}
-            onChange={(v) => update("reminder", v)}
-            label="Reminder"
+        </InputShell>
+      </Field>
+      <Field
+        label="Assigned To"
+        required
+        error={submitted ? errors.assignedTo : undefined}
+      >
+        <InputShell icon={User} error={!!(submitted && errors.assignedTo)}>
+          <select
+            className={elevatedSelectClass(true)}
+            value={form.assignedTo}
+            onChange={(e) => update("assignedTo", e.target.value)}
+          >
+            {TASK_OWNERS.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        </InputShell>
+      </Field>
+      <Field label="Collaborators">
+        <InputShell icon={Users}>
+          <input
+            className={elevatedInputClass(true)}
+            value={form.collaborators}
+            onChange={(e) => update("collaborators", e.target.value)}
+            placeholder="Comma-separated names"
           />
-        </FieldRow>
-
-        <h2 className="mb-2 mt-8 text-sm font-semibold text-slate-900">
-          Description Information
-        </h2>
-
-        <div className="border-b border-slate-100 py-3">
-          <label className="mb-2 block text-sm text-slate-500">
-            Description
-          </label>
+        </InputShell>
+      </Field>
+      <Field label="Description" className="sm:col-span-2 lg:col-span-3">
+        <TextAreaShell>
           <textarea
+            className={elevatedTextareaClass}
             value={form.description}
             onChange={(e) => update("description", e.target.value)}
-            rows={4}
-            className="w-full resize-y rounded-md border border-slate-200 p-2 text-sm text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+            placeholder="Details, acceptance criteria…"
           />
-        </div>
-      </div>
-    </div>
+        </TextAreaShell>
+      </Field>
+      <Field label="Notes" className="sm:col-span-2 lg:col-span-3">
+        <TextAreaShell>
+          <textarea
+            className={elevatedTextareaClass}
+            value={form.notes}
+            onChange={(e) => update("notes", e.target.value)}
+            placeholder="Internal notes…"
+          />
+        </TextAreaShell>
+      </Field>
+    </CreateEntityFormShell>
   );
 }

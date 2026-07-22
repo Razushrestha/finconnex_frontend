@@ -2,263 +2,276 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, User, Search } from "lucide-react";
-import type { CallStatus } from "@/lib/calls/types";
+import {
+  Phone,
+  User,
+  Calendar,
+  Clock,
+  Link2,
+  Users,
+} from "lucide-react";
+import {
+  CALL_OWNERS,
+  CALL_STATUSES,
+  CALL_TYPES,
+  type CallStatus,
+  type CallType,
+} from "@/lib/calls/types";
+import {
+  RELATED_ENTITY_KINDS,
+  RELATED_RECORD_OPTIONS,
+  type RelatedEntityKind,
+} from "@/lib/activities/shared";
+import {
+  CreateEntityFormShell,
+  Field,
+  InputShell,
+  TextAreaShell,
+  elevatedInputClass,
+  elevatedSelectClass,
+  elevatedTextareaClass,
+} from "@/components/sales/CreateEntityForm";
 
 interface CreateCallFormProps {
   layoutId: string;
   redirect: boolean;
 }
 
-interface CallFormState {
-  callOwner: string;
+interface FormState {
   subject: string;
-  relatedTo: string;
-  callType: "Outbound" | "Inbound" | "Missed";
-  callStartTime: string;
-  callDuration: string;
-  callPurpose: string;
-  status: CallStatus;
-  description: string;
+  relatedKind: RelatedEntityKind | "";
+  relatedName: string;
+  contact: string;
+  callType: CallType | "";
+  status: CallStatus | "";
+  date: string;
+  duration: string;
+  notes: string;
+  assignedTo: string;
 }
 
-const initialState: CallFormState = {
-  callOwner: "",
+const initialState: FormState = {
   subject: "",
-  relatedTo: "",
+  relatedKind: "",
+  relatedName: "",
+  contact: "",
   callType: "Outbound",
-  callStartTime: "",
-  callDuration: "",
-  callPurpose: "",
   status: "Scheduled",
-  description: "",
+  date: "",
+  duration: "",
+  notes: "",
+  assignedTo: "John Smith",
 };
-
-function FieldRow({
-  label,
-  required,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="grid grid-cols-[140px_1fr] items-center gap-4 border-b border-slate-100 py-3 sm:grid-cols-[180px_1fr]">
-      <label className="text-sm text-slate-500">
-        {label}
-        {required && <span className="ml-0.5 text-rose-500">*</span>}
-      </label>
-      <div>{children}</div>
-    </div>
-  );
-}
 
 export function CreateCallForm({ layoutId, redirect }: CreateCallFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState<CallFormState>(initialState);
-  const [subjectTouched, setSubjectTouched] = useState(false);
+  const [form, setForm] = useState<FormState>(initialState);
+  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
+    {},
+  );
+  const [submitted, setSubmitted] = useState(false);
 
-  function update<K extends keyof CallFormState>(
-    key: K,
-    value: CallFormState[K],
-  ) {
+  function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleCancel() {
-    router.back();
+  const relatedOptions = form.relatedKind
+    ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === form.relatedKind)
+    : RELATED_RECORD_OPTIONS;
+
+  function validate() {
+    const next: Partial<Record<keyof FormState, string>> = {};
+    if (!form.subject.trim()) next.subject = "Subject is required";
+    if (!form.callType) next.callType = "Call type is required";
+    if (!form.status) next.status = "Status is required";
+    if (!form.date) next.date = "Date is required";
+    if (!form.assignedTo.trim()) next.assignedTo = "Assigned to is required";
+    setErrors(next);
+    return Object.keys(next).length === 0;
   }
 
   function handleSave(createAnother: boolean) {
-    setSubjectTouched(true);
-    if (!form.subject.trim()) return;
-
-    // TODO: wire to your actual create-call API/mutation.
+    setSubmitted(true);
+    if (!validate()) return;
     console.log("Saving call", { layoutId, redirect, ...form });
-
     if (createAnother) {
-      setForm(initialState);
-      setSubjectTouched(false);
-    } else {
-      router.push("/activities/calls");
+      setForm({ ...initialState, assignedTo: form.assignedTo });
+      setErrors({});
+      setSubmitted(false);
+      return;
     }
+    router.push("/activities/calls");
   }
 
-  const subjectInvalid = subjectTouched && !form.subject.trim();
-
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-6">
-        <div className="flex items-center gap-3">
-          <h1 className="text-base font-semibold text-slate-900">
-            Create Call
-          </h1>
-          <button
-            type="button"
-            className="text-sm font-medium text-indigo-600 hover:underline"
-          >
-            Edit Page Layout
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="rounded-lg px-3.5 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSave(true)}
-            className="rounded-lg border border-slate-300 px-3.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Save &amp; New
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSave(false)}
-            className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
-          >
-            Save
-          </button>
-        </div>
-      </div>
-
-      {/* Form */}
-      <div className="max-w-2xl px-4 py-6 sm:px-6">
-        <h2 className="mb-2 text-sm font-semibold text-slate-900">
-          Call Information
-        </h2>
-
-        <FieldRow label="Call Owner">
-          {/*
-            TODO: replace this plain text input with an employee lookup —
-            once you have an endpoint for company employees, swap this for
-            a searchable dropdown/combobox (e.g. filter-as-you-type against
-            GET /api/employees) that sets form.callOwner to the selected
-            employee's name/id instead of freeform text.
-          */}
-          <div className="flex items-center justify-between border-b border-slate-100 pb-1">
-            <input
-              type="text"
-              value={form.callOwner}
-              onChange={(e) => update("callOwner", e.target.value)}
-              placeholder="Type a name"
-              className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-300 outline-none"
-            />
-            <div className="flex items-center gap-2 text-slate-400">
-              <ChevronDown className="h-4 w-4" />
-              <User className="h-4 w-4" />
-            </div>
-          </div>
-        </FieldRow>
-
-        <FieldRow label="Subject" required>
+    <CreateEntityFormShell
+      breadcrumbParent={{ label: "Calls", href: "/activities/calls" }}
+      badge="New call"
+      title="Create Call"
+      subtitle="Log an inbound or outbound conversation — capture type, timing, and outcome."
+      tip="Tip: Subject, call type, status, date & assignee are required."
+      cardIcon={Phone}
+      cardTitle="Call Information"
+      cardDescription="Fields marked required are needed to save (SRS §7.2)"
+      listHref="/activities/calls"
+      saveLabel="Save Call"
+      onSave={handleSave}
+    >
+      <Field
+        label="Subject"
+        required
+        error={submitted ? errors.subject : undefined}
+        className="sm:col-span-2 lg:col-span-3"
+      >
+        <InputShell icon={Phone} error={!!(submitted && errors.subject)}>
           <input
-            type="text"
+            className={elevatedInputClass(true)}
             value={form.subject}
             onChange={(e) => update("subject", e.target.value)}
-            onBlur={() => setSubjectTouched(true)}
-            className={`w-full border-b bg-transparent pb-1 text-sm text-slate-800 outline-none ${
-              subjectInvalid
-                ? "border-rose-400"
-                : "border-transparent focus:border-indigo-400"
-            }`}
+            placeholder="e.g. Discovery call — Anderson Finance"
           />
-          {subjectInvalid && (
-            <p className="mt-1 text-xs text-rose-500">Subject is required.</p>
-          )}
-        </FieldRow>
+        </InputShell>
+      </Field>
 
-        <FieldRow label="Related To">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-1">
-            <input
-              type="text"
-              value={form.relatedTo}
-              onChange={(e) => update("relatedTo", e.target.value)}
-              className="w-full bg-transparent text-sm text-slate-800 outline-none"
-            />
-            <Search className="h-4 w-4 shrink-0 text-slate-400" />
-          </div>
-        </FieldRow>
-
-        <FieldRow label="Call Type">
+      <Field label="Related Entity">
+        <InputShell icon={Link2}>
           <select
-            value={form.callType}
-            onChange={(e) =>
-              update("callType", e.target.value as CallFormState["callType"])
-            }
-            className="w-full bg-transparent text-sm text-slate-800 outline-none"
+            className={elevatedSelectClass(true)}
+            value={form.relatedKind}
+            onChange={(e) => {
+              update("relatedKind", e.target.value as RelatedEntityKind | "");
+              update("relatedName", "");
+            }}
           >
-            <option>Outbound</option>
-            <option>Inbound</option>
-            <option>Missed</option>
+            <option value="">None</option>
+            {RELATED_ENTITY_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
           </select>
-        </FieldRow>
-
-        <FieldRow label="Call Start Time">
-          <input
-            type="text"
-            placeholder="DD/MM/YYYY HH:MM AM"
-            value={form.callStartTime}
-            onChange={(e) => update("callStartTime", e.target.value)}
-            className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-300 outline-none"
-          />
-        </FieldRow>
-
-        <FieldRow label="Call Duration">
-          <input
-            type="text"
-            placeholder="e.g. 15 mins"
-            value={form.callDuration}
-            onChange={(e) => update("callDuration", e.target.value)}
-            className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-300 outline-none"
-          />
-        </FieldRow>
-
-        <FieldRow label="Call Purpose">
-          <input
-            type="text"
-            placeholder="e.g. Prospecting"
-            value={form.callPurpose}
-            onChange={(e) => update("callPurpose", e.target.value)}
-            className="w-full bg-transparent text-sm text-slate-800 placeholder:text-slate-300 outline-none"
-          />
-        </FieldRow>
-
-        <FieldRow label="Status">
+        </InputShell>
+      </Field>
+      <Field label="Related To">
+        <InputShell>
           <select
+            className={elevatedSelectClass(false)}
+            value={form.relatedName}
+            onChange={(e) => update("relatedName", e.target.value)}
+            disabled={!form.relatedKind}
+          >
+            <option value="">Select record</option>
+            {relatedOptions.map((r) => (
+              <option key={`${r.kind}-${r.name}`} value={r.name}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </InputShell>
+      </Field>
+      <Field label="Contact">
+        <InputShell icon={User}>
+          <input
+            className={elevatedInputClass(true)}
+            value={form.contact}
+            onChange={(e) => update("contact", e.target.value)}
+            placeholder="Who did you speak with?"
+          />
+        </InputShell>
+      </Field>
+
+      <Field
+        label="Call Type"
+        required
+        error={submitted ? errors.callType : undefined}
+      >
+        <InputShell error={!!(submitted && errors.callType)}>
+          <select
+            className={elevatedSelectClass(false)}
+            value={form.callType}
+            onChange={(e) => update("callType", e.target.value as CallType)}
+          >
+            {CALL_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </InputShell>
+      </Field>
+      <Field
+        label="Status"
+        required
+        error={submitted ? errors.status : undefined}
+      >
+        <InputShell error={!!(submitted && errors.status)}>
+          <select
+            className={elevatedSelectClass(false)}
             value={form.status}
             onChange={(e) => update("status", e.target.value as CallStatus)}
-            className="w-full bg-transparent text-sm text-slate-800 outline-none"
           >
-            <option>Scheduled</option>
-            <option>Completed</option>
-            <option>Missed</option>
-            <option>Cancelled</option>
+            {CALL_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
           </select>
-        </FieldRow>
-
-        <h2 className="mb-2 mt-8 text-sm font-semibold text-slate-900">
-          Description Information
-        </h2>
-
-        <div className="border-b border-slate-100 py-3">
-          <label className="mb-2 block text-sm text-slate-500">
-            Description
-          </label>
-          <textarea
-            value={form.description}
-            onChange={(e) => update("description", e.target.value)}
-            rows={4}
-            className="w-full resize-y rounded-md border border-slate-200 p-2 text-sm text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+        </InputShell>
+      </Field>
+      <Field
+        label="Date"
+        required
+        error={submitted ? errors.date : undefined}
+      >
+        <InputShell icon={Calendar} error={!!(submitted && errors.date)}>
+          <input
+            type="datetime-local"
+            className={elevatedInputClass(true)}
+            value={form.date}
+            onChange={(e) => update("date", e.target.value)}
           />
-        </div>
-      </div>
-    </div>
+        </InputShell>
+      </Field>
+      <Field label="Duration">
+        <InputShell icon={Clock}>
+          <input
+            className={elevatedInputClass(true)}
+            value={form.duration}
+            onChange={(e) => update("duration", e.target.value)}
+            placeholder="e.g. 18 min"
+          />
+        </InputShell>
+      </Field>
+      <Field
+        label="Assigned To"
+        required
+        error={submitted ? errors.assignedTo : undefined}
+      >
+        <InputShell icon={Users} error={!!(submitted && errors.assignedTo)}>
+          <select
+            className={elevatedSelectClass(true)}
+            value={form.assignedTo}
+            onChange={(e) => update("assignedTo", e.target.value)}
+          >
+            {CALL_OWNERS.map((o) => (
+              <option key={o} value={o}>
+                {o}
+              </option>
+            ))}
+          </select>
+        </InputShell>
+      </Field>
+
+      <Field label="Notes" className="sm:col-span-2 lg:col-span-3">
+        <TextAreaShell>
+          <textarea
+            className={elevatedTextareaClass}
+            value={form.notes}
+            onChange={(e) => update("notes", e.target.value)}
+            placeholder="Call summary, next steps…"
+          />
+        </TextAreaShell>
+      </Field>
+    </CreateEntityFormShell>
   );
 }

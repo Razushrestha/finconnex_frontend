@@ -2,324 +2,275 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Paperclip, ChevronDown, Send, Trash2, Search, X } from "lucide-react";
+import {
+  Mail,
+  User,
+  Users,
+  Link2,
+  FileText,
+} from "lucide-react";
 import type { EmailStatus } from "@/lib/emails/types";
+import {
+  RELATED_ENTITY_KINDS,
+  RELATED_RECORD_OPTIONS,
+  type RelatedEntityKind,
+} from "@/lib/activities/shared";
+import {
+  CreateEntityFormShell,
+  Field,
+  InputShell,
+  TextAreaShell,
+  elevatedInputClass,
+  elevatedSelectClass,
+  elevatedTextareaClass,
+} from "@/components/sales/CreateEntityForm";
 
 interface CreateEmailFormProps {
   layoutId: string;
   redirect: boolean;
 }
 
-interface EmailFormState {
-  from: string;
-  to: string[];
-  cc: string[];
-  bcc: string[];
-  subject: string;
-  body: string;
-  relatedTo: string;
-  templateUsed: string;
-}
-
-const initialState: EmailFormState = {
-  from: "bishnu@nepatronix.com",
-  to: [],
-  cc: [],
-  bcc: [],
-  subject: "",
-  body: "",
-  relatedTo: "",
-  templateUsed: "",
-};
+const EMAIL_STATUSES: EmailStatus[] = [
+  "Draft",
+  "Scheduled",
+  "Sent",
+  "Delivered",
+  "Opened",
+  "Bounced",
+  "Failed",
+];
 
 const EMAIL_TEMPLATES = [
-  "-None-",
   "Follow-up Template",
   "Intro Template",
   "Meeting Recap",
+  "Proposal Follow-up",
 ];
 
-function RecipientField({
-  label,
-  values,
-  onChange,
-  autoFocus,
-}: {
-  label: string;
-  values: string[];
-  onChange: (next: string[]) => void;
-  autoFocus?: boolean;
-}) {
-  const [draft, setDraft] = useState("");
-
-  function commitDraft() {
-    const trimmed = draft.trim().replace(/,$/, "");
-    if (trimmed) {
-      onChange([...values, trimmed]);
-    }
-    setDraft("");
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" || e.key === ",") {
-      e.preventDefault();
-      commitDraft();
-    } else if (e.key === "Backspace" && draft === "" && values.length > 0) {
-      onChange(values.slice(0, -1));
-    }
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-100 px-4 py-2">
-      <span className="shrink-0 text-sm text-slate-400">{label}</span>
-      {values.map((address, i) => (
-        <span
-          key={`${address}-${i}`}
-          className="flex items-center gap-1 rounded-full bg-slate-100 py-0.5 pl-2.5 pr-1 text-xs text-slate-700"
-        >
-          {address}
-          <button
-            type="button"
-            onClick={() => onChange(values.filter((_, idx) => idx !== i))}
-            aria-label={`Remove ${address}`}
-            className="rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        </span>
-      ))}
-      <input
-        type="text"
-        value={draft}
-        autoFocus={autoFocus}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onBlur={commitDraft}
-        placeholder={values.length === 0 ? "Recipients, comma separated" : ""}
-        className="min-w-[120px] flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-300 outline-none"
-      />
-    </div>
-  );
+interface FormState {
+  subject: string;
+  body: string;
+  from: string;
+  to: string;
+  cc: string;
+  bcc: string;
+  relatedKind: RelatedEntityKind | "";
+  relatedName: string;
+  template: string;
+  status: EmailStatus | "";
 }
+
+const initialState: FormState = {
+  subject: "",
+  body: "",
+  from: "bishnu@nepatronix.com",
+  to: "",
+  cc: "",
+  bcc: "",
+  relatedKind: "",
+  relatedName: "",
+  template: "",
+  status: "Draft",
+};
 
 export function CreateEmailForm({ layoutId, redirect }: CreateEmailFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState<EmailFormState>(initialState);
-  const [showCc, setShowCc] = useState(false);
-  const [showBcc, setShowBcc] = useState(false);
-  const [toTouched, setToTouched] = useState(false);
+  const [form, setForm] = useState<FormState>(initialState);
+  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
+    {},
+  );
+  const [submitted, setSubmitted] = useState(false);
 
-  function update<K extends keyof EmailFormState>(
-    key: K,
-    value: EmailFormState[K],
-  ) {
+  function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleDiscard() {
-    router.back();
+  const relatedOptions = form.relatedKind
+    ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === form.relatedKind)
+    : RELATED_RECORD_OPTIONS;
+
+  function validate() {
+    const next: Partial<Record<keyof FormState, string>> = {};
+    if (!form.subject.trim()) next.subject = "Subject is required";
+    if (!form.body.trim()) next.body = "Body is required";
+    if (!form.to.trim()) next.to = "To is required";
+    setErrors(next);
+    return Object.keys(next).length === 0;
   }
 
-  function persist(status: EmailStatus) {
-    // TODO: wire to your actual create-email API/mutation.
-    console.log("Saving email", { layoutId, redirect, status, ...form });
+  function handleSave(createAnother: boolean) {
+    setSubmitted(true);
+    if (!validate()) return;
+    console.log("Saving email", { layoutId, redirect, ...form });
+    if (createAnother) {
+      setForm({ ...initialState, from: form.from });
+      setErrors({});
+      setSubmitted(false);
+      return;
+    }
     router.push("/activities/emails");
   }
 
-  function handleSend() {
-    setToTouched(true);
-    if (form.to.length === 0) return;
-    persist("Sent");
-  }
-
-  function handleSaveDraft() {
-    persist("Draft");
-  }
-
-  const toInvalid = toTouched && form.to.length === 0;
-
   return (
-    <div className="flex min-h-screen justify-center bg-slate-100 px-4 py-6">
-      <div className="flex w-full max-w-3xl flex-col rounded-2xl border border-slate-200 bg-white shadow-sm">
-        {/* Header */}
-        <div className="flex items-center justify-between rounded-t-2xl border-b border-slate-200 bg-slate-50 px-5 py-3">
-          <h1 className="text-sm font-semibold text-slate-900">New Email</h1>
-          <button
-            type="button"
-            onClick={handleDiscard}
-            aria-label="Discard"
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+    <CreateEntityFormShell
+      breadcrumbParent={{ label: "Emails", href: "/activities/emails" }}
+      badge="Compose email"
+      title="Create Email"
+      subtitle="Compose a message with recipients, subject, and body — then save or send later."
+      tip="Tip: Subject, body & To are required to save."
+      cardIcon={Mail}
+      cardTitle="Compose Email"
+      cardDescription="Fields marked required are needed to save (SRS §7.4)"
+      listHref="/activities/emails"
+      saveLabel="Save Email"
+      onSave={handleSave}
+    >
+      <Field
+        label="Subject"
+        required
+        error={submitted ? errors.subject : undefined}
+        className="sm:col-span-2 lg:col-span-3"
+      >
+        <InputShell icon={Mail} error={!!(submitted && errors.subject)}>
+          <input
+            className={elevatedInputClass(true)}
+            value={form.subject}
+            onChange={(e) => update("subject", e.target.value)}
+            placeholder="Email subject line"
+          />
+        </InputShell>
+      </Field>
+
+      <Field label="From">
+        <InputShell icon={User}>
+          <input
+            type="email"
+            className={elevatedInputClass(true)}
+            value={form.from}
+            onChange={(e) => update("from", e.target.value)}
+            placeholder="you@company.com"
+          />
+        </InputShell>
+      </Field>
+      <Field
+        label="To"
+        required
+        error={submitted ? errors.to : undefined}
+      >
+        <InputShell icon={Users} error={!!(submitted && errors.to)}>
+          <input
+            className={elevatedInputClass(true)}
+            value={form.to}
+            onChange={(e) => update("to", e.target.value)}
+            placeholder="recipient@company.com"
+          />
+        </InputShell>
+      </Field>
+      <Field label="Status">
+        <InputShell>
+          <select
+            className={elevatedSelectClass(false)}
+            value={form.status}
+            onChange={(e) => update("status", e.target.value as EmailStatus)}
           >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+            {EMAIL_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </InputShell>
+      </Field>
 
-        {/* Compose header fields */}
-        <div>
-          <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-2">
-            <span className="shrink-0 text-sm text-slate-400">From</span>
-            <input
-              type="text"
-              value={form.from}
-              onChange={(e) => update("from", e.target.value)}
-              className="flex-1 bg-transparent text-sm text-slate-800 outline-none"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center">
-              <div className="flex-1">
-                <RecipientField
-                  label="To"
-                  values={form.to}
-                  onChange={(v) => update("to", v)}
-                  autoFocus
-                />
-              </div>
-              <div className="flex shrink-0 items-center gap-2 pr-4 text-xs font-medium text-slate-400">
-                {!showCc && (
-                  <button
-                    type="button"
-                    onClick={() => setShowCc(true)}
-                    className="hover:text-slate-600"
-                  >
-                    Cc
-                  </button>
-                )}
-                {!showBcc && (
-                  <button
-                    type="button"
-                    onClick={() => setShowBcc(true)}
-                    className="hover:text-slate-600"
-                  >
-                    Bcc
-                  </button>
-                )}
-              </div>
-            </div>
-            {toInvalid && (
-              <p className="border-b border-slate-100 px-4 pb-1.5 text-xs text-rose-500">
-                Add at least one recipient before sending.
-              </p>
-            )}
-          </div>
-
-          {showCc && (
-            <RecipientField
-              label="Cc"
-              values={form.cc}
-              onChange={(v) => update("cc", v)}
-              autoFocus
-            />
-          )}
-          {showBcc && (
-            <RecipientField
-              label="Bcc"
-              values={form.bcc}
-              onChange={(v) => update("bcc", v)}
-              autoFocus
-            />
-          )}
-
-          <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-2">
-            <input
-              type="text"
-              value={form.subject}
-              onChange={(e) => update("subject", e.target.value)}
-              placeholder="Subject"
-              className="w-full bg-transparent text-sm font-medium text-slate-900 placeholder:font-normal placeholder:text-slate-300 outline-none"
-            />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-4 border-b border-slate-100 px-4 py-2 text-xs text-slate-500">
-            <div className="flex items-center gap-1.5">
-              <span className="shrink-0 text-slate-400">Related To</span>
-              <input
-                type="text"
-                value={form.relatedTo}
-                onChange={(e) => update("relatedTo", e.target.value)}
-                className="w-36 bg-transparent text-slate-800 outline-none"
-              />
-              <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-            </div>
-
-            <span className="h-4 w-px bg-slate-200" />
-
-            <div className="flex items-center gap-1.5">
-              <span className="shrink-0 text-slate-400">Template</span>
-              <select
-                value={form.templateUsed}
-                onChange={(e) => update("templateUsed", e.target.value)}
-                className="bg-transparent text-slate-800 outline-none"
-              >
-                {EMAIL_TEMPLATES.map((tpl) => (
-                  <option key={tpl} value={tpl === "-None-" ? "" : tpl}>
-                    {tpl}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Body */}
-        <textarea
-          value={form.body}
-          onChange={(e) => update("body", e.target.value)}
-          placeholder="Write your message…"
-          className="min-h-[280px] flex-1 resize-none px-5 py-4 text-sm text-slate-800 placeholder:text-slate-300 outline-none"
-        />
-
-        {/* Footer toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-b-2xl border-t border-slate-200 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <div className="flex overflow-hidden rounded-lg bg-indigo-600">
-              <button
-                type="button"
-                onClick={handleSend}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-              >
-                <Send className="h-3.5 w-3.5" />
-                Send
-              </button>
-              <button
-                type="button"
-                aria-label="More send options"
-                className="flex items-center border-l border-indigo-500 px-2 text-white hover:bg-indigo-700"
-              >
-                <ChevronDown className="h-4 w-4" />
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSaveDraft}
-              className="rounded-lg border border-slate-300 px-3.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Save as Draft
-            </button>
-
-            <button
-              type="button"
-              aria-label="Attach file"
-              title="Attach file (coming soon)"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50"
-            >
-              <Paperclip className="h-4 w-4" />
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleDiscard}
-            aria-label="Discard email"
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-slate-400 hover:bg-slate-50 hover:text-rose-500"
+      <Field label="CC">
+        <InputShell icon={Users}>
+          <input
+            className={elevatedInputClass(true)}
+            value={form.cc}
+            onChange={(e) => update("cc", e.target.value)}
+            placeholder="cc@company.com"
+          />
+        </InputShell>
+      </Field>
+      <Field label="BCC">
+        <InputShell icon={Users}>
+          <input
+            className={elevatedInputClass(true)}
+            value={form.bcc}
+            onChange={(e) => update("bcc", e.target.value)}
+            placeholder="bcc@company.com"
+          />
+        </InputShell>
+      </Field>
+      <Field label="Template">
+        <InputShell icon={FileText}>
+          <select
+            className={elevatedSelectClass(true)}
+            value={form.template}
+            onChange={(e) => update("template", e.target.value)}
           >
-            <Trash2 className="h-4 w-4" />
-            Discard
-          </button>
-        </div>
-      </div>
-    </div>
+            <option value="">None</option>
+            {EMAIL_TEMPLATES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </InputShell>
+      </Field>
+
+      <Field label="Related Entity">
+        <InputShell icon={Link2}>
+          <select
+            className={elevatedSelectClass(true)}
+            value={form.relatedKind}
+            onChange={(e) => {
+              update("relatedKind", e.target.value as RelatedEntityKind | "");
+              update("relatedName", "");
+            }}
+          >
+            <option value="">None</option>
+            {RELATED_ENTITY_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </select>
+        </InputShell>
+      </Field>
+      <Field label="Related To" className="sm:col-span-2">
+        <InputShell>
+          <select
+            className={elevatedSelectClass(false)}
+            value={form.relatedName}
+            onChange={(e) => update("relatedName", e.target.value)}
+            disabled={!form.relatedKind}
+          >
+            <option value="">Select record</option>
+            {relatedOptions.map((r) => (
+              <option key={`${r.kind}-${r.name}`} value={r.name}>
+                {r.name}
+              </option>
+            ))}
+          </select>
+        </InputShell>
+      </Field>
+
+      <Field
+        label="Body"
+        required
+        error={submitted ? errors.body : undefined}
+        className="sm:col-span-2 lg:col-span-3"
+      >
+        <TextAreaShell error={!!(submitted && errors.body)}>
+          <textarea
+            className={`${elevatedTextareaClass} min-h-[160px]`}
+            value={form.body}
+            onChange={(e) => update("body", e.target.value)}
+            placeholder="Write your email…"
+          />
+        </TextAreaShell>
+      </Field>
+    </CreateEntityFormShell>
   );
 }

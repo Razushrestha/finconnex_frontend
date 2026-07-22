@@ -60,7 +60,10 @@ export function DealsListView({
                 Value
               </th>
               <th scope="col" className="px-5 py-3.5 font-semibold">
-                Company
+                Account
+              </th>
+              <th scope="col" className="px-5 py-3.5 font-semibold">
+                Owner
               </th>
               <th scope="col" className="px-5 py-3.5 font-semibold">
                 Expected Close
@@ -100,25 +103,24 @@ export function DealsListView({
                   </span>
                 </td>
 
-                {/* Value */}
                 <td className="px-5 py-1 whitespace-nowrap font-medium text-slate-900">
+                  {deal.value} {deal.currency}
+                </td>
+
+                <td className="px-5 py-1 whitespace-nowrap text-slate-500">
                   <div className="flex items-center gap-1.5">
-                    <span>{deal.value}</span>
+                    <Building2 className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                    <span>{deal.account}</span>
                   </div>
                 </td>
 
-                {/* Company */}
-                <td className="px-5 py-1 whitespace-nowrap text-slate-500">
-                  <div className="flex items-center gap-1.5">
-                    <Building2 className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                    <span>{deal.company}</span>
-                  </div>
+                <td className="px-5 py-1 whitespace-nowrap text-slate-600">
+                  {deal.owner}
                 </td>
 
-                {/* Close Date */}
                 <td className="px-5 py-1 whitespace-nowrap text-slate-500">
                   <div className="flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    <Calendar className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                     <span>{deal.closeDate}</span>
                   </div>
                 </td>
@@ -169,7 +171,7 @@ export function DealsListView({
             {allDeals.length === 0 && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-5 py-12 text-center text-sm text-slate-400"
                 >
                   No deals match the current filters.

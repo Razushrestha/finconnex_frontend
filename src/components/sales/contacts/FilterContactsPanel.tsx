@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { Search, ChevronDown, ChevronUp } from "lucide-react";
-import { CONTACT_SOURCES, CONTACT_TYPES } from "@/lib/contacts/types";
+import { CONTACT_SOURCES, CONTACT_STATUSES } from "@/lib/contacts/types";
 
 interface FilterSection {
-  id: "source" | "type";
+  id: "source" | "status";
   title: string;
   fields: readonly string[];
 }
@@ -13,26 +13,29 @@ interface FilterSection {
 const filterSections: FilterSection[] = [
   {
     id: "source",
-    title: "Contact Source",
+    title: "Lead Source",
     fields: CONTACT_SOURCES,
   },
   {
-    id: "type",
-    title: "Type",
-    fields: CONTACT_TYPES,
+    id: "status",
+    title: "Status",
+    fields: CONTACT_STATUSES,
   },
 ];
 
 export interface ContactFilters {
   sources: string[];
-  types: string[];
+  statuses: string[];
 }
 
-export const EMPTY_CONTACT_FILTERS: ContactFilters = { sources: [], types: [] };
+export const EMPTY_CONTACT_FILTERS: ContactFilters = {
+  sources: [],
+  statuses: [],
+};
 
 interface FilterContactsPanelProps {
   filters: ContactFilters;
-  onToggleField: (sectionId: "source" | "type", field: string) => void;
+  onToggleField: (sectionId: "source" | "status", field: string) => void;
   onClose?: () => void;
 }
 
@@ -60,10 +63,10 @@ export function FilterContactsPanel({
       .filter((section) => section.fields.length > 0);
   }, [search]);
 
-  function isChecked(sectionId: "source" | "type", field: string) {
+  function isChecked(sectionId: "source" | "status", field: string) {
     return sectionId === "source"
       ? filters.sources.includes(field)
-      : filters.types.includes(field);
+      : filters.statuses.includes(field);
   }
 
   return (
@@ -84,21 +87,19 @@ export function FilterContactsPanel({
         )}
       </div>
 
-      {/* Search */}
       <div className="border-b border-slate-100 p-3">
         <div className="relative">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search"
-            className="w-full rounded-lg border border-slate-200 py-1.5 pl-8 pr-3 text-xs text-slate-700 placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+            className="w-full rounded-lg border border-slate-200 py-1.5 pr-3 pl-8 text-xs text-slate-700 placeholder:text-slate-400 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 focus:outline-none"
           />
         </div>
       </div>
 
-      {/* Sections */}
       <div className="flex-1 overflow-y-auto px-3 py-2 [scrollbar-color:#94a3b8_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300">
         {filteredSections.map((section) => {
           const isCollapsed = collapsed[section.id];
@@ -107,7 +108,7 @@ export function FilterContactsPanel({
               <button
                 type="button"
                 onClick={() => toggleSection(section.id)}
-                className="mb-1.5 flex w-full items-center justify-between py-1 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700"
+                className="mb-1.5 flex w-full items-center justify-between py-1 text-xs font-semibold tracking-wide text-slate-500 uppercase hover:text-slate-700"
               >
                 {section.title}
                 {isCollapsed ? (
@@ -128,7 +129,7 @@ export function FilterContactsPanel({
                         type="checkbox"
                         checked={isChecked(section.id, field)}
                         onChange={() => onToggleField(section.id, field)}
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-500 focus:ring-indigo-300"
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-violet-500 focus:ring-violet-300"
                       />
                       {field}
                     </label>

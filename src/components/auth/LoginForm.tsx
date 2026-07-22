@@ -3,11 +3,10 @@
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2, ShieldCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 function getSafeDashboardUrl(callbackUrl: string | null): string {
-  // Only allow internal paths; never bounce back to login
   if (
     !callbackUrl ||
     !callbackUrl.startsWith("/") ||
@@ -32,6 +31,7 @@ export function LoginForm() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    event.stopPropagation();
     setError(null);
 
     if (!username.trim() || !password) {
@@ -44,6 +44,7 @@ export function LoginForm() {
     try {
       const response = await fetch("/api/auth/login", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username: username.trim(),
@@ -52,15 +53,19 @@ export function LoginForm() {
         }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setError(data.error ?? "Unable to sign in. Please try again.");
+        setError(
+          (data as { error?: string }).error ??
+            "Unable to sign in. Please try again.",
+        );
+        setIsLoading(false);
         return;
       }
 
-      // Hard navigation so the dashboard layout loads with the new session cookie
-      window.location.assign(destination);
+      // Full page load so the session cookie is picked up by proxy + layouts
+      window.location.href = destination;
     } catch {
       setError("Network error. Check your connection and try again.");
       setIsLoading(false);
@@ -68,7 +73,13 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+    <form
+      onSubmit={handleSubmit}
+      method="post"
+      action="#"
+      className="space-y-5"
+      noValidate
+    >
       {error && (
         <div
           role="alert"
@@ -129,10 +140,14 @@ export function LoginForm() {
         <span className="text-sm text-gray-600">Keep me signed in for 30 days</span>
       </label>
 
-      <Button
+      {/* Native submit button — Base UI Button forces type="button" and breaks form submit */}
+      <button
         type="submit"
         disabled={isLoading}
-        className="h-11 w-full rounded-xl bg-violet-600 text-sm font-semibold text-white hover:bg-violet-700"
+        className={cn(
+          "inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-violet-600 text-sm font-semibold text-white transition-colors hover:bg-violet-700",
+          "disabled:pointer-events-none disabled:opacity-50",
+        )}
       >
         {isLoading ? (
           <>
@@ -145,7 +160,7 @@ export function LoginForm() {
             Sign in to workspace
           </>
         )}
-      </Button>
+      </button>
     </form>
   );
 }

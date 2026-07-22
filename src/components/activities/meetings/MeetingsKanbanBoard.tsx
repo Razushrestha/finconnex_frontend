@@ -19,10 +19,16 @@ export function MeetingsKanbanBoard() {
 
     setColumns((prev) => {
       const sourceCol = prev.find((c) => c.id === dragInfo.sourceColumnId);
+      const targetCol = prev.find((c) => c.id === targetColumnId);
       const meeting = sourceCol?.meetings.find(
         (m) => m.id === dragInfo.meetingId,
       );
-      if (!meeting) return prev;
+      if (!meeting || !targetCol) return prev;
+
+      const moved = {
+        ...meeting,
+        status: targetCol.title as typeof meeting.status,
+      };
 
       return prev.map((col) => {
         if (col.id === dragInfo.sourceColumnId)
@@ -34,7 +40,7 @@ export function MeetingsKanbanBoard() {
         if (col.id === targetColumnId)
           return {
             ...col,
-            meetings: [meeting, ...col.meetings],
+            meetings: [moved, ...col.meetings],
             count: col.count + 1,
           };
         return col;

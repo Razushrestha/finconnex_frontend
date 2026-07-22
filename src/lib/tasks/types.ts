@@ -1,18 +1,34 @@
-export type TaskType =
-  | "Call"
-  | "Email"
-  | "Meeting"
-  | "Followup"
-  | "Demo"
-  | "Research"
-  | "Other";
-export type Priority = "High" | "Medium" | "Low";
-export type TaskStatus =
-  | "Not Started"
-  | "In Progress"
-  | "Completed"
-  | "Deferred"
-  | "Cancelled";
+/** SRS §7.1 Tasks */
+
+import {
+  ACTIVITY_OWNERS,
+  avatarColor,
+  initials,
+  type RelatedTo,
+} from "@/lib/activities/shared";
+
+export const TASK_TYPES = [
+  "Call",
+  "Email",
+  "Meeting",
+  "Follow-up",
+  "Demo",
+  "Research",
+  "Other",
+] as const;
+export type TaskType = (typeof TASK_TYPES)[number];
+
+export const TASK_PRIORITIES = ["High", "Medium", "Low"] as const;
+export type Priority = (typeof TASK_PRIORITIES)[number];
+
+export const TASK_STATUSES = [
+  "Not Started",
+  "In Progress",
+  "Completed",
+  "Deferred",
+  "Cancelled",
+] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
 
 export interface Task {
   taskId: string;
@@ -22,228 +38,183 @@ export interface Task {
   status: TaskStatus;
   dueDate: string;
   assignedTo: string;
-
-  relatedTo?: string;
+  relatedTo?: RelatedTo;
   reminderDate?: string;
   createdBy?: string;
   description?: string;
   completedDate?: string;
-  notes?: string[];
+  notes?: string;
   collaborators?: string[];
-
-  category: string;
-  project: string;
-  urgent?: boolean;
   assignee: {
     initials: string;
     colorClass: string;
   };
+  overdue?: boolean;
 }
 
 export interface TaskColumn {
   id: string;
-  title: string;
+  title: TaskStatus;
   count: number;
   badgeColorClass: string;
   tasks: Task[];
 }
 
+function task(
+  partial: Omit<Task, "assignee"> & { assignee?: Task["assignee"] },
+): Task {
+  return {
+    ...partial,
+    assignee: partial.assignee ?? {
+      initials: initials(partial.assignedTo),
+      colorClass: avatarColor(partial.assignedTo),
+    },
+  };
+}
+
 export const taskColumns: TaskColumn[] = [
   {
-    id: "new",
-    title: "New",
-    count: 603,
+    id: "not-started",
+    title: "Not Started",
+    count: 3,
     badgeColorClass: "bg-sky-500 text-white",
     tasks: [
-      {
-        taskId: "ZWA-T56",
-        title: "Release Announcement",
-        category: "Launch",
-        project: "Zylsoft Web App",
-        taskType: "Meeting",
+      task({
+        taskId: "T-001",
+        title: "Send welcome pack",
+        taskType: "Email",
         priority: "High",
         status: "Not Started",
-        dueDate: "28/06/2026 03:30 AM",
-        assignedTo: "John Doe",
-        assignee: { initials: "JD", colorClass: "bg-amber-100 text-amber-700" },
-        urgent: true,
-      },
-      {
-        taskId: "DS1-T17",
-        title: "Painting - Base Coat",
-        category: "Electricity and wiring",
-        project: "Donelley site construction",
+        dueDate: "22/07/2026",
+        assignedTo: "John Smith",
+        relatedTo: { kind: "Lead", name: "William Anderson" },
+        createdBy: "John Smith",
+        overdue: false,
+      }),
+      task({
+        taskId: "T-002",
+        title: "Discovery call prep",
+        taskType: "Call",
+        priority: "Medium",
+        status: "Not Started",
+        dueDate: "23/07/2026",
+        assignedTo: "Shiva Kadhka",
+        relatedTo: { kind: "Contact", name: "Olivia Bennett" },
+        createdBy: "Shiva Kadhka",
+      }),
+      task({
+        taskId: "T-003",
+        title: "Research competitor pricing",
         taskType: "Research",
-        priority: "High",
+        priority: "Low",
         status: "Not Started",
-        dueDate: "28/05/2026 07:48 PM",
-        assignedTo: "Tom P",
-        assignee: { initials: "TP", colorClass: "bg-rose-100 text-rose-700" },
-        urgent: true,
-      },
-      {
-        taskId: "DS1-T9",
-        title: "Safety Unit Check",
-        category: "Electricity and wiring- All tasks",
-        project: "Donelley site construction",
-        taskType: "Followup",
-        priority: "High",
-        status: "Not Started",
-        dueDate: "02/02/2026 02:30 AM",
-        assignedTo: "Mike R",
-        assignee: {
-          initials: "MR",
-          colorClass: "bg-indigo-100 text-indigo-700",
-        },
-        urgent: true,
-      },
+        dueDate: "25/07/2026",
+        assignedTo: "Tejas Gokhe",
+        relatedTo: { kind: "Deal", name: "Atlas CRM Rollout" },
+        createdBy: "Tejas Gokhe",
+      }),
     ],
   },
   {
     id: "in-progress",
     title: "In Progress",
-    count: 78,
-    badgeColorClass: "bg-slate-400 text-white",
+    count: 2,
+    badgeColorClass: "bg-amber-500 text-white",
     tasks: [
-      {
-        taskId: "Sm-T11",
-        title: "Data assessment",
-        category: "Evaluation and debriefing",
-        project: "New York Pet Drive",
-        taskType: "Research",
-        priority: "High",
-        status: "In Progress",
-        dueDate: "12/09/2026 05:00 PM",
-        assignedTo: "Alex L",
-        assignee: { initials: "AL", colorClass: "bg-amber-100 text-amber-700" },
-        urgent: true,
-      },
-      {
-        taskId: "SC1-T9",
-        title: "Set Roof trusses",
-        category: "Roof and Basement carpentry",
-        project: "Supermarket Construction",
-        taskType: "Other",
-        priority: "High",
-        status: "In Progress",
-        dueDate: "17/07/2026 09:00 AM",
-        assignedTo: "Kate N",
-        assignee: { initials: "KN", colorClass: "bg-slate-200 text-slate-700" },
-        urgent: true,
-      },
-      {
-        taskId: "A7NC-T2",
-        title: "Addition exercise",
-        category: "Math",
-        project: "Zylker airlines mobile app",
+      task({
+        taskId: "T-004",
+        title: "Demo environment setup",
         taskType: "Demo",
         priority: "High",
         status: "In Progress",
-        dueDate: "20/02/2026 02:30 AM",
-        assignedTo: "Rob V",
-        assignee: {
-          initials: "RV",
-          colorClass: "bg-orange-100 text-orange-700",
-        },
-        urgent: true,
-      },
+        dueDate: "21/07/2026",
+        assignedTo: "Roshna Abraham",
+        relatedTo: { kind: "Company", name: "Fabrikam Inc." },
+        createdBy: "John Smith",
+        overdue: true,
+      }),
+      task({
+        taskId: "T-005",
+        title: "Follow-up on proposal",
+        taskType: "Follow-up",
+        priority: "Medium",
+        status: "In Progress",
+        dueDate: "24/07/2026",
+        assignedTo: "John Smith",
+        relatedTo: { kind: "Deal", name: "Greystone Realty" },
+        createdBy: "John Smith",
+      }),
     ],
   },
   {
-    id: "pending",
-    title: "Pending",
-    count: 7,
-    badgeColorClass: "bg-emerald-400 text-white",
+    id: "completed",
+    title: "Completed",
+    count: 2,
+    badgeColorClass: "bg-emerald-500 text-white",
     tasks: [
-      {
-        taskId: "XYA-T43",
-        title: "Spell check",
-        category: "Event management",
-        project: "Zylker Product Launch",
-        taskType: "Other",
+      task({
+        taskId: "T-006",
+        title: "Kickoff meeting notes",
+        taskType: "Meeting",
         priority: "Medium",
-        status: "Deferred",
-        dueDate: "06/05/2026 02:00 AM",
-        assignedTo: "Zara",
-        assignee: { initials: "Z", colorClass: "bg-emerald-500 text-white" },
-        urgent: false,
-      },
-      {
-        taskId: "E8-T5",
-        title: "Check Usage",
-        category: "General",
-        project: "Industrial Equipments Design",
-        taskType: "Research",
-        priority: "Low",
-        status: "Deferred",
-        dueDate: "07/11/2026 10:00 AM",
-        assignedTo: "Paul N",
-        assignee: { initials: "PN", colorClass: "bg-rose-100 text-rose-700" },
-        urgent: false,
-      },
-      {
-        taskId: "ZWA-T10",
-        title: "UI Design",
-        category: "Design",
-        project: "Zylsoft Web App",
-        taskType: "Demo",
+        status: "Completed",
+        dueDate: "18/07/2026",
+        completedDate: "18/07/2026",
+        assignedTo: "Shiva Kadhka",
+        relatedTo: { kind: "Company", name: "Northwind Traders" },
+        createdBy: "Shiva Kadhka",
+      }),
+      task({
+        taskId: "T-007",
+        title: "Send contract draft",
+        taskType: "Email",
         priority: "High",
-        status: "Deferred",
-        dueDate: "04/06/2026 03:30 AM",
-        assignedTo: "Sam G",
-        assignee: { initials: "SG", colorClass: "bg-amber-100 text-amber-700" },
-        urgent: true,
-      },
+        status: "Completed",
+        dueDate: "17/07/2026",
+        completedDate: "17/07/2026",
+        assignedTo: "Tejas Gokhe",
+        relatedTo: { kind: "Deal", name: "Atlas CRM Rollout" },
+        createdBy: "Tejas Gokhe",
+      }),
     ],
   },
   {
-    id: "complete",
-    title: "Complete",
-    count: 9,
-    badgeColorClass: "bg-sky-500 text-white",
+    id: "deferred",
+    title: "Deferred",
+    count: 1,
+    badgeColorClass: "bg-slate-500 text-white",
     tasks: [
-      {
-        taskId: "DS1-T79",
-        title: "Import screws",
-        category: "General",
-        project: "Donelley site",
+      task({
+        taskId: "T-008",
+        title: "Quarterly business review",
+        taskType: "Meeting",
+        priority: "Low",
+        status: "Deferred",
+        dueDate: "30/08/2026",
+        assignedTo: "Roshna Abraham",
+        relatedTo: { kind: "Contact", name: "Marcus Lin" },
+        createdBy: "John Smith",
+      }),
+    ],
+  },
+  {
+    id: "cancelled",
+    title: "Cancelled",
+    count: 1,
+    badgeColorClass: "bg-rose-500 text-white",
+    tasks: [
+      task({
+        taskId: "T-009",
+        title: "Legacy import check",
         taskType: "Other",
         priority: "Low",
-        status: "Completed",
-        dueDate: "17/07/2026 12:00 PM",
-        assignedTo: "Tom P",
-        assignee: { initials: "TP", colorClass: "bg-rose-100 text-rose-700" },
-        urgent: false,
-      },
-      {
-        taskId: "AC1-T108",
-        title: "Import screws",
-        category: "Hardware- All tasks",
-        project: "Apt. Construction",
-        taskType: "Other",
-        priority: "Low",
-        status: "Completed",
-        dueDate: "17/07/2026 12:00 PM",
-        assignedTo: "Kate N",
-        assignee: { initials: "KN", colorClass: "bg-slate-200 text-slate-700" },
-        urgent: false,
-      },
-      {
-        taskId: "AC1-T168",
-        title: "Install windows",
-        category: "Roof and Basement",
-        project: "Apt. Construction",
-        taskType: "Other",
-        priority: "Medium",
-        status: "Completed",
-        dueDate: "17/07/2026 12:00 PM",
-        assignedTo: "Mike R",
-        assignee: {
-          initials: "MR",
-          colorClass: "bg-indigo-100 text-indigo-700",
-        },
-        urgent: false,
-      },
+        status: "Cancelled",
+        dueDate: "10/07/2026",
+        assignedTo: "John Smith",
+        createdBy: "John Smith",
+      }),
     ],
   },
 ];
+
+export const TASK_OWNERS = ACTIVITY_OWNERS;

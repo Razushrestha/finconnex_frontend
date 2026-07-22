@@ -1,20 +1,20 @@
 "use client";
 
-import type { Message, MessageStatus } from "@/lib/messages/types";
+import type { Message, MessageStatus, MessageType } from "@/lib/messages/types";
 import { messages } from "@/lib/messages/types";
 
 const statusStyles: Record<MessageStatus, string> = {
+  Draft: "bg-slate-100 text-slate-600",
   Sent: "bg-blue-50 text-blue-600",
   Delivered: "bg-indigo-50 text-indigo-600",
   Read: "bg-emerald-50 text-emerald-600",
   Failed: "bg-rose-50 text-rose-600",
 };
 
-const channelStyles: Record<Message["channel"], string> = {
-  SMS: "bg-slate-100 text-slate-600",
-  WhatsApp: "bg-emerald-50 text-emerald-600",
-  Email: "bg-amber-50 text-amber-600",
-  Chat: "bg-violet-50 text-violet-600",
+const typeStyles: Record<MessageType, string> = {
+  Internal: "bg-violet-50 text-violet-700",
+  External: "bg-sky-50 text-sky-700",
+  System: "bg-amber-50 text-amber-700",
 };
 
 interface MessagesListTableProps {
@@ -24,23 +24,23 @@ interface MessagesListTableProps {
 export function MessagesListTable({ data = messages }: MessagesListTableProps) {
   return (
     <div className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-200 bg-white">
-      {/* Internal scroll wrapper — owns its own scrolling, independent of parent */}
-      <div className="min-h-0 flex-1 overflow-auto rounded-2xl [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100">
-        <table className="w-full min-w-[840px] border-separate border-spacing-0 text-sm">
+      <div className="min-h-0 flex-1 overflow-auto">
+        <table className="w-full min-w-[900px] border-separate border-spacing-0 text-[12px]">
           <thead className="sticky top-0 z-10 bg-white">
             <tr>
               {[
+                "Type",
+                "Subject",
+                "Body",
+                "From",
+                "To",
                 "Related To",
-                "Sender",
-                "Message",
-                "Channel",
-                "Direction",
-                "Timestamp",
                 "Status",
+                "Sent",
               ].map((heading) => (
                 <th
                   key={heading}
-                  className="border-b border-slate-200 bg-white px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"
+                  className="border-b border-slate-200 bg-slate-50/90 px-3 py-2.5 text-left text-[11px] font-medium tracking-wide text-slate-400 uppercase"
                 >
                   {heading}
                 </th>
@@ -49,63 +49,41 @@ export function MessagesListTable({ data = messages }: MessagesListTableProps) {
           </thead>
           <tbody>
             {data.map((message) => (
-              <tr key={message.id} className="group hover:bg-slate-50">
-                <td className="border-b border-slate-100 px-4 py-3 font-medium text-slate-800">
-                  {message.relatedTo}
-                </td>
-                <td className="border-b border-slate-100 px-4 py-3 text-slate-600">
-                  {message.sender}
-                </td>
-                <td className="max-w-[280px] truncate border-b border-slate-100 px-4 py-3 text-slate-600">
-                  {message.subject ? (
-                    <span className="mr-1 font-medium text-slate-700">
-                      {message.subject}:
-                    </span>
-                  ) : null}
-                  {message.content}
-                </td>
-                <td className="border-b border-slate-100 px-4 py-3">
+              <tr key={message.id} className="hover:bg-slate-50">
+                <td className="border-b border-slate-100 px-3 py-2.5">
                   <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${channelStyles[message.channel]}`}
+                    className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${typeStyles[message.type]}`}
                   >
-                    {message.channel}
+                    {message.type}
                   </span>
                 </td>
-                <td className="border-b border-slate-100 px-4 py-3 text-slate-600">
-                  <span
-                    className={`inline-flex items-center gap-1 text-xs font-medium ${
-                      message.direction === "Incoming"
-                        ? "text-slate-500"
-                        : "text-slate-700"
-                    }`}
-                  >
-                    {message.direction === "Incoming" ? "↓" : "↑"}{" "}
-                    {message.direction}
-                  </span>
+                <td className="border-b border-slate-100 px-3 py-2.5 font-semibold text-slate-900">
+                  {message.subject}
                 </td>
-                <td className="whitespace-nowrap border-b border-slate-100 px-4 py-3 text-slate-500">
-                  {message.timestamp}
+                <td className="max-w-[220px] truncate border-b border-slate-100 px-3 py-2.5 text-slate-600">
+                  {message.body}
                 </td>
-                <td className="border-b border-slate-100 px-4 py-3">
+                <td className="border-b border-slate-100 px-3 py-2.5 text-slate-600">
+                  {message.from}
+                </td>
+                <td className="border-b border-slate-100 px-3 py-2.5 text-slate-600">
+                  {message.to}
+                </td>
+                <td className="border-b border-slate-100 px-3 py-2.5 text-slate-500">
+                  {message.relatedTo || "—"}
+                </td>
+                <td className="border-b border-slate-100 px-3 py-2.5">
                   <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[message.status]}`}
+                    className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusStyles[message.status]}`}
                   >
                     {message.status}
                   </span>
                 </td>
-              </tr>
-            ))}
-
-            {data.length === 0 && (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-4 py-10 text-center text-sm text-slate-400"
-                >
-                  No messages found.
+                <td className="border-b border-slate-100 px-3 py-2.5 whitespace-nowrap text-slate-500">
+                  {message.sentDate || "—"}
                 </td>
               </tr>
-            )}
+            ))}
           </tbody>
         </table>
       </div>

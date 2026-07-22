@@ -1,155 +1,161 @@
-export type CallStatus = "Scheduled" | "Completed" | "Missed" | "Cancelled";
+/** SRS §7.2 Calls */
+
+import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+
+export const CALL_TYPES = [
+  "Inbound",
+  "Outbound",
+  "Missed",
+  "Voicemail",
+] as const;
+export type CallType = (typeof CALL_TYPES)[number];
+
+export const CALL_STATUSES = [
+  "Scheduled",
+  "Completed",
+  "No Answer",
+  "Voicemail Left",
+  "Cancelled",
+] as const;
+export type CallStatus = (typeof CALL_STATUSES)[number];
 
 export interface Call {
   id: string;
-  relatedTo: string;
-  callOwner: string;
   subject: string;
-  callType: "Outbound" | "Inbound" | "Missed";
-  callStartTime: string;
-  callDuration?: string;
-  callPurpose?: string;
-  description?: string;
+  relatedTo?: string;
+  contact?: string;
+  callType: CallType;
   status: CallStatus;
+  date: string;
+  duration?: string;
+  notes?: string;
+  assignedTo: string;
 }
 
 export interface CallColumn {
   id: string;
-  title: string;
+  title: CallStatus;
   count: number;
   badgeColorClass: string;
   calls: Call[];
 }
 
-export const totalCallRecords = 1427;
-
-export const calls: Call[] = [
-  {
-    id: "c1",
-    relatedTo: "Shiva Khadka",
-    callOwner: "Bishnu Aryal",
-    subject: "Call scheduled with Shiva Khadka",
-    callType: "Outbound",
-    callStartTime: "24/05/2029 01:00 PM",
-    status: "Scheduled",
-  },
-  {
-    id: "c2",
-    relatedTo: "Sithira Dasith",
-    callOwner: "Admin",
-    subject: "Call scheduled with Sithira Dasith",
-    callType: "Outbound",
-    callStartTime: "23/06/2027 12:00 AM",
-    callPurpose: "Prospecting",
-    status: "Scheduled",
-  },
-  {
-    id: "c3",
-    relatedTo: "Aneesh Kumar Kulandhaigounder",
-    callOwner: "Admin",
-    subject: "Call scheduled with Aneesh Kumar Kulandhaigounder",
-    callType: "Outbound",
-    callStartTime: "03/06/2027 09:00 AM",
-    callPurpose: "Prospecting",
-    status: "Completed",
-  },
-  {
-    id: "c4",
-    relatedTo: "Shoieb Mohammed",
-    callOwner: "Admin",
-    subject: "Call scheduled with Shoieb Mohammed",
-    callType: "Outbound",
-    callStartTime: "25/05/2027 05:00 PM",
-    status: "Completed",
-  },
-  {
-    id: "c5",
-    relatedTo: "Ravisingh Rawat",
-    callOwner: "Admin",
-    subject: "Call scheduled with Ravisingh Rawat",
-    callType: "Outbound",
-    callStartTime: "15/04/2027 09:00 AM",
-    callPurpose: "Prospecting",
-    status: "Completed",
-  },
-  {
-    id: "c6",
-    relatedTo: "Thanju Paragahathora Pathirage Dona",
-    callOwner: "Admin",
-    subject: "Call scheduled with Thanju Paragahathora Pathirage Dona",
-    callType: "Outbound",
-    callStartTime: "15/03/2027 07:00 AM",
-    callPurpose: "Prospecting",
-    status: "Missed",
-  },
-  {
-    id: "c7",
-    relatedTo: "Thanju Paragahathora Pathirage Dona",
-    callOwner: "Admin",
-    subject: "Call scheduled with THANUJI PARAGAHATHORA PATHIRAGE DONA",
-    callType: "Outbound",
-    callStartTime: "15/03/2027 07:00 AM",
-    callPurpose: "Prospecting",
-    status: "Missed",
-  },
-  {
-    id: "c8",
-    relatedTo: "Ramchandra Umakant Patil",
-    callOwner: "Admin",
-    subject: "Call scheduled with Ramchandra Umakant Patil",
-    callType: "Outbound",
-    callStartTime: "13/02/2027 07:00 AM",
-    status: "Cancelled",
-  },
-  {
-    id: "c9",
-    relatedTo: "Tejas Gokhe",
-    callOwner: "Admin",
-    subject: "Call scheduled with Tejas Gokhe",
-    callType: "Outbound",
-    callStartTime: "05/01/2027 12:00 AM",
-    callPurpose: "Prospecting",
-    status: "Cancelled",
-  },
-  {
-    id: "c10",
-    relatedTo: "Roshna Abraham",
-    callOwner: "Admin",
-    subject: "Call scheduled with Roshna Abraham",
-    callType: "Outbound",
-    callStartTime: "15/12/2026 12:00 AM",
-    callPurpose: "Prospecting",
-    status: "Completed",
-  },
-];
+export const CALL_OWNERS = ACTIVITY_OWNERS;
 
 export const callColumns: CallColumn[] = [
   {
     id: "scheduled",
     title: "Scheduled",
-    count: 412,
+    count: 2,
     badgeColorClass: "bg-sky-500 text-white",
-    calls: calls.filter((c) => c.status === "Scheduled"),
+    calls: [
+      {
+        id: "c1",
+        subject: "Discovery call — Anderson Finance",
+        relatedTo: "Lead: William Anderson",
+        contact: "William Anderson",
+        callType: "Outbound",
+        status: "Scheduled",
+        date: "22/07/2026 10:00 AM",
+        assignedTo: "John Smith",
+      },
+      {
+        id: "c2",
+        subject: "Follow-up with Olivia Bennett",
+        relatedTo: "Contact: Olivia Bennett",
+        contact: "Olivia Bennett",
+        callType: "Outbound",
+        status: "Scheduled",
+        date: "23/07/2026 02:00 PM",
+        assignedTo: "Shiva Kadhka",
+      },
+    ],
   },
   {
     id: "completed",
     title: "Completed",
-    count: 861,
-    badgeColorClass: "bg-emerald-400 text-white",
-    calls: calls.filter((c) => c.status === "Completed"),
+    count: 2,
+    badgeColorClass: "bg-emerald-500 text-white",
+    calls: [
+      {
+        id: "c3",
+        subject: "Inbound support — Contoso",
+        relatedTo: "Company: Contoso Ltd.",
+        contact: "Marcus Lin",
+        callType: "Inbound",
+        status: "Completed",
+        date: "20/07/2026 11:30 AM",
+        duration: "18 min",
+        notes: "Resolved billing question.",
+        assignedTo: "Tejas Gokhe",
+      },
+      {
+        id: "c4",
+        subject: "Deal review — Greystone",
+        relatedTo: "Deal: Greystone Realty",
+        callType: "Outbound",
+        status: "Completed",
+        date: "19/07/2026 04:00 PM",
+        duration: "32 min",
+        assignedTo: "Roshna Abraham",
+      },
+    ],
   },
   {
-    id: "missed",
-    title: "Missed",
-    count: 98,
-    badgeColorClass: "bg-rose-400 text-white",
-    calls: calls.filter((c) => c.status === "Missed"),
+    id: "no-answer",
+    title: "No Answer",
+    count: 1,
+    badgeColorClass: "bg-amber-500 text-white",
+    calls: [
+      {
+        id: "c5",
+        subject: "Cold outreach — Riverstone",
+        relatedTo: "Lead: Chloe Ramirez",
+        callType: "Outbound",
+        status: "No Answer",
+        date: "21/07/2026 09:15 AM",
+        assignedTo: "John Smith",
+      },
+    ],
+  },
+  {
+    id: "voicemail-left",
+    title: "Voicemail Left",
+    count: 1,
+    badgeColorClass: "bg-violet-500 text-white",
+    calls: [
+      {
+        id: "c6",
+        subject: "Voicemail — Priya Nair",
+        relatedTo: "Contact: Priya Nair",
+        contact: "Priya Nair",
+        callType: "Voicemail",
+        status: "Voicemail Left",
+        date: "20/07/2026 03:45 PM",
+        duration: "0:42",
+        assignedTo: "Shiva Kadhka",
+      },
+    ],
   },
   {
     id: "cancelled",
     title: "Cancelled",
-    count: 56,
-    badgeColorClass: "bg-slate-400 text-white",
-    calls: calls.filter((c) => c.status === "Cancelled"),
+    count: 1,
+    badgeColorClass: "bg-rose-500 text-white",
+    calls: [
+      {
+        id: "c7",
+        subject: "Cancelled sync — Bright Bay",
+        relatedTo: "Company: Bright Bay Co.",
+        callType: "Outbound",
+        status: "Cancelled",
+        date: "18/07/2026 01:00 PM",
+        assignedTo: "Tejas Gokhe",
+      },
+    ],
   },
 ];
+
+/** Flat list for legacy list consumers */
+export const calls: Call[] = callColumns.flatMap((c) => c.calls);
+export const totalCallRecords = calls.length;
