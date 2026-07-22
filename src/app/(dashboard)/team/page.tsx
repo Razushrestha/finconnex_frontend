@@ -1,9 +1,15 @@
-"use client";
-
-import { NewTeamMembersCard } from "@/components/teams/NewTeamMembersCard";
+import type { Metadata } from "next";
 import { TeamManagementHeader } from "@/components/teams/TeamManagementHeader";
-import { TeamPerformancesCard } from "@/components/teams/TeamPerformancesCard";
 import { TeamStatCard } from "@/components/teams/TeamStatCard";
+import {
+  NewTeamMembersCard,
+  TeamPerformancesCard,
+} from "@/lib/lazy-charts";
+
+export const metadata: Metadata = {
+  title: "Team — FinConnex",
+  description: "Team performance, members, and management.",
+};
 
 export default function TeamManagementPage() {
   return (

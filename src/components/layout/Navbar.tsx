@@ -1,14 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
   ChevronsLeft,
   Search,
-  Sun,
-  Moon,
   MessageSquare,
   Bell,
   Calendar,
@@ -17,7 +15,12 @@ import {
   Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SearchModal } from "@/components/layout/SearchModal";
+
+const SearchModal = dynamic(
+  () =>
+    import("@/components/layout/SearchModal").then((m) => m.SearchModal),
+  { ssr: false },
+);
 
 interface NavbarProps {
   onToggleSidebar?: () => void;
@@ -38,8 +41,6 @@ export function Navbar({
   newLeadsCount = 27,
   user = { name: "John Smith", role: "Manager" },
 }: NavbarProps) {
-  const router = useRouter();
-  const [theme, setTheme] = React.useState<"light" | "dark">("light");
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
@@ -59,9 +60,9 @@ export function Navbar({
     setIsLoggingOut(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
-      router.push("/login");
-      router.refresh();
-    } finally {
+      // Hard navigation so login loads without any leftover dashboard state
+      window.location.assign("/login");
+    } catch {
       setIsLoggingOut(false);
       setMenuOpen(false);
     }
@@ -94,7 +95,9 @@ export function Navbar({
         </span>
       </button>
 
-      <SearchModal open={searchOpen} onOpenChange={setSearchOpen} />
+      {searchOpen ? (
+        <SearchModal open={searchOpen} onOpenChange={setSearchOpen} />
+      ) : null}
 
       {user.tenantName && (
         <div className="hidden h-10 shrink-0 items-center gap-2 rounded-full border border-violet-100 bg-violet-50 px-4 md:flex">
@@ -115,31 +118,6 @@ export function Navbar({
       </div>
 
       <div className="flex-1" />
-
-      <div className="flex h-10 shrink-0 items-center gap-1 rounded-full bg-gray-100 p-1">
-        <button
-          type="button"
-          onClick={() => setTheme("light")}
-          aria-label="Light mode"
-          className={cn(
-            "flex h-8 w-8 items-center justify-center rounded-full",
-            theme === "light" ? "bg-white shadow-sm" : "text-gray-400",
-          )}
-        >
-          <Sun className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setTheme("dark")}
-          aria-label="Dark mode"
-          className={cn(
-            "flex h-8 w-8 items-center justify-center rounded-full",
-            theme === "dark" ? "bg-white shadow-sm" : "text-gray-400",
-          )}
-        >
-          <Moon className="h-4 w-4" />
-        </button>
-      </div>
 
       <div className="flex shrink-0 items-center gap-2">
         <button

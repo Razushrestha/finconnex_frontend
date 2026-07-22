@@ -1,5 +1,6 @@
 import dynamic from "next/dynamic";
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import {
   DashboardBreadcrumb,
   OrderByTimeCard,
@@ -15,10 +16,18 @@ const DashboardMetricsSection = dynamic(
   { loading: () => <CardGridSkeleton count={4} /> },
 );
 
-const DashboardAnalyticsSection = dynamic(
+const DashboardChartRow = dynamic(
   () =>
     import("@/components/dashboard/DashboardAnalyticsSection").then(
-      (m) => m.DashboardAnalyticsSection,
+      (m) => m.DashboardChartRow,
+    ),
+  { loading: () => <CardGridSkeleton count={2} /> },
+);
+
+const DashboardDealsRow = dynamic(
+  () =>
+    import("@/components/dashboard/DashboardAnalyticsSection").then(
+      (m) => m.DashboardDealsRow,
     ),
   { loading: () => <CardGridSkeleton count={2} /> },
 );
@@ -33,6 +42,11 @@ const TaskUpdateCard = dynamic(
   { loading: () => <ChartSkeleton className="min-h-[420px]" /> },
 );
 
+export const metadata: Metadata = {
+  title: "Dashboard — FinConnex",
+  description: "CRM overview with sales, finance, and team insights.",
+};
+
 export default function DashboardPage() {
   return (
     <div className="flex flex-1 flex-col gap-4 bg-zinc-50 p-6">
@@ -45,7 +59,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
         <div className="lg:col-span-3">
           <Suspense fallback={<CardGridSkeleton count={2} />}>
-            <DashboardAnalyticsSection />
+            <DashboardChartRow />
           </Suspense>
         </div>
         <OrderByTimeCard />
@@ -53,6 +67,11 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <UpcomingMeetingsCard />
+        <div className="lg:col-span-2">
+          <Suspense fallback={<CardGridSkeleton count={2} />}>
+            <DashboardDealsRow />
+          </Suspense>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_420px]">

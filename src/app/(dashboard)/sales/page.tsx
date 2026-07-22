@@ -1,19 +1,27 @@
+import type { Metadata } from "next";
+import Link from "next/link";
 import { Wallet, ShoppingCart, LineChart, Target } from "lucide-react";
 import { SalesStatCard } from "@/components/sales/SalesStatCard";
-import { SalesReportCard } from "@/components/sales/SalesReportCard";
 import { MonthlyTargetCard } from "@/components/sales/MonthlyTargetCard";
 import { SalesByCountryCard } from "@/components/sales/SalesByCountryCard";
-import { TotalVisitorsCard } from "@/components/sales/TotalVisitorsCard";
 import { RecentSalesTable } from "@/components/sales/RecentSalesTable";
 import { TopSellingItemsTable } from "@/components/sales/TopSellingItemsTable";
-import { SalesGrowthCard } from "@/components/sales/SalesGrowthCard";
+import {
+  SalesGrowthCard,
+  SalesReportCard,
+  TotalVisitorsCard,
+} from "@/lib/lazy-charts";
+
+export const metadata: Metadata = {
+  title: "Sales — FinConnex",
+  description: "Sales performance, leads, and conversion analytics.",
+};
 
 export default function SalesDashboardPage() {
   return (
     <div className="min-h-screen bg-slate-50/50 p-8">
-      {/* Breadcrumb */}
       <nav className="mb-8 flex items-center gap-2 text-sm text-slate-400">
-        <a href="/" className="flex items-center gap-1.5 hover:text-slate-600">
+        <Link href="/" className="flex items-center gap-1.5 hover:text-slate-600">
           <svg
             className="h-4 w-4"
             fill="none"
@@ -28,13 +36,12 @@ export default function SalesDashboardPage() {
             />
           </svg>
           Home
-        </a>
+        </Link>
         <span>&gt;</span>
         <span className="text-slate-500">Sales</span>
       </nav>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-4">
+      <div className="mb-4 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <SalesStatCard
           icon={Wallet}
           iconColorClass="bg-indigo-50 text-indigo-500"
@@ -63,13 +70,13 @@ export default function SalesDashboardPage() {
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr_1fr] mb-4">
+      <div className="mb-4 grid grid-cols-1 gap-6 lg:grid-cols-[2fr_1fr_1fr]">
         <SalesReportCard />
         <MonthlyTargetCard />
         <SalesByCountryCard />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_2.2fr] mb-4">
+      <div className="mb-4 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_2.2fr]">
         <TotalVisitorsCard />
         <RecentSalesTable />
       </div>

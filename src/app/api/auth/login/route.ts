@@ -4,6 +4,7 @@ import { createSessionToken } from "@/lib/auth/session";
 import {
   getSessionCookieOptions,
   SESSION_COOKIE,
+  STATIC_LOGIN,
 } from "@/lib/auth/constants";
 import { loginSchema } from "@/lib/auth/validation";
 
@@ -19,7 +20,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const { rememberMe } = parsed.data;
+    const { username, password, rememberMe } = parsed.data;
+
+    // Static credential check — swap for real API auth later
+    if (
+      username !== STATIC_LOGIN.username ||
+      password !== STATIC_LOGIN.password
+    ) {
+      return NextResponse.json(
+        { error: "Invalid username or password" },
+        { status: 401 },
+      );
+    }
+
     const result = getDefaultSession();
 
     const token = await createSessionToken(
