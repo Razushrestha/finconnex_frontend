@@ -16,6 +16,7 @@ const PUBLIC_PREFIXES = [
   "/book/", // Public booking
   "/f/", // Marketing forms
   "/l/", // Linktree
+  "/j/", // Proposal-to-payment journey (client link)
 ] as const;
 
 function isPublicPath(pathname: string): boolean {

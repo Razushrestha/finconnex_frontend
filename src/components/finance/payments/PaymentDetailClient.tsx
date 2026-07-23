@@ -19,7 +19,10 @@ import {
 } from "@/lib/finance/invoices/types";
 import { formatAUD } from "@/lib/finance/shared";
 import { PAYMENT_STATUS_STYLE } from "@/lib/finance/statusStyles";
+import { CommercialTrail } from "@/components/finance/CommercialTrail";
 import { cn } from "@/lib/utils";
+import { softDeleteRecord } from "@/lib/rules";
+import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 
 export function PaymentDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -101,6 +104,10 @@ export function PaymentDetailClient({ id }: { id: string }) {
                 Home
               </Link>
               <span>/</span>
+              <Link href="/finance" className="hover:text-slate-600">
+                Sales Ops
+              </Link>
+              <span>/</span>
               <Link href="/finance/payments" className="hover:text-slate-600">
                 Payments
               </Link>
@@ -148,6 +155,19 @@ export function PaymentDetailClient({ id }: { id: string }) {
             <button
               type="button"
               onClick={() => {
+                if (!window.confirm(`Delete ${row.paymentId}?`)) return;
+                const gate = softDeleteRecord({
+                  action: "finance.payments.delete",
+                  module: "finance.payments",
+                  recordId: row.id,
+                  recordLabel: row.paymentId,
+                  recordType: "Payment",
+                  snapshot: row,
+                });
+                if (!gate.ok) {
+                  window.alert(gate.message);
+                  return;
+                }
                 deletePayment(row.id);
                 router.push("/finance/payments");
               }}
@@ -158,6 +178,16 @@ export function PaymentDetailClient({ id }: { id: string }) {
             </button>
           </div>
         </div>
+
+        <CommercialTrail
+          links={[
+            {
+              label: row.invoiceRef,
+              href: `/finance/invoices/${row.invoiceId}`,
+            },
+            { label: row.paymentId, current: true },
+          ]}
+        />
 
         <div className="overflow-hidden rounded-2xl border border-slate-100/80 bg-white shadow-sm">
           <div className="grid gap-4 px-5 py-5 sm:grid-cols-2">
@@ -199,18 +229,11 @@ export function PaymentDetailClient({ id }: { id: string }) {
             ) : null}
           </div>
           <div className="border-t border-slate-100 px-5 py-4">
-            <h3 className="mb-2 text-[11px] font-bold tracking-wide text-slate-500 uppercase">
-              Audit
-            </h3>
-            <ul className="space-y-1.5">
-              {row.audit.map((a) => (
-                <li key={a.id} className="text-[11px] text-slate-500">
-                  <span className="font-medium text-slate-700">{a.action}</span>
-                  {" · "}
-                  {a.actor} · {a.at}
-                </li>
-              ))}
-            </ul>
+            <RecordAuditHistory
+              module="finance.payments"
+              recordId={row.id}
+              localAudit={row.audit}
+            />
           </div>
         </div>
       </div>

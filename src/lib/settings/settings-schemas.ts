@@ -1,135 +1,366 @@
-export const SETTINGS_SCHEMAS: Record<string, any> = {
-  "company-profile": {
-    title: "Company Profile & Corporate Identity",
-    description:
-      "Manage your legal entity records, tax registration numbers, registered addresses, and corporate branding assets.",
+/**
+ * Settings field schemas — keyed by `${category}/${subpage}`.
+ * Every SRS page gets a concrete form (curated override or generated defaults).
+ */
+
+import {
+  SETTINGS_CATEGORIES,
+  settingsSchemaKey,
+  type SettingsCategory,
+  type SettingsSubItem,
+} from "@/lib/settings/settings-config";
+
+export type SettingsFieldType =
+  | "text"
+  | "textarea"
+  | "select"
+  | "toggle"
+  | "file"
+  | "number";
+
+export interface SettingsFieldOption {
+  label: string;
+  value: string;
+}
+
+export interface SettingsField {
+  id: string;
+  label: string;
+  type: SettingsFieldType;
+  placeholder?: string;
+  defaultValue?: string | boolean | number;
+  options?: SettingsFieldOption[];
+  help?: string;
+}
+
+export interface SettingsSchema {
+  title: string;
+  description: string;
+  fields: SettingsField[];
+}
+
+const YES_NO = [
+  { label: "Enabled", value: "enabled" },
+  { label: "Disabled", value: "disabled" },
+];
+
+function slugToLabel(slug: string) {
+  return slug
+    .split("-")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+/** Sensible defaults by page title keywords / section. */
+function generateSchema(
+  category: SettingsCategory,
+  item: SettingsSubItem,
+): SettingsSchema {
+  const title = item.title;
+  const description =
+    item.blurb ??
+    `${category.section} · Configure ${title.toLowerCase()} for this tenant.`;
+  const baseId = item.slug.replace(/-/g, "_");
+
+  // Integration / connect surfaces
+  if (
+    category.slug === "integrations" ||
+    [
+      "facebook-page",
+      "instagram-business",
+      "whatsapp-business",
+      "stripe",
+      "twilio",
+      "xero",
+      "myob",
+      "quickbooks",
+      "zapier",
+      "make",
+    ].includes(item.slug)
+  ) {
+    return {
+      title,
+      description,
+      fields: [
+        {
+          id: `${baseId}_connected`,
+          label: "Connection status",
+          type: "toggle",
+          defaultValue: false,
+          help: "Toggle to simulate connect / disconnect in this demo.",
+        },
+        {
+          id: `${baseId}_account`,
+          label: "Account / workspace",
+          type: "text",
+          placeholder: "e.g. finconnex-prod",
+        },
+        {
+          id: `${baseId}_sync`,
+          label: "Sync frequency",
+          type: "select",
+          defaultValue: "15m",
+          options: [
+            { label: "Every 5 minutes", value: "5m" },
+            { label: "Every 15 minutes", value: "15m" },
+            { label: "Hourly", value: "1h" },
+            { label: "Manual only", value: "manual" },
+          ],
+        },
+        {
+          id: `${baseId}_notes`,
+          label: "Admin notes",
+          type: "textarea",
+          placeholder: "Internal notes about this connection…",
+        },
+      ],
+    };
+  }
+
+  // Template libraries
+  if (category.slug === "templates" || item.slug.includes("template")) {
+    return {
+      title,
+      description,
+      fields: [
+        {
+          id: `${baseId}_default_name`,
+          label: "Default template name",
+          type: "text",
+          placeholder: `Default ${title}`,
+        },
+        {
+          id: `${baseId}_active`,
+          label: "Templates enabled",
+          type: "toggle",
+          defaultValue: true,
+        },
+        {
+          id: `${baseId}_locale`,
+          label: "Default language",
+          type: "select",
+          defaultValue: "en-AU",
+          options: [
+            { label: "English (AU)", value: "en-AU" },
+            { label: "English (US)", value: "en-US" },
+            { label: "English (UK)", value: "en-GB" },
+          ],
+        },
+        {
+          id: `${baseId}_body`,
+          label: "Sample body / merge fields",
+          type: "textarea",
+          placeholder: "Hi {{first_name}}, …",
+        },
+      ],
+    };
+  }
+
+  // Log / monitor / history style pages
+  if (
+    /log|history|monitor|queue|usage|activity|session/i.test(item.slug) ||
+    /Logs|History|Monitor|Queue|Usage|Activity|Sessions/.test(title)
+  ) {
+    return {
+      title,
+      description,
+      fields: [
+        {
+          id: `${baseId}_retention_days`,
+          label: "Retention (days)",
+          type: "number",
+          defaultValue: 90,
+        },
+        {
+          id: `${baseId}_level`,
+          label: "Detail level",
+          type: "select",
+          defaultValue: "standard",
+          options: [
+            { label: "Errors only", value: "errors" },
+            { label: "Standard", value: "standard" },
+            { label: "Verbose", value: "verbose" },
+          ],
+        },
+        {
+          id: `${baseId}_export`,
+          label: "Allow CSV export",
+          type: "toggle",
+          defaultValue: true,
+        },
+        {
+          id: `${baseId}_alert_email`,
+          label: "Alert email",
+          type: "text",
+          placeholder: "ops@finconnex.example",
+        },
+      ],
+    };
+  }
+
+  // Generic configurable page
+  return {
+    title,
+    description,
+    fields: [
+      {
+        id: `${baseId}_enabled`,
+        label: `${title} enabled`,
+        type: "toggle",
+        defaultValue: true,
+      },
+      {
+        id: `${baseId}_name`,
+        label: `${title} label`,
+        type: "text",
+        placeholder: title,
+        defaultValue: title,
+      },
+      {
+        id: `${baseId}_mode`,
+        label: "Mode",
+        type: "select",
+        defaultValue: "standard",
+        options: [
+          { label: "Standard", value: "standard" },
+          { label: "Strict", value: "strict" },
+          { label: "Custom", value: "custom" },
+        ],
+      },
+      {
+        id: `${baseId}_notes`,
+        label: "Notes",
+        type: "textarea",
+        placeholder: `Configuration notes for ${title.toLowerCase()}…`,
+      },
+    ],
+  };
+}
+
+/** Hand-tuned schemas for high-visibility SRS pages. */
+const CURATED: Record<string, SettingsSchema> = {
+  "organization/company-profile": {
+    title: "Company Profile",
+    description: "Legal entity, contacts, and primary brand identity.",
     fields: [
       {
         id: "companyName",
-        label: "Display / Brand Name",
+        label: "Display / brand name",
         type: "text",
-        placeholder: "e.g. Meta-Tronix",
+        defaultValue: "FinConnex",
+        placeholder: "FinConnex",
       },
       {
         id: "legalName",
-        label: "Official Registered Legal Name",
+        label: "Registered legal name",
         type: "text",
-        placeholder: "e.g. Meta-Tronix Technologies Private Limited",
+        defaultValue: "Finconnex Financial Services Pty Ltd",
       },
       {
-        id: "taxId",
-        label: "Tax ID / VAT / EIN Number",
+        id: "abn",
+        label: "ABN / Tax ID",
         type: "text",
-        placeholder: "e.g. US-123456789",
+        placeholder: "12 345 678 901",
       },
       {
         id: "industry",
-        label: "Industry Sector",
+        label: "Primary industry",
         type: "select",
+        defaultValue: "mortgage",
         options: [
-          { label: "Software & SaaS", value: "tech" },
-          { label: "E-Commerce & Retail", value: "retail" },
-          { label: "Financial Services", value: "finance" },
-          { label: "Consulting & Agency", value: "agency" },
+          { label: "Mortgage / Finance", value: "mortgage" },
+          { label: "Accounting", value: "accounting" },
+          { label: "Real Estate", value: "real-estate" },
+          { label: "Legal", value: "legal" },
+          { label: "Insurance", value: "insurance" },
+          { label: "Agency", value: "agency" },
         ],
       },
       {
-        id: "companyEmail",
-        label: "Corporate Support Email",
+        id: "email",
+        label: "Company email",
         type: "text",
-        placeholder: "contact@meta-tronix.com",
+        defaultValue: "hello@finconnex.example",
       },
       {
-        id: "companyPhone",
-        label: "Official Phone Number",
+        id: "phone",
+        label: "Phone",
         type: "text",
-        placeholder: "+1 (555) 019-2834",
+        defaultValue: "+61 2 9000 0000",
       },
       {
-        id: "websiteUrl",
-        label: "Official Website URL",
+        id: "website",
+        label: "Website",
         type: "text",
-        placeholder: "https://meta-tronix.com",
+        defaultValue: "https://finconnex.example",
       },
       {
-        id: "streetAddress",
-        label: "Registered Street Address",
-        type: "text",
-        placeholder: "104 Innovation Drive, Suite 400",
+        id: "address",
+        label: "Registered address",
+        type: "textarea",
+        defaultValue: "Level 12, 100 Pitt Street, Sydney NSW 2000",
       },
-      {
-        id: "cityState",
-        label: "City, State / Province, Postal Code",
-        type: "text",
-        placeholder: "San Francisco, CA 94107",
-      },
-      {
-        id: "country",
-        label: "Country of Incorporation",
-        type: "select",
-        options: [
-          { label: "United States", value: "us" },
-          { label: "United Kingdom", value: "uk" },
-          { label: "Canada", value: "ca" },
-          { label: "Australia", value: "au" },
-          { label: "Nepal", value: "np" },
-        ],
-      },
-      { id: "logo", label: "Primary Vector Brand Logo", type: "file" },
-      { id: "faviconAsset", label: "App Dark Mode Brand Mark", type: "file" },
+      { id: "logo", label: "Company logo", type: "file" },
     ],
   },
 
-  "time-format": {
-    title: "Time Format Configuration",
-    description:
-      "Choose how time values are displayed throughout the dashboard interface.",
+  "organization/regional-settings": {
+    title: "Regional Settings",
+    description: "Date, time, and number formats used across FinConnex.",
     fields: [
       {
-        id: "timeFormatChoice",
-        label: "System Time Display Format",
+        id: "dateFormat",
+        label: "Date format",
         type: "select",
-        defaultValue: "12hr",
-        options: [
-          { label: "12-Hour Format", value: "12hr" },
-          { label: "24-Hour Format", value: "24hr" },
-        ],
-      },
-    ],
-  },
-
-  "date-format": {
-    title: "Date Format Configuration",
-    description:
-      "Choose how dates are displayed across the system interface and reports.",
-    fields: [
-      {
-        id: "dateFormatChoice",
-        label: "System Date Display Format",
-        type: "select",
-        defaultValue: "YYYY-MM-DD",
+        defaultValue: "DD/MM/YYYY",
         options: [
           { label: "DD/MM/YYYY", value: "DD/MM/YYYY" },
           { label: "MM/DD/YYYY", value: "MM/DD/YYYY" },
           { label: "YYYY-MM-DD", value: "YYYY-MM-DD" },
           { label: "DD MMM YYYY", value: "DD MMM YYYY" },
-          {
-            label: "Month DD, YYYY",
-            value: "MMMM DD, YYYY",
-          },
+        ],
+      },
+      {
+        id: "timeFormat",
+        label: "Time format",
+        type: "select",
+        defaultValue: "24hr",
+        options: [
+          { label: "24-hour", value: "24hr" },
+          { label: "12-hour", value: "12hr" },
+        ],
+      },
+      {
+        id: "numberFormat",
+        label: "Number format",
+        type: "select",
+        defaultValue: "1,234.56",
+        options: [
+          { label: "1,234.56", value: "1,234.56" },
+          { label: "1.234,56", value: "1.234,56" },
+          { label: "1 234.56", value: "1 234.56" },
+        ],
+      },
+      {
+        id: "firstDayOfWeek",
+        label: "First day of week",
+        type: "select",
+        defaultValue: "monday",
+        options: [
+          { label: "Monday", value: "monday" },
+          { label: "Sunday", value: "sunday" },
         ],
       },
     ],
   },
 
-  "business-hours": {
+  "organization/business-hours": {
     title: "Business Hours",
-    description:
-      "Define the operational hours of your organization to help employees ensure activities are carried out during active working periods.",
+    description: "Operational hours used by booking, SLA, and digests.",
     fields: [
       {
         id: "weekStartsOn",
-        label: "Week Starts On",
+        label: "Week starts on",
         type: "select",
         defaultValue: "monday",
         options: [
@@ -139,270 +370,588 @@ export const SETTINGS_SCHEMAS: Record<string, any> = {
       },
       {
         id: "businessDays",
-        label: "Business Days",
+        label: "Business days",
         type: "text",
-        defaultValue: "Monday - Friday",
-        placeholder: "e.g. Monday - Friday",
+        defaultValue: "Monday – Friday",
       },
       {
         id: "startTime",
-        label: "Opening Time",
+        label: "Opening time",
         type: "text",
-        defaultValue: "09:00 AM",
+        defaultValue: "09:00",
       },
       {
         id: "endTime",
-        label: "Closing Time",
+        label: "Closing time",
         type: "text",
-        defaultValue: "06:00 PM",
+        defaultValue: "17:30",
       },
       {
-        id: "timeZone",
-        label: "Operational Time Zone",
+        id: "timezone",
+        label: "Operational time zone",
         type: "select",
-        defaultValue: "AEST",
+        defaultValue: "Australia/Sydney",
         options: [
-          {
-            label: "Australian Eastern Standard Time (New South Wales)",
-            value: "AEST",
-          },
-          { label: "Coordinated Universal Time (UTC)", value: "UTC" },
-          { label: "Nepal Time (NPT)", value: "NPT" },
+          { label: "Australia/Sydney", value: "Australia/Sydney" },
+          { label: "UTC", value: "UTC" },
+          { label: "Asia/Kathmandu", value: "Asia/Kathmandu" },
         ],
-      },
-      {
-        id: "closedDays",
-        label: "Closed Days",
-        type: "text",
-        defaultValue: "Saturday, Sunday",
       },
     ],
   },
 
-  "email-notifications": {
-    title: "Email Notifications",
+  "crm-configuration/industry-preset": {
+    title: "Industry Preset",
     description:
-      "Configure global outbound email dispatch rules and transactional triggers.",
+      "Edit the Section 3 industry template applied at signup (pipelines, fields, KPIs).",
     fields: [
       {
-        id: "enableEmail",
-        label: "Master Email Dispatch",
-        type: "toggle",
-        defaultValue: true,
+        id: "preset",
+        label: "Active industry preset",
+        type: "select",
+        defaultValue: "mortgage",
+        options: [
+          { label: "Mortgage / Finance (FinConnex)", value: "mortgage" },
+          { label: "Accounting", value: "accounting" },
+          { label: "Real Estate", value: "real-estate" },
+          { label: "Legal", value: "legal" },
+          { label: "Insurance", value: "insurance" },
+          { label: "Recruitment (WorkConnex)", value: "recruitment" },
+          { label: "Migration / Education (EduConnex)", value: "education" },
+          { label: "Trades", value: "trades" },
+          { label: "Agency", value: "agency" },
+          { label: "Custom", value: "custom" },
+        ],
       },
       {
-        id: "senderName",
-        label: "Default Sender Alias",
-        type: "text",
-        placeholder: "Acme Notifications",
-      },
-      {
-        id: "replyToEmail",
-        label: "Global Reply-To Address",
-        type: "text",
-        placeholder: "support@acmepartner.com",
-      },
-    ],
-  },
-  "sms-notifications": {
-    title: "SMS & Text Alerts",
-    description:
-      "Manage cellular provider dispatch parameters and critical text messaging flags.",
-    fields: [
-      {
-        id: "enableSms",
-        label: "Enable SMS Channel Delivery",
+        id: "applyPipelines",
+        label: "Re-apply industry pipelines",
         type: "toggle",
         defaultValue: false,
       },
       {
-        id: "smsGateway",
-        label: "Active SMS Provider",
-        type: "select",
-        options: [
-          { label: "Twilio Gateway", value: "twilio" },
-          { label: "AWS SNS", value: "aws" },
-          { label: "Vonage API", value: "vonage" },
-        ],
+        id: "applyFields",
+        label: "Re-apply industry custom fields",
+        type: "toggle",
+        defaultValue: false,
       },
       {
-        id: "senderId",
-        label: "Sender ID / Shortcode",
-        type: "text",
-        placeholder: "ACMEALERT",
+        id: "notes",
+        label: "Change notes",
+        type: "textarea",
+        placeholder: "Why this preset was changed…",
       },
     ],
   },
-  "push-notifications": {
-    title: "Web & Browser Push Notifications",
-    description:
-      "Control web-browser notification permissions and background service worker alerts.",
+
+  "system/queue-monitor": {
+    title: "Queue Monitor",
+    description: "Email, SMS, and workflow queue health in one place.",
     fields: [
       {
-        id: "browserPush",
-        label: "Enable Browser Push Prompts",
+        id: "emailQueuePaused",
+        label: "Pause email queue",
         type: "toggle",
-        defaultValue: true,
+        defaultValue: false,
       },
       {
-        id: "vapidKey",
-        label: "VAPID Public Key Identifier",
-        type: "text",
-        placeholder: "BN3x_Public_Key_String...",
+        id: "smsQueuePaused",
+        label: "Pause SMS queue",
+        type: "toggle",
+        defaultValue: false,
       },
       {
-        id: "soundAlert",
-        label: "Play Audio Tone on Incoming Push",
+        id: "workflowQueuePaused",
+        label: "Pause workflow queue",
         type: "toggle",
-        defaultValue: true,
+        defaultValue: false,
+      },
+      {
+        id: "maxRetries",
+        label: "Max retries",
+        type: "number",
+        defaultValue: 3,
+      },
+      {
+        id: "alertThreshold",
+        label: "Alert when depth exceeds",
+        type: "number",
+        defaultValue: 500,
       },
     ],
   },
-  "in-app-notifications": {
-    title: "In-App Notification Center",
-    description:
-      "Customize the dropdown bell center, banner popups, and unread badge behaviors.",
+
+  "notifications/in-app-notifications": {
+    title: "In-App Notifications",
+    description: "Bell center, badges, and toast behaviour (§18 / §27.12).",
     fields: [
       {
         id: "badgeCount",
-        label: "Show Unread Count Badge on Nav Bell",
+        label: "Show unread badge on nav bell",
         type: "toggle",
         defaultValue: true,
       },
       {
         id: "autoDismiss",
-        label: "Auto-Dismiss Toast Banners After (Seconds)",
+        label: "Auto-dismiss toasts",
         type: "select",
+        defaultValue: "5",
         options: [
-          { label: "3 Seconds", value: "3" },
-          { label: "5 Seconds", value: "5" },
-          { label: "Manual Dismiss Only", value: "manual" },
+          { label: "3 seconds", value: "3" },
+          { label: "5 seconds", value: "5" },
+          { label: "Manual only", value: "manual" },
         ],
       },
       {
         id: "soundToast",
-        label: "Play Sound on In-App Banner Appearance",
+        label: "Play sound on toast",
         type: "toggle",
         defaultValue: false,
       },
     ],
   },
-  "notification-rules": {
-    title: "Conditional Notification Rules",
-    description:
-      "Set advanced automated triggers based on record state changes or user roles.",
+
+  "my-preferences/profile": {
+    title: "Profile",
+    description: "Your display name, contact details, and job title.",
     fields: [
       {
-        id: "ruleName",
-        label: "Rule Description",
+        id: "displayName",
+        label: "Display name",
         type: "text",
-        placeholder: "e.g. Notify manager on high-value deal loss",
+        defaultValue: "John Smith",
       },
       {
-        id: "triggerEvent",
-        label: "Trigger Event",
+        id: "email",
+        label: "Email",
+        type: "text",
+        defaultValue: "admin@finconnex.example",
+      },
+      {
+        id: "phone",
+        label: "Phone",
+        type: "text",
+        defaultValue: "+61 400 000 000",
+      },
+      {
+        id: "jobTitle",
+        label: "Job title",
+        type: "text",
+        defaultValue: "Senior Broker",
+      },
+      { id: "avatar", label: "Profile photo", type: "file" },
+    ],
+  },
+
+  "my-preferences/signature": {
+    title: "Signature",
+    description: "Personal email / message signature used in outbound sends.",
+    fields: [
+      {
+        id: "signatureHtml",
+        label: "Email signature",
+        type: "textarea",
+        defaultValue: "John Smith\nSenior Broker · FinConnex\nSydney",
+      },
+      {
+        id: "includeLogo",
+        label: "Include company logo",
+        type: "toggle",
+        defaultValue: true,
+      },
+      {
+        id: "includeMobile",
+        label: "Include mobile number",
+        type: "toggle",
+        defaultValue: true,
+      },
+    ],
+  },
+
+  "my-preferences/password": {
+    title: "Password",
+    description: "Change your password (subject to organisation password policy).",
+    fields: [
+      {
+        id: "currentPassword",
+        label: "Current password",
+        type: "text",
+        placeholder: "••••••••",
+      },
+      {
+        id: "newPassword",
+        label: "New password",
+        type: "text",
+        placeholder: "Min 12 characters",
+      },
+      {
+        id: "confirmPassword",
+        label: "Confirm new password",
+        type: "text",
+        placeholder: "Repeat new password",
+      },
+      {
+        id: "forceLogout",
+        label: "Sign out other sessions after change",
+        type: "toggle",
+        defaultValue: true,
+      },
+    ],
+  },
+
+  "my-preferences/notifications": {
+    title: "Notifications",
+    description: "Personal channel preferences for mentions and digests.",
+    fields: [
+      {
+        id: "emailMentions",
+        label: "Email me for @mentions",
+        type: "toggle",
+        defaultValue: true,
+      },
+      {
+        id: "inAppMentions",
+        label: "In-app for @mentions",
+        type: "toggle",
+        defaultValue: true,
+      },
+      {
+        id: "taskAssigned",
+        label: "Notify when a task is assigned to me",
+        type: "toggle",
+        defaultValue: true,
+      },
+      {
+        id: "digest",
+        label: "Personal digest",
         type: "select",
+        defaultValue: "daily",
         options: [
-          { label: "Record Created", value: "create" },
-          { label: "Status Updated", value: "update" },
-          { label: "SLA Deadline Breached", value: "sla" },
+          { label: "Real-time", value: "realtime" },
+          { label: "Daily", value: "daily" },
+          { label: "Weekly", value: "weekly" },
+          { label: "Off", value: "off" },
+        ],
+      },
+    ],
+  },
+
+  "my-preferences/theme": {
+    title: "Theme",
+    description: "Personal appearance overrides (does not change tenant branding).",
+    fields: [
+      {
+        id: "theme",
+        label: "Colour mode",
+        type: "select",
+        defaultValue: "system",
+        options: [
+          { label: "System", value: "system" },
+          { label: "Light", value: "light" },
+          { label: "Dark", value: "dark" },
         ],
       },
       {
-        id: "instantAlert",
-        label: "Bypass Queue for Immediate Dispatch",
-        type: "toggle",
-        defaultValue: true,
-      },
-    ],
-  },
-  mentions: {
-    title: "@Mention & Tagging Alerts",
-    description:
-      "Configure how team members are alerted when tagged in comments or documentation.",
-    fields: [
-      {
-        id: "notifyOnMention",
-        label: "Instant Alert When Tagged (@username)",
-        type: "toggle",
-        defaultValue: true,
-      },
-      {
-        id: "mentionChannels",
-        label: "Delivery Channel for Mentions",
+        id: "density",
+        label: "UI density",
         type: "select",
+        defaultValue: "comfortable",
         options: [
-          { label: "In-App & Email Combined", value: "both" },
-          { label: "In-App Only", value: "inapp" },
-          { label: "Email Only", value: "email" },
+          { label: "Comfortable", value: "comfortable" },
+          { label: "Compact", value: "compact" },
+        ],
+      },
+      {
+        id: "accent",
+        label: "Accent preference",
+        type: "select",
+        defaultValue: "violet",
+        options: [
+          { label: "Violet (default)", value: "violet" },
+          { label: "Indigo", value: "indigo" },
+          { label: "Teal", value: "teal" },
         ],
       },
     ],
   },
-  "digest-settings": {
-    title: "Summary Digest Frequency",
-    description:
-      "Reduce notification fatigue by bundling updates into periodic rollup digests.",
+
+  "security/password-policy": {
+    title: "Password Policy",
+    description: "Minimum strength and rotation rules for all users.",
     fields: [
       {
-        id: "digestFrequency",
-        label: "Digest Delivery Schedule",
+        id: "minLength",
+        label: "Minimum length",
+        type: "number",
+        defaultValue: 12,
+      },
+      {
+        id: "requireUpper",
+        label: "Require uppercase",
+        type: "toggle",
+        defaultValue: true,
+      },
+      {
+        id: "requireNumber",
+        label: "Require number",
+        type: "toggle",
+        defaultValue: true,
+      },
+      {
+        id: "requireSymbol",
+        label: "Require symbol",
+        type: "toggle",
+        defaultValue: true,
+      },
+      {
+        id: "expiryDays",
+        label: "Password expiry (days, 0 = never)",
+        type: "number",
+        defaultValue: 90,
+      },
+    ],
+  },
+
+  "security/session-timeout": {
+    title: "Session Timeout",
+    description: "Idle and absolute session limits for CRM users.",
+    fields: [
+      {
+        id: "idleMinutes",
+        label: "Idle timeout (minutes)",
+        type: "number",
+        defaultValue: 30,
+      },
+      {
+        id: "absoluteHours",
+        label: "Absolute session length (hours)",
+        type: "number",
+        defaultValue: 12,
+      },
+      {
+        id: "rememberMe",
+        label: "Allow “Remember me”",
+        type: "toggle",
+        defaultValue: true,
+      },
+    ],
+  },
+
+  "security/single-sign-on": {
+    title: "Single Sign-On (SSO)",
+    description: "SAML / OIDC identity provider for the tenant.",
+    fields: [
+      {
+        id: "ssoEnabled",
+        label: "SSO enabled",
+        type: "toggle",
+        defaultValue: false,
+      },
+      {
+        id: "protocol",
+        label: "Protocol",
         type: "select",
+        defaultValue: "oidc",
         options: [
-          { label: "Real-Time (No Digest)", value: "realtime" },
-          { label: "Daily Summary Rollup", value: "daily" },
-          { label: "Weekly Summary Rollup", value: "weekly" },
+          { label: "OIDC", value: "oidc" },
+          { label: "SAML 2.0", value: "saml" },
         ],
       },
       {
-        id: "digestTime",
-        label: "Scheduled Delivery Time",
+        id: "issuer",
+        label: "Issuer / Entity ID",
         type: "text",
-        placeholder: "08:00 AM",
+        placeholder: "https://login.example.com/…",
+      },
+      {
+        id: "enforceSso",
+        label: "Enforce SSO (disable password login)",
+        type: "toggle",
+        defaultValue: false,
       },
     ],
   },
-  "push-notification-settings": {
-    title: "Advanced Push Configuration",
-    description:
-      "Manage APNS (Apple) and FCM (Firebase) credential handshakes for native push.",
+
+  "finance/payment-gateways": {
+    title: "Payment Gateways",
+    description: "Card / bank gateways used for invoice collection.",
     fields: [
       {
-        id: "fcmServerKey",
-        label: "Firebase Cloud Messaging (FCM) Server Key",
-        type: "text",
-        placeholder: "AAAA...",
+        id: "stripeEnabled",
+        label: "Stripe",
+        type: "toggle",
+        defaultValue: true,
       },
       {
-        id: "apnsCert",
-        label: "Apple Push Notification service (APNs) Certificate",
-        type: "file",
+        id: "stripeMode",
+        label: "Stripe mode",
+        type: "select",
+        defaultValue: "test",
+        options: [
+          { label: "Test", value: "test" },
+          { label: "Live", value: "live" },
+        ],
+      },
+      {
+        id: "defaultGateway",
+        label: "Default gateway",
+        type: "select",
+        defaultValue: "stripe",
+        options: [
+          { label: "Stripe", value: "stripe" },
+          { label: "Manual / bank transfer", value: "manual" },
+        ],
+      },
+      {
+        id: "receiptEmail",
+        label: "Send payment receipts by email",
+        type: "toggle",
+        defaultValue: true,
       },
     ],
   },
-  "mobile-app-settings": {
-    title: "Mobile Application Notification Settings",
-    description:
-      "Fine-tune behavior rules specific to iOS and Android companion mobile apps.",
+
+  "finance/taxes": {
+    title: "Taxes",
+    description: "Default tax rates for quotes and invoices.",
     fields: [
       {
-        id: "richPreviews",
-        label: "Show Rich Image Previews on Lock Screen",
-        type: "toggle",
-        defaultValue: true,
+        id: "defaultTaxName",
+        label: "Default tax name",
+        type: "text",
+        defaultValue: "GST",
       },
       {
-        id: "vibrateMode",
-        label: "Enable Haptic Vibration Feedback",
-        type: "toggle",
-        defaultValue: true,
+        id: "defaultTaxRate",
+        label: "Default rate (%)",
+        type: "number",
+        defaultValue: 10,
       },
       {
-        id: "badgeAppIcon",
-        label: "Show Badge Counter on App Launcher Icon",
+        id: "pricesIncludeTax",
+        label: "Prices include tax",
         type: "toggle",
-        defaultValue: true,
+        defaultValue: false,
+      },
+      {
+        id: "taxIdLabel",
+        label: "Tax ID label on invoices",
+        type: "text",
+        defaultValue: "ABN",
+      },
+    ],
+  },
+
+  "organization/branding": {
+    title: "Branding",
+    description: "Primary brand colours and logos for the CRM shell.",
+    fields: [
+      {
+        id: "primaryColor",
+        label: "Primary colour",
+        type: "text",
+        defaultValue: "#7C3AED",
+      },
+      {
+        id: "secondaryColor",
+        label: "Secondary colour",
+        type: "text",
+        defaultValue: "#0F172A",
+      },
+      { id: "logoLight", label: "Logo (light backgrounds)", type: "file" },
+      { id: "logoDark", label: "Logo (dark backgrounds)", type: "file" },
+      {
+        id: "appName",
+        label: "Product name in nav",
+        type: "text",
+        defaultValue: "FinConnex",
+      },
+    ],
+  },
+
+  "organization/favicon": {
+    title: "Favicon",
+    description: "Browser tab icon for CRM and public pages.",
+    fields: [
+      { id: "favicon", label: "Favicon (.ico / .png)", type: "file" },
+      { id: "appleTouch", label: "Apple touch icon", type: "file" },
+    ],
+  },
+
+  "communication/whatsapp-business": {
+    title: "WhatsApp Business",
+    description: "WhatsApp Business API connection for Unified Inbox (§10.4).",
+    fields: [
+      {
+        id: "connected",
+        label: "Connected",
+        type: "toggle",
+        defaultValue: false,
+      },
+      {
+        id: "businessId",
+        label: "WhatsApp Business Account ID",
+        type: "text",
+        placeholder: "WABA-…",
+      },
+      {
+        id: "phoneNumberId",
+        label: "Phone number ID",
+        type: "text",
+      },
+      {
+        id: "displayName",
+        label: "Display name",
+        type: "text",
+        defaultValue: "FinConnex Brokers",
       },
     ],
   },
 };
+
+/** Build full registry once. */
+function buildRegistry(): Record<string, SettingsSchema> {
+  const map: Record<string, SettingsSchema> = { ...CURATED };
+  for (const category of SETTINGS_CATEGORIES) {
+    for (const item of category.items) {
+      const key = settingsSchemaKey(category.slug, item.slug);
+      if (!map[key]) {
+        map[key] = generateSchema(category, item);
+      }
+    }
+  }
+  return map;
+}
+
+export const SETTINGS_SCHEMAS = buildRegistry();
+
+export function getSettingsSchema(categorySlug: string, subpageSlug: string) {
+  const key = settingsSchemaKey(categorySlug, subpageSlug);
+  return (
+    SETTINGS_SCHEMAS[key] ?? {
+      title: slugToLabel(subpageSlug),
+      description: "Manage this setting.",
+      fields: [
+        {
+          id: "enabled",
+          label: "Enabled",
+          type: "toggle" as const,
+          defaultValue: true,
+        },
+      ],
+    }
+  );
+}
+
+export function assertFullSchemaCoverage() {
+  const missing: string[] = [];
+  for (const category of SETTINGS_CATEGORIES) {
+    for (const item of category.items) {
+      const key = settingsSchemaKey(category.slug, item.slug);
+      if (!SETTINGS_SCHEMAS[key]) missing.push(key);
+    }
+  }
+  return missing;
+}
+
+void YES_NO;

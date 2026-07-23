@@ -45,6 +45,10 @@ export interface Quotation {
   estimateRef?: string;
   invoiceId?: string;
   signatureStatus?: "Not sent" | "Pending" | "Signed";
+  /** Linked §9.3 SignatureRequest id */
+  signatureRequestId?: string;
+  /** Public /sign/[token] manage token */
+  signatureToken?: string;
   createdBy: string;
   createdAt: string;
   sentAt?: string;
@@ -95,6 +99,8 @@ export const quotations: Quotation[] = [
     estimateRef: "EST-3001",
     invoiceId: "inv1",
     signatureStatus: "Signed",
+    signatureRequestId: "sr2",
+    signatureToken: "sig-olivia-1",
     createdBy: "John Smith",
     createdAt: "14/07/2026",
     sentAt: "14/07/2026 12:00",
@@ -137,6 +143,8 @@ export const quotations: Quotation[] = [
       },
     ],
     signatureStatus: "Pending",
+    signatureRequestId: "sr-quo2",
+    signatureToken: "sig-harbour-quo2",
     createdBy: "Tejas Gokhe",
     createdAt: "19/07/2026",
     sentAt: "19/07/2026 11:00",

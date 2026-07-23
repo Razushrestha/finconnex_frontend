@@ -41,6 +41,7 @@ import {
   elevatedSelectClass,
 } from "@/components/sales/CreateEntityForm";
 import { cn } from "@/lib/utils";
+import { softDeleteRecord } from "@/lib/rules";
 
 const ACCESS_STYLE: Record<DocumentAccessLevel, string> = {
   Private: "bg-slate-100 text-slate-600",
@@ -146,8 +147,20 @@ export default function DocumentLibraryPage() {
 
   function deleteDoc(doc: LibraryDocument) {
     if (!window.confirm(`Delete ${doc.fileName}?`)) return;
+    const gate = softDeleteRecord({
+      action: "documents.library.delete",
+      module: "documents.library",
+      recordId: doc.id,
+      recordLabel: doc.fileName,
+      recordType: "Library Document",
+      snapshot: doc,
+    });
+    if (!gate.ok) {
+      flash(gate.message);
+      return;
+    }
     setDocs((prev) => prev.filter((d) => d.id !== doc.id));
-    flash("File deleted");
+    flash("Moved to Recycle Bin");
     setMenuId(null);
   }
 

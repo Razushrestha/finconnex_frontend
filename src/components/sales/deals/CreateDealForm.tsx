@@ -21,6 +21,15 @@ import {
 } from "@/lib/deals/types";
 import { COMPANY_NAMES } from "@/lib/companies/types";
 import { CONTACT_SOURCES } from "@/lib/contacts/types";
+import { api } from "@/lib/api";
+import {
+  getOrgManager,
+  logCreate,
+  notifyDealClosed,
+  notifyOwnerAssigned,
+  requireAction,
+  requiredFieldErrors,
+} from "@/lib/rules";
 import {
   CreateEntityFormShell,
   Field,
@@ -90,13 +99,16 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
   }
 
   function validate() {
-    const next: Partial<Record<keyof FormState, string>> = {};
-    if (!form.dealName.trim()) next.dealName = "Deal Name is required";
-    if (!form.account.trim()) next.account = "Account is required";
-    if (!form.stage) next.stage = "Stage is required";
-    if (!form.dealValue.trim()) next.dealValue = "Deal Value is required";
-    if (!form.currency) next.currency = "Currency is required";
-    if (!form.owner.trim()) next.owner = "Owner is required";
+    const next: Partial<Record<keyof FormState, string>> = {
+      ...requiredFieldErrors(form as unknown as Record<string, unknown>, [
+        "dealName",
+        "account",
+        "stage",
+        "dealValue",
+        "currency",
+        "owner",
+      ]),
+    };
     if (form.stage === "Closed Lost" && !form.lostReason) {
       next.lostReason = "Lost Reason is required for Closed Lost";
     }
@@ -104,10 +116,54 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
     return Object.keys(next).length === 0;
   }
 
-  function handleSave(createAnother: boolean) {
+  async function handleSave(createAnother: boolean) {
     setSubmitted(true);
     if (!validate()) return;
-    console.log("Saving deal", { layoutId, redirect, ...form });
+    const gate = requireAction("sales.deals.create");
+    if (!gate.ok) {
+      window.alert(gate.message);
+      return;
+    }
+    const result = await api.deals.create({
+      dealName: form.dealName.trim(),
+      account: form.account.trim(),
+      contact: form.contact || undefined,
+      stage: form.stage,
+      dealValue: form.dealValue.trim(),
+      currency: form.currency,
+      probability: form.probability ? Number(form.probability) : undefined,
+      owner: form.owner,
+      closeDate: form.expectedCloseDate || undefined,
+    });
+    if (!result.ok) {
+      if (result.error.fields?.dealName) {
+        setErrors((prev) => ({
+          ...prev,
+          dealName: result.error.fields!.dealName,
+        }));
+      }
+      window.alert(result.error.message);
+      return;
+    }
+    const deal = result.data;
+    logCreate("sales.deals", form.owner, deal.id, form.dealName);
+    notifyOwnerAssigned({
+      owner: form.owner,
+      entityLabel: `Deal ${form.dealName}`,
+      relatedTo: form.dealName,
+      relatedHref: "/sales/deals",
+      type: "Lead Assigned",
+    });
+    if (form.stage === "Closed Won" || form.stage === "Closed Lost") {
+      notifyDealClosed({
+        owner: form.owner,
+        manager: getOrgManager(),
+        dealName: form.dealName,
+        stage: form.stage,
+        relatedTo: form.dealName,
+        relatedHref: "/sales/deals",
+      });
+    }
     if (createAnother) {
       setForm({ ...initialState, owner: form.owner, currency: form.currency });
       setErrors({});

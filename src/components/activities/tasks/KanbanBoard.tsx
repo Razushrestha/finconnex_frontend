@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   taskColumns as initialColumns,
   type TaskColumn,
 } from "@/lib/tasks/types";
+import { listTaskColumns, saveTaskColumns } from "@/lib/tasks/store";
 import { KanbanColumn } from "./KanbanColumn";
 
 interface DragInfo {
@@ -15,6 +16,15 @@ interface DragInfo {
 export function KanbanBoard() {
   const [columns, setColumns] = useState<TaskColumn[]>(initialColumns);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
+
+  useEffect(() => {
+    setColumns(listTaskColumns());
+  }, []);
+
+  function persist(next: TaskColumn[]) {
+    saveTaskColumns(next);
+    setColumns(next);
+  }
 
   function handleDragStartTask(
     e: React.DragEvent<HTMLDivElement>,
@@ -38,15 +48,17 @@ export function KanbanBoard() {
       return;
     }
 
-    setColumns((prev) => {
-      const sourceColumn = prev.find((c) => c.id === sourceColumnId);
-      const targetColumn = prev.find((c) => c.id === targetColumnId);
-      const task = sourceColumn?.tasks.find((t) => t.taskId === taskId);
-      if (!task || !targetColumn) return prev;
+    const sourceColumn = columns.find((c) => c.id === sourceColumnId);
+    const targetColumn = columns.find((c) => c.id === targetColumnId);
+    const task = sourceColumn?.tasks.find((t) => t.taskId === taskId);
+    if (!task || !targetColumn) {
+      setDragInfo(null);
+      return;
+    }
 
-      const moved = { ...task, status: targetColumn.title };
-
-      return prev.map((col) => {
+    const moved = { ...task, status: targetColumn.title };
+    persist(
+      columns.map((col) => {
         if (col.id === sourceColumnId) {
           return {
             ...col,
@@ -62,8 +74,8 @@ export function KanbanBoard() {
           };
         }
         return col;
-      });
-    });
+      }),
+    );
 
     setDragInfo(null);
   }

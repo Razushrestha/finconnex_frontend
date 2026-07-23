@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Navbar from "@/components/layout/Navbar";
 import type { SessionPayload } from "@/lib/auth/types";
+import { setRulesActor } from "@/lib/rules/actor";
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -13,6 +14,14 @@ interface DashboardShellProps {
 export function DashboardShell({ children, session }: DashboardShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    setRulesActor({
+      id: session.userId,
+      name: session.name,
+      role: session.role,
+    });
+  }, [session.userId, session.name, session.role]);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-zinc-50 font-sans dark:bg-black">

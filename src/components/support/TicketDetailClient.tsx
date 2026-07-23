@@ -38,6 +38,16 @@ import {
   type TicketPriority,
   type TicketStatus,
 } from "@/lib/support/types";
+import {
+  assertTicketStatusChange,
+  getRulesActor,
+  logStatusChange,
+  notifyOwnerAssigned,
+  notifyStatusChanged,
+  notifyTicketUpdated,
+  softDeleteRecord,
+} from "@/lib/rules";
+import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { cn } from "@/lib/utils";
 import {
   elevatedInputClass,
@@ -84,11 +94,17 @@ export function TicketDetailClient({ id }: { id: string }) {
   }
 
   function actor() {
-    return row?.assignedTo || row?.createdBy || SUPPORT_AGENTS[0];
+    return getRulesActor().name || row?.assignedTo || row?.createdBy || SUPPORT_AGENTS[0];
   }
 
   function setStatus(status: TicketStatus, actionLabel?: string) {
     if (!row) return;
+    const from = row.status;
+    const gate = assertTicketStatusChange(from, status);
+    if (!gate.ok) {
+      flash(gate.message);
+      return;
+    }
     let next: SupportTicket = {
       ...row,
       status,
@@ -110,6 +126,28 @@ export function TicketDetailClient({ id }: { id: string }) {
       actor(),
     );
     save(next, actionLabel ?? `Status → ${status}`);
+    logStatusChange(
+      "support.tickets",
+      actor(),
+      row.id,
+      row.ticketId,
+      from,
+      status,
+    );
+    notifyStatusChanged({
+      recipient: row.assignedTo || actor(),
+      entityLabel: row.ticketId,
+      from,
+      to: status,
+      relatedTo: row.ticketId,
+      relatedHref: `/support/${row.id}`,
+    });
+    notifyTicketUpdated({
+      requester: row.requester,
+      ticketRef: row.ticketId,
+      summary: actionLabel ?? `Status → ${status}`,
+      relatedHref: `/support/${row.id}`,
+    });
   }
 
   function setPriority(priority: TicketPriority) {
@@ -143,6 +181,14 @@ export function TicketDetailClient({ id }: { id: string }) {
       );
     }
     save(next, assignedTo ? `Assigned to ${assignedTo}` : "Unassigned");
+    if (assignedTo) {
+      notifyOwnerAssigned({
+        owner: assignedTo,
+        entityLabel: `Ticket ${row.ticketId}`,
+        relatedTo: row.ticketId,
+        relatedHref: `/support/${row.id}`,
+      });
+    }
   }
 
   function setCategory(category: TicketCategory | "") {
@@ -420,6 +466,18 @@ export function TicketDetailClient({ id }: { id: string }) {
             <button
               type="button"
               onClick={() => {
+                const gate = softDeleteRecord({
+                  action: "support.tickets.delete",
+                  module: "support.tickets",
+                  recordId: row.id,
+                  recordLabel: row.ticketId,
+                  recordType: "Ticket",
+                  snapshot: row,
+                });
+                if (!gate.ok) {
+                  window.alert(gate.message);
+                  return;
+                }
                 deleteTicket(row.id);
                 router.push("/support");
               }}
@@ -755,6 +813,12 @@ export function TicketDetailClient({ id }: { id: string }) {
               )}
             </ul>
           </div>
+
+          <RecordAuditHistory
+            module="support.tickets"
+            recordId={row.id}
+            localAudit={row.audit}
+          />
         </div>
       </div>
     </div>

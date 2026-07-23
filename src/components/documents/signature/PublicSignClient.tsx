@@ -8,6 +8,7 @@ import {
   upsertSignatureRequest,
   type SignatureRequest,
 } from "@/lib/documents/signature/types";
+import { syncQuotationFromSignature } from "@/lib/finance/quotations/signatureBridge";
 import { pushLibraryDoc } from "@/lib/documents/library/types";
 import { CheckCircle2, Eraser, PenLine } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -107,6 +108,9 @@ export function PublicSignClient({ token }: { token: string }) {
   function persist(next: SignatureRequest) {
     upsertSignatureRequest(next);
     setReq(next);
+    if (next.status === "Signed" || next.status === "Declined") {
+      syncQuotationFromSignature(next);
+    }
     if (next.status === "Signed") {
       const today = new Date().toLocaleDateString("en-AU");
       pushLibraryDoc({

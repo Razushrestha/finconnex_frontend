@@ -27,6 +27,8 @@ import {
   type EmailCampaign,
   type EmailCampaignStatus,
 } from "@/lib/marketing/email/types";
+import { assertCampaignStatusChange, logStatusChange, softDeleteRecord } from "@/lib/rules";
+import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
 
@@ -77,6 +79,11 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
 
   function setStatus(status: EmailCampaignStatus, actionLabel: string) {
     if (!campaign) return;
+    const gate = assertCampaignStatusChange(campaign.status, status);
+    if (!gate.ok) {
+      flash(gate.message);
+      return;
+    }
     let next = appendAudit({ ...campaign, status }, actionLabel);
     if (status === "Running" && campaign.sentCount === 0) {
       const audienceSize =
@@ -94,6 +101,14 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
       /* keep metrics */
     }
     save(next, actionLabel);
+    logStatusChange(
+      "marketing.email",
+      campaign.createdBy,
+      campaign.id,
+      campaign.campaignId,
+      campaign.status,
+      status,
+    );
   }
 
   function schedule() {
@@ -152,6 +167,18 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
   function remove() {
     if (!campaign) return;
     if (!window.confirm(`Delete ${campaign.campaignId}?`)) return;
+    const gate = softDeleteRecord({
+      action: "marketing.email.delete",
+      module: "marketing.email",
+      recordId: campaign.id,
+      recordLabel: campaign.campaignId,
+      recordType: "Email Campaign",
+      snapshot: campaign,
+    });
+    if (!gate.ok) {
+      window.alert(gate.message);
+      return;
+    }
     deleteEmailCampaign(campaign.id);
     router.push("/marketing/email");
   }
@@ -441,6 +468,13 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
                   </li>
                 ))}
               </ol>
+              <div className="mt-4">
+                <RecordAuditHistory
+                  module="marketing.email"
+                  recordId={campaign.id}
+                  localAudit={campaign.audit}
+                />
+              </div>
             </aside>
           </div>
         </div>

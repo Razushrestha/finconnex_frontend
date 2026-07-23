@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, MoreVertical } from "lucide-react";
-import { CONTACT_GROUPS, type ContactGroup } from "@/lib/contacts/types";
+import { type ContactGroup } from "@/lib/contacts/types";
+import { listContactGroups, saveContactGroups } from "@/lib/contacts/store";
 import type { ContactFilters } from "./FilterContactsPanel";
 import { ContactRecordCard } from "./ContactRecordCard";
 
@@ -16,9 +17,18 @@ interface ContactsKanbanBoardProps {
 }
 
 export function ContactsKanbanBoard({ filters }: ContactsKanbanBoardProps) {
-  const [groups, setGroups] = useState<ContactGroup[]>(CONTACT_GROUPS);
+  const [groups, setGroups] = useState<ContactGroup[]>([]);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const [overGroupId, setOverGroupId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setGroups(listContactGroups());
+  }, []);
+
+  function persist(next: ContactGroup[]) {
+    saveContactGroups(next);
+    setGroups(next);
+  }
 
   const visibleGroups = useMemo(() => {
     const hasStatusFilter = !!filters?.statuses.length;
@@ -59,19 +69,22 @@ export function ContactsKanbanBoard({ filters }: ContactsKanbanBoardProps) {
       return;
     }
 
-    setGroups((prev) => {
-      const sourceGroup = prev.find((g) => g.id === sourceGroupId);
-      const targetGroup = prev.find((g) => g.id === targetGroupId);
-      const contact = sourceGroup?.contacts.find((c) => c.id === contactId);
+    const sourceGroup = groups.find((g) => g.id === sourceGroupId);
+    const targetGroup = groups.find((g) => g.id === targetGroupId);
+    const contact = sourceGroup?.contacts.find((c) => c.id === contactId);
 
-      if (!contact || !targetGroup) return prev;
+    if (!contact || !targetGroup) {
+      setDragInfo(null);
+      return;
+    }
 
-      const updatedContact = {
-        ...contact,
-        accentColorClass: targetGroup.dotColorClass,
-      };
+    const updatedContact = {
+      ...contact,
+      accentColorClass: targetGroup.dotColorClass,
+    };
 
-      return prev.map((g) => {
+    persist(
+      groups.map((g) => {
         if (g.id === sourceGroupId) {
           return {
             ...g,
@@ -82,8 +95,8 @@ export function ContactsKanbanBoard({ filters }: ContactsKanbanBoardProps) {
           return { ...g, contacts: [updatedContact, ...g.contacts] };
         }
         return g;
-      });
-    });
+      }),
+    );
 
     setDragInfo(null);
   }

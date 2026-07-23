@@ -113,7 +113,7 @@ interface CreateEntityFormShellProps {
   cardDescription: string;
   listHref: string;
   saveLabel: string;
-  onSave: (createAnother: boolean) => void;
+  onSave: (createAnother: boolean) => void | Promise<void>;
   children: React.ReactNode;
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EntityHeader } from "@/components/sales/EntityHeader";
 import { LeadKanbanBoard } from "@/components/sales/leads/LeadKanbanBoard";
 import { LeadListView } from "@/components/sales/leads/LeadListView";
@@ -9,12 +9,24 @@ import {
   EMPTY_LEAD_FILTERS,
   type LeadFilters,
 } from "@/components/sales/leads/FilterLeadsPanel";
-import { LEAD_COLUMNS } from "@/lib/leads/types";
+import { listLeadColumns } from "@/lib/leads/store";
+import { onRulesChange } from "@/lib/rules";
 
 export default function LeadsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [filters, setFilters] = useState<LeadFilters>(EMPTY_LEAD_FILTERS);
+  const [totalLeads, setTotalLeads] = useState(0);
+
+  useEffect(() => {
+    function refresh() {
+      setTotalLeads(
+        listLeadColumns().reduce((sum, column) => sum + column.cards.length, 0),
+      );
+    }
+    refresh();
+    return onRulesChange(() => refresh());
+  }, [viewMode]);
 
   function toggleFilterField(section: "source" | "status", field: string) {
     setFilters((prev) => {
@@ -26,11 +38,6 @@ export default function LeadsPage() {
       return { ...prev, [key]: next };
     });
   }
-
-  const totalLeads = LEAD_COLUMNS.reduce(
-    (sum, column) => sum + column.cards.length,
-    0,
-  );
 
   return (
     <div className="min-h-screen bg-slate-50 p-2 pr-4">

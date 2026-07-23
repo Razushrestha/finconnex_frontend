@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Home, Plus, Search, Download, FileText } from "lucide-react";
+import { Plus, Search, Download, FileText } from "lucide-react";
 import {
   ESTIMATE_STATUSES,
   estimates as seed,
@@ -13,6 +12,7 @@ import {
 } from "@/lib/finance/estimates/types";
 import { formatAUD } from "@/lib/finance/shared";
 import { ESTIMATE_STATUS_STYLE } from "@/lib/finance/statusStyles";
+import { FinanceOpsShell } from "@/components/finance/FinanceOpsShell";
 import { cn } from "@/lib/utils";
 
 export default function EstimatesPage() {
@@ -78,54 +78,35 @@ export default function EstimatesPage() {
   }
 
   return (
-    <div className="relative min-h-full overflow-hidden bg-slate-50">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.10),_transparent_65%)]"
-      />
-
-      <div className="relative mx-auto flex max-w-[1400px] flex-col p-2.5 sm:p-3 lg:p-4">
-        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-              <Link href="/" className="flex items-center gap-0.5 hover:text-slate-600">
-                <Home className="h-3 w-3" />
-                Home
-              </Link>
-              <span>/</span>
-              <span className="text-slate-500">Finance</span>
-              <span>/</span>
-            </nav>
-            <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
-              Estimates
-            </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
-              <FileText className="h-2.5 w-2.5" />
-              §13.1
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={exportCsv}
-              className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Export
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                router.push("/finance/estimates/create?layoutid=standard&redirect=false")
-              }
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-md shadow-violet-600/20 hover:bg-violet-700"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New estimate
-            </button>
-          </div>
-        </div>
-
+    <FinanceOpsShell
+      title="Estimates"
+      section="§20.1"
+      sectionIcon={FileText}
+      actions={
+        <>
+          <button
+            type="button"
+            onClick={exportCsv}
+            className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                "/finance/estimates/create?layoutid=standard&redirect=false",
+              )
+            }
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-md shadow-violet-600/20 hover:bg-violet-700"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New estimate
+          </button>
+        </>
+      }
+    >
         <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
           <button
             type="button"
@@ -242,7 +223,6 @@ export default function EstimatesPage() {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </FinanceOpsShell>
   );
 }

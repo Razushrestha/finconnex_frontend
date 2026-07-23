@@ -32,7 +32,10 @@ import {
 } from "@/lib/finance/shared";
 import { INVOICE_STATUS_STYLE } from "@/lib/finance/statusStyles";
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
+import { CommercialTrail } from "@/components/finance/CommercialTrail";
 import { cn } from "@/lib/utils";
+import { softDeleteRecord } from "@/lib/rules";
+import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 
 export function InvoiceDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -145,6 +148,10 @@ export function InvoiceDetailClient({ id }: { id: string }) {
                 Home
               </Link>
               <span>/</span>
+              <Link href="/finance" className="hover:text-slate-600">
+                Sales Ops
+              </Link>
+              <span>/</span>
               <Link href="/finance/invoices" className="hover:text-slate-600">
                 Invoices
               </Link>
@@ -202,6 +209,19 @@ export function InvoiceDetailClient({ id }: { id: string }) {
               <button
                 type="button"
                 onClick={() => {
+                  if (!window.confirm(`Delete ${row.invoiceId}?`)) return;
+                  const gate = softDeleteRecord({
+                    action: "finance.invoices.delete",
+                    module: "finance.invoices",
+                    recordId: row.id,
+                    recordLabel: row.invoiceId,
+                    recordType: "Invoice",
+                    snapshot: row,
+                  });
+                  if (!gate.ok) {
+                    window.alert(gate.message);
+                    return;
+                  }
                   deleteInvoice(row.id);
                   router.push("/finance/invoices");
                 }}
@@ -213,6 +233,24 @@ export function InvoiceDetailClient({ id }: { id: string }) {
             ) : null}
           </div>
         </div>
+
+        <CommercialTrail
+          links={[
+            ...(row.quotationId
+              ? [
+                  {
+                    label: row.quotationRef ?? "Quotation",
+                    href: `/finance/quotations/${row.quotationId}`,
+                  },
+                ]
+              : []),
+            { label: row.invoiceId, current: true },
+            {
+              label: "Payments",
+              href: "/finance/payments",
+            },
+          ]}
+        />
 
         <div className="overflow-hidden rounded-2xl border border-slate-100/80 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-5 py-4">
@@ -289,18 +327,11 @@ export function InvoiceDetailClient({ id }: { id: string }) {
           </div>
 
           <div className="border-t border-slate-100 px-5 py-4">
-            <h3 className="mb-2 text-[11px] font-bold tracking-wide text-slate-500 uppercase">
-              Audit
-            </h3>
-            <ul className="space-y-1.5">
-              {row.audit.map((a) => (
-                <li key={a.id} className="text-[11px] text-slate-500">
-                  <span className="font-medium text-slate-700">{a.action}</span>
-                  {" · "}
-                  {a.actor} · {a.at}
-                </li>
-              ))}
-            </ul>
+            <RecordAuditHistory
+              module="finance.invoices"
+              recordId={row.id}
+              localAudit={row.audit}
+            />
           </div>
         </div>
       </div>

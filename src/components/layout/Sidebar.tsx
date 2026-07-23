@@ -21,9 +21,12 @@ import {
   TrendingUp,
   LibraryBig,
   Calculator,
+  Route,
   Settings,
   X,
   CalendarClock,
+  Timer,
+  Scale,
 } from "lucide-react";
 
 type NavChildItem = {
@@ -88,28 +91,31 @@ const dashboardItems: NavItem[] = [
       { label: "WhatsApp Campaigns", href: "/marketing/whatsapp" },
       { label: "Unified Inbox", href: "/marketing/inbox" },
       { label: "Forms", href: "/marketing/forms" },
-      { label: "Linktree", href: "/marketing/linktree" },
+      { label: "Broker pages", href: "/marketing/linktree" },
     ],
   },
   {
-    label: "Finance",
+    label: "Sales Ops",
     icon: LineChart,
     children: [
-      { label: "Overview", href: "/finance" },
+      { label: "Hub", href: "/finance" },
       { label: "Estimates", href: "/finance/estimates" },
       { label: "Quotations", href: "/finance/quotations" },
       { label: "Invoices", href: "/finance/invoices" },
       { label: "Payments", href: "/finance/payments" },
-      { label: "Products & Services", href: "/finance/products" },
+      { label: "Items / Services", href: "/finance/products" },
     ],
   },
   { label: "Team Management", href: "/team", icon: UserCog },
   { label: "Support", href: "/support", icon: HelpCircle },
+  { label: "Time Tracking", href: "/time-tracking", icon: Timer },
   { label: "Client Portal", href: "/portals", icon: Globe },
   { label: "Reports", href: "/reports", icon: LineChartIcon },
   { label: "Analytics", href: "/analytics", icon: TrendingUp },
   { label: "Resources", href: "/resources", icon: LibraryBig },
   { label: "Calculator", href: "/calculator", icon: Calculator },
+  { label: "Journeys", href: "/journeys", icon: Route },
+  { label: "Rules", href: "/rules", icon: Scale },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 

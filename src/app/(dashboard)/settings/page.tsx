@@ -1,9 +1,6 @@
 import { redirect } from "next/navigation";
-import { SETTINGS_CATEGORIES } from "@/lib/settings/settings-config";
 
+/** Settings root → Organization hub (SRS §27.1). */
 export default function SettingsRootPage() {
-  const defaultCategory = SETTINGS_CATEGORIES[0];
-  const defaultSubItem = defaultCategory.items[0];
-
-  redirect(`/settings/${defaultCategory.slug}/${defaultSubItem.slug}`);
+  redirect("/settings/organization");
 }

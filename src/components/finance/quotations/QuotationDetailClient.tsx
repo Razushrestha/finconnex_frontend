@@ -12,6 +12,9 @@ import {
   Trash2,
   PenLine,
   Receipt,
+  ExternalLink,
+  Copy,
+  FileSignature,
 } from "lucide-react";
 import {
   appendQuotationAudit,
@@ -22,10 +25,19 @@ import {
   type QuotationStatus,
 } from "@/lib/finance/quotations/types";
 import {
+  publicSignPath,
+  sendQuotationContract,
+} from "@/lib/finance/quotations/signatureBridge";
+import {
   appendInvoiceAudit,
   nextInvoiceIds,
   upsertInvoice,
 } from "@/lib/finance/invoices/types";
+import {
+  ensureJourneyForQuote,
+  getJourneyByQuotationId,
+  touchJourneyStatus,
+} from "@/lib/finance/journey/types";
 import {
   formatAUD,
   formatFinanceAt,
@@ -34,6 +46,8 @@ import {
 import { QUOTATION_STATUS_STYLE } from "@/lib/finance/statusStyles";
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
 import { cn } from "@/lib/utils";
+import { softDeleteRecord } from "@/lib/rules";
+import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 
 export function QuotationDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -46,7 +60,7 @@ export function QuotationDetailClient({ id }: { id: string }) {
 
   function flash(msg: string) {
     setToast(msg);
-    window.setTimeout(() => setToast(null), 2600);
+    window.setTimeout(() => setToast(null), 2800);
   }
 
   function save(next: Quotation, msg?: string) {
@@ -64,30 +78,27 @@ export function QuotationDetailClient({ id }: { id: string }) {
 
   function sendForSignature() {
     if (!row) return;
-    save(
-      appendQuotationAudit(
-        { ...row, signatureStatus: "Pending", status: row.status === "Draft" ? "Sent" : row.status, sentAt: row.sentAt ?? formatFinanceAt() },
-        "Contract sent for signature",
-      ),
-      "Contract sent (mock)",
-    );
+    const { quotation, signUrl } = sendQuotationContract(row);
+    setRow(quotation);
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(
+        `${window.location.origin}${signUrl}`,
+      );
+    }
+    flash("Contract sent — sign link copied");
   }
 
-  function markSigned() {
-    if (!row) return;
-    save(
-      appendQuotationAudit(
-        { ...row, signatureStatus: "Signed", status: "Accepted" },
-        "Contract signed",
-      ),
-      "Marked signed",
-    );
+  function copySignLink() {
+    if (!row?.signatureToken) return;
+    const url = `${window.location.origin}${publicSignPath(row.signatureToken)}`;
+    void navigator.clipboard?.writeText(url);
+    flash("Sign link copied");
   }
 
   function convertToInvoice() {
     if (!row) return;
-    if (row.status !== "Accepted" && row.signatureStatus !== "Signed") {
-      flash("Accept / sign the quotation before invoicing");
+    if (row.signatureStatus !== "Signed" && row.status !== "Accepted") {
+      flash("Sign or accept the quotation before invoicing");
       return;
     }
     if (row.invoiceId) {
@@ -100,7 +111,9 @@ export function QuotationDetailClient({ id }: { id: string }) {
         {
           id: ids.id,
           invoiceId: ids.invoiceId,
-          title: row.title.replace(/quotation/i, "invoice") || `${row.title} invoice`,
+          title:
+            row.title.replace(/quotation/i, "invoice") ||
+            `${row.title} invoice`,
           status: "Draft",
           clientId: row.clientId,
           clientName: row.clientName,
@@ -127,13 +140,26 @@ export function QuotationDetailClient({ id }: { id: string }) {
         row.owner,
       ),
     );
-    save(
-      appendQuotationAudit(
-        { ...row, status: "Invoiced", invoiceId: inv.id },
-        "Converted to invoice",
-      ),
+    const next = appendQuotationAudit(
+      { ...row, status: "Invoiced", invoiceId: inv.id },
       "Converted to invoice",
     );
+    upsertQuotation(next);
+    ensureJourneyForQuote({
+      quotationId: next.id,
+      clientId: next.clientId,
+      clientName: next.clientName,
+      contactName: next.contactName,
+      contactEmail: next.contactEmail,
+      dealName: next.dealName,
+      estimateId: next.estimateId,
+      signatureRequestId: next.signatureRequestId,
+      invoiceId: inv.id,
+      status: "Invoiced",
+    });
+    touchJourneyStatus(next.id, "Invoiced", { invoiceId: inv.id });
+    setRow(next);
+    flash("Converted to invoice");
     router.push(`/finance/invoices/${inv.id}`);
   }
 
@@ -146,6 +172,10 @@ export function QuotationDetailClient({ id }: { id: string }) {
   }
 
   const locked = row.status === "Invoiced";
+  const journey = getJourneyByQuotationId(row.id);
+  const signHref = row.signatureToken
+    ? publicSignPath(row.signatureToken)
+    : null;
 
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
@@ -170,9 +200,16 @@ export function QuotationDetailClient({ id }: { id: string }) {
               <ArrowLeft className="h-3.5 w-3.5" />
             </button>
             <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-              <Link href="/" className="flex items-center gap-0.5 hover:text-slate-600">
+              <Link
+                href="/"
+                className="flex items-center gap-0.5 hover:text-slate-600"
+              >
                 <Home className="h-3 w-3" />
                 Home
+              </Link>
+              <span>/</span>
+              <Link href="/finance" className="hover:text-slate-600">
+                Sales Ops
               </Link>
               <span>/</span>
               <Link href="/finance/quotations" className="hover:text-slate-600">
@@ -215,18 +252,39 @@ export function QuotationDetailClient({ id }: { id: string }) {
                 className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600"
               >
                 <PenLine className="h-3.5 w-3.5" />
-                Send contract
+                {row.signatureStatus === "Pending"
+                  ? "Resend contract"
+                  : "Send for signature"}
               </button>
             ) : null}
-            {!locked && row.signatureStatus === "Pending" ? (
-              <button
-                type="button"
-                onClick={markSigned}
-                className="inline-flex h-8 items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-[11px] font-semibold text-emerald-700"
+            {signHref ? (
+              <>
+                <Link
+                  href={signHref}
+                  target="_blank"
+                  className="inline-flex h-8 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-semibold text-violet-700"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  Open sign page
+                </Link>
+                <button
+                  type="button"
+                  onClick={copySignLink}
+                  className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Copy sign link
+                </button>
+              </>
+            ) : null}
+            {row.signatureRequestId ? (
+              <Link
+                href={`/documents/signature/${row.signatureRequestId}`}
+                className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600"
               >
-                <Check className="h-3.5 w-3.5" />
-                Simulate sign
-              </button>
+                <FileSignature className="h-3.5 w-3.5" />
+                E-Sign record
+              </Link>
             ) : null}
             {!locked && (row.status === "Sent" || row.status === "Draft") ? (
               <>
@@ -279,6 +337,19 @@ export function QuotationDetailClient({ id }: { id: string }) {
               <button
                 type="button"
                 onClick={() => {
+                  if (!window.confirm(`Delete ${row.quotationId}?`)) return;
+                  const gate = softDeleteRecord({
+                    action: "finance.quotations.delete",
+                    module: "finance.quotations",
+                    recordId: row.id,
+                    recordLabel: row.quotationId,
+                    recordType: "Quotation",
+                    snapshot: row,
+                  });
+                  if (!gate.ok) {
+                    window.alert(gate.message);
+                    return;
+                  }
                   deleteQuotation(row.id);
                   router.push("/finance/quotations");
                 }}
@@ -289,6 +360,59 @@ export function QuotationDetailClient({ id }: { id: string }) {
               </button>
             ) : null}
           </div>
+        </div>
+
+        <div className="mb-2.5 flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2 text-[11px] shadow-sm">
+          <span className="font-semibold tracking-wide text-slate-400 uppercase">
+            Journey
+          </span>
+          {row.estimateId ? (
+            <Link
+              href={`/finance/estimates/${row.estimateId}`}
+              className="rounded-full bg-slate-50 px-2 py-0.5 font-medium text-slate-600 hover:bg-violet-50 hover:text-violet-700"
+            >
+              Estimate
+            </Link>
+          ) : (
+            <span className="rounded-full bg-slate-50 px-2 py-0.5 text-slate-400">
+              Estimate
+            </span>
+          )}
+          <span className="text-slate-300">→</span>
+          <span className="rounded-full bg-violet-50 px-2 py-0.5 font-semibold text-violet-700">
+            Quotation
+          </span>
+          <span className="text-slate-300">→</span>
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 font-medium",
+              row.signatureStatus === "Signed"
+                ? "bg-emerald-50 text-emerald-700"
+                : row.signatureStatus === "Pending"
+                  ? "bg-amber-50 text-amber-800"
+                  : "bg-slate-50 text-slate-400",
+            )}
+          >
+            E-Sign {row.signatureStatus ?? "—"}
+          </span>
+          <span className="text-slate-300">→</span>
+          {row.invoiceId ? (
+            <Link
+              href={`/finance/invoices/${row.invoiceId}`}
+              className="rounded-full bg-emerald-50 px-2 py-0.5 font-medium text-emerald-700"
+            >
+              Invoice
+            </Link>
+          ) : (
+            <span className="rounded-full bg-slate-50 px-2 py-0.5 text-slate-400">
+              Invoice
+            </span>
+          )}
+          {journey ? (
+            <span className="ml-auto text-[10px] text-slate-400">
+              {journey.status} · /j/{journey.token}
+            </span>
+          ) : null}
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-slate-100/80 bg-white shadow-sm">
@@ -310,24 +434,29 @@ export function QuotationDetailClient({ id }: { id: string }) {
                 Total:{" "}
                 <strong className="text-slate-900">{formatAUD(row.total)}</strong>
               </span>
+              {signHref ? (
+                <span className="text-violet-600">
+                  Client sign:{" "}
+                  <Link href={signHref} className="font-semibold underline">
+                    {signHref}
+                  </Link>
+                </span>
+              ) : null}
             </div>
           </div>
           <div className="px-5 py-4">
-            <LineItemsEditor items={row.lineItems} onChange={() => {}} readOnly />
+            <LineItemsEditor
+              items={row.lineItems}
+              onChange={() => {}}
+              readOnly
+            />
           </div>
           <div className="border-t border-slate-100 px-5 py-4">
-            <h3 className="mb-2 text-[11px] font-bold tracking-wide text-slate-500 uppercase">
-              Audit
-            </h3>
-            <ul className="space-y-1.5">
-              {row.audit.map((a) => (
-                <li key={a.id} className="text-[11px] text-slate-500">
-                  <span className="font-medium text-slate-700">{a.action}</span>
-                  {" · "}
-                  {a.actor} · {a.at}
-                </li>
-              ))}
-            </ul>
+            <RecordAuditHistory
+              module="finance.quotations"
+              recordId={row.id}
+              localAudit={row.audit}
+            />
           </div>
         </div>
       </div>

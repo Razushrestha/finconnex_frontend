@@ -35,6 +35,8 @@ export interface SignatureRequest {
   signer: string;
   signerEmail: string;
   relatedTo?: string;
+  /** When created from a quotation (§13.3) */
+  relatedQuotationId?: string;
   status: SignatureStatus;
   sentDate?: string;
   signedDate?: string;
@@ -86,6 +88,7 @@ export const signatureRequests: SignatureRequest[] = [
     signer: "Olivia Bennett",
     signerEmail: "olivia@northwind.com",
     relatedTo: "Deal: Greystone Realty",
+    relatedQuotationId: "quo1",
     status: "Signed",
     sentDate: "10/07/2026",
     signedDate: "12/07/2026",
@@ -119,6 +122,35 @@ export const signatureRequests: SignatureRequest[] = [
         action: "Signed",
         actor: "Olivia Bennett",
         ip: "203.0.113.42",
+      },
+    ],
+  },
+  {
+    id: "sr-quo2",
+    signatureRequestId: "ES-2004",
+    documentName: "Engagement — Harbour packaging quotation",
+    documentFile: "QUO-3102_Contract.pdf",
+    signer: "Marcus Chen",
+    signerEmail: "marcus@harbour.example",
+    relatedTo: "Quotation: QUO-3102",
+    relatedQuotationId: "quo2",
+    status: "Sent",
+    sentDate: "19/07/2026",
+    expiryDate: "10/08/2026",
+    createdBy: "Tejas Gokhe",
+    manageToken: "sig-harbour-quo2",
+    audit: [
+      {
+        id: "a1",
+        at: "19/07/2026 11:05",
+        action: "Created from quotation",
+        actor: "Tejas Gokhe",
+      },
+      {
+        id: "a2",
+        at: "19/07/2026 11:05",
+        action: "Sent for signature",
+        actor: "Tejas Gokhe",
       },
     ],
   },

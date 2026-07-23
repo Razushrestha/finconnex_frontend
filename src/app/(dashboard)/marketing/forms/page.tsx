@@ -71,7 +71,7 @@ export default function MarketingFormsPage() {
             </h1>
             <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
               <ClipboardList className="h-2.5 w-2.5" />
-              Embeds
+              §21
             </span>
           </div>
           <button
@@ -124,6 +124,7 @@ export default function MarketingFormsPage() {
                 <tr>
                   <th className="px-4 py-2.5">Form</th>
                   <th className="px-4 py-2.5">Public URL</th>
+                  <th className="px-4 py-2.5">Routes to</th>
                   <th className="px-4 py-2.5">Status</th>
                   <th className="px-4 py-2.5">Fields</th>
                   <th className="px-4 py-2.5">Submissions</th>
@@ -153,6 +154,16 @@ export default function MarketingFormsPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-3">
+                      <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
+                        {f.destination ?? "Lead"}
+                      </span>
+                      {f.journeyId ? (
+                        <span className="mt-0.5 block text-[10px] text-slate-400">
+                          + journey
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3">
                       <span
                         className={cn(
                           "rounded-full px-2 py-0.5 text-[10px] font-semibold",
@@ -170,7 +181,7 @@ export default function MarketingFormsPage() {
                 {filtered.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="px-4 py-16 text-center text-sm text-slate-400"
                     >
                       No forms match.
