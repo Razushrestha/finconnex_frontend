@@ -67,7 +67,6 @@ export function CreateProductForm({ layoutId: _l, redirect: _r }: Props) {
       return;
     }
     router.push("/finance/products");
-    return created;
   }
 
   return (
