@@ -22,7 +22,6 @@ import {
   LibraryBig,
   Calculator,
   Settings,
-  Menu,
   X,
   CalendarClock,
 } from "lucide-react";
@@ -115,10 +114,19 @@ const dashboardItems: NavItem[] = [
 ];
 
 const workItems: NavItem[] = [
-  { label: "Tasks & Projects", href: "/activities/tasks", swatch: "bg-red-500" },
+  {
+    label: "Tasks & Projects",
+    href: "/activities/tasks",
+    swatch: "bg-red-500",
+  },
   { label: "User Management", href: "/team", swatch: "bg-violet-600" },
   { label: "Activities", href: "/activities/calendar", swatch: "bg-amber-500" },
-  { label: "Deals", href: "/sales/deals", swatch: "bg-indigo-500", badge: "+24%" },
+  {
+    label: "Deals",
+    href: "/sales/deals",
+    swatch: "bg-indigo-500",
+    badge: "+24%",
+  },
 ];
 
 interface SidebarProps {
@@ -166,7 +174,6 @@ export function Sidebar({
     });
   };
 
-  // Close the drawer on navigation so it never stays "open" after a link tap.
   React.useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
@@ -177,10 +184,8 @@ export function Sidebar({
     const handleChange = () => setMobileOpen(false);
     mql.addEventListener("change", handleChange);
     return () => mql.removeEventListener("change", handleChange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Prevent background scroll while the mobile drawer is open.
   React.useEffect(() => {
     if (!mobileOpen) return;
     const original = document.body.style.overflow;
@@ -196,33 +201,19 @@ export function Sidebar({
 
   return (
     <>
-      {/* Mobile trigger — hidden once the drawer is open (drawer has its own close button) */}
-      {!mobileOpen && (
-        <button
-          type="button"
-          onClick={() => setMobileOpen(true)}
-          aria-label="Open menu"
-          className="fixed left-3 top-3 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-white text-gray-600 shadow-md md:hidden"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-      )}
-
       {/* Backdrop, mobile only */}
       {mobileOpen && (
         <div
           onClick={() => setMobileOpen(false)}
           aria-hidden="true"
-          className="fixed inset-0 z-40 bg-gray-900/50 md:hidden"
+          className="fixed inset-0 z-40 bg-background/70 md:hidden"
         />
       )}
 
       <aside
         className={cn(
-          // Mobile: fixed off-canvas drawer, slides in from the left.
-          "fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[85vw] shrink-0 flex-col overflow-hidden bg-white px-5 py-6 shadow-xl transition-transform duration-200 ease-in-out",
+          "fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[85vw] shrink-0 flex-col overflow-hidden bg-background px-5 py-6 shadow-xl transition-transform duration-200 ease-in-out",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
-          // Desktop (md+): back to a normal in-flow sticky sidebar, width driven by `collapsed`.
           "md:sticky md:top-0 md:z-0 md:w-64 md:max-w-none md:translate-x-0 md:shadow-none md:transition-[width]",
           collapsed && "md:w-[72px] md:px-3",
         )}
@@ -231,7 +222,7 @@ export function Sidebar({
           <Link
             href="/"
             className={cn(
-              "text-xl font-semibold text-gray-900",
+              "text-xl font-semibold text-foreground",
               collapsed && "md:text-base",
             )}
           >
@@ -245,7 +236,7 @@ export function Sidebar({
             type="button"
             onClick={() => setMobileOpen(false)}
             aria-label="Close menu"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-50 md:hidden"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-accent md:hidden"
           >
             <X className="h-4 w-4" />
           </button>
@@ -254,7 +245,7 @@ export function Sidebar({
         {tenantName && (
           <p
             className={cn(
-              "mb-6 truncate px-1 text-xs text-gray-400",
+              "mb-6 truncate px-1 text-xs text-muted-foreground",
               hideLabel,
             )}
           >
@@ -265,7 +256,7 @@ export function Sidebar({
 
         {/* Dashboard section */}
         <div className={cn("mb-2 px-1", hideLabel)}>
-          <span className="text-[11px] font-semibold tracking-wider text-violet-600">
+          <span className="text-[11px] font-semibold tracking-wider text-violet-600 dark:text-violet-400">
             DASHBOARD
           </span>
         </div>
@@ -292,14 +283,16 @@ export function Sidebar({
                         "flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm transition-colors md:py-2",
                         iconOnly,
                         isActive
-                          ? "text-violet-600 font-medium"
-                          : "text-gray-700 hover:bg-gray-50",
+                          ? "text-violet-600 dark:text-violet-400 font-medium"
+                          : "text-foreground/80 hover:bg-accent",
                       )}
                     >
                       <Icon
                         className={cn(
                           "h-[18px] w-[18px] shrink-0",
-                          isActive ? "text-violet-600" : "text-gray-500",
+                          isActive
+                            ? "text-violet-600 dark:text-violet-400"
+                            : "text-muted-foreground",
                         )}
                         strokeWidth={1.75}
                       />
@@ -308,7 +301,7 @@ export function Sidebar({
                       </span>
                       <ChevronDown
                         className={cn(
-                          "h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform",
+                          "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
                           isOpen && "rotate-180",
                           hideLabel,
                         )}
@@ -322,14 +315,16 @@ export function Sidebar({
                         "flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm transition-colors md:py-2",
                         iconOnly,
                         isActive
-                          ? "text-violet-600 font-medium"
-                          : "text-gray-700 hover:bg-gray-50",
+                          ? "text-violet-600 dark:text-violet-400 font-medium"
+                          : "text-foreground/80 hover:bg-accent",
                       )}
                     >
                       <Icon
                         className={cn(
                           "h-[18px] w-[18px] shrink-0",
-                          isActive ? "text-violet-600" : "text-gray-500",
+                          isActive
+                            ? "text-violet-600 dark:text-violet-400"
+                            : "text-muted-foreground",
                         )}
                         strokeWidth={1.75}
                       />
@@ -340,7 +335,7 @@ export function Sidebar({
                   {hasChildren && isOpen && (
                     <div
                       className={cn(
-                        "ml-[27px] flex flex-col gap-0.5 border-l border-gray-100 pl-3.5",
+                        "ml-[27px] flex flex-col gap-0.5 border-l border-border pl-3.5",
                         collapsed && "md:hidden",
                       )}
                     >
@@ -353,8 +348,8 @@ export function Sidebar({
                             className={cn(
                               "rounded-lg px-2.5 py-2 text-sm transition-colors md:py-1.5",
                               childActive
-                                ? "text-violet-600 font-medium"
-                                : "text-gray-600 hover:bg-gray-50",
+                                ? "text-violet-600 dark:text-violet-400 font-medium"
+                                : "text-muted-foreground hover:bg-accent",
                             )}
                           >
                             {child.label}
@@ -368,7 +363,7 @@ export function Sidebar({
             })}
           </nav>
 
-          <div className="my-4 border-t border-gray-100" />
+          <div className="my-4 border-t border-border" />
 
           <nav className="flex flex-col gap-0.5">
             {workItems.map((item) => (
@@ -377,7 +372,7 @@ export function Sidebar({
                 href={item.href!}
                 title={collapsed ? item.label : undefined}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm text-gray-700 hover:bg-gray-50 md:py-2",
+                  "flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm text-foreground/80 hover:bg-accent md:py-2",
                   iconOnly,
                 )}
               >
