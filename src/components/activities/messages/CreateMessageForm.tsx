@@ -271,7 +271,7 @@ export function CreateMessageForm({
       </Field>
 
       {form.template === "Document Request" ? (
-        <div className="sm:col-span-2 lg:col-span-3">
+        <div className="col-span-full">
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-100 bg-violet-50/60 px-3.5 py-3">
             <p className="text-[12px] text-violet-900/80">
               Prefer a trackable chase? Create a Document Request instead of a
@@ -296,7 +296,7 @@ export function CreateMessageForm({
         label="Body"
         required
         error={submitted ? errors.body : undefined}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <TextAreaShell error={!!(submitted && errors.body)}>
           <textarea

@@ -225,6 +225,16 @@ export function CreateLeadForm({ layoutId, redirect }: CreateLeadFormProps) {
           />
         </InputShell>
       </Field>
+      <Field label="Job Title">
+        <InputShell icon={Briefcase}>
+          <input
+            className={elevatedInputClass(true)}
+            value={form.jobTitle}
+            onChange={(e) => update("jobTitle", e.target.value)}
+            placeholder="e.g. CFO"
+          />
+        </InputShell>
+      </Field>
       <Field label="Company">
         <InputShell icon={Building2}>
           <input
@@ -262,16 +272,6 @@ export function CreateLeadForm({ layoutId, redirect }: CreateLeadFormProps) {
             value={form.companySize}
             onChange={(e) => update("companySize", e.target.value)}
             placeholder="e.g. 11–50"
-          />
-        </InputShell>
-      </Field>
-      <Field label="Job Title">
-        <InputShell icon={Briefcase}>
-          <input
-            className={elevatedInputClass(true)}
-            value={form.jobTitle}
-            onChange={(e) => update("jobTitle", e.target.value)}
-            placeholder="e.g. CFO"
           />
         </InputShell>
       </Field>
@@ -361,7 +361,7 @@ export function CreateLeadForm({ layoutId, redirect }: CreateLeadFormProps) {
           />
         </InputShell>
       </Field>
-      <Field label="Notes" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Notes" className="col-span-full">
         <TextAreaShell>
           <textarea
             className={elevatedTextareaClass}

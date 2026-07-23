@@ -162,7 +162,7 @@ export function CreateMarketingFormForm({
         label="Form name"
         required
         error={errors.name}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <InputShell icon={Type} error={!!errors.name}>
           <input
@@ -244,7 +244,7 @@ export function CreateMarketingFormForm({
         </InputShell>
       </Field>
 
-      <Field label="Description" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Description" className="col-span-full">
         <TextAreaShell>
           <textarea
             value={description}
@@ -258,7 +258,7 @@ export function CreateMarketingFormForm({
 
       <Field
         label="Thank-you message"
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <input
           value={thankYouMessage}
@@ -268,7 +268,7 @@ export function CreateMarketingFormForm({
         />
       </Field>
 
-      <div className="sm:col-span-2 lg:col-span-3">
+      <div className="col-span-full">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
             Fields

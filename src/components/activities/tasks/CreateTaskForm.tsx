@@ -182,7 +182,7 @@ export function CreateTaskForm({ layoutId, redirect }: CreateTaskFormProps) {
         label="Task Name"
         required
         error={submitted ? errors.title : undefined}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <InputShell
           icon={CheckSquare}
@@ -346,7 +346,7 @@ export function CreateTaskForm({ layoutId, redirect }: CreateTaskFormProps) {
           />
         </InputShell>
       </Field>
-      <Field label="Description" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Description" className="col-span-full">
         <TextAreaShell>
           <textarea
             className={elevatedTextareaClass}
@@ -356,7 +356,7 @@ export function CreateTaskForm({ layoutId, redirect }: CreateTaskFormProps) {
           />
         </TextAreaShell>
       </Field>
-      <Field label="Notes" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Notes" className="col-span-full">
         <TextAreaShell>
           <textarea
             className={elevatedTextareaClass}

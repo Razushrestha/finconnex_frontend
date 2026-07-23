@@ -5,6 +5,8 @@ import { Plus, MoreVertical } from "lucide-react";
 import { COMPANY_GROUPS, type CompanyGroup } from "@/lib/companies/types";
 import type { CompanyFilters } from "./FilterCompaniesPanel";
 import { CompanyCard } from "./CompanyCard";
+import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 
 interface DragInfo {
   companyId: string;
@@ -96,11 +98,13 @@ export function CompaniesKanbanBoard({ filters }: CompaniesKanbanBoardProps) {
                 e.preventDefault();
                 handleDrop(group.id);
               }}
-              className={`flex flex-col rounded-sm border p-3 transition-colors ${
+              className={cn(
+                "flex flex-col rounded-sm border p-3",
+                dropTargetIdle,
                 isOver
-                  ? "border-violet-300 bg-violet-50 ring-2 ring-violet-200"
-                  : "border-slate-200/60 bg-slate-100/60"
-              }`}
+                  ? dropTargetActive
+                  : "border-slate-200/60 bg-slate-100/60",
+              )}
             >
               <div className="mb-3 flex items-center justify-between px-1 py-1">
                 <div className="flex items-center gap-2">

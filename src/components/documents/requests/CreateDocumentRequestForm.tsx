@@ -129,7 +129,7 @@ export function CreateDocumentRequestForm({
       saveLabel="Save request"
       onSave={onSave}
     >
-      <Field label="Title" required error={errors.title} className="sm:col-span-2 lg:col-span-3">
+      <Field label="Title" required error={errors.title} className="col-span-full">
         <InputShell icon={FileStack} error={!!errors.title}>
           <input
             value={title}
@@ -252,7 +252,7 @@ export function CreateDocumentRequestForm({
         </InputShell>
       </Field>
 
-      <Field label="Notes" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Notes" className="col-span-full">
         <TextAreaShell>
           <textarea
             value={notes}

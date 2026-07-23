@@ -233,7 +233,7 @@ export function CreatePaymentForm({ layoutId: _l, redirect: _r }: Props) {
           </select>
         </InputShell>
       </Field>
-      <Field label="Notes" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Notes" className="col-span-full">
         <TextAreaShell>
           <textarea
             className={elevatedTextareaClass}

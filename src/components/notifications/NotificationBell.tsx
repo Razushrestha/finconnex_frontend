@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, CheckCheck, Settings } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { menuEnter } from "@/lib/motion";
 import {
   NOTIFICATION_SETTINGS_HREF,
   NOTIFICATION_TYPE_STYLE,
@@ -14,7 +16,6 @@ import {
   writeAllNotifications,
   type AppNotification,
 } from "@/lib/notifications/types";
-import { cn } from "@/lib/utils";
 
 export function NotificationBell() {
   const router = useRouter();
@@ -86,7 +87,12 @@ export function NotificationBell() {
       </button>
 
       {open ? (
-        <div className="absolute right-0 z-50 mt-2 w-[340px] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+        <div
+          className={cn(
+            "absolute right-0 z-50 mt-2 w-[340px] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-card shadow-lg",
+            menuEnter,
+          )}
+        >
           <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
             <div>
               <p className="text-[12px] font-semibold text-foreground">

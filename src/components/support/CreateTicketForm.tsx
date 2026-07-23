@@ -279,7 +279,7 @@ export function CreateTicketForm({ layoutId: _l, redirect: _r }: Props) {
         label="Description"
         required
         error={errors.description}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <TextAreaShell error={!!errors.description}>
           <textarea

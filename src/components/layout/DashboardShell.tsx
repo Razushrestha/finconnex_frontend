@@ -28,7 +28,7 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
       {/* On mobile the sidebar renders as a fixed off-canvas drawer (out of
           document flow), so this wrapper takes up no space there — width
           only matters at md+, where the sidebar is back in normal flow. */}
-      <div className="shrink-0">
+      <div className="relative z-20 shrink-0">
         <Sidebar
           collapsed={collapsed}
           tenantName={session.tenantName}
@@ -36,7 +36,7 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
           onMobileOpenChange={setMobileOpen}
         />
       </div>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col">
         <Navbar
           collapsed={collapsed}
           onToggleSidebar={() => setCollapsed((c) => !c)}
@@ -48,7 +48,9 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
             tenantName: session.tenantName,
           }}
         />
-        <main className="min-h-0 min-w-0 flex-1 overflow-auto">{children}</main>
+        <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
+          {children}
+        </main>
       </div>
     </div>
   );

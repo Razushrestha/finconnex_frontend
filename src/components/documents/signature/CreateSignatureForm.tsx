@@ -128,7 +128,7 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
         label="Document name"
         required
         error={errors.documentName}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <InputShell icon={FileText} error={!!errors.documentName}>
           <input
@@ -144,7 +144,7 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
         label="Document file"
         required
         error={errors.documentFile}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <InputShell icon={FileText} error={!!errors.documentFile}>
           <input

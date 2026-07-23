@@ -193,7 +193,7 @@ export function CreateSmsCampaignForm({ layoutId: _l, redirect: _r }: Props) {
         label="Message body"
         required
         error={errors.message}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <TextAreaShell error={!!errors.message}>
           <textarea

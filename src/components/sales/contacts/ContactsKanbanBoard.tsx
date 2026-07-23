@@ -6,6 +6,8 @@ import { type ContactGroup } from "@/lib/contacts/types";
 import { listContactGroups, saveContactGroups } from "@/lib/contacts/store";
 import type { ContactFilters } from "./FilterContactsPanel";
 import { ContactRecordCard } from "./ContactRecordCard";
+import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 
 interface DragInfo {
   contactId: string;
@@ -121,11 +123,13 @@ export function ContactsKanbanBoard({ filters }: ContactsKanbanBoardProps) {
                 e.preventDefault();
                 handleDrop(group.id);
               }}
-              className={`flex flex-col rounded-sm border p-3 transition-colors ${
+              className={cn(
+                "flex flex-col rounded-sm border p-3",
+                dropTargetIdle,
                 isOver
-                  ? "border-violet-300 bg-violet-50 ring-2 ring-violet-200"
-                  : "border-slate-200/60 bg-slate-100/60"
-              }`}
+                  ? dropTargetActive
+                  : "border-slate-200/60 bg-slate-100/60",
+              )}
             >
               <div className="mb-3 flex items-center justify-between px-1 py-1">
                 <div className="flex items-center gap-2">

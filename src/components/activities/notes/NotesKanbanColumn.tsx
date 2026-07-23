@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { NoteColumn } from "@/lib/notes/types";
 import { NoteCard } from "./NoteCard";
 import { cn } from "@/lib/utils";
+import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 
 interface NotesKanbanColumnProps {
   column: NoteColumn;
@@ -41,13 +42,14 @@ export function NotesKanbanColumn({
         onDropNote(column.id);
       }}
       className={cn(
-        "flex h-full min-w-[220px] flex-1 flex-col transition-colors",
+        "flex h-full min-w-[220px] flex-1 flex-col",
+        dropTargetIdle,
         embedded
-          ? cn("min-h-[420px]", isOver && "bg-violet-50/50")
+          ? cn("min-h-[420px]", isOver && dropTargetActive)
           : cn(
               "w-72 shrink-0 rounded-2xl border p-3",
               isOver
-                ? "border-violet-300 bg-violet-50/80 ring-2 ring-violet-200"
+                ? dropTargetActive
                 : "border-slate-200/70 bg-slate-50/80",
             ),
       )}

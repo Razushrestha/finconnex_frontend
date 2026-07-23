@@ -183,7 +183,7 @@ export function CreateLinktreeForm({ layoutId: _l, redirect: _r }: Props) {
         </select>
       </Field>
 
-      <Field label="Bio" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Bio" className="col-span-full">
         <TextAreaShell>
           <textarea
             value={bio}
@@ -240,7 +240,7 @@ export function CreateLinktreeForm({ layoutId: _l, redirect: _r }: Props) {
         />
       </Field>
 
-      <div className="sm:col-span-2 lg:col-span-3">
+      <div className="col-span-full">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
             Extra links

@@ -191,7 +191,7 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
         label="Deal Name"
         required
         error={submitted ? errors.dealName : undefined}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <InputShell
           icon={Handshake}
@@ -390,7 +390,7 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
           </Field>
         </>
       ) : null}
-      <Field label="Description" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Description" className="col-span-full">
         <TextAreaShell>
           <textarea
             className={elevatedTextareaClass}

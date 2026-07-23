@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Search, ChevronDown, ChevronUp } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { filterEnter } from "@/lib/motion";
 import { LEAD_SOURCES, LEAD_STATUSES } from "@/lib/leads/types";
 
 interface FilterSection {
@@ -67,7 +69,7 @@ export function FilterLeadsPanel({
   }
 
   return (
-    <div className="flex h-full w-48 shrink-0 flex-col rounded-2xl border border-slate-100 bg-white shadow-sm">
+    <div className={cn("flex h-full w-48 shrink-0 flex-col rounded-2xl border border-slate-100 bg-white shadow-sm", filterEnter)}>
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
         <h3 className="text-sm font-semibold text-slate-900">
           Filter Leads by

@@ -98,7 +98,7 @@ export function CreateNoteForm({ layoutId, redirect }: CreateNoteFormProps) {
       saveLabel="Save Note"
       onSave={handleSave}
     >
-      <Field label="Title" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Title" className="col-span-full">
         <InputShell icon={StickyNote}>
           <input
             className={elevatedInputClass(true)}
@@ -199,7 +199,7 @@ export function CreateNoteForm({ layoutId, redirect }: CreateNoteFormProps) {
         label="Body"
         required
         error={submitted ? errors.body : undefined}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <TextAreaShell error={!!(submitted && errors.body)}>
           <textarea

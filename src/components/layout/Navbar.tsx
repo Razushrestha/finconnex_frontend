@@ -22,6 +22,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { menuEnter, badgePop } from "@/lib/motion";
 import { logAuth, onRulesChange } from "@/lib/rules";
 import { listLeadColumns } from "@/lib/leads/store";
 import { listInboxConversations } from "@/lib/marketing/inbox/types";
@@ -207,7 +208,13 @@ export function Navbar({
         <span className="whitespace-nowrap text-sm font-medium text-foreground">
           Today New Leads
         </span>
-        <Badge className="rounded-full bg-violet-600 px-2 py-0 text-xs font-semibold text-white hover:bg-violet-600 dark:bg-violet-500">
+        <Badge
+          key={newLeadsCount}
+          className={cn(
+            "rounded-full bg-violet-600 px-2 py-0 text-xs font-semibold text-white hover:bg-violet-600 dark:bg-violet-500",
+            badgePop,
+          )}
+        >
           {newLeadsCount}
         </Badge>
       </Link>
@@ -328,7 +335,10 @@ export function Navbar({
         {menuOpen && (
           <div
             role="menu"
-            className="absolute right-0 mt-2 w-60 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-card py-1 shadow-lg"
+            className={cn(
+              "absolute right-0 mt-2 w-60 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-card py-1 shadow-lg",
+              menuEnter,
+            )}
           >
             <div className="border-b border-border px-4 py-3">
               <p className="text-sm font-semibold text-foreground">

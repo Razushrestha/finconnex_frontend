@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { Meeting, MeetingStatus, MeetingType } from "@/lib/meetings/types";
 import { cn } from "@/lib/utils";
+import { cardDragging, cardMotion } from "@/lib/motion";
 
 const STATUS_BORDER: Record<MeetingStatus, string> = {
   Scheduled: "border-l-sky-500",
@@ -57,9 +58,10 @@ export function MeetingCard({
       data-meeting-id={meeting.id}
       data-column-id={columnId}
       className={cn(
-        "cursor-grab select-none rounded-xl border border-slate-100 border-l-[3px] bg-white p-3.5 shadow-sm transition-all active:cursor-grabbing",
+        "cursor-grab select-none rounded-xl border border-slate-100 border-l-[3px] bg-white p-3.5 shadow-sm active:cursor-grabbing",
         STATUS_BORDER[meeting.status],
-        isDragging ? "opacity-40" : "hover:border-slate-200 hover:shadow-md",
+        cardMotion,
+        isDragging && cardDragging,
       )}
     >
       <div className="mb-2 flex items-start justify-between gap-2">

@@ -16,6 +16,8 @@ import {
 } from "@/lib/rules";
 import type { DealFilters } from "./FilterDealsPanel";
 import { DealRecordCard } from "./DealRecordCard";
+import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 
 interface DragInfo {
   dealId: string;
@@ -168,11 +170,13 @@ export function DealsKanbanBoard({ pipeline, filters }: DealsKanbanBoardProps) {
                 e.preventDefault();
                 handleDrop(stage.id);
               }}
-              className={`flex flex-col rounded-sm border p-3 transition-colors ${
+              className={cn(
+                "flex flex-col rounded-sm border p-3",
+                dropTargetIdle,
                 isOver
-                  ? "border-violet-300 bg-violet-50 ring-2 ring-violet-200"
-                  : "border-slate-200/60 bg-slate-100/60"
-              }`}
+                  ? dropTargetActive
+                  : "border-slate-200/60 bg-slate-100/60",
+              )}
             >
               <div className="mb-3 flex items-center justify-between px-1 py-1">
                 <div className="flex items-center gap-2">

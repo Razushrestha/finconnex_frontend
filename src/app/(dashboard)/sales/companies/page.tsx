@@ -10,6 +10,8 @@ import {
   type CompanyFilters,
 } from "@/components/sales/companies/FilterCompaniesPanel";
 import { COMPANY_GROUPS } from "@/lib/companies/types";
+import { viewEnter } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 
 export default function CompaniesPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -43,7 +45,7 @@ export default function CompaniesPage() {
         onToggleFilter={() => setIsFilterOpen((v) => !v)}
       />
 
-      <div className="mt-6 flex items-start gap-6">
+      <div className="mt-3 flex items-start gap-4">
         {isFilterOpen && (
           <div className="sticky top-6">
             <FilterCompaniesPanel
@@ -54,7 +56,10 @@ export default function CompaniesPage() {
           </div>
         )}
 
-        <div className="flex-1 overflow-x-auto">
+        <div
+          key={viewMode}
+          className={cn("flex-1 overflow-x-auto", viewEnter)}
+        >
           {viewMode === "kanban" ? (
             <CompaniesKanbanBoard filters={filters} />
           ) : (

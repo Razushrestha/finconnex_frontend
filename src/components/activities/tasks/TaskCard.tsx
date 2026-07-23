@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import type { Task } from "@/lib/tasks/types";
 import { formatRelatedTo } from "@/lib/activities/shared";
+import { cn } from "@/lib/utils";
+import { cardDragging, cardMotion } from "@/lib/motion";
 
 interface TaskCardProps {
   task: Task;
@@ -37,9 +39,11 @@ export function TaskCard({
       onDragEnd={onDragEnd}
       data-task-id={task.taskId}
       data-column-id={columnId}
-      className={`cursor-grab select-none rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm transition-all active:cursor-grabbing ${
-        isDragging ? "opacity-40" : "hover:shadow-md"
-      }`}
+      className={cn(
+        "cursor-grab select-none rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm active:cursor-grabbing",
+        cardMotion,
+        isDragging && cardDragging,
+      )}
     >
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-[10px] font-medium tracking-wide text-slate-400 uppercase">

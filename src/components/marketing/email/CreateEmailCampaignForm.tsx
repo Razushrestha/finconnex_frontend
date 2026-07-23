@@ -233,7 +233,7 @@ export function CreateEmailCampaignForm({
         label="Subject line"
         required
         error={errors.subject}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <InputShell icon={Type} error={!!errors.subject}>
           <input
@@ -293,7 +293,7 @@ export function CreateEmailCampaignForm({
         </InputShell>
       </Field>
 
-      <Field label="Preview text" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Preview text" className="col-span-full">
         <InputShell>
           <input
             value={previewText}
@@ -304,7 +304,7 @@ export function CreateEmailCampaignForm({
         </InputShell>
       </Field>
 
-      <Field label="Body" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Body" className="col-span-full">
         <TextAreaShell>
           <textarea
             value={body}

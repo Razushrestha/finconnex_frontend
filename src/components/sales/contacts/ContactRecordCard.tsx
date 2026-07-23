@@ -14,6 +14,8 @@ import {
   CalendarDays,
 } from "lucide-react";
 import type { ContactCardData } from "@/lib/contacts/types";
+import { cn } from "@/lib/utils";
+import { cardDragging, cardMotion } from "@/lib/motion";
 
 interface ContactRecordCardProps {
   contact: ContactCardData;
@@ -33,9 +35,11 @@ export function ContactRecordCard({
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      className={`w-full cursor-grab rounded-md border border-slate-200/80 bg-white p-3.5 shadow-2xs transition-all active:cursor-grabbing ${
-        isDragging ? "opacity-40" : "hover:shadow-md"
-      }`}
+      className={cn(
+        "w-full cursor-grab rounded-md border border-slate-200/80 bg-white p-3.5 shadow-2xs active:cursor-grabbing",
+        cardMotion,
+        isDragging && cardDragging,
+      )}
     >
       <div
         className={`mb-3 h-1.5 w-full rounded-full ${contact.accentColorClass}`}

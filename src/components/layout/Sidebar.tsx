@@ -218,9 +218,11 @@ export function Sidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[85vw] shrink-0 flex-col overflow-hidden bg-background px-5 py-6 shadow-xl transition-transform duration-200 ease-in-out",
+          "fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[85vw] shrink-0 flex-col overflow-hidden rounded-tr-[18px] rounded-br-[18px] bg-white px-5 py-6 transition-transform duration-200 ease-in-out dark:bg-zinc-950",
+          // Elevated rail — stronger depth + right edge
+          "border-r border-slate-200/90 shadow-[8px_0_40px_-2px_rgba(15,23,42,0.22),2px_0_12px_-2px_rgba(15,23,42,0.10)] dark:border-zinc-800 dark:shadow-[8px_0_44px_-4px_rgba(0,0,0,0.65),2px_0_14px_-2px_rgba(0,0,0,0.4)]",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
-          "md:sticky md:top-0 md:z-0 md:w-64 md:max-w-none md:translate-x-0 md:shadow-none md:transition-[width]",
+          "md:sticky md:top-0 md:z-20 md:w-64 md:max-w-none md:translate-x-0 md:rounded-tr-[18px] md:rounded-br-[18px] md:transition-[width,box-shadow,border-radius]",
           collapsed && "md:w-[72px] md:px-3",
         )}
       >

@@ -131,7 +131,7 @@ export function CreateMeetingForm({
         label="Title"
         required
         error={submitted ? errors.title : undefined}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <InputShell
           icon={CalendarDays}
@@ -298,7 +298,7 @@ export function CreateMeetingForm({
         </InputShell>
       </Field>
 
-      <Field label="Attendees" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Attendees" className="col-span-full">
         <InputShell icon={Users}>
           <input
             className={elevatedInputClass(true)}
@@ -309,7 +309,7 @@ export function CreateMeetingForm({
         </InputShell>
       </Field>
 
-      <Field label="Agenda" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Agenda" className="col-span-full">
         <TextAreaShell>
           <textarea
             className={elevatedTextareaClass}
@@ -319,7 +319,7 @@ export function CreateMeetingForm({
           />
         </TextAreaShell>
       </Field>
-      <Field label="Notes" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Notes" className="col-span-full">
         <TextAreaShell>
           <textarea
             className={elevatedTextareaClass}

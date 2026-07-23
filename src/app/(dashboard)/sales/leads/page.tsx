@@ -11,6 +11,8 @@ import {
 } from "@/components/sales/leads/FilterLeadsPanel";
 import { listLeadColumns } from "@/lib/leads/store";
 import { onRulesChange } from "@/lib/rules";
+import { viewEnter } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 
 export default function LeadsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -51,7 +53,7 @@ export default function LeadsPage() {
         onToggleFilter={() => setIsFilterOpen((v) => !v)}
       />
 
-      <div className="mt-6 flex items-start gap-6">
+      <div className="mt-3 flex items-start gap-4">
         {isFilterOpen && (
           <div className="sticky top-6">
             <FilterLeadsPanel
@@ -62,8 +64,10 @@ export default function LeadsPage() {
           </div>
         )}
 
-        {/* Dynamic View Display */}
-        <div className="flex-1 overflow-x-auto">
+        <div
+          key={viewMode}
+          className={cn("flex-1 overflow-x-auto", viewEnter)}
+        >
           {viewMode === "kanban" ? (
             <LeadKanbanBoard filters={filters} />
           ) : (

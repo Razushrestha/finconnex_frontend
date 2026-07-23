@@ -129,7 +129,7 @@ export function CreateEmailForm({ layoutId, redirect }: CreateEmailFormProps) {
         label="Subject"
         required
         error={submitted ? errors.subject : undefined}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <InputShell icon={Mail} error={!!(submitted && errors.subject)}>
           <input
@@ -260,7 +260,7 @@ export function CreateEmailForm({ layoutId, redirect }: CreateEmailFormProps) {
         label="Body"
         required
         error={submitted ? errors.body : undefined}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <TextAreaShell error={!!(submitted && errors.body)}>
           <textarea
