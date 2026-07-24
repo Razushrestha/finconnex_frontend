@@ -4,14 +4,13 @@ import { useMemo, useState } from "react";
 import { Search, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { filterEnter } from "@/lib/motion";
-import {
-  TASK_PRIORITIES,
-  TASK_STATUSES,
-  TASK_TYPES,
-} from "@/lib/tasks/types";
+import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from "@/lib/tasks/types";
+import type { TaskFilters } from "@/lib/tasks/types";
+
+type FilterSectionId = "status" | "priority" | "type";
 
 interface FilterSection {
-  id: string;
+  id: FilterSectionId;
   title: string;
   fields: readonly string[];
 }
@@ -22,21 +21,32 @@ const filterSections: FilterSection[] = [
   { id: "type", title: "Task Type", fields: TASK_TYPES },
 ];
 
+const sectionKeyMap: Record<FilterSectionId, keyof TaskFilters> = {
+  status: "statuses",
+  priority: "priorities",
+  type: "types",
+};
+
 interface FilterPanelProps {
+  filters: TaskFilters;
+  onToggleField: (sectionId: FilterSectionId, field: string) => void;
   onClose?: () => void;
 }
 
-export function FilterPanel({ onClose }: FilterPanelProps) {
+export function FilterPanel({
+  filters,
+  onToggleField,
+  onClose,
+}: FilterPanelProps) {
   const [search, setSearch] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
 
   function toggleSection(id: string) {
     setCollapsed((prev) => ({ ...prev, [id]: !prev[id] }));
   }
 
-  function toggleField(field: string) {
-    setChecked((prev) => ({ ...prev, [field]: !prev[field] }));
+  function isChecked(sectionId: FilterSectionId, field: string) {
+    return (filters[sectionKeyMap[sectionId]] as string[]).includes(field);
   }
 
   const filteredSections = useMemo(() => {
@@ -52,13 +62,19 @@ export function FilterPanel({ onClose }: FilterPanelProps) {
   }, [search]);
 
   return (
-    <div className={cn("flex h-full w-56 shrink-0 flex-col rounded-2xl border border-slate-100 bg-white shadow-sm", filterEnter)}>
+    <div
+      className={cn(
+        "flex h-full w-56 shrink-0 flex-col rounded-2xl border border-slate-100 bg-white shadow-sm",
+        filterEnter,
+      )}
+    >
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
         <h3 className="text-sm font-semibold text-slate-900">Filter Tasks</h3>
         {onClose ? (
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close filter panel"
             className="text-xs font-medium text-slate-400 hover:text-slate-600"
           >
             ✕
@@ -105,8 +121,8 @@ export function FilterPanel({ onClose }: FilterPanelProps) {
                     >
                       <input
                         type="checkbox"
-                        checked={!!checked[field]}
-                        onChange={() => toggleField(field)}
+                        checked={isChecked(section.id, field)}
+                        onChange={() => onToggleField(section.id, field)}
                         className="h-3.5 w-3.5 rounded border-slate-300 text-violet-500 focus:ring-violet-300"
                       />
                       {field}
@@ -117,6 +133,12 @@ export function FilterPanel({ onClose }: FilterPanelProps) {
             </div>
           );
         })}
+
+        {filteredSections.length === 0 && (
+          <p className="py-6 text-center text-xs text-slate-400">
+            No fields match your search.
+          </p>
+        )}
       </div>
     </div>
   );

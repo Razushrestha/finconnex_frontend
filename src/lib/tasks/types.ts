@@ -29,6 +29,18 @@ export const TASK_STATUSES = [
 ] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
+export interface TaskFilters {
+  statuses: TaskStatus[];
+  priorities: Priority[];
+  types: TaskType[];
+}
+
+export const EMPTY_TASK_FILTERS: TaskFilters = {
+  statuses: [],
+  priorities: [],
+  types: [],
+};
+
 export interface Task {
   taskId: string;
   title: string;
