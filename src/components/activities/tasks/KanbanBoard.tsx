@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   taskColumns as initialColumns,
   type TaskColumn,
+  type TaskFilters,
 } from "@/lib/tasks/types";
 import { listTaskColumns, saveTaskColumns } from "@/lib/tasks/store";
 import { KanbanColumn } from "./KanbanColumn";
@@ -13,7 +14,11 @@ interface DragInfo {
   sourceColumnId: string;
 }
 
-export function KanbanBoard() {
+interface KanbanBoardProps {
+  filters?: TaskFilters;
+}
+
+export function KanbanBoard({ filters }: KanbanBoardProps) {
   const [columns, setColumns] = useState<TaskColumn[]>(initialColumns);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
 
@@ -25,6 +30,28 @@ export function KanbanBoard() {
     saveTaskColumns(next);
     setColumns(next);
   }
+
+  const visibleColumns = useMemo(() => {
+    const hasStatusFilter = !!filters?.statuses.length;
+    const hasPriorityFilter = !!filters?.priorities.length;
+    const hasTypeFilter = !!filters?.types.length;
+    if (!hasStatusFilter && !hasPriorityFilter && !hasTypeFilter)
+      return columns;
+
+    return columns
+      .filter(
+        (col) => !hasStatusFilter || filters!.statuses.includes(col.title),
+      )
+      .map((col) => ({
+        ...col,
+        tasks: col.tasks.filter(
+          (task) =>
+            (!hasPriorityFilter ||
+              filters!.priorities.includes(task.priority)) &&
+            (!hasTypeFilter || filters!.types.includes(task.taskType)),
+        ),
+      }));
+  }, [columns, filters]);
 
   function handleDragStartTask(
     e: React.DragEvent<HTMLDivElement>,
@@ -82,7 +109,7 @@ export function KanbanBoard() {
 
   return (
     <div className="flex h-full items-stretch gap-4">
-      {columns.map((column) => (
+      {visibleColumns.map((column) => (
         <KanbanColumn
           key={column.id}
           column={column}

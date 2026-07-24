@@ -9,7 +9,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
-import { taskColumns, type Task } from "@/lib/tasks/types";
+import { taskColumns, TaskFilters, type Task } from "@/lib/tasks/types";
 import { formatRelatedTo } from "@/lib/activities/shared";
 
 interface FlatTask extends Task {
@@ -35,7 +35,11 @@ const columns = [
   { key: "assignedTo", label: "Assigned To", sortable: true },
 ] as const;
 
-export function TaskListView() {
+interface TaskListViewProps {
+  filters?: TaskFilters;
+}
+
+export function TaskListView({ filters }: TaskListViewProps) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [sortConfig, setSortConfig] = useState<{
@@ -47,6 +51,20 @@ export function TaskListView() {
 
   const processedData = useMemo(() => {
     let data = [...flatTasks];
+
+    const hasStatusFilter = !!filters?.statuses.length;
+    const hasPriorityFilter = !!filters?.priorities.length;
+    const hasTypeFilter = !!filters?.types.length;
+
+    if (hasStatusFilter) {
+      data = data.filter((t) => filters!.statuses.includes(t.status));
+    }
+    if (hasPriorityFilter) {
+      data = data.filter((t) => filters!.priorities.includes(t.priority));
+    }
+    if (hasTypeFilter) {
+      data = data.filter((t) => filters!.types.includes(t.taskType));
+    }
 
     if (search) {
       const q = search.toLowerCase();
@@ -74,7 +92,7 @@ export function TaskListView() {
     }
 
     return data;
-  }, [search, sortConfig]);
+  }, [search, sortConfig, filters]);
 
   const totalPages = Math.max(
     1,
