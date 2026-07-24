@@ -1,4 +1,4 @@
-/** Live contact board store — session-backed (production adapter: swap for API). */
+/** Live contact board store: session-backed (production adapter: swap for API). */
 
 import {
   CONTACT_GROUPS,
@@ -29,7 +29,7 @@ function cloneSeed(): ContactGroup[] {
 }
 
 const board = createBoardStore({
-  key: "sales:contacts:board:v1",
+  key: "sales:contacts:board:v2",
   seed: cloneSeed,
 });
 
@@ -87,7 +87,7 @@ export function createContact(input: {
     id: newRulesId("ct"),
     name,
     initials,
-    company: input.company?.trim() || "—",
+    company: input.company?.trim() || "",
     email: input.email.trim(),
     phone: input.phone?.trim() || "",
     mobile: input.mobile?.trim() || undefined,

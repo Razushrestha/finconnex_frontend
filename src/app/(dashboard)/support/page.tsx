@@ -277,10 +277,10 @@ export default function SupportTicketsPage() {
                     </span>
                   </td>
                   <td className="px-3 py-3 text-slate-600">
-                    {r.assignedTo ?? "—"}
+                    {r.assignedTo ?? ""}
                   </td>
                   <td className="px-4 py-3 text-slate-600">
-                    {r.category ?? "—"}
+                    {r.category ?? ""}
                     {r.satisfactionRating ? (
                       <span className="ml-1.5 text-amber-600">
                         ★ {r.satisfactionRating}

@@ -146,7 +146,7 @@ export function JourneyDetailClient({ id }: { id: string }) {
 
   function onTest() {
     if (!row) return;
-    persist(runTestJourney(row), "Test run completed (mock — no messages sent)");
+    persist(runTestJourney(row), "Test run completed (mock: no messages sent)");
   }
 
   function onExitContact(enrollmentId: string) {
@@ -398,7 +398,7 @@ export function JourneyDetailClient({ id }: { id: string }) {
                           </div>
                         </td>
                         <td className="px-3 py-3 text-slate-600">
-                          {step?.label ?? "—"}
+                          {step?.label ?? ""}
                         </td>
                         <td className="px-3 py-3 text-slate-500">
                           {e.enteredAt}
@@ -428,7 +428,7 @@ export function JourneyDetailClient({ id }: { id: string }) {
                               Exit manually
                             </button>
                           ) : (
-                            <span className="text-[11px] text-slate-300">—</span>
+                            <span className="text-[11px] text-slate-300"></span>
                           )}
                         </td>
                       </tr>

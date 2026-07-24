@@ -436,7 +436,7 @@ export function TimeEntryDetailClient({ id }: { id: string }) {
                 <div className="flex justify-between gap-2">
                   <dt className="text-slate-500">Amount</dt>
                   <dd className="font-semibold text-violet-700">
-                    {row.billable ? formatAUD(amountFor(row)) : "—"}
+                    {row.billable ? formatAUD(amountFor(row)) : ""}
                   </dd>
                 </div>
                 <div className="flex justify-between gap-2">

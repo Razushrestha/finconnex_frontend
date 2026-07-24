@@ -75,7 +75,7 @@ export const documentRequests: DocumentRequest[] = [
   {
     id: "dr2",
     requestId: "DR-1002",
-    title: "Bank statements — last 3 months",
+    title: "Bank statements: last 3 months",
     requestedFrom: "Chloe Ramirez",
     relatedTo: "Lead: Chloe Ramirez",
     documentType: "Financial",
@@ -98,7 +98,7 @@ export const documentRequests: DocumentRequest[] = [
     requestedDate: "12/07/2026",
     receivedDate: "19/07/2026",
     receivedFileName: "Vendor_Agreement_Marcus.pdf",
-    notes: "Uploaded via portal — review for approval.",
+    notes: "Uploaded via portal: review for approval.",
   },
   {
     id: "dr4",
@@ -127,7 +127,7 @@ export const documentRequests: DocumentRequest[] = [
     requestedDate: "02/07/2026",
     receivedDate: "09/07/2026",
     receivedFileName: "Trust_Deed_scan.pdf",
-    notes: "Scan unreadable — request clearer copy.",
+    notes: "Scan unreadable: request clearer copy.",
   },
   {
     id: "dr6",

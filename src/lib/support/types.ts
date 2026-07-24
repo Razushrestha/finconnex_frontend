@@ -156,7 +156,7 @@ export const supportTickets: SupportTicket[] = [
       {
         id: "n2",
         kind: "public",
-        body: "Thanks for reporting — we're investigating the portal session issue and will update you shortly.",
+        body: "Thanks for reporting: we're investigating the portal session issue and will update you shortly.",
         at: "18/07/2026 15:00",
         actor: "John Smith",
       },
@@ -241,14 +241,14 @@ export const supportTickets: SupportTicket[] = [
       {
         id: "n4",
         kind: "internal",
-        body: "Escalated — TTL was 60m in staging config. Bumped to 7 days.",
+        body: "Escalated: TTL was 60m in staging config. Bumped to 7 days.",
         at: "16/07/2026 12:05",
         actor: "Shiva Kadhka",
       },
       {
         id: "n5",
         kind: "public",
-        body: "New signing link sent. Validity is now 7 days — please confirm once signed.",
+        body: "New signing link sent. Validity is now 7 days: please confirm once signed.",
         at: "16/07/2026 13:00",
         actor: "Shiva Kadhka",
       },
@@ -285,7 +285,7 @@ export const supportTickets: SupportTicket[] = [
       {
         id: "n6",
         kind: "public",
-        body: "Invalid mailbox on contact record — updated email and re-sent request. Please confirm receipt.",
+        body: "Invalid mailbox on contact record: updated email and re-sent request. Please confirm receipt.",
         at: "11/07/2026 15:00",
         actor: "Roshna Abraham",
       },

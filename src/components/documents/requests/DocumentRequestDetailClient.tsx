@@ -241,7 +241,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
           </div>
         </div>
 
-        {/* One surface — fills remaining viewport */}
+        {/* One surface: fills remaining viewport */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
           {/* Status progress */}
           <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
@@ -366,7 +366,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
                 <MetaCell
                   icon={Link2}
                   label="Related to"
-                  value={request.relatedTo ?? "—"}
+                  value={request.relatedTo ?? ""}
                 />
                 <MetaCell
                   icon={Calendar}
@@ -376,12 +376,12 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
                 <MetaCell
                   icon={Clock}
                   label="Received date"
-                  value={request.receivedDate ?? "—"}
+                  value={request.receivedDate ?? ""}
                   muted={!request.receivedDate}
                 />
               </div>
 
-              {/* Document + notes — grow to fill */}
+              {/* Document + notes: grow to fill */}
               <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-2">
                 <section className="flex flex-col border-b border-slate-100 p-4 sm:p-5 lg:border-r lg:border-b-0">
                   <p className="mb-3 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">

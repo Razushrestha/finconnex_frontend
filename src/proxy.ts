@@ -7,7 +7,7 @@ import { getAuthSecretKey, SESSION_COOKIE } from "@/lib/auth/constants";
 const PUBLIC_EXACT = new Set(["/login"]);
 
 /**
- * Prefixes for client-facing surfaces — must work without CRM login.
+ * Prefixes for client-facing surfaces: must work without CRM login.
  * Authenticated brokers may also open these (no force-redirect to dashboard).
  */
 const PUBLIC_PREFIXES = [

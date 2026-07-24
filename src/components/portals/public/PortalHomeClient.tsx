@@ -34,7 +34,7 @@ export function PortalHomeClient({ slug }: { slug: string }) {
         Welcome back
       </h2>
       <p className="mt-1 max-w-xl text-sm text-slate-500">
-        Everything for {portal.clientName} in one place — deal status, documents
+        Everything for {portal.clientName} in one place: deal status, documents
         to sign, invoices to pay, and support tickets.
       </p>
 

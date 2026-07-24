@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
     const { username, password, rememberMe } = parsed.data;
 
-    // Static credential check — swap for real API auth later
+    // Static credential check: swap for real API auth later
     if (
       username !== STATIC_LOGIN.username ||
       password !== STATIC_LOGIN.password

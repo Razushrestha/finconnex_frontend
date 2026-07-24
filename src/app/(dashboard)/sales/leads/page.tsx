@@ -12,6 +12,7 @@ import {
 import { listLeadColumns } from "@/lib/leads/store";
 import { onRulesChange } from "@/lib/rules";
 import { viewEnter } from "@/lib/motion";
+import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
 
 export default function LeadsPage() {
@@ -43,6 +44,7 @@ export default function LeadsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-2 pr-4">
+      <FocusHighlight />
       <EntityHeader
         entityLabel="Lead"
         createRoute="/sales/leads/create"

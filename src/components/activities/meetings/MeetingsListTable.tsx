@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Video,
@@ -37,7 +37,7 @@ interface MeetingsListTableProps {
   search?: string;
   onSearchChange?: (value: string) => void;
   statusLabel?: string;
-  /** Sit inside a parent surface — no nested card chrome. */
+  /** Sit inside a parent surface: no nested card chrome. */
   embedded?: boolean;
 }
 
@@ -52,6 +52,13 @@ export function MeetingsListTable({
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [page, setPage] = useState(1);
   const pageSize = 8;
+
+  useEffect(() => {
+    const focus = new URLSearchParams(window.location.search).get("focus");
+    if (!focus) return;
+    const hit = data.find((m) => m.id === focus);
+    if (hit) setSelectedMeeting(hit);
+  }, [data]);
 
   const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -157,6 +164,8 @@ export function MeetingsListTable({
               return (
                 <tr
                   key={meeting.id}
+                  data-focus-id={meeting.id}
+                  data-meeting-id={meeting.id}
                   onClick={() => setSelectedMeeting(meeting)}
                   className="group cursor-pointer transition-colors hover:bg-violet-50/40"
                 >
@@ -181,7 +190,7 @@ export function MeetingsListTable({
                     ) : null}
                   </td>
                   <td className="px-4 py-3 text-slate-600">
-                    {meeting.relatedTo ?? "—"}
+                    {meeting.relatedTo ?? ""}
                   </td>
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-1.5 text-slate-600">

@@ -1,4 +1,9 @@
-/** sessionStorage persistence + favorites + audit for Settings */
+/** Settings persistence + favorites + audit (tenant-scoped driver). */
+
+import {
+  readPersistedJson,
+  writePersistedJson,
+} from "@/lib/persistence/registry";
 
 const VALUES_KEY = "settings:values:v1";
 const FAVORITES_KEY = "settings:favorites:v1";
@@ -15,19 +20,11 @@ export interface SettingsAuditEvent {
 }
 
 function readJson<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = sessionStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
+  return readPersistedJson(key, fallback);
 }
 
 function writeJson(key: string, value: unknown) {
-  if (typeof window === "undefined") return;
-  sessionStorage.setItem(key, JSON.stringify(value));
+  writePersistedJson(key, value);
 }
 
 export function loadSettingsValues(schemaKey: string): SettingsValues {

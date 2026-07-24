@@ -19,6 +19,7 @@ import {
   type DealFilters,
 } from "@/components/sales/deals/FilterDealsPanel";
 import { viewEnter } from "@/lib/motion";
+import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
 
 const PIPELINE_OPTIONS: PipelineOption[] = DEAL_PIPELINES.map((pipeline) => ({
@@ -62,6 +63,7 @@ export default function DealsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-2 pr-4">
+      <FocusHighlight />
       <EntityHeader
         entityLabel="Deal"
         createRoute="/sales/deals/create"

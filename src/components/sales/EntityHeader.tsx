@@ -22,7 +22,7 @@ export interface PipelineOption {
 }
 
 export interface EntityHeaderProps {
-  /** Singular entity name — drives the Create button label. */
+  /** Singular entity name: drives the Create button label. */
   entityLabel: string;
   /** Plural form for the page title / search placeholder. */
   entityLabelPlural?: string;

@@ -1,5 +1,5 @@
 /**
- * Remote HTTP API — calls backend at NEXT_PUBLIC_API_BASE_URL/v1/*
+ * Remote HTTP API: calls backend at NEXT_PUBLIC_API_BASE_URL/v1/*
  * Returns ApiResult; never throws to callers (except programmer errors).
  */
 

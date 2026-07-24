@@ -1,15 +1,27 @@
 import { CreateMessageForm } from "@/components/activities/messages/CreateMessageForm";
+import { asRelatedKind } from "@/lib/activities/create-defaults";
 
-interface CreateMessagePageProps {
-  searchParams: Promise<{ layoutid?: string; redirect?: string }>;
+interface PageProps {
+  searchParams: Promise<{
+    layoutid?: string;
+    redirect?: string;
+    relatedKind?: string;
+    relatedName?: string;
+    to?: string;
+  }>;
 }
 
-export default async function CreateMessagePage({
-  searchParams,
-}: CreateMessagePageProps) {
+export default async function CreateMessagePage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const layoutId = params.layoutid ?? "standard";
-  const redirect = params.redirect === "true";
-
-  return <CreateMessageForm layoutId={layoutId} redirect={redirect} />;
+  return (
+    <CreateMessageForm
+      layoutId={params.layoutid ?? "standard"}
+      redirect={params.redirect === "true"}
+      defaults={{
+        relatedKind: asRelatedKind(params.relatedKind),
+        relatedName: params.relatedName,
+        to: params.to,
+      }}
+    />
+  );
 }

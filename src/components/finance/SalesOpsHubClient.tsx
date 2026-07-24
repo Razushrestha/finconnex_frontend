@@ -98,7 +98,7 @@ export function SalesOpsHubClient() {
         label: "Estimates",
         section: "§20.1",
         icon: FileText,
-        headline: ready ? `${metrics.estimatesOpen} open` : "—",
+        headline: ready ? `${metrics.estimatesOpen} open` : "",
         sub: ready ? `${metrics.estimatesDraft} draft` : "Create & track",
         cta: "New estimate",
       },
@@ -109,7 +109,7 @@ export function SalesOpsHubClient() {
         label: "Quotations",
         section: "§20.2",
         icon: FileText,
-        headline: ready ? `${metrics.quotesOpen} open` : "—",
+        headline: ready ? `${metrics.quotesOpen} open` : "",
         sub: ready
           ? `${formatAUD(metrics.quotesTotal)} pipeline`
           : "Line items & pricing",
@@ -122,7 +122,7 @@ export function SalesOpsHubClient() {
         label: "Invoices",
         section: "§20.3",
         icon: Receipt,
-        headline: ready ? `${metrics.invoicesUnpaid} unpaid` : "—",
+        headline: ready ? `${metrics.invoicesUnpaid} unpaid` : "",
         sub: ready
           ? `${metrics.invoicesOverdue} overdue`
           : "Generate & send",
@@ -135,7 +135,7 @@ export function SalesOpsHubClient() {
         label: "Payments",
         section: "§20.4",
         icon: Banknote,
-        headline: ready ? formatAUD(metrics.paymentsMonth) : "—",
+        headline: ready ? formatAUD(metrics.paymentsMonth) : "",
         sub: ready
           ? `${metrics.paymentsPending} pending`
           : "Record against invoices",
@@ -148,7 +148,7 @@ export function SalesOpsHubClient() {
         label: "Items / Services",
         section: "§20.5",
         icon: Package,
-        headline: ready ? `${metrics.productsActive} active` : "—",
+        headline: ready ? `${metrics.productsActive} active` : "",
         sub: ready
           ? `${metrics.productsTotal} in catalogue`
           : "Pricing catalogue",
@@ -161,7 +161,7 @@ export function SalesOpsHubClient() {
   return (
     <FinanceOpsShell title="Sales operations" section="§20">
       <p className="mb-3 max-w-2xl text-[12px] leading-relaxed text-slate-500">
-        Standalone estimates, quotations, invoices, payments, and catalogue —
+        Standalone estimates, quotations, invoices, payments, and catalogue 
         use each module on its own, or convert along the chain when you need to.
       </p>
 
@@ -222,19 +222,19 @@ export function SalesOpsHubClient() {
         <span className="text-slate-600">
           Open quotes{" "}
           <strong className="text-slate-900">
-            {ready ? formatAUD(metrics.quotesTotal) : "—"}
+            {ready ? formatAUD(metrics.quotesTotal) : ""}
           </strong>
         </span>
         <span className="text-slate-600">
           Unpaid invoices{" "}
           <strong className="text-slate-900">
-            {ready ? formatAUD(metrics.unpaidAmount) : "—"}
+            {ready ? formatAUD(metrics.unpaidAmount) : ""}
           </strong>
         </span>
         <span className="text-slate-600">
           Received{" "}
           <strong className="text-slate-900">
-            {ready ? formatAUD(metrics.paymentsMonth) : "—"}
+            {ready ? formatAUD(metrics.paymentsMonth) : ""}
           </strong>
         </span>
       </div>
@@ -274,7 +274,7 @@ export function SalesOpsHubClient() {
             </p>
             <p className={cn("text-[11px] text-slate-400")}>
               Optional client journey links still appear on quotation detail when
-              a proposal-to-payment path exists — they are not required here.
+              a proposal-to-payment path exists: they are not required here.
             </p>
           </div>
         ) : null}

@@ -112,7 +112,7 @@ export function CreateTimeEntryForm({ layoutId: _l, redirect: _r }: Props) {
       tip="Related To, User, Date, Duration, and Description are required."
       cardIcon={Timer}
       cardTitle="Time entry"
-      cardDescription="SRS §23 — feeds Generate Invoice from Logged Time"
+      cardDescription="SRS §23: feeds Generate Invoice from Logged Time"
       listHref="/time-tracking"
       saveLabel="Log time"
       onSave={onSave}

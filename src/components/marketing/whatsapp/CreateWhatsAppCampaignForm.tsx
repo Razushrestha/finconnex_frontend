@@ -104,7 +104,7 @@ export function CreateWhatsAppCampaignForm({
       tip="Name, approved template, and audience are required. Launch only when Approved."
       cardIcon={MessageCircle}
       cardTitle="WhatsApp campaign"
-      cardDescription="SRS §10.3 — template pre-approval required"
+      cardDescription="SRS §10.3: template pre-approval required"
       listHref="/marketing/whatsapp"
       saveLabel="Save draft"
       onSave={onSave}
@@ -119,7 +119,7 @@ export function CreateWhatsAppCampaignForm({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Appointment reminders — this week"
+            placeholder="Appointment reminders: this week"
             className={elevatedInputClass(true)}
           />
         </InputShell>

@@ -98,7 +98,7 @@ export function CreateReminderForm({
       breadcrumbParent={{ label: "Reminders", href: "/activities/reminders" }}
       badge="New reminder"
       title="Create Reminder"
-      subtitle="Never miss a follow-up — set when and how you want to be notified."
+      subtitle="Never miss a follow-up: set when and how you want to be notified."
       tip="Tip: Title, date/time, type & notification method are required."
       cardIcon={Bell}
       cardTitle="Reminder Information"

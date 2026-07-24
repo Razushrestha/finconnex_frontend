@@ -130,7 +130,7 @@ export function DocumentRequestsList({
                     </span>
                   </td>
                   <td className="px-4 py-3 text-slate-500">
-                    {r.relatedTo ?? "—"}
+                    {r.relatedTo ?? ""}
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap text-slate-500">
                     {r.dueDate}

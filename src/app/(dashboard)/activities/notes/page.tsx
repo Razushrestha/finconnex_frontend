@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -17,14 +17,14 @@ import {
 } from "lucide-react";
 import {
   NOTE_TYPES,
-  notes as seedNotes,
-  noteColumns as initialColumns,
   type Note,
   type NoteColumn,
   type NoteType,
 } from "@/lib/notes/types";
+import { listNoteColumns, saveNotes } from "@/lib/notes/store";
 import { NotesListView } from "@/components/activities/notes/NotesListView";
 import { NotesKanbanColumn } from "@/components/activities/notes/NotesKanbanColumn";
+import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "list" | "kanban";
@@ -46,11 +46,15 @@ export default function NotesPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [privateOnly, setPrivateOnly] = useState(false);
-  const [columns, setColumns] = useState<NoteColumn[]>(initialColumns);
+  const [columns, setColumns] = useState<NoteColumn[]>([]);
   const [dragInfo, setDragInfo] = useState<{
     noteId: string;
     sourceColumnId: string;
   } | null>(null);
+
+  useEffect(() => {
+    setColumns(listNoteColumns());
+  }, []);
 
   const allNotes = useMemo(
     () =>
@@ -112,7 +116,7 @@ export default function NotesPage() {
       const source = prev.find((c) => c.id === sourceColumnId);
       const note = source?.notes.find((n) => n.id === noteId);
       if (!note) return prev;
-      return prev.map((col) => {
+      const next = prev.map((col) => {
         if (col.id === sourceColumnId) {
           const notes = col.notes.filter((n) => n.id !== noteId);
           return { ...col, notes, count: notes.length };
@@ -123,6 +127,8 @@ export default function NotesPage() {
         }
         return col;
       });
+      saveNotes(next.flatMap((c) => c.notes));
+      return next;
     });
     setDragInfo(null);
   }
@@ -131,6 +137,7 @@ export default function NotesPage() {
 
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
+      <FocusHighlight />
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-52 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.11),_transparent_65%)]"
@@ -185,7 +192,7 @@ export default function NotesPage() {
                 active={typeTab === "All"}
                 onClick={() => setTypeTab("All")}
                 label="All"
-                count={allNotes.length || seedNotes.length}
+                count={allNotes.length}
               />
               {NOTE_TYPES.map((t) => (
                 <TabBtn

@@ -85,7 +85,7 @@ export function QuotationDetailClient({ id }: { id: string }) {
         `${window.location.origin}${signUrl}`,
       );
     }
-    flash("Contract sent — sign link copied");
+    flash("Contract sent: sign link copied");
   }
 
   function copySignLink() {
@@ -393,7 +393,7 @@ export function QuotationDetailClient({ id }: { id: string }) {
                   : "bg-slate-50 text-slate-400",
             )}
           >
-            E-Sign {row.signatureStatus ?? "—"}
+            E-Sign {row.signatureStatus ?? ""}
           </span>
           <span className="text-slate-300">→</span>
           {row.invoiceId ? (

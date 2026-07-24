@@ -1,5 +1,10 @@
 /** Shared SSR-safe storage + id/time helpers for §28 engines */
 
+import {
+  readPersistedJson,
+  writePersistedJson,
+} from "@/lib/persistence/registry";
+
 export function isBrowser() {
   return typeof window !== "undefined";
 }
@@ -23,29 +28,19 @@ export function newRulesId(prefix: string) {
   return `${prefix}-${Date.now()}-${rand}`;
 }
 
+/** Tenant-scoped JSON via active persistence driver (session → API). */
 export function readJsonStore<T>(key: string, fallback: T): T {
-  if (!isBrowser()) return fallback;
-  try {
-    const raw = sessionStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
+  return readPersistedJson(key, fallback);
 }
 
 export function writeJsonStore(key: string, value: unknown) {
-  if (!isBrowser()) return;
-  try {
-    sessionStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Quota / private mode — rules degrade silently in demo
-  }
+  writePersistedJson(key, value);
 }
 
 /** Notify UI listeners (audit panels, rules hub) after store mutations. */
 export function emitRulesChange(kind: "audit" | "bin" | "actor" | "all" = "all") {
   if (!isBrowser()) return;
+  if (typeof window.dispatchEvent !== "function") return;
   window.dispatchEvent(new CustomEvent("finconnex:rules", { detail: { kind } }));
 }
 

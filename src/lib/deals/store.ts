@@ -1,4 +1,4 @@
-/** Live deals pipeline store — session-backed (production adapter: swap for API). */
+/** Live deals pipeline store: session-backed (production adapter: swap for API). */
 
 import {
   DEAL_PIPELINE_STAGES,

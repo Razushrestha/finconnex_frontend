@@ -1,4 +1,4 @@
-/** Shared finance helpers — §13 / §20 */
+/** Shared finance helpers: §13 / §20 */
 
 export interface FinanceLineItem {
   id: string;

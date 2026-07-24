@@ -34,7 +34,7 @@ export const RELATED_RECORD_OPTIONS: {
 ];
 
 export function formatRelatedTo(r?: RelatedTo | string) {
-  if (!r) return "—";
+  if (!r) return "";
   if (typeof r === "string") return r;
   return `${r.kind}: ${r.name}`;
 }

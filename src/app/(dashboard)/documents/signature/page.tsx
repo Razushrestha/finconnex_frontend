@@ -262,7 +262,7 @@ export default function ESignaturePage() {
                       </p>
                     </td>
                     <td className="px-4 py-3 text-slate-500">
-                      {r.relatedTo ?? "—"}
+                      {r.relatedTo ?? ""}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -275,7 +275,7 @@ export default function ESignaturePage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-slate-500">
-                      {r.sentDate ?? "—"}
+                      {r.sentDate ?? ""}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-slate-500">
                       {r.expiryDate}

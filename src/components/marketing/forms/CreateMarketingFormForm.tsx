@@ -168,7 +168,7 @@ export function CreateMarketingFormForm({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Lead capture — home loan"
+            placeholder="Lead capture: home loan"
             className={elevatedInputClass(true)}
           />
         </InputShell>
@@ -263,7 +263,7 @@ export function CreateMarketingFormForm({
         <input
           value={thankYouMessage}
           onChange={(e) => setThankYouMessage(e.target.value)}
-          placeholder="Thanks — we'll be in touch."
+          placeholder="Thanks: we'll be in touch."
           className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[13px] outline-none focus:border-violet-500"
         />
       </Field>

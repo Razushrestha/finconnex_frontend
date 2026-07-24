@@ -5,7 +5,7 @@ import { MY_PREFERENCES_TABS } from "@/lib/settings/settings-config";
 import { SettingsFormClient } from "@/components/settings/SettingsFormClient";
 import { cn } from "@/lib/utils";
 
-/** SRS Top Right — My Preferences (profile, signature, password, notifications, theme). */
+/** SRS Top Right: My Preferences (profile, signature, password, notifications, theme). */
 export default function MyPreferencesPage() {
   const [tab, setTab] = useState<(typeof MY_PREFERENCES_TABS)[number]["slug"]>(
     "profile",
@@ -23,7 +23,7 @@ export default function MyPreferencesPage() {
         </p>
         <h2 className="text-[17px] font-bold text-slate-900">My Preferences</h2>
         <p className="mt-1 text-[12px] text-slate-500">
-          Profile, signature, password, notifications, and theme — personal
+          Profile, signature, password, notifications, and theme: personal
           overrides that do not change tenant-wide Settings.
         </p>
       </div>

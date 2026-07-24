@@ -1,4 +1,4 @@
-/** SRS §28.5 Permissions — RBAC with hierarchy + module/field/record/action */
+/** SRS §28.5 Permissions: RBAC with hierarchy + module/field/record/action */
 
 export type HierarchyLevel =
   | "System Admin"
@@ -67,12 +67,12 @@ export const ROLES: RoleDefinition[] = [
     id: "ro",
     name: "Read Only",
     level: 10,
-    description: "View only — no create/edit/delete",
+    description: "View only: no create/edit/delete",
   },
 ];
 
 /**
- * Explicit grants — denies win when matched.
+ * Explicit grants: denies win when matched.
  * Unmatched actions use role-aware defaults in `can()` (not fail-open for delete).
  */
 export const PERMISSION_GRANTS: PermissionGrant[] = [

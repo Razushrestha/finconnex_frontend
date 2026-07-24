@@ -102,7 +102,7 @@ export function PublicJourneyClient({ token }: { token: string }) {
               ) : null}
               {quote.signatureStatus === "Signed" ? (
                 <p className="mt-3 text-[12px] font-medium text-emerald-700">
-                  Contract signed — thank you.
+                  Contract signed: thank you.
                 </p>
               ) : null}
             </div>

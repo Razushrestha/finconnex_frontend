@@ -555,7 +555,7 @@ export function TicketDetailClient({ id }: { id: string }) {
                   disabled={isMerged}
                   onChange={(e) => setAssignee(e.target.value)}
                 >
-                  <option value="">— Unassigned —</option>
+                  <option value="">Unassigned</option>
                   {SUPPORT_AGENTS.map((a) => (
                     <option key={a} value={a}>
                       {a}
@@ -612,7 +612,7 @@ export function TicketDetailClient({ id }: { id: string }) {
                     setCategory(e.target.value as TicketCategory | "")
                   }
                 >
-                  <option value="">— None —</option>
+                  <option value="">None</option>
                   {TICKET_CATEGORIES.map((c) => (
                     <option key={c} value={c}>
                       {c}
@@ -655,7 +655,7 @@ export function TicketDetailClient({ id }: { id: string }) {
                   CSAT {row.satisfactionRating}/5
                 </span>
                 {row.satisfactionComment
-                  ? ` — “${row.satisfactionComment}”`
+                  ? `: “${row.satisfactionComment}”`
                   : null}
               </div>
             ) : null}

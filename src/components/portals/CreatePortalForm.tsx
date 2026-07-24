@@ -426,7 +426,7 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
               </div>
             </div>
 
-            {/* Side summary — fills remaining area */}
+            {/* Side summary: fills remaining area */}
             <aside className="flex flex-col bg-slate-50/60 p-4 sm:p-5">
               <p className="mb-3 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
                 Preview
@@ -465,13 +465,13 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-slate-400">Contact</span>
                     <span className="truncate font-semibold text-slate-700">
-                      {contactName.trim() || "—"}
+                      {contactName.trim() || ""}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-slate-400">Email</span>
                     <span className="truncate font-semibold text-slate-700">
-                      {contactEmail.trim() || "—"}
+                      {contactEmail.trim() || ""}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
@@ -496,7 +496,7 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
               </div>
 
               <p className="mt-auto pt-4 text-[11px] leading-relaxed text-slate-400">
-                Clients sign in at this URL with no CRM chrome — deals,
+                Clients sign in at this URL with no CRM chrome: deals,
                 documents, invoices, and tickets based on the modules you enable.
               </p>
             </aside>

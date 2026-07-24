@@ -45,7 +45,7 @@ export function EmailsKanbanColumn({
         isOver ? dropTargetActive : "bg-slate-100/70",
       )}
     >
-      {/* Header — fixed */}
+      {/* Header: fixed */}
       <div className="mb-3 shrink-0">
         <span
           className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${column.badgeColorClass}`}

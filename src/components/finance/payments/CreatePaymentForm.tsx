@@ -142,7 +142,7 @@ export function CreatePaymentForm({ layoutId: _l, redirect: _r }: Props) {
       tip="Invoice and amount are required. Completed payments update invoice balance."
       cardIcon={Banknote}
       cardTitle="Payment details"
-      cardDescription="SRS §20.4 — links to the open invoice balance"
+      cardDescription="SRS §20.4: links to the open invoice balance"
       listHref="/finance/payments"
       saveLabel="Save payment"
       onSave={onSave}

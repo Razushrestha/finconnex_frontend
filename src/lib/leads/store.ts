@@ -1,4 +1,4 @@
-/** Live lead board store — session-backed (production adapter: swap for API). */
+/** Live lead board store: session-backed (production adapter: swap for API). */
 
 import {
   LEAD_COLUMNS,
@@ -7,6 +7,14 @@ import {
   type LeadSource,
   type LeadStatus,
 } from "@/lib/leads/types";
+import {
+  isMortgagePipelineStage,
+  normalizeMortgageBoard,
+  PIPELINE_STAGE_DOT,
+} from "@/lib/pipeline-sla/board";
+import { leadStatusToPipelineStage } from "@/lib/pipeline-sla/engine";
+import type { MortgagePipelineStage } from "@/lib/pipeline-sla/types";
+import { formatPipelineTimestamp } from "@/lib/pipeline-sla/ui";
 import { createBoardStore } from "@/lib/rules/module-store";
 import { formatRulesAt, newRulesId } from "@/lib/rules/storage";
 
@@ -22,22 +30,20 @@ const AVATAR_COLORS = [
 ];
 
 function cloneSeed(): KanbanColumn[] {
-  return LEAD_COLUMNS.map((col) => ({
-    ...col,
-    cards: col.cards.map((c) => ({ ...c })),
-  }));
+  return normalizeMortgageBoard(
+    LEAD_COLUMNS.map((col) => ({
+      ...col,
+      cards: col.cards.map((c) => ({ ...c })),
+    })),
+  );
 }
 
 function normalize(cols: KanbanColumn[]): KanbanColumn[] {
-  return cols.map((col) => ({
-    ...col,
-    leadCount: col.cards.length,
-    cards: col.cards.map((c) => ({ ...c })),
-  }));
+  return normalizeMortgageBoard(cols);
 }
 
 const board = createBoardStore({
-  key: "sales:leads:board:v1",
+  key: "sales:leads:board:v6",
   seed: cloneSeed,
 });
 
@@ -58,7 +64,14 @@ export function listLeadEmails(): string[] {
 export function findLeadById(id: string) {
   for (const col of listLeadColumns()) {
     const card = col.cards.find((c) => c.id === id);
-    if (card) return { card, status: col.title as LeadStatus, columnId: col.id };
+    if (card) {
+      return {
+        card,
+        status: col.leadStatus,
+        pipelineStage: col.title,
+        columnId: col.id,
+      };
+    }
   }
   return null;
 }
@@ -71,29 +84,40 @@ export function createLead(input: {
   company?: string;
   source?: LeadSource;
   status: LeadStatus;
+  /** Prefer mortgage stage when provided (Session 17 create form). */
+  pipelineStage?: string;
   owner: string;
   estimatedValue?: string;
 }): LeadCardData {
   const cols = listLeadColumns();
+  const stage: MortgagePipelineStage =
+    input.pipelineStage && isMortgagePipelineStage(input.pipelineStage)
+      ? input.pipelineStage
+      : leadStatusToPipelineStage(input.status);
   const target =
-    cols.find((c) => c.title === input.status) ??
-    cols.find((c) => c.title === "New") ??
-    cols[0];
+    cols.find((c) => c.title === stage) ??
+    cols.find((c) => c.title === "New Lead") ??
+    cols[0]!;
   const name = `${input.firstName} ${input.lastName}`.trim();
   const initials = `${input.firstName.charAt(0)}${input.lastName.charAt(0)}`.toUpperCase();
   const avatarIndex = cols.reduce((n, c) => n + c.cards.length, 0);
+  const enteredAt = formatPipelineTimestamp(new Date());
   const card: LeadCardData = {
     id: newRulesId("l"),
     name,
     initials,
-    company: input.company?.trim() || "—",
+    company: input.company?.trim() || "",
     email: input.email.trim(),
     phone: input.phone?.trim() || "",
     owner: input.owner,
     createdDate: formatRulesAt().split(",")[0] ?? formatRulesAt(),
     source: input.source ?? "Website",
     estimatedValue: input.estimatedValue,
-    accentColorClass: target.dotColorClass,
+    pipelineStage: target.title,
+    stageEnteredAt: enteredAt,
+    pipelineStartedAt: enteredAt,
+    accentColorClass:
+      PIPELINE_STAGE_DOT[target.title] ?? target.dotColorClass,
     avatarBgClass: AVATAR_COLORS[avatarIndex % AVATAR_COLORS.length],
   };
 

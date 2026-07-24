@@ -68,7 +68,7 @@ export function portalDocumentsForClient(clientName: string): PortalDocument[] {
     "Greystone Realty": [
       {
         id: "doc1",
-        name: "Engagement letter — refinance",
+        name: "Engagement letter: refinance",
         status: "Signed",
         type: "Contract",
       },

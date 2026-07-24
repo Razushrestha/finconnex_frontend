@@ -97,7 +97,7 @@ export function TaskUpdateCard() {
   const [maxHeight, setMaxHeight] = React.useState<number>();
 
   // Measure the height of the first 6 rows (+ gaps) so the box always
-  // fits exactly 6 tasks — anything beyond that scrolls inside the list
+  // fits exactly 6 tasks: anything beyond that scrolls inside the list
   // instead of growing the card.
   React.useLayoutEffect(() => {
     if (!listRef.current) return;

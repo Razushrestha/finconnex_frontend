@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Phone, ChevronLeft, ChevronRight } from "lucide-react";
-import { calls } from "@/lib/calls/types";
+import { listCalls } from "@/lib/calls/store";
+import type { Call } from "@/lib/calls/types";
+import { RecordDetailModal } from "@/components/shared/RecordDetailModal";
 
 interface CallsListTableProps {
   sortActive: boolean;
@@ -15,15 +17,29 @@ export function CallsListTable({
 }: CallsListTableProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
+  const [detail, setDetail] = useState<Call | null>(null);
+  const [tick, setTick] = useState(0);
   const pageSize = 10;
 
+  useEffect(() => {
+    setTick((n) => n + 1);
+  }, []);
+
   const sorted = useMemo(() => {
-    const data = [...calls];
+    const data = [...listCalls()];
     if (sortActive) {
       data.sort((a, b) => a.date.localeCompare(b.date));
     }
     return data;
-  }, [sortActive]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortActive, tick]);
+
+  useEffect(() => {
+    const focus = new URLSearchParams(window.location.search).get("focus");
+    if (!focus) return;
+    const hit = sorted.find((c) => c.id === focus);
+    if (hit) setDetail(hit);
+  }, [sorted]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -76,8 +92,17 @@ export function CallsListTable({
           </thead>
           <tbody className="divide-y divide-slate-50">
             {paginated.map((call) => (
-              <tr key={call.id} className="hover:bg-slate-50/60">
-                <td className="px-3 py-2">
+              <tr
+                key={call.id}
+                data-focus-id={call.id}
+                data-call-id={call.id}
+                className="cursor-pointer hover:bg-slate-50/60"
+                onClick={() => setDetail(call)}
+              >
+                <td
+                  className="px-3 py-2"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <input
                     type="checkbox"
                     checked={selected.has(call.id)}
@@ -92,10 +117,10 @@ export function CallsListTable({
                   </div>
                 </td>
                 <td className="px-3 py-2 text-slate-600">
-                  {call.relatedTo || "—"}
+                  {call.relatedTo || ""}
                 </td>
                 <td className="px-3 py-2 text-slate-600">
-                  {call.contact || "—"}
+                  {call.contact || ""}
                 </td>
                 <td className="px-3 py-2 text-slate-600">{call.callType}</td>
                 <td className="px-3 py-2 text-slate-600">{call.status}</td>
@@ -103,7 +128,7 @@ export function CallsListTable({
                   {call.date}
                 </td>
                 <td className="px-3 py-2 text-slate-500">
-                  {call.duration || "—"}
+                  {call.duration || ""}
                 </td>
                 <td className="px-3 py-2 text-slate-600">{call.assignedTo}</td>
               </tr>
@@ -135,6 +160,27 @@ export function CallsListTable({
           </button>
         </div>
       </div>
+
+      <RecordDetailModal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title={detail?.subject ?? "Call"}
+        subtitle={detail?.status}
+        fields={
+          detail
+            ? [
+                { label: "Related to", value: detail.relatedTo ?? "" },
+                { label: "Contact", value: detail.contact ?? "" },
+                { label: "Type", value: detail.callType },
+                { label: "Status", value: detail.status },
+                { label: "Date", value: detail.date },
+                { label: "Duration", value: detail.duration ?? "" },
+                { label: "Assigned to", value: detail.assignedTo },
+              ]
+            : []
+        }
+        body={detail?.notes}
+      />
     </div>
   );
 }

@@ -65,13 +65,13 @@ export function CompaniesListView({
                   </div>
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-slate-500">
-                  {company.website || "—"}
+                  {company.website || ""}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-slate-600">
-                  {company.industry || "—"}
+                  {company.industry || ""}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-slate-600">
-                  {company.phone || "—"}
+                  {company.phone || ""}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
@@ -85,7 +85,7 @@ export function CompaniesListView({
                   {company.owner}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-slate-500">
-                  {company.annualRevenue || "—"}
+                  {company.annualRevenue || ""}
                 </td>
                 <td className="px-3 py-2 text-right">
                   <button

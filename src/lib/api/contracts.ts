@@ -1,5 +1,5 @@
 /**
- * Module API contracts — what the backend must implement.
+ * Module API contracts: what the backend must implement.
  * Paths are relative to {BASE}/v1
  */
 
@@ -39,7 +39,7 @@ import type { SessionPayload } from "@/lib/auth/types";
 /* ── Auth ─────────────────────────────────────────────── */
 
 export interface AuthApi {
-  /** POST /auth/login — existing Next route may proxy later */
+  /** POST /auth/login: existing Next route may proxy later */
   login(input: {
     username: string;
     password: string;
@@ -61,6 +61,8 @@ export interface LeadCreateInput {
   company?: string;
   source?: LeadSource;
   status: LeadStatus;
+  /** Mortgage pipeline stage (Session 17). When set, preferred over status→stage map. */
+  pipelineStage?: string;
   owner: string;
   estimatedValue?: string;
 }
@@ -238,7 +240,7 @@ export interface RulesApi {
   restore(id: string): Promise<ApiResult<RecycleBinItem>>;
   /** DELETE /rules/recycle-bin/:id (purge) */
   purge(id: string): Promise<ApiResult<{ id: string }>>;
-  /** GET /rules/permissions/me — effective grants for current role */
+  /** GET /rules/permissions/me: effective grants for current role */
   myPermissions(): Promise<
     ApiResult<{ role: string; canDelete: boolean }>
   >;

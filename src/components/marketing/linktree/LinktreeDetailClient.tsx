@@ -285,7 +285,7 @@ export function LinktreeDetailClient({ id }: { id: string }) {
                   <input
                     value={page.avatarUrl ?? ""}
                     onChange={(e) => patch({ avatarUrl: e.target.value })}
-                    placeholder="https://… (optional — initials if empty)"
+                    placeholder="https://… (optional: initials if empty)"
                     className="h-9 rounded-lg border border-slate-200 px-2.5 text-[12px] outline-none"
                   />
                 </label>

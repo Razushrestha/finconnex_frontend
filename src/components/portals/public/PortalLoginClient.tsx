@@ -104,7 +104,7 @@ export function PortalLoginClient({ slug }: { slug: string }) {
             {portal.name}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            Sign in to view deals, documents, invoices, and support — for{" "}
+            Sign in to view deals, documents, invoices, and support: for{" "}
             {portal.clientName}.
           </p>
         </div>
@@ -130,7 +130,7 @@ export function PortalLoginClient({ slug }: { slug: string }) {
             <p className="mt-2 text-[11px] font-medium text-rose-500">{error}</p>
           ) : (
             <p className="mt-2 text-[11px] text-slate-400">
-              Mock login — use {portal.primaryContactEmail}
+              Mock login: use {portal.primaryContactEmail}
             </p>
           )}
           <button

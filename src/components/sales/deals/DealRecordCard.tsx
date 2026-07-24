@@ -34,6 +34,8 @@ export function DealRecordCard({
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      data-focus-id={deal.id}
+      data-deal-id={deal.id}
       className={cn(
         "w-full cursor-grab rounded-md border border-slate-200/80 bg-white p-3.5 shadow-2xs active:cursor-grabbing",
         cardMotion,

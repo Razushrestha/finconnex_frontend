@@ -109,7 +109,7 @@ export function CreateSmsCampaignForm({ layoutId: _l, redirect: _r }: Props) {
       tip="Name, Type, Audience, and Message are required."
       cardIcon={MessageSquare}
       cardTitle="SMS details"
-      cardDescription="SRS §10.2 — keep copy under 160 characters"
+      cardDescription="SRS §10.2: keep copy under 160 characters"
       listHref="/marketing/sms"
       saveLabel="Save draft"
       onSave={onSave}
@@ -119,7 +119,7 @@ export function CreateSmsCampaignForm({ layoutId: _l, redirect: _r }: Props) {
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Appointment reminder — tomorrow"
+            placeholder="Appointment reminder: tomorrow"
             className={elevatedInputClass(true)}
           />
         </InputShell>

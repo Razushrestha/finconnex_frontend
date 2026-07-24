@@ -657,9 +657,9 @@ export function TaskCard({
     <>
       <div
         draggable
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onClick={handleCardClick}
+        onDragStart={onDragStart}
+        onDragEnd={onDragEnd}
+        data-focus-id={task.taskId}
         data-task-id={task.taskId}
         data-column-id={columnId}
         className={cn(

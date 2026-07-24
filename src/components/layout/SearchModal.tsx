@@ -35,7 +35,7 @@ interface SearchItem {
   keywords?: string[];
 }
 
-/** Real app routes — kept in sync with Sidebar destinations. */
+/** Real app routes: kept in sync with Sidebar destinations. */
 const DESTINATIONS: SearchItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutGrid, keywords: ["home"] },
   { label: "Leads", href: "/sales/leads", icon: Users, keywords: ["sales", "prospect"] },

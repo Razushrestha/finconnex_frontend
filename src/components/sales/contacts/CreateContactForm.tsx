@@ -146,7 +146,7 @@ export function CreateContactForm({
       breadcrumbParent={{ label: "Contacts", href: "/sales/contacts" }}
       badge="New contact"
       title="Create Contact"
-      subtitle="Add someone you work with — link them to a company and keep the relationship warm."
+      subtitle="Add someone you work with: link them to a company and keep the relationship warm."
       tip="Tip: First name, last name, email, status & owner are enough to start."
       cardIcon={User}
       cardTitle="Contact Information"

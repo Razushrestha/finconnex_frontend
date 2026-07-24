@@ -135,11 +135,11 @@ export function CreateEmailCampaignForm({
       }}
       badge="§10.1"
       title="Create Email Campaign"
-      subtitle="Bulk or drip email using the Templates Library — scored like Zoho Campaigns."
+      subtitle="Bulk or drip email using the Templates Library: scored like Zoho Campaigns."
       tip="Name, Type, Audience, Template, Subject, and From are required."
       cardIcon={Mail}
       cardTitle="Campaign details"
-      cardDescription="SRS §10.1 — starts as Draft until you schedule or launch"
+      cardDescription="SRS §10.1: starts as Draft until you schedule or launch"
       listHref="/marketing/email"
       saveLabel="Save draft"
       onSave={onSave}

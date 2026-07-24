@@ -6,6 +6,9 @@ import {
 } from "@/lib/settings/settings-config";
 import { SettingsFormClient } from "@/components/settings/SettingsFormClient";
 import { RecycleBinSettingsClient } from "@/components/settings/RecycleBinSettingsClient";
+import { LeadCardSettingsClient } from "@/components/settings/LeadCardSettingsClient";
+import { CustomFieldsSettingsClient } from "@/components/settings/CustomFieldsSettingsClient";
+import { PipelineSlaSettingsClient } from "@/components/settings/PipelineSlaSettingsClient";
 import { cn } from "@/lib/utils";
 
 interface PageProps {
@@ -27,6 +30,12 @@ export default async function SettingsSubPage({ params }: PageProps) {
   const path = `/settings/${category.slug}/${item.slug}`;
   const isRecycleBin =
     category.slug === "data-management" && item.slug === "recycle-bin";
+  const isLeadCard =
+    category.slug === "crm-configuration" && item.slug === "lead-card";
+  const isCustomFields =
+    category.slug === "crm-configuration" && item.slug === "custom-fields";
+  const isPipelines =
+    category.slug === "crm-configuration" && item.slug === "pipelines";
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-4">
@@ -60,6 +69,12 @@ export default async function SettingsSubPage({ params }: PageProps) {
       <div className="lg:col-span-3">
         {isRecycleBin ? (
           <RecycleBinSettingsClient />
+        ) : isLeadCard ? (
+          <LeadCardSettingsClient />
+        ) : isCustomFields ? (
+          <CustomFieldsSettingsClient />
+        ) : isPipelines ? (
+          <PipelineSlaSettingsClient />
         ) : (
           <SettingsFormClient
             categorySlug={category.slug}

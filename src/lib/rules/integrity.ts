@@ -1,4 +1,4 @@
-/** SRS §28.1 Data Integrity — uniqueness derived from live module stores */
+/** SRS §28.1 Data Integrity: uniqueness derived from live module stores */
 
 import { listContactEmails } from "@/lib/contacts/store";
 import { listDealKeys } from "@/lib/deals/store";
@@ -55,11 +55,11 @@ export function assertUniqueEmail(
 
 /** @deprecated Uniqueness is live-store based; kept for call-site compatibility. */
 export function claimEmail(_email: string) {
-  // no-op — createLead/createContact persist the email into the live store
+  // no-op: createLead/createContact persist the email into the live store
 }
 
 export function releaseEmail(_email: string) {
-  // no-op — deleteLead/deleteContact remove the live record
+  // no-op: deleteLead/deleteContact remove the live record
 }
 
 /** Deal Name + Account must be unique (§28.1). */
@@ -86,11 +86,11 @@ export function assertUniqueDealNameAccount(
 
 /** @deprecated Uniqueness is live-store based; kept for call-site compatibility. */
 export function claimDealNameAccount(_name: string, _account: string) {
-  // no-op — createDeal persists into the live pipeline store
+  // no-op: createDeal persists into the live pipeline store
 }
 
 export function releaseDealNameAccount(_name: string, _account: string) {
-  // no-op — deleteDeal removes the live record
+  // no-op: deleteDeal removes the live record
 }
 
 /** Required fields cannot be left blank on creation (§28.1). */
@@ -110,7 +110,7 @@ export function assertRequired(
   return ok();
 }
 
-/** System fields are non-editable (§28.1) — strip them from update payloads. */
+/** System fields are non-editable (§28.1): strip them from update payloads. */
 export function stripSystemFields<T extends Record<string, unknown>>(
   patch: T,
 ): Omit<T, (typeof SYSTEM_FIELDS)[number]> {

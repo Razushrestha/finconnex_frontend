@@ -365,7 +365,7 @@ function BookingsTable({ bookings }: { bookings: Booking[] }) {
               </span>
             </td>
             <td className="px-4 py-3 text-[11px] text-slate-500">
-              {b.createdLead ? "Created" : "—"}
+              {b.createdLead ? "Created" : ""}
             </td>
           </tr>
         ))}

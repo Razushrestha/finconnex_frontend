@@ -296,7 +296,7 @@ export function SmsCampaignDetailClient({ id }: { id: string }) {
                     Scheduled
                   </dt>
                   <dd className="mt-0.5 text-[13px] font-semibold">
-                    {campaign.scheduledAt ?? "—"}
+                    {campaign.scheduledAt ?? ""}
                   </dd>
                 </div>
                 <div className="rounded-xl border border-slate-100 px-3 py-2.5">

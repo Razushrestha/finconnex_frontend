@@ -81,7 +81,7 @@ export function RulesHubClient() {
             </div>
             <p className="mt-0.5 text-[12px] text-slate-500">
               Shared integrity, transitions, notifications, audit, soft-delete,
-              and RBAC — enforced on create/edit/delete across CRM modules.
+              and RBAC: enforced on create/edit/delete across CRM modules.
             </p>
           </div>
           <Link
@@ -190,7 +190,7 @@ export function RulesHubClient() {
                       {e.changes
                         .map(
                           (c) =>
-                            `${c.field}: ${String(c.from ?? "—")} → ${String(c.to ?? "—")}`,
+                            `${c.field}: ${String(c.from ?? "")} → ${String(c.to ?? "")}`,
                         )
                         .join("; ")}
                     </p>

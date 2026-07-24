@@ -109,7 +109,7 @@ th{text-align:left;padding:8px;border-bottom:2px solid #cbd5e1;color:#64748b;fon
     const url = URL.createObjectURL(blob);
     window.open(url, "_blank", "noopener,noreferrer");
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    flash("Chart pack opened — print / save as PDF");
+    flash("Chart pack opened: print / save as PDF");
   }
 
   function persistBenchmarks(next: BenchmarkMap) {

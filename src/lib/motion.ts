@@ -1,4 +1,4 @@
-/** Shared motion classes — Tailwind + tw-animate-css (no Framer). */
+/** Shared motion classes: Tailwind + tw-animate-css (no Framer). */
 
 const reduce = "motion-reduce:animate-none motion-reduce:transition-none";
 

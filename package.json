@@ -6,7 +6,21 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke": "vitest run src/lib/leads/__tests__/lead-card-smokes.test.ts",
+    "smoke:phase9": "npx tsx src/lib/leads/smoke-session9.ts",
+    "smoke:phase10": "npx tsx src/lib/leads/smoke-session10.ts",
+    "smoke:phase11": "npx tsx src/lib/leads/smoke-session11.ts",
+    "smoke:phase12": "npx tsx src/lib/leads/smoke-session12.ts",
+    "smoke:phase13": "npx tsx src/lib/leads/smoke-session13.ts",
+    "smoke:phase14": "npx tsx src/lib/leads/smoke-session14.ts",
+    "smoke:phase15": "npx tsx src/lib/leads/smoke-session15.ts",
+    "smoke:phase16": "npx tsx src/lib/leads/smoke-session16.ts",
+    "smoke:phase17": "npx tsx src/lib/leads/smoke-session17.ts",
+    "smoke:phase18": "npx tsx src/lib/leads/smoke-session18.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -33,6 +47,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }

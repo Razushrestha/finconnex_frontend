@@ -32,7 +32,7 @@ const features = [
 ];
 
 export const metadata: Metadata = {
-  title: "Sign in — FinConnex",
+  title: "Sign in: FinConnex",
   description: "Sign in to your organization workspace",
 };
 

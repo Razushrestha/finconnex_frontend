@@ -1,4 +1,4 @@
-/** SRS §7.8 Calendar — aggregated events */
+/** SRS §7.8 Calendar: aggregated events */
 
 export type CalendarItemType = "Event" | "Task" | "Meeting" | "Reminder";
 
@@ -16,7 +16,7 @@ export interface CalendarItem {
 export const calendarItems: CalendarItem[] = [
   {
     id: "cal-1",
-    title: "Discovery call — Anderson",
+    title: "Discovery call: Anderson",
     type: "Event",
     start: "2026-07-22T10:00",
     end: "2026-07-22T10:30",

@@ -25,9 +25,17 @@ import {
   elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
 
+import { createEmail } from "@/lib/emails/store";
+import { formatRulesAt } from "@/lib/rules/storage";
+
 interface CreateEmailFormProps {
   layoutId: string;
   redirect: boolean;
+  defaults?: {
+    relatedKind?: RelatedEntityKind;
+    relatedName?: string;
+    to?: string;
+  };
 }
 
 const EMAIL_STATUSES: EmailStatus[] = [
@@ -73,9 +81,18 @@ const initialState: FormState = {
   status: "Draft",
 };
 
-export function CreateEmailForm({ layoutId, redirect }: CreateEmailFormProps) {
+export function CreateEmailForm({
+  layoutId,
+  redirect,
+  defaults,
+}: CreateEmailFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(initialState);
+  const [form, setForm] = useState<FormState>({
+    ...initialState,
+    relatedKind: defaults?.relatedKind ?? "",
+    relatedName: defaults?.relatedName ?? "",
+    to: defaults?.to ?? "",
+  });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
   );
@@ -101,14 +118,38 @@ export function CreateEmailForm({ layoutId, redirect }: CreateEmailFormProps) {
   function handleSave(createAnother: boolean) {
     setSubmitted(true);
     if (!validate()) return;
-    console.log("Saving email", { layoutId, redirect, ...form });
+    const relatedTo =
+      form.relatedKind && form.relatedName
+        ? `${form.relatedKind}: ${form.relatedName}`
+        : undefined;
+    const status = (form.status || "Sent") as EmailStatus;
+    const created = createEmail({
+      subject: form.subject.trim(),
+      body: form.body.trim(),
+      from: form.from.trim(),
+      to: form.to
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      relatedTo,
+      status,
+      sentDate: status === "Draft" ? undefined : formatRulesAt(new Date()),
+      templateUsed: form.template || undefined,
+    });
     if (createAnother) {
-      setForm({ ...initialState, from: form.from });
+      setForm({
+        ...initialState,
+        from: form.from,
+        relatedKind: form.relatedKind,
+        relatedName: form.relatedName,
+      });
       setErrors({});
       setSubmitted(false);
       return;
     }
-    router.push("/activities/emails");
+    void layoutId;
+    void redirect;
+    router.push(`/activities/emails?focus=${created.id}`);
   }
 
   return (
@@ -116,7 +157,7 @@ export function CreateEmailForm({ layoutId, redirect }: CreateEmailFormProps) {
       breadcrumbParent={{ label: "Emails", href: "/activities/emails" }}
       badge="Compose email"
       title="Create Email"
-      subtitle="Compose a message with recipients, subject, and body — then save or send later."
+      subtitle="Compose a message with recipients, subject, and body: then save or send later."
       tip="Tip: Subject, body & To are required to save."
       cardIcon={Mail}
       cardTitle="Compose Email"

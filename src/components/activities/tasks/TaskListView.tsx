@@ -163,6 +163,8 @@ export function TaskListView({ filters }: TaskListViewProps) {
             {paginatedData.map((task) => (
               <tr
                 key={task.taskId}
+                data-focus-id={task.taskId}
+                data-task-id={task.taskId}
                 className="transition-colors hover:bg-slate-50/80"
               >
                 <td className="px-3 py-2.5 font-medium text-slate-500">

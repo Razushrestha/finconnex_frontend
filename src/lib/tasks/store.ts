@@ -1,4 +1,4 @@
-/** Live task board store — session-backed (production adapter: swap for API). */
+/** Live task board store: session-backed (production adapter: swap for API). */
 
 import {
   taskColumns as SEED_COLUMNS,
@@ -37,7 +37,8 @@ function normalize(cols: TaskColumn[]): TaskColumn[] {
 }
 
 const board = createBoardStore({
-  key: "activities:tasks:board:v1",
+  // v2: lead-card Phase 7 seeds (William +X task, overdue flags)
+  key: "activities:tasks:board:v2",
   seed: cloneSeed,
 });
 

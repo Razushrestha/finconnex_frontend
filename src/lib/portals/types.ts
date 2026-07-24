@@ -126,7 +126,7 @@ export function portalPublicPath(slug: string) {
   return `/p/${slug}`;
 }
 
-/** Modules visible in public nav — intersection of configured modules only */
+/** Modules visible in public nav: intersection of configured modules only */
 export function effectiveModules(p: ClientPortal): PortalModule[] {
   return PORTAL_MODULES.filter((m) => p.modules.includes(m));
 }
@@ -217,7 +217,7 @@ export const clientPortals: ClientPortal[] = [
     createdAt: "28/05/2026",
     activity: [
       { id: "v1", at: "01/06/2026 10:00", action: "Invite sent", actor: "Shiva Kadhka" },
-      { id: "v2", at: "12/06/2026 09:00", action: "Suspended — overdue invoice", actor: "Shiva Kadhka" },
+      { id: "v2", at: "12/06/2026 09:00", action: "Suspended: overdue invoice", actor: "Shiva Kadhka" },
     ],
     audit: [
       { id: "a1", at: "28/05/2026 09:00", action: "Created", actor: "Shiva Kadhka" },
@@ -327,7 +327,7 @@ export function uniqueSlug(base: string, excludeId?: string) {
   return slug;
 }
 
-/* —— Public mock session —— */
+/*  Public mock session  */
 
 function sessionKey(slug: string) {
   return `portal:session:${slug}`;

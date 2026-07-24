@@ -17,6 +17,7 @@ import {
   type ActivityView,
 } from "@/components/activities/ActivityToolbar";
 import { EMPTY_TASK_FILTERS, type TaskFilters } from "@/lib/tasks/types";
+import { FocusHighlight } from "@/components/shared/FocusHighlight";
 
 const moreMenuItems = [
   { key: "mass-transfer", icon: ArrowRightLeft, label: "Mass Transfer" },
@@ -58,6 +59,7 @@ export default function TasksPage() {
 
   return (
     <div className="flex min-h-full w-full min-w-0 flex-col overflow-hidden bg-slate-50/50  lg:p-4">
+      <FocusHighlight />
       <div className="shrink-0">
         <ActivityToolbar
           entityLabel="Task"

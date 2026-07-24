@@ -664,7 +664,7 @@ export function UnifiedInboxClient() {
                 <div className="mt-4 space-y-1.5 text-[11px] text-slate-500">
                   <p>
                     <span className="font-semibold text-slate-400">Email:</span>{" "}
-                    {active.contactEmail ?? "—"}
+                    {active.contactEmail ?? ""}
                   </p>
                   <p>
                     <span className="font-semibold text-slate-400">Related:</span>{" "}

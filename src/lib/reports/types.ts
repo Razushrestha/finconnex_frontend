@@ -199,7 +199,7 @@ export function exportReportExcel(r: SavedReport) {
     )
     .join("");
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(r.name)}</title></head><body>
-<h2>${escapeHtml(r.reportId)} — ${escapeHtml(r.name)}</h2>
+<h2>${escapeHtml(r.reportId)}: ${escapeHtml(r.name)}</h2>
 <p>Type: ${escapeHtml(r.type)} · Source: ${escapeHtml(r.dataSource)} · Range: ${escapeHtml(resolveDateRangeLabel(r))}</p>
 <table border="1"><thead><tr><th>Label</th><th>Value</th><th>Secondary</th></tr></thead><tbody>${rows}</tbody></table>
 </body></html>`;

@@ -46,7 +46,7 @@ export function KanbanColumn({
         isOver ? dropTargetActive : "bg-slate-100/70",
       )}
     >
-      {/* Header — stays fixed while the task list scrolls */}
+      {/* Header: stays fixed while the task list scrolls */}
       <div className="mb-3 shrink-0">
         <span
           className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${column.badgeColorClass}`}

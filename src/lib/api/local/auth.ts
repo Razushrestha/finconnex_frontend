@@ -1,4 +1,4 @@
-/** Local (session) Auth API — proxies existing Next auth routes */
+/** Local (session) Auth API: proxies existing Next auth routes */
 
 import type { AuthApi } from "@/lib/api/contracts";
 import { apiFail, apiOk, ApiError, toApiError } from "@/lib/api/errors";
@@ -25,7 +25,7 @@ export const localAuthApi: AuthApi = {
       }
       const data = (await res.json()) as { user?: SessionPayload };
       if (!data.user) {
-        // login route may set cookie only — hydrate via me()
+        // login route may set cookie only: hydrate via me()
         const me = await localAuthApi.me();
         if (!me.ok) return me;
         return apiOk({ user: me.data });

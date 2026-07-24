@@ -220,7 +220,7 @@ export function PaymentDetailClient({ id }: { id: string }) {
             </div>
             <div className="text-[12px] text-slate-600">
               Reference:{" "}
-              <strong className="text-slate-800">{row.reference ?? "—"}</strong>
+              <strong className="text-slate-800">{row.reference ?? ""}</strong>
             </div>
             {row.notes ? (
               <p className="sm:col-span-2 rounded-lg bg-slate-50 px-3 py-2 text-[12px] text-slate-600">

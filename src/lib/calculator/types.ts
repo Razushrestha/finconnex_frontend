@@ -1,4 +1,4 @@
-/** SRS §17 Calculator — in-call number tools for reps */
+/** SRS §17 Calculator: in-call number tools for reps */
 
 export type CalculatorType =
   | "Commission"
@@ -555,7 +555,7 @@ export function exportCalculationText(
   >,
 ) {
   const lines = [
-    `FinConnex Calculator — ${c.calcId ?? "draft"}`,
+    `FinConnex Calculator: ${c.calcId ?? "draft"}`,
     `Title: ${c.title}`,
     `Type: ${c.type}`,
     `Currency: ${c.currency}`,

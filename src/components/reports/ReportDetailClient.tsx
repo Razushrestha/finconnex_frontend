@@ -465,7 +465,7 @@ export function ReportDetailClient({ id }: { id: string }) {
                     <span>
                       Last run{" "}
                       <strong className="text-slate-700">
-                        {row.lastRunAt ?? "—"}
+                        {row.lastRunAt ?? ""}
                       </strong>
                     </span>
                     {row.sharedWith ? (
@@ -550,7 +550,7 @@ export function ReportDetailClient({ id }: { id: string }) {
                     Edit report
                   </h2>
                   <p className="text-[11px] text-slate-500">
-                    Update definition fields — Report ID stays fixed
+                    Update definition fields: Report ID stays fixed
                   </p>
                 </div>
                 <button
@@ -724,7 +724,7 @@ export function ReportDetailClient({ id }: { id: string }) {
                         setDirty(true);
                       }}
                     >
-                      <option value="">—</option>
+                      <option value=""></option>
                       {REPORT_GROUP_BY.map((g) => (
                         <option key={g} value={g}>
                           {g}
@@ -743,7 +743,7 @@ export function ReportDetailClient({ id }: { id: string }) {
                         setDirty(true);
                       }}
                     >
-                      <option value="">—</option>
+                      <option value=""></option>
                       {REPORT_SORT_BY.map((s) => (
                         <option key={s} value={s}>
                           {s}

@@ -20,9 +20,15 @@ import {
   elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
 
+import { createNote } from "@/lib/notes/store";
+
 interface CreateNoteFormProps {
   layoutId: string;
   redirect: boolean;
+  defaults?: {
+    relatedKind?: RelatedEntityKind;
+    relatedName?: string;
+  };
 }
 
 interface FormState {
@@ -45,9 +51,17 @@ const initialState: FormState = {
   createdBy: "John Smith",
 };
 
-export function CreateNoteForm({ layoutId, redirect }: CreateNoteFormProps) {
+export function CreateNoteForm({
+  layoutId,
+  redirect,
+  defaults,
+}: CreateNoteFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(initialState);
+  const [form, setForm] = useState<FormState>({
+    ...initialState,
+    relatedKind: defaults?.relatedKind ?? "",
+    relatedName: defaults?.relatedName ?? "",
+  });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
   );
@@ -74,14 +88,29 @@ export function CreateNoteForm({ layoutId, redirect }: CreateNoteFormProps) {
   function handleSave(createAnother: boolean) {
     setSubmitted(true);
     if (!validate()) return;
-    console.log("Saving note", { layoutId, redirect, ...form });
+    const relatedTo = `${form.relatedKind}: ${form.relatedName}`;
+    const created = createNote({
+      title: form.title.trim() || form.body.trim().slice(0, 60),
+      body: form.body.trim(),
+      relatedTo,
+      noteType: (form.noteType || "General") as NoteType,
+      createdBy: form.createdBy.trim() || "John Smith",
+      isPrivate: form.isPrivate,
+    });
     if (createAnother) {
-      setForm({ ...initialState, createdBy: form.createdBy });
+      setForm({
+        ...initialState,
+        createdBy: form.createdBy,
+        relatedKind: form.relatedKind,
+        relatedName: form.relatedName,
+      });
       setErrors({});
       setSubmitted(false);
       return;
     }
-    router.push("/activities/notes");
+    void layoutId;
+    void redirect;
+    router.push(`/activities/notes?focus=${created.id}`);
   }
 
   return (
@@ -89,7 +118,7 @@ export function CreateNoteForm({ layoutId, redirect }: CreateNoteFormProps) {
       breadcrumbParent={{ label: "Notes", href: "/activities/notes" }}
       badge="New note"
       title="Create Note"
-      subtitle="Capture context against a related record — body and related to are required."
+      subtitle="Capture context against a related record: body and related to are required."
       tip="Tip: Body & Related To are required to save."
       cardIcon={StickyNote}
       cardTitle="Note Information"

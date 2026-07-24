@@ -331,7 +331,7 @@ export function SignatureDetailClient({ id }: { id: string }) {
                 <MetaCell
                   icon={Link2}
                   label="Related to"
-                  value={req.relatedTo ?? "—"}
+                  value={req.relatedTo ?? ""}
                 />
                 <MetaCell
                   icon={Calendar}
@@ -463,9 +463,9 @@ export function SignatureDetailClient({ id }: { id: string }) {
               </div>
 
               <dl className="mt-5 space-y-2.5 rounded-xl border border-slate-200/80 bg-white px-3 py-3 text-[12px]">
-                <Row label="Sent" value={req.sentDate ?? "—"} />
-                <Row label="Signed" value={req.signedDate ?? "—"} />
-                <Row label="IP address" value={req.ipAddress ?? "—"} />
+                <Row label="Sent" value={req.sentDate ?? ""} />
+                <Row label="Signed" value={req.signedDate ?? ""} />
+                <Row label="IP address" value={req.ipAddress ?? ""} />
                 <Row label="Token" value={req.manageToken} />
               </dl>
 

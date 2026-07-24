@@ -1,15 +1,25 @@
 import { CreateNoteForm } from "@/components/activities/notes/CreateNoteForm";
+import { asRelatedKind } from "@/lib/activities/create-defaults";
 
-interface CreateNotePageProps {
-  searchParams: Promise<{ layoutid?: string; redirect?: string }>;
+interface PageProps {
+  searchParams: Promise<{
+    layoutid?: string;
+    redirect?: string;
+    relatedKind?: string;
+    relatedName?: string;
+  }>;
 }
 
-export default async function CreateNotePage({
-  searchParams,
-}: CreateNotePageProps) {
+export default async function CreateNotePage({ searchParams }: PageProps) {
   const params = await searchParams;
-  const layoutId = params.layoutid ?? "standard";
-  const redirect = params.redirect === "true";
-
-  return <CreateNoteForm layoutId={layoutId} redirect={redirect} />;
+  return (
+    <CreateNoteForm
+      layoutId={params.layoutid ?? "standard"}
+      redirect={params.redirect === "true"}
+      defaults={{
+        relatedKind: asRelatedKind(params.relatedKind),
+        relatedName: params.relatedName,
+      }}
+    />
+  );
 }

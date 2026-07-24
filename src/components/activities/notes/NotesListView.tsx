@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Pin,
@@ -10,9 +10,11 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
-import { notes as allNotes, type Note, type NoteType } from "@/lib/notes/types";
+import { type Note, type NoteType } from "@/lib/notes/types";
+import { listNotes } from "@/lib/notes/store";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
+import { RecordDetailModal } from "@/components/shared/RecordDetailModal";
 
 const TYPE_META: Record<NoteType, { soft: string; text: string }> = {
   General: { soft: "bg-slate-100", text: "text-slate-600" },
@@ -28,7 +30,7 @@ interface NotesListViewProps {
   onSearchChange?: (value: string) => void;
   /** When provided, parent owns filtering (search/type/pinned). */
   notesOverride?: Note[];
-  /** Sit inside a parent surface — no nested card chrome. */
+  /** Sit inside a parent surface: no nested card chrome. */
   embedded?: boolean;
 }
 
@@ -45,6 +47,15 @@ export function NotesListView({
 
   const search = controlledSearch ?? localSearch;
   const setSearch = onSearchChange ?? setLocalSearch;
+  const [detail, setDetail] = useState<Note | null>(null);
+  const allNotes = notesOverride ?? listNotes();
+
+  useEffect(() => {
+    const focus = new URLSearchParams(window.location.search).get("focus");
+    if (!focus) return;
+    const hit = allNotes.find((n) => n.id === focus);
+    if (hit) setDetail(hit);
+  }, [allNotes]);
 
   const filtered = useMemo(() => {
     if (notesOverride) {
@@ -68,7 +79,7 @@ export function NotesListView({
     }
     data.sort((a, b) => Number(b.isPinned) - Number(a.isPinned));
     return data;
-  }, [search, typeFilter, notesOverride]);
+  }, [search, typeFilter, notesOverride, allNotes]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const paginated = filtered.slice(
@@ -128,7 +139,10 @@ export function NotesListView({
               return (
                 <tr
                   key={note.id}
-                  className="group transition-colors hover:bg-violet-50/40"
+                  data-focus-id={note.id}
+                  data-note-id={note.id}
+                  className="group cursor-pointer transition-colors hover:bg-violet-50/40"
+                  onClick={() => setDetail(note)}
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
@@ -227,6 +241,33 @@ export function NotesListView({
           />
         </div>
       </div>
+
+      <RecordDetailModal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title={detail?.title || "Note"}
+        subtitle={detail?.noteType}
+        fields={
+          detail
+            ? [
+                { label: "Related to", value: detail.relatedTo },
+                { label: "Type", value: detail.noteType },
+                { label: "Created by", value: detail.createdBy },
+                { label: "Created at", value: detail.createdAt },
+                {
+                  label: "Flags",
+                  value: [
+                    detail.isPinned ? "Pinned" : null,
+                    detail.isPrivate ? "Private" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(", "),
+                },
+              ]
+            : []
+        }
+        body={detail?.body}
+      />
     </div>
   );
 }

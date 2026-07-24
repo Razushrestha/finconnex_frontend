@@ -145,7 +145,7 @@ export function LoginForm() {
         <span className="text-sm text-gray-600">Keep me signed in for 30 days</span>
       </label>
 
-      {/* Native submit button — Base UI Button forces type="button" and breaks form submit */}
+      {/* Native submit button: Base UI Button forces type="button" and breaks form submit */}
       <button
         type="submit"
         disabled={isLoading}

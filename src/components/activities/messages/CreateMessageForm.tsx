@@ -31,9 +31,17 @@ import {
   elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
 
+import { createMessage } from "@/lib/messages/store";
+import { formatRulesAt } from "@/lib/rules/storage";
+
 interface CreateMessageFormProps {
   layoutId: string;
   redirect: boolean;
+  defaults?: {
+    relatedKind?: RelatedEntityKind;
+    relatedName?: string;
+    to?: string;
+  };
 }
 
 interface FormState {
@@ -70,9 +78,15 @@ const initialState: FormState = {
 export function CreateMessageForm({
   layoutId,
   redirect,
+  defaults,
 }: CreateMessageFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(initialState);
+  const [form, setForm] = useState<FormState>({
+    ...initialState,
+    relatedKind: defaults?.relatedKind ?? "",
+    relatedName: defaults?.relatedName ?? "",
+    to: defaults?.to ?? defaults?.relatedName ?? "",
+  });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
   );
@@ -98,14 +112,36 @@ export function CreateMessageForm({
   function handleSave(createAnother: boolean) {
     setSubmitted(true);
     if (!validate()) return;
-    console.log("Saving message", { layoutId, redirect, ...form });
+    const relatedTo =
+      form.relatedKind && form.relatedName
+        ? `${form.relatedKind}: ${form.relatedName}`
+        : undefined;
+    const status = (form.status || "Sent") as MessageStatus;
+    const created = createMessage({
+      type: form.type as MessageType,
+      subject: form.subject.trim(),
+      body: form.body.trim(),
+      from: form.from.trim() || "John Smith",
+      to: form.to.trim() || form.relatedName,
+      relatedTo,
+      status,
+      sentDate: status === "Draft" ? undefined : formatRulesAt(new Date()),
+      template: form.template || undefined,
+    });
     if (createAnother) {
-      setForm({ ...initialState, from: form.from });
+      setForm({
+        ...initialState,
+        from: form.from,
+        relatedKind: form.relatedKind,
+        relatedName: form.relatedName,
+      });
       setErrors({});
       setSubmitted(false);
       return;
     }
-    router.push("/activities/messages");
+    void layoutId;
+    void redirect;
+    router.push(`/activities/messages?focus=${created.id}`);
   }
 
   return (
@@ -113,7 +149,7 @@ export function CreateMessageForm({
       breadcrumbParent={{ label: "Messages", href: "/activities/messages" }}
       badge="New message"
       title="Create Message"
-      subtitle="Send an internal note or external message — subject and body are required."
+      subtitle="Send an internal note or external message: subject and body are required."
       tip="Tip: Type, subject & body are enough to start."
       cardIcon={MessageSquare}
       cardTitle="Message Information"
@@ -250,7 +286,7 @@ export function CreateMessageForm({
               if (value === "Document Request") {
                 update(
                   "subject",
-                  form.subject || "Document request — please upload",
+                  form.subject || "Document request: please upload",
                 );
                 update(
                   "body",

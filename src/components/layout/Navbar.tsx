@@ -53,9 +53,9 @@ function userInitials(name: string) {
     .join("");
 }
 
-/** Leads in "New" column — live board store. */
+/** Leads in New Lead column: live board store. */
 function countNewLeads() {
-  const col = listLeadColumns().find((c) => c.title === "New");
+  const col = listLeadColumns().find((c) => c.title === "New Lead");
   return col?.cards.length ?? 0;
 }
 

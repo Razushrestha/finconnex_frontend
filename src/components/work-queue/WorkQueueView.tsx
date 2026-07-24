@@ -1,227 +1,314 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
-import {
-  ChevronDown,
-  Download,
-  Home,
-  LayoutGrid,
-  Plus,
-  RefreshCw,
-} from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { WorkQueueSidebar } from "@/components/work-queue/WorkQueueSidebar";
-import { WorkQueueTable } from "@/components/work-queue/WorkQueueTable";
-import { WorkQueueMeetingsTable } from "@/components/work-queue/WorkQueueMeetingsTable";
-import { WorkQueueCallsTable } from "@/components/work-queue/WorkQueueCallsTable";
-import { WorkQueueLeadsTable } from "@/components/work-queue/WorkQueueLeadsTable";
 import {
+  WorkQueueTable,
+  type QueueTableFilters,
+} from "@/components/work-queue/WorkQueueTable";
+import { ManageQueueModal } from "@/components/work-queue/ManageQueueModal";
+import {
+  CATEGORIES_DEFAULT,
+  QUEUE_STORAGE_KEY,
+  cloneCategories,
   getActivityTitle,
-  getCallsForPerson,
-  getLeadsForPerson,
-  getMeetingsForPerson,
-  getTasksForPerson,
-  WORK_QUEUE_PEOPLE,
-} from "@/lib/work-queue/data";
+  isActivityNav,
+  type WorkQueueNavId,
+  type WorkqueueCategoryDef,
+} from "@/lib/work-queue/config";
+import {
+  filterQueueRows,
+  getActivityNav,
+  getUserTabs,
+  getWorkqueueSidebar,
+  listQueueRows,
+  type WorkQueueTimeFilter,
+} from "@/lib/work-queue/live";
+import { onLeadActivityChange } from "@/lib/leads/lead-extras-store";
+import { onPipelineSlaChange } from "@/lib/pipeline-sla/settings";
+import { onRulesChange } from "@/lib/rules";
+import { viewEnter } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 10;
 
-function isLeadsNav(nav: string) {
-  return nav === "my-leads" || nav === "leads-3hrs" || nav === "pendings";
+const DEFAULT_FILTERS: QueueTableFilters = {
+  priority: "all",
+  status: "all",
+  due: "all",
+};
+
+function readStoredCategories(): WorkqueueCategoryDef[] {
+  if (typeof window === "undefined") return cloneCategories();
+  try {
+    const raw = sessionStorage.getItem(QUEUE_STORAGE_KEY);
+    if (!raw) return cloneCategories();
+    const parsed = JSON.parse(raw) as WorkqueueCategoryDef[];
+    if (!Array.isArray(parsed) || parsed.length === 0) return cloneCategories();
+    return parsed;
+  } catch {
+    return cloneCategories();
+  }
 }
 
 export function WorkQueueView() {
-  const [activePerson, setActivePerson] = React.useState(
-    WORK_QUEUE_PEOPLE[0]?.id ?? "shiva",
-  );
-  const [activeNav, setActiveNav] = React.useState("tasks");
+  const [tabs, setTabs] = React.useState(() => getUserTabs());
+  const [scope, setScope] = React.useState(() => getUserTabs()[0]?.id ?? "");
+  const [timeFilter, setTimeFilter] =
+    React.useState<WorkQueueTimeFilter>("today-overdue");
+  const [activeNav, setActiveNav] = React.useState<WorkQueueNavId>("tasks");
   const [page, setPage] = React.useState(1);
-  const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const [tick, setTick] = React.useState(0);
+  const [spinning, setSpinning] = React.useState(false);
+  const [query, setQuery] = React.useState("");
+  const [filters, setFilters] =
+    React.useState<QueueTableFilters>(DEFAULT_FILTERS);
+  const [categories, setCategories] = React.useState<WorkqueueCategoryDef[]>(
+    CATEGORIES_DEFAULT,
+  );
+  const [manageOpen, setManageOpen] = React.useState(false);
 
-  const activePersonMeta = WORK_QUEUE_PEOPLE.find((p) => p.id === activePerson);
+  React.useEffect(() => {
+    setCategories(readStoredCategories());
+    const nextTabs = getUserTabs();
+    setTabs(nextTabs);
+    setScope((prev) =>
+      nextTabs.some((t) => t.id === prev) ? prev : (nextTabs[0]?.id ?? ""),
+    );
+  }, []);
+
+  React.useEffect(() => {
+    return onRulesChange(() => {
+      setTick((n) => n + 1);
+      const nextTabs = getUserTabs();
+      setTabs(nextTabs);
+    });
+  }, []);
+
+  React.useEffect(() => {
+    const bump = () => setTick((n) => n + 1);
+    const offSla = onPipelineSlaChange(bump);
+    const offLeads = onLeadActivityChange(bump);
+    return () => {
+      offSla();
+      offLeads();
+    };
+  }, []);
+
+  const activityItems = React.useMemo(
+    () => getActivityNav(scope, timeFilter),
+    [scope, timeFilter, tick],
+  );
+
+  const sidebarCategories = React.useMemo(
+    () => getWorkqueueSidebar(scope, categories, timeFilter),
+    [scope, categories, timeFilter, tick],
+  );
+
+  const rawRows = React.useMemo(
+    () => listQueueRows(activeNav, scope, timeFilter),
+    [activeNav, scope, timeFilter, tick],
+  );
+
+  const filteredRows = React.useMemo(
+    () =>
+      filterQueueRows(rawRows, {
+        query,
+        priority: filters.priority,
+        status: filters.status,
+        due: filters.due,
+      }),
+    [rawRows, query, filters],
+  );
+
+  const statusOptions = React.useMemo(() => {
+    const set = new Set(rawRows.map((r) => r.status).filter(Boolean));
+    return Array.from(set).sort();
+  }, [rawRows]);
+
+  const total = filteredRows.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  React.useEffect(() => {
+    if (page > totalPages) setPage(1);
+  }, [page, totalPages]);
+
+  const pageRows = React.useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredRows.slice(start, start + PAGE_SIZE);
+  }, [filteredRows, page]);
+
   const title = getActivityTitle(activeNav);
-  const isMeetings = activeNav === "meetings";
-  const isCalls = activeNav === "calls";
-  const isLeads = isLeadsNav(activeNav);
 
-  const filteredTasks = React.useMemo(
-    () => getTasksForPerson(activePerson),
-    [activePerson],
-  );
-  const filteredMeetings = React.useMemo(
-    () => getMeetingsForPerson(activePerson),
-    [activePerson],
-  );
-  const filteredCalls = React.useMemo(
-    () => getCallsForPerson(activePerson),
-    [activePerson],
-  );
-  const filteredLeads = React.useMemo(
-    () => getLeadsForPerson(activePerson),
-    [activePerson],
-  );
+  function refresh() {
+    setSpinning(true);
+    setTick((n) => n + 1);
+    window.setTimeout(() => setSpinning(false), 450);
+  }
 
-  const total = isLeads
-    ? filteredLeads.length
-    : isCalls
-      ? filteredCalls.length
-      : isMeetings
-        ? filteredMeetings.length
-        : filteredTasks.length;
+  function saveCategories(next: WorkqueueCategoryDef[]) {
+    setCategories(next);
+    sessionStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(next));
+    setManageOpen(false);
+    if (!isActivityNav(activeNav)) {
+      const stillVisible = next.some(
+        (c) =>
+          c.checked && c.items.some((it) => it.checked && it.id === activeNav),
+      );
+      if (!stillVisible) {
+        setActiveNav("tasks");
+        setPage(1);
+      }
+    }
+  }
 
-  const pageTasks = React.useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return filteredTasks.slice(start, start + PAGE_SIZE);
-  }, [filteredTasks, page]);
-  const pageMeetings = React.useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return filteredMeetings.slice(start, start + PAGE_SIZE);
-  }, [filteredMeetings, page]);
-  const pageCalls = React.useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return filteredCalls.slice(start, start + PAGE_SIZE);
-  }, [filteredCalls, page]);
-  const pageLeads = React.useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return filteredLeads.slice(start, start + PAGE_SIZE);
-  }, [filteredLeads, page]);
+  function resetLocalFilters() {
+    setQuery("");
+    setFilters(DEFAULT_FILTERS);
+    setPage(1);
+  }
 
   return (
-    <div className="flex min-h-full w-full min-w-0 flex-col gap-3 bg-slate-50/50 p-3 sm:p-5 lg:p-6">
-      <nav className="flex items-center gap-1.5 text-[11px] text-slate-400">
-        <Link
-          href="/"
-          className="flex items-center gap-1 hover:text-slate-600"
-        >
-          <Home className="h-3.5 w-3.5" />
-          Home
-        </Link>
-        <span>&gt;</span>
-        <span className="text-slate-600">Work Queue</span>
-      </nav>
-
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-2">
-          <div className="flex items-center gap-1.5">
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-              {title}
-            </h1>
-            <button
-              type="button"
-              aria-label={`Refresh ${title.toLowerCase()}`}
-              className="rounded-full p-1 text-slate-400 transition-colors hover:bg-white hover:text-slate-600"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-0.5">
-            {WORK_QUEUE_PEOPLE.map((person) => {
-              const active = person.id === activePerson;
-              return (
-                <button
-                  key={person.id}
-                  type="button"
-                  onClick={() => {
-                    setActivePerson(person.id);
-                    setPage(1);
-                  }}
-                  className={cn(
-                    "rounded-none border-b-2 px-2.5 py-1.5 text-[12px] transition-colors",
-                    active
-                      ? "border-violet-600 font-semibold text-violet-600"
-                      : "border-transparent text-slate-500 hover:text-slate-800",
-                  )}
-                >
-                  {person.name}
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              aria-label="Add person filter"
-              className="ml-0.5 rounded-full p-1 text-slate-400 hover:bg-white hover:text-slate-600"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[12px] font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-          >
-            <Download className="h-3.5 w-3.5 text-slate-500" />
-            Export
-            <ChevronDown className="h-3 w-3 text-slate-400" />
-          </button>
-          <button
-            type="button"
-            aria-label="Toggle layout panel"
-            onClick={() => setSidebarOpen((v) => !v)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50"
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row lg:items-stretch">
-        {sidebarOpen ? (
-          <WorkQueueSidebar
-            activeItem={activeNav}
-            onActiveItemChange={(id) => {
-              setActiveNav(id);
+    <div
+      className="flex h-full min-h-[calc(100vh-4rem)] w-full min-w-0 flex-col bg-white text-gray-900 antialiased"
+      style={
+        {
+          "--wq-accent": "#2563EB",
+          "--wq-accent-soft": "#EFF6FF",
+          "--wq-accent-badge": "#DBEAFE",
+          "--wq-surface": "#FAFAFA",
+          "--wq-line": "#E5E7EB",
+          "--wq-danger": "#DC2626",
+          "--wq-danger-soft": "#FEE2E2",
+        } as React.CSSProperties
+      }
+    >
+      {/* Title strip + search */}
+      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--wq-line)] px-5 py-3.5 sm:px-7">
+        <h1 className="text-[20px] leading-6 font-bold tracking-tight text-gray-900">
+          Workqueue
+        </h1>
+        <div className="relative w-full max-w-[340px] flex-1 sm:ml-2">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
               setPage(1);
             }}
-            onClose={() => setSidebarOpen(false)}
+            placeholder="Search records"
+            className="h-9 w-full rounded-lg border border-[var(--wq-line)] bg-[var(--wq-surface)] pr-3 pl-8 text-[13px] text-gray-900 outline-none transition-shadow placeholder:text-gray-400 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-500/15"
           />
-        ) : null}
-
-        {isLeads ? (
-          <WorkQueueLeadsTable
-            key={`leads-${activePerson}-${activeNav}`}
-            leads={pageLeads}
-            page={page}
-            pageSize={PAGE_SIZE}
-            total={total}
-            onPageChange={setPage}
-            personName={activePersonMeta?.name}
-          />
-        ) : isCalls ? (
-          <WorkQueueCallsTable
-            key={`calls-${activePerson}`}
-            calls={pageCalls}
-            page={page}
-            pageSize={PAGE_SIZE}
-            total={total}
-            onPageChange={setPage}
-            personName={activePersonMeta?.name}
-          />
-        ) : isMeetings ? (
-          <WorkQueueMeetingsTable
-            key={`meetings-${activePerson}`}
-            meetings={pageMeetings}
-            page={page}
-            pageSize={PAGE_SIZE}
-            total={total}
-            onPageChange={setPage}
-            personName={activePersonMeta?.name}
-          />
-        ) : (
-          <WorkQueueTable
-            key={`tasks-${activePerson}`}
-            tasks={pageTasks}
-            page={page}
-            pageSize={PAGE_SIZE}
-            total={total}
-            onPageChange={setPage}
-            personName={activePersonMeta?.name}
-          />
-        )}
+        </div>
       </div>
+
+      {/* User tabs */}
+      <div className="flex shrink-0 items-stretch gap-0 overflow-x-auto border-b border-[var(--wq-line)] px-2 sm:px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {tabs.map((u) => {
+          const active = u.id === scope;
+          return (
+            <button
+              key={u.id}
+              type="button"
+              onClick={() => {
+                setScope(u.id);
+                setPage(1);
+                resetLocalFilters();
+              }}
+              className={cn(
+                "group relative flex shrink-0 items-center gap-2.5 px-4 py-3 transition-colors sm:px-5",
+                active ? "bg-white" : "hover:bg-[var(--wq-surface)]",
+              )}
+            >
+              <span
+                className={cn(
+                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white shadow-sm ring-2 transition-shadow",
+                  active ? "ring-blue-100" : "ring-transparent",
+                )}
+                style={{ background: u.color }}
+              >
+                {u.initials}
+              </span>
+              <span className="hidden min-w-0 flex-col leading-tight sm:flex">
+                <span
+                  className={cn(
+                    "truncate text-[13px] font-semibold transition-colors",
+                    active ? "text-[var(--wq-accent)]" : "text-gray-900",
+                  )}
+                >
+                  {u.name}
+                </span>
+                <span className="truncate text-[12px] text-gray-500">
+                  {u.role}
+                </span>
+              </span>
+              <span
+                className={cn(
+                  "absolute inset-x-3 bottom-0 h-0.5 rounded-full transition-colors",
+                  active ? "bg-[var(--wq-accent)]" : "bg-transparent",
+                )}
+              />
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          aria-label="Add person"
+          className="ml-1 flex h-9 w-9 shrink-0 items-center self-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-[var(--wq-surface)] hover:text-gray-600"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        <WorkQueueSidebar
+          activeItem={activeNav}
+          onActiveItemChange={(id) => {
+            setActiveNav(id);
+            setPage(1);
+            resetLocalFilters();
+          }}
+          activityItems={activityItems}
+          sidebarCategories={sidebarCategories}
+          timeFilter={timeFilter}
+          onTimeFilterChange={(v) => {
+            setTimeFilter(v);
+            setPage(1);
+            setFilters((f) => ({ ...f, status: "all" }));
+          }}
+          onOpenManage={() => setManageOpen(true)}
+        />
+
+        <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", viewEnter)}>
+          <WorkQueueTable
+            key={`${activeNav}-${scope}-${timeFilter}`}
+            rows={pageRows}
+            title={title}
+            page={page}
+            pageSize={PAGE_SIZE}
+            total={total}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onRefresh={refresh}
+            spinning={spinning}
+            emptyLabel={`No ${title.toLowerCase()} for ${scope || "this user"}.`}
+            filters={filters}
+            onFiltersChange={(f) => {
+              setFilters(f);
+              setPage(1);
+            }}
+            statusOptions={statusOptions}
+          />
+        </div>
+      </div>
+
+      <ManageQueueModal
+        open={manageOpen}
+        categories={categories}
+        onClose={() => setManageOpen(false)}
+        onSave={saveCategories}
+      />
     </div>
   );
 }

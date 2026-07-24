@@ -1,5 +1,5 @@
 /**
- * Settings field schemas — keyed by `${category}/${subpage}`.
+ * Settings field schemas: keyed by `${category}/${subpage}`.
  * Every SRS page gets a concrete form (curated override or generated defaults).
  */
 
@@ -239,6 +239,54 @@ function generateSchema(
 
 /** Hand-tuned schemas for high-visibility SRS pages. */
 const CURATED: Record<string, SettingsSchema> = {
+  "crm-configuration/pipelines": {
+    title: "Pipelines",
+    description:
+      "Mortgage pipeline Stage SLA + Milestone SLA (Session 16). Prefer the dedicated editor on this page.",
+    fields: [
+      {
+        id: "pipelineName",
+        label: "Pipeline name",
+        type: "text",
+        defaultValue: "Mortgage Pipeline",
+      },
+      {
+        id: "configJson",
+        label: "SLA config (JSON)",
+        type: "textarea",
+        help: "Managed by the Pipelines SLA editor — do not edit by hand unless necessary.",
+      },
+    ],
+  },
+  "crm-configuration/lead-card": {
+    title: "Lead Card",
+    description:
+      "Kanban lead card layout (spec v3): owner avatar, dynamic Lead Details fields (hard cap 4), and unreplied SMS/email threshold. Prefer the dedicated editor on this page.",
+    fields: [
+      {
+        id: "showOwnerAvatar",
+        label: "Show owner avatar on cards",
+        type: "toggle",
+        defaultValue: false,
+        help: "Off by default. Small initials only — no permanent “owner” label.",
+      },
+      {
+        id: "dynamicFields",
+        label: "Dynamic fields (comma-separated keys)",
+        type: "text",
+        defaultValue: "company,email,phone",
+        help: "Max 4. Use the Lead Card settings editor for a guided picker.",
+      },
+      {
+        id: "unrepliedThresholdHours",
+        label: "Unreplied SMS/email threshold (hours)",
+        type: "number",
+        defaultValue: 24,
+        help: "After this many hours, unreplied inbound messages count as broken (red).",
+      },
+    ],
+  },
+
   "organization/company-profile": {
     title: "Company Profile",
     description: "Legal entity, contacts, and primary brand identity.",

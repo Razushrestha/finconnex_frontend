@@ -376,7 +376,7 @@ export function NotificationsCenterClient() {
                       Read
                     </dt>
                     <dd className="mt-0.5 font-medium text-slate-800">
-                      {selected.readAt ?? "—"}
+                      {selected.readAt ?? ""}
                     </dd>
                   </div>
                 </dl>

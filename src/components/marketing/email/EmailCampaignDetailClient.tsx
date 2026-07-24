@@ -339,7 +339,7 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
                 <Meta label="Audience" value={campaign.audience} />
                 <Meta
                   label="Scheduled"
-                  value={campaign.scheduledAt ?? "—"}
+                  value={campaign.scheduledAt ?? ""}
                 />
                 <Meta label="Template" value={campaign.templateName} />
                 <Meta label="Created" value={campaign.createdAt} />

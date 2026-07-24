@@ -1,4 +1,4 @@
-/** Proposal-to-payment journey — links Estimate → Quote → E-Sign → Invoice → Payment */
+/** Proposal-to-payment journey: links Estimate → Quote → E-Sign → Invoice → Payment */
 
 import { formatFinanceAt, formatFinanceDate } from "@/lib/finance/shared";
 
