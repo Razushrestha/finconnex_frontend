@@ -89,7 +89,7 @@ export const localContactsApi: ContactsApi = {
     return apiFail(
       new ApiError(501, {
         code: "NOT_IMPLEMENTED",
-        message: "Contact update via API local adapter pending — use UI edit",
+        message: "Contact update via API local adapter pending: use UI edit",
       }),
     );
   },

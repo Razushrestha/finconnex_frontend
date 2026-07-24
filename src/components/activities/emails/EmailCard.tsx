@@ -46,6 +46,7 @@ export function EmailCard({
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      data-focus-id={email.id}
       data-email-id={email.id}
       data-column-id={columnId}
       className={cn(

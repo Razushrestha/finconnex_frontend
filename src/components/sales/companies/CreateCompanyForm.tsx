@@ -105,7 +105,7 @@ export function CreateCompanyForm({
       breadcrumbParent={{ label: "Companies", href: "/sales/companies" }}
       badge="New company"
       title="Create Company"
-      subtitle="Add an account once — link contacts and deals to it as the relationship grows."
+      subtitle="Add an account once: link contacts and deals to it as the relationship grows."
       tip="Tip: Company name, status & owner are enough to start."
       cardIcon={Building2}
       cardTitle="Company Information"

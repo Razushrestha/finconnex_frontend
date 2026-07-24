@@ -81,7 +81,7 @@ export function CreateProductForm({ layoutId: _l, redirect: _r }: Props) {
       tip="Name is required. Active items appear in line-item pickers."
       cardIcon={Package}
       cardTitle="Catalogue item"
-      cardDescription="SRS §20.5 — maintain pricing in one place"
+      cardDescription="SRS §20.5: maintain pricing in one place"
       listHref="/finance/products"
       saveLabel="Save item"
       onSave={onSave}

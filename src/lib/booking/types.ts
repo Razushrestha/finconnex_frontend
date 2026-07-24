@@ -149,7 +149,7 @@ export const bookingPages: BookingPage[] = [
   },
   {
     id: "bp3",
-    title: "Site Visit — Sydney",
+    title: "Site Visit: Sydney",
     slug: "site-visit-syd",
     owner: "Roshna Abraham",
     eventType: "Site Visit",
@@ -166,7 +166,7 @@ export const bookingPages: BookingPage[] = [
     ],
     confirmationTemplate:
       "Hi {{name}}, your site visit is confirmed for {{datetime}} at {{location}}.",
-    reminderTemplate: "Site visit tomorrow — see you at Market St.",
+    reminderTemplate: "Site visit tomorrow: see you at Market St.",
     status: "Draft",
     views: 12,
     bookingsCount: 2,
@@ -190,7 +190,7 @@ export const bookingPages: BookingPage[] = [
     ],
     confirmationTemplate:
       "Hi {{name}}, your consultation is confirmed for {{datetime}}.",
-    reminderTemplate: "Consultation reminder — starting soon.",
+    reminderTemplate: "Consultation reminder: starting soon.",
     status: "Live",
     views: 54,
     bookingsCount: 9,

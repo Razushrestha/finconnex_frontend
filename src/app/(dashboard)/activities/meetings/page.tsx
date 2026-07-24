@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -20,14 +20,18 @@ import {
 import {
   MEETING_STATUSES,
   MEETING_TYPES,
-  meetingColumns as initialColumns,
   type Meeting,
   type MeetingColumn,
   type MeetingStatus,
   type MeetingType,
 } from "@/lib/meetings/types";
+import {
+  listMeetingColumns,
+  saveMeetingColumns,
+} from "@/lib/meetings/store";
 import { MeetingsListTable } from "@/components/activities/meetings/MeetingsListTable";
 import { MeetingsKanbanColumn } from "@/components/activities/meetings/MeetingsKanbanColumn";
+import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "list" | "kanban";
@@ -55,11 +59,15 @@ export default function MeetingsPage() {
   const [typeFilter, setTypeFilter] = useState<MeetingType | "All">("All");
   const [search, setSearch] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
-  const [columns, setColumns] = useState<MeetingColumn[]>(initialColumns);
+  const [columns, setColumns] = useState<MeetingColumn[]>([]);
   const [dragInfo, setDragInfo] = useState<{
     meetingId: string;
     sourceColumnId: string;
   } | null>(null);
+
+  useEffect(() => {
+    setColumns(listMeetingColumns());
+  }, []);
 
   const allMeetings = useMemo(
     () =>
@@ -120,7 +128,7 @@ export default function MeetingsPage() {
       const source = prev.find((c) => c.id === sourceColumnId);
       const meeting = source?.meetings.find((m) => m.id === meetingId);
       if (!meeting) return prev;
-      return prev.map((col) => {
+      const next = prev.map((col) => {
         if (col.id === sourceColumnId) {
           const meetings = col.meetings.filter((m) => m.id !== meetingId);
           return { ...col, meetings, count: meetings.length };
@@ -134,6 +142,8 @@ export default function MeetingsPage() {
         }
         return col;
       });
+      saveMeetingColumns(next);
+      return next;
     });
     setDragInfo(null);
   }
@@ -142,6 +152,7 @@ export default function MeetingsPage() {
 
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
+      <FocusHighlight />
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-52 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.11),_transparent_65%)]"

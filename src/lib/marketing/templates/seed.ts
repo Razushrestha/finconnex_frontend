@@ -29,9 +29,9 @@ export const EMAIL_TEMPLATE_SEEDS: EmailTemplateSeed[] = [
     id: "et1",
     name: "Rate lock nurture",
     subject: "Lock in today's home loan rate",
-    previewText: "Rates moved overnight — here's what it means for you.",
+    previewText: "Rates moved overnight: here's what it means for you.",
     bodyHtml:
-      "Hi {{first_name}},\n\nMarkets moved overnight. Reply to this email if you'd like us to lock a rate this week.\n\n— FinConnex",
+      "Hi {{first_name}},\n\nMarkets moved overnight. Reply to this email if you'd like us to lock a rate this week.\n\n FinConnex",
   },
   {
     id: "et2",
@@ -39,7 +39,7 @@ export const EMAIL_TEMPLATE_SEEDS: EmailTemplateSeed[] = [
     subject: "Your proposal is ready to review",
     previewText: "We've prepared options tailored to your goals.",
     bodyHtml:
-      "Hi {{first_name}},\n\nYour proposal pack is ready. Open the link in this email to review and book a walkthrough.\n\n— FinConnex",
+      "Hi {{first_name}},\n\nYour proposal pack is ready. Open the link in this email to review and book a walkthrough.\n\n FinConnex",
   },
   {
     id: "et3",
@@ -47,15 +47,15 @@ export const EMAIL_TEMPLATE_SEEDS: EmailTemplateSeed[] = [
     subject: "We're still waiting on your documents",
     previewText: "A quick nudge so we can keep your application moving.",
     bodyHtml:
-      "Hi {{first_name}},\n\nWe're still missing a few documents. Upload them in the portal when you can so we can keep things moving.\n\n— FinConnex",
+      "Hi {{first_name}},\n\nWe're still missing a few documents. Upload them in the portal when you can so we can keep things moving.\n\n FinConnex",
   },
   {
     id: "et4",
     name: "Quarterly newsletter",
-    subject: "FinConnex insights — this quarter",
+    subject: "FinConnex insights: this quarter",
     previewText: "Market notes, tips, and what's new at FinConnex.",
     bodyHtml:
-      "Hi {{first_name}},\n\nHere's what's happening in lending this quarter, plus a few tips from our brokers.\n\n— The FinConnex team",
+      "Hi {{first_name}},\n\nHere's what's happening in lending this quarter, plus a few tips from our brokers.\n\n The FinConnex team",
   },
 ];
 
@@ -68,7 +68,7 @@ export const SMS_TEMPLATE_SEEDS: SmsTemplateSeed[] = [
   {
     id: "st2",
     name: "Docs nudge",
-    body: "Quick nudge — please upload your ID proof in the portal when you can. Thanks! FinConnex",
+    body: "Quick nudge: please upload your ID proof in the portal when you can. Thanks! FinConnex",
   },
 ];
 

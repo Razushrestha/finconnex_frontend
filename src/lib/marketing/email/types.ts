@@ -185,7 +185,7 @@ export const emailCampaigns: EmailCampaign[] = [
   {
     id: "ec5",
     campaignId: "EM-4005",
-    name: "Drip — warm lead week 1",
+    name: "Drip: warm lead week 1",
     type: "Drip",
     status: "Running",
     audience: "Leads · Mortgage · Warm",
@@ -264,11 +264,11 @@ export function formatCampaignAt(d = new Date()) {
 }
 
 export function openRate(c: EmailCampaign) {
-  if (!c.sentCount) return "—";
+  if (!c.sentCount) return "";
   return `${Math.round((c.openCount / c.sentCount) * 100)}%`;
 }
 
 export function clickRate(c: EmailCampaign) {
-  if (!c.sentCount) return "—";
+  if (!c.sentCount) return "";
   return `${Math.round((c.clickCount / c.sentCount) * 100)}%`;
 }

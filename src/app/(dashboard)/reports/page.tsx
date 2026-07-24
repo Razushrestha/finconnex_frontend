@@ -273,7 +273,7 @@ export default function ReportsPage() {
                   </td>
                   <td className="px-3 py-3 text-slate-600">{r.createdBy}</td>
                   <td className="px-4 py-3 text-slate-600">
-                    {r.lastRunAt ?? "—"}
+                    {r.lastRunAt ?? ""}
                   </td>
                 </tr>
               ))}

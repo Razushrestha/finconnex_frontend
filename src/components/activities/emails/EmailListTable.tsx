@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import type { Email, EmailStatus } from "@/lib/emails/types";
-import { emails } from "@/lib/emails/types";
+import { listEmails } from "@/lib/emails/store";
 import { Paperclip } from "lucide-react";
+import { RecordDetailModal } from "@/components/shared/RecordDetailModal";
 
 const statusStyles: Record<EmailStatus, string> = {
   Draft: "bg-slate-100 text-slate-600",
@@ -29,10 +31,20 @@ interface EmailListTableProps {
   data?: Email[];
 }
 
-export function EmailListTable({ data = emails }: EmailListTableProps) {
+export function EmailListTable({ data }: EmailListTableProps) {
+  const [detail, setDetail] = useState<Email | null>(null);
+  const rows = useMemo(() => data ?? listEmails(), [data]);
+
+  useEffect(() => {
+    const focus = new URLSearchParams(window.location.search).get("focus");
+    if (!focus) return;
+    const hit = rows.find((e) => e.id === focus);
+    if (hit) setDetail(hit);
+  }, [rows]);
+
   return (
     <div className="flex h-full w-full min-w-0 flex-col rounded-2xl border border-slate-100 bg-white">
-      {/* Internal scroll wrapper — owns its own scroll, independent of parent */}
+      {/* Internal scroll wrapper: owns its own scroll, independent of parent */}
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-auto [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100">
         <table className="w-full min-w-[1200px] border-collapse text-left text-sm">
           <thead className="sticky top-0 z-20 bg-white">
@@ -52,10 +64,13 @@ export function EmailListTable({ data = emails }: EmailListTableProps) {
           </thead>
 
           <tbody>
-            {data.map((email) => (
+            {rows.map((email) => (
               <tr
                 key={email.id}
-                className="group border-b border-slate-50 last:border-b-0 hover:bg-slate-50/60"
+                data-focus-id={email.id}
+                data-email-id={email.id}
+                className="group cursor-pointer border-b border-slate-50 last:border-b-0 hover:bg-slate-50/60"
+                onClick={() => setDetail(email)}
               >
                 <td className="sticky left-0 z-10 bg-white px-4 py-3 group-hover:bg-slate-50/60">
                   <input
@@ -78,7 +93,7 @@ export function EmailListTable({ data = emails }: EmailListTableProps) {
                   {email.to.join(", ")}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                  {email.relatedTo ?? "—"}
+                  {email.relatedTo ?? ""}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-500">
                   {email.templateUsed ? (
@@ -87,14 +102,14 @@ export function EmailListTable({ data = emails }: EmailListTableProps) {
                       {email.templateUsed}
                     </span>
                   ) : (
-                    "—"
+                    ""
                   )}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-500">
-                  {email.sentDate ?? "—"}
+                  {email.sentDate ?? ""}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-slate-500">
-                  {email.openedDate ?? "—"}
+                  {email.openedDate ?? ""}
                 </td>
                 <td className="px-4 py-3">
                   <span
@@ -106,7 +121,7 @@ export function EmailListTable({ data = emails }: EmailListTableProps) {
               </tr>
             ))}
 
-            {data.length === 0 && (
+            {rows.length === 0 && (
               <tr>
                 <td
                   colSpan={9}
@@ -119,6 +134,27 @@ export function EmailListTable({ data = emails }: EmailListTableProps) {
           </tbody>
         </table>
       </div>
+
+      <RecordDetailModal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title={detail?.subject ?? "Email"}
+        subtitle={detail?.status}
+        fields={
+          detail
+            ? [
+                { label: "From", value: detail.from },
+                { label: "To", value: detail.to.join(", ") },
+                { label: "Related to", value: detail.relatedTo ?? "" },
+                { label: "Template", value: detail.templateUsed ?? "" },
+                { label: "Sent", value: detail.sentDate ?? "" },
+                { label: "Opened", value: detail.openedDate ?? "" },
+                { label: "Status", value: detail.status },
+              ]
+            : []
+        }
+        body={detail?.body}
+      />
     </div>
   );
 }

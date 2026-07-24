@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Search, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { filterEnter } from "@/lib/motion";
-import { LEAD_SOURCES, LEAD_STATUSES } from "@/lib/leads/types";
+import { LEAD_PIPELINE_STAGES, LEAD_SOURCES } from "@/lib/leads/types";
 
 interface FilterSection {
   id: "source" | "status";
@@ -20,8 +20,8 @@ const filterSections: FilterSection[] = [
   },
   {
     id: "status",
-    title: "Status",
-    fields: LEAD_STATUSES,
+    title: "Pipeline stage",
+    fields: LEAD_PIPELINE_STAGES,
   },
 ];
 

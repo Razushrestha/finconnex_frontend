@@ -45,7 +45,7 @@ function createSignatureFromQuote(
   return upsertSignatureRequest({
     id: fresh.id,
     signatureRequestId: fresh.signatureRequestId,
-    documentName: `Engagement — ${quote.title}`,
+    documentName: `Engagement: ${quote.title}`,
     documentFile: `${quote.quotationId}_Contract.pdf`,
     signer: quote.contactName,
     signerEmail: quote.contactEmail,

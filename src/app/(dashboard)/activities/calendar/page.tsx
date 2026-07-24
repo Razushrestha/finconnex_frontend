@@ -232,7 +232,7 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          {/* Type filters — same surface */}
+          {/* Type filters: same surface */}
           <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-100 px-3 py-1.5 sm:px-4">
             {TYPE_FILTERS.map((t) => {
               const active = typeFilter === t;

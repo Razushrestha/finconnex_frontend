@@ -16,7 +16,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-/** Small vertical bar chart — used in Total Contacts, Traffic Sources, Order By Time */
+/** Small vertical bar chart: used in Total Contacts, Traffic Sources, Order By Time */
 export function MiniBarChart({
   data,
   color = "#7C3AED",
@@ -43,7 +43,7 @@ export function MiniBarChart({
   );
 }
 
-/** Small smooth line chart — used in Lead Analytics */
+/** Small smooth line chart: used in Lead Analytics */
 export function MiniLineChart({
   data,
   color = "#ffffff",
@@ -66,7 +66,7 @@ export function MiniLineChart({
   );
 }
 
-/** Filled area chart — used in Revenue */
+/** Filled area chart: used in Revenue */
 export function MiniAreaChart({
   data,
   color = "#7C3AED",
@@ -95,7 +95,7 @@ export function MiniAreaChart({
   );
 }
 
-/** Full monthly bar chart with axes — used in Revenue */
+/** Full monthly bar chart with axes: used in Revenue */
 export function RevenueBarChart({
   data,
 }: {
@@ -138,7 +138,7 @@ export function RevenueBarChart({
   );
 }
 
-/** Stacked monthly bar chart with axes — used in Retention Rate */
+/** Stacked monthly bar chart with axes: used in Retention Rate */
 export function RetentionBarChart({
   data,
 }: {

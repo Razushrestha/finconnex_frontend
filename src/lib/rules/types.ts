@@ -1,4 +1,4 @@
-/** SRS §28 Cross-Module Rules — shared result types */
+/** SRS §28 Cross-Module Rules: shared result types */
 
 export type RuleOk = { ok: true };
 export type RuleFail = { ok: false; code: string; message: string };

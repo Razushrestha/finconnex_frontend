@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import type { Message, MessageStatus, MessageType } from "@/lib/messages/types";
-import { messages } from "@/lib/messages/types";
+import { listMessages } from "@/lib/messages/store";
+import { RecordDetailModal } from "@/components/shared/RecordDetailModal";
 
 const statusStyles: Record<MessageStatus, string> = {
   Draft: "bg-slate-100 text-slate-600",
@@ -21,7 +23,17 @@ interface MessagesListTableProps {
   data?: Message[];
 }
 
-export function MessagesListTable({ data = messages }: MessagesListTableProps) {
+export function MessagesListTable({ data }: MessagesListTableProps) {
+  const [detail, setDetail] = useState<Message | null>(null);
+  const rows = useMemo(() => data ?? listMessages(), [data]);
+
+  useEffect(() => {
+    const focus = new URLSearchParams(window.location.search).get("focus");
+    if (!focus) return;
+    const hit = rows.find((m) => m.id === focus);
+    if (hit) setDetail(hit);
+  }, [rows]);
+
   return (
     <div className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-200 bg-white">
       <div className="min-h-0 flex-1 overflow-auto">
@@ -48,8 +60,14 @@ export function MessagesListTable({ data = messages }: MessagesListTableProps) {
             </tr>
           </thead>
           <tbody>
-            {data.map((message) => (
-              <tr key={message.id} className="hover:bg-slate-50">
+            {rows.map((message) => (
+              <tr
+                key={message.id}
+                data-focus-id={message.id}
+                data-message-id={message.id}
+                className="cursor-pointer hover:bg-slate-50"
+                onClick={() => setDetail(message)}
+              >
                 <td className="border-b border-slate-100 px-3 py-2.5">
                   <span
                     className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${typeStyles[message.type]}`}
@@ -70,7 +88,7 @@ export function MessagesListTable({ data = messages }: MessagesListTableProps) {
                   {message.to}
                 </td>
                 <td className="border-b border-slate-100 px-3 py-2.5 text-slate-500">
-                  {message.relatedTo || "—"}
+                  {message.relatedTo || ""}
                 </td>
                 <td className="border-b border-slate-100 px-3 py-2.5">
                   <span
@@ -80,13 +98,33 @@ export function MessagesListTable({ data = messages }: MessagesListTableProps) {
                   </span>
                 </td>
                 <td className="border-b border-slate-100 px-3 py-2.5 whitespace-nowrap text-slate-500">
-                  {message.sentDate || "—"}
+                  {message.sentDate || ""}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <RecordDetailModal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title={detail?.subject ?? "Message"}
+        subtitle={detail?.status}
+        fields={
+          detail
+            ? [
+                { label: "Type", value: detail.type },
+                { label: "From", value: detail.from },
+                { label: "To", value: detail.to },
+                { label: "Related to", value: detail.relatedTo ?? "" },
+                { label: "Status", value: detail.status },
+                { label: "Sent", value: detail.sentDate ?? "" },
+              ]
+            : []
+        }
+        body={detail?.body}
+      />
     </div>
   );
 }

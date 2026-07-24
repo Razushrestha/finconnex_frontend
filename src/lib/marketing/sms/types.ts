@@ -64,7 +64,7 @@ export const smsCampaigns: SmsCampaign[] = [
   {
     id: "sc1",
     campaignId: "SM-5001",
-    name: "Appointment reminder — tomorrow",
+    name: "Appointment reminder: tomorrow",
     type: "Reminder",
     status: "Completed",
     audience: "Meetings · Tomorrow",
@@ -201,6 +201,6 @@ export function formatSmsAt(d = new Date()) {
 }
 
 export function deliveryRate(c: SmsCampaign) {
-  if (!c.sentCount) return "—";
+  if (!c.sentCount) return "";
   return `${Math.round((c.deliveredCount / c.sentCount) * 100)}%`;
 }

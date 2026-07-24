@@ -55,7 +55,7 @@ export const signatureRequests: SignatureRequest[] = [
   {
     id: "sr1",
     signatureRequestId: "ES-2001",
-    documentName: "Engagement Letter — Anderson",
+    documentName: "Engagement Letter: Anderson",
     documentFile: "Anderson_Engagement_Letter.pdf",
     signer: "William Anderson",
     signerEmail: "william@example.com",
@@ -128,7 +128,7 @@ export const signatureRequests: SignatureRequest[] = [
   {
     id: "sr-quo2",
     signatureRequestId: "ES-2004",
-    documentName: "Engagement — Harbour packaging quotation",
+    documentName: "Engagement: Harbour packaging quotation",
     documentFile: "QUO-3102_Contract.pdf",
     signer: "Marcus Chen",
     signerEmail: "marcus@harbour.example",
@@ -157,7 +157,7 @@ export const signatureRequests: SignatureRequest[] = [
   {
     id: "sr3",
     signatureRequestId: "ES-2003",
-    documentName: "NDA — Fabrikam",
+    documentName: "NDA: Fabrikam",
     documentFile: "NDA_Fabrikam.pdf",
     signer: "Marcus Lin",
     signerEmail: "marcus@fabrikam.com",

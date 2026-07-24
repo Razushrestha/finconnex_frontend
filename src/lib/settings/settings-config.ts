@@ -1,5 +1,5 @@
 /**
- * SRS §27 Settings — source of truth for all 19 sections.
+ * SRS §27 Settings: source of truth for all 19 sections.
  * Routes: /settings/{category.slug}/{item.slug}
  * Schema keys: `${category.slug}/${item.slug}` (avoids collisions like users, themes, api-keys)
  */
@@ -84,8 +84,23 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     description:
       "Pipelines, statuses, custom fields/objects, and industry presets (§3).",
     items: [
-      { title: "Pipelines", slug: "pipelines" },
+      {
+        title: "Pipelines",
+        slug: "pipelines",
+        blurb:
+          "Mortgage Stage + Milestone SLA clocks; badges on Lead Card",
+        moduleHref: "/sales/leads",
+        moduleLabel: "Open Leads board",
+      },
       { title: "Lead Statuses", slug: "lead-statuses" },
+      {
+        title: "Lead Card",
+        slug: "lead-card",
+        blurb:
+          "Kanban card layout: owner avatar, dynamic fields (max 4), unreplied threshold",
+        moduleHref: "/sales/leads",
+        moduleLabel: "Open Leads board",
+      },
       { title: "Deal Stages", slug: "deal-stages" },
       { title: "Lead Sources", slug: "lead-sources" },
       { title: "Lost Reasons", slug: "lost-reasons" },

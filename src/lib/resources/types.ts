@@ -1,4 +1,4 @@
-/** SRS §16 Resources — internal knowledge hub */
+/** SRS §16 Resources: internal knowledge hub */
 
 export type ResourceType =
   | "Document"
@@ -185,7 +185,7 @@ export const resourceItems: ResourceItem[] = [
     category: "Legal",
     fileOrUrl: "Engagement_Letter_Template.docx",
     isExternalUrl: false,
-    description: "Standard engagement letter — Legal approved.",
+    description: "Standard engagement letter: Legal approved.",
     tags: ["template", "legal", "engagement"],
     accessLevel: "Restricted",
     uploadedBy: "Shiva Kadhka",
@@ -221,7 +221,7 @@ export const resourceItems: ResourceItem[] = [
     category: "Support",
     fileOrUrl: "https://help.finconnex.example/refinance-faq",
     isExternalUrl: true,
-    description: "Client-facing FAQ — safe to share publicly.",
+    description: "Client-facing FAQ: safe to share publicly.",
     tags: ["faq", "refinance", "client"],
     accessLevel: "Public",
     uploadedBy: "John Smith",

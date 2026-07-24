@@ -1,4 +1,4 @@
-/** SRS §18 Notifications — event inbox for the CRM */
+/** SRS §18 Notifications: event inbox for the CRM */
 
 export type NotificationType =
   | "Task Assigned"
@@ -93,7 +93,7 @@ export const seedNotifications: AppNotification[] = [
     notificationId: "NTF-6002",
     type: "Deal Won",
     title: "Deal won",
-    message: "Northside Refinance moved to Closed Won — $850k.",
+    message: "Northside Refinance moved to Closed Won: $850k.",
     relatedTo: "Deal · Northside Refinance",
     relatedHref: "/sales/deals",
     recipient: "John Smith",

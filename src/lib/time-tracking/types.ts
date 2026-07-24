@@ -1,4 +1,4 @@
-/** SRS §23 Time Tracking — billable hours for professional services */
+/** SRS §23 Time Tracking: billable hours for professional services */
 
 import {
   FINANCE_CLIENTS,
@@ -87,12 +87,12 @@ export const TIME_USERS = [
 export const RELATED_RECORD_OPTIONS: TimeRelatedTo[] = [
   {
     kind: "Matter",
-    name: "Anderson — refinance matter",
+    name: "Anderson: refinance matter",
     clientId: "c1",
   },
   {
     kind: "Matter",
-    name: "Harbour — first-home matter",
+    name: "Harbour: first-home matter",
     clientId: "c2",
   },
   {
@@ -107,12 +107,12 @@ export const RELATED_RECORD_OPTIONS: TimeRelatedTo[] = [
   },
   {
     kind: "Ticket",
-    name: "TKT-5001 — Portal login issue",
+    name: "TKT-5001: Portal login issue",
     clientId: "c1",
   },
   {
     kind: "Ticket",
-    name: "TKT-5003 — Document upload failed",
+    name: "TKT-5003: Document upload failed",
     clientId: "c3",
   },
   {
@@ -122,7 +122,7 @@ export const RELATED_RECORD_OPTIONS: TimeRelatedTo[] = [
   },
   {
     kind: "Project",
-    name: "Agency retainer — Apex",
+    name: "Agency retainer: Apex",
     clientId: "c4",
   },
 ];
@@ -249,7 +249,7 @@ export const timeEntries: TimeEntry[] = [
     durationHours: 0.75,
     billable: false,
     rate: 250,
-    description: "Internal triage — non-billable support",
+    description: "Internal triage: non-billable support",
     status: "Logged",
     createdBy: "Tejas Gokhe",
     createdAt: "20/07/2026, 10:05",
@@ -278,7 +278,7 @@ export const timeEntries: TimeEntry[] = [
     durationHours: 3,
     billable: true,
     rate: 200,
-    description: "Agency retainer — weekly creative standup + revisions",
+    description: "Agency retainer: weekly creative standup + revisions",
     status: "Approved",
     createdBy: "Shiva Kadhka",
     createdAt: "21/07/2026, 08:30",

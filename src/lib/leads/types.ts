@@ -1,3 +1,11 @@
+import type { MortgagePipelineStage } from "@/lib/pipeline-sla/types";
+import { MORTGAGE_PIPELINE_STAGES } from "@/lib/pipeline-sla/types";
+import {
+  PIPELINE_STAGE_DOT,
+  pipelineStageToLeadStatus,
+  stageColumnId,
+} from "@/lib/pipeline-sla/board";
+
 export const LEAD_SOURCES = [
   "Website",
   "Referral",
@@ -8,7 +16,7 @@ export const LEAD_SOURCES = [
 ] as const;
 export type LeadSource = (typeof LEAD_SOURCES)[number];
 
-/** SRS §6.1 Status* */
+/** SRS §6.1 Status* — still used as CRM bridge; Kanban columns are mortgage stages (Session 17). */
 export const LEAD_STATUSES = [
   "New",
   "Contacted",
@@ -17,6 +25,10 @@ export const LEAD_STATUSES = [
   "Converted",
 ] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
+
+/** Session 17 — filter / board column titles = mortgage pipeline stages. */
+export const LEAD_PIPELINE_STAGES = MORTGAGE_PIPELINE_STAGES;
+export type LeadPipelineStage = MortgagePipelineStage;
 
 export interface LeadRecord {
   id: string;
@@ -38,6 +50,13 @@ export interface LeadRecord {
   productInterest?: string;
   budgetRange?: string;
   estimatedValue?: string;
+  /** Spec §4 example field — shown when selected in Lead Card settings. */
+  tags?: string[];
+  pipelineStage?: string;
+  stageEnteredAt?: string;
+  pipelineStartedAt?: string;
+  /** Values keyed by Custom Field `key` (not `cf:` prefix). */
+  custom?: Record<string, string>;
   initials: string;
   accentColorClass: string;
   avatarBgClass: string;
@@ -55,17 +74,48 @@ export interface LeadCardData {
   createdDate: string;
   source: LeadSource;
   estimatedValue?: string;
+  /** Spec §4 example field — shown when selected in Lead Card settings. */
+  tags?: string[];
+  /**
+   * Session 16 — mortgage pipeline stage for SLA (optional override).
+   * When omitted, derived from Kanban LeadStatus.
+   */
+  pipelineStage?: string;
+  /** ISO or flexible date — when current pipeline stage was entered. */
+  stageEnteredAt?: string;
+  /** Pipeline start (New Lead) timestamp for milestone clocks. */
+  pipelineStartedAt?: string;
+  /** Values keyed by Custom Field `key` (not `cf:` prefix). */
+  custom?: Record<string, string>;
   accentColorClass: string;
   avatarBgClass: string;
 }
 
 export interface KanbanColumn {
   id: string;
-  title: LeadStatus;
+  /** Mortgage pipeline stage (Session 17 Kanban column). */
+  title: LeadPipelineStage;
+  /** Bridged CRM LeadStatus for forms / legacy APIs. */
+  leadStatus: LeadStatus;
   dotColorClass: string;
   leadCount: number;
   totalAmount: string;
   cards: LeadCardData[];
+}
+
+function emptyStageColumn(
+  stage: LeadPipelineStage,
+  totalAmount = "$0",
+): KanbanColumn {
+  return {
+    id: stageColumnId(stage),
+    title: stage,
+    leadStatus: pipelineStageToLeadStatus(stage),
+    dotColorClass: PIPELINE_STAGE_DOT[stage],
+    leadCount: 0,
+    totalAmount,
+    cards: [],
+  };
 }
 
 const AVATAR_COLORS = [
@@ -100,18 +150,49 @@ function toCard(
     createdDate: lead.createdDate,
     source: lead.source,
     estimatedValue: lead.estimatedValue,
+    tags: lead.tags,
+    pipelineStage: lead.pipelineStage,
+    stageEnteredAt: lead.stageEnteredAt,
+    pipelineStartedAt: lead.pipelineStartedAt,
+    custom: lead.custom,
     accentColorClass: lead.accentColorClass,
     avatarBgClass: AVATAR_COLORS[lead.avatarIndex % AVATAR_COLORS.length],
   };
 }
 
+/** Session 17 — Kanban columns = mortgage pipeline stages (PDF). */
 export const LEAD_COLUMNS: KanbanColumn[] = [
   {
-    id: "new",
-    title: "New",
-    dotColorClass: "bg-sky-500",
-    leadCount: 3,
-    totalAmount: "$8,20,000",
+    ...emptyStageColumn("New Lead", "$4,50,000"),
+    leadCount: 1,
+    cards: [
+      toCard({
+        id: "l-nl1",
+        leadId: "L-000",
+        firstName: "Jamie",
+        lastName: "Cole",
+        email: "jamie.cole@example.com",
+        phone: "+61 400 100 000",
+        company: "Cole Homes",
+        source: "Website",
+        status: "New",
+        owner: "John Smith",
+        createdDate: "23/07/2026",
+        estimatedValue: "$4,50,000",
+        tags: ["First Home"],
+        pipelineStage: "New Lead",
+        // Fixed demo clock 23/07/2026 12:00 → 15 mins into 30-min stage SLA
+        stageEnteredAt: "23/07/2026 11:45 AM",
+        pipelineStartedAt: "23/07/2026 11:45 AM",
+        accentColorClass: PIPELINE_STAGE_DOT["New Lead"],
+        avatarIndex: 0,
+      }),
+    ],
+  },
+  emptyStageColumn("Appointment Booked"),
+  {
+    ...emptyStageColumn("In Conversation", "$11,10,000"),
+    leadCount: 4,
     cards: [
       toCard({
         id: "l-n1",
@@ -122,28 +203,21 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         phone: "+61 400 111 001",
         company: "Anderson Finance",
         source: "Website",
-        status: "New",
+        status: "Contacted",
         owner: "John Smith",
-        createdDate: "18/07/2026",
+        createdDate: "23/07/2026",
         estimatedValue: "$3,50,000",
-        accentColorClass: "bg-sky-500",
+        tags: ["Refinance", "Hot"],
+        pipelineStage: "In Conversation",
+        stageEnteredAt: "19/07/2026 12:00 PM",
+        pipelineStartedAt: "16/07/2026 12:00 PM",
+        custom: {
+          leadScore: "86",
+          referralSource: "Website",
+          preferredBranch: "Sydney CBD",
+        },
+        accentColorClass: PIPELINE_STAGE_DOT["In Conversation"],
         avatarIndex: 0,
-      }),
-      toCard({
-        id: "l-n2",
-        leadId: "L-002",
-        firstName: "Chloe",
-        lastName: "Ramirez",
-        email: "chloe.r@example.com",
-        phone: "+61 400 111 002",
-        company: "Riverstone Capital",
-        source: "Referral",
-        status: "New",
-        owner: "Shiva Kadhka",
-        createdDate: "19/07/2026",
-        estimatedValue: "$2,10,000",
-        accentColorClass: "bg-sky-500",
-        avatarIndex: 1,
       }),
       toCard({
         id: "l-n3",
@@ -154,22 +228,16 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         phone: "+61 400 111 003",
         company: "Mehta Advisors",
         source: "Cold Call",
-        status: "New",
+        status: "Contacted",
         owner: "Tejas Gokhe",
-        createdDate: "20/07/2026",
+        createdDate: "10/07/2026",
         estimatedValue: "$2,60,000",
-        accentColorClass: "bg-sky-500",
+        pipelineStage: "In Conversation",
+        stageEnteredAt: "20/07/2026 09:00 AM",
+        pipelineStartedAt: "01/07/2026 09:00 AM",
+        accentColorClass: PIPELINE_STAGE_DOT["In Conversation"],
         avatarIndex: 2,
       }),
-    ],
-  },
-  {
-    id: "contacted",
-    title: "Contacted",
-    dotColorClass: "bg-amber-400",
-    leadCount: 3,
-    totalAmount: "$9,50,000",
-    cards: [
       toCard({
         id: "l-c1",
         leadId: "L-004",
@@ -183,24 +251,11 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         owner: "Roshna Abraham",
         createdDate: "15/07/2026",
         estimatedValue: "$1,90,000",
-        accentColorClass: "bg-amber-500",
+        pipelineStage: "In Conversation",
+        stageEnteredAt: "15/07/2026 10:00 AM",
+        pipelineStartedAt: "14/07/2026 10:00 AM",
+        accentColorClass: PIPELINE_STAGE_DOT["In Conversation"],
         avatarIndex: 3,
-      }),
-      toCard({
-        id: "l-c2",
-        leadId: "L-005",
-        firstName: "Jennifer",
-        lastName: "Adams",
-        email: "j.adams@example.com",
-        phone: "+61 400 222 002",
-        company: "Adams Group",
-        source: "Social Media",
-        status: "Contacted",
-        owner: "John Smith",
-        createdDate: "16/07/2026",
-        estimatedValue: "$3,50,000",
-        accentColorClass: "bg-amber-500",
-        avatarIndex: 4,
       }),
       toCard({
         id: "l-c3",
@@ -215,18 +270,61 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         owner: "Shiva Kadhka",
         createdDate: "17/07/2026",
         estimatedValue: "$4,10,000",
-        accentColorClass: "bg-amber-500",
+        pipelineStage: "In Conversation",
+        stageEnteredAt: "17/07/2026 09:00 AM",
+        pipelineStartedAt: "16/07/2026 09:00 AM",
+        accentColorClass: PIPELINE_STAGE_DOT["In Conversation"],
         avatarIndex: 5,
       }),
     ],
   },
   {
-    id: "qualified",
-    title: "Qualified",
-    dotColorClass: "bg-violet-500",
-    leadCount: 2,
-    totalAmount: "$7,00,000",
+    ...emptyStageColumn("Waiting on Documents", "$9,80,000"),
+    leadCount: 3,
     cards: [
+      toCard({
+        id: "l-n2",
+        leadId: "L-002",
+        firstName: "Chloe",
+        lastName: "Ramirez",
+        email: "chloe.r@example.com",
+        phone: "+61 400 111 002",
+        company: "Riverstone Capital",
+        source: "Referral",
+        status: "Qualified",
+        owner: "Shiva Kadhka",
+        createdDate: "13/07/2026",
+        estimatedValue: "$2,10,000",
+        tags: ["Partner", "Priority"],
+        pipelineStage: "Waiting on Documents",
+        stageEnteredAt: "20/07/2026 10:00 AM",
+        pipelineStartedAt: "13/07/2026 12:00 PM",
+        custom: {
+          leadScore: "72",
+          referralSource: "Partner",
+        },
+        accentColorClass: PIPELINE_STAGE_DOT["Waiting on Documents"],
+        avatarIndex: 1,
+      }),
+      toCard({
+        id: "l-c2",
+        leadId: "L-005",
+        firstName: "Jennifer",
+        lastName: "Adams",
+        email: "j.adams@example.com",
+        phone: "+61 400 222 002",
+        company: "Adams Group",
+        source: "Social Media",
+        status: "Qualified",
+        owner: "John Smith",
+        createdDate: "16/07/2026",
+        estimatedValue: "$3,50,000",
+        pipelineStage: "Waiting on Documents",
+        stageEnteredAt: "01/07/2026 10:00 AM",
+        pipelineStartedAt: "20/06/2026 10:00 AM",
+        accentColorClass: PIPELINE_STAGE_DOT["Waiting on Documents"],
+        avatarIndex: 4,
+      }),
       toCard({
         id: "l-q1",
         leadId: "L-007",
@@ -240,9 +338,18 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         owner: "Tejas Gokhe",
         createdDate: "12/07/2026",
         estimatedValue: "$4,20,000",
-        accentColorClass: "bg-violet-500",
+        pipelineStage: "Waiting on Documents",
+        stageEnteredAt: "12/07/2026 11:00 AM",
+        pipelineStartedAt: "10/07/2026 11:00 AM",
+        accentColorClass: PIPELINE_STAGE_DOT["Waiting on Documents"],
         avatarIndex: 6,
       }),
+    ],
+  },
+  {
+    ...emptyStageColumn("Documents Received", "$2,80,000"),
+    leadCount: 1,
+    cards: [
       toCard({
         id: "l-q2",
         leadId: "L-008",
@@ -256,58 +363,18 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         owner: "John Smith",
         createdDate: "13/07/2026",
         estimatedValue: "$2,80,000",
-        accentColorClass: "bg-violet-500",
+        pipelineStage: "Documents Received",
+        stageEnteredAt: "22/07/2026 09:00 AM",
+        pipelineStartedAt: "13/07/2026 09:00 AM",
+        accentColorClass: PIPELINE_STAGE_DOT["Documents Received"],
         avatarIndex: 7,
       }),
     ],
   },
+  emptyStageColumn("Processing"),
   {
-    id: "unqualified",
-    title: "Unqualified",
-    dotColorClass: "bg-slate-400",
+    ...emptyStageColumn("Settled", "$5,70,000"),
     leadCount: 2,
-    totalAmount: "$3,70,000",
-    cards: [
-      toCard({
-        id: "l-u1",
-        leadId: "L-009",
-        firstName: "Alexandra",
-        lastName: "Bennett",
-        email: "a.bennett@example.com",
-        phone: "+61 400 444 001",
-        company: "Bright Bay Co.",
-        source: "Other",
-        status: "Unqualified",
-        owner: "Roshna Abraham",
-        createdDate: "10/07/2026",
-        estimatedValue: "$2,20,000",
-        accentColorClass: "bg-slate-400",
-        avatarIndex: 0,
-      }),
-      toCard({
-        id: "l-u2",
-        leadId: "L-010",
-        firstName: "Meera",
-        lastName: "Kapoor",
-        email: "m.kapoor@example.com",
-        phone: "+61 400 444 002",
-        company: "Harborview Supply",
-        source: "Cold Call",
-        status: "Unqualified",
-        owner: "Shiva Kadhka",
-        createdDate: "11/07/2026",
-        estimatedValue: "$1,50,000",
-        accentColorClass: "bg-slate-400",
-        avatarIndex: 1,
-      }),
-    ],
-  },
-  {
-    id: "converted",
-    title: "Converted",
-    dotColorClass: "bg-emerald-500",
-    leadCount: 2,
-    totalAmount: "$5,70,000",
     cards: [
       toCard({
         id: "l-v1",
@@ -322,7 +389,10 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         owner: "John Smith",
         createdDate: "05/07/2026",
         estimatedValue: "$1,50,000",
-        accentColorClass: "bg-emerald-500",
+        pipelineStage: "Settled",
+        stageEnteredAt: "20/07/2026 10:00 AM",
+        pipelineStartedAt: "01/06/2026 10:00 AM",
+        accentColorClass: PIPELINE_STAGE_DOT.Settled,
         avatarIndex: 2,
       }),
       toCard({
@@ -338,8 +408,55 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         owner: "Tejas Gokhe",
         createdDate: "06/07/2026",
         estimatedValue: "$4,20,000",
-        accentColorClass: "bg-emerald-500",
+        pipelineStage: "Settled",
+        stageEnteredAt: "18/07/2026 10:00 AM",
+        pipelineStartedAt: "01/06/2026 10:00 AM",
+        accentColorClass: PIPELINE_STAGE_DOT.Settled,
         avatarIndex: 3,
+      }),
+    ],
+  },
+  {
+    ...emptyStageColumn("Lost", "$3,70,000"),
+    leadCount: 2,
+    cards: [
+      toCard({
+        id: "l-u1",
+        leadId: "L-009",
+        firstName: "Alexandra",
+        lastName: "Bennett",
+        email: "a.bennett@example.com",
+        phone: "+61 400 444 001",
+        company: "Bright Bay Co.",
+        source: "Other",
+        status: "Unqualified",
+        owner: "Roshna Abraham",
+        createdDate: "10/07/2026",
+        estimatedValue: "$2,20,000",
+        pipelineStage: "Lost",
+        stageEnteredAt: "10/07/2026 12:00 PM",
+        pipelineStartedAt: "08/07/2026 12:00 PM",
+        accentColorClass: PIPELINE_STAGE_DOT.Lost,
+        avatarIndex: 0,
+      }),
+      toCard({
+        id: "l-u2",
+        leadId: "L-010",
+        firstName: "Meera",
+        lastName: "Kapoor",
+        email: "m.kapoor@example.com",
+        phone: "+61 400 444 002",
+        company: "Harborview Supply",
+        source: "Cold Call",
+        status: "Unqualified",
+        owner: "Shiva Kadhka",
+        createdDate: "11/07/2026",
+        estimatedValue: "$1,50,000",
+        pipelineStage: "Lost",
+        stageEnteredAt: "11/07/2026 12:00 PM",
+        pipelineStartedAt: "09/07/2026 12:00 PM",
+        accentColorClass: PIPELINE_STAGE_DOT.Lost,
+        avatarIndex: 1,
       }),
     ],
   },

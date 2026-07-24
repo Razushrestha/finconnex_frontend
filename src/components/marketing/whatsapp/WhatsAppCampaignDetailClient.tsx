@@ -102,7 +102,7 @@ export function WhatsAppCampaignDetailClient({ id }: { id: string }) {
   function launch() {
     if (!campaign) return;
     if (campaign.templateApproval !== "Approved") {
-      flash("Cannot launch — template must be Meta Approved");
+      flash("Cannot launch: template must be Meta Approved");
       return;
     }
     const n = 24;

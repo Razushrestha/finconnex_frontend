@@ -27,7 +27,7 @@ export function setRulesActor(actor: RulesActor) {
   emitRulesChange("actor");
 }
 
-/** Current actor — session-backed when DashboardShell hydrated, else demo seed. */
+/** Current actor: session-backed when DashboardShell hydrated, else demo seed. */
 export function getRulesActor(): RulesActor {
   const stored = readJsonStore<RulesActor | null>(ACTOR_KEY, null);
   if (stored?.name && stored?.role) return stored;
@@ -39,7 +39,7 @@ export function getOrgManager() {
   return "Tejas Gokhe";
 }
 
-/** §28.5 — gate an action; logs permission_denied when blocked. */
+/** §28.5: gate an action; logs permission_denied when blocked. */
 export function requireAction(resource: string): RuleResult {
   const actor = getRulesActor();
   if (
@@ -65,7 +65,7 @@ export function requireAction(resource: string): RuleResult {
 }
 
 /**
- * §28.1 + §28.5 — permission check then soft-delete into Recycle Bin.
+ * §28.1 + §28.5: permission check then soft-delete into Recycle Bin.
  * Caller still removes the live record from its module store.
  */
 export function softDeleteRecord(input: {

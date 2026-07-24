@@ -1,16 +1,33 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Plus, MoreVertical } from "lucide-react";
 import { type KanbanColumn } from "@/lib/leads/types";
 import { listLeadColumns, saveLeadColumns } from "@/lib/leads/store";
 import {
-  assertLeadStatusChange,
-  logStatusChange,
-  notifyStatusChanged,
-} from "@/lib/rules";
+  emitLeadActivityChange,
+  onLeadActivityChange,
+} from "@/lib/leads/lead-extras-store";
+import {
+  loadLeadCardSettings,
+  onLeadCardSettingsChange,
+  type LeadCardSettings,
+} from "@/lib/leads/lead-card-settings";
+import type { QuickActionKind } from "@/lib/leads/panel-actions";
+import {
+  applyPipelineStageMove,
+  assertPipelineStageChange,
+  isMortgagePipelineStage,
+} from "@/lib/pipeline-sla/board";
+import { onPipelineSlaChange } from "@/lib/pipeline-sla/settings";
+import { logStatusChange, notifyStatusChanged } from "@/lib/rules";
 import type { LeadFilters } from "./FilterLeadsPanel";
 import { LeadCard } from "./LeadCard";
+import {
+  LeadCardPanelHost,
+  type LeadPanelState,
+} from "./panels/LeadCardPanelHost";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
@@ -24,13 +41,35 @@ interface LeadKanbanBoardProps {
 }
 
 export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
-  const [columns, setColumns] = useState<KanbanColumn[]>([]);
+  const [columns, setColumns] = useState<KanbanColumn[]>(() =>
+    listLeadColumns(),
+  );
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const [overColumnId, setOverColumnId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [panel, setPanel] = useState<LeadPanelState | null>(null);
+  const [activityRevision, setActivityRevision] = useState(0);
+  const [cardSettings, setCardSettings] = useState<LeadCardSettings>(() =>
+    loadLeadCardSettings(),
+  );
 
   useEffect(() => {
-    setColumns(listLeadColumns());
+    return onLeadActivityChange(() => {
+      setActivityRevision((n) => n + 1);
+    });
+  }, []);
+
+  useEffect(() => {
+    return onLeadCardSettingsChange(() => {
+      setCardSettings(loadLeadCardSettings());
+      setActivityRevision((n) => n + 1);
+    });
+  }, []);
+
+  useEffect(() => {
+    return onPipelineSlaChange(() => {
+      setActivityRevision((n) => n + 1);
+    });
   }, []);
 
   function persist(next: KanbanColumn[]) {
@@ -45,7 +84,10 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
 
     return columns
       .filter(
-        (col) => !hasStatusFilter || filters!.statuses.includes(col.title),
+        (col) =>
+          !hasStatusFilter ||
+          filters!.statuses.includes(col.title) ||
+          filters!.statuses.includes(col.leadStatus),
       )
       .map((col) => ({
         ...col,
@@ -93,17 +135,27 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
       return;
     }
 
-    const gate = assertLeadStatusChange(sourceColumn.title, targetColumn.title);
+    const gate = assertPipelineStageChange(
+      sourceColumn.title,
+      targetColumn.title,
+    );
     if (!gate.ok) {
       flash(gate.message);
       setDragInfo(null);
       return;
     }
 
-    const updatedCard = {
-      ...card,
-      accentColorClass: targetColumn.dotColorClass,
-    };
+    if (!isMortgagePipelineStage(targetColumn.title)) {
+      flash(`Unknown pipeline stage "${targetColumn.title}"`);
+      setDragInfo(null);
+      return;
+    }
+
+    const updatedCard = applyPipelineStageMove(
+      card,
+      targetColumn.title,
+      new Date(),
+    );
 
     const next = columns.map((col) => {
       if (col.id === sourceColumnId) {
@@ -132,6 +184,7 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
       sourceColumn.title,
       targetColumn.title,
     );
+    emitLeadActivityChange();
     notifyStatusChanged({
       recipient: card.owner,
       entityLabel: `Lead ${card.name}`,
@@ -146,7 +199,7 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
 
   return (
     <div className="relative w-full overflow-x-auto bg-slate-50/50">
-      <div className="grid min-w-[1300px] grid-cols-1 items-start gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid min-w-[1800px] grid-cols-1 items-start gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
         {visibleColumns.map((column) => {
           const isOver = overColumnId === column.id;
 
@@ -177,7 +230,7 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
                   <span
                     className={`h-2.5 w-2.5 rounded-full ${column.dotColorClass}`}
                   />
-                  <h2 className="text-sm font-semibold text-slate-800">
+                  <h2 className="max-w-[9.5rem] text-xs font-semibold leading-snug text-slate-800 xl:text-sm">
                     {column.title}
                   </h2>
                   <span className="rounded-full border border-slate-200/80 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500">
@@ -186,13 +239,13 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
                 </div>
 
                 <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    aria-label="Add lead"
+                  <Link
+                    href={`/sales/leads/create?stage=${encodeURIComponent(column.title)}`}
+                    aria-label={`Add lead to ${column.title}`}
                     className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs transition-colors hover:bg-slate-50"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                  </button>
+                  </Link>
                   <button
                     type="button"
                     aria-label="Column options"
@@ -212,9 +265,39 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
                   <LeadCard
                     key={card.id}
                     card={card}
+                    status={column.leadStatus}
+                    cardSettings={cardSettings}
+                    revision={activityRevision}
                     isDragging={dragInfo?.cardId === card.id}
                     onDragStart={(e) => handleDragStart(e, card.id, column.id)}
                     onDragEnd={handleDragEnd}
+                    onOpenActivitySummary={() =>
+                      setPanel({
+                        type: "activity-summary",
+                        leadId: card.id,
+                        leadName: card.name,
+                        status: column.leadStatus,
+                      })
+                    }
+                    onOpenLastActivity={() =>
+                      setPanel({
+                        type: "last-activity",
+                        leadId: card.id,
+                        leadName: card.name,
+                        status: column.leadStatus,
+                      })
+                    }
+                    onQuickAction={(kind: QuickActionKind) =>
+                      setPanel({
+                        type: "quick-action",
+                        kind,
+                        leadId: card.id,
+                        leadName: card.name,
+                        status: column.leadStatus,
+                        email: card.email,
+                        phone: card.phone,
+                      })
+                    }
                   />
                 ))}
 
@@ -228,6 +311,13 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
           );
         })}
       </div>
+
+      <LeadCardPanelHost
+        panel={panel}
+        onClose={() => setPanel(null)}
+        revision={activityRevision}
+        onQuickActionSuccess={(message) => flash(message)}
+      />
 
       {toast && (
         <div className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">

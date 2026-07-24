@@ -75,7 +75,7 @@ export function RecordAuditHistory({
                     <span className="font-semibold text-slate-600">
                       {f.field}
                     </span>
-                    : {String(f.from ?? "—")} → {String(f.to ?? "—")}
+                    : {String(f.from ?? "")} → {String(f.to ?? "")}
                   </li>
                 ))}
               </ul>

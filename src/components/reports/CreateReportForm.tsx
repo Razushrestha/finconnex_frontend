@@ -361,7 +361,7 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
                       value={groupBy}
                       onChange={(e) => setGroupBy(e.target.value)}
                     >
-                      <option value="">—</option>
+                      <option value=""></option>
                       {REPORT_GROUP_BY.map((g) => (
                         <option key={g} value={g}>
                           {g}
@@ -378,7 +378,7 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
                       value={sortBy}
                       onChange={(e) => setSortBy(e.target.value)}
                     >
-                      <option value="">—</option>
+                      <option value=""></option>
                       {REPORT_SORT_BY.map((s) => (
                         <option key={s} value={s}>
                           {s}

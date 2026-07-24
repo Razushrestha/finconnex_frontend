@@ -1,4 +1,4 @@
-/** SRS §15 Analytics — pre-built KPI dashboard (mock) */
+/** SRS §15 Analytics: pre-built KPI dashboard (mock) */
 
 import { csatAverage, listTickets } from "@/lib/support/types";
 
@@ -124,7 +124,7 @@ export function getAnalyticsSnapshot(opts: {
   period: AnalyticsPeriod;
   team: AnalyticsTeam;
   owner: string;
-  /** Multiply all scales — used for prior-period compare (~85%) */
+  /** Multiply all scales: used for prior-period compare (~85%) */
   priorScale?: number;
 }) {
   const f = periodFactor(opts.period) * (opts.priorScale ?? 1);

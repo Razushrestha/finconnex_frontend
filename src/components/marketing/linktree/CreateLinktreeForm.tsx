@@ -108,7 +108,7 @@ export function CreateLinktreeForm({ layoutId: _l, redirect: _r }: Props) {
       tip="Display name is required. Booking is optional (§8)."
       cardIcon={Link2}
       cardTitle="Broker profile"
-      cardDescription="Live at /l/[slug] — for bios & email signatures"
+      cardDescription="Live at /l/[slug]: for bios & email signatures"
       listHref="/marketing/linktree"
       saveLabel="Save page"
       onSave={onSave}

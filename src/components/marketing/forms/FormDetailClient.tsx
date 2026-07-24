@@ -372,7 +372,7 @@ export function FormDetailClient({ id }: { id: string }) {
                           Enrolled
                         </Link>
                       ) : (
-                        "—"
+                        ""
                       )}
                     </td>
                     <td className="px-4 py-3 text-slate-500">{s.submittedAt}</td>
@@ -384,7 +384,7 @@ export function FormDetailClient({ id }: { id: string }) {
                       colSpan={4}
                       className="px-4 py-10 text-center text-slate-400"
                     >
-                      No submissions yet — open the public form to test
+                      No submissions yet: open the public form to test
                     </td>
                   </tr>
                 ) : null}

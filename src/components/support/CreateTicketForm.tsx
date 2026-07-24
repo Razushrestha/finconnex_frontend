@@ -140,7 +140,7 @@ export function CreateTicketForm({ layoutId: _l, redirect: _r }: Props) {
       tip="Subject, Requester, Priority, Status, and Description are required."
       cardIcon={HelpCircle}
       cardTitle="Ticket details"
-      cardDescription="SRS §11 — feeds Customer Satisfaction Score on Analytics"
+      cardDescription="SRS §11: feeds Customer Satisfaction Score on Analytics"
       listHref="/support"
       saveLabel="Create ticket"
       onSave={onSave}
@@ -179,7 +179,7 @@ export function CreateTicketForm({ layoutId: _l, redirect: _r }: Props) {
             value={relatedAccount}
             onChange={(e) => setRelatedAccount(e.target.value)}
           >
-            <option value="">— None —</option>
+            <option value="">None</option>
             {SUPPORT_ACCOUNTS.map((a) => (
               <option key={a} value={a}>
                 {a}
@@ -232,7 +232,7 @@ export function CreateTicketForm({ layoutId: _l, redirect: _r }: Props) {
               setCategory(e.target.value as TicketCategory | "")
             }
           >
-            <option value="">— None —</option>
+            <option value="">None</option>
             {TICKET_CATEGORIES.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -249,7 +249,7 @@ export function CreateTicketForm({ layoutId: _l, redirect: _r }: Props) {
             value={assignedTo}
             onChange={(e) => setAssignedTo(e.target.value)}
           >
-            <option value="">— Unassigned —</option>
+            <option value="">Unassigned</option>
             {SUPPORT_AGENTS.map((a) => (
               <option key={a} value={a}>
                 {a}

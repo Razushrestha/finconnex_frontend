@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint Lead Card surface
+        # Full-repo eslint still has legacy errors; Phase 9 gates the Lead Card surface.
+        run: >
+          npx eslint
+          src/lib/leads
+          src/lib/persistence
+          src/lib/attachments
+          src/lib/custom-fields
+          src/hooks/useFocusHighlight.ts
+          "src/components/sales/leads/**/*.{ts,tsx}"
+          src/components/settings/LeadCardSettingsClient.tsx
+          src/components/settings/CustomFieldsSettingsClient.tsx
+          "src/app/(dashboard)/activities/attachments/**/*.{ts,tsx}"
+          src/lib/work-queue/live.ts
+          src/components/persistence/PersistenceBootstrap.tsx
+          src/app/providers.tsx
+          src/app/api/auth/crm-token/route.ts
+          src/lib/comms
+          src/lib/attachments/upload.ts
+          --max-warnings 0
+      - name: Unit + Lead Card smokes
+        run: npm test

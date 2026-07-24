@@ -26,6 +26,7 @@ export function CallCard({
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      data-focus-id={call.id}
       data-call-id={call.id}
       data-column-id={columnId}
       className={cn(
@@ -45,7 +46,7 @@ export function CallCard({
         {call.subject}
       </h4>
       <p className="mb-3 truncate text-[11px] text-slate-500">
-        {call.relatedTo || call.contact || "—"}
+        {call.relatedTo || call.contact || ""}
       </p>
 
       <div className="space-y-1.5 text-[11px] text-slate-500">

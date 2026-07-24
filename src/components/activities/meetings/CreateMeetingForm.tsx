@@ -33,9 +33,15 @@ import {
   elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
 
+import { createMeeting } from "@/lib/meetings/store";
+
 interface CreateMeetingFormProps {
   layoutId: string;
   redirect: boolean;
+  defaults?: {
+    relatedKind?: RelatedEntityKind;
+    relatedName?: string;
+  };
 }
 interface FormState {
   title: string;
@@ -72,9 +78,14 @@ const initialState: FormState = {
 export function CreateMeetingForm({
   layoutId,
   redirect,
+  defaults,
 }: CreateMeetingFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(initialState);
+  const [form, setForm] = useState<FormState>({
+    ...initialState,
+    relatedKind: defaults?.relatedKind ?? "",
+    relatedName: defaults?.relatedName ?? "",
+  });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
   );
@@ -103,14 +114,37 @@ export function CreateMeetingForm({
   function handleSave(createAnother: boolean) {
     setSubmitted(true);
     if (!validate()) return;
-    console.log("Saving meeting", { layoutId, redirect, ...form });
+    const relatedTo =
+      form.relatedKind && form.relatedName
+        ? `${form.relatedKind}: ${form.relatedName}`
+        : undefined;
+    const created = createMeeting({
+      title: form.title.trim(),
+      relatedTo,
+      type: form.type as MeetingType,
+      startDateTime: form.startDateTime,
+      endDateTime: form.endDateTime,
+      location: form.location.trim() || undefined,
+      meetingLink: form.meetingLink.trim() || undefined,
+      organizer: form.organizer.trim(),
+      status: form.status as MeetingStatus,
+      agenda: form.agenda.trim() || undefined,
+      notes: form.notes.trim() || undefined,
+    });
     if (createAnother) {
-      setForm({ ...initialState, organizer: form.organizer });
+      setForm({
+        ...initialState,
+        organizer: form.organizer,
+        relatedKind: form.relatedKind,
+        relatedName: form.relatedName,
+      });
       setErrors({});
       setSubmitted(false);
       return;
     }
-    router.push("/activities/meetings");
+    void layoutId;
+    void redirect;
+    router.push(`/activities/meetings?focus=${created.id}`);
   }
 
   return (
@@ -118,7 +152,7 @@ export function CreateMeetingForm({
       breadcrumbParent={{ label: "Meetings", href: "/activities/meetings" }}
       badge="New meeting"
       title="Create Meeting"
-      subtitle="Schedule a call or in-person session — set time, attendees, and agenda."
+      subtitle="Schedule a call or in-person session: set time, attendees, and agenda."
       tip="Tip: Title, type, start/end, organizer & status are required."
       cardIcon={CalendarDays}
       cardTitle="Meeting Information"

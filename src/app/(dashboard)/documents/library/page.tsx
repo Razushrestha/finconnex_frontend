@@ -341,7 +341,7 @@ export default function DocumentLibraryPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 text-slate-500">
-                        {doc.relatedTo ?? "—"}
+                        {doc.relatedTo ?? ""}
                       </td>
                       <td className="px-4 py-3">
                         <button

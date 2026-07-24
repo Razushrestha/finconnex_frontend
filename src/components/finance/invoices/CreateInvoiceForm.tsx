@@ -113,7 +113,7 @@ export function CreateInvoiceForm({ layoutId: _l, redirect: _r }: Props) {
       tip="Title, Due date, and line items are required."
       cardIcon={Receipt}
       cardTitle="Invoice details"
-      cardDescription="SRS §20.3 — standalone or from a signed quotation"
+      cardDescription="SRS §20.3: standalone or from a signed quotation"
       listHref="/finance/invoices"
       saveLabel="Save invoice"
       onSave={onSave}

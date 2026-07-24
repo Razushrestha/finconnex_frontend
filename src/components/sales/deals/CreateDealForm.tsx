@@ -178,7 +178,7 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
       breadcrumbParent={{ label: "Deals", href: "/sales/deals" }}
       badge="New deal"
       title="Create Deal"
-      subtitle="Track an opportunity from first interest through close — value, stage, and owner in one place."
+      subtitle="Track an opportunity from first interest through close: value, stage, and owner in one place."
       tip="Tip: Name, account, stage, value, currency & owner are required."
       cardIcon={Handshake}
       cardTitle="Deal Information"

@@ -17,6 +17,7 @@ import {
   type CallStatus,
   type CallType,
 } from "@/lib/calls/types";
+import { createCall } from "@/lib/calls/store";
 import {
   RELATED_ENTITY_KINDS,
   RELATED_RECORD_OPTIONS,
@@ -35,6 +36,11 @@ import {
 interface CreateCallFormProps {
   layoutId: string;
   redirect: boolean;
+  defaults?: {
+    relatedKind?: RelatedEntityKind;
+    relatedName?: string;
+    contact?: string;
+  };
 }
 
 interface FormState {
@@ -63,9 +69,18 @@ const initialState: FormState = {
   assignedTo: "John Smith",
 };
 
-export function CreateCallForm({ layoutId, redirect }: CreateCallFormProps) {
+export function CreateCallForm({
+  layoutId,
+  redirect,
+  defaults,
+}: CreateCallFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(initialState);
+  const [form, setForm] = useState<FormState>({
+    ...initialState,
+    relatedKind: defaults?.relatedKind ?? "",
+    relatedName: defaults?.relatedName ?? "",
+    contact: defaults?.contact ?? defaults?.relatedName ?? "",
+  });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
   );
@@ -75,9 +90,22 @@ export function CreateCallForm({ layoutId, redirect }: CreateCallFormProps) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  const relatedOptions = form.relatedKind
-    ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === form.relatedKind)
-    : RELATED_RECORD_OPTIONS;
+  const relatedOptions = (() => {
+    const base = form.relatedKind
+      ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === form.relatedKind)
+      : RELATED_RECORD_OPTIONS;
+    if (
+      form.relatedKind &&
+      form.relatedName &&
+      !base.some((r) => r.name === form.relatedName)
+    ) {
+      return [
+        ...base,
+        { kind: form.relatedKind as RelatedEntityKind, name: form.relatedName },
+      ];
+    }
+    return base;
+  })();
 
   function validate() {
     const next: Partial<Record<keyof FormState, string>> = {};
@@ -93,14 +121,35 @@ export function CreateCallForm({ layoutId, redirect }: CreateCallFormProps) {
   function handleSave(createAnother: boolean) {
     setSubmitted(true);
     if (!validate()) return;
-    console.log("Saving call", { layoutId, redirect, ...form });
+    const relatedTo =
+      form.relatedKind && form.relatedName
+        ? `${form.relatedKind}: ${form.relatedName}`
+        : undefined;
+    const created = createCall({
+      subject: form.subject.trim(),
+      relatedTo,
+      contact: form.contact.trim() || undefined,
+      callType: form.callType as CallType,
+      status: form.status as CallStatus,
+      date: form.date,
+      duration: form.duration.trim() || undefined,
+      notes: form.notes.trim() || undefined,
+      assignedTo: form.assignedTo.trim(),
+    });
     if (createAnother) {
-      setForm({ ...initialState, assignedTo: form.assignedTo });
+      setForm({
+        ...initialState,
+        assignedTo: form.assignedTo,
+        relatedKind: form.relatedKind,
+        relatedName: form.relatedName,
+      });
       setErrors({});
       setSubmitted(false);
       return;
     }
-    router.push("/activities/calls");
+    void layoutId;
+    void redirect;
+    router.push(`/activities/calls?focus=${created.id}`);
   }
 
   return (
@@ -108,7 +157,7 @@ export function CreateCallForm({ layoutId, redirect }: CreateCallFormProps) {
       breadcrumbParent={{ label: "Calls", href: "/activities/calls" }}
       badge="New call"
       title="Create Call"
-      subtitle="Log an inbound or outbound conversation — capture type, timing, and outcome."
+      subtitle="Log an inbound or outbound conversation: capture type, timing, and outcome."
       tip="Tip: Subject, call type, status, date & assignee are required."
       cardIcon={Phone}
       cardTitle="Call Information"
@@ -128,7 +177,7 @@ export function CreateCallForm({ layoutId, redirect }: CreateCallFormProps) {
             className={elevatedInputClass(true)}
             value={form.subject}
             onChange={(e) => update("subject", e.target.value)}
-            placeholder="e.g. Discovery call — Anderson Finance"
+            placeholder="e.g. Discovery call: Anderson Finance"
           />
         </InputShell>
       </Field>

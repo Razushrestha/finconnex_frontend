@@ -28,6 +28,7 @@ import {
   type NotificationMethod,
 } from "@/lib/reminders/types";
 import { avatarColor, initials } from "@/lib/activities/shared";
+import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "kanban" | "list";
@@ -125,6 +126,7 @@ export default function RemindersPage() {
 
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
+      <FocusHighlight />
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-52 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.11),_transparent_65%)]"
@@ -344,6 +346,8 @@ export default function RemindersPage() {
                     return (
                       <tr
                         key={r.id}
+                        data-focus-id={r.id}
+                        data-reminder-id={r.id}
                         className="transition-colors hover:bg-violet-50/40"
                       >
                         <td className="px-4 py-3">
@@ -373,7 +377,7 @@ export default function RemindersPage() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-slate-500">
-                          {r.relatedTo || "—"}
+                          {r.relatedTo || ""}
                         </td>
                         <td className="px-4 py-3">
                           <span
@@ -501,6 +505,8 @@ function ReminderCard({
         onDragStart();
       }}
       onDragEnd={onDragEnd}
+      data-focus-id={reminder.id}
+      data-reminder-id={reminder.id}
       className={cn(
         "group cursor-grab rounded-xl border border-slate-100 border-l-[3px] bg-white p-3.5 shadow-sm transition-all active:cursor-grabbing",
         meta.border,

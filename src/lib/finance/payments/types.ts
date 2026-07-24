@@ -98,13 +98,13 @@ export const payments: Payment[] = [
     method: "Card",
     status: "Failed",
     reference: "ch_mock_apex",
-    notes: "Card declined — retry requested",
+    notes: "Card declined: retry requested",
     receivedAt: "10/07/2026",
     recordedBy: "Shiva Kadhka",
     createdAt: "10/07/2026",
     audit: [
       { id: "a1", at: "10/07/2026 14:00", action: "Recorded", actor: "Shiva Kadhka" },
-      { id: "a2", at: "10/07/2026 14:02", action: "Failed — card declined", actor: "System" },
+      { id: "a2", at: "10/07/2026 14:02", action: "Failed: card declined", actor: "System" },
     ],
   },
 ];

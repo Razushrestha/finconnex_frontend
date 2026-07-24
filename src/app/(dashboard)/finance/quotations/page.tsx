@@ -172,7 +172,7 @@ export default function QuotationsPage() {
                   <td className="px-3 py-3 text-slate-700">{r.clientName}</td>
                   <td className="px-3 py-3 text-slate-600">{r.owner}</td>
                   <td className="px-3 py-3 text-slate-600">
-                    {r.signatureStatus ?? "—"}
+                    {r.signatureStatus ?? ""}
                   </td>
                   <td className="px-3 py-3">
                     <span

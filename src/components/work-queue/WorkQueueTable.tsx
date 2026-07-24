@@ -1,231 +1,319 @@
 "use client";
 
-import type { ReactNode } from "react";
+import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
-  ArrowDownUp,
   ChevronLeft,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
+  Inbox,
+  ListFilter,
+  RefreshCw,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { WorkQueueTask } from "@/lib/work-queue/data";
+import type { QueueRow } from "@/lib/work-queue/live";
+
+export type QueueTableFilters = {
+  priority: "all" | "High" | "Medium" | "Low";
+  status: string;
+  due: "all" | "overdue" | "today" | "upcoming";
+};
 
 interface WorkQueueTableProps {
-  tasks: WorkQueueTask[];
+  rows: QueueRow[];
+  title: string;
   page: number;
   pageSize: number;
   total: number;
+  totalPages: number;
   onPageChange: (page: number) => void;
-  personName?: string;
+  onRefresh: () => void;
+  spinning?: boolean;
+  emptyLabel?: string;
+  filters: QueueTableFilters;
+  onFiltersChange: (f: QueueTableFilters) => void;
+  statusOptions: string[];
 }
 
-const columns = [
-  { key: "id", label: "Task ID", sortable: true },
-  { key: "title", label: "Title", sortable: true },
-  { key: "category", label: "Category", sortable: false },
-  { key: "project", label: "Project", sortable: true },
-  { key: "dueDate", label: "Due Date", sortable: true },
-  { key: "status", label: "Status", sortable: false },
-  { key: "assignee", label: "Assignee", sortable: false },
-] as const;
-
-function StatusPill({ status }: { status: WorkQueueTask["status"] }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold text-white",
-        status === "Open" ? "bg-sky-500" : "bg-slate-400",
-      )}
-    >
-      {status}
-    </span>
-  );
-}
+const COLS =
+  "grid min-w-[760px] grid-cols-[minmax(220px,2.2fr)_minmax(100px,1fr)_minmax(110px,1fr)_minmax(80px,0.8fr)_minmax(140px,1.2fr)]";
 
 export function WorkQueueTable({
-  tasks,
+  rows,
+  title,
   page,
   pageSize,
   total,
+  totalPages,
   onPageChange,
-  personName,
+  onRefresh,
+  spinning,
+  emptyLabel = "No records in this queue.",
+  filters,
+  onFiltersChange,
+  statusOptions,
 }: WorkQueueTableProps) {
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const router = useRouter();
+  const [filterOpen, setFilterOpen] = React.useState(false);
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
+  const activeFilterCount = [
+    filters.priority !== "all",
+    filters.status !== "all",
+    filters.due !== "all",
+  ].filter(Boolean).length;
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-100 bg-white">
-      <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[860px] border-collapse text-left text-[12px]">
-          <thead>
-            <tr className="border-b border-slate-100">
-              {columns.map((col) => (
-                <th
-                  key={col.key}
-                  className="sticky top-0 z-10 bg-white px-3 py-2 text-[11px] font-medium tracking-wide whitespace-nowrap text-slate-400 uppercase"
-                >
-                  <span className="inline-flex items-center gap-1">
-                    {col.label}
-                    {col.sortable ? (
-                      <ArrowDownUp className="h-2.5 w-2.5 text-slate-300" />
-                    ) : null}
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {tasks.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={columns.length}
-                  className="px-3 py-10 text-center text-[12px] text-slate-400"
-                >
-                  No tasks for {personName ?? "this person"}.
-                </td>
-              </tr>
-            ) : (
-              tasks.map((task) => (
-                <tr
-                  key={`${task.ownerId}-${task.id}`}
-                  className="border-b border-slate-50 transition-colors hover:bg-slate-50/80"
-                >
-                  <td className="px-3 py-2 font-medium whitespace-nowrap text-slate-800">
-                    {task.id}
-                  </td>
-                  <td className="px-3 py-2 font-medium text-slate-900">
-                    {task.title}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-slate-600">
-                    {task.category}
-                  </td>
-                  <td
-                    className={cn(
-                      "px-3 py-2 whitespace-nowrap",
-                      task.projectHighlight
-                        ? "font-medium text-rose-500"
-                        : "text-slate-700",
-                    )}
-                  >
-                    {task.project}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {task.dueDate ? (
-                      <span className="flex flex-col leading-tight font-medium text-red-500">
-                        <span>{task.dueDate}</span>
-                        {task.dueTime ? (
-                          <span className="text-[11px] font-normal">
-                            {task.dueTime}
-                          </span>
-                        ) : null}
-                      </span>
-                    ) : (
-                      <span className="font-medium text-red-500">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <StatusPill status={task.status} />
-                  </td>
-                  <td className="px-3 py-2">
-                    <span
-                      className={cn(
-                        "inline-flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold",
-                        task.assignee.color,
-                      )}
-                      title={task.assignee.initials}
-                    >
-                      {task.assignee.initials}
-                    </span>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-white">
+      <div className="flex shrink-0 items-center justify-between gap-3 px-5 pt-5 pb-4 sm:px-7">
+        <div className="flex min-w-0 items-center gap-2">
+          <h2 className="truncate text-[22px] leading-7 font-bold tracking-tight text-gray-900">
+            {title}
+          </h2>
+          <button
+            type="button"
+            aria-label={`Refresh ${title}`}
+            onClick={onRefresh}
+            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-[var(--wq-surface)] hover:text-gray-600"
+          >
+            <RefreshCw
+              className={cn("h-3.5 w-3.5", spinning && "animate-spin")}
+            />
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => setFilterOpen((v) => !v)}
+          className={cn(
+            "inline-flex h-9 items-center gap-1.5 rounded-lg border bg-white px-3 text-[13px] font-medium shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-colors",
+            filterOpen || activeFilterCount > 0
+              ? "border-blue-200 bg-blue-50 text-blue-700"
+              : "border-[var(--wq-line)] text-gray-700 hover:bg-[var(--wq-surface)]",
+          )}
+        >
+          <ListFilter className="h-3.5 w-3.5" />
+          Filter
+          {activeFilterCount > 0 ? (
+            <span className="rounded-md bg-blue-600 px-1.5 py-px text-[10px] font-semibold text-white">
+              {activeFilterCount}
+            </span>
+          ) : null}
+        </button>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-3 py-2">
-        <p className="text-[11px] text-slate-500">
-          Showing {from} to {to} of {total} tasks
-          {personName ? (
-            <span className="text-slate-400"> · {personName}</span>
-          ) : null}
-        </p>
-
-        <div className="flex items-center gap-0.5">
-          <PageButton
-            ariaLabel="First page"
-            disabled={page <= 1}
-            onClick={() => onPageChange(1)}
-          >
-            <ChevronsLeft className="h-3.5 w-3.5" />
-          </PageButton>
-          <PageButton
-            ariaLabel="Previous page"
-            disabled={page <= 1}
-            onClick={() => onPageChange(page - 1)}
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-          </PageButton>
-
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => onPageChange(n)}
-              className={cn(
-                "flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-medium transition-colors",
-                n === page
-                  ? "bg-violet-600 text-white"
-                  : "text-slate-600 hover:bg-slate-100",
-              )}
+      {filterOpen ? (
+        <div className="mx-5 mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--wq-line)] bg-[var(--wq-surface)] px-4 py-3 sm:mx-7">
+          <label className="flex min-w-[120px] flex-1 flex-col gap-1">
+            <span className="text-[11px] font-semibold tracking-wide text-gray-400 uppercase">
+              Priority
+            </span>
+            <select
+              value={filters.priority}
+              onChange={(e) =>
+                onFiltersChange({
+                  ...filters,
+                  priority: e.target.value as QueueTableFilters["priority"],
+                })
+              }
+              className="h-9 rounded-lg border border-[var(--wq-line)] bg-white px-2.5 text-[13px] text-gray-800 outline-none focus:border-blue-600"
             >
-              {n}
-            </button>
-          ))}
+              <option value="all">All</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+          </label>
+          <label className="flex min-w-[140px] flex-1 flex-col gap-1">
+            <span className="text-[11px] font-semibold tracking-wide text-gray-400 uppercase">
+              Status
+            </span>
+            <select
+              value={filters.status}
+              onChange={(e) =>
+                onFiltersChange({ ...filters, status: e.target.value })
+              }
+              className="h-9 rounded-lg border border-[var(--wq-line)] bg-white px-2.5 text-[13px] text-gray-800 outline-none focus:border-blue-600"
+            >
+              <option value="all">All</option>
+              {statusOptions.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex min-w-[140px] flex-1 flex-col gap-1">
+            <span className="text-[11px] font-semibold tracking-wide text-gray-400 uppercase">
+              Due
+            </span>
+            <select
+              value={filters.due}
+              onChange={(e) =>
+                onFiltersChange({
+                  ...filters,
+                  due: e.target.value as QueueTableFilters["due"],
+                })
+              }
+              className="h-9 rounded-lg border border-[var(--wq-line)] bg-white px-2.5 text-[13px] text-gray-800 outline-none focus:border-blue-600"
+            >
+              <option value="all">All</option>
+              <option value="overdue">Overdue</option>
+              <option value="today">Today</option>
+              <option value="upcoming">Upcoming</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              onFiltersChange({
+                priority: "all",
+                status: "all",
+                due: "all",
+              });
+            }}
+            className="inline-flex h-9 items-center gap-1 rounded-lg px-2.5 text-[12.5px] font-medium text-gray-500 hover:bg-white hover:text-gray-800"
+          >
+            <X className="h-3.5 w-3.5" />
+            Clear
+          </button>
+        </div>
+      ) : null}
 
-          <PageButton
-            ariaLabel="Next page"
-            disabled={page >= totalPages}
-            onClick={() => onPageChange(page + 1)}
+      <div className="min-h-0 flex-1 overflow-auto px-5 pb-2 sm:px-7">
+        <div className="overflow-hidden rounded-xl border border-[var(--wq-line)] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+          <div
+            className={cn(
+              COLS,
+              "sticky top-0 z-10 border-b border-[var(--wq-line)] bg-[var(--wq-surface)] px-4 py-2.5",
+            )}
           >
-            <ChevronRight className="h-3.5 w-3.5" />
-          </PageButton>
-          <PageButton
-            ariaLabel="Last page"
-            disabled={page >= totalPages}
-            onClick={() => onPageChange(totalPages)}
-          >
-            <ChevronsRight className="h-3.5 w-3.5" />
-          </PageButton>
+            {["Subject", "Due Date", "Status", "Priority", "Related To"].map(
+              (h) => (
+                <span
+                  key={h}
+                  className="text-[12px] font-semibold tracking-wide text-gray-500"
+                >
+                  {h}
+                </span>
+              ),
+            )}
+          </div>
+
+          {rows.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 px-4 py-16 text-center">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--wq-surface)] text-gray-300">
+                <Inbox className="h-5 w-5" />
+              </span>
+              <p className="text-[13.5px] font-medium text-gray-500">
+                {emptyLabel}
+              </p>
+              <p className="text-[12px] text-gray-400">
+                Try another person, time filter, or clear search/filters.
+              </p>
+            </div>
+          ) : (
+            rows.map((row) => {
+              const overdue =
+                row.dueLabel === "Yesterday" ||
+                row.dueLabel.includes("overdue");
+              return (
+                <button
+                  key={row.id}
+                  type="button"
+                  onClick={() => router.push(row.href)}
+                  className={cn(
+                    COLS,
+                    "w-full items-center border-b border-gray-100 px-4 py-3.5 text-left transition-colors last:border-b-0 hover:bg-[var(--wq-surface)]",
+                    overdue && "bg-red-50/40 hover:bg-red-50/70",
+                  )}
+                >
+                  <span className="truncate pr-3 text-[13.5px] leading-[18px] font-medium text-gray-900">
+                    {row.subject}
+                  </span>
+                  <span
+                    className="text-[13.5px] leading-[18px] font-semibold tabular-nums"
+                    style={{ color: row.dueColor }}
+                  >
+                    {row.dueLabel || ""}
+                  </span>
+                  <span className="truncate text-[13.5px] leading-[18px] text-gray-600">
+                    {row.status}
+                  </span>
+                  <span className="truncate text-[13.5px] leading-[18px] text-gray-600">
+                    {row.priority}
+                  </span>
+                  <span className="truncate text-[13.5px] leading-[18px] font-medium text-[var(--wq-accent)]">
+                    {row.related}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--wq-line)] px-5 py-3.5 sm:px-7">
+        <span className="text-[13px] font-medium text-gray-600">
+          Total Records{" "}
+          <span className="font-bold text-gray-900 tabular-nums">{total}</span>
+        </span>
+
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-medium text-gray-400 tabular-nums">
+            {from} to {to}
+          </span>
+          {totalPages > 1 ? (
+            <div className="ml-1 flex items-center gap-0.5">
+              <button
+                type="button"
+                aria-label="Previous page"
+                disabled={page <= 1}
+                onClick={() => onPageChange(page - 1)}
+                className="flex h-7 w-7 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-[var(--wq-surface)] disabled:pointer-events-none disabled:opacity-35"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((n) => {
+                  if (totalPages <= 5) return true;
+                  return n === 1 || n === totalPages || Math.abs(n - page) <= 1;
+                })
+                .map((n, idx, arr) => {
+                  const prev = arr[idx - 1];
+                  const showGap = prev != null && n - prev > 1;
+                  return (
+                    <span key={n} className="contents">
+                      {showGap ? (
+                        <span className="px-0.5 text-xs text-gray-300">…</span>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => onPageChange(n)}
+                        className={cn(
+                          "flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-semibold transition-colors",
+                          n === page
+                            ? "bg-[var(--wq-accent)] text-white shadow-sm"
+                            : "text-gray-600 hover:bg-[var(--wq-surface)]",
+                        )}
+                      >
+                        {n}
+                      </button>
+                    </span>
+                  );
+                })}
+              <button
+                type="button"
+                aria-label="Next page"
+                disabled={page >= totalPages}
+                onClick={() => onPageChange(page + 1)}
+                className="flex h-7 w-7 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-[var(--wq-surface)] disabled:pointer-events-none disabled:opacity-35"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
-  );
-}
-
-function PageButton({
-  children,
-  disabled,
-  onClick,
-  ariaLabel,
-}: {
-  children: ReactNode;
-  disabled?: boolean;
-  onClick: () => void;
-  ariaLabel: string;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={ariaLabel}
-      disabled={disabled}
-      onClick={onClick}
-      className="flex h-6 w-6 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 disabled:pointer-events-none disabled:opacity-40"
-    >
-      {children}
-    </button>
   );
 }

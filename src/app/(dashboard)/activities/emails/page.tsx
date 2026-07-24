@@ -8,6 +8,7 @@ import {
 } from "@/components/activities/ActivityToolbar";
 import { EmailsFilterPanel } from "@/components/activities/emails/EmailsFilterPanel";
 import { EmailsKanbanBoard } from "@/components/activities/emails/EmailsKanbanBoard";
+import { FocusHighlight } from "@/components/shared/FocusHighlight";
 
 export default function EmailsPage() {
   const [view, setView] = useState<ActivityView>("list");
@@ -16,6 +17,7 @@ export default function EmailsPage() {
 
   return (
     <div className="flex min-h-full w-full min-w-0 flex-col overflow-hidden bg-slate-50/50 p-4">
+      <FocusHighlight />
       <div className="shrink-0">
         <ActivityToolbar
           entityLabel="Email"

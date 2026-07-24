@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import {
-  callColumns as initialColumns,
-  type CallColumn,
-} from "@/lib/calls/types";
+import { useEffect, useState } from "react";
+import { type CallColumn } from "@/lib/calls/types";
+import { listCallColumns, saveCallColumns } from "@/lib/calls/store";
 import { CallsKanbanColumn } from "./CallsKanbanColumn";
 
 interface DragInfo {
@@ -13,8 +11,12 @@ interface DragInfo {
 }
 
 export function CallsKanbanBoard() {
-  const [columns, setColumns] = useState<CallColumn[]>(initialColumns);
+  const [columns, setColumns] = useState<CallColumn[]>([]);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
+
+  useEffect(() => {
+    setColumns(listCallColumns());
+  }, []);
 
   function handleDragStartCall(
     e: React.DragEvent<HTMLDivElement>,
@@ -46,7 +48,7 @@ export function CallsKanbanBoard() {
 
       const moved = { ...call, status: targetColumn.title };
 
-      return prev.map((col) => {
+      const next = prev.map((col) => {
         if (col.id === sourceColumnId) {
           return {
             ...col,
@@ -63,6 +65,8 @@ export function CallsKanbanBoard() {
         }
         return col;
       });
+      saveCallColumns(next);
+      return next;
     });
 
     setDragInfo(null);

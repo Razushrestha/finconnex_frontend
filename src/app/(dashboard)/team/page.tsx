@@ -7,7 +7,7 @@ import {
 } from "@/lib/lazy-charts";
 
 export const metadata: Metadata = {
-  title: "Team — FinConnex",
+  title: "Team: FinConnex",
   description: "Team performance, members, and management.",
 };
 

@@ -1,4 +1,4 @@
-/** SRS §28.3 Notifications — emitters into the Notifications store */
+/** SRS §28.3 Notifications: emitters into the Notifications store */
 
 import {
   formatNotificationAt,

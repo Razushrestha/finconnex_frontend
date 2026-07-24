@@ -77,6 +77,8 @@ export function DealsListView({
             {allDeals.map((deal) => (
               <tr
                 key={deal.id}
+                data-focus-id={deal.id}
+                data-deal-id={deal.id}
                 className="hover:bg-slate-50/80 transition-colors"
               >
                 {/* Name & Avatar */}

@@ -77,7 +77,7 @@ export const taskColumns: TaskColumn[] = [
   {
     id: "not-started",
     title: "Not Started",
-    count: 3,
+    count: 4,
     badgeColorClass: "bg-slate-500 text-white",
     tasks: [
       task({
@@ -96,7 +96,19 @@ export const taskColumns: TaskColumn[] = [
           "Michael Jordan",
         ],
         createdBy: "John Smith",
-        overdue: false,
+        overdue: true,
+      }),
+      task({
+        // Extra pending competitor for William (+X coverage)
+        taskId: "T-010",
+        title: "Confirm documents checklist",
+        taskType: "Follow-up",
+        priority: "Medium",
+        status: "Not Started",
+        dueDate: "25/07/2026",
+        assignedTo: "John Smith",
+        relatedTo: { kind: "Lead", name: "William Anderson" },
+        createdBy: "John Smith",
       }),
 
       task({

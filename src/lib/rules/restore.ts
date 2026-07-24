@@ -1,5 +1,5 @@
 /**
- * §28.1 Recycle Bin restore — rehydrate module stores from snapshot.
+ * §28.1 Recycle Bin restore: rehydrate module stores from snapshot.
  */
 
 import { getRulesActor, requireAction } from "@/lib/rules/actor";

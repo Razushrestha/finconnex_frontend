@@ -1,4 +1,4 @@
-/** SRS §28.1 — soft delete → Recycle Bin (unlimited retention in demo) */
+/** SRS §28.1: soft delete → Recycle Bin (unlimited retention in demo) */
 
 import { appendAuditEvent, logDelete } from "@/lib/rules/audit";
 import {

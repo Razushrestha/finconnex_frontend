@@ -57,6 +57,8 @@ export function ContactsListView({
             {allContacts.map((contact) => (
               <tr
                 key={contact.id}
+                data-focus-id={contact.id}
+                data-contact-id={contact.id}
                 className="transition-colors hover:bg-slate-50/80"
               >
                 <td className="px-3 py-2 whitespace-nowrap">
@@ -72,13 +74,13 @@ export function ContactsListView({
                   </div>
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-slate-600">
-                  {contact.company || "—"}
+                  {contact.company || ""}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-slate-500">
                   {contact.email}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-slate-600">
-                  {contact.phone || "—"}
+                  {contact.phone || ""}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700">

@@ -578,10 +578,10 @@ export function PortalDetailClient({ id }: { id: string }) {
                       </div>
                       <div className="mt-0.5 text-[11px] text-slate-500">
                         {a === "Full"
-                          ? "View and act — pay invoices, sign, raise tickets"
+                          ? "View and act: pay invoices, sign, raise tickets"
                           : a === "Limited"
-                            ? "View all enabled modules; sign, tasks, tickets — no payments"
-                            : "View only — no sign, pay, or ticket actions"}
+                            ? "View all enabled modules; sign, tasks, tickets: no payments"
+                            : "View only: no sign, pay, or ticket actions"}
                       </div>
                     </button>
                   ))}

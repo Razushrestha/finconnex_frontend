@@ -44,6 +44,10 @@ import {
 interface CreateTaskFormProps {
   layoutId: string;
   redirect: boolean;
+  defaults?: {
+    relatedKind?: RelatedEntityKind;
+    relatedName?: string;
+  };
 }
 
 interface FormState {
@@ -76,9 +80,17 @@ const initialState: FormState = {
   collaborators: "",
 };
 
-export function CreateTaskForm({ layoutId, redirect }: CreateTaskFormProps) {
+export function CreateTaskForm({
+  layoutId,
+  redirect,
+  defaults,
+}: CreateTaskFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(initialState);
+  const [form, setForm] = useState<FormState>({
+    ...initialState,
+    relatedKind: defaults?.relatedKind ?? "",
+    relatedName: defaults?.relatedName ?? "",
+  });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
   );
@@ -117,9 +129,10 @@ export function CreateTaskForm({ layoutId, redirect }: CreateTaskFormProps) {
     }
     const related =
       form.relatedKind && form.relatedName
-        ? RELATED_RECORD_OPTIONS.find(
-            (r) => r.kind === form.relatedKind && r.name === form.relatedName,
-          )
+        ? {
+            kind: form.relatedKind as RelatedEntityKind,
+            name: form.relatedName,
+          }
         : undefined;
     const result = await api.tasks.create({
       title: form.title.trim(),
@@ -161,7 +174,9 @@ export function CreateTaskForm({ layoutId, redirect }: CreateTaskFormProps) {
       setSubmitted(false);
       return;
     }
-    router.push("/activities/tasks");
+    void layoutId;
+    void redirect;
+    router.push(`/activities/tasks?focus=${task.taskId}`);
   }
 
   return (
@@ -169,7 +184,7 @@ export function CreateTaskForm({ layoutId, redirect }: CreateTaskFormProps) {
       breadcrumbParent={{ label: "Tasks", href: "/activities/tasks" }}
       badge="New task"
       title="Create Task"
-      subtitle="Anything actionable becomes a task — assign an owner, due date, and priority."
+      subtitle="Anything actionable becomes a task: assign an owner, due date, and priority."
       tip="Tip: Name, type, priority, status, due date & assignee are required."
       cardIcon={CheckSquare}
       cardTitle="Task Information"

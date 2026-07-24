@@ -43,7 +43,7 @@ const TaskUpdateCard = dynamic(
 );
 
 export const metadata: Metadata = {
-  title: "Dashboard — FinConnex",
+  title: "Dashboard: FinConnex",
   description: "CRM overview with sales, finance, and team insights.",
 };
 

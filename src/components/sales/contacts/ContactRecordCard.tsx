@@ -35,6 +35,8 @@ export function ContactRecordCard({
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      data-focus-id={contact.id}
+      data-contact-id={contact.id}
       className={cn(
         "w-full cursor-grab rounded-md border border-slate-200/80 bg-white p-3.5 shadow-2xs active:cursor-grabbing",
         cardMotion,
@@ -60,7 +62,7 @@ export function ContactRecordCard({
         <div className="flex items-center gap-2">
           <Building2 className="h-3 w-3 shrink-0 text-slate-400" />
           <span className="truncate font-medium text-slate-700">
-            {contact.company || "—"}
+            {contact.company || ""}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -69,7 +71,7 @@ export function ContactRecordCard({
         </div>
         <div className="flex items-center gap-2">
           <Phone className="h-3 w-3 shrink-0 text-slate-400" />
-          <span>{contact.phone || "—"}</span>
+          <span>{contact.phone || ""}</span>
         </div>
         <div className="flex items-center gap-2">
           <User className="h-3 w-3 shrink-0 text-slate-400" />

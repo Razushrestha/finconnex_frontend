@@ -26,7 +26,7 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-zinc-50 font-sans dark:bg-black">
       {/* On mobile the sidebar renders as a fixed off-canvas drawer (out of
-          document flow), so this wrapper takes up no space there — width
+          document flow), so this wrapper takes up no space there: width
           only matters at md+, where the sidebar is back in normal flow. */}
       <div className="relative z-20 shrink-0">
         <Sidebar

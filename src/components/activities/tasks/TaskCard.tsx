@@ -150,6 +150,7 @@ export function TaskCard({
         draggable
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
+        data-focus-id={task.taskId}
         data-task-id={task.taskId}
         data-column-id={columnId}
         className={`flex h-[220px] w-full cursor-grab select-none flex-col rounded-xl border border-slate-100 bg-white p-3 shadow-sm transition-all active:cursor-grabbing sm:h-[230px] sm:p-3.5 ${

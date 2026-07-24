@@ -12,7 +12,7 @@ export interface DealFilters {
 export const EMPTY_DEAL_FILTERS: DealFilters = { stages: [] };
 
 interface FilterDealsPanelProps {
-  /** Stage titles for the currently active pipeline — these vary per pipeline, so they're passed in rather than hardcoded. */
+  /** Stage titles for the currently active pipeline: these vary per pipeline, so they're passed in rather than hardcoded. */
   stageOptions: string[];
   filters: DealFilters;
   onToggleField: (field: string) => void;

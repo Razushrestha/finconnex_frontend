@@ -144,7 +144,7 @@ export function BookingPageForm({
   );
   const [reminderTemplate, setReminderTemplate] = useState(
     initial?.reminderTemplate ??
-      "Hi {{name}}, reminder — your appointment starts in 1 hour.",
+      "Hi {{name}}, reminder: your appointment starts in 1 hour.",
   );
   const [status, setStatus] = useState<BookingPageStatus>(
     initial?.status ?? "Draft",
@@ -324,7 +324,7 @@ export function BookingPageForm({
             ) : null}
           </div>
 
-          {/* ONE surface — all sections visible */}
+          {/* ONE surface: all sections visible */}
           <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
             <div className="grid lg:grid-cols-[minmax(0,1fr)_280px]">
               <div className="min-w-0 divide-y divide-slate-100 border-b border-slate-100 lg:border-r lg:border-b-0">
@@ -856,7 +856,7 @@ export function BookingPageForm({
                 </section>
               </div>
 
-              {/* Preview — sticky on desktop */}
+              {/* Preview: sticky on desktop */}
               <aside className="bg-slate-50/70 p-4 lg:sticky lg:top-0 lg:self-start">
                 <p className="mb-3 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
                   Guest preview
@@ -950,7 +950,7 @@ export function BookingPageForm({
         </div>
       </div>
 
-      {/* Footer — always visible, never covers scroll content */}
+      {/* Footer: always visible, never covers scroll content */}
       <div className="shrink-0 border-t border-slate-200/80 bg-white px-3 py-3 sm:px-5">
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-2">
           <p className="hidden text-[11px] text-slate-400 sm:block">

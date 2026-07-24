@@ -260,3 +260,24 @@
     @apply font-sans;
   }
 }
+
+/* Workqueue deep-link highlight (?focus=id) */
+@keyframes focus-record-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.18);
+  }
+}
+
+.focus-record-pulse {
+  outline: 2px solid #2563eb !important;
+  outline-offset: 2px;
+  border-color: #93c5fd !important;
+  background-color: #eff6ff !important;
+  animation: focus-record-pulse 1.1s ease-in-out 2;
+  z-index: 2;
+  position: relative;
+}

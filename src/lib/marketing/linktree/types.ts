@@ -82,7 +82,7 @@ export interface LinktreeLink {
 export interface LinktreePage {
   id: string;
   pageId: string;
-  /** @deprecated use displayName — kept for list search compatibility */
+  /** @deprecated use displayName: kept for list search compatibility */
   title: string;
   displayName: string;
   slug: string;

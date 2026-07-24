@@ -13,13 +13,17 @@ import {
   DollarSign,
 } from "lucide-react";
 import {
+  LEAD_PIPELINE_STAGES,
   LEAD_SOURCES,
-  LEAD_STATUSES,
   OWNERS,
+  type LeadPipelineStage,
   type LeadSource,
-  type LeadStatus,
 } from "@/lib/leads/types";
 import { api } from "@/lib/api";
+import {
+  isMortgagePipelineStage,
+  pipelineStageToLeadStatus,
+} from "@/lib/pipeline-sla/board";
 import {
   logCreate,
   notifyOwnerAssigned,
@@ -39,6 +43,8 @@ import {
 interface CreateLeadFormProps {
   layoutId: string;
   redirect: boolean;
+  /** Prefill from Kanban column Plus (`?stage=`). */
+  stage?: string;
 }
 
 interface LeadFormState {
@@ -52,7 +58,7 @@ interface LeadFormState {
   companySize: string;
   jobTitle: string;
   leadSource: LeadSource | "";
-  status: LeadStatus | "";
+  pipelineStage: LeadPipelineStage | "";
   owner: string;
   notes: string;
   productInterest: string;
@@ -60,28 +66,38 @@ interface LeadFormState {
   estimatedValue: string;
 }
 
-const initialState: LeadFormState = {
-  firstName: "",
-  lastName: "",
-  email: "",
-  phone: "",
-  company: "",
-  companyWebsite: "",
-  industry: "",
-  companySize: "",
-  jobTitle: "",
-  leadSource: "",
-  status: "New",
-  owner: "John Smith",
-  notes: "",
-  productInterest: "",
-  budgetRange: "",
-  estimatedValue: "",
-};
+function resolveInitialStage(stage?: string): LeadPipelineStage {
+  return stage && isMortgagePipelineStage(stage) ? stage : "New Lead";
+}
 
-export function CreateLeadForm({ layoutId, redirect }: CreateLeadFormProps) {
+function makeInitialState(stage?: string): LeadFormState {
+  return {
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    company: "",
+    companyWebsite: "",
+    industry: "",
+    companySize: "",
+    jobTitle: "",
+    leadSource: "",
+    pipelineStage: resolveInitialStage(stage),
+    owner: "John Smith",
+    notes: "",
+    productInterest: "",
+    budgetRange: "",
+    estimatedValue: "",
+  };
+}
+
+export function CreateLeadForm(props: CreateLeadFormProps) {
+  void props.layoutId;
+  void props.redirect;
   const router = useRouter();
-  const [form, setForm] = useState<LeadFormState>(initialState);
+  const [form, setForm] = useState<LeadFormState>(() =>
+    makeInitialState(props.stage),
+  );
   const [errors, setErrors] = useState<
     Partial<Record<keyof LeadFormState, string>>
   >({});
@@ -100,7 +116,7 @@ export function CreateLeadForm({ layoutId, redirect }: CreateLeadFormProps) {
         "firstName",
         "lastName",
         "email",
-        "status",
+        "pipelineStage",
         "owner",
       ]),
     };
@@ -121,6 +137,7 @@ export function CreateLeadForm({ layoutId, redirect }: CreateLeadFormProps) {
       window.alert(gate.message);
       return;
     }
+    const pipelineStage = form.pipelineStage || "New Lead";
     const result = await api.leads.create({
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
@@ -128,7 +145,8 @@ export function CreateLeadForm({ layoutId, redirect }: CreateLeadFormProps) {
       phone: form.phone,
       company: form.company,
       source: form.leadSource || "Website",
-      status: form.status || "New",
+      status: pipelineStageToLeadStatus(pipelineStage),
+      pipelineStage,
       owner: form.owner,
       estimatedValue: form.estimatedValue || undefined,
     });
@@ -150,7 +168,11 @@ export function CreateLeadForm({ layoutId, redirect }: CreateLeadFormProps) {
       type: "Lead Assigned",
     });
     if (createAnother) {
-      setForm({ ...initialState, owner: form.owner, status: "New" });
+      setForm({
+        ...makeInitialState(props.stage),
+        owner: form.owner,
+        pipelineStage,
+      });
       setErrors({});
       setSubmitted(false);
       return;
@@ -163,8 +185,8 @@ export function CreateLeadForm({ layoutId, redirect }: CreateLeadFormProps) {
       breadcrumbParent={{ label: "Leads", href: "/sales/leads" }}
       badge="New lead"
       title="Create Lead"
-      subtitle="Capture a new prospect in a few quick fields — you can always enrich the record later."
-      tip="Tip: First name, last name, email, status & owner are enough to start."
+      subtitle="Capture a new prospect in a few quick fields: you can always enrich the record later."
+      tip="Tip: First name, last name, email, pipeline stage & owner are enough to start."
       cardIcon={User}
       cardTitle="Lead Information"
       cardDescription="Fields marked required are needed to save (SRS §6.1)"
@@ -294,17 +316,19 @@ export function CreateLeadForm({ layoutId, redirect }: CreateLeadFormProps) {
         </InputShell>
       </Field>
       <Field
-        label="Status"
+        label="Pipeline stage"
         required
-        error={submitted ? errors.status : undefined}
+        error={submitted ? errors.pipelineStage : undefined}
       >
-        <InputShell error={!!(submitted && errors.status)}>
+        <InputShell error={!!(submitted && errors.pipelineStage)}>
           <select
             className={elevatedSelectClass(false)}
-            value={form.status}
-            onChange={(e) => update("status", e.target.value as LeadStatus)}
+            value={form.pipelineStage}
+            onChange={(e) =>
+              update("pipelineStage", e.target.value as LeadPipelineStage)
+            }
           >
-            {LEAD_STATUSES.map((s) => (
+            {LEAD_PIPELINE_STAGES.map((s) => (
               <option key={s} value={s}>
                 {s}
               </option>

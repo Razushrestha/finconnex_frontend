@@ -94,7 +94,7 @@ export const meetings: Meeting[] = [
   },
   {
     id: "m3",
-    title: "Vendor Sync — Q3 Pricing",
+    title: "Vendor Sync: Q3 Pricing",
     relatedTo: "Deal: Vendor Management",
     type: "Conference",
     startDateTime: "18/07/2026 10:00 AM",
@@ -110,7 +110,7 @@ export const meetings: Meeting[] = [
   },
   {
     id: "m4",
-    title: "Onsite Discovery — Northwind",
+    title: "Onsite Discovery: Northwind",
     relatedTo: "Company: Northwind Traders",
     type: "In-person",
     startDateTime: "15/07/2026 09:00 AM",
@@ -127,7 +127,7 @@ export const meetings: Meeting[] = [
   },
   {
     id: "m5",
-    title: "Internal Retro — Sprint 12",
+    title: "Internal Retro: Sprint 12",
     relatedTo: "Company: Administration",
     type: "Video Call",
     startDateTime: "14/07/2026 04:00 PM",
@@ -154,6 +154,23 @@ export const meetings: Meeting[] = [
     organizer: "roshna@nepatronix.com",
     status: "Scheduled",
     agenda: "Review open tickets and SLA breaches.",
+  },
+  {
+    // Green card seed: future appointment, nothing broken (Lead: Arjun Mehta)
+    id: "m7",
+    title: "Discovery appointment",
+    relatedTo: "Lead: Arjun Mehta",
+    type: "Video Call",
+    startDateTime: "24/07/2026 10:00 AM",
+    endDateTime: "24/07/2026 11:00 AM",
+    meetingLink: "https://meet.google.com/arjun-discovery",
+    attendees: [
+      { id: "u4", name: "Tejas Gokhe", email: "tejas@example.com" },
+      { id: "u7", name: "Arjun Mehta", email: "arjun.m@example.com" },
+    ],
+    organizer: "tejas@nepatronix.com",
+    status: "Scheduled",
+    agenda: "Discovery for Mehta Advisors loan products.",
   },
 ];
 

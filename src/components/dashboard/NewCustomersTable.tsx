@@ -308,7 +308,7 @@ import {
  * Next.js 16 (App Router) + Tailwind CSS v4 + shadcn/ui
  *
  * Uses shadcn's <Button /> (npx shadcn@latest add button).
- * Self-contained — pagination/search/selection are local UI state only;
+ * Self-contained: pagination/search/selection are local UI state only;
  * wire `onPageChange` / `query` up to real data fetching as needed.
  */
 

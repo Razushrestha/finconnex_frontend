@@ -124,7 +124,7 @@ export function CreateDocumentRequestForm({
       tip="Title, Requested From, Document Type & Status are required."
       cardIcon={FileStack}
       cardTitle="Request details"
-      cardDescription="SRS §9.2 — trackable instead of an email thread"
+      cardDescription="SRS §9.2: trackable instead of an email thread"
       listHref="/documents/requests"
       saveLabel="Save request"
       onSave={onSave}

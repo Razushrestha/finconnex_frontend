@@ -487,7 +487,7 @@ export default function TimeTrackingPage() {
                       {formatAUD(r.rate)}/h
                     </td>
                     <td className="px-3 py-2 font-medium text-slate-900">
-                      {r.billable ? formatAUD(amountFor(r)) : "—"}
+                      {r.billable ? formatAUD(amountFor(r)) : ""}
                     </td>
                     <td className="px-3 py-2">
                       <span

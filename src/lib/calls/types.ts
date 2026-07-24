@@ -46,12 +46,14 @@ export const callColumns: CallColumn[] = [
   {
     id: "scheduled",
     title: "Scheduled",
-    count: 2,
+    count: 3,
     badgeColorClass: "bg-sky-500 text-white",
     calls: [
       {
         id: "c1",
-        subject: "Discovery call — Anderson Finance",
+        // Spec §11 long-title example (~58 chars) — card truncates, full title in tooltip
+        subject:
+          "Follow up on refinancing application before rate lock expires",
         relatedTo: "Lead: William Anderson",
         contact: "William Anderson",
         callType: "Outbound",
@@ -69,17 +71,28 @@ export const callColumns: CallColumn[] = [
         date: "23/07/2026 02:00 PM",
         assignedTo: "Shiva Kadhka",
       },
+      {
+        // Amber card seed: due today, nothing broken (Lead: Jennifer Adams)
+        id: "c9",
+        subject: "Call client",
+        relatedTo: "Lead: Jennifer Adams",
+        contact: "Jennifer Adams",
+        callType: "Outbound",
+        status: "Scheduled",
+        date: "23/07/2026 05:00 PM",
+        assignedTo: "John Smith",
+      },
     ],
   },
   {
     id: "completed",
     title: "Completed",
-    count: 2,
+    count: 3,
     badgeColorClass: "bg-emerald-500 text-white",
     calls: [
       {
         id: "c3",
-        subject: "Inbound support — Contoso",
+        subject: "Inbound support: Contoso",
         relatedTo: "Company: Contoso Ltd.",
         contact: "Marcus Lin",
         callType: "Inbound",
@@ -91,12 +104,25 @@ export const callColumns: CallColumn[] = [
       },
       {
         id: "c4",
-        subject: "Deal review — Greystone",
+        subject: "Deal review: Greystone",
         relatedTo: "Deal: Greystone Realty",
         callType: "Outbound",
         status: "Completed",
         date: "19/07/2026 04:00 PM",
         duration: "32 min",
+        assignedTo: "Roshna Abraham",
+      },
+      {
+        // Empty-summary + last-activity seed (Lead: Katherina Brooks)
+        id: "c8",
+        subject: "Intro call: Blue Sky Media",
+        relatedTo: "Lead: Katherina Brooks",
+        contact: "Katherina Brooks",
+        callType: "Outbound",
+        status: "Completed",
+        date: "22/07/2026 03:00 PM",
+        duration: "22 min",
+        notes: "Interested; follow up next week.",
         assignedTo: "Roshna Abraham",
       },
     ],
@@ -109,7 +135,7 @@ export const callColumns: CallColumn[] = [
     calls: [
       {
         id: "c5",
-        subject: "Cold outreach — Riverstone",
+        subject: "Cold outreach: Riverstone",
         relatedTo: "Lead: Chloe Ramirez",
         callType: "Outbound",
         status: "No Answer",
@@ -126,7 +152,7 @@ export const callColumns: CallColumn[] = [
     calls: [
       {
         id: "c6",
-        subject: "Voicemail — Priya Nair",
+        subject: "Voicemail: Priya Nair",
         relatedTo: "Contact: Priya Nair",
         contact: "Priya Nair",
         callType: "Voicemail",
@@ -145,7 +171,7 @@ export const callColumns: CallColumn[] = [
     calls: [
       {
         id: "c7",
-        subject: "Cancelled sync — Bright Bay",
+        subject: "Cancelled sync: Bright Bay",
         relatedTo: "Company: Bright Bay Co.",
         callType: "Outbound",
         status: "Cancelled",

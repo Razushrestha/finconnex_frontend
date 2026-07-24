@@ -44,7 +44,7 @@ export const messages: Message[] = [
   {
     id: "msg-2",
     type: "Internal",
-    subject: "Handoff — Atlas deal",
+    subject: "Handoff: Atlas deal",
     body: "Please take over Atlas CRM Rollout while I'm on leave Friday.",
     from: "Shiva Kadhka",
     to: "Tejas Gokhe",
@@ -79,7 +79,7 @@ export const messages: Message[] = [
     id: "msg-5",
     type: "External",
     subject: "Draft intro",
-    body: "Hi William — looking forward to connecting…",
+    body: "Hi William: looking forward to connecting…",
     from: "John Smith",
     to: "William Anderson",
     relatedTo: "Lead: William Anderson",
@@ -94,5 +94,17 @@ export const messages: Message[] = [
     to: "invalid@example.com",
     status: "Failed",
     sentDate: "19/07/2026 02:20 PM",
+  },
+  {
+    // Last-activity seed for William (completed outbound SMS)
+    id: "msg-7",
+    type: "External",
+    subject: "Thanks for your time",
+    body: "Hi William — thanks for speaking earlier. Sharing the rate sheet shortly.",
+    from: "John Smith",
+    to: "William Anderson",
+    relatedTo: "Lead: William Anderson",
+    status: "Sent",
+    sentDate: "22/07/2026 06:00 PM",
   },
 ];

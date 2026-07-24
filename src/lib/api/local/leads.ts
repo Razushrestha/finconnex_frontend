@@ -10,7 +10,8 @@ import {
   listLeadColumns,
   saveLeadColumns,
 } from "@/lib/leads/store";
-import type { LeadStatus } from "@/lib/leads/types";
+import { leadStatusToPipelineStage } from "@/lib/pipeline-sla/engine";
+import { formatPipelineTimestamp } from "@/lib/pipeline-sla/ui";
 import {
   assertLeadStatusChange,
   assertUniqueEmail,
@@ -31,7 +32,8 @@ export const localLeadsApi: LeadsApi = {
       const flat = listLeadColumns().flatMap((col) =>
         col.cards.map((card) => ({
           ...card,
-          status: col.title as LeadStatus,
+          status: col.leadStatus,
+          pipelineStage: card.pipelineStage ?? col.title,
         })),
       );
       let items = flat;
@@ -147,7 +149,10 @@ export const localLeadsApi: LeadsApi = {
       }
       const cols = listLeadColumns();
       const source = cols.find((c) => c.id === found.columnId);
-      const target = cols.find((c) => c.title === input.status);
+      const stage = leadStatusToPipelineStage(input.status);
+      const target =
+        cols.find((c) => c.title === stage) ??
+        cols.find((c) => c.leadStatus === input.status);
       if (!source || !target) {
         return apiFail(
           new ApiError(400, {
@@ -156,9 +161,16 @@ export const localLeadsApi: LeadsApi = {
           }),
         );
       }
+      const enteredAt = formatPipelineTimestamp(new Date());
       const card = {
         ...found.card,
         accentColorClass: target.dotColorClass,
+        pipelineStage: target.title,
+        stageEnteredAt: enteredAt,
+        pipelineStartedAt:
+          found.card.pipelineStartedAt ??
+          found.card.stageEnteredAt ??
+          found.card.createdDate,
       };
       saveLeadColumns(
         cols.map((c) => {

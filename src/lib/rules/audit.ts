@@ -1,4 +1,4 @@
-/** SRS §28.4 Audit Trail — central log + field-level diffs */
+/** SRS §28.4 Audit Trail: central log + field-level diffs */
 
 import {
   emitRulesChange,

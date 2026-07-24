@@ -1,4 +1,4 @@
-/** SRS — Customer Journey & Lifecycle Automation (on top of §27.4 workflows) */
+/** SRS: Customer Journey & Lifecycle Automation (on top of §27.4 workflows) */
 
 export type JourneyTrigger =
   | "Lead Created"
@@ -115,7 +115,7 @@ export const DEFAULT_STEP_DETAIL: Record<JourneyStepType, string> = {
   "Send Email": "Template: Welcome nurture #1",
   "Send SMS": "SMS: Booking reminder",
   "Send WhatsApp": "WhatsApp: Proposal follow-up",
-  "Create Task": "Task: Call contact — due +1 day",
+  "Create Task": "Task: Call contact: due +1 day",
   "Update Field": "Set Lead Status → Contacted",
   "Branch Condition": "If Deal Stage = Proposal Sent",
 };

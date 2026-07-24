@@ -13,7 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formEnter } from "@/lib/motion";
 
-/** Span the full form grid — use for notes, long text, section blocks. */
+/** Span the full form grid: use for notes, long text, section blocks. */
 export const formFullSpan = "col-span-full";
 
 /** Span two columns from sm up (titles, related-to, etc.). */
@@ -211,7 +211,7 @@ export function CreateEntityFormShell({
         </div>
       </header>
 
-      {/* Form body — fills remaining viewport */}
+      {/* Form body: fills remaining viewport */}
       <div className="min-h-0 flex-1 overflow-auto">
         <div
           className={cn(
@@ -224,7 +224,7 @@ export function CreateEntityFormShell({
         </div>
       </div>
 
-      {/* Actions — compact sticky bar */}
+      {/* Actions: compact sticky bar */}
       <div className="shrink-0 border-t border-slate-200/80 bg-slate-50/95 px-3 py-2 sm:px-4 lg:px-5 dark:border-zinc-800 dark:bg-zinc-900/95">
         <div className="flex w-full flex-wrap items-center justify-between gap-2">
           <p className="hidden text-[11px] text-slate-400 sm:block">

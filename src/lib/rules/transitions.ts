@@ -74,7 +74,7 @@ export function assertTicketStatusChange(
       `Unknown ticket status "${to}"`,
     );
   }
-  // Closed / Resolved may reopen — SRS explicit allowance
+  // Closed / Resolved may reopen: SRS explicit allowance
   return ok();
 }
 

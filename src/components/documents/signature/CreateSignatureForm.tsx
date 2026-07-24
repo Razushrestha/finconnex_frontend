@@ -119,7 +119,7 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
       tip="Document name, file, and signer are required."
       cardIcon={PenLine}
       cardTitle="Signature request"
-      cardDescription="SRS §9.3 — status starts as Draft until you send"
+      cardDescription="SRS §9.3: status starts as Draft until you send"
       listHref="/documents/signature"
       saveLabel="Save draft"
       onSave={onSave}
@@ -134,7 +134,7 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
           <input
             value={documentName}
             onChange={(e) => setDocumentName(e.target.value)}
-            placeholder="Engagement Letter — Anderson"
+            placeholder="Engagement Letter: Anderson"
             className={elevatedInputClass(true)}
           />
         </InputShell>

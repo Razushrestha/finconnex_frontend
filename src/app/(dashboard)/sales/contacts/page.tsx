@@ -11,6 +11,7 @@ import {
 } from "@/components/sales/contacts/FilterContactsPanel";
 import { CONTACT_GROUPS } from "@/lib/contacts/types";
 import { viewEnter } from "@/lib/motion";
+import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
 
 export default function ContactsPage() {
@@ -36,6 +37,7 @@ export default function ContactsPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 p-2 pr-3 dark:bg-zinc-950">
+      <FocusHighlight />
       <EntityHeader
         entityLabel="Contact"
         createRoute="/sales/contacts/create"

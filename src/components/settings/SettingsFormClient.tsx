@@ -189,7 +189,7 @@ function FieldRenderer({
               {field.label}
             </p>
             <p className="text-[11px] text-slate-400">
-              .png, .jpg, or .svg — up to 5MB (demo)
+              .png, .jpg, or .svg: up to 5MB (demo)
             </p>
           </div>
         </div>

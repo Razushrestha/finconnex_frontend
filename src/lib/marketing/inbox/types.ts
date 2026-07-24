@@ -30,7 +30,7 @@ export const INBOX_AGENTS = [
 ] as const;
 
 export const QUICK_REPLIES = [
-  "Thanks — we'll get back to you shortly.",
+  "Thanks: we'll get back to you shortly.",
   "Happy to help. Can you share a bit more detail?",
   "I've linked this to your CRM record. A broker will follow up today.",
   "Please upload the requested docs in the portal when you can.",
@@ -130,7 +130,7 @@ export const inboxConversations: InboxConversation[] = [
     messages: [
       {
         id: "m1",
-        body: "Hi John — saw the rate update email.",
+        body: "Hi John: saw the rate update email.",
         at: "20/07/2026 16:30",
         outbound: false,
         author: "William Anderson",
@@ -160,7 +160,7 @@ export const inboxConversations: InboxConversation[] = [
     relatedTo: "Deal: Greystone Realty",
     assignedAgent: "Tejas Gokhe",
     status: "Pending",
-    lastMessage: "Thanks — reviewing the proposal tonight.",
+    lastMessage: "Thanks: reviewing the proposal tonight.",
     unreadCount: 0,
     timestamp: "20/07/2026 14:10",
     tags: ["proposal"],
@@ -175,7 +175,7 @@ export const inboxConversations: InboxConversation[] = [
       },
       {
         id: "m2",
-        body: "Thanks — reviewing the proposal tonight.",
+        body: "Thanks: reviewing the proposal tonight.",
         at: "20/07/2026 14:10",
         outbound: false,
         author: "Olivia Bennett",
@@ -220,7 +220,7 @@ export const inboxConversations: InboxConversation[] = [
     relatedTo: "Deal: Vendor Management",
     assignedAgent: "Shiva Kadhka",
     status: "Resolved",
-    lastMessage: "Docs uploaded — thanks!",
+    lastMessage: "Docs uploaded: thanks!",
     unreadCount: 0,
     timestamp: "19/07/2026 18:20",
     tags: ["docs"],
@@ -228,14 +228,14 @@ export const inboxConversations: InboxConversation[] = [
     messages: [
       {
         id: "m1",
-        body: "Quick nudge — please upload your ID proof when you can.",
+        body: "Quick nudge: please upload your ID proof when you can.",
         at: "19/07/2026 09:00",
         outbound: true,
         author: "Shiva Kadhka",
       },
       {
         id: "m2",
-        body: "Docs uploaded — thanks!",
+        body: "Docs uploaded: thanks!",
         at: "19/07/2026 18:20",
         outbound: false,
         author: "Marcus Lin",

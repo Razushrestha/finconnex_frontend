@@ -1,4 +1,4 @@
-/** SRS §21 Forms — embeddable intake → CRM + optional Journey (§19) */
+/** SRS §21 Forms: embeddable intake → CRM + optional Journey (§19) */
 
 import {
   appendTicketAudit,
@@ -181,7 +181,7 @@ export const marketingForms: MarketingForm[] = [
   {
     id: "mf1",
     formId: "FR-6001",
-    name: "Lead capture — home loan",
+    name: "Lead capture: home loan",
     status: "Published",
     submissions: 312,
     fields: DEFAULT_LEAD_FIELDS.length,
@@ -193,12 +193,12 @@ export const marketingForms: MarketingForm[] = [
     updatedAt: "18/07/2026",
     embedSlug: "home-loan-lead",
     description: "Capture new mortgage enquiries from your website.",
-    thankYouMessage: "Thanks — a broker will be in touch shortly.",
+    thankYouMessage: "Thanks: a broker will be in touch shortly.",
   },
   {
     id: "mf2",
     formId: "FR-6002",
-    name: "Support intake — document issue",
+    name: "Support intake: document issue",
     status: "Published",
     submissions: 94,
     fields: 5,
@@ -230,7 +230,7 @@ export const marketingForms: MarketingForm[] = [
   {
     id: "mf3",
     formId: "FR-6003",
-    name: "Event RSVP — broker breakfast",
+    name: "Event RSVP: broker breakfast",
     status: "Draft",
     submissions: 0,
     fields: 6,
@@ -469,7 +469,7 @@ export function processFormSubmission(
         {
           id: ids.id,
           ticketId: ids.ticketId,
-          subject: `${form.name} — ${contactName}`,
+          subject: `${form.name}: ${contactName}`,
           requester: contactName,
           relatedAccount: contactEmail,
           priority: "Medium",
@@ -537,7 +537,7 @@ export function processFormSubmission(
       submission,
       thankYou:
         form.thankYouMessage ||
-        `Thanks — your ${form.destination.toLowerCase()} was created (${createdRecordRef}).`,
+        `Thanks: your ${form.destination.toLowerCase()} was created (${createdRecordRef}).`,
     },
   };
 }

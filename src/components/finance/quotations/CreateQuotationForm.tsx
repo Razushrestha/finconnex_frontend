@@ -106,11 +106,11 @@ export function CreateQuotationForm({ layoutId: _l, redirect: _r }: Props) {
       breadcrumbParent={{ label: "Quotations", href: "/finance/quotations" }}
       badge="§13.2"
       title="Create Quotation"
-      subtitle="Formal quotation with line items and pricing — convertible to invoice."
+      subtitle="Formal quotation with line items and pricing: convertible to invoice."
       tip="Title, Valid until, and line items are required."
       cardIcon={FileText}
       cardTitle="Quotation details"
-      cardDescription="SRS §20.2 — standalone or from an accepted estimate"
+      cardDescription="SRS §20.2: standalone or from an accepted estimate"
       listHref="/finance/quotations"
       saveLabel="Save quotation"
       onSave={onSave}

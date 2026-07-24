@@ -65,7 +65,7 @@ export const whatsappCampaigns: WhatsAppCampaign[] = [
   {
     id: "wc1",
     campaignId: "WA-8001",
-    name: "Appointment reminders — this week",
+    name: "Appointment reminders: this week",
     templateId: "wt1",
     templateName: wt("wt1").name,
     templateApproval: "Approved",
@@ -206,6 +206,6 @@ export function formatWaAt(d = new Date()) {
 }
 
 export function readRate(c: WhatsAppCampaign) {
-  if (!c.sentCount) return "—";
+  if (!c.sentCount) return "";
   return `${Math.round((c.readCount / c.sentCount) * 100)}%`;
 }

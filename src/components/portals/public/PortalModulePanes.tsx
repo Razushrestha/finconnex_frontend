@@ -201,8 +201,8 @@ export function PortalInvoicesPane({ slug }: { slug: string }) {
       {!canPay && invoices.some((i) => i.amountDue > 0) ? (
         <p className="mb-3 text-[11px] text-slate-500">
           {portal.accessLevel === "Read-only"
-            ? "Read-only access — invoices are view-only."
-            : "Limited access — contact your broker to pay invoices."}
+            ? "Read-only access: invoices are view-only."
+            : "Limited access: contact your broker to pay invoices."}
         </p>
       ) : null}
       {toast ? (

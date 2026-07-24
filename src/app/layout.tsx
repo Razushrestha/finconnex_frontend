@@ -12,7 +12,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "FinConnex — Multi-tenant CRM",
+  title: "FinConnex: Multi-tenant CRM",
   description:
     "Manage sales, finance, and customer relationships across your organization.",
 };

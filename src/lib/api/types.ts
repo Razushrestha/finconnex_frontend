@@ -24,7 +24,7 @@ export interface IdResponse {
   id: string;
 }
 
-/** Soft-delete response — record moved to recycle bin. */
+/** Soft-delete response: record moved to recycle bin. */
 export interface SoftDeleteResponse {
   id: string;
   recycleBinId?: string;

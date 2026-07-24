@@ -55,6 +55,7 @@ export function MeetingCard({
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      data-focus-id={meeting.id}
       data-meeting-id={meeting.id}
       data-column-id={columnId}
       className={cn(

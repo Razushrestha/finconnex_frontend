@@ -1,4 +1,4 @@
-/** SRS §6.4 Deals — default stages + industry pipeline variants */
+/** SRS §6.4 Deals: default stages + industry pipeline variants */
 
 export const DEAL_STAGES = [
   "Prospecting",
