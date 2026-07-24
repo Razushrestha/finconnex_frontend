@@ -46,6 +46,14 @@ import {
   elevatedInputClass,
   elevatedSelectClass,
 } from "@/components/sales/CreateEntityForm";
+import {
+  assertRequired,
+  fieldDiff,
+  logEdit,
+  softDeleteRecord,
+  stripSystemFields,
+} from "@/lib/rules";
+import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 
 export function PortalDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -158,25 +166,46 @@ export function PortalDetailClient({ id }: { id: string }) {
 
   function saveEdits() {
     if (!row) return;
-    if (!name.trim() || !slug.trim() || !contactName.trim() || !contactEmail.trim()) {
-      flash("Name, slug, and primary contact are required");
+    const req = assertRequired(
+      {
+        name,
+        slug,
+        contactName,
+        contactEmail,
+      },
+      ["name", "slug", "contactName", "contactEmail"],
+    );
+    if (!req.ok) {
+      flash(req.message);
       return;
     }
     const client =
       PORTAL_CLIENTS.find((c) => c.id === clientId) ??
       PORTAL_CLIENTS.find((c) => c.id === row.clientId);
     const finalSlug = uniqueSlug(slug, row.id);
-    let next: ClientPortal = {
-      ...row,
+    const patch = stripSystemFields({
       name: name.trim(),
       slug: finalSlug,
       clientId: client?.id ?? row.clientId,
       clientName: client?.name ?? row.clientName,
       primaryContactName: contactName.trim(),
       primaryContactEmail: contactEmail.trim(),
-    };
+    });
+    let next: ClientPortal = { ...row, ...patch };
     next = appendPortalAudit(next, "Edited portal details", row.createdBy);
     next = appendPortalActivity(next, "Portal details updated", row.createdBy);
+    const changes = fieldDiff(
+      row as unknown as Record<string, unknown>,
+      next as unknown as Record<string, unknown>,
+      [
+        "name",
+        "slug",
+        "clientId",
+        "primaryContactName",
+        "primaryContactEmail",
+      ],
+    );
+    logEdit("portals", row.createdBy, row.id, row.portalId, changes);
     save(next, "Changes saved");
     setSlug(finalSlug);
     setDirty(false);
@@ -320,6 +349,19 @@ export function PortalDetailClient({ id }: { id: string }) {
           <button
             type="button"
             onClick={() => {
+              if (!window.confirm(`Delete ${row.portalId}?`)) return;
+              const gate = softDeleteRecord({
+                action: "portals.delete",
+                module: "portals",
+                recordId: row.id,
+                recordLabel: row.portalId,
+                recordType: "Client Portal",
+                snapshot: row,
+              });
+              if (!gate.ok) {
+                flash(gate.message);
+                return;
+              }
               deletePortal(row.id);
               router.push("/portals");
             }}
@@ -629,6 +671,14 @@ export function PortalDetailClient({ id }: { id: string }) {
               </div>
             </div>
           ) : null}
+        </div>
+
+        <div className="mt-3">
+          <RecordAuditHistory
+            module="portals"
+            recordId={row.id}
+            localAudit={row.audit}
+          />
         </div>
       </div>
     </div>

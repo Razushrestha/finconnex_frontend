@@ -67,7 +67,6 @@ export function CreateProductForm({ layoutId: _l, redirect: _r }: Props) {
       return;
     }
     router.push("/finance/products");
-    return created;
   }
 
   return (
@@ -161,7 +160,7 @@ export function CreateProductForm({ layoutId: _l, redirect: _r }: Props) {
           </select>
         </InputShell>
       </Field>
-      <Field label="Description" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Description" className="col-span-full">
         <TextAreaShell>
           <textarea
             className={elevatedTextareaClass}

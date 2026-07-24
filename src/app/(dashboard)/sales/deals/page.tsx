@@ -18,6 +18,8 @@ import {
   EMPTY_DEAL_FILTERS,
   type DealFilters,
 } from "@/components/sales/deals/FilterDealsPanel";
+import { viewEnter } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 
 const PIPELINE_OPTIONS: PipelineOption[] = DEAL_PIPELINES.map((pipeline) => ({
   label: pipeline,
@@ -76,7 +78,7 @@ export default function DealsPage() {
         }}
       />
 
-      <div className="mt-6 flex items-start gap-6">
+      <div className="mt-3 flex items-start gap-4">
         {isFilterOpen && (
           <div className="sticky top-6">
             <FilterDealsPanel
@@ -88,8 +90,10 @@ export default function DealsPage() {
           </div>
         )}
 
-        {/* Dynamic View Display */}
-        <div className="flex-1 overflow-x-auto">
+        <div
+          key={`${viewMode}-${activePipeline}`}
+          className={cn("flex-1 overflow-x-auto", viewEnter)}
+        >
           {viewMode === "kanban" ? (
             <DealsKanbanBoard pipeline={activePipeline} filters={filters} />
           ) : (

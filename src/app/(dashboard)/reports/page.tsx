@@ -5,11 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Home, Plus, Search, Download, FileBarChart } from "lucide-react";
 import {
+  REPORT_SCHEDULES,
   REPORT_STATUS_STYLE,
   REPORT_STATUSES,
   REPORT_TYPES,
+  REPORT_TYPE_STYLE,
   listReports,
   savedReports as seed,
+  type ReportSchedule,
   type ReportStatus,
   type ReportType,
   type SavedReport,
@@ -21,6 +24,9 @@ export default function ReportsPage() {
   const [rows, setRows] = useState<SavedReport[]>(seed);
   const [statusTab, setStatusTab] = useState<ReportStatus | "All">("All");
   const [typeFilter, setTypeFilter] = useState<ReportType | "All">("All");
+  const [scheduleFilter, setScheduleFilter] = useState<ReportSchedule | "All">(
+    "All",
+  );
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 8;
@@ -31,7 +37,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [statusTab, typeFilter, search]);
+  }, [statusTab, typeFilter, scheduleFilter, search]);
 
   const counts = useMemo(() => {
     const map = Object.fromEntries(
@@ -45,6 +51,8 @@ export default function ReportsPage() {
     let data = rows;
     if (statusTab !== "All") data = data.filter((r) => r.status === statusTab);
     if (typeFilter !== "All") data = data.filter((r) => r.type === typeFilter);
+    if (scheduleFilter !== "All")
+      data = data.filter((r) => r.schedule === scheduleFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
       data = data.filter(
@@ -52,11 +60,12 @@ export default function ReportsPage() {
           r.name.toLowerCase().includes(q) ||
           r.reportId.toLowerCase().includes(q) ||
           r.dataSource.toLowerCase().includes(q) ||
-          r.createdBy.toLowerCase().includes(q),
+          r.createdBy.toLowerCase().includes(q) ||
+          r.type.toLowerCase().includes(q),
       );
     }
     return data;
-  }, [rows, statusTab, typeFilter, search]);
+  }, [rows, statusTab, typeFilter, scheduleFilter, search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -189,6 +198,20 @@ export default function ReportsPage() {
               </option>
             ))}
           </select>
+          <select
+            value={scheduleFilter}
+            onChange={(e) =>
+              setScheduleFilter(e.target.value as ReportSchedule | "All")
+            }
+            className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-600 outline-none focus:border-violet-400"
+          >
+            <option value="All">All schedules</option>
+            {REPORT_SCHEDULES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
           <div className="relative ml-auto min-w-[200px] flex-1 sm:max-w-xs">
             <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
             <input
@@ -207,8 +230,10 @@ export default function ReportsPage() {
                 <th className="px-4 py-2.5">Report</th>
                 <th className="px-3 py-2.5">Type</th>
                 <th className="px-3 py-2.5">Source</th>
+                <th className="px-3 py-2.5">Range</th>
                 <th className="px-3 py-2.5">Schedule</th>
                 <th className="px-3 py-2.5">Status</th>
+                <th className="px-3 py-2.5">Created by</th>
                 <th className="px-4 py-2.5">Last run</th>
               </tr>
             </thead>
@@ -223,8 +248,18 @@ export default function ReportsPage() {
                     <div className="font-semibold text-slate-900">{r.reportId}</div>
                     <div className="text-[11px] text-slate-500">{r.name}</div>
                   </td>
-                  <td className="px-3 py-3 text-slate-700">{r.type}</td>
+                  <td className="px-3 py-3">
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[9px] font-semibold",
+                        REPORT_TYPE_STYLE[r.type],
+                      )}
+                    >
+                      {r.type}
+                    </span>
+                  </td>
                   <td className="px-3 py-3 text-slate-600">{r.dataSource}</td>
+                  <td className="px-3 py-3 text-slate-600">{r.dateRange}</td>
                   <td className="px-3 py-3 text-slate-600">{r.schedule}</td>
                   <td className="px-3 py-3">
                     <span
@@ -236,6 +271,7 @@ export default function ReportsPage() {
                       {r.status}
                     </span>
                   </td>
+                  <td className="px-3 py-3 text-slate-600">{r.createdBy}</td>
                   <td className="px-4 py-3 text-slate-600">
                     {r.lastRunAt ?? "—"}
                   </td>
@@ -243,7 +279,7 @@ export default function ReportsPage() {
               ))}
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
+                  <td colSpan={8} className="px-4 py-10 text-center text-slate-400">
                     No reports match
                   </td>
                 </tr>

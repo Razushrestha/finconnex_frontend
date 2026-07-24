@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  bumpFormSubmission,
   getFormBySlug,
+  processFormSubmission,
+  visibleFields,
   type MarketingForm,
 } from "@/lib/marketing/forms/types";
 import { CheckCircle2, ClipboardList } from "lucide-react";
@@ -13,13 +14,19 @@ export function PublicFormClient({ slug }: { slug: string }) {
   const [form, setForm] = useState<MarketingForm | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
-  const [done, setDone] = useState(false);
+  const [thankYou, setThankYou] = useState<string | null>(null);
+  const [recordRef, setRecordRef] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setForm(getFormBySlug(slug) ?? null);
     setHydrated(true);
   }, [slug]);
+
+  const shown = useMemo(
+    () => (form ? visibleFields(form.fieldDefs, values) : []),
+    [form, values],
+  );
 
   if (!hydrated) {
     return (
@@ -52,30 +59,31 @@ export function PublicFormClient({ slug }: { slug: string }) {
     );
   }
 
-  if (done) {
+  if (thankYou) {
     return (
       <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-4 text-center">
         <CheckCircle2 className="mb-3 h-12 w-12 text-emerald-500" />
         <h1 className="text-xl font-bold text-slate-900">Thanks</h1>
-        <p className="mt-1 text-[13px] text-slate-500">
-          Your response to {form.name} was recorded.
-        </p>
+        <p className="mt-1 text-[13px] text-slate-500">{thankYou}</p>
+        {recordRef ? (
+          <p className="mt-2 text-[11px] font-semibold text-violet-700">
+            Routed as {form.destination}: {recordRef}
+          </p>
+        ) : null}
       </div>
     );
   }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    const next: Record<string, string> = {};
-    for (const f of form!.fieldDefs) {
-      if (f.required && !values[f.id]?.trim()) {
-        next[f.id] = "Required";
-      }
+    const out = processFormSubmission(slug, values);
+    if (!out.ok) {
+      setErrors(out.errors);
+      return;
     }
-    setErrors(next);
-    if (Object.keys(next).length) return;
-    bumpFormSubmission(slug);
-    setDone(true);
+    setErrors({});
+    setThankYou(out.result.thankYou);
+    setRecordRef(out.result.submission.createdRecordRef);
   }
 
   return (
@@ -94,7 +102,7 @@ export function PublicFormClient({ slug }: { slug: string }) {
         onSubmit={submit}
         className="space-y-3 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"
       >
-        {form.fieldDefs.map((f) => (
+        {shown.map((f) => (
           <label key={f.id} className="block">
             <span className="mb-1 block text-[11px] font-semibold text-slate-600">
               {f.label}
@@ -167,6 +175,9 @@ export function PublicFormClient({ slug }: { slug: string }) {
             ) : null}
           </label>
         ))}
+        {errors._form ? (
+          <p className="text-[11px] font-medium text-rose-600">{errors._form}</p>
+        ) : null}
         <button
           type="submit"
           className="mt-2 h-10 w-full rounded-xl bg-violet-600 text-[13px] font-semibold text-white shadow-md shadow-violet-600/20 hover:bg-violet-700"

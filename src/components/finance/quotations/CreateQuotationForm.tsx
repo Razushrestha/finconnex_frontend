@@ -195,7 +195,7 @@ export function CreateQuotationForm({ layoutId: _l, redirect: _r }: Props) {
           />
         </InputShell>
       </Field>
-      <Field label="Notes" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Notes" className="col-span-full">
         <TextAreaShell>
           <textarea
             className={elevatedTextareaClass}
@@ -205,7 +205,7 @@ export function CreateQuotationForm({ layoutId: _l, redirect: _r }: Props) {
           />
         </TextAreaShell>
       </Field>
-      <div className="sm:col-span-2 lg:col-span-3">
+      <div className="col-span-full">
         <h3 className="mb-3 text-[12px] font-bold tracking-wide text-slate-700 uppercase">
           Line items
         </h3>

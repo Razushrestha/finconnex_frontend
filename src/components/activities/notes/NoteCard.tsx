@@ -4,6 +4,7 @@ import { Pin, Lock, Link2, Clock } from "lucide-react";
 import type { Note, NoteType } from "@/lib/notes/types";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
+import { cardDragging, cardMotion } from "@/lib/motion";
 
 const TYPE_META: Record<
   NoteType,
@@ -61,9 +62,10 @@ export function NoteCard({
       data-note-id={note.id}
       data-column-id={columnId}
       className={cn(
-        "cursor-grab select-none rounded-xl border border-slate-100 border-l-[3px] bg-white p-3.5 shadow-sm transition-all active:cursor-grabbing",
+        "cursor-grab select-none rounded-xl border border-slate-100 border-l-[3px] bg-white p-3.5 shadow-sm active:cursor-grabbing",
         meta.border,
-        isDragging ? "opacity-40" : "hover:border-slate-200 hover:shadow-md",
+        cardMotion,
+        isDragging && cardDragging,
       )}
     >
       <div className="mb-2 flex items-start justify-between gap-2">

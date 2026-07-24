@@ -3,6 +3,8 @@
 import { Phone, Clock, User } from "lucide-react";
 import type { Call } from "@/lib/calls/types";
 import { initials, avatarColor } from "@/lib/activities/shared";
+import { cn } from "@/lib/utils";
+import { cardDragging, cardMotion } from "@/lib/motion";
 
 interface CallCardProps {
   call: Call;
@@ -26,9 +28,11 @@ export function CallCard({
       onDragEnd={onDragEnd}
       data-call-id={call.id}
       data-column-id={columnId}
-      className={`cursor-grab select-none rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm transition-all active:cursor-grabbing ${
-        isDragging ? "opacity-40" : "hover:shadow-md"
-      }`}
+      className={cn(
+        "cursor-grab select-none rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm active:cursor-grabbing",
+        cardMotion,
+        isDragging && cardDragging,
+      )}
     >
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700">

@@ -23,6 +23,14 @@ import {
   RELATED_RECORD_OPTIONS,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
+import { api } from "@/lib/api";
+import {
+  logCreate,
+  notifyOwnerAssigned,
+  notifyTaskDue,
+  requireAction,
+  requiredFieldErrors,
+} from "@/lib/rules";
 import {
   CreateEntityFormShell,
   Field,
@@ -85,21 +93,68 @@ export function CreateTaskForm({ layoutId, redirect }: CreateTaskFormProps) {
     : RELATED_RECORD_OPTIONS;
 
   function validate() {
-    const next: Partial<Record<keyof FormState, string>> = {};
-    if (!form.title.trim()) next.title = "Task name is required";
-    if (!form.taskType) next.taskType = "Task type is required";
-    if (!form.priority) next.priority = "Priority is required";
-    if (!form.status) next.status = "Status is required";
-    if (!form.dueDate) next.dueDate = "Due date is required";
-    if (!form.assignedTo.trim()) next.assignedTo = "Assigned to is required";
+    const next: Partial<Record<keyof FormState, string>> = {
+      ...requiredFieldErrors(form as unknown as Record<string, unknown>, [
+        "title",
+        "taskType",
+        "priority",
+        "status",
+        "dueDate",
+        "assignedTo",
+      ]),
+    };
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
-  function handleSave(createAnother: boolean) {
+  async function handleSave(createAnother: boolean) {
     setSubmitted(true);
     if (!validate()) return;
-    console.log("Saving task", { layoutId, redirect, ...form });
+    const gate = requireAction("activities.tasks.create");
+    if (!gate.ok) {
+      window.alert(gate.message);
+      return;
+    }
+    const related =
+      form.relatedKind && form.relatedName
+        ? RELATED_RECORD_OPTIONS.find(
+            (r) => r.kind === form.relatedKind && r.name === form.relatedName,
+          )
+        : undefined;
+    const result = await api.tasks.create({
+      title: form.title.trim(),
+      taskType: form.taskType as TaskType,
+      priority: form.priority as Priority,
+      status: form.status as TaskStatus,
+      dueDate: form.dueDate,
+      assignedTo: form.assignedTo,
+      relatedTo: related,
+      description: form.description || undefined,
+      notes: form.notes || undefined,
+      collaborators: form.collaborators
+        ? form.collaborators.split(",").map((s) => s.trim()).filter(Boolean)
+        : undefined,
+      createdBy: form.assignedTo,
+    });
+    if (!result.ok) {
+      window.alert(result.error.message);
+      return;
+    }
+    const task = result.data;
+    logCreate("activities.tasks", form.assignedTo, task.taskId, form.title);
+    notifyOwnerAssigned({
+      owner: form.assignedTo,
+      entityLabel: `Task ${form.title}`,
+      relatedTo: form.title,
+      relatedHref: "/activities/tasks",
+      type: "Task Assigned",
+    });
+    notifyTaskDue({
+      recipient: form.assignedTo,
+      taskTitle: form.title,
+      relatedTo: form.title,
+      relatedHref: "/activities/tasks",
+    });
     if (createAnother) {
       setForm({ ...initialState, assignedTo: form.assignedTo });
       setErrors({});
@@ -127,7 +182,7 @@ export function CreateTaskForm({ layoutId, redirect }: CreateTaskFormProps) {
         label="Task Name"
         required
         error={submitted ? errors.title : undefined}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <InputShell
           icon={CheckSquare}
@@ -291,7 +346,7 @@ export function CreateTaskForm({ layoutId, redirect }: CreateTaskFormProps) {
           />
         </InputShell>
       </Field>
-      <Field label="Description" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Description" className="col-span-full">
         <TextAreaShell>
           <textarea
             className={elevatedTextareaClass}
@@ -301,7 +356,7 @@ export function CreateTaskForm({ layoutId, redirect }: CreateTaskFormProps) {
           />
         </TextAreaShell>
       </Field>
-      <Field label="Notes" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Notes" className="col-span-full">
         <TextAreaShell>
           <textarea
             className={elevatedTextareaClass}

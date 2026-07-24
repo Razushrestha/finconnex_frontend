@@ -1,17 +1,11 @@
 import type { Metadata } from "next";
-import { ComingSoonPage } from "@/components/layout/ComingSoonPage";
+import { CalculatorWorkspaceClient } from "@/components/calculator/CalculatorWorkspaceClient";
 
 export const metadata: Metadata = {
   title: "Calculator — FinConnex",
-  description: "Loan and product calculators.",
+  description: "Built-in calculators for commissions, loans, tax, and more.",
 };
 
 export default function CalculatorPage() {
-  return (
-    <ComingSoonPage
-      title="Calculator"
-      section="§17"
-      description="Loan, serviceability, and product calculators will live here. Navigation is ready; the engine is coming next."
-    />
-  );
+  return <CalculatorWorkspaceClient />;
 }

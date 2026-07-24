@@ -1,5 +1,7 @@
 import { Mail, Clock } from "lucide-react";
 import type { Email } from "@/lib/emails/types";
+import { cn } from "@/lib/utils";
+import { cardDragging, cardMotion } from "@/lib/motion";
 
 function initialsOf(email: string) {
   const name = email.split("@")[0] ?? email;
@@ -46,9 +48,11 @@ export function EmailCard({
       onDragEnd={onDragEnd}
       data-email-id={email.id}
       data-column-id={columnId}
-      className={`cursor-grab select-none rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all active:cursor-grabbing ${
-        isDragging ? "opacity-40" : "hover:shadow-md"
-      }`}
+      className={cn(
+        "cursor-grab select-none rounded-xl border border-slate-100 bg-white p-4 shadow-sm active:cursor-grabbing",
+        cardMotion,
+        isDragging && cardDragging,
+      )}
     >
       <div className="mb-2 flex items-center gap-1.5 text-xs text-slate-400">
         <Mail className="h-3.5 w-3.5" />

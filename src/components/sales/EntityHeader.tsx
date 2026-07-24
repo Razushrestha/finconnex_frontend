@@ -1,231 +1,3 @@
-// "use client";
-
-// import Link from "next/link";
-// import { useRouter } from "next/navigation";
-// import {
-//   Package,
-//   RotateCw,
-//   Home,
-//   Filter,
-//   Search,
-//   List,
-//   LayoutGrid,
-//   Plus,
-//   ChevronDown,
-// } from "lucide-react";
-
-// const DEFAULT_LAYOUT_ID = "standard";
-
-// export interface PipelineOption {
-//   label: string;
-//   value: string;
-// }
-
-// export interface EntityHeaderProps {
-//   entityLabel: string;
-//   entityLabelPlural?: string;
-//   createRoute: string;
-//   breadcrumb?: string[];
-//   totalCount?: number;
-
-//   pipelineOptions?: PipelineOption[];
-//   activePipeline?: string;
-//   onPipelineChange?: (pipeline: string) => void;
-
-//   onToggleFilter?: () => void;
-//   isFilterOpen?: boolean;
-
-//   searchValue?: string;
-//   onSearchChange?: (value: string) => void;
-//   searchPlaceholder?: string;
-
-//   viewMode?: "kanban" | "list";
-//   onViewChange?: (mode: "kanban" | "list") => void;
-
-//   onExport?: () => void;
-//   onRefresh?: () => void;
-// }
-
-// export function EntityHeader({
-//   entityLabel,
-//   entityLabelPlural = `${entityLabel}s`,
-//   createRoute,
-//   breadcrumb = ["Sales", entityLabelPlural],
-//   totalCount,
-//   pipelineOptions,
-//   activePipeline,
-//   onPipelineChange,
-//   onToggleFilter,
-//   isFilterOpen,
-//   searchValue,
-//   onSearchChange,
-//   searchPlaceholder = `Search ${entityLabelPlural}`,
-//   viewMode = "kanban",
-//   onViewChange,
-//   onExport,
-//   onRefresh,
-// }: EntityHeaderProps) {
-//   const router = useRouter();
-//   const title = pipelineOptions
-//     ? `${activePipeline} Pipeline`
-//     : entityLabelPlural;
-
-//   return (
-//     <div className="w-full bg-slate-50/50">
-//       <nav className="flex items-center gap-2 text-sm text-slate-400">
-//         <Link
-//           href="/"
-//           className="flex items-center gap-1.5 hover:text-slate-600 transition-colors"
-//         >
-//           <Home className="h-4 w-4" />
-//           <span>Home</span>
-//         </Link>
-//         {breadcrumb.map((crumb, i) => (
-//           <span key={crumb} className="flex items-center gap-2">
-//             <span>&gt;</span>
-//             <span
-//               className={
-//                 i === breadcrumb.length - 1
-//                   ? "text-slate-600 font-medium"
-//                   : "hover:text-slate-600 transition-colors"
-//               }
-//             >
-//               {crumb}
-//             </span>
-//           </span>
-//         ))}
-//       </nav>
-
-//       <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
-//         <div className="flex items-center gap-3">
-//           <h1 className="text-xl font-bold tracking-tight text-slate-900">
-//             {title}
-//           </h1>
-//           {totalCount !== undefined && (
-//             <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-semibold text-purple-700">
-//               {totalCount}
-//             </span>
-//           )}
-//         </div>
-
-//         {/* Pipeline Selector and Actions */}
-//         <div className="flex items-center gap-3">
-//           {pipelineOptions && (
-//             <div className="flex items-center gap-2">
-//               <span className="text-xs font-medium text-slate-500">
-//                 Pipelines
-//               </span>
-//               <select
-//                 value={activePipeline}
-//                 onChange={(e) => onPipelineChange?.(e.target.value)}
-//                 className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-2xs focus:border-indigo-300 focus:outline-none"
-//               >
-//                 {pipelineOptions.map((opt) => (
-//                   <option key={opt.value} value={opt.value}>
-//                     {opt.label}
-//                   </option>
-//                 ))}
-//               </select>
-//             </div>
-//           )}
-
-//           <div className="flex items-center gap-2">
-//             <button
-//               type="button"
-//               onClick={onExport}
-//               className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-2xs hover:bg-slate-50 transition-colors"
-//             >
-//               <Package className="h-4 w-4 text-slate-500" />
-//               <span>Export</span>
-//             </button>
-//             <button
-//               type="button"
-//               onClick={onRefresh}
-//               aria-label="Refresh"
-//               className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs hover:bg-slate-50 transition-colors"
-//             >
-//               <RotateCw className="h-4 w-4" />
-//             </button>
-//           </div>
-//         </div>
-//       </div>
-
-//       {/* Toolbar with Filters, Search, and View Toggles */}
-//       <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
-//         <div className="flex flex-wrap items-center gap-3">
-//           <button
-//             type="button"
-//             onClick={onToggleFilter}
-//             aria-pressed={isFilterOpen}
-//             className={`flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium shadow-2xs transition-colors ${
-//               isFilterOpen
-//                 ? "border-indigo-300 bg-indigo-50/50 text-indigo-700"
-//                 : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-//             }`}
-//           >
-//             <Filter className="h-4 w-4 text-slate-500" />
-//             <span>Filter</span>
-//             <ChevronDown className="h-4 w-4 text-slate-400" />
-//           </button>
-
-//           <div className="relative">
-//             <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-//             <input
-//               type="text"
-//               value={searchValue}
-//               onChange={(e) => onSearchChange?.(e.target.value)}
-//               placeholder={searchPlaceholder}
-//               className="w-64 rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm text-slate-800 placeholder-slate-400 shadow-2xs focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
-//             />
-//           </div>
-//         </div>
-
-//         <div className="flex items-center gap-3">
-//           <div className="flex items-center rounded-lg border border-slate-200 bg-white p-1 shadow-2xs">
-//             <button
-//               type="button"
-//               aria-label="List view"
-//               onClick={() => onViewChange?.("list")}
-//               className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
-//                 viewMode === "list"
-//                   ? "bg-emerald-600 text-white shadow-2xs"
-//                   : "text-slate-400 hover:text-slate-700"
-//               }`}
-//             >
-//               <List className="h-4 w-4" />
-//             </button>
-//             <button
-//               type="button"
-//               aria-label="Grid view"
-//               onClick={() => onViewChange?.("kanban")}
-//               className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
-//                 viewMode === "kanban"
-//                   ? "bg-emerald-600 text-white shadow-2xs"
-//                   : "text-slate-400 hover:text-slate-700"
-//               }`}
-//             >
-//               <LayoutGrid className="h-4 w-4" />
-//             </button>
-//           </div>
-
-//           <button
-//             type="button"
-//             onClick={() =>
-//               router.push(
-//                 `${createRoute}?layoutid=${DEFAULT_LAYOUT_ID}&redirect=false`,
-//               )
-//             }
-//             className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-purple-700 transition-colors"
-//           >
-//             <Plus className="h-4 w-4" />
-//             <span>Create {entityLabel}</span>
-//           </button>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
 "use client";
 
 import Link from "next/link";
@@ -250,18 +22,17 @@ export interface PipelineOption {
 }
 
 export interface EntityHeaderProps {
-  /** Singular entity name — drives the Create button label ("Create Lead" / "Create Contact" / "Create Deal"). */
+  /** Singular entity name — drives the Create button label. */
   entityLabel: string;
-  /** Plural form for the page title and search placeholder, e.g. "Leads", "Contacts", "Deals". Defaults to `${entityLabel}s`. */
+  /** Plural form for the page title / search placeholder. */
   entityLabelPlural?: string;
-  /** Route the Create button pushes to, e.g. "/sales/leads/create". Matches the ActivityToolbar convention (?layoutid=...&redirect=false). */
+  /** Route the Create button pushes to. */
   createRoute: string;
-  /** Breadcrumb trail after Home, e.g. ["Dashboard", "Leads"]. Defaults to ["Dashboard", entityLabelPlural]. */
+  /** Breadcrumb trail after Home. */
   breadcrumb?: string[];
-  /** Total record count shown as a badge next to the title. Omit to hide the badge. */
+  /** Total record count badge. Omit to hide. */
   totalCount?: number;
 
-  /** Optional pipeline/stage selector (e.g. Leads' Deals/Refinance/Commercial/Insurance). Omit entirely for entities without a pipeline concept. */
   pipelineOptions?: PipelineOption[];
   activePipeline?: string;
   onPipelineChange?: (pipeline: string) => void;
@@ -305,142 +76,124 @@ export function EntityHeader({
     : entityLabelPlural;
 
   return (
-    <div className="w-full bg-slate-50/50">
-      <nav className="flex items-center gap-2 text-sm text-slate-400">
-        <Link
-          href="/"
-          className="flex items-center gap-1.5 hover:text-slate-600 transition-colors"
-        >
-          <Home className="h-4 w-4" />
-          <span>Home</span>
-        </Link>
-        {breadcrumb.map((crumb, i) => (
-          <span key={crumb} className="flex items-center gap-2">
-            <span>&gt;</span>
-            <span
-              className={
-                i === breadcrumb.length - 1
-                  ? "text-slate-600 font-medium"
-                  : "hover:text-slate-600 transition-colors"
-              }
-            >
-              {crumb}
+    <div className="w-full border-b border-slate-200/80 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+      {/* Single compact toolbar */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-1 py-2 sm:gap-x-3">
+        <nav className="hidden items-center gap-1 text-[11px] text-slate-400 md:flex">
+          <Link
+            href="/"
+            className="flex items-center gap-0.5 hover:text-slate-600"
+            aria-label="Home"
+          >
+            <Home className="h-3.5 w-3.5" />
+          </Link>
+          {breadcrumb.map((crumb) => (
+            <span key={crumb} className="flex items-center gap-1">
+              <span>/</span>
+              <span className="text-slate-500">{crumb}</span>
             </span>
-          </span>
-        ))}
-      </nav>
+          ))}
+        </nav>
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">
+        <div className="hidden h-4 w-px bg-slate-200 md:block dark:bg-zinc-700" />
+
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">
             {title}
           </h1>
           {totalCount !== undefined && (
-            <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-semibold text-purple-700">
+            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
               {totalCount}
             </span>
           )}
         </div>
 
-        {/* Pipeline Selector and Actions */}
-        <div className="flex items-center gap-3">
-          {pipelineOptions && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-slate-500">
-                Pipelines
-              </span>
-              <select
-                value={activePipeline}
-                onChange={(e) => onPipelineChange?.(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-2xs focus:border-indigo-300 focus:outline-none"
-              >
-                {pipelineOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+        {pipelineOptions ? (
+          <select
+            value={activePipeline}
+            onChange={(e) => onPipelineChange?.(e.target.value)}
+            aria-label="Pipeline"
+            className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[12px] font-medium text-slate-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-slate-200"
+          >
+            {pipelineOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        ) : null}
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onExport}
-              className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-2xs hover:bg-slate-50 transition-colors"
-            >
-              <Package className="h-4 w-4 text-slate-500" />
-              <span>Export</span>
-            </button>
-            <button
-              type="button"
-              onClick={onRefresh}
-              aria-label="Refresh"
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs hover:bg-slate-50 transition-colors"
-            >
-              <RotateCw className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Toolbar with Filters, Search, and View Toggles */}
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
           <button
             type="button"
             onClick={onToggleFilter}
             aria-pressed={isFilterOpen}
-            className={`flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium shadow-2xs transition-colors ${
+            className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium transition-colors ${
               isFilterOpen
-                ? "border-indigo-300 bg-indigo-50/50 text-indigo-700"
-                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                ? "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-300"
+                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-slate-300"
             }`}
           >
-            <Filter className="h-4 w-4 text-slate-500" />
-            <span>Filter</span>
-            <ChevronDown className="h-4 w-4 text-slate-400" />
+            <Filter className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Filter</span>
+            <ChevronDown className="hidden h-3.5 w-3.5 text-slate-400 sm:block" />
           </button>
 
-          <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <div className="relative hidden sm:block">
+            <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              value={searchValue}
+              value={searchValue ?? ""}
               onChange={(e) => onSearchChange?.(e.target.value)}
               placeholder={searchPlaceholder}
-              className="w-64 rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm text-slate-800 placeholder-slate-400 shadow-2xs focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+              className="h-8 w-44 rounded-md border border-slate-200 bg-white pr-2.5 pl-8 text-[12px] text-slate-800 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none lg:w-56 dark:border-zinc-700 dark:bg-zinc-900 dark:text-slate-100"
             />
           </div>
-        </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center rounded-lg border border-slate-200 bg-white p-1 shadow-2xs">
+          <div className="flex h-8 items-center rounded-md border border-slate-200 bg-white p-0.5 dark:border-zinc-700 dark:bg-zinc-900">
             <button
               type="button"
               aria-label="List view"
               onClick={() => onViewChange?.("list")}
-              className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+              className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${
                 viewMode === "list"
-                  ? "bg-emerald-600 text-white shadow-2xs"
+                  ? "bg-violet-600 text-white"
                   : "text-slate-400 hover:text-slate-700"
               }`}
             >
-              <List className="h-4 w-4" />
+              <List className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
-              aria-label="Grid view"
+              aria-label="Kanban view"
               onClick={() => onViewChange?.("kanban")}
-              className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+              className={`flex h-7 w-7 items-center justify-center rounded transition-colors ${
                 viewMode === "kanban"
-                  ? "bg-emerald-600 text-white shadow-2xs"
+                  ? "bg-violet-600 text-white"
                   : "text-slate-400 hover:text-slate-700"
               }`}
             >
-              <LayoutGrid className="h-4 w-4" />
+              <LayoutGrid className="h-3.5 w-3.5" />
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={onExport}
+            className="hidden h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[12px] font-medium text-slate-600 hover:bg-slate-50 sm:inline-flex dark:border-zinc-700 dark:bg-zinc-900 dark:text-slate-300"
+          >
+            <Package className="h-3.5 w-3.5" />
+            Export
+          </button>
+
+          <button
+            type="button"
+            onClick={onRefresh}
+            aria-label="Refresh"
+            className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900"
+          >
+            <RotateCw className="h-3.5 w-3.5" />
+          </button>
 
           <button
             type="button"
@@ -449,10 +202,11 @@ export function EntityHeader({
                 `${createRoute}?layoutid=${DEFAULT_LAYOUT_ID}&redirect=false`,
               )
             }
-            className="flex items-center gap-2 rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-purple-700 transition-colors"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-violet-600 px-3 text-[12px] font-semibold text-white hover:bg-violet-700"
           >
-            <Plus className="h-4 w-4" />
-            <span>Create {entityLabel}</span>
+            <Plus className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Create {entityLabel}</span>
+            <span className="sm:hidden">Create</span>
           </button>
         </div>
       </div>

@@ -26,6 +26,12 @@ import {
   type SmsCampaign,
   type SmsCampaignStatus,
 } from "@/lib/marketing/sms/types";
+import {
+  assertCampaignStatusChange,
+  logStatusChange,
+  softDeleteRecord,
+} from "@/lib/rules";
+import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
 
@@ -76,6 +82,12 @@ export function SmsCampaignDetailClient({ id }: { id: string }) {
 
   function setStatus(status: SmsCampaignStatus, actionLabel: string) {
     if (!campaign) return;
+    const gate = assertCampaignStatusChange(campaign.status, status);
+    if (!gate.ok) {
+      flash(gate.message);
+      return;
+    }
+    const from = campaign.status;
     let next = appendAudit({ ...campaign, status }, actionLabel);
     if (status === "Running" && campaign.sentCount === 0) {
       const n = campaign.audience.includes("Deal") ? 8 : 40;
@@ -88,6 +100,14 @@ export function SmsCampaignDetailClient({ id }: { id: string }) {
       };
     }
     save(next, actionLabel);
+    logStatusChange(
+      "marketing.sms",
+      campaign.createdBy,
+      campaign.id,
+      campaign.campaignId,
+      from,
+      status,
+    );
   }
 
   function schedule() {
@@ -349,6 +369,18 @@ export function SmsCampaignDetailClient({ id }: { id: string }) {
                 <ActionBtn
                   onClick={() => {
                     if (!window.confirm("Delete campaign?")) return;
+                    const gate = softDeleteRecord({
+                      action: "marketing.sms.delete",
+                      module: "marketing.sms",
+                      recordId: campaign.id,
+                      recordLabel: campaign.campaignId,
+                      recordType: "SMS Campaign",
+                      snapshot: campaign,
+                    });
+                    if (!gate.ok) {
+                      window.alert(gate.message);
+                      return;
+                    }
                     deleteSmsCampaign(campaign.id);
                     router.push("/marketing/sms");
                   }}
@@ -376,6 +408,13 @@ export function SmsCampaignDetailClient({ id }: { id: string }) {
                   </li>
                 ))}
               </ol>
+              <div className="mt-4">
+                <RecordAuditHistory
+                  module="marketing.sms"
+                  recordId={campaign.id}
+                  localAudit={campaign.audit}
+                />
+              </div>
             </aside>
           </div>
         </div>

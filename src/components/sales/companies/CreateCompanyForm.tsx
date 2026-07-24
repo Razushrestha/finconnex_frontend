@@ -118,7 +118,7 @@ export function CreateCompanyForm({
         label="Company Name"
         required
         error={submitted ? errors.companyName : undefined}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <InputShell
           icon={Building2}
@@ -182,7 +182,7 @@ export function CreateCompanyForm({
           />
         </InputShell>
       </Field>
-      <Field label="Address" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Address" className="col-span-full">
         <InputShell icon={MapPin}>
           <input
             className={elevatedInputClass(true)}
@@ -262,7 +262,7 @@ export function CreateCompanyForm({
           </select>
         </InputShell>
       </Field>
-      <Field label="Notes" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Notes" className="col-span-full">
         <TextAreaShell>
           <textarea
             className={elevatedTextareaClass}

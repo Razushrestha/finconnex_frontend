@@ -24,6 +24,12 @@ import {
   type WhatsAppCampaign,
   type WhatsAppCampaignStatus,
 } from "@/lib/marketing/whatsapp/types";
+import {
+  assertCampaignStatusChange,
+  logStatusChange,
+  softDeleteRecord,
+} from "@/lib/rules";
+import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
 
@@ -119,7 +125,21 @@ export function WhatsAppCampaignDetailClient({ id }: { id: string }) {
 
   function setStatus(status: WhatsAppCampaignStatus, action: string) {
     if (!campaign) return;
+    const gate = assertCampaignStatusChange(campaign.status, status);
+    if (!gate.ok) {
+      flash(gate.message);
+      return;
+    }
+    const from = campaign.status;
     save(appendAudit({ ...campaign, status }, action), action);
+    logStatusChange(
+      "marketing.whatsapp",
+      campaign.createdBy,
+      campaign.id,
+      campaign.campaignId,
+      from,
+      status,
+    );
   }
 
   function schedule() {
@@ -365,6 +385,18 @@ export function WhatsAppCampaignDetailClient({ id }: { id: string }) {
                 <ActionBtn
                   onClick={() => {
                     if (!window.confirm("Delete campaign?")) return;
+                    const gate = softDeleteRecord({
+                      action: "marketing.whatsapp.delete",
+                      module: "marketing.whatsapp",
+                      recordId: campaign.id,
+                      recordLabel: campaign.campaignId,
+                      recordType: "WhatsApp Campaign",
+                      snapshot: campaign,
+                    });
+                    if (!gate.ok) {
+                      window.alert(gate.message);
+                      return;
+                    }
                     deleteWhatsAppCampaign(campaign.id);
                     router.push("/marketing/whatsapp");
                   }}
@@ -392,6 +424,13 @@ export function WhatsAppCampaignDetailClient({ id }: { id: string }) {
                   </li>
                 ))}
               </ol>
+              <div className="mt-4">
+                <RecordAuditHistory
+                  module="marketing.whatsapp"
+                  recordId={campaign.id}
+                  localAudit={campaign.audit}
+                />
+              </div>
             </aside>
           </div>
         </div>

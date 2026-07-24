@@ -27,10 +27,14 @@ import {
   nextQuotationIds,
   upsertQuotation,
 } from "@/lib/finance/quotations/types";
+import { ensureJourneyForQuote } from "@/lib/finance/journey/types";
 import { formatAUD } from "@/lib/finance/shared";
 import { ESTIMATE_STATUS_STYLE } from "@/lib/finance/statusStyles";
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
+import { CommercialTrail } from "@/components/finance/CommercialTrail";
 import { cn } from "@/lib/utils";
+import { softDeleteRecord } from "@/lib/rules";
+import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 
 export function EstimateDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -100,6 +104,16 @@ export function EstimateDetailClient({ id }: { id: string }) {
         row.owner,
       ),
     );
+    ensureJourneyForQuote({
+      quotationId: quo.id,
+      clientId: quo.clientId,
+      clientName: quo.clientName,
+      contactName: quo.contactName,
+      contactEmail: quo.contactEmail,
+      dealName: quo.dealName,
+      estimateId: row.id,
+      status: "Quoted",
+    });
     save(
       appendEstimateAudit(
         { ...row, status: "Converted", quotationId: quo.id },
@@ -146,6 +160,10 @@ export function EstimateDetailClient({ id }: { id: string }) {
               <Link href="/" className="flex items-center gap-0.5 hover:text-slate-600">
                 <Home className="h-3 w-3" />
                 Home
+              </Link>
+              <span>/</span>
+              <Link href="/finance" className="hover:text-slate-600">
+                Sales Ops
               </Link>
               <span>/</span>
               <Link href="/finance/estimates" className="hover:text-slate-600">
@@ -219,6 +237,19 @@ export function EstimateDetailClient({ id }: { id: string }) {
               <button
                 type="button"
                 onClick={() => {
+                  if (!window.confirm(`Delete ${row.estimateId}?`)) return;
+                  const gate = softDeleteRecord({
+                    action: "finance.estimates.delete",
+                    module: "finance.estimates",
+                    recordId: row.id,
+                    recordLabel: row.estimateId,
+                    recordType: "Estimate",
+                    snapshot: row,
+                  });
+                  if (!gate.ok) {
+                    window.alert(gate.message);
+                    return;
+                  }
                   deleteEstimate(row.id);
                   router.push("/finance/estimates");
                 }}
@@ -230,6 +261,20 @@ export function EstimateDetailClient({ id }: { id: string }) {
             ) : null}
           </div>
         </div>
+
+        <CommercialTrail
+          links={[
+            { label: row.estimateId, current: true },
+            ...(row.quotationId
+              ? [
+                  {
+                    label: "Quotation",
+                    href: `/finance/quotations/${row.quotationId}`,
+                  },
+                ]
+              : []),
+          ]}
+        />
 
         <div className="overflow-hidden rounded-2xl border border-slate-100/80 bg-white shadow-sm">
           <div className="border-b border-slate-100 px-5 py-4">
@@ -263,18 +308,11 @@ export function EstimateDetailClient({ id }: { id: string }) {
           </div>
 
           <div className="border-t border-slate-100 px-5 py-4">
-            <h3 className="mb-2 text-[11px] font-bold tracking-wide text-slate-500 uppercase">
-              Audit
-            </h3>
-            <ul className="space-y-1.5">
-              {row.audit.map((a) => (
-                <li key={a.id} className="text-[11px] text-slate-500">
-                  <span className="font-medium text-slate-700">{a.action}</span>
-                  {" · "}
-                  {a.actor} · {a.at}
-                </li>
-              ))}
-            </ul>
+            <RecordAuditHistory
+              module="finance.estimates"
+              recordId={row.id}
+              localAudit={row.audit}
+            />
           </div>
         </div>
       </div>

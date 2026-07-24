@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import type { TaskColumn } from "@/lib/tasks/types";
 import { TaskCard } from "./TaskCard";
+import { cn } from "@/lib/utils";
+import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 
 interface KanbanColumnProps {
   column: TaskColumn;
@@ -38,9 +40,11 @@ export function KanbanColumn({
         setIsOver(false);
         onDropTask(column.id);
       }}
-      className={`flex h-full w-72 shrink-0 flex-col rounded-2xl p-3 transition-colors ${
-        isOver ? "bg-indigo-50 ring-2 ring-indigo-300" : "bg-slate-100/70"
-      }`}
+      className={cn(
+        "flex h-full w-72 shrink-0 flex-col rounded-2xl border border-transparent p-3",
+        dropTargetIdle,
+        isOver ? dropTargetActive : "bg-slate-100/70",
+      )}
     >
       {/* Header — stays fixed while the task list scrolls */}
       <div className="mb-3 shrink-0">

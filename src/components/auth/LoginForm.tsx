@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { logAuth } from "@/lib/rules";
 
 function getSafeDashboardUrl(callbackUrl: string | null): string {
   if (
@@ -56,6 +57,9 @@ export function LoginForm() {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
+        logAuth("login_failed", username.trim() || "unknown", {
+          reason: (data as { error?: string }).error ?? "invalid",
+        });
         setError(
           (data as { error?: string }).error ??
             "Unable to sign in. Please try again.",
@@ -64,6 +68,7 @@ export function LoginForm() {
         return;
       }
 
+      logAuth("login", username.trim());
       // Full page load so the session cookie is picked up by proxy + layouts
       window.location.href = destination;
     } catch {

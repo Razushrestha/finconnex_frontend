@@ -10,6 +10,8 @@ import {
   type ContactFilters,
 } from "@/components/sales/contacts/FilterContactsPanel";
 import { CONTACT_GROUPS } from "@/lib/contacts/types";
+import { viewEnter } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 
 export default function ContactsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -33,7 +35,7 @@ export default function ContactsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 p-2 pr-4">
+    <div className="min-h-screen bg-slate-50 p-2 pr-3 dark:bg-zinc-950">
       <EntityHeader
         entityLabel="Contact"
         createRoute="/sales/contacts/create"
@@ -44,7 +46,7 @@ export default function ContactsPage() {
         onToggleFilter={() => setIsFilterOpen((v) => !v)}
       />
 
-      <div className="mt-6 flex items-start gap-6">
+      <div className="mt-3 flex items-start gap-4">
         {isFilterOpen && (
           <div className="sticky top-6">
             <FilterContactsPanel
@@ -55,7 +57,10 @@ export default function ContactsPage() {
           </div>
         )}
 
-        <div className="flex-1 overflow-x-auto">
+        <div
+          key={viewMode}
+          className={cn("flex-1 overflow-x-auto", viewEnter)}
+        >
           {viewMode === "kanban" ? (
             <ContactsKanbanBoard filters={filters} />
           ) : (

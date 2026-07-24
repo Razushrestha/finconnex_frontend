@@ -113,7 +113,7 @@ export function CreateWhatsAppCampaignForm({
         label="Name"
         required
         error={errors.name}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <InputShell icon={MessageCircle} error={!!errors.name}>
           <input
@@ -207,7 +207,7 @@ export function CreateWhatsAppCampaignForm({
         </InputShell>
       </Field>
 
-      <div className="sm:col-span-2 lg:col-span-3">
+      <div className="col-span-full">
         <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
           <p className="text-[10px] font-semibold tracking-wide text-emerald-700 uppercase">
             Template preview · {template.approvalStatus}

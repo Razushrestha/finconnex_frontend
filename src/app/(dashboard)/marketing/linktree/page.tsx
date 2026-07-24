@@ -37,6 +37,7 @@ export default function LinktreeListPage() {
       data = data.filter(
         (r) =>
           r.title.toLowerCase().includes(q) ||
+          (r.displayName ?? "").toLowerCase().includes(q) ||
           r.pageId.toLowerCase().includes(q) ||
           r.slug.toLowerCase().includes(q) ||
           r.owner.toLowerCase().includes(q),
@@ -67,11 +68,11 @@ export default function LinktreeListPage() {
               <span>/</span>
             </nav>
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
-              Linktree
+              Broker pages
             </h1>
             <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
               <Link2 className="h-2.5 w-2.5" />
-              Broker pages
+              §22
             </span>
           </div>
           <button
@@ -138,8 +139,14 @@ export default function LinktreeListPage() {
                     onClick={() => router.push(`/marketing/linktree/${p.id}`)}
                   >
                     <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-900">{p.title}</p>
-                      <p className="text-[11px] text-slate-400">{p.pageId}</p>
+                      <p className="font-semibold text-slate-900">
+                        {p.displayName || p.title}
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        {p.pageId}
+                        {p.role ? ` · ${p.role}` : ""}
+                        {p.bookingSlug ? " · booking" : ""}
+                      </p>
                     </td>
                     <td className="px-4 py-3">
                       <Link

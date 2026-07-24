@@ -19,6 +19,13 @@ import {
   type LeadSource,
   type LeadStatus,
 } from "@/lib/leads/types";
+import { api } from "@/lib/api";
+import {
+  logCreate,
+  notifyOwnerAssigned,
+  requireAction,
+  requiredFieldErrors,
+} from "@/lib/rules";
 import {
   CreateEntityFormShell,
   Field,
@@ -88,23 +95,60 @@ export function CreateLeadForm({ layoutId, redirect }: CreateLeadFormProps) {
   }
 
   function validate() {
-    const next: Partial<Record<keyof LeadFormState, string>> = {};
-    if (!form.firstName.trim()) next.firstName = "First name is required";
-    if (!form.lastName.trim()) next.lastName = "Last name is required";
-    if (!form.email.trim()) next.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      next.email = "Enter a valid email";
+    const next: Partial<Record<keyof LeadFormState, string>> = {
+      ...requiredFieldErrors(form as unknown as Record<string, unknown>, [
+        "firstName",
+        "lastName",
+        "email",
+        "status",
+        "owner",
+      ]),
+    };
+    if (form.email.trim() && !next.email) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+        next.email = "Enter a valid email";
+      }
     }
-    if (!form.status) next.status = "Status is required";
-    if (!form.owner.trim()) next.owner = "Owner is required";
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
-  function handleSave(createAnother: boolean) {
+  async function handleSave(createAnother: boolean) {
     setSubmitted(true);
     if (!validate()) return;
-    console.log("Saving lead", { layoutId, redirect, ...form });
+    const gate = requireAction("sales.leads.create");
+    if (!gate.ok) {
+      window.alert(gate.message);
+      return;
+    }
+    const result = await api.leads.create({
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
+      email: form.email.trim(),
+      phone: form.phone,
+      company: form.company,
+      source: form.leadSource || "Website",
+      status: form.status || "New",
+      owner: form.owner,
+      estimatedValue: form.estimatedValue || undefined,
+    });
+    if (!result.ok) {
+      if (result.error.fields?.email) {
+        setErrors((prev) => ({ ...prev, email: result.error.fields!.email }));
+      }
+      window.alert(result.error.message);
+      return;
+    }
+    const card = result.data;
+    const label = card.name;
+    logCreate("sales.leads", form.owner, card.id, label);
+    notifyOwnerAssigned({
+      owner: form.owner,
+      entityLabel: `Lead ${label}`,
+      relatedTo: label,
+      relatedHref: "/sales/leads",
+      type: "Lead Assigned",
+    });
     if (createAnother) {
       setForm({ ...initialState, owner: form.owner, status: "New" });
       setErrors({});
@@ -181,6 +225,16 @@ export function CreateLeadForm({ layoutId, redirect }: CreateLeadFormProps) {
           />
         </InputShell>
       </Field>
+      <Field label="Job Title">
+        <InputShell icon={Briefcase}>
+          <input
+            className={elevatedInputClass(true)}
+            value={form.jobTitle}
+            onChange={(e) => update("jobTitle", e.target.value)}
+            placeholder="e.g. CFO"
+          />
+        </InputShell>
+      </Field>
       <Field label="Company">
         <InputShell icon={Building2}>
           <input
@@ -218,16 +272,6 @@ export function CreateLeadForm({ layoutId, redirect }: CreateLeadFormProps) {
             value={form.companySize}
             onChange={(e) => update("companySize", e.target.value)}
             placeholder="e.g. 11–50"
-          />
-        </InputShell>
-      </Field>
-      <Field label="Job Title">
-        <InputShell icon={Briefcase}>
-          <input
-            className={elevatedInputClass(true)}
-            value={form.jobTitle}
-            onChange={(e) => update("jobTitle", e.target.value)}
-            placeholder="e.g. CFO"
           />
         </InputShell>
       </Field>
@@ -317,7 +361,7 @@ export function CreateLeadForm({ layoutId, redirect }: CreateLeadFormProps) {
           />
         </InputShell>
       </Field>
-      <Field label="Notes" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Notes" className="col-span-full">
         <TextAreaShell>
           <textarea
             className={elevatedTextareaClass}

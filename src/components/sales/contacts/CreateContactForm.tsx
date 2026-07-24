@@ -18,6 +18,13 @@ import {
   type ContactStatus,
 } from "@/lib/contacts/types";
 import { COMPANY_NAMES } from "@/lib/companies/types";
+import { api } from "@/lib/api";
+import {
+  logCreate,
+  notifyOwnerAssigned,
+  requireAction,
+  requiredFieldErrors,
+} from "@/lib/rules";
 import {
   CreateEntityFormShell,
   Field,
@@ -71,23 +78,60 @@ export function CreateContactForm({
   }
 
   function validate() {
-    const next: Partial<Record<keyof FormState, string>> = {};
-    if (!form.firstName.trim()) next.firstName = "First name is required";
-    if (!form.lastName.trim()) next.lastName = "Last name is required";
-    if (!form.email.trim()) next.email = "Email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      next.email = "Enter a valid email";
+    const next: Partial<Record<keyof FormState, string>> = {
+      ...requiredFieldErrors(form as unknown as Record<string, unknown>, [
+        "firstName",
+        "lastName",
+        "email",
+        "status",
+        "owner",
+      ]),
+    };
+    if (form.email.trim() && !next.email) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+        next.email = "Enter a valid email";
+      }
     }
-    if (!form.status) next.status = "Status is required";
-    if (!form.owner.trim()) next.owner = "Owner is required";
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
-  function handleSave(createAnother: boolean) {
+  async function handleSave(createAnother: boolean) {
     setSubmitted(true);
     if (!validate()) return;
-    console.log("Saving contact", { layoutId, redirect, ...form });
+    const gate = requireAction("sales.contacts.create");
+    if (!gate.ok) {
+      window.alert(gate.message);
+      return;
+    }
+    const result = await api.contacts.create({
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
+      email: form.email.trim(),
+      phone: form.phone,
+      mobile: form.mobile,
+      company: form.company,
+      source: form.leadSource || "Website",
+      status: form.status || "Active",
+      owner: form.owner,
+    });
+    if (!result.ok) {
+      if (result.error.fields?.email) {
+        setErrors((prev) => ({ ...prev, email: result.error.fields!.email }));
+      }
+      window.alert(result.error.message);
+      return;
+    }
+    const contact = result.data;
+    const label = contact.name;
+    logCreate("sales.contacts", form.owner, contact.id, label);
+    notifyOwnerAssigned({
+      owner: form.owner,
+      entityLabel: `Contact ${label}`,
+      relatedTo: label,
+      relatedHref: "/sales/contacts",
+      type: "Lead Assigned",
+    });
     if (createAnother) {
       setForm({ ...initialState, owner: form.owner, status: "Active" });
       setErrors({});

@@ -26,6 +26,13 @@ import {
   type TicketStatus,
 } from "@/lib/support/types";
 import {
+  getRulesActor,
+  logCreate,
+  notifyOwnerAssigned,
+  requireAction,
+  requiredFieldErrors,
+} from "@/lib/rules";
+import {
   CreateEntityFormShell,
   Field,
   InputShell,
@@ -54,20 +61,24 @@ export function CreateTicketForm({ layoutId: _l, redirect: _r }: Props) {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   function validate() {
-    const next: Record<string, string> = {};
-    if (!subject.trim()) next.subject = "Subject is required";
-    if (!requester.trim()) next.requester = "Requester is required";
-    if (!priority) next.priority = "Priority is required";
-    if (!status) next.status = "Status is required";
-    if (!description.trim()) next.description = "Description is required";
+    const next = requiredFieldErrors(
+      { subject, requester, priority, status, description },
+      ["subject", "requester", "priority", "status", "description"],
+    );
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
   function onSave(createAnother: boolean) {
     if (!validate()) return;
+    const gate = requireAction("support.tickets.create");
+    if (!gate.ok) {
+      window.alert(gate.message);
+      return;
+    }
     const ids = nextTicketIds();
     const now = formatTicketDate();
+    const actor = getRulesActor().name || createdBy;
     let ticket = appendTicketAudit(
       {
         id: ids.id,
@@ -80,30 +91,37 @@ export function CreateTicketForm({ layoutId: _l, redirect: _r }: Props) {
         category: category || undefined,
         assignedTo: assignedTo || undefined,
         description: description.trim(),
-        createdBy,
+        createdBy: actor,
         createdAt: now,
         modifiedAt: now,
         notes: [],
         audit: [],
       },
       "Created",
-      createdBy,
+      actor,
     );
     if (assignedTo) {
       ticket = appendTicketAudit(
         ticket,
         `Assigned to ${assignedTo}`,
-        createdBy,
+        actor,
       );
       if (status === "New") {
         ticket = appendTicketAudit(
           { ...ticket, status: "Open" },
           "Status → Open",
-          createdBy,
+          actor,
         );
       }
+      notifyOwnerAssigned({
+        owner: assignedTo,
+        entityLabel: `Ticket ${ticket.ticketId}`,
+        relatedTo: ticket.ticketId,
+        relatedHref: `/support/${ticket.id}`,
+      });
     }
     const created = upsertTicket(ticket);
+    logCreate("support.tickets", actor, created.id, created.ticketId);
     if (createAnother) {
       setSubject("");
       setDescription("");
@@ -261,7 +279,7 @@ export function CreateTicketForm({ layoutId: _l, redirect: _r }: Props) {
         label="Description"
         required
         error={errors.description}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <TextAreaShell error={!!errors.description}>
           <textarea

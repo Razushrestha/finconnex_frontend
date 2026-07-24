@@ -121,7 +121,7 @@ export function CreateCallForm({ layoutId, redirect }: CreateCallFormProps) {
         label="Subject"
         required
         error={submitted ? errors.subject : undefined}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <InputShell icon={Phone} error={!!(submitted && errors.subject)}>
           <input
@@ -262,7 +262,7 @@ export function CreateCallForm({ layoutId, redirect }: CreateCallFormProps) {
         </InputShell>
       </Field>
 
-      <Field label="Notes" className="sm:col-span-2 lg:col-span-3">
+      <Field label="Notes" className="col-span-full">
         <TextAreaShell>
           <textarea
             className={elevatedTextareaClass}

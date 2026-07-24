@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EntityHeader } from "@/components/sales/EntityHeader";
 import { LeadKanbanBoard } from "@/components/sales/leads/LeadKanbanBoard";
 import { LeadListView } from "@/components/sales/leads/LeadListView";
@@ -9,12 +9,26 @@ import {
   EMPTY_LEAD_FILTERS,
   type LeadFilters,
 } from "@/components/sales/leads/FilterLeadsPanel";
-import { LEAD_COLUMNS } from "@/lib/leads/types";
+import { listLeadColumns } from "@/lib/leads/store";
+import { onRulesChange } from "@/lib/rules";
+import { viewEnter } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 
 export default function LeadsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [filters, setFilters] = useState<LeadFilters>(EMPTY_LEAD_FILTERS);
+  const [totalLeads, setTotalLeads] = useState(0);
+
+  useEffect(() => {
+    function refresh() {
+      setTotalLeads(
+        listLeadColumns().reduce((sum, column) => sum + column.cards.length, 0),
+      );
+    }
+    refresh();
+    return onRulesChange(() => refresh());
+  }, [viewMode]);
 
   function toggleFilterField(section: "source" | "status", field: string) {
     setFilters((prev) => {
@@ -26,11 +40,6 @@ export default function LeadsPage() {
       return { ...prev, [key]: next };
     });
   }
-
-  const totalLeads = LEAD_COLUMNS.reduce(
-    (sum, column) => sum + column.cards.length,
-    0,
-  );
 
   return (
     <div className="min-h-screen bg-slate-50 p-2 pr-4">
@@ -44,7 +53,7 @@ export default function LeadsPage() {
         onToggleFilter={() => setIsFilterOpen((v) => !v)}
       />
 
-      <div className="mt-6 flex items-start gap-6">
+      <div className="mt-3 flex items-start gap-4">
         {isFilterOpen && (
           <div className="sticky top-6">
             <FilterLeadsPanel
@@ -55,8 +64,10 @@ export default function LeadsPage() {
           </div>
         )}
 
-        {/* Dynamic View Display */}
-        <div className="flex-1 overflow-x-auto">
+        <div
+          key={viewMode}
+          className={cn("flex-1 overflow-x-auto", viewEnter)}
+        >
           {viewMode === "kanban" ? (
             <LeadKanbanBoard filters={filters} />
           ) : (

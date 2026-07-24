@@ -111,7 +111,7 @@ export function CreateReminderForm({
         label="Title"
         required
         error={submitted ? errors.title : undefined}
-        className="sm:col-span-2 lg:col-span-3"
+        className="col-span-full"
       >
         <InputShell icon={Bell} error={!!(submitted && errors.title)}>
           <input
