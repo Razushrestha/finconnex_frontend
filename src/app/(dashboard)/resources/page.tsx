@@ -3,13 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Home,
-  Plus,
-  Search,
-  Download,
-  LibraryBig,
-} from "lucide-react";
+import { Home, Plus, Search, Download, LibraryBig } from "lucide-react";
 import {
   RESOURCE_ACCESS_LEVELS,
   RESOURCE_ACCESS_STYLE,
@@ -30,9 +24,9 @@ export default function ResourcesPage() {
   const router = useRouter();
   const [rows, setRows] = useState<ResourceItem[]>(seed);
   const [typeFilter, setTypeFilter] = useState<ResourceType | "All">("All");
-  const [categoryFilter, setCategoryFilter] = useState<ResourceCategory | "All">(
-    "All",
-  );
+  const [categoryFilter, setCategoryFilter] = useState<
+    ResourceCategory | "All"
+  >("All");
   const [accessFilter, setAccessFilter] = useState<ResourceAccess | "All">(
     "All",
   );
@@ -87,7 +81,7 @@ export default function ResourcesPage() {
   }, [rows]);
 
   return (
-    <div className="relative min-h-full overflow-hidden bg-slate-50">
+    <div className="relative min-h-screen overflow-hidden bg-slate-50">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.10),_transparent_65%)]"
@@ -125,7 +119,9 @@ export default function ResourcesPage() {
             <button
               type="button"
               onClick={() =>
-                router.push("/resources/create?layoutid=standard&redirect=false")
+                router.push(
+                  "/resources/create?layoutid=standard&redirect=false",
+                )
               }
               className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-md shadow-violet-600/20 hover:bg-violet-700"
             >

@@ -81,7 +81,7 @@ const meetings = [
     title: "Sprint Planning",
     tag: "Design",
     time: "06:00 - 07:00",
-    faded: true,
+    faded: false,
   },
 ];
 
@@ -112,8 +112,8 @@ export function UpcomingMeetingsCard() {
         </div>
       </div>
 
-      <div className="relative -mx-5 max-h-[300px] overflow-hidden px-5">
-        <div className="flex flex-col gap-3">
+      <div className="relative -mx-5 px-5">
+        <div className="flex max-h-[300px] flex-col gap-3 overflow-y-auto pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {meetings.map((m) => (
             <div
               key={m.title}
