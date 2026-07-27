@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { Plus, MoreVertical } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trophy, XCircle } from "lucide-react";
 import { type KanbanColumn } from "@/lib/leads/types";
 import { listLeadColumns, saveLeadColumns } from "@/lib/leads/store";
 import {
@@ -36,22 +35,49 @@ interface DragInfo {
   sourceColumnId: string;
 }
 
-interface LeadKanbanBoardProps {
-  filters?: LeadFilters;
+type LeadCardRecord = KanbanColumn["cards"][number];
+
+/** A "mark as lost" drop that's waiting on a reason before it's committed. */
+interface PendingLostDrop {
+  card: LeadCardRecord;
+  sourceColumnId: string;
+  targetColumnId: string;
+  targetColumnTitle: string;
 }
 
-export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
+interface LeadKanbanBoardProps {
+  filters?: LeadFilters;
+  visibleColumnIds?: string[];
+}
+
+// Adjust this offset to match whatever chrome (nav bar, filter bar, tabs)
+// sits above the board on the page that renders it.
+const BOARD_HEIGHT = "h-[calc(100vh-5rem)]";
+
+export function LeadKanbanBoard({
+  filters,
+  visibleColumnIds,
+}: LeadKanbanBoardProps) {
   const [columns, setColumns] = useState<KanbanColumn[]>(() =>
     listLeadColumns(),
   );
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const [overColumnId, setOverColumnId] = useState<string | null>(null);
+  const [overOutcome, setOverOutcome] = useState<"settled" | "lost" | null>(
+    null,
+  );
   const [toast, setToast] = useState<string | null>(null);
   const [panel, setPanel] = useState<LeadPanelState | null>(null);
   const [activityRevision, setActivityRevision] = useState(0);
   const [cardSettings, setCardSettings] = useState<LeadCardSettings>(() =>
     loadLeadCardSettings(),
   );
+  const [collapsedColumns, setCollapsedColumns] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [pendingLostDrop, setPendingLostDrop] =
+    useState<PendingLostDrop | null>(null);
+  const [lostReason, setLostReason] = useState("");
 
   useEffect(() => {
     return onLeadActivityChange(() => {
@@ -80,9 +106,15 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
   const visibleColumns = useMemo(() => {
     const hasStatusFilter = !!filters?.statuses.length;
     const hasSourceFilter = !!filters?.sources.length;
-    if (!hasStatusFilter && !hasSourceFilter) return columns;
+    const hasColumnFilter = !!visibleColumnIds;
 
-    return columns
+    const result = hasColumnFilter
+      ? visibleColumnIds!
+          .map((id) => columns.find((col) => col.id === id))
+          .filter((col): col is KanbanColumn => !!col)
+      : columns;
+
+    return result
       .filter(
         (col) =>
           !hasStatusFilter ||
@@ -95,11 +127,29 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
           ? col.cards.filter((card) => filters!.sources.includes(card.source))
           : col.cards,
       }));
-  }, [columns, filters]);
+  }, [columns, filters, visibleColumnIds]);
+
+  const wonColumn = useMemo(
+    () => columns.find((c) => /settled/i.test(c.title)),
+    [columns],
+  );
+  const lostColumn = useMemo(
+    () => columns.find((c) => /lost/i.test(c.title)),
+    [columns],
+  );
 
   function flash(msg: string) {
     setToast(msg);
     window.setTimeout(() => setToast(null), 2400);
+  }
+
+  function toggleCollapsed(columnId: string) {
+    setCollapsedColumns((prev) => {
+      const next = new Set(prev);
+      if (next.has(columnId)) next.delete(columnId);
+      else next.add(columnId);
+      return next;
+    });
   }
 
   function handleDragStart(
@@ -114,6 +164,52 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
   function handleDragEnd() {
     setDragInfo(null);
     setOverColumnId(null);
+    setOverOutcome(null);
+  }
+
+  /** Shared move: pulls the card out of the source column, drops it into the target. */
+  function moveCard(
+    card: LeadCardRecord,
+    sourceColumn: KanbanColumn,
+    targetColumn: KanbanColumn,
+    updatedCard: LeadCardRecord,
+  ) {
+    const next = columns.map((col) => {
+      if (col.id === sourceColumn.id) {
+        return {
+          ...col,
+          cards: col.cards.filter((c) => c.id !== card.id),
+          leadCount: col.leadCount - 1,
+        };
+      }
+      if (col.id === targetColumn.id) {
+        return {
+          ...col,
+          cards: [updatedCard, ...col.cards],
+          leadCount: col.leadCount + 1,
+        };
+      }
+      return col;
+    });
+    persist(next);
+
+    logStatusChange(
+      "sales.leads",
+      card.owner,
+      card.id,
+      card.name,
+      sourceColumn.title,
+      targetColumn.title,
+    );
+    emitLeadActivityChange();
+    notifyStatusChanged({
+      recipient: card.owner,
+      entityLabel: `Lead ${card.name}`,
+      from: sourceColumn.title,
+      to: targetColumn.title,
+      relatedTo: card.name,
+      relatedHref: "/sales/leads",
+    });
   }
 
   function handleDrop(targetColumnId: string) {
@@ -157,51 +253,88 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
       new Date(),
     );
 
-    const next = columns.map((col) => {
-      if (col.id === sourceColumnId) {
-        return {
-          ...col,
-          cards: col.cards.filter((c) => c.id !== cardId),
-          leadCount: col.leadCount - 1,
-        };
-      }
-      if (col.id === targetColumnId) {
-        return {
-          ...col,
-          cards: [updatedCard, ...col.cards],
-          leadCount: col.leadCount + 1,
-        };
-      }
-      return col;
-    });
-    persist(next);
-
-    logStatusChange(
-      "sales.leads",
-      card.owner,
-      card.id,
-      card.name,
-      sourceColumn.title,
-      targetColumn.title,
-    );
-    emitLeadActivityChange();
-    notifyStatusChanged({
-      recipient: card.owner,
-      entityLabel: `Lead ${card.name}`,
-      from: sourceColumn.title,
-      to: targetColumn.title,
-      relatedTo: card.name,
-      relatedHref: "/sales/leads",
-    });
-
+    moveCard(card, sourceColumn, targetColumn, updatedCard);
     setDragInfo(null);
   }
 
+  /** Drop onto the floating Win / Lost zone rather than a column. */
+  function handleOutcomeDrop(outcome: "settled" | "lost") {
+    setOverOutcome(null);
+    if (!dragInfo) return;
+    const { cardId, sourceColumnId } = dragInfo;
+
+    const targetColumn = outcome === "settled" ? wonColumn : lostColumn;
+    if (!targetColumn) {
+      flash(`No "${outcome === "settled" ? "Won" : "Lost"}" column found`);
+      setDragInfo(null);
+      return;
+    }
+
+    const sourceColumn = columns.find((col) => col.id === sourceColumnId);
+    const card = sourceColumn?.cards.find((c) => c.id === cardId);
+    if (!card || !sourceColumn || sourceColumn.id === targetColumn.id) {
+      setDragInfo(null);
+      return;
+    }
+
+    if (outcome === "lost") {
+      // Hold the move until the reason modal is confirmed.
+      setPendingLostDrop({
+        card,
+        sourceColumnId: sourceColumn.id,
+        targetColumnId: targetColumn.id,
+        targetColumnTitle: targetColumn.title,
+      });
+      setLostReason("");
+      setDragInfo(null);
+      return;
+    }
+
+    const updatedCard = applyPipelineStageMove(
+      card,
+      targetColumn.title,
+      new Date(),
+    );
+    moveCard(card, sourceColumn, targetColumn, updatedCard);
+    setDragInfo(null);
+    flash(`${card.name} marked as settled`);
+  }
+
+  function confirmLostDrop() {
+    if (!pendingLostDrop) return;
+    const { card, sourceColumnId, targetColumnId, targetColumnTitle } =
+      pendingLostDrop;
+
+    const sourceColumn = columns.find((col) => col.id === sourceColumnId);
+    const targetColumn = columns.find((col) => col.id === targetColumnId);
+    if (!sourceColumn || !targetColumn) {
+      setPendingLostDrop(null);
+      return;
+    }
+
+    const updatedCard: LeadCardRecord & { lostReason?: string } = {
+      ...applyPipelineStageMove(card, targetColumnTitle, new Date()),
+      lostReason: lostReason.trim() || undefined,
+    };
+
+    moveCard(card, sourceColumn, targetColumn, updatedCard);
+    flash(`${card.name} marked as lost`);
+    setPendingLostDrop(null);
+    setLostReason("");
+  }
+
+  function cancelLostDrop() {
+    setPendingLostDrop(null);
+    setLostReason("");
+  }
+
   return (
-    <div className="relative w-full overflow-x-auto bg-slate-50/50">
-      <div className="grid min-w-[1800px] grid-cols-1 items-start gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+    <div className="relative w-full overflow-x-auto bg-slate-50/50 no-scrollbar">
+      {/* Changed from grid to a flex container with a min-width to support horizontal scrolling if necessary */}
+      <div className="flex min-w-[1400px] items-start gap-3 p-1">
         {visibleColumns.map((column) => {
           const isOver = overColumnId === column.id;
+          const isCollapsed = collapsedColumns.has(column.id);
 
           return (
             <div
@@ -218,99 +351,187 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
                 handleDrop(column.id);
               }}
               className={cn(
-                "flex flex-col rounded-sm border p-3",
-                dropTargetIdle,
-                isOver
-                  ? dropTargetActive
-                  : "border-slate-200/60 bg-slate-100/60",
+                "group relative flex flex-col gap-2 transition-all duration-200",
+                BOARD_HEIGHT,
+                isCollapsed
+                  ? "w-14 min-w-[3.5rem] flex-shrink-0"
+                  : "flex-1 min-w-[18rem]",
               )}
             >
-              <div className="mb-3 flex items-center justify-between px-1 py-1">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`h-2.5 w-2.5 rounded-full ${column.dotColorClass}`}
+              {isCollapsed ? (
+                <div
+                  className={cn(
+                    "flex h-full flex-col rounded-sm border p-2",
+                    dropTargetIdle,
+                    isOver
+                      ? dropTargetActive
+                      : "border-slate-200/60 bg-slate-100/60",
+                  )}
+                >
+                  <CollapsedColumn
+                    column={column}
+                    onExpand={() => toggleCollapsed(column.id)}
                   />
-                  <h2 className="max-w-[9.5rem] text-xs font-semibold leading-snug text-slate-800 xl:text-sm">
-                    {column.title}
-                  </h2>
-                  <span className="rounded-full border border-slate-200/80 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500">
-                    {column.cards.length}
-                  </span>
                 </div>
-
-                <div className="flex items-center gap-1">
-                  <Link
-                    href={`/sales/leads/create?stage=${encodeURIComponent(column.title)}`}
-                    aria-label={`Add lead to ${column.title}`}
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs transition-colors hover:bg-slate-50"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </Link>
-                  <button
-                    type="button"
-                    aria-label="Column options"
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs transition-colors hover:bg-slate-50"
-                  >
-                    <MoreVertical className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="mb-3 px-1 text-xs font-medium text-slate-500">
-                {column.totalAmount} total
-              </div>
-
-              <div className="flex flex-col gap-3">
-                {column.cards.map((card) => (
-                  <LeadCard
-                    key={card.id}
-                    card={card}
-                    status={column.leadStatus}
-                    cardSettings={cardSettings}
-                    revision={activityRevision}
-                    isDragging={dragInfo?.cardId === card.id}
-                    onDragStart={(e) => handleDragStart(e, card.id, column.id)}
-                    onDragEnd={handleDragEnd}
-                    onOpenActivitySummary={() =>
-                      setPanel({
-                        type: "activity-summary",
-                        leadId: card.id,
-                        leadName: card.name,
-                        status: column.leadStatus,
-                      })
-                    }
-                    onOpenLastActivity={() =>
-                      setPanel({
-                        type: "last-activity",
-                        leadId: card.id,
-                        leadName: card.name,
-                        status: column.leadStatus,
-                      })
-                    }
-                    onQuickAction={(kind: QuickActionKind) =>
-                      setPanel({
-                        type: "quick-action",
-                        kind,
-                        leadId: card.id,
-                        leadName: card.name,
-                        status: column.leadStatus,
-                        email: card.email,
-                        phone: card.phone,
-                      })
-                    }
-                  />
-                ))}
-
-                {column.cards.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 py-8 text-center text-xs text-slate-400">
-                    Drop a lead here
+              ) : (
+                <>
+                  {/* Header box */}
+                  <div className="rounded-sm border border-slate-200/60 bg-slate-100/60 p-3">
+                    <div className="flex items-center justify-between px-1 py-1">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`h-2.5 w-2.5 rounded-full ${column.dotColorClass}`}
+                        />
+                        <h2 className="max-w-[9.5rem] text-xs font-semibold leading-snug text-slate-800 xl:text-sm">
+                          {column.title}
+                        </h2>
+                        <span className="rounded-full border border-slate-200/80 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500">
+                          {column.cards.length}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-2 px-1 text-xs font-medium text-slate-500">
+                      {column.totalAmount} total
+                    </div>
                   </div>
-                )}
-              </div>
+
+                  {/* Card list box */}
+                  <div
+                    className={cn(
+                      "relative flex min-h-0 flex-1 flex-col rounded-sm border p-3",
+                      dropTargetIdle,
+                      isOver
+                        ? dropTargetActive
+                        : "border-slate-200/60 bg-slate-100/60",
+                    )}
+                  >
+                    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-8 no-scrollbar">
+                      {column.cards.map((card) => (
+                        <LeadCard
+                          key={card.id}
+                          card={card}
+                          status={column.leadStatus}
+                          cardSettings={cardSettings}
+                          revision={activityRevision}
+                          isDragging={dragInfo?.cardId === card.id}
+                          onDragStart={(e) =>
+                            handleDragStart(e, card.id, column.id)
+                          }
+                          onDragEnd={handleDragEnd}
+                          onOpenActivitySummary={() =>
+                            setPanel({
+                              type: "activity-summary",
+                              leadId: card.id,
+                              leadName: card.name,
+                              status: column.leadStatus,
+                            })
+                          }
+                          onOpenLastActivity={() =>
+                            setPanel({
+                              type: "last-activity",
+                              leadId: card.id,
+                              leadName: card.name,
+                              status: column.leadStatus,
+                            })
+                          }
+                          onQuickAction={(kind: QuickActionKind) =>
+                            setPanel({
+                              type: "quick-action",
+                              kind,
+                              leadId: card.id,
+                              leadName: card.name,
+                              status: column.leadStatus,
+                              email: card.email,
+                              phone: card.phone,
+                            })
+                          }
+                        />
+                      ))}
+
+                      {column.cards.length === 0 && (
+                        <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 py-8 text-center text-xs text-slate-400">
+                          Drop a lead here
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Collapse control */}
+                    <button
+                      type="button"
+                      onClick={() => toggleCollapsed(column.id)}
+                      aria-label={`Collapse ${column.title}`}
+                      className="absolute inset-x-0 bottom-2 mx-auto flex h-6 w-6 items-center justify-center self-center rounded-full border border-slate-200 bg-white text-slate-500 opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100 hover:bg-slate-50"
+                    >
+                      <ChevronLeft className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           );
         })}
       </div>
+
+      {/* Win / Lost drop zones — shown only while a card is being dragged */}
+      {dragInfo && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center gap-4">
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setOverOutcome("settled");
+            }}
+            onDragLeave={() =>
+              setOverOutcome((prev) => (prev === "settled" ? null : prev))
+            }
+            onDrop={(e) => {
+              e.preventDefault();
+              handleOutcomeDrop("settled");
+            }}
+            className={cn(
+              "pointer-events-auto flex w-40 items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-3 text-sm font-semibold shadow-lg backdrop-blur-sm transition-colors",
+              overOutcome === "settled"
+                ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                : "border-emerald-300 bg-white/90 text-emerald-600",
+            )}
+          >
+            <Trophy className="h-4 w-4" />
+            Win
+          </div>
+
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setOverOutcome("lost");
+            }}
+            onDragLeave={() =>
+              setOverOutcome((prev) => (prev === "lost" ? null : prev))
+            }
+            onDrop={(e) => {
+              e.preventDefault();
+              handleOutcomeDrop("lost");
+            }}
+            className={cn(
+              "pointer-events-auto flex w-40 items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-3 text-sm font-semibold shadow-lg backdrop-blur-sm transition-colors",
+              overOutcome === "lost"
+                ? "border-rose-500 bg-rose-50 text-rose-700"
+                : "border-rose-300 bg-white/90 text-rose-600",
+            )}
+          >
+            <XCircle className="h-4 w-4" />
+            Lost
+          </div>
+        </div>
+      )}
+
+      {pendingLostDrop && (
+        <LostReasonModal
+          cardName={pendingLostDrop.card.name}
+          reason={lostReason}
+          onReasonChange={setLostReason}
+          onCancel={cancelLostDrop}
+          onConfirm={confirmLostDrop}
+        />
+      )}
 
       <LeadCardPanelHost
         panel={panel}
@@ -324,6 +545,106 @@ export function LeadKanbanBoard({ filters }: LeadKanbanBoardProps) {
           {toast}
         </div>
       )}
+    </div>
+  );
+}
+
+function CollapsedColumn({
+  column,
+  onExpand,
+}: {
+  column: KanbanColumn;
+  onExpand: () => void;
+}) {
+  return (
+    <div className="flex h-full flex-col items-center justify-between py-2">
+      <div className="flex flex-col items-center gap-2">
+        <span className={`h-2.5 w-2.5 rounded-full ${column.dotColorClass}`} />
+        <span className="rounded-full border border-slate-200/80 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+          {column.cards.length}
+        </span>
+      </div>
+      <p
+        className="flex-1 py-3 text-xs font-semibold text-slate-600 [writing-mode:vertical-rl]"
+        title={column.title}
+      >
+        {column.title}
+      </p>
+      <button
+        type="button"
+        onClick={onExpand}
+        aria-label={`Expand ${column.title}`}
+        className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50"
+      >
+        <ChevronRight className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+function LostReasonModal({
+  cardName,
+  reason,
+  onReasonChange,
+  onCancel,
+  onConfirm,
+}: {
+  cardName: string;
+  reason: string;
+  onReasonChange: (value: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]"
+      onClick={onCancel}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl"
+      >
+        <div className="border-b border-slate-100 px-5 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-rose-600">
+            Mark as lost
+          </p>
+          <p className="mt-0.5 text-[13px] font-semibold text-slate-900">
+            {cardName}
+          </p>
+        </div>
+
+        <div className="px-5 py-4">
+          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            Reason
+          </label>
+          <textarea
+            value={reason}
+            onChange={(e) => onReasonChange(e.target.value)}
+            rows={3}
+            autoFocus
+            placeholder="Why was this lead lost?"
+            className="w-full resize-none rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] text-slate-900 outline-none placeholder:text-slate-300 focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+          />
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-md px-3 py-1.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={!reason.trim()}
+            className="rounded-md bg-rose-600 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Mark as lost
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

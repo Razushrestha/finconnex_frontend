@@ -37,11 +37,8 @@ interface LeadCardProps {
   isDragging: boolean;
   onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
-  /** Optional override (tests / story); otherwise built from card + status. */
   viewModel?: LeadCardViewModel;
-  /** Admin settings; when omitted, loaded from settings store. */
   cardSettings?: LeadCardSettings;
-  /** Bump after quick-action / settings changes so the card re-reads data. */
   revision?: number;
   onOpenActivitySummary?: () => void;
   onOpenLastActivity?: () => void;
@@ -92,10 +89,7 @@ export function LeadCard({
 
   const summary = vm.activitySummary;
   const summaryTitle = summary.primary
-    ? truncateActivityTitle(
-        summary.primary.title,
-        ACTIVITY_TITLE_TRUNCATE_AT,
-      )
+    ? truncateActivityTitle(summary.primary.title, ACTIVITY_TITLE_TRUNCATE_AT)
     : "";
 
   return (
@@ -153,9 +147,6 @@ export function LeadCard({
           ))}
         </dl>
       )}
-
-      {/* Session 16 — Stage Due + Milestone clocks (separate from Activity Summary) */}
-      <LeadSlaChip sla={vm.sla} variant="panel" />
 
       {/* §5 Activity Summary — omit entirely when empty (§12) */}
       {summary.primary && summary.urgency && (
@@ -220,7 +211,6 @@ export function LeadCard({
         </button>
       )}
 
-      {/* §7 Quick actions — fixed 7, always present */}
       <div
         className="flex items-center justify-between gap-0.5 border-t border-slate-100 pt-2"
         role="toolbar"
@@ -247,8 +237,7 @@ function QuickActionButton({
 }) {
   const Icon = QUICK_ICONS[action.kind];
   const label = QUICK_LABELS[action.kind];
-  const badge =
-    action.badgeCount >= 2 ? String(action.badgeCount) : null;
+  const badge = action.badgeCount >= 2 ? String(action.badgeCount) : null;
   const stateHint = QUICK_STATE_WORDS[action.urgency];
   const countHint = badge ? `, ${badge} pending` : "";
 
