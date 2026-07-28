@@ -370,7 +370,7 @@ export function LeadKanbanBoard({
                 BOARD_HEIGHT,
                 isCollapsed
                   ? "w-14 min-w-[3.5rem] flex-shrink-0"
-                  : "flex-1 min-w-[18rem]",
+                  : "w-[300px] flex-shrink-0",
               )}
             >
               {isCollapsed ? (

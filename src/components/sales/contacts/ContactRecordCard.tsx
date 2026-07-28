@@ -38,7 +38,7 @@ export function ContactRecordCard({
       data-focus-id={contact.id}
       data-contact-id={contact.id}
       className={cn(
-        "w-full cursor-grab rounded-md border border-slate-200/80 bg-white p-3.5 shadow-2xs active:cursor-grabbing",
+        "w-[272px] shrink-0 cursor-grab rounded-md border border-slate-200/80 bg-white p-3.5 shadow-2xs active:cursor-grabbing",
         cardMotion,
         isDragging && cardDragging,
       )}

@@ -13,6 +13,8 @@ export const CONTACT_STATUSES = [
   "Active",
   "Inactive",
   "Unsubscribed",
+  "Bounced",
+  "Archived",
 ] as const;
 export type ContactStatus = (typeof CONTACT_STATUSES)[number];
 
@@ -177,6 +179,46 @@ export const CONTACT_GROUPS: ContactGroup[] = [
         createdDate: "22/05/2026",
         accentColorClass: "bg-rose-500",
         avatarIndex: 6,
+      }),
+    ],
+  },
+  {
+    id: "bounced",
+    title: "Bounced",
+    dotColorClass: "bg-amber-500",
+    contacts: [
+      card({
+        id: "ct-8",
+        name: "Liam O'Connor",
+        initials: "LO",
+        company: "Apex Global",
+        email: "liam.oconnor@apexglobal-fake.com",
+        phone: "+61 400 400 001",
+        owner: "Roshna Abraham",
+        source: "Cold Call",
+        createdDate: "10/04/2026",
+        accentColorClass: "bg-amber-500",
+        avatarIndex: 7,
+      }),
+    ],
+  },
+  {
+    id: "archived",
+    title: "Archived",
+    dotColorClass: "bg-zinc-400",
+    contacts: [
+      card({
+        id: "ct-9",
+        name: "Sophia Martinez",
+        initials: "SM",
+        company: "Vanguard Tech",
+        email: "sophia.martinez@vanguard.com",
+        phone: "+61 400 500 001",
+        owner: "John Smith",
+        source: "Website",
+        createdDate: "15/01/2026",
+        accentColorClass: "bg-zinc-400",
+        avatarIndex: 0,
       }),
     ],
   },
