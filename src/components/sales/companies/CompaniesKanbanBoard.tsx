@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, MoreVertical } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, MoreVertical } from "lucide-react";
 import { COMPANY_GROUPS, type CompanyGroup } from "@/lib/companies/types";
 import type { CompanyFilters } from "./FilterCompaniesPanel";
 import { CompanyCard } from "./CompanyCard";
@@ -13,20 +13,64 @@ interface DragInfo {
   sourceGroupId: string;
 }
 
-interface CompaniesKanbanBoardProps {
-  filters?: CompanyFilters;
+interface DropTargetPosition {
+  groupId: string;
+  targetIndex: number;
 }
 
-export function CompaniesKanbanBoard({ filters }: CompaniesKanbanBoardProps) {
+type CompanyRecord = CompanyGroup["companies"][number];
+
+interface CompaniesKanbanBoardProps {
+  filters?: CompanyFilters;
+  visibleColumnIds?: string[];
+}
+
+const BOARD_HEIGHT = "h-[calc(100vh-5rem)]";
+
+export function CompaniesKanbanBoard({
+  filters,
+  visibleColumnIds,
+}: CompaniesKanbanBoardProps) {
   const [groups, setGroups] = useState<CompanyGroup[]>(COMPANY_GROUPS);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
+  const [dropTargetPos, setDropTargetPos] = useState<DropTargetPosition | null>(
+    null,
+  );
   const [overGroupId, setOverGroupId] = useState<string | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  function toggleCollapsed(groupId: string) {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }
 
   const visibleGroups = useMemo(() => {
     const hasStatusFilter = !!filters?.statuses.length;
-    if (!hasStatusFilter) return groups;
-    return groups.filter((g) => filters!.statuses.includes(g.title));
-  }, [groups, filters]);
+    const hasColumnFilter = !!visibleColumnIds;
+
+    const result = hasColumnFilter
+      ? visibleColumnIds!
+          .map((id) => groups.find((g) => g.id === id))
+          .filter((g): g is CompanyGroup => !!g)
+      : groups;
+
+    return result.filter(
+      (g) => !hasStatusFilter || filters!.statuses.includes(g.title),
+    );
+  }, [groups, filters, visibleColumnIds]);
+
+  function visibleCompanyCount(group: CompanyGroup) {
+    if (dragInfo && dragInfo.sourceGroupId === group.id) {
+      return group.companies.length - 1;
+    }
+    return group.companies.length;
+  }
 
   function handleDragStart(
     e: React.DragEvent<HTMLDivElement>,
@@ -39,51 +83,79 @@ export function CompaniesKanbanBoard({ filters }: CompaniesKanbanBoardProps) {
 
   function handleDragEnd() {
     setDragInfo(null);
+    setDropTargetPos(null);
     setOverGroupId(null);
   }
 
-  function handleDrop(targetGroupId: string) {
+  /** Shared move: pulls the company out of the source group, drops it into the target at targetIndex. */
+  function moveCompany(
+    company: CompanyRecord,
+    sourceGroup: CompanyGroup,
+    targetGroup: CompanyGroup,
+    updatedCompany: CompanyRecord,
+    targetIndex?: number,
+  ) {
+    setGroups((prev) =>
+      prev.map((g) => {
+        if (g.id === sourceGroup.id && g.id === targetGroup.id) {
+          // Reordering within the same group.
+          const filtered = g.companies.filter((c) => c.id !== company.id);
+          const insertAt =
+            targetIndex !== undefined ? targetIndex : filtered.length;
+          const next = [...filtered];
+          next.splice(insertAt, 0, updatedCompany);
+          return { ...g, companies: next };
+        }
+        if (g.id === sourceGroup.id) {
+          return {
+            ...g,
+            companies: g.companies.filter((c) => c.id !== company.id),
+          };
+        }
+        if (g.id === targetGroup.id) {
+          const filtered = g.companies.filter((c) => c.id !== company.id);
+          const insertAt =
+            targetIndex !== undefined ? targetIndex : filtered.length;
+          const next = [...filtered];
+          next.splice(insertAt, 0, updatedCompany);
+          return { ...g, companies: next };
+        }
+        return g;
+      }),
+    );
+  }
+
+  function handleDrop(targetGroupId: string, targetIndex?: number) {
     setOverGroupId(null);
+    setDropTargetPos(null);
     if (!dragInfo) return;
     const { companyId, sourceGroupId } = dragInfo;
-    if (sourceGroupId === targetGroupId) {
+
+    const sourceGroup = groups.find((g) => g.id === sourceGroupId);
+    const targetGroup = groups.find((g) => g.id === targetGroupId);
+    const company = sourceGroup?.companies.find((c) => c.id === companyId);
+
+    if (!company || !sourceGroup || !targetGroup) {
       setDragInfo(null);
       return;
     }
 
-    setGroups((prev) => {
-      const sourceGroup = prev.find((g) => g.id === sourceGroupId);
-      const targetGroup = prev.find((g) => g.id === targetGroupId);
-      const company = sourceGroup?.companies.find((c) => c.id === companyId);
-      if (!company || !targetGroup) return prev;
+    const updatedCompany =
+      sourceGroup.id === targetGroup.id
+        ? company
+        : { ...company, accentColorClass: targetGroup.dotColorClass };
 
-      const updated = {
-        ...company,
-        accentColorClass: targetGroup.dotColorClass,
-      };
-
-      return prev.map((g) => {
-        if (g.id === sourceGroupId) {
-          return {
-            ...g,
-            companies: g.companies.filter((c) => c.id !== companyId),
-          };
-        }
-        if (g.id === targetGroupId) {
-          return { ...g, companies: [updated, ...g.companies] };
-        }
-        return g;
-      });
-    });
-
+    moveCompany(company, sourceGroup, targetGroup, updatedCompany, targetIndex);
     setDragInfo(null);
   }
 
   return (
-    <div className="w-full overflow-x-auto bg-slate-50/50">
-      <div className="grid min-w-[1300px] grid-cols-1 items-start gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+    <div className="relative w-full overflow-x-auto bg-slate-50/50 no-scrollbar">
+      <div className="flex items-start gap-3 p-1">
         {visibleGroups.map((group) => {
           const isOver = overGroupId === group.id;
+          const isCollapsed = collapsedGroups.has(group.id);
+
           return (
             <div
               key={group.id}
@@ -99,70 +171,224 @@ export function CompaniesKanbanBoard({ filters }: CompaniesKanbanBoardProps) {
                 handleDrop(group.id);
               }}
               className={cn(
-                "flex flex-col rounded-sm border p-3",
-                dropTargetIdle,
-                isOver
-                  ? dropTargetActive
-                  : "border-slate-200/60 bg-slate-100/60",
+                "group relative flex flex-col gap-2 transition-all duration-200",
+                BOARD_HEIGHT,
+                isCollapsed
+                  ? "w-14 min-w-[3.5rem] flex-shrink-0"
+                  : "w-[300px] flex-shrink-0",
               )}
             >
-              <div className="mb-3 flex items-center justify-between px-1 py-1">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`h-2.5 w-2.5 rounded-full ${group.dotColorClass}`}
+              {isCollapsed ? (
+                <div
+                  className={cn(
+                    "flex h-full flex-col rounded-sm border p-2",
+                    dropTargetIdle,
+                    isOver
+                      ? dropTargetActive
+                      : "border-slate-200/60 bg-slate-100/60",
+                  )}
+                >
+                  <CollapsedColumn
+                    group={group}
+                    onExpand={() => toggleCollapsed(group.id)}
                   />
-                  <h2 className="text-sm font-semibold text-slate-800">
-                    {group.title}
-                  </h2>
-                  <span className="rounded-full border border-slate-200/80 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500">
-                    {group.companies.length}
-                  </span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    aria-label="Add company"
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs hover:bg-slate-50"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Column options"
-                    className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs hover:bg-slate-50"
-                  >
-                    <MoreVertical className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                {group.companies.map((company) => (
-                  <CompanyCard
-                    key={company.id}
-                    company={company}
-                    isDragging={dragInfo?.companyId === company.id}
-                    onDragStart={(e) =>
-                      handleDragStart(e, company.id, group.id)
-                    }
-                    onDragEnd={handleDragEnd}
-                  />
-                ))}
-                {group.companies.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 py-8 text-center text-xs text-slate-400">
-                    Drop a company here
+              ) : (
+                <div
+                  className={cn(
+                    "relative flex min-h-0 flex-1 flex-col rounded-sm border p-3",
+                    dropTargetIdle,
+                    isOver
+                      ? dropTargetActive
+                      : "border-slate-200/60 bg-slate-100/60",
+                  )}
+                >
+                  <div className="mb-3 flex items-center justify-between px-1 py-1">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`h-2.5 w-2.5 rounded-full ${group.dotColorClass}`}
+                      />
+                      <h2 className="max-w-[9.5rem] text-xs font-semibold leading-snug text-slate-800 xl:text-sm">
+                        {group.title}
+                      </h2>
+                      <span className="rounded-full border border-slate-200/80 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500">
+                        {group.companies.length}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        aria-label="Add company"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs hover:bg-slate-50"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="Column options"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-2xs hover:bg-slate-50"
+                      >
+                        <MoreVertical className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
-                )}
-              </div>
+
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (dragInfo) {
+                        setOverGroupId(group.id);
+                        if (
+                          !dropTargetPos ||
+                          dropTargetPos.groupId !== group.id
+                        ) {
+                          setDropTargetPos({
+                            groupId: group.id,
+                            targetIndex: visibleCompanyCount(group),
+                          });
+                        }
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDrop(group.id, dropTargetPos?.targetIndex);
+                    }}
+                    className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-8 no-scrollbar"
+                  >
+                    {(() => {
+                      let visibleIndex = 0;
+                      const rendered: React.ReactNode[] = [];
+
+                      const showPlaceholderAt = (idx: number) =>
+                        dragInfo &&
+                        dropTargetPos?.groupId === group.id &&
+                        dropTargetPos.targetIndex === idx;
+
+                      group.companies.forEach((company) => {
+                        const isDraggedCompany =
+                          dragInfo?.companyId === company.id;
+                        const myIndex = visibleIndex;
+
+                        if (!isDraggedCompany && showPlaceholderAt(myIndex)) {
+                          rendered.push(
+                            <div
+                              key={`placeholder-${company.id}`}
+                              className="h-[168px] rounded-md border-2 border-dashed border-indigo-300 bg-indigo-50/60 transition-all duration-150 ease-out"
+                            />,
+                          );
+                        }
+
+                        rendered.push(
+                          <div
+                            key={company.id}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (!dragInfo || isDraggedCompany) return;
+
+                              const rect =
+                                e.currentTarget.getBoundingClientRect();
+                              const midpoint = rect.top + rect.height / 2;
+                              const insertIndex =
+                                e.clientY < midpoint ? myIndex : myIndex + 1;
+
+                              setDropTargetPos({
+                                groupId: group.id,
+                                targetIndex: insertIndex,
+                              });
+                            }}
+                          >
+                            <CompanyCard
+                              company={company}
+                              isDragging={isDraggedCompany}
+                              onDragStart={(e) =>
+                                handleDragStart(e, company.id, group.id)
+                              }
+                              onDragEnd={handleDragEnd}
+                            />
+                          </div>,
+                        );
+
+                        if (!isDraggedCompany) visibleIndex++;
+                      });
+
+                      if (showPlaceholderAt(visibleIndex)) {
+                        rendered.push(
+                          <div
+                            key="placeholder-end"
+                            className="h-[168px] rounded-md border-2 border-dashed border-indigo-300 bg-indigo-50/60 transition-all duration-150 ease-out"
+                          />,
+                        );
+                      }
+
+                      return (
+                        <>
+                          {rendered}
+                          {group.companies.length === 0 && (
+                            <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 py-8 text-center text-xs text-slate-400">
+                              Drop a company here
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Collapse control */}
+                  <button
+                    type="button"
+                    onClick={() => toggleCollapsed(group.id)}
+                    aria-label={`Collapse ${group.title}`}
+                    className="absolute inset-x-0 bottom-2 mx-auto flex h-6 w-6 items-center justify-center self-center rounded-full border border-slate-200 bg-white text-slate-500 opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100 hover:bg-slate-50"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}
+
         {visibleGroups.length === 0 && (
-          <div className="col-span-full rounded-xl border border-dashed border-slate-300 bg-white/60 py-12 text-center text-sm text-slate-400">
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 py-12 text-center text-sm text-slate-400">
             No companies match the current filters.
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function CollapsedColumn({
+  group,
+  onExpand,
+}: {
+  group: CompanyGroup;
+  onExpand: () => void;
+}) {
+  return (
+    <div className="flex h-full flex-col items-center justify-between py-2">
+      <div className="flex flex-col items-center gap-2">
+        <span className={`h-2.5 w-2.5 rounded-full ${group.dotColorClass}`} />
+        <span className="rounded-full border border-slate-200/80 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+          {group.companies.length}
+        </span>
+      </div>
+      <p
+        className="flex-1 py-3 text-xs font-semibold text-slate-600 [writing-mode:vertical-rl]"
+        title={group.title}
+      >
+        {group.title}
+      </p>
+      <button
+        type="button"
+        onClick={onExpand}
+        aria-label={`Expand ${group.title}`}
+        className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50"
+      >
+        <ChevronRight className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

@@ -13,19 +13,42 @@ import { COMPANY_GROUPS } from "@/lib/companies/types";
 import { viewEnter } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
+const DEFAULT_COMPANY_COLUMNS = COMPANY_GROUPS.map((group) => ({
+  id: group.id,
+  label: group.title,
+  visible: true,
+}));
+
 export default function CompaniesPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [filters, setFilters] = useState<CompanyFilters>(EMPTY_COMPANY_FILTERS);
+  const [columns, setColumns] = useState(DEFAULT_COMPANY_COLUMNS);
 
-  function toggleFilterField(field: string) {
+  function toggleFilterField(section: "source" | "status", field: string) {
     setFilters((prev) => {
-      const next = prev.statuses.includes(field)
-        ? prev.statuses.filter((f) => f !== field)
-        : [...prev.statuses, field];
-      return { statuses: next };
+      const key = section === "source" ? "sources" : "statuses";
+      const current = prev[key];
+      const next = current.includes(field)
+        ? current.filter((f) => f !== field)
+        : [...current, field];
+      return { ...prev, [key]: next };
     });
   }
+
+  function reorderColumn(draggedId: string, targetId: string) {
+    setColumns((prev) => {
+      const next = [...prev];
+      const fromIndex = next.findIndex((c) => c.id === draggedId);
+      const toIndex = next.findIndex((c) => c.id === targetId);
+      if (fromIndex === -1 || toIndex === -1) return prev;
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }
+
+  const visibleColumnIds = columns.filter((c) => c.visible).map((c) => c.id);
 
   const totalCompanies = COMPANY_GROUPS.reduce(
     (sum, group) => sum + group.companies.length,
@@ -37,6 +60,13 @@ export default function CompaniesPage() {
       <EntityHeader
         entityLabel="Company"
         entityLabelPlural="Companies"
+        columnOptions={columns}
+        onColumnToggle={(id) =>
+          setColumns((prev) =>
+            prev.map((c) => (c.id === id ? { ...c, visible: !c.visible } : c)),
+          )
+        }
+        onColumnReorder={reorderColumn}
         createRoute="/sales/companies/create"
         totalCount={totalCompanies}
         viewMode={viewMode}
@@ -56,12 +86,12 @@ export default function CompaniesPage() {
           </div>
         )}
 
-        <div
-          key={viewMode}
-          className={cn("flex-1 overflow-x-auto", viewEnter)}
-        >
+        <div key={viewMode} className={cn("flex-1 overflow-x-auto", viewEnter)}>
           {viewMode === "kanban" ? (
-            <CompaniesKanbanBoard filters={filters} />
+            <CompaniesKanbanBoard
+              filters={filters}
+              visibleColumnIds={visibleColumnIds}
+            />
           ) : (
             <CompaniesListView filters={filters} />
           )}

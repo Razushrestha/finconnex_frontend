@@ -107,7 +107,7 @@ export function LeadCard({
       data-lead-id={card.id}
       aria-labelledby={nameId}
       className={cn(
-        "w-full cursor-grab rounded-md border border-slate-200/80 bg-white p-3 shadow-2xs active:cursor-grabbing",
+        "w-[272px] shrink-0 cursor-grab rounded-md border border-slate-200/80 bg-white p-3 shadow-2xs active:cursor-grabbing",
         cardMotion,
         isDragging && cardDragging,
       )}
