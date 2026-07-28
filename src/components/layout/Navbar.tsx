@@ -1,6 +1,6 @@
 "use client";
 
-import * as React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -73,15 +73,15 @@ export function Navbar({
   const router = useRouter();
   const pathname = usePathname();
   const { theme, setTheme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-  const [searchOpen, setSearchOpen] = React.useState(false);
-  const [menuOpen, setMenuOpen] = React.useState(false);
-  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
-  const [newLeadsCount, setNewLeadsCount] = React.useState(newLeadsProp ?? 0);
-  const [inboxUnread, setInboxUnread] = React.useState(0);
-  const menuRef = React.useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [newLeadsCount, setNewLeadsCount] = useState(newLeadsProp ?? 0);
+  const [inboxUnread, setInboxUnread] = useState(0);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  React.useEffect(() => setMounted(true), []);
+  useEffect(() => setMounted(true), []);
 
   React.useEffect(() => {
     function refresh() {
@@ -92,11 +92,11 @@ export function Navbar({
     return onRulesChange(() => refresh());
   }, [newLeadsProp, pathname]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (newLeadsProp !== undefined) setNewLeadsCount(newLeadsProp);
   }, [newLeadsProp]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setMenuOpen(false);
@@ -107,7 +107,7 @@ export function Navbar({
   }, []);
 
   // ⌘K / Ctrl+K opens global search
-  React.useEffect(() => {
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -173,7 +173,7 @@ export function Navbar({
           Search anything&apos;s
         </span>
         <kbd className="ml-auto hidden rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline">
-          ⌘K
+          Ctrl/⌘K
         </kbd>
       </button>
 
@@ -260,9 +260,7 @@ export function Navbar({
         <Link
           href="/marketing/inbox"
           aria-label={
-            inboxUnread > 0
-              ? `Messages, ${inboxUnread} unread`
-              : "Messages"
+            inboxUnread > 0 ? `Messages, ${inboxUnread} unread` : "Messages"
           }
           className={cn(
             "relative flex h-9 w-9 items-center justify-center rounded-full transition-colors sm:h-10 sm:w-10",
