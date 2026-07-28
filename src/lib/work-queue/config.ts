@@ -79,12 +79,7 @@ export const CATEGORIES_DEFAULT: WorkqueueCategoryDef[] = [
     checked: true,
     items: [
       { id: "my-leads", label: "My Leads", checked: true },
-      {
-        id: "new-leads",
-        label: "Leads assigned in last 3 hours",
-        checked: true,
-      },
-      { id: "pending-tags", label: "Pending Tags", checked: true },
+
       {
         id: "stale-leads",
         label: "Stale Leads",
@@ -97,15 +92,7 @@ export const CATEGORIES_DEFAULT: WorkqueueCategoryDef[] = [
     id: "contacts",
     label: "Contacts",
     checked: true,
-    items: [
-      { id: "my-contacts", label: "My Contacts", checked: true },
-      {
-        id: "contacts-3h",
-        label: "Contacts assigned in last 3 hours",
-        checked: true,
-      },
-      { id: "followup", label: "Follow-up Required", checked: true },
-    ],
+    items: [{ id: "my-contacts", label: "My Contacts", checked: true }],
   },
   {
     id: "deals",
@@ -129,7 +116,6 @@ export const CATEGORIES_DEFAULT: WorkqueueCategoryDef[] = [
     items: [
       { id: "pending-review", label: "Pending Review", checked: true },
       { id: "missing-info", label: "Missing Information", checked: false },
-      { id: "awaiting-action", label: "Awaiting Action", checked: true },
     ],
   },
   {
@@ -138,11 +124,6 @@ export const CATEGORIES_DEFAULT: WorkqueueCategoryDef[] = [
     checked: true,
     items: [
       { id: "pending-approval", label: "Pending My Approval", checked: true },
-      {
-        id: "waiting-approval",
-        label: "Waiting for Approval",
-        checked: true,
-      },
     ],
   },
   {
@@ -165,12 +146,6 @@ export const CATEGORIES_DEFAULT: WorkqueueCategoryDef[] = [
     label: "Pipeline SLA",
     checked: true,
     items: [
-      {
-        id: "sla-attention",
-        label: "Needs attention",
-        checked: true,
-        danger: true,
-      },
       { id: "sla-overdue", label: "Overdue", checked: true, danger: true },
       {
         id: "sla-milestone-overdue",

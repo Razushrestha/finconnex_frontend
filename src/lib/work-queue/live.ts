@@ -59,6 +59,9 @@ export interface QueueRow {
   status: string;
   priority: string;
   related: string;
+  contactName?: string;
+  fileHandler?: string;
+  tag?: string;
   sortKey: number;
   href: string;
 }
@@ -580,10 +583,7 @@ function slaQueueRows(entries: SlaWorkQueueEntry[]): QueueRow[] {
     dueColor: slaDueColor(it.badgeLabel),
     status: it.badgeLabel,
     priority: slaPriority(it.badgeLabel),
-    related: [
-      it.stage,
-      it.company ? `Company: ${it.company}` : "",
-    ]
+    related: [it.stage, it.company ? `Company: ${it.company}` : ""]
       .filter(Boolean)
       .join(" · "),
     sortKey: i,
@@ -695,14 +695,14 @@ export function listWorkqueueItemRows(
       );
     case "followup":
       return contactRows(
-        contacts.filter((c) => c.status === "Active" && c.source === "Cold Call"),
+        contacts.filter(
+          (c) => c.status === "Active" && c.source === "Cold Call",
+        ),
       );
     case "my-deals":
       return dealRows(deals);
     case "closing-soon":
-      return dealRows(
-        deals.filter((d) => closingThisMonth(d.closeDate, now)),
-      );
+      return dealRows(deals.filter((d) => closingThisMonth(d.closeDate, now)));
     case "pending-deal-tags":
       return dealRows(deals.filter((d) => !d.contact));
     case "stalled": {
@@ -744,18 +744,15 @@ export function listWorkqueueItemRows(
     case "waiting-approval":
       return dealRows(deals.filter((d) => d.status === "Proposal"));
     case "overdue":
-      return (
-        [
-          ...listActivityRows("tasks", scope, "today-overdue", now),
-          ...listActivityRows("calls", scope, "today-overdue", now),
-          ...listActivityRows("reminders", scope, "today-overdue", now),
-        ]
-          .filter(
-            (r) =>
-              r.dueLabel === "Yesterday" || r.dueLabel.includes("overdue"),
-          )
-          .sort((a, b) => a.sortKey - b.sortKey)
-      );
+      return [
+        ...listActivityRows("tasks", scope, "today-overdue", now),
+        ...listActivityRows("calls", scope, "today-overdue", now),
+        ...listActivityRows("reminders", scope, "today-overdue", now),
+      ]
+        .filter(
+          (r) => r.dueLabel === "Yesterday" || r.dueLabel.includes("overdue"),
+        )
+        .sort((a, b) => a.sortKey - b.sortKey);
     case "high-priority":
       return listActivityRows("tasks", scope, timeFilter, now).filter(
         (r) => r.priority.toLowerCase() === "high",
@@ -852,16 +849,15 @@ export function filterQueueRows(
       if (!hay.includes(q)) return false;
     }
     if (opts.priority && opts.priority !== "all") {
-      if (r.priority.toLowerCase() !== opts.priority.toLowerCase()) return false;
+      if (r.priority.toLowerCase() !== opts.priority.toLowerCase())
+        return false;
     }
     if (opts.status && opts.status !== "all") {
       if (r.status.toLowerCase() !== opts.status.toLowerCase()) return false;
     }
     if (opts.due && opts.due !== "all") {
       if (opts.due === "overdue") {
-        if (
-          !(r.dueLabel === "Yesterday" || r.dueLabel.includes("overdue"))
-        ) {
+        if (!(r.dueLabel === "Yesterday" || r.dueLabel.includes("overdue"))) {
           return false;
         }
       } else if (opts.due === "today") {

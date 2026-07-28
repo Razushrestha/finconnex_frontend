@@ -13,10 +13,7 @@ import {
   Settings2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type {
-  ActivityIconId,
-  WorkQueueNavId,
-} from "@/lib/work-queue/config";
+import type { ActivityIconId, WorkQueueNavId } from "@/lib/work-queue/config";
 import type {
   ActivityNavItem,
   WorkQueueTimeFilter,
@@ -98,8 +95,13 @@ export function WorkQueueSidebar({
           >
             <option value="today-overdue">Today &amp; Overdue</option>
             <option value="today">Today</option>
+            <option value="tomorrow">Tomorrow</option>
+            <option value="overdue">Overdue</option>
             <option value="this-week">This Week</option>
-            <option value="all">All Open</option>
+            <option value="next-week">Next Week</option>
+            <option value="this-month">This Month</option>
+            <option value="next-month">Next Month</option>
+            <option value="specific-date">On a Specific Date</option>
           </select>
           <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
         </div>
@@ -115,9 +117,7 @@ export function WorkQueueSidebar({
                 onClick={() => onActiveItemChange(item.id)}
                 className={cn(
                   "group flex h-9 items-center gap-2 rounded-lg pr-2 pl-1 text-left transition-all duration-150",
-                  active
-                    ? "bg-[var(--wq-accent-soft)]"
-                    : "hover:bg-white/80",
+                  active ? "bg-[var(--wq-accent-soft)]" : "hover:bg-white/80",
                 )}
               >
                 <span

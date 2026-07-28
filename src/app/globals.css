@@ -281,3 +281,72 @@
   z-index: 2;
   position: relative;
 }
+
+/* Thin custom scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.75 0 0 / 45%) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    oklch(0.78 0 0 / 55%),
+    oklch(0.6 0 0 / 55%)
+  );
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 0.2s ease;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    oklch(0.62 0.14 258 / 65%),
+    oklch(0.48 0.16 258 / 65%)
+  );
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background: oklch(0.5 0.17 258 / 80%);
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Dark mode */
+.dark *::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, oklch(1 0 0 / 22%), oklch(1 0 0 / 12%));
+  background-clip: content-box;
+}
+
+.dark *::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    oklch(0.7 0.16 258 / 55%),
+    oklch(0.55 0.18 258 / 55%)
+  );
+  background-clip: content-box;
+}
+
+.dark *::-webkit-scrollbar-thumb:active {
+  background: oklch(0.62 0.19 258 / 70%);
+  background-clip: content-box;
+}
+
+.dark * {
+  scrollbar-color: oklch(1 0 0 / 18%) transparent;
+}
