@@ -35,6 +35,11 @@ interface DragInfo {
   sourceColumnId: string;
 }
 
+interface DropTargetPosition {
+  columnId: string;
+  targetIndex: number;
+}
+
 type LeadCardRecord = KanbanColumn["cards"][number];
 
 /** A "mark as lost" drop that's waiting on a reason before it's committed. */
@@ -62,6 +67,9 @@ export function LeadKanbanBoard({
     listLeadColumns(),
   );
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
+  const [dropTargetPos, setDropTargetPos] = useState<DropTargetPosition | null>(
+    null,
+  );
   const [overColumnId, setOverColumnId] = useState<string | null>(null);
   const [overOutcome, setOverOutcome] = useState<"settled" | "lost" | null>(
     null,
@@ -173,8 +181,18 @@ export function LeadKanbanBoard({
     sourceColumn: KanbanColumn,
     targetColumn: KanbanColumn,
     updatedCard: LeadCardRecord,
+    targetIndex?: number,
   ) {
     const next = columns.map((col) => {
+      if (col.id === sourceColumn.id && col.id === targetColumn.id) {
+        // Reordering within the same column: remove then re-insert at the new index.
+        const filteredCards = col.cards.filter((c) => c.id !== card.id);
+        const insertAt =
+          targetIndex !== undefined ? targetIndex : filteredCards.length;
+        const newCards = [...filteredCards];
+        newCards.splice(insertAt, 0, updatedCard);
+        return { ...col, cards: newCards, leadCount: newCards.length };
+      }
       if (col.id === sourceColumn.id) {
         return {
           ...col,
@@ -183,11 +201,12 @@ export function LeadKanbanBoard({
         };
       }
       if (col.id === targetColumn.id) {
-        return {
-          ...col,
-          cards: [updatedCard, ...col.cards],
-          leadCount: col.leadCount + 1,
-        };
+        const filteredCards = col.cards.filter((c) => c.id !== card.id);
+        const insertAt =
+          targetIndex !== undefined ? targetIndex : filteredCards.length;
+        const newCards = [...filteredCards];
+        newCards.splice(insertAt, 0, updatedCard);
+        return { ...col, cards: newCards, leadCount: newCards.length };
       }
       return col;
     });
@@ -212,15 +231,11 @@ export function LeadKanbanBoard({
     });
   }
 
-  function handleDrop(targetColumnId: string) {
+  function handleDrop(targetColumnId: string, targetIndex?: number) {
     setOverColumnId(null);
+    setDropTargetPos(null);
     if (!dragInfo) return;
     const { cardId, sourceColumnId } = dragInfo;
-
-    if (sourceColumnId === targetColumnId) {
-      setDragInfo(null);
-      return;
-    }
 
     const sourceColumn = columns.find((col) => col.id === sourceColumnId);
     const targetColumn = columns.find((col) => col.id === targetColumnId);
@@ -241,19 +256,13 @@ export function LeadKanbanBoard({
       return;
     }
 
-    if (!isMortgagePipelineStage(targetColumn.title)) {
-      flash(`Unknown pipeline stage "${targetColumn.title}"`);
-      setDragInfo(null);
-      return;
-    }
-
     const updatedCard = applyPipelineStageMove(
       card,
       targetColumn.title,
       new Date(),
     );
 
-    moveCard(card, sourceColumn, targetColumn, updatedCard);
+    moveCard(card, sourceColumn, targetColumn, updatedCard, targetIndex);
     setDragInfo(null);
   }
 
@@ -278,7 +287,6 @@ export function LeadKanbanBoard({
     }
 
     if (outcome === "lost") {
-      // Hold the move until the reason modal is confirmed.
       setPendingLostDrop({
         card,
         sourceColumnId: sourceColumn.id,
@@ -298,6 +306,13 @@ export function LeadKanbanBoard({
     moveCard(card, sourceColumn, targetColumn, updatedCard);
     setDragInfo(null);
     flash(`${card.name} marked as settled`);
+  }
+
+  function visibleCardCount(column: KanbanColumn) {
+    if (dragInfo && dragInfo.sourceColumnId === column.id) {
+      return column.cards.length - 1;
+    }
+    return column.cards.length;
   }
 
   function confirmLostDrop() {
@@ -397,6 +412,31 @@ export function LeadKanbanBoard({
 
                   {/* Card list box */}
                   <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (dragInfo) {
+                        setOverColumnId(column.id);
+                        if (
+                          !dropTargetPos ||
+                          dropTargetPos.columnId !== column.id
+                        ) {
+                          setDropTargetPos({
+                            columnId: column.id,
+                            targetIndex: visibleCardCount(column),
+                          });
+                        }
+                      }
+                    }}
+                    onDragLeave={() =>
+                      setOverColumnId((prev) =>
+                        prev === column.id ? null : prev,
+                      )
+                    }
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDrop(column.id, dropTargetPos?.targetIndex);
+                    }}
                     className={cn(
                       "relative flex min-h-0 flex-1 flex-col rounded-sm border p-3",
                       dropTargetIdle,
@@ -406,53 +446,112 @@ export function LeadKanbanBoard({
                     )}
                   >
                     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-8 no-scrollbar">
-                      {column.cards.map((card) => (
-                        <LeadCard
-                          key={card.id}
-                          card={card}
-                          status={column.leadStatus}
-                          cardSettings={cardSettings}
-                          revision={activityRevision}
-                          isDragging={dragInfo?.cardId === card.id}
-                          onDragStart={(e) =>
-                            handleDragStart(e, card.id, column.id)
-                          }
-                          onDragEnd={handleDragEnd}
-                          onOpenActivitySummary={() =>
-                            setPanel({
-                              type: "activity-summary",
-                              leadId: card.id,
-                              leadName: card.name,
-                              status: column.leadStatus,
-                            })
-                          }
-                          onOpenLastActivity={() =>
-                            setPanel({
-                              type: "last-activity",
-                              leadId: card.id,
-                              leadName: card.name,
-                              status: column.leadStatus,
-                            })
-                          }
-                          onQuickAction={(kind: QuickActionKind) =>
-                            setPanel({
-                              type: "quick-action",
-                              kind,
-                              leadId: card.id,
-                              leadName: card.name,
-                              status: column.leadStatus,
-                              email: card.email,
-                              phone: card.phone,
-                            })
-                          }
-                        />
-                      ))}
+                      {(() => {
+                        let visibleIndex = 0;
+                        const rendered: React.ReactNode[] = [];
 
-                      {column.cards.length === 0 && (
-                        <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 py-8 text-center text-xs text-slate-400">
-                          Drop a lead here
-                        </div>
-                      )}
+                        const showPlaceholderAt = (idx: number) =>
+                          dragInfo &&
+                          dropTargetPos?.columnId === column.id &&
+                          dropTargetPos.targetIndex === idx;
+
+                        column.cards.forEach((card) => {
+                          const isDraggedCard = dragInfo?.cardId === card.id;
+                          const myIndex = visibleIndex;
+
+                          if (!isDraggedCard && showPlaceholderAt(myIndex)) {
+                            rendered.push(
+                              <div
+                                key={`placeholder-${card.id}`}
+                                className="mb-3 h-[88px] rounded-md border-2 border-dashed border-indigo-300 bg-indigo-50/60 transition-all duration-150 ease-out"
+                              />,
+                            );
+                          }
+
+                          rendered.push(
+                            <div
+                              key={card.id}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (!dragInfo || isDraggedCard) return;
+
+                                const rect =
+                                  e.currentTarget.getBoundingClientRect();
+                                const midpoint = rect.top + rect.height / 2;
+                                const insertIndex =
+                                  e.clientY < midpoint ? myIndex : myIndex + 1;
+
+                                setDropTargetPos({
+                                  columnId: column.id,
+                                  targetIndex: insertIndex,
+                                });
+                              }}
+                            >
+                              <LeadCard
+                                card={card}
+                                status={column.leadStatus}
+                                cardSettings={cardSettings}
+                                revision={activityRevision}
+                                isDragging={isDraggedCard}
+                                onDragStart={(e) =>
+                                  handleDragStart(e, card.id, column.id)
+                                }
+                                onDragEnd={handleDragEnd}
+                                onOpenActivitySummary={() =>
+                                  setPanel({
+                                    type: "activity-summary",
+                                    leadId: card.id,
+                                    leadName: card.name,
+                                    status: column.leadStatus,
+                                  })
+                                }
+                                onOpenLastActivity={() =>
+                                  setPanel({
+                                    type: "last-activity",
+                                    leadId: card.id,
+                                    leadName: card.name,
+                                    status: column.leadStatus,
+                                  })
+                                }
+                                onQuickAction={(kind: QuickActionKind) =>
+                                  setPanel({
+                                    type: "quick-action",
+                                    kind,
+                                    leadId: card.id,
+                                    leadName: card.name,
+                                    status: column.leadStatus,
+                                    email: card.email,
+                                    phone: card.phone,
+                                  })
+                                }
+                              />
+                            </div>,
+                          );
+
+                          if (!isDraggedCard) visibleIndex++;
+                        });
+
+                        if (showPlaceholderAt(visibleIndex)) {
+                          rendered.push(
+                            <div
+                              key="placeholder-end"
+                              className="h-[88px] rounded-md border-2 border-dashed border-indigo-300 bg-indigo-50/60 transition-all duration-150 ease-out"
+                            />,
+                          );
+                        }
+
+                        return (
+                          <>
+                            {rendered}
+                            {column.cards.length === 0 && (
+                              <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 py-8 text-center text-xs text-slate-400">
+                                Drop a lead here
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {/* Collapse control */}

@@ -9,6 +9,7 @@ import {
   CheckSquare,
   StickyNote,
   Paperclip,
+  SlidersHorizontal,
 } from "lucide-react";
 import { type KanbanColumn, type LeadStatus } from "@/lib/leads/types";
 import { listLeadColumns } from "@/lib/leads/store";
@@ -66,12 +67,14 @@ const QUICK_LABELS: Record<LeadCardQuickActionState["kind"], string> = {
   attachment: "Attachment",
 };
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
+
 export function LeadListView({
   columns: columnsProp,
   filters,
 }: LeadListViewProps) {
-  const [columns] = useState<KanbanColumn[]>(() =>
-    columnsProp ?? listLeadColumns(),
+  const [columns] = useState<KanbanColumn[]>(
+    () => columnsProp ?? listLeadColumns(),
   );
   const [cardSettings, setCardSettings] = useState<LeadCardSettings>(() =>
     loadLeadCardSettings(),
@@ -79,6 +82,9 @@ export function LeadListView({
   const [revision, setRevision] = useState(0);
   const [panel, setPanel] = useState<LeadPanelState | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [pageSizeMenuOpen, setPageSizeMenuOpen] = useState(false);
 
   useEffect(() => {
     return onLeadActivityChange(() => setRevision((n) => n + 1));
@@ -105,8 +111,8 @@ export function LeadListView({
       .filter(
         (column) =>
           !hasStatusFilter ||
-            filters!.statuses.includes(column.title) ||
-            filters!.statuses.includes(column.leadStatus),
+          filters!.statuses.includes(column.title) ||
+          filters!.statuses.includes(column.leadStatus),
       )
       .flatMap((column) =>
         column.cards
@@ -123,6 +129,32 @@ export function LeadListView({
       );
   }, [columns, columnsProp, filters, revision]);
 
+  const pagedLeads = useMemo(
+    () => allLeads.slice(0, pageSize),
+    [allLeads, pageSize],
+  );
+
+  const allSelected =
+    pagedLeads.length > 0 && pagedLeads.every((l) => selectedIds.has(l.id));
+  const someSelected =
+    pagedLeads.some((l) => selectedIds.has(l.id)) && !allSelected;
+
+  function toggleAll() {
+    setSelectedIds((prev) => {
+      if (allSelected) return new Set();
+      return new Set([...prev, ...pagedLeads.map((l) => l.id)]);
+    });
+  }
+
+  function toggleOne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   function flash(msg: string) {
     setToast(msg);
     window.setTimeout(() => setToast(null), 2400);
@@ -134,6 +166,18 @@ export function LeadListView({
         <table className="w-full min-w-[1100px] text-left text-[12px]">
           <thead className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
             <tr>
+              <th className="w-8 px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSelected;
+                  }}
+                  onChange={toggleAll}
+                  aria-label="Select all leads"
+                  className="h-3.5 w-3.5 rounded border-slate-300"
+                />
+              </th>
               <th className="px-3 py-2.5">Lead</th>
               <th className="px-3 py-2.5">Company</th>
               <th className="px-3 py-2.5">Status</th>
@@ -142,10 +186,40 @@ export function LeadListView({
               <th className="min-w-[200px] px-3 py-2.5">Activity</th>
               <th className="px-3 py-2.5">Last activity</th>
               <th className="px-3 py-2.5 text-right">Actions</th>
+              <th className="relative px-3 py-2.5 text-right">
+                <button
+                  type="button"
+                  onClick={() => setPageSizeMenuOpen((o) => !o)}
+                  aria-label="Table display options"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
+                </button>
+                {pageSizeMenuOpen && (
+                  <div className="absolute right-0 top-full z-10 mt-1 w-32 rounded-md border border-slate-100 bg-white py-1 text-left text-[11px] font-normal normal-case text-slate-600 shadow-lg">
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <button
+                        key={size}
+                        type="button"
+                        onClick={() => {
+                          setPageSize(size);
+                          setPageSizeMenuOpen(false);
+                        }}
+                        className={cn(
+                          "flex w-full items-center justify-between px-3 py-1.5 hover:bg-slate-50",
+                          pageSize === size && "font-semibold text-slate-900",
+                        )}
+                      >
+                        Show {size}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50 text-slate-700">
-            {allLeads.map((lead) => {
+            {pagedLeads.map((lead) => {
               const vm = buildLeadCardViewModelFromCard(
                 lead,
                 lead.statusTitle,
@@ -166,6 +240,15 @@ export function LeadListView({
                   data-lead-id={lead.id}
                   className="transition-colors hover:bg-slate-50/80"
                 >
+                  <td className="px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(lead.id)}
+                      onChange={() => toggleOne(lead.id)}
+                      aria-label={`Select ${lead.name}`}
+                      className="h-3.5 w-3.5 rounded border-slate-300"
+                    />
+                  </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     <div className="flex items-center gap-2.5">
                       <div
@@ -337,6 +420,7 @@ export function LeadListView({
                       })}
                     </div>
                   </td>
+                  <td className="px-3 py-2" />
                 </tr>
               );
             })}
@@ -344,7 +428,7 @@ export function LeadListView({
         </table>
       </div>
       <div className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-500">
-        Showing {allLeads.length} leads
+        Showing {pagedLeads.length} of {allLeads.length} leads
       </div>
 
       <LeadCardPanelHost

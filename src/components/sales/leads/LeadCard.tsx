@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo } from "react";
+import { useId, useMemo, useState, useEffect } from "react";
 import {
   Phone,
   MessageSquare,
@@ -79,6 +79,12 @@ export function LeadCard({
   onQuickAction,
 }: LeadCardProps) {
   const nameId = useId();
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const vm = useMemo(() => {
     void revision;
     return (
@@ -204,10 +210,10 @@ export function LeadCard({
             onOpenLastActivity?.();
           }}
           className="mb-2 block w-full truncate text-left text-[10px] text-slate-400 transition-colors hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-1"
-          aria-label={`Last activity: ${vm.lastActivity.label}, ${vm.lastActivity.relativeTime}. Open activity history.`}
-          title={`${vm.lastActivity.label} · ${vm.lastActivity.relativeTime}`}
+          aria-label={`Last activity: ${vm.lastActivity.label}, ${isMounted ? vm.lastActivity.relativeTime : ""}. Open activity history.`}
+          title={`${vm.lastActivity.label} · ${isMounted ? vm.lastActivity.relativeTime : ""}`}
         >
-          Last activity {vm.lastActivity.relativeTime}
+          Last activity {isMounted ? vm.lastActivity.relativeTime : "..."}
         </button>
       )}
 
