@@ -56,7 +56,7 @@ interface WorkQueueTableProps {
 }
 
 const COLS =
-  "grid min-w-[1180px] grid-cols-[64px_minmax(220px,2fr)_minmax(110px,0.9fr)_minmax(110px,0.9fr)_minmax(80px,0.7fr)_minmax(160px,1.3fr)_minmax(140px,1.1fr)_minmax(120px,1fr)_minmax(110px,0.9fr)_40px]";
+  "grid min-w-[1180px] grid-cols-[64px_minmax(220px,2fr)_minmax(110px,0.9fr)_minmax(110px,0.9fr)_minmax(80px,0.7fr)_minmax(160px,1.3fr)_minmax(140px,1.1fr)_minmax(120px,1fr)_minmax(110px,0.9fr)_40px] gap-x-3";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
@@ -286,7 +286,12 @@ export function WorkQueueTable({
               </span>
             ))}
 
-            <div className="relative flex justify-end">
+            <div
+              className={cn(
+                "sticky right-0 z-20 -mr-5 flex justify-end bg-white pr-5 pl-3 sm:-mr-7 sm:pr-7",
+                "shadow-[-12px_0_12px_-8px_rgba(15,23,42,0.06)]",
+              )}
+            >
               <button
                 ref={optionsButtonRef}
                 type="button"
@@ -422,7 +427,7 @@ export function WorkQueueTable({
                   }}
                   className={cn(
                     COLS,
-                    "group w-full cursor-pointer items-center border-b border-gray-100 px-5 py-1.5 text-left transition-colors last:border-b-0 hover:bg-[var(--wq-surface)] sm:px-7",
+                    "group w-full cursor-pointer items-center gap-x-3 border-b border-gray-100 px-5 py-1.5 text-left transition-colors last:border-b-0 hover:bg-[var(--wq-surface)] sm:px-7",
                     overdue && "bg-red-50/30 hover:bg-red-50/60",
                   )}
                 >
@@ -525,7 +530,6 @@ export function WorkQueueTable({
                   <span className="truncate text-[13.5px] leading-[18px] text-gray-600">
                     {row.tag ?? ""}
                   </span>
-                  <span aria-hidden />
                 </div>
               );
             })
