@@ -176,7 +176,7 @@ export function ManageQueueModal({
             onChange={(e) =>
               setViewType(e.target.value as "category" | "list")
             }
-            className="h-8 rounded-lg border border-gray-200 bg-white px-2.5 text-[12.5px] font-medium text-gray-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/15"
+            className="h-8 rounded border border-gray-200 bg-white px-2.5 text-[12.5px] font-medium text-gray-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/15"
           >
             <option value="category">Category View</option>
             <option value="list">List View</option>
@@ -227,7 +227,7 @@ export function ManageQueueModal({
                       }}
                       onDragEnd={() => setDragItem(null)}
                       className={cn(
-                        "group flex h-8 items-center gap-2.5 rounded-lg px-1.5 transition-colors hover:bg-blue-50",
+                        "group flex h-8 items-center gap-2.5 rounded-lg px-1.5 transition-colors hover:bg-violet-50",
                         dragItem?.itemId === it.id && "opacity-40",
                       )}
                     >
@@ -285,7 +285,7 @@ export function ManageQueueModal({
           <button
             type="button"
             onClick={() => onSave(draft)}
-            className="h-9 rounded-lg bg-blue-600 px-5 text-[13.5px] font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
+            className="h-9 rounded bg-violet-600 px-5 text-[13.5px] font-medium text-white transition-colors hover:bg-violet-700"
           >
             Save
           </button>
@@ -315,7 +315,7 @@ function Checkbox({
         "inline-flex shrink-0 items-center justify-center rounded-[5px] border-[1.5px] transition-colors",
         dim,
         checked
-          ? "border-blue-600 bg-blue-600"
+          ? "border-violet-600 bg-violet-600"
           : "border-gray-300 bg-white hover:border-gray-400",
       )}
     >

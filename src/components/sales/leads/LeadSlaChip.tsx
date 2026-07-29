@@ -104,7 +104,7 @@ export function LeadSlaChip({
   return (
     <div
       className={cn(
-        "mb-2 space-y-1 rounded-md border border-slate-100 bg-slate-50/80 px-2 py-1.5",
+        "mb-1.5 space-y-0.5 rounded-md border border-slate-100 bg-slate-50/80 px-2 py-1",
         className,
       )}
       role="status"

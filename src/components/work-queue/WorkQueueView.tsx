@@ -31,7 +31,7 @@ import { onRulesChange } from "@/lib/rules";
 import { viewEnter } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 25;
 
 const DEFAULT_FILTERS: QueueTableFilters = {
   priority: "all",
@@ -67,6 +67,7 @@ export function WorkQueueView() {
   const [categories, setCategories] =
     React.useState<WorkqueueCategoryDef[]>(CATEGORIES_DEFAULT);
   const [manageOpen, setManageOpen] = React.useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
 
   const [isAddUserOpen, setIsAddUserOpen] = React.useState(false);
   const [newUserName, setNewUserName] = React.useState("");
@@ -185,9 +186,9 @@ export function WorkQueueView() {
       className="flex h-full min-h-[calc(100vh-4rem)] w-full min-w-0 flex-col bg-white text-gray-900 antialiased"
       style={
         {
-          "--wq-accent": "#2563EB",
-          "--wq-accent-soft": "#EFF6FF",
-          "--wq-accent-badge": "#DBEAFE",
+          "--wq-accent": "#7C3AED",
+          "--wq-accent-soft": "#F5F3FF",
+          "--wq-accent-badge": "#EDE9FE",
           "--wq-surface": "#FAFAFA",
           "--wq-line": "#E5E7EB",
           "--wq-danger": "#DC2626",
@@ -196,8 +197,8 @@ export function WorkQueueView() {
       }
     >
       {/* Title strip + search */}
-      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--wq-line)] px-5 py-3.5 sm:px-7">
-        <h1 className="text-[20px] leading-6 font-bold tracking-tight text-gray-900">
+      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-[var(--wq-line)] px-4 py-2.5 sm:px-5">
+        <h1 className="text-[18px] leading-6 font-bold tracking-tight text-gray-900">
           Workqueue
         </h1>
         <div className="relative w-full max-w-[340px] flex-1 sm:ml-2">
@@ -209,7 +210,7 @@ export function WorkQueueView() {
               setPage(1);
             }}
             placeholder="Search records"
-            className="h-9 w-full rounded-lg border border-[var(--wq-line)] bg-[var(--wq-surface)] pr-3 pl-8 text-[13px] text-gray-900 outline-none transition-shadow placeholder:text-gray-400 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-500/15"
+            className="h-9 w-full rounded border border-[var(--wq-line)] bg-[var(--wq-surface)] pr-3 pl-8 text-[13px] text-gray-900 outline-none placeholder:text-gray-400 focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-500/15"
           />
         </div>
       </div>
@@ -228,16 +229,15 @@ export function WorkQueueView() {
                 resetLocalFilters();
               }}
               className={cn(
-                "group relative flex shrink-0 items-center gap-2.5 px-4 py-3 transition-colors sm:px-5",
+                "group relative flex shrink-0 items-center gap-2 px-3 py-2 transition-colors sm:px-4",
                 active ? "bg-white" : "hover:bg-[var(--wq-surface)]",
               )}
             >
               <span
                 className={cn(
-                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white shadow-sm ring-2 transition-shadow",
-                  active ? "ring-blue-100" : "ring-transparent",
+                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white ring-2 transition-shadow",
+                  active ? "bg-violet-600 ring-violet-100" : "bg-violet-500/80 ring-transparent",
                 )}
-                style={{ background: u.color }}
               >
                 {u.initials}
               </span>
@@ -245,19 +245,19 @@ export function WorkQueueView() {
                 <span
                   className={cn(
                     "truncate text-[13px] font-semibold transition-colors",
-                    active ? "text-[var(--wq-accent)]" : "text-gray-900",
+                    active ? "text-violet-700" : "text-slate-700",
                   )}
                 >
                   {u.name}
                 </span>
-                <span className="truncate text-[12px] text-gray-500">
+                <span className="truncate text-[12px] text-slate-500">
                   {u.role}
                 </span>
               </span>
               <span
                 className={cn(
-                  "absolute inset-x-3 bottom-0 h-0.5 rounded-full transition-colors",
-                  active ? "bg-[var(--wq-accent)]" : "bg-transparent",
+                  "absolute inset-x-3 bottom-0 h-0.5 transition-colors",
+                  active ? "bg-violet-600" : "bg-transparent",
                 )}
               />
             </button>
@@ -275,6 +275,8 @@ export function WorkQueueView() {
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <WorkQueueSidebar
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
           activeItem={activeNav}
           onActiveItemChange={(id) => {
             setActiveNav(id);

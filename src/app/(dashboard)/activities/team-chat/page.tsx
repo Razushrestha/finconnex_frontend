@@ -81,10 +81,6 @@ export default function TeamChatPage() {
 
   return (
     <div className="relative flex h-[calc(100dvh-0px)] min-h-full flex-col overflow-hidden bg-slate-50">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.10),_transparent_65%)]"
-      />
 
       <div className="relative flex min-h-0 flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
@@ -117,7 +113,7 @@ export default function TeamChatPage() {
         {/* One continuous workspace surface */}
         <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_rgba(15,23,42,0.06)]">
           {/* Channel rail */}
-          <aside className="flex w-[240px] shrink-0 flex-col border-r border-slate-100 bg-gradient-to-b from-slate-50/90 to-white">
+          <aside className="flex w-[240px] shrink-0 flex-col border-r border-slate-100 bg-slate-50">
             <div className="border-b border-slate-100 p-3">
               <div className="relative">
                 <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
@@ -267,7 +263,7 @@ export default function TeamChatPage() {
             </div>
 
             {/* Elevated composer */}
-            <div className="border-t border-slate-100 bg-gradient-to-t from-slate-50/80 to-white px-4 py-3 sm:px-5">
+            <div className="border-t border-slate-100 bg-white px-4 py-3 sm:px-5">
               <div className="mx-auto max-w-3xl">
                 <div className="rounded-2xl border border-slate-200/90 bg-white p-2 shadow-[0_2px_8px_rgba(15,23,42,0.06)] transition-all focus-within:border-violet-400 focus-within:shadow-[0_0_0_3px_rgba(139,92,246,0.12),0_4px_16px_rgba(15,23,42,0.06)]">
                   <textarea

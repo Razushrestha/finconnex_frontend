@@ -5,7 +5,6 @@ import {
   Bar,
   XAxis,
   ResponsiveContainer,
-  Cell,
   Tooltip,
   TooltipContentProps,
 } from "recharts";
@@ -82,13 +81,6 @@ export function TotalVisitorsCard() {
             barCategoryGap="20%"
             margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
           >
-            <defs>
-              <linearGradient id="currentGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#6366f1" />
-                <stop offset="100%" stopColor="#a78bfa" />
-              </linearGradient>
-            </defs>
-
             <XAxis
               dataKey="device"
               axisLine={false}
@@ -104,19 +96,8 @@ export function TotalVisitorsCard() {
               cursor={{ fill: "#f8fafc" }}
             />
 
-            <Bar dataKey="current" radius={[6, 6, 0, 0]} barSize={32}>
-              {data.map((entry) => (
-                <Cell
-                  key={`current-${entry.device}`}
-                  fill="url(#currentGradient)"
-                />
-              ))}
-            </Bar>
-            <Bar dataKey="lastMonth" radius={[6, 6, 0, 0]} barSize={32}>
-              {data.map((entry) => (
-                <Cell key={`last-${entry.device}`} fill="#f1f5f9" />
-              ))}
-            </Bar>
+            <Bar dataKey="current" radius={[6, 6, 0, 0]} barSize={32} fill="#64748B" />
+            <Bar dataKey="lastMonth" radius={[6, 6, 0, 0]} barSize={32} fill="#f1f5f9" />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -124,7 +105,7 @@ export function TotalVisitorsCard() {
       {/* Legend */}
       <div className="mt-5 flex items-center justify-center gap-6">
         <div className="flex items-center gap-2 text-sm text-slate-500">
-          <span className="h-2.5 w-2.5 rounded-sm bg-indigo-500" />
+          <span className="h-2.5 w-2.5 rounded-sm bg-slate-500" />
           Current
         </div>
         <div className="flex items-center gap-2 text-sm text-slate-500">

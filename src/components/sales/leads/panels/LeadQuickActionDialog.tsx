@@ -158,7 +158,7 @@ export function LeadQuickActionDialog({
             </p>
             <Button
               type="button"
-              className="w-full justify-center gap-2"
+              className="w-full justify-center gap-2 bg-violet-600 text-white hover:bg-violet-700"
               onClick={runIntent}
             >
               {kind === "call" && <Phone className="h-4 w-4" />}
@@ -189,7 +189,7 @@ export function LeadQuickActionDialog({
               autoFocus={!isContactIntent}
               value={draft.title}
               onChange={(e) => update("title", e.target.value)}
-              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-slate-300"
+              className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm text-slate-800 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
               placeholder={
                 kind === "call"
                   ? "Discovery call"
@@ -211,7 +211,7 @@ export function LeadQuickActionDialog({
                 value={draft.body}
                 onChange={(e) => update("body", e.target.value)}
                 rows={3}
-                className="mt-1 w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-slate-300"
+                className="mt-1 w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
                 placeholder={
                   kind === "sms"
                     ? "Write a text…"
@@ -233,7 +233,7 @@ export function LeadQuickActionDialog({
                   type="date"
                   value={draft.date}
                   onChange={(e) => update("date", e.target.value)}
-                  className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-slate-300"
+                  className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
                 />
               </label>
               <label className="block text-xs font-medium text-slate-600">
@@ -242,7 +242,7 @@ export function LeadQuickActionDialog({
                   type="time"
                   value={draft.time}
                   onChange={(e) => update("time", e.target.value)}
-                  className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-slate-300"
+                  className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
                 />
               </label>
             </div>
@@ -254,7 +254,7 @@ export function LeadQuickActionDialog({
               <select
                 value={draft.assignedTo}
                 onChange={(e) => update("assignedTo", e.target.value)}
-                className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-slate-300"
+                className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
               >
                 {ACTIVITY_OWNERS.map((o) => (
                   <option key={o} value={o}>
@@ -273,7 +273,7 @@ export function LeadQuickActionDialog({
                 onChange={(e) =>
                   update("priority", e.target.value as Priority)
                 }
-                className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-slate-300"
+                className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
               >
                 <option value="High">High</option>
                 <option value="Medium">Medium</option>
@@ -300,11 +300,15 @@ export function LeadQuickActionDialog({
               <Button
                 type="button"
                 variant="outline"
+                className="border-slate-200 hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
                 onClick={() => onOpenChange(false)}
               >
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button
+                type="submit"
+                className="bg-violet-600 text-white hover:bg-violet-700"
+              >
                 {kind === "sms" || kind === "email"
                   ? "Log as sent"
                   : kind === "note"

@@ -177,10 +177,6 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
 
   return (
     <div className="relative flex min-h-full flex-col bg-slate-50">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.09),_transparent_60%)]"
-      />
 
       <div className="relative flex flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
         {/* Compact header */}

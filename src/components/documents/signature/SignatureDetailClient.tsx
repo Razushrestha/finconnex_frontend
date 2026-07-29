@@ -205,10 +205,6 @@ export function SignatureDetailClient({ id }: { id: string }) {
 
   return (
     <div className="relative flex min-h-full flex-col bg-slate-50">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.09),_transparent_60%)]"
-      />
 
       <div className="relative flex flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
@@ -356,7 +352,7 @@ export function SignatureDetailClient({ id }: { id: string }) {
                   role={req.status === "Draft" ? "button" : undefined}
                   onClick={addField}
                   className={cn(
-                    "relative mx-auto aspect-[3/4] w-full max-w-md flex-1 overflow-hidden rounded-xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 shadow-inner",
+                    "relative mx-auto aspect-[3/4] w-full max-w-md flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-inner",
                     req.status === "Draft" && "cursor-crosshair",
                   )}
                 >

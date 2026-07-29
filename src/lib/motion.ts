@@ -1,56 +1,54 @@
-/** Shared motion classes: Tailwind + tw-animate-css (no Framer). */
+/** Shared motion classes: Tailwind + tw-animate-css (no Framer).
+ * Keep: drag ghost, focus feedback, subtle page fade.
+ * Cut: decorative entrance cascades / bounce / violet hover lift.
+ */
 
 const reduce = "motion-reduce:animate-none motion-reduce:transition-none";
 
-/** Kanban / draggable record cards */
+/** Kanban / draggable record cards — quiet hover, no lift cascade */
 export const cardMotion = [
-  "transition-all duration-200 ease-out will-change-transform",
-  "hover:-translate-y-0.5 hover:shadow-md hover:border-violet-200/80",
+  "transition-[opacity,box-shadow,border-color] duration-150 ease-out",
+  "hover:border-slate-300 hover:shadow-sm",
   reduce,
 ].join(" ");
 
+/** Drag ghost — keep */
 export const cardDragging =
-  "scale-[0.98] opacity-50 shadow-none ring-2 ring-violet-300/50 motion-reduce:scale-100";
+  "scale-[0.98] opacity-50 shadow-none ring-2 ring-slate-300/60 motion-reduce:scale-100";
 
 /** Dropdown menus (profile, notifications) */
 export const menuEnter = [
-  "animate-in fade-in-0 zoom-in-95 slide-in-from-top-1 duration-150 origin-top-right",
+  "animate-in fade-in-0 duration-100",
   reduce,
 ].join(" ");
 
-/** Board / list content when view switches */
+/** Board / list content when view switches — subtle page fade only */
 export const viewEnter = [
-  "animate-in fade-in-0 slide-in-from-bottom-1 duration-200 fill-mode-both",
+  "animate-in fade-in-0 duration-150 fill-mode-both",
   reduce,
 ].join(" ");
 
-/** Search result rows */
-export const listItemEnter = [
-  "animate-in fade-in-0 slide-in-from-left-1 duration-150 fill-mode-both",
-  reduce,
-].join(" ");
+/** Search / list rows — no staggered slide-in cascade */
+export const listItemEnter = "";
 
-/** Unread / count badge pop */
-export const badgePop = [
-  "animate-in zoom-in-50 fade-in-0 duration-200",
-  reduce,
-].join(" ");
+/** Unread / count badge — instant, no pop */
+export const badgePop = "";
 
-/** Filter sidebar open */
+/** Filter sidebar open — fade only */
 export const filterEnter = [
-  "animate-in fade-in-0 slide-in-from-left-2 duration-200 fill-mode-both",
+  "animate-in fade-in-0 duration-150 fill-mode-both",
   reduce,
 ].join(" ");
 
-/** Create form field grid */
+/** Create form field grid — fade only, no slide cascade */
 export const formEnter = [
-  "animate-in fade-in-0 slide-in-from-bottom-1 duration-250 fill-mode-both",
+  "animate-in fade-in-0 duration-150 fill-mode-both",
   reduce,
 ].join(" ");
 
-/** Kanban column idle vs drag-over */
+/** Kanban column idle vs drag-over — no scale bounce */
 export const dropTargetIdle =
-  "transition-all duration-200 ease-out motion-reduce:transition-none";
+  "transition-colors duration-150 ease-out motion-reduce:transition-none";
 
 export const dropTargetActive =
-  "border-violet-300 bg-violet-50 ring-2 ring-violet-200/80 scale-[1.01] shadow-sm shadow-violet-100 motion-reduce:scale-100";
+  "border-slate-400 bg-slate-100 ring-1 ring-slate-300/80";

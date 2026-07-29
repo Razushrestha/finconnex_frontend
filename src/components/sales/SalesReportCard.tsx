@@ -175,17 +175,6 @@ export function SalesReportCard() {
             data={data}
             margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
           >
-            <defs>
-              <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#6366f1" stopOpacity={0.25} />
-                <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
-              </linearGradient>
-              <linearGradient id="expensesGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ef4444" stopOpacity={0.15} />
-                <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-
             <CartesianGrid vertical={false} stroke="#f1f5f9" />
 
             <XAxis
@@ -212,12 +201,13 @@ export function SalesReportCard() {
               <Area
                 type="monotone"
                 dataKey="income"
-                stroke="#6366f1"
-                strokeWidth={2.5}
-                fill="url(#incomeGradient)"
+                stroke="#475569"
+                strokeWidth={2}
+                fill="#64748B"
+                fillOpacity={0.12}
                 activeDot={{
                   r: 5,
-                  stroke: "#6366f1",
+                  stroke: "#475569",
                   strokeWidth: 2,
                   fill: "#fff",
                 }}
@@ -228,12 +218,13 @@ export function SalesReportCard() {
               <Area
                 type="monotone"
                 dataKey="expenses"
-                stroke="#ef4444"
-                strokeWidth={2.5}
-                fill="url(#expensesGradient)"
+                stroke="#b91c1c"
+                strokeWidth={2}
+                fill="#ef4444"
+                fillOpacity={0.1}
                 activeDot={{
                   r: 5,
-                  stroke: "#ef4444",
+                  stroke: "#b91c1c",
                   strokeWidth: 2,
                   fill: "#fff",
                 }}

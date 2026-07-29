@@ -152,7 +152,7 @@ export function DealsKanbanBoard({ pipeline, filters }: DealsKanbanBoardProps) {
 
   return (
     <div className="relative w-full overflow-x-auto bg-slate-50/50">
-      <div className="grid min-w-[1400px] grid-cols-1 items-start gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid min-w-[1400px] grid-cols-1 items-start gap-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {visibleStages.map((stage) => {
           const isOver = overStageId === stage.id;
 
@@ -171,7 +171,7 @@ export function DealsKanbanBoard({ pipeline, filters }: DealsKanbanBoardProps) {
                 handleDrop(stage.id);
               }}
               className={cn(
-                "flex flex-col rounded-sm border p-3",
+                "flex flex-col rounded-sm border p-2",
                 dropTargetIdle,
                 isOver
                   ? dropTargetActive
@@ -218,7 +218,7 @@ export function DealsKanbanBoard({ pipeline, filters }: DealsKanbanBoardProps) {
                   : "No deals"}
               </div>
 
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
                 {stage.deals.map((deal) => (
                   <DealRecordCard
                     key={deal.id}
@@ -230,7 +230,7 @@ export function DealsKanbanBoard({ pipeline, filters }: DealsKanbanBoardProps) {
                 ))}
 
                 {stage.deals.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 py-8 text-center text-xs text-slate-400">
+                  <div className="rounded-md border border-dashed border-slate-300 bg-white/60 py-4 text-center text-xs text-slate-400">
                     Drop a deal here
                   </div>
                 )}
@@ -240,7 +240,7 @@ export function DealsKanbanBoard({ pipeline, filters }: DealsKanbanBoardProps) {
         })}
 
         {visibleStages.length === 0 && (
-          <div className="col-span-full rounded-xl border border-dashed border-slate-300 bg-white/60 py-12 text-center text-sm text-slate-400">
+          <div className="col-span-full rounded-md border border-dashed border-slate-300 bg-white/60 py-8 text-center text-sm text-slate-400">
             No deals match the current filters.
           </div>
         )}

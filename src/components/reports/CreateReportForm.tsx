@@ -156,10 +156,6 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
 
   return (
     <div className="relative flex min-h-full flex-col overflow-hidden bg-slate-50">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.09),_transparent_65%)]"
-      />
 
       <div className="relative mx-auto flex w-full max-w-[1400px] flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">

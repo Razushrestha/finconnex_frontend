@@ -6,6 +6,8 @@ import {
   CalendarDays,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Mail,
   MessageSquare,
   Phone,
@@ -33,6 +35,8 @@ const iconMap: Record<
 };
 
 interface WorkQueueSidebarProps {
+  collapsed: boolean;
+  onToggleCollapse: () => void;
   activeItem: WorkQueueNavId;
   onActiveItemChange: (id: WorkQueueNavId) => void;
   activityItems: ActivityNavItem[];
@@ -45,21 +49,17 @@ interface WorkQueueSidebarProps {
 function CountBadge({
   count,
   active,
-  danger,
 }: {
   count: number;
   active?: boolean;
-  danger?: boolean;
 }) {
   return (
     <span
       className={cn(
         "min-w-[22px] rounded-md px-1.5 py-0.5 text-center text-[11px] font-semibold tabular-nums transition-colors",
-        danger
-          ? "bg-[var(--wq-danger-soft)] text-[var(--wq-danger)]"
-          : active
-            ? "bg-[var(--wq-accent-badge)] text-[var(--wq-accent)]"
-            : "bg-gray-100 text-gray-500",
+        active
+          ? "bg-[var(--wq-accent-badge)] text-[var(--wq-accent)]"
+          : "bg-slate-100 text-slate-500",
       )}
     >
       {count}
@@ -68,6 +68,8 @@ function CountBadge({
 }
 
 export function WorkQueueSidebar({
+  collapsed,
+  onToggleCollapse,
   activeItem,
   onActiveItemChange,
   activityItems,
@@ -76,21 +78,75 @@ export function WorkQueueSidebar({
   onTimeFilterChange,
   onOpenManage,
 }: WorkQueueSidebarProps) {
+  if (collapsed) {
+    return (
+      <aside className="flex w-10 shrink-0 flex-col items-center border-b border-[var(--wq-line)] bg-[var(--wq-surface)] py-3 lg:border-r lg:border-b-0">
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          aria-label="Expand sidebar"
+          title="Expand sidebar"
+          className="flex h-8 w-8 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-slate-800"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+        <div className="mt-3 flex flex-col items-center gap-1">
+          {activityItems.map((item) => {
+            const active = activeItem === item.id;
+            const Icon = iconMap[item.icon];
+            return (
+              <button
+                key={item.id}
+                type="button"
+                title={item.label}
+                aria-label={item.label}
+                onClick={() => onActiveItemChange(item.id)}
+                className={cn(
+                  "relative flex h-8 w-8 items-center justify-center rounded transition-colors",
+                  active
+                    ? "bg-[var(--wq-accent-soft)] text-[var(--wq-accent)]"
+                    : "text-slate-400 hover:bg-white hover:text-slate-700",
+                )}
+              >
+                <Icon strokeWidth={1.75} className="h-4 w-4" />
+                {item.count > 0 ? (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded bg-[var(--wq-accent)] px-0.5 text-[9px] font-semibold text-white">
+                    {item.count > 9 ? "9+" : item.count}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      </aside>
+    );
+  }
+
   return (
-    <aside className="w-full shrink-0 overflow-y-auto border-b border-[var(--wq-line)] bg-[var(--wq-surface)] px-3.5 py-4 sm:px-4 lg:w-[300px] lg:border-r lg:border-b-0">
-      {/* My Open Activity */}
-      <section className="mb-4 border-b border-[var(--wq-line)] pb-4">
-        <h2 className="mb-2.5 px-1.5 text-[13.5px] font-semibold tracking-tight text-gray-900">
+    <aside className="w-full shrink-0 overflow-y-auto border-b border-[var(--wq-line)] bg-[var(--wq-surface)] px-3.5 py-3 sm:px-4 lg:w-[300px] lg:border-r lg:border-b-0">
+      <div className="mb-3 flex items-center justify-between px-1.5">
+        <h2 className="text-[13.5px] font-semibold tracking-tight text-slate-900">
           My Open Activity
         </h2>
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          aria-label="Minimize sidebar"
+          title="Minimize sidebar"
+          className="flex h-7 w-7 items-center justify-center rounded text-slate-400 transition-colors hover:bg-white hover:text-slate-700"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+      </div>
 
+      <section className="mb-4 border-b border-[var(--wq-line)] pb-4">
         <div className="relative mb-2.5">
           <select
             value={timeFilter}
             onChange={(e) =>
               onTimeFilterChange(e.target.value as WorkQueueTimeFilter)
             }
-            className="h-9 w-full appearance-none rounded-lg border border-[var(--wq-line)] bg-white px-3 pr-8 text-[12.5px] font-medium text-gray-700 shadow-[0_1px_0_rgba(15,23,42,0.02)] outline-none transition-shadow focus:border-[var(--wq-accent)] focus:ring-2 focus:ring-blue-500/15"
+            className="h-9 w-full appearance-none rounded border border-[var(--wq-line)] bg-white px-3 pr-8 text-[12.5px] font-medium text-slate-700 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/15"
             aria-label="Activity time filter"
           >
             <option value="today-overdue">Today &amp; Overdue</option>
@@ -152,7 +208,6 @@ export function WorkQueueSidebar({
         </div>
       </section>
 
-      {/* My Workqueue */}
       <section>
         <div className="mb-2.5 flex items-center justify-between px-1.5">
           <h2 className="text-[13.5px] font-semibold tracking-tight text-gray-900">
@@ -207,11 +262,7 @@ export function WorkQueueSidebar({
                     >
                       {item.label}
                     </span>
-                    <CountBadge
-                      count={item.count}
-                      active={active}
-                      danger={item.danger}
-                    />
+                    <CountBadge count={item.count} active={active} />
                   </button>
                 );
               })}

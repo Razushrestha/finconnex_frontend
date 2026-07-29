@@ -61,10 +61,6 @@ export function PublicJourneyClient({ token }: { token: string }) {
 
   return (
     <div className="relative min-h-dvh bg-slate-50">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.14),_transparent_60%)]"
-      />
       <div className="relative mx-auto max-w-lg px-4 py-10 sm:px-6">
         <p className="text-[11px] font-semibold tracking-widest text-violet-600 uppercase">
           FinConnex · Your proposal

@@ -10,7 +10,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "flex flex-col rounded-2xl border border-gray-100 bg-white p-5",
+        "flex flex-col rounded-md border border-slate-200/80 bg-white p-4",
         className,
       )}
     >

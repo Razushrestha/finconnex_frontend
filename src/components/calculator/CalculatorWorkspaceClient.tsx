@@ -201,10 +201,6 @@ export function CalculatorWorkspaceClient() {
 
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.10),_transparent_65%)]"
-      />
       {toast ? (
         <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-semibold text-white shadow-lg">
           {toast}
@@ -462,7 +458,7 @@ export function CalculatorWorkspaceClient() {
             </div>
 
             <aside className="space-y-3">
-              <div className="rounded-2xl border border-violet-100 bg-gradient-to-b from-violet-50/80 to-white p-4 shadow-sm">
+              <div className="rounded-2xl border border-violet-100 bg-slate-50 p-4 shadow-sm">
                 <div className="mb-1 text-[10px] font-semibold tracking-wide text-violet-600 uppercase">
                   Output result
                 </div>

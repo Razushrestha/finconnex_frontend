@@ -145,7 +145,7 @@ export function UpcomingMeetingsCard() {
           ))}
         </div>
 
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-white/90" />
       </div>
     </Card>
   );

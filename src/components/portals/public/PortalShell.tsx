@@ -95,10 +95,6 @@ export function PortalShell({
   if (portal.status !== "Active") {
     return (
       <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-slate-50 px-4 text-center">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.12),_transparent_55%)]"
-        />
         <div className="relative max-w-md">
           <p className="text-[11px] font-semibold tracking-widest text-violet-600 uppercase">
             FinConnex
@@ -129,10 +125,6 @@ export function PortalShell({
 
   return (
     <div className="relative min-h-dvh bg-slate-50">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.14),_transparent_60%)]"
-      />
       <header className="relative border-b border-slate-200/80 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div>

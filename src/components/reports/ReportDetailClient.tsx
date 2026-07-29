@@ -142,11 +142,10 @@ export function ReportDetailClient({ id }: { id: string }) {
 
   function saveEdits() {
     if (!row) return;
-    const req = assertRequired({ name, dataSource, dateRange }, [
-      "name",
-      "dataSource",
-      "dateRange",
-    ]);
+    const req = assertRequired(
+      { name, dataSource, dateRange },
+      ["name", "dataSource", "dateRange"],
+    );
     if (!req.ok) {
       flash(req.message);
       return;
@@ -183,16 +182,7 @@ export function ReportDetailClient({ id }: { id: string }) {
     const changes = fieldDiff(
       row as unknown as Record<string, unknown>,
       next as unknown as Record<string, unknown>,
-      [
-        "name",
-        "type",
-        "dataSource",
-        "dateRange",
-        "filters",
-        "groupBy",
-        "sortBy",
-        "schedule",
-      ],
+      ["name", "type", "dataSource", "dateRange", "filters", "groupBy", "sortBy", "schedule"],
     );
     logEdit("reports", createdBy, row.id, row.reportId, changes);
     save(next, "Changes saved");
@@ -246,11 +236,7 @@ export function ReportDetailClient({ id }: { id: string }) {
     if (!row) return;
     const tpl = saveReportAsTemplate(row, row.createdBy);
     save(
-      appendReportAudit(
-        row,
-        `Saved as template ${tpl.reportId}`,
-        row.createdBy,
-      ),
+      appendReportAudit(row, `Saved as template ${tpl.reportId}`, row.createdBy),
       `Template ${tpl.reportId} saved`,
     );
   }
@@ -269,11 +255,7 @@ export function ReportDetailClient({ id }: { id: string }) {
     cn(elevatedSelectClass(hasIcon), "!h-9 !text-[12px] !rounded-lg");
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-50">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.10),_transparent_65%)]"
-      />
+    <div className="relative min-h-full overflow-hidden bg-slate-50">
       {toast ? (
         <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
           {toast}
@@ -291,10 +273,7 @@ export function ReportDetailClient({ id }: { id: string }) {
               <ArrowLeft className="h-3.5 w-3.5" />
             </button>
             <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-              <Link
-                href="/"
-                className="flex items-center gap-0.5 hover:text-slate-600"
-              >
+              <Link href="/" className="flex items-center gap-0.5 hover:text-slate-600">
                 <Home className="h-3 w-3" />
                 Home
               </Link>
@@ -473,9 +452,7 @@ export function ReportDetailClient({ id }: { id: string }) {
                   <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-500">
                     <span>
                       Created by{" "}
-                      <strong className="text-slate-700">
-                        {row.createdBy}
-                      </strong>
+                      <strong className="text-slate-700">{row.createdBy}</strong>
                     </span>
                     <span>
                       Schedule{" "}
@@ -533,9 +510,7 @@ export function ReportDetailClient({ id }: { id: string }) {
 
               {row.filters ? (
                 <p className="mb-4 rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
-                  <span className="font-semibold text-slate-500">
-                    Filters ·{" "}
-                  </span>
+                  <span className="font-semibold text-slate-500">Filters · </span>
                   {row.filters}
                 </p>
               ) : null}
@@ -844,9 +819,7 @@ function Field({
 }) {
   return (
     <div className={cn("flex flex-col gap-1", className)}>
-      <label className="text-[11px] font-semibold text-slate-600">
-        {label}
-      </label>
+      <label className="text-[11px] font-semibold text-slate-600">{label}</label>
       {children}
     </div>
   );

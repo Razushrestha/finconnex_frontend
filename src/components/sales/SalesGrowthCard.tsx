@@ -77,19 +77,6 @@ export function SalesGrowthCard() {
             data={data}
             margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
           >
-            <defs>
-              <linearGradient
-                id="salesGrowthGradient"
-                x1="0"
-                y1="0"
-                x2="0"
-                y2="1"
-              >
-                <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-
             <XAxis
               dataKey="day"
               axisLine={false}
@@ -113,12 +100,13 @@ export function SalesGrowthCard() {
             <Area
               type="monotone"
               dataKey="sales"
-              stroke="#7c3aed"
-              strokeWidth={3}
-              fill="url(#salesGrowthGradient)"
+              stroke="#475569"
+              strokeWidth={2}
+              fill="#64748B"
+              fillOpacity={0.15}
               activeDot={{
                 r: 5,
-                stroke: "#7c3aed",
+                stroke: "#475569",
                 strokeWidth: 2,
                 fill: "#fff",
               }}

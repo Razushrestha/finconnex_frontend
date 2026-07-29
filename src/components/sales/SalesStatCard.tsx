@@ -4,7 +4,7 @@ type TrendTone = "positive" | "negative";
 
 interface SalesStatCardProps {
   icon: LucideIcon;
-  iconColorClass: string;
+  iconColorClass?: string;
   label: string;
   value: string;
   trend?: {
@@ -15,23 +15,20 @@ interface SalesStatCardProps {
 
 export function SalesStatCard({
   icon: Icon,
-  iconColorClass,
+  iconColorClass = "text-slate-500",
   label,
   value,
   trend,
 }: SalesStatCardProps) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-sm">
-      <div
-        className={`mb-6 flex h-11 w-11 items-center justify-center rounded-full ${iconColorClass}`}
-      >
-        <Icon className="h-5 w-5" strokeWidth={2} />
+    <div className="rounded-md border border-slate-200/80 bg-white p-4 shadow-2xs">
+      <div className="mb-2 flex items-center gap-2">
+        <Icon className={`h-4 w-4 ${iconColorClass}`} strokeWidth={2} />
+        <p className="text-sm text-slate-500">{label}</p>
       </div>
 
-      <p className="mb-1.5 text-sm text-slate-500">{label}</p>
-
       <div className="flex items-center gap-2">
-        <span className="text-2xl font-semibold text-slate-900">{value}</span>
+        <span className="text-xl font-semibold text-slate-900">{value}</span>
 
         {trend && (
           <span

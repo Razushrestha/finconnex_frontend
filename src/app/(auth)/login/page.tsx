@@ -40,10 +40,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen">
       {/* Brand panel */}
-      <div className="relative hidden w-[480px] shrink-0 overflow-hidden bg-gradient-to-br from-violet-700 via-violet-600 to-indigo-700 lg:flex lg:flex-col lg:justify-between lg:p-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.12),transparent_40%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_80%,rgba(0,0,0,0.15),transparent_50%)]" />
-
+      <div className="relative hidden w-[480px] shrink-0 overflow-hidden bg-slate-900 lg:flex lg:flex-col lg:justify-between lg:p-10">
         <div className="relative">
           <div className="mb-2 text-2xl font-bold tracking-tight text-white">
             FinConnex
@@ -69,9 +66,7 @@ export default function LoginPage() {
               const Icon = feature.icon;
               return (
                 <li key={feature.title} className="flex gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15 backdrop-blur-sm">
-                    <Icon className="h-4 w-4 text-white" />
-                  </div>
+                  <Icon className="mt-0.5 h-4 w-4 shrink-0 text-violet-200" />
                   <div>
                     <p className="text-sm font-semibold text-white">
                       {feature.title}

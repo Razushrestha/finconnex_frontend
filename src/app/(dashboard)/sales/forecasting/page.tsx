@@ -10,6 +10,12 @@ import {
   formatAud,
   type ForecastPeriod,
 } from "@/lib/forecasting/types";
+import { cn } from "@/lib/utils";
+
+function attainmentPct(closed: number, quota: number) {
+  if (!quota) return 0;
+  return Math.round((closed / quota) * 100);
+}
 
 export default function ForecastingPage() {
   const [period, setPeriod] = useState<ForecastPeriod>("Quarter");
@@ -27,121 +33,169 @@ export default function ForecastingPage() {
     );
   }, []);
 
-  return (
-    <div className="min-h-screen bg-slate-50 p-3 sm:p-5 lg:p-6">
-      <nav className="mb-3 flex items-center gap-1.5 text-[11px] text-slate-400">
-        <Link href="/" className="flex items-center gap-1 hover:text-slate-600">
-          <Home className="h-3.5 w-3.5" />
-          Home
-        </Link>
-        <span>&gt;</span>
-        <span className="text-slate-500">Sales</span>
-        <span>&gt;</span>
-        <span className="text-slate-600">Forecasting</span>
-      </nav>
+  const teamAttainment = attainmentPct(totals.closed, totals.quota);
 
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">
-            Sales Forecasting &amp; Territory
-          </h1>
-          <p className="mt-0.5 text-[12px] text-slate-500">
-            Roll-up by owner and territory · SRS §6.5
+  const metrics: { label: string; value: number; emphasize?: boolean }[] = [
+    { label: "Pipeline", value: totals.pipeline },
+    { label: "Best case", value: totals.bestCase },
+    { label: "Committed", value: totals.committed },
+    { label: "Closed", value: totals.closed, emphasize: true },
+    { label: "Quota", value: totals.quota },
+  ];
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-3 sm:p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <nav className="mb-0.5 flex items-center gap-1 text-[10px] text-slate-400">
+            <Link
+              href="/"
+              className="flex items-center gap-0.5 hover:text-slate-600"
+            >
+              <Home className="h-3 w-3" />
+              Home
+            </Link>
+            <span>/</span>
+            <span>Sales</span>
+            <span>/</span>
+            <span className="text-slate-600">Forecasting</span>
+          </nav>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <h1 className="text-[16px] font-semibold tracking-tight text-slate-900">
+              Sales Forecasting
+            </h1>
+            <p className="text-[12px] text-slate-500">
+              Owner roll-up · {period}
+            </p>
+          </div>
+        </div>
+
+        <div
+          className="inline-flex rounded border border-slate-200 bg-white p-0.5"
+          role="group"
+          aria-label="Forecast period"
+        >
+          {FORECAST_PERIODS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPeriod(p)}
+              className={cn(
+                "h-7 rounded px-2.5 text-[11px] font-medium transition-colors",
+                period === p
+                  ? "bg-violet-600 text-white"
+                  : "text-slate-600 hover:bg-violet-50 hover:text-violet-700",
+              )}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* KPI strip */}
+      <div className="mb-4 overflow-hidden rounded-md border border-slate-200 bg-white">
+        <div className="grid grid-cols-2 divide-y divide-slate-100 sm:grid-cols-3 lg:grid-cols-6 lg:divide-x lg:divide-y-0">
+          {metrics.map((m) => (
+            <div key={m.label} className="px-4 py-3">
+              <p className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                {m.label}
+              </p>
+              <p
+                className={cn(
+                  "mt-1 text-[17px] font-semibold tabular-nums tracking-tight",
+                  m.emphasize ? "text-violet-700" : "text-slate-900",
+                )}
+              >
+                {formatAud(m.value)}
+              </p>
+            </div>
+          ))}
+          <div className="px-4 py-3">
+            <p className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+              Attainment
+            </p>
+            <div className="mt-1.5 flex items-center gap-2">
+              <p className="text-[17px] font-semibold tabular-nums text-violet-700">
+                {teamAttainment}%
+              </p>
+              <div className="h-1.5 min-w-[56px] flex-1 overflow-hidden rounded-full bg-violet-100">
+                <div
+                  className="h-full rounded-full bg-violet-600"
+                  style={{ width: `${Math.min(teamAttainment, 100)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Forecast table */}
+      <div className="mb-4 overflow-hidden rounded-md border border-slate-200 bg-white">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-2.5">
+          <h2 className="text-[13px] font-semibold text-slate-900">
+            Forecast by owner
+          </h2>
+          <p className="text-[12px] text-slate-400">
+            {FORECAST_ROWS.length} owners
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-medium text-slate-500">Period</span>
-          <select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value as ForecastPeriod)}
-            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-medium text-slate-700 shadow-2xs focus:border-violet-300 focus:outline-none"
-          >
-            {FORECAST_PERIODS.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        {(
-          [
-            ["Pipeline", totals.pipeline],
-            ["Best Case", totals.bestCase],
-            ["Committed", totals.committed],
-            ["Closed", totals.closed],
-            ["Quota", totals.quota],
-          ] as const
-        ).map(([label, value]) => (
-          <div
-            key={label}
-            className="rounded-xl border border-slate-100 bg-white px-4 py-3 shadow-sm"
-          >
-            <p className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
-              {label}
-            </p>
-            <p className="mt-1 text-lg font-semibold text-slate-900">
-              {formatAud(value)}
-            </p>
-            <p className="text-[10px] text-slate-400">{period} view</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="mb-5 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-4 py-3">
-          <h2 className="text-[13px] font-semibold text-slate-800">
-            Forecast by Owner
-          </h2>
-        </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px] text-left text-[12px]">
-            <thead className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+          <table className="w-full min-w-[860px] text-left text-[13px]">
+            <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-medium tracking-wide text-slate-500 uppercase">
               <tr>
-                <th className="px-3 py-2.5">Owner</th>
-                <th className="px-3 py-2.5">Territory</th>
-                <th className="px-3 py-2.5">Pipeline</th>
-                <th className="px-3 py-2.5">Best Case</th>
-                <th className="px-3 py-2.5">Committed</th>
-                <th className="px-3 py-2.5">Closed</th>
-                <th className="px-3 py-2.5">Quota</th>
-                <th className="px-3 py-2.5">Attainment</th>
+                <th className="px-3 py-2 font-medium">Owner</th>
+                <th className="px-3 py-2 font-medium">Territory</th>
+                <th className="px-3 py-2 font-medium">Pipeline</th>
+                <th className="px-3 py-2 font-medium">Best case</th>
+                <th className="px-3 py-2 font-medium">Committed</th>
+                <th className="px-3 py-2 font-medium">Closed</th>
+                <th className="px-3 py-2 font-medium">Quota</th>
+                <th className="min-w-[140px] px-3 py-2 font-medium">
+                  Attainment
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50 text-slate-700">
+            <tbody className="divide-y divide-slate-100 text-slate-700">
               {FORECAST_ROWS.map((row) => {
-                const attainment = Math.round((row.closed / row.quota) * 100);
+                const attainment = attainmentPct(row.closed, row.quota);
                 return (
                   <tr
                     key={row.id}
-                    className="transition-colors hover:bg-slate-50/80"
+                    className="h-10 transition-colors hover:bg-violet-50/40"
                   >
-                    <td className="px-3 py-2.5 font-semibold text-slate-900">
+                    <td className="px-3 py-1.5 font-medium text-slate-900">
                       {row.owner}
                     </td>
-                    <td className="px-3 py-2.5 text-slate-600">
+                    <td className="px-3 py-1.5 text-slate-600">
                       {row.territory}
                     </td>
-                    <td className="px-3 py-2.5">{formatAud(row.pipeline)}</td>
-                    <td className="px-3 py-2.5">{formatAud(row.bestCase)}</td>
-                    <td className="px-3 py-2.5">{formatAud(row.committed)}</td>
-                    <td className="px-3 py-2.5 font-medium text-emerald-700">
+                    <td className="px-3 py-1.5 tabular-nums">
+                      {formatAud(row.pipeline)}
+                    </td>
+                    <td className="px-3 py-1.5 tabular-nums">
+                      {formatAud(row.bestCase)}
+                    </td>
+                    <td className="px-3 py-1.5 tabular-nums">
+                      {formatAud(row.committed)}
+                    </td>
+                    <td className="px-3 py-1.5 font-medium tabular-nums text-violet-700">
                       {formatAud(row.closed)}
                     </td>
-                    <td className="px-3 py-2.5">{formatAud(row.quota)}</td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-1.5 tabular-nums">
+                      {formatAud(row.quota)}
+                    </td>
+                    <td className="px-3 py-1.5">
                       <div className="flex items-center gap-2">
-                        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-1.5 w-20 overflow-hidden rounded-full bg-violet-100">
                           <div
-                            className="h-full rounded-full bg-violet-500"
+                            className="h-full rounded-full bg-violet-600"
                             style={{
                               width: `${Math.min(attainment, 100)}%`,
                             }}
                           />
                         </div>
-                        <span className="text-[11px] font-medium text-slate-600">
+                        <span className="w-8 text-[12px] font-medium tabular-nums text-slate-700">
                           {attainment}%
                         </span>
                       </div>
@@ -150,41 +204,82 @@ export default function ForecastingPage() {
                 );
               })}
             </tbody>
+            <tfoot className="border-t border-slate-200 bg-slate-50/80 text-[12.5px] font-semibold text-slate-900">
+              <tr>
+                <td className="px-3 py-2.5" colSpan={2}>
+                  Team total
+                </td>
+                <td className="px-3 py-2.5 tabular-nums">
+                  {formatAud(totals.pipeline)}
+                </td>
+                <td className="px-3 py-2.5 tabular-nums">
+                  {formatAud(totals.bestCase)}
+                </td>
+                <td className="px-3 py-2.5 tabular-nums">
+                  {formatAud(totals.committed)}
+                </td>
+                <td className="px-3 py-2.5 tabular-nums text-violet-700">
+                  {formatAud(totals.closed)}
+                </td>
+                <td className="px-3 py-2.5 tabular-nums">
+                  {formatAud(totals.quota)}
+                </td>
+                <td className="px-3 py-2.5 tabular-nums text-violet-700">
+                  {teamAttainment}%
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-4 py-3">
-          <h2 className="text-[13px] font-semibold text-slate-800">
+      {/* Territories */}
+      <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-2">
+          <h2 className="text-[13px] font-semibold text-slate-900">
             Territories
           </h2>
-          <p className="text-[11px] text-slate-500">
-            Rules for region, postcode, industry, and account size
+          <p className="text-[11px] text-slate-400">
+            {TERRITORIES.length} regions
           </p>
         </div>
-        <div className="divide-y divide-slate-50">
-          {TERRITORIES.map((t) => (
-            <div
-              key={t.id}
-              className="flex flex-wrap items-start justify-between gap-3 px-4 py-3"
-            >
-              <div>
-                <p className="text-[13px] font-semibold text-slate-900">
-                  {t.name}
-                </p>
-                <p className="mt-0.5 text-[11px] text-slate-500">{t.rules}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[12px] font-medium text-slate-700">
-                  {t.owner}
-                </p>
-                <p className="text-[11px] text-slate-400">
-                  {t.accountCount} accounts
-                </p>
-              </div>
-            </div>
-          ))}
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left text-[13px]">
+            <thead className="border-b border-slate-200 bg-violet-50/60 text-[11px] font-medium tracking-wide text-violet-700 uppercase">
+              <tr>
+                <th className="px-3 py-2 font-medium">Territory</th>
+                <th className="px-3 py-2 font-medium">Owner</th>
+                <th className="px-3 py-2 font-medium">Rules</th>
+                <th className="px-3 py-2 text-right font-medium">Accounts</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-slate-700">
+              {TERRITORIES.map((t) => (
+                <tr
+                  key={t.id}
+                  className="h-9 transition-colors hover:bg-violet-50/40"
+                >
+                  <td className="px-3 py-1.5">
+                    <span className="inline-flex items-center gap-1.5 font-medium text-slate-900">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet-600" />
+                      {t.name}
+                    </span>
+                  </td>
+                  <td className="px-3 py-1.5 whitespace-nowrap text-violet-700">
+                    {t.owner}
+                  </td>
+                  <td className="px-3 py-1.5 text-[12px] text-slate-500">
+                    {t.rules}
+                  </td>
+                  <td className="px-3 py-1.5 text-right">
+                    <span className="inline-flex min-w-[2rem] justify-end rounded bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold text-violet-700 tabular-nums">
+                      {t.accountCount}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

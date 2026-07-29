@@ -35,13 +35,13 @@ const trafficSources = [
   { label: "Email Traffic", value: "3.20%", color: "bg-violet-900" },
 ];
 const earningDonutData = [
-  { value: 70, color: "rgba(255,255,255,0.9)" },
-  { value: 30, color: "rgba(255,255,255,0.25)" },
+  { value: 70, color: "#334155" },
+  { value: 30, color: "#E2E8F0" },
 ];
 const orderStatus = [
-  { label: "Paid", value: "70%", color: "bg-white" },
-  { label: "Cancelled", value: "25%", color: "bg-white/60" },
-  { label: "Refunded", value: "5%", color: "bg-white/30" },
+  { label: "Paid", value: "70%", color: "bg-slate-700" },
+  { label: "Cancelled", value: "25%", color: "bg-slate-400" },
+  { label: "Refunded", value: "5%", color: "bg-slate-200" },
 ];
 
 function TotalContactsCard() {
@@ -173,60 +173,64 @@ function TrafficSourcesCard() {
 
 function TotalEarningCard() {
   return (
-    <Card className="h-full justify-between border-none bg-gradient-to-br from-violet-500 to-violet-800 text-white">
+    <Card className="h-full justify-between">
       <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-[15px] font-semibold">Total Earning</h3>
-          <MoreHorizontal className="h-[18px] w-[18px] text-white/70" />
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-[15px] font-semibold text-gray-900">
+            Total Earning
+          </h3>
+          <MoreHorizontal className="h-[18px] w-[18px] text-gray-400" />
         </div>
-        <div className="flex flex-col items-center py-2">
+        <div className="flex flex-col items-center py-1">
           <DonutChart
             data={earningDonutData}
-            size={140}
+            size={120}
             thickness={10}
             centerLabel={
               <div className="text-center">
-                <p className="text-2xl font-bold">$5.7m</p>
-                <p className="text-xs text-white/80">673 Orders</p>
+                <p className="text-xl font-bold text-gray-900">$5.7m</p>
+                <p className="text-xs text-gray-500">673 Orders</p>
               </div>
             }
           />
         </div>
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="h-3 w-3 shrink-0 rounded-sm bg-white" />
+            <span className="h-2.5 w-2.5 shrink-0 rounded-sm bg-slate-700" />
             <div>
-              <p className="text-sm font-semibold">$2.78m</p>
-              <p className="text-xs text-white/70">245 Pickups</p>
+              <p className="text-sm font-semibold text-gray-900">$2.78m</p>
+              <p className="text-xs text-gray-500">245 Pickups</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="h-3 w-3 shrink-0 rounded-sm bg-white/40" />
+            <span className="h-2.5 w-2.5 shrink-0 rounded-sm bg-slate-300" />
             <div>
-              <p className="text-sm font-semibold">$65,820</p>
-              <p className="text-xs text-white/70">120 Shipments</p>
+              <p className="text-sm font-semibold text-gray-900">$65,820</p>
+              <p className="text-xs text-gray-500">120 Shipments</p>
             </div>
           </div>
         </div>
       </div>
-      <div className="mt-6 border-t border-white/20 pt-4">
-        <h4 className="mb-3 text-sm font-semibold">Orders Status</h4>
-        <div className="flex h-2 w-full overflow-hidden rounded-full bg-white/20">
-          <div className="h-full bg-white" style={{ width: "70%" }} />
-          <div className="h-full bg-white/60" style={{ width: "25%" }} />
-          <div className="h-full bg-white/30" style={{ width: "5%" }} />
+      <div className="mt-4 border-t border-gray-100 pt-3">
+        <h4 className="mb-2 text-sm font-semibold text-gray-900">
+          Orders Status
+        </h4>
+        <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+          <div className="h-full bg-slate-700" style={{ width: "70%" }} />
+          <div className="h-full bg-slate-400" style={{ width: "25%" }} />
+          <div className="h-full bg-slate-200" style={{ width: "5%" }} />
         </div>
-        <ul className="mt-4 flex flex-col gap-2.5">
+        <ul className="mt-3 flex flex-col gap-2">
           {orderStatus.map((item) => (
             <li
               key={item.label}
-              className="flex items-center justify-between text-sm"
+              className="flex items-center justify-between text-sm text-gray-600"
             >
               <span className="flex items-center gap-2">
                 <span className={cn("h-2.5 w-2.5 rounded-sm", item.color)} />
                 {item.label}
               </span>
-              <span className="font-medium">{item.value}</span>
+              <span className="font-medium text-gray-900">{item.value}</span>
             </li>
           ))}
         </ul>
@@ -237,12 +241,12 @@ function TotalEarningCard() {
 
 export function DashboardMetricsSection() {
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-      <div className="flex flex-col gap-4">
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
+      <div className="flex flex-col gap-3">
         <TotalContactsCard />
         <TasksOverviewCard />
       </div>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <LeadAnalyticsCard />
         <ActiveDealsCard />
       </div>

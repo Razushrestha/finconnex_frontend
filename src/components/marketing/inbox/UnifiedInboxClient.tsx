@@ -247,10 +247,6 @@ export function UnifiedInboxClient() {
 
   return (
     <div className="relative flex min-h-full flex-col overflow-hidden bg-slate-50">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.10),_transparent_65%)]"
-      />
 
       <div className="relative flex min-h-0 flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
@@ -291,7 +287,7 @@ export function UnifiedInboxClient() {
 
         <div className="flex min-h-[calc(100dvh-7.5rem)] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
           {/* Channel rail */}
-          <aside className="hidden w-[180px] shrink-0 flex-col border-r border-slate-100 bg-gradient-to-b from-slate-50/90 to-white lg:flex">
+          <aside className="hidden w-[180px] shrink-0 flex-col border-r border-slate-100 bg-slate-50 lg:flex">
             <div className="border-b border-slate-100 px-3 py-3">
               <p className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
                 Channels

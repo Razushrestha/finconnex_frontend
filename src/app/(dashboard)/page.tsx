@@ -49,7 +49,7 @@ export const metadata: Metadata = {
 
 export default function DashboardPage() {
   return (
-    <div className="flex flex-1 flex-col gap-4 bg-zinc-50 p-6">
+    <div className="flex flex-1 flex-col gap-3 bg-zinc-50 p-4">
       <DashboardBreadcrumb />
 
       <Suspense fallback={<CardGridSkeleton count={4} />}>

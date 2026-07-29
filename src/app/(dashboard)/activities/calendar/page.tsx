@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Home,
@@ -9,8 +9,6 @@ import {
   CalendarDays,
   Plus,
   Sparkles,
-  X,
-  Trash2,
 } from "lucide-react";
 import {
   calendarItems,
@@ -18,36 +16,74 @@ import {
   type CalendarItemType,
 } from "@/lib/calendar/types";
 import { cn } from "@/lib/utils";
-import { TYPE_META, TYPE_FILTERS } from "@/lib/calendar/calendar-type-meta";
-import AddEventModal from "@/components/activities/calendar/AddCalendarModal";
 
 type CalendarView = "Day" | "Week" | "Month" | "Agenda";
 
-const TODAY = new Date();
+const TYPE_META: Record<
+  CalendarItemType,
+  { label: string; dot: string; soft: string; text: string; bar: string }
+> = {
+  Event: {
+    label: "Event",
+    dot: "bg-violet-500",
+    soft: "bg-violet-50/90",
+    text: "text-violet-800",
+    bar: "bg-violet-500",
+  },
+  Task: {
+    label: "Task",
+    dot: "bg-amber-500",
+    soft: "bg-amber-50/90",
+    text: "text-amber-900",
+    bar: "bg-amber-500",
+  },
+  Meeting: {
+    label: "Meeting",
+    dot: "bg-sky-500",
+    soft: "bg-sky-50/90",
+    text: "text-sky-900",
+    bar: "bg-sky-500",
+  },
+  Reminder: {
+    label: "Reminder",
+    dot: "bg-rose-500",
+    soft: "bg-rose-50/90",
+    text: "text-rose-900",
+    bar: "bg-rose-500",
+  },
+};
+
+const TYPE_FILTERS: (CalendarItemType | "All")[] = [
+  "All",
+  "Event",
+  "Task",
+  "Meeting",
+  "Reminder",
+];
+
+const TODAY = new Date(2026, 6, 22);
 
 export default function CalendarPage() {
   const [view, setView] = useState<CalendarView>("Week");
-  const [typeFilter, setTypeFilter] =
-    useState<(typeof TYPE_FILTERS)[number]>("All");
+  const [typeFilter, setTypeFilter] = useState<(typeof TYPE_FILTERS)[number]>(
+    "All",
+  );
   const [anchor, setAnchor] = useState(() => new Date(TODAY));
-  const [items, setItems] = useState<CalendarItem[]>(calendarItems);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
 
   const filtered = useMemo(() => {
-    return items.filter(
+    return calendarItems.filter(
       (item) => typeFilter === "All" || item.type === typeFilter,
     );
-  }, [items, typeFilter]);
+  }, [typeFilter]);
 
   const counts = useMemo(() => {
     const base = { Event: 0, Task: 0, Meeting: 0, Reminder: 0, All: 0 };
-    for (const item of items) {
+    for (const item of calendarItems) {
       base[item.type] += 1;
       base.All += 1;
     }
     return base;
-  }, [items]);
+  }, []);
 
   const weekDays = useMemo(() => {
     const start = startOfWeek(anchor);
@@ -83,11 +119,6 @@ export default function CalendarPage() {
     return "Upcoming schedule";
   }, [view, anchor, weekDays]);
 
-  const selectedItem = useMemo(
-    () => items.find((i) => i.id === selectedId) ?? null,
-    [items, selectedId],
-  );
-
   function shift(dir: -1 | 1) {
     const d = new Date(anchor);
     if (view === "Day") d.setDate(d.getDate() + dir);
@@ -97,51 +128,8 @@ export default function CalendarPage() {
     setAnchor(d);
   }
 
-  function handleReschedule(id: string, newDateKey: string) {
-    setItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-
-        const startTime = item.start.split("T")[1] ?? "09:00:00";
-        const newStart = `${newDateKey}T${startTime}`;
-
-        if (!item.end) {
-          return { ...item, start: newStart };
-        }
-
-        const durationMs =
-          new Date(item.end).getTime() - new Date(item.start).getTime();
-        const newEnd = new Date(
-          new Date(newStart).getTime() + durationMs,
-        ).toISOString();
-
-        return { ...item, start: newStart, end: newEnd };
-      }),
-    );
-  }
-
-  function handleUpdate(id: string, updates: Partial<CalendarItem>) {
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updates } : item)),
-    );
-  }
-
-  function handleDelete(id: string) {
-    setItems((prev) => prev.filter((item) => item.id !== id));
-    setSelectedId(null);
-  }
-
-  function handleCreate(newItem: Omit<CalendarItem, "id">) {
-    const id = `cal-${Date.now()}`;
-    setItems((prev) => [...prev, { ...newItem, id }]);
-  }
-
   return (
-    <div className="relative min-h-full bg-slate-50">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.10),_transparent_65%)]"
-      />
+    <div className="relative min-h-full overflow-hidden bg-slate-50">
 
       <div className="relative mx-auto flex max-w-[1400px] flex-col p-2.5 sm:p-3 lg:p-4">
         {/* Compact page chrome */}
@@ -170,7 +158,6 @@ export default function CalendarPage() {
 
           <button
             type="button"
-            onClick={() => setShowAddModal(true)}
             className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-md shadow-violet-600/20 transition-all hover:bg-violet-700"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -179,7 +166,7 @@ export default function CalendarPage() {
         </div>
 
         {/* ONE surface: toolbar + grid */}
-        <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
+        <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
           {/* Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 sm:px-4">
             <div className="flex min-w-0 items-center gap-2">
@@ -281,15 +268,13 @@ export default function CalendarPage() {
             })}
           </div>
 
-          {/* Grid content */}
-          <div>
+          {/* Grid fills remaining height */}
+          <div className="min-h-0 flex-1 overflow-auto">
             {(view === "Week" || view === "Day") && (
               <WeekDayGrid
                 days={view === "Day" ? [anchor] : weekDays}
                 filtered={filtered}
                 columns={view === "Day" ? 1 : 7}
-                onReschedule={handleReschedule}
-                onSelect={setSelectedId}
               />
             )}
             {view === "Month" && (
@@ -297,33 +282,12 @@ export default function CalendarPage() {
                 days={monthDays}
                 anchor={anchor}
                 filtered={filtered}
-                onReschedule={handleReschedule}
-                onSelect={setSelectedId}
               />
             )}
-            {view === "Agenda" && (
-              <AgendaList filtered={filtered} onSelect={setSelectedId} />
-            )}
+            {view === "Agenda" && <AgendaList filtered={filtered} />}
           </div>
         </div>
       </div>
-
-      {selectedItem ? (
-        <ItemDetailModal
-          item={selectedItem}
-          onClose={() => setSelectedId(null)}
-          onSave={handleUpdate}
-          onDelete={handleDelete}
-        />
-      ) : null}
-
-      {showAddModal ? (
-        <AddEventModal
-          defaultDate={isoDate(anchor)}
-          onClose={() => setShowAddModal(false)}
-          onCreate={handleCreate}
-        />
-      ) : null}
     </div>
   );
 }
@@ -332,17 +296,11 @@ function WeekDayGrid({
   days,
   filtered,
   columns,
-  onReschedule,
-  onSelect,
 }: {
   days: Date[];
   filtered: CalendarItem[];
   columns: number;
-  onReschedule: (id: string, newDateKey: string) => void;
-  onSelect: (id: string) => void;
 }) {
-  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
-
   return (
     <div
       className={cn(
@@ -360,22 +318,9 @@ function WeekDayGrid({
         return (
           <div
             key={key}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOverKey(key);
-            }}
-            onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
-            onDrop={(e) => {
-              e.preventDefault();
-              const id = e.dataTransfer.getData("text/plain");
-              if (id) onReschedule(id, key);
-              setDragOverKey(null);
-            }}
             className={cn(
               "flex min-h-0 flex-col",
               isToday && "bg-violet-50/35",
-              dragOverKey === key &&
-                "bg-violet-100/60 ring-1 ring-inset ring-violet-300",
             )}
           >
             <div
@@ -390,7 +335,9 @@ function WeekDayGrid({
               <span
                 className={cn(
                   "flex h-6 min-w-6 items-center justify-center rounded-full text-[12px] font-bold tabular-nums",
-                  isToday ? "bg-violet-600 text-white" : "text-slate-800",
+                  isToday
+                    ? "bg-violet-600 text-white"
+                    : "text-slate-800",
                 )}
               >
                 {day.getDate()}
@@ -399,11 +346,7 @@ function WeekDayGrid({
 
             <div className="flex flex-1 flex-col gap-1 p-1.5">
               {items.map((item) => (
-                <EventChip
-                  key={item.id}
-                  item={item}
-                  onClick={() => onSelect(item.id)}
-                />
+                <EventChip key={item.id} item={item} />
               ))}
             </div>
           </div>
@@ -417,17 +360,11 @@ function MonthGrid({
   days,
   anchor,
   filtered,
-  onReschedule,
-  onSelect,
 }: {
   days: Date[];
   anchor: Date;
   filtered: CalendarItem[];
-  onReschedule: (id: string, newDateKey: string) => void;
-  onSelect: (id: string) => void;
 }) {
-  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
-
   return (
     <div className="grid h-full grid-cols-7">
       {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
@@ -447,24 +384,11 @@ function MonthGrid({
         return (
           <div
             key={key}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOverKey(key);
-            }}
-            onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
-            onDrop={(e) => {
-              e.preventDefault();
-              const id = e.dataTransfer.getData("text/plain");
-              if (id) onReschedule(id, key);
-              setDragOverKey(null);
-            }}
             className={cn(
               "min-h-[88px] border-b border-slate-100 p-1",
               idx % 7 !== 0 && "border-l border-slate-100",
               !inMonth && "bg-slate-50/40",
               isToday && "bg-violet-50/40",
-              dragOverKey === key &&
-                "bg-violet-100/60 ring-1 ring-inset ring-violet-300",
             )}
           >
             <span
@@ -485,14 +409,8 @@ function MonthGrid({
                 return (
                   <div
                     key={item.id}
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData("text/plain", item.id);
-                      e.dataTransfer.effectAllowed = "move";
-                    }}
-                    onClick={() => onSelect(item.id)}
                     className={cn(
-                      "cursor-grab truncate rounded px-1 py-0.5 text-[9px] font-medium transition-colors hover:brightness-[0.97] active:cursor-grabbing",
+                      "truncate rounded px-1 py-0.5 text-[9px] font-medium",
                       meta.soft,
                       meta.text,
                     )}
@@ -515,13 +433,7 @@ function MonthGrid({
   );
 }
 
-function AgendaList({
-  filtered,
-  onSelect,
-}: {
-  filtered: CalendarItem[];
-  onSelect: (id: string) => void;
-}) {
+function AgendaList({ filtered }: { filtered: CalendarItem[] }) {
   const sorted = filtered
     .slice()
     .sort((a, b) => a.start.localeCompare(b.start));
@@ -561,11 +473,7 @@ function AgendaList({
                 </p>
               </div>
             ) : null}
-            <button
-              type="button"
-              onClick={() => onSelect(item.id)}
-              className="flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors hover:bg-slate-50/50"
-            >
+            <div className="flex items-start gap-3 px-4 py-2.5 transition-colors hover:bg-slate-50/50">
               <div className="w-16 shrink-0 pt-0.5 text-right">
                 <p className="text-[11px] font-semibold tabular-nums text-slate-800">
                   {formatTime(item.start)}
@@ -576,12 +484,7 @@ function AgendaList({
                   </p>
                 ) : null}
               </div>
-              <span
-                className={cn(
-                  "mt-1.5 h-8 w-0.5 shrink-0 rounded-full",
-                  meta.bar,
-                )}
-              />
+              <span className={cn("mt-1.5 h-8 w-0.5 shrink-0 rounded-full", meta.bar)} />
               <div className="min-w-0 flex-1">
                 <div className="mb-0.5 flex items-center gap-1.5">
                   <span className={cn("text-[10px] font-semibold", meta.text)}>
@@ -595,7 +498,7 @@ function AgendaList({
                   {[item.relatedTo, item.owner].filter(Boolean).join(" · ")}
                 </p>
               </div>
-            </button>
+            </div>
           </div>
         );
       })}
@@ -603,32 +506,18 @@ function AgendaList({
   );
 }
 
-function EventChip({
-  item,
-  onClick,
-}: {
-  item: CalendarItem;
-  onClick: () => void;
-}) {
+function EventChip({ item }: { item: CalendarItem }) {
   const meta = TYPE_META[item.type];
   return (
     <button
       type="button"
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData("text/plain", item.id);
-        e.dataTransfer.effectAllowed = "move";
-      }}
-      onClick={onClick}
       className={cn(
-        "w-full cursor-grab rounded-md px-1.5 py-1.5 text-left transition-colors hover:brightness-[0.97] active:cursor-grabbing",
+        "w-full rounded-md px-1.5 py-1.5 text-left transition-colors hover:brightness-[0.97]",
         meta.soft,
       )}
     >
       <div className="flex items-start gap-1.5">
-        <span
-          className={cn("mt-1 h-3 w-0.5 shrink-0 rounded-full", meta.bar)}
-        />
+        <span className={cn("mt-1 h-3 w-0.5 shrink-0 rounded-full", meta.bar)} />
         <div className="min-w-0 flex-1">
           <p className={cn("text-[9px] font-semibold", meta.text)}>
             {formatTime(item.start)}
@@ -640,265 +529,6 @@ function EventChip({
         </div>
       </div>
     </button>
-  );
-}
-
-function ItemDetailModal({
-  item,
-  onClose,
-  onSave,
-  onDelete,
-}: {
-  item: CalendarItem;
-  onClose: () => void;
-  onSave: (id: string, updates: Partial<CalendarItem>) => void;
-  onDelete: (id: string) => void;
-}) {
-  const [title, setTitle] = useState(item.title);
-  const [type, setType] = useState<CalendarItemType>(item.type);
-  const [date, setDate] = useState(item.start.slice(0, 10));
-  const [startTime, setStartTime] = useState(item.start.slice(11, 16));
-  const [hasEnd, setHasEnd] = useState(Boolean(item.end));
-  const [endTime, setEndTime] = useState(
-    item.end ? item.end.slice(11, 16) : "",
-  );
-  const [owner, setOwner] = useState(item.owner);
-  const [relatedTo, setRelatedTo] = useState(item.relatedTo ?? "");
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-
-  // Reset the form whenever a different item is opened.
-  useEffect(() => {
-    setTitle(item.title);
-    setType(item.type);
-    setDate(item.start.slice(0, 10));
-    setStartTime(item.start.slice(11, 16));
-    setHasEnd(Boolean(item.end));
-    setEndTime(item.end ? item.end.slice(11, 16) : "");
-    setOwner(item.owner);
-    setRelatedTo(item.relatedTo ?? "");
-    setConfirmingDelete(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item.id]);
-
-  const meta = TYPE_META[type];
-
-  function handleClose() {
-    if (!confirmingDelete) onClose();
-  }
-
-  function handleSave() {
-    if (!title.trim() || !date || !startTime) return;
-    onSave(item.id, {
-      title: title.trim(),
-      type,
-      start: `${date}T${startTime}`,
-      end: hasEnd && endTime ? `${date}T${endTime}` : undefined,
-      owner: owner.trim(),
-      relatedTo: relatedTo.trim() ? relatedTo.trim() : undefined,
-    });
-    onClose();
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]"
-      onClick={handleClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
-      >
-        {/* Header */}
-        <div
-          className={cn(
-            "flex items-center justify-between px-5 py-3",
-            meta.soft,
-          )}
-        >
-          <div className="flex items-center gap-2">
-            <span className={cn("h-2.5 w-2.5 rounded-full", meta.dot)} />
-            <span
-              className={cn(
-                "text-[11px] font-semibold uppercase tracking-wide",
-                meta.text,
-              )}
-            >
-              {meta.label} details
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="flex h-6 w-6 items-center justify-center rounded-md text-slate-500 hover:bg-white/60 hover:text-slate-800"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="space-y-3 px-5 py-4">
-          <div>
-            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-              Title
-            </label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] font-medium text-slate-900 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                Type
-              </label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value as CalendarItemType)}
-                className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] font-medium text-slate-900 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-              >
-                {(Object.keys(TYPE_META) as CalendarItemType[]).map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                Date
-              </label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] font-medium text-slate-900 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                Start time
-              </label>
-              <input
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] font-medium text-slate-900 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-              />
-            </div>
-            <div>
-              <div className="mb-1 flex items-center justify-between">
-                <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                  End time
-                </label>
-                <label className="flex items-center gap-1 text-[10px] font-medium text-slate-500">
-                  <input
-                    type="checkbox"
-                    checked={hasEnd}
-                    onChange={(e) => setHasEnd(e.target.checked)}
-                    className="h-3 w-3 rounded border-slate-300 text-violet-600 focus:ring-violet-300"
-                  />
-                  Set
-                </label>
-              </div>
-              <input
-                type="time"
-                value={endTime}
-                disabled={!hasEnd}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] font-medium text-slate-900 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 disabled:bg-slate-50 disabled:text-slate-300"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-              Owner
-            </label>
-            <input
-              value={owner}
-              onChange={(e) => setOwner(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] font-medium text-slate-900 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-              Related to
-            </label>
-            <input
-              value={relatedTo}
-              onChange={(e) => setRelatedTo(e.target.value)}
-              placeholder="e.g. Lead: Jane Doe"
-              className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] font-medium text-slate-900 outline-none placeholder:text-slate-300 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-            />
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3">
-          {confirmingDelete ? (
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-medium text-slate-500">
-                Delete this item?
-              </span>
-              <button
-                type="button"
-                onClick={() => onDelete(item.id)}
-                className="rounded-md bg-rose-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-rose-700"
-              >
-                Confirm
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmingDelete(false)}
-                className="rounded-md px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setConfirmingDelete(true)}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Delete
-            </button>
-          )}
-
-          {!confirmingDelete ? (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-md px-3 py-1.5 text-[11px] font-semibold text-slate-500 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={!title.trim() || !date || !startTime}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-[11px] font-semibold text-white transition-colors",
-                  meta.solid,
-                  "hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40",
-                )}
-              >
-                Save changes
-              </button>
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </div>
   );
 }
 

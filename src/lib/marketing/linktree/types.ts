@@ -43,28 +43,28 @@ export const LINKTREE_ACCENT_STYLE: Record<
   { wash: string; button: string; avatar: string; icon: string }
 > = {
   slate: {
-    wash: "from-slate-200/80 via-slate-50 to-white",
+    wash: "bg-slate-100",
     button:
       "bg-white text-slate-900 ring-slate-200/90 hover:bg-slate-900 hover:text-white hover:ring-slate-900",
     avatar: "bg-slate-800 text-white",
     icon: "text-slate-700 hover:bg-slate-900 hover:text-white",
   },
   forest: {
-    wash: "from-emerald-100/90 via-stone-50 to-white",
+    wash: "bg-emerald-50",
     button:
       "bg-white text-emerald-950 ring-emerald-100 hover:bg-emerald-800 hover:text-white hover:ring-emerald-800",
     avatar: "bg-emerald-800 text-white",
     icon: "text-emerald-800 hover:bg-emerald-800 hover:text-white",
   },
   ocean: {
-    wash: "from-sky-100/90 via-slate-50 to-white",
+    wash: "bg-sky-50",
     button:
       "bg-white text-sky-950 ring-sky-100 hover:bg-sky-800 hover:text-white hover:ring-sky-800",
     avatar: "bg-sky-800 text-white",
     icon: "text-sky-800 hover:bg-sky-800 hover:text-white",
   },
   violet: {
-    wash: "from-violet-100/80 via-slate-50 to-white",
+    wash: "bg-violet-50",
     button:
       "bg-white text-violet-950 ring-violet-100 hover:bg-violet-700 hover:text-white hover:ring-violet-700",
     avatar: "bg-violet-700 text-white",

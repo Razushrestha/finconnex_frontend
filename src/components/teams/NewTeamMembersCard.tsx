@@ -4,7 +4,6 @@ import {
   BarChart,
   Bar,
   ResponsiveContainer,
-  Cell,
   Tooltip,
   TooltipContentProps,
 } from "recharts";
@@ -71,19 +70,6 @@ export function NewTeamMembersCard() {
         <div className="h-28 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} barCategoryGap="28%">
-              <defs>
-                <linearGradient
-                  id="newMembersGradient"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop offset="0%" stopColor="#8b5cf6" />
-                  <stop offset="100%" stopColor="#6366f1" />
-                </linearGradient>
-              </defs>
-
               <Tooltip
                 content={({ active, payload }) => (
                   <ChartTooltip active={active} payload={payload} />
@@ -91,11 +77,7 @@ export function NewTeamMembersCard() {
                 cursor={{ fill: "#f8fafc" }}
               />
 
-              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                {chartData.map((d) => (
-                  <Cell key={d.id} fill="url(#newMembersGradient)" />
-                ))}
-              </Bar>
+              <Bar dataKey="value" radius={[4, 4, 0, 0]} fill="#64748B" />
             </BarChart>
           </ResponsiveContainer>
         </div>

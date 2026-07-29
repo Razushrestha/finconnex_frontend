@@ -77,18 +77,13 @@ export function MiniAreaChart({
   return (
     <ResponsiveContainer width="100%" height={160}>
       <AreaChart data={data}>
-        <defs>
-          <linearGradient id="revenueFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity={0.35} />
-            <stop offset="100%" stopColor={color} stopOpacity={0} />
-          </linearGradient>
-        </defs>
         <Area
           type="monotone"
           dataKey="value"
           stroke={color}
           strokeWidth={2}
-          fill="url(#revenueFill)"
+          fill={color}
+          fillOpacity={0.15}
         />
       </AreaChart>
     </ResponsiveContainer>
@@ -104,12 +99,6 @@ export function RevenueBarChart({
   return (
     <ResponsiveContainer width="100%" height={300}>
       <BarChart data={data} margin={{ left: -10 }}>
-        <defs>
-          <linearGradient id="revenueBar" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#4C1D95" />
-            <stop offset="100%" stopColor="#A78BFA" />
-          </linearGradient>
-        </defs>
         <CartesianGrid
           vertical={false}
           strokeDasharray="4 4"
@@ -129,7 +118,7 @@ export function RevenueBarChart({
         />
         <Bar
           dataKey="value"
-          fill="url(#revenueBar)"
+          fill="#64748B"
           radius={[6, 6, 0, 0]}
           maxBarSize={28}
         />

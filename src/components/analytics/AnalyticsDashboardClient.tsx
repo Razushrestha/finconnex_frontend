@@ -55,8 +55,7 @@ export function AnalyticsDashboardClient() {
   const [owner, setOwner] = useState<string>("All");
   const [compare, setCompare] = useState(false);
   const [benchmarksOpen, setBenchmarksOpen] = useState(false);
-  const [benchmarks, setBenchmarks] =
-    useState<BenchmarkMap>(DEFAULT_BENCHMARKS);
+  const [benchmarks, setBenchmarks] = useState<BenchmarkMap>(DEFAULT_BENCHMARKS);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
@@ -122,11 +121,7 @@ th{text-align:left;padding:8px;border-bottom:2px solid #cbd5e1;color:#64748b;fon
     ANALYTICS_PERIODS.find((p) => p.id === period)?.label ?? period;
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-50">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.10),_transparent_65%)]"
-      />
+    <div className="relative min-h-full overflow-hidden bg-slate-50">
       {toast ? (
         <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
           {toast}
@@ -415,7 +410,10 @@ th{text-align:left;padding:8px;border-bottom:2px solid #cbd5e1;color:#64748b;fon
                     paddingAngle={2}
                   >
                     {snap.revenueBySource.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      <Cell
+                        key={i}
+                        fill={PIE_COLORS[i % PIE_COLORS.length]}
+                      />
                     ))}
                   </Pie>
                   <Tooltip

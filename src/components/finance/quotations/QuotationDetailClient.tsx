@@ -179,10 +179,6 @@ export function QuotationDetailClient({ id }: { id: string }) {
 
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.10),_transparent_65%)]"
-      />
       {toast ? (
         <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
           {toast}

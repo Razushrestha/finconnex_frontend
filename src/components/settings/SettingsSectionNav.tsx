@@ -64,10 +64,10 @@ export function SettingsSectionNav() {
               href={`/settings/${cat.slug}`}
               title={`${cat.section} ${cat.title}`}
               className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold whitespace-nowrap transition-colors",
+                "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-medium whitespace-nowrap transition-colors",
                 active
-                  ? "bg-violet-600 text-white shadow-sm shadow-violet-600/20"
-                  : "text-slate-600 hover:bg-slate-50",
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-600 hover:bg-slate-100",
               )}
             >
               <Icon className="h-3.5 w-3.5" />

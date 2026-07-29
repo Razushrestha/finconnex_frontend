@@ -37,27 +37,23 @@ export function DealRecordCard({
       data-focus-id={deal.id}
       data-deal-id={deal.id}
       className={cn(
-        "w-full cursor-grab rounded-md border border-slate-200/80 bg-white p-3.5 shadow-2xs active:cursor-grabbing",
+        "w-full cursor-grab rounded-md border border-slate-200/80 bg-white p-2.5 shadow-2xs active:cursor-grabbing",
         cardMotion,
         isDragging && cardDragging,
       )}
     >
-      <div
-        className={`mb-3 h-1.5 w-full rounded-full ${deal.accentColorClass}`}
-      />
-
-      <div className="mb-3 flex items-center gap-2.5">
+      <div className="mb-1.5 flex items-center gap-2">
         <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${deal.avatarBgClass}`}
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold ${deal.avatarBgClass}`}
         >
           {deal.initials}
         </div>
-        <h3 className="truncate text-[13px] font-semibold text-slate-800">
+        <h3 className="truncate text-[13px] font-semibold leading-snug text-slate-900">
           {deal.name}
         </h3>
       </div>
 
-      <div className="space-y-1.5 text-[11px] text-slate-500">
+      <div className="space-y-0.5 text-[11px] leading-snug text-slate-500">
         <div className="flex items-center gap-2">
           <DollarSign className="h-3 w-3 shrink-0 text-slate-400" />
           <span className="font-medium text-slate-700">

@@ -273,10 +273,6 @@ export function BookingPageForm({
       {/* Scrollable body */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="relative mx-auto max-w-[1200px] p-3 sm:p-4 lg:p-5">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.10),_transparent_65%)]"
-          />
 
           {/* Compact header */}
           <div className="relative mb-3 flex flex-wrap items-center justify-between gap-2">

@@ -66,10 +66,6 @@ export function PortalLoginClient({ slug }: { slug: string }) {
   if (portal.status !== "Active") {
     return (
       <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-slate-50 px-4 text-center">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.12),_transparent_55%)]"
-        />
         <div className="relative max-w-md">
           <p className="text-[11px] font-semibold tracking-widest text-violet-600 uppercase">
             FinConnex
@@ -86,15 +82,6 @@ export function PortalLoginClient({ slug }: { slug: string }) {
 
   return (
     <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-slate-50 px-4">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.16),_transparent_55%)]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.05)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.05)_1px,transparent_1px)] bg-size-[24px_24px]"
-      />
-
       <div className="relative w-full max-w-md">
         <div className="mb-8 text-center">
           <p className="text-[11px] font-semibold tracking-[0.2em] text-violet-600 uppercase">

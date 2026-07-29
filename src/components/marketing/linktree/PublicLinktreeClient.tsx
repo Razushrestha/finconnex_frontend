@@ -102,7 +102,7 @@ export function PublicLinktreeClient({ slug }: { slug: string }) {
   return (
     <div
       className={cn(
-        "relative min-h-dvh overflow-hidden bg-gradient-to-b",
+        "relative min-h-dvh overflow-hidden",
         accent.wash,
       )}
     >

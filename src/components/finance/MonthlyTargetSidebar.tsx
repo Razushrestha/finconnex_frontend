@@ -13,7 +13,7 @@ const miniStats: MiniStat[] = [
 
 export function MonthlyTargetSidebar() {
   return (
-    <div className="flex h-full flex-col justify-between rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 p-5 text-white shadow-sm sm:p-6">
+    <div className="flex h-full flex-col justify-between rounded-2xl bg-slate-800 p-5 text-white shadow-sm sm:p-6">
       <div>
         {/* Header */}
         <div className="mb-2 flex items-center justify-between">

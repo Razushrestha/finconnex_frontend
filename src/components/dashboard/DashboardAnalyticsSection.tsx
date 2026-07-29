@@ -223,18 +223,13 @@ function DealsOverviewCard() {
       <div className="relative h-[180px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={dealsChartData}>
-            <defs>
-              <linearGradient id="dealsFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#7C3AED" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="#7C3AED" stopOpacity={0.08} />
-              </linearGradient>
-            </defs>
             <Area
               type="stepAfter"
               dataKey="value"
-              stroke="#6D28D9"
+              stroke="#475569"
               strokeWidth={2.5}
-              fill="url(#dealsFill)"
+              fill="#64748B"
+              fillOpacity={0.15}
             />
           </AreaChart>
         </ResponsiveContainer>

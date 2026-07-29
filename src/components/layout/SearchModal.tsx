@@ -21,7 +21,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { listItemEnter } from "@/lib/motion";
 
 interface SearchModalProps {
   open: boolean;
@@ -178,10 +177,8 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
                   key={item.href + item.label}
                   type="button"
                   onClick={() => go(item)}
-                  style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-2 py-2.5 text-left text-[14px] text-foreground transition-colors hover:bg-violet-50 dark:hover:bg-violet-950/40",
-                    listItemEnter,
+                    "flex items-center gap-3 rounded-md px-2 py-2 text-left text-[14px] text-foreground transition-colors hover:bg-slate-100 dark:hover:bg-zinc-800",
                   )}
                 >
                   <Icon
