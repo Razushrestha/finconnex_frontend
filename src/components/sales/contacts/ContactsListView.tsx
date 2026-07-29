@@ -1,17 +1,125 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MoreVertical, SlidersHorizontal } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import { CONTACT_GROUPS, type ContactGroup } from "@/lib/contacts/types";
 import type { ContactFilters } from "./FilterContactsPanel";
 import { cn } from "@/lib/utils";
+import { TableDisplayOptionsMenu } from "@/components/common/TableDisplayOptionsMenu";
+import {
+  ManageColumnsModal,
+  type ManageColumn,
+} from "@/components/work-queue/ManageColumnsModal";
 
 interface ContactsListViewProps {
   groups?: ContactGroup[];
   filters?: ContactFilters;
 }
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50];
+const DEFAULT_CONTACT_COLUMNS: ManageColumn[] = [
+  { id: "contact", label: "Contact", checked: true, required: true },
+  { id: "company", label: "Company", checked: true },
+  { id: "email", label: "Email", checked: true },
+  { id: "phone", label: "Phone", checked: true },
+  { id: "status", label: "Status", checked: true },
+  { id: "owner", label: "Owner", checked: true },
+  { id: "source", label: "Source", checked: true },
+  { id: "created", label: "Created", checked: true },
+  { id: "actions", label: "Actions", checked: true },
+];
+
+// Row shape as produced by the allContacts useMemo below
+type ContactRow = ReturnType<typeof buildAllContactsShape>;
+// Helper purely for type inference — never called
+function buildAllContactsShape(groups: ContactGroup[]) {
+  return groups.flatMap((group) =>
+    group.contacts.map((c) => ({
+      ...c,
+      statusTitle: group.title,
+      statusDotColor: group.dotColorClass,
+    })),
+  )[0];
+}
+
+interface ColumnRenderer {
+  th: React.ReactNode;
+  thClassName?: string;
+  td: (contact: ContactRow) => React.ReactNode;
+  tdClassName?: string;
+}
+
+const columnRenderers: Record<string, ColumnRenderer> = {
+  contact: {
+    th: "Contact",
+    tdClassName: "px-3 py-2 whitespace-nowrap",
+    td: (contact) => (
+      <div className="flex items-center gap-2.5">
+        <div
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${contact.avatarBgClass}`}
+        >
+          {contact.initials}
+        </div>
+        <span className="font-semibold text-slate-900">{contact.name}</span>
+      </div>
+    ),
+  },
+  company: {
+    th: "Company",
+    tdClassName: "px-3 py-2 whitespace-nowrap text-slate-600",
+    td: (contact) => contact.company || "",
+  },
+  email: {
+    th: "Email",
+    tdClassName: "px-3 py-2 whitespace-nowrap text-slate-500",
+    td: (contact) => contact.email,
+  },
+  phone: {
+    th: "Phone",
+    tdClassName: "px-3 py-2 whitespace-nowrap text-slate-600",
+    td: (contact) => contact.phone || "",
+  },
+  status: {
+    th: "Status",
+    tdClassName: "px-3 py-2 whitespace-nowrap",
+    td: (contact) => (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${contact.statusDotColor}`}
+        />
+        {contact.statusTitle}
+      </span>
+    ),
+  },
+  owner: {
+    th: "Owner",
+    tdClassName: "px-3 py-2 whitespace-nowrap text-slate-600",
+    td: (contact) => contact.owner,
+  },
+  source: {
+    th: "Source",
+    tdClassName: "px-3 py-2 whitespace-nowrap text-slate-500",
+    td: (contact) => contact.source,
+  },
+  created: {
+    th: "Created",
+    tdClassName: "px-3 py-2 whitespace-nowrap text-slate-500",
+    td: (contact) => contact.createdDate,
+  },
+  actions: {
+    th: "Actions",
+    thClassName: "px-3 py-2.5 text-right",
+    tdClassName: "px-3 py-2 text-right",
+    td: () => (
+      <button
+        type="button"
+        aria-label="More actions"
+        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+      >
+        <MoreVertical className="h-3.5 w-3.5" />
+      </button>
+    ),
+  },
+};
 
 export function ContactsListView({
   groups = CONTACT_GROUPS,
@@ -19,7 +127,10 @@ export function ContactsListView({
 }: ContactsListViewProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pageSize, setPageSize] = useState<number>(10);
-  const [pageSizeMenuOpen, setPageSizeMenuOpen] = useState(false);
+  const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
+  const [manageColumns, setManageColumns] = useState<ManageColumn[]>(
+    DEFAULT_CONTACT_COLUMNS,
+  );
 
   const allContacts = useMemo(() => {
     const hasStatusFilter = !!filters?.statuses.length;
@@ -53,6 +164,11 @@ export function ContactsListView({
   const someSelected =
     pagedContacts.some((c) => selectedIds.has(c.id)) && !allSelected;
 
+  const orderedVisibleColumns = useMemo(
+    () => manageColumns.filter((c) => c.checked),
+    [manageColumns],
+  );
+
   function toggleAll() {
     setSelectedIds((prev) => {
       if (allSelected) return new Set();
@@ -73,8 +189,8 @@ export function ContactsListView({
     <div className="w-full overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-left text-[12px]">
-          <thead className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
-            <tr>
+          <thead className="border-b border-slate-100 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+            <tr className="sticky top-0 z-10 bg-slate-50/80">
               <th className="w-8 px-3 py-2.5">
                 <input
                   type="checkbox"
@@ -87,44 +203,30 @@ export function ContactsListView({
                   className="h-3.5 w-3.5 rounded border-slate-300"
                 />
               </th>
-              <th className="px-3 py-2.5">Contact</th>
-              <th className="px-3 py-2.5">Company</th>
-              <th className="px-3 py-2.5">Email</th>
-              <th className="px-3 py-2.5">Phone</th>
-              <th className="px-3 py-2.5">Status</th>
-              <th className="px-3 py-2.5">Owner</th>
-              <th className="px-3 py-2.5">Source</th>
-              <th className="px-3 py-2.5">Created</th>
-              <th className="px-3 py-2.5 text-right">Actions</th>
-              <th className="relative px-3 py-2.5 text-right">
-                <button
-                  type="button"
-                  onClick={() => setPageSizeMenuOpen((o) => !o)}
-                  aria-label="Table display options"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+
+              {orderedVisibleColumns.map((col) => (
+                <th
+                  key={col.id}
+                  className={
+                    columnRenderers[col.id]?.thClassName ?? "px-3 py-2.5"
+                  }
                 >
-                  <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
-                </button>
-                {pageSizeMenuOpen && (
-                  <div className="absolute right-0 top-full z-10 mt-1 w-32 rounded-md border border-slate-100 bg-white py-1 text-left text-[11px] font-normal normal-case text-slate-600 shadow-lg">
-                    {PAGE_SIZE_OPTIONS.map((size) => (
-                      <button
-                        key={size}
-                        type="button"
-                        onClick={() => {
-                          setPageSize(size);
-                          setPageSizeMenuOpen(false);
-                        }}
-                        className={cn(
-                          "flex w-full items-center justify-between px-3 py-1.5 hover:bg-slate-50",
-                          pageSize === size && "font-semibold text-slate-900",
-                        )}
-                      >
-                        Show {size}
-                      </button>
-                    ))}
-                  </div>
+                  {columnRenderers[col.id]?.th}
+                </th>
+              ))}
+
+              <th
+                className={cn(
+                  "sticky right-0 z-20 -mr-3 bg-slate-50/80 pr-3 pl-3 text-right",
+                  "shadow-[-12px_0_12px_-8px_rgba(15,23,42,0.06)]",
                 )}
+              >
+                <TableDisplayOptionsMenu
+                  pageSize={pageSize}
+                  onPageSizeChange={setPageSize}
+                  onManageColumns={() => setManageColumnsOpen(true)}
+                  className="flex justify-end"
+                />
               </th>
             </tr>
           </thead>
@@ -145,60 +247,25 @@ export function ContactsListView({
                     className="h-3.5 w-3.5 rounded border-slate-300"
                   />
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${contact.avatarBgClass}`}
-                    >
-                      {contact.initials}
-                    </div>
-                    <span className="font-semibold text-slate-900">
-                      {contact.name}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-slate-600">
-                  {contact.company || ""}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-slate-500">
-                  {contact.email}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-slate-600">
-                  {contact.phone || ""}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${contact.statusDotColor}`}
-                    />
-                    {contact.statusTitle}
-                  </span>
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-slate-600">
-                  {contact.owner}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-slate-500">
-                  {contact.source}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-slate-500">
-                  {contact.createdDate}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  <button
-                    type="button"
-                    aria-label="More actions"
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+
+                {orderedVisibleColumns.map((col) => (
+                  <td
+                    key={col.id}
+                    className={
+                      columnRenderers[col.id]?.tdClassName ?? "px-3 py-2"
+                    }
                   >
-                    <MoreVertical className="h-3.5 w-3.5" />
-                  </button>
-                </td>
+                    {columnRenderers[col.id]?.td(contact)}
+                  </td>
+                ))}
+
                 <td className="px-3 py-2" />
               </tr>
             ))}
             {pagedContacts.length === 0 && (
               <tr>
                 <td
-                  colSpan={11}
+                  colSpan={orderedVisibleColumns.length + 2}
                   className="px-3 py-12 text-center text-sm text-slate-400"
                 >
                   No contacts match the current filters.
@@ -211,6 +278,16 @@ export function ContactsListView({
       <div className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-500">
         Showing {pagedContacts.length} of {allContacts.length} contacts
       </div>
+
+      <ManageColumnsModal
+        open={manageColumnsOpen}
+        columns={manageColumns}
+        onClose={() => setManageColumnsOpen(false)}
+        onSave={(cols) => {
+          setManageColumns(cols);
+          setManageColumnsOpen(false);
+        }}
+      />
     </div>
   );
 }
