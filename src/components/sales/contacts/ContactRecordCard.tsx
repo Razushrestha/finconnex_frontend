@@ -43,10 +43,6 @@ export function ContactRecordCard({
         isDragging && cardDragging,
       )}
     >
-      <div
-        className={`mb-3 h-1.5 w-full rounded-full ${contact.accentColorClass}`}
-      />
-
       <div className="mb-3 flex items-center gap-2.5">
         <div
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${contact.avatarBgClass}`}

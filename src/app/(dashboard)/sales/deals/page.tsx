@@ -35,20 +35,34 @@ export default function DealsPage() {
     DEAL_PIPELINES[0],
   );
 
-  const [allStages] =
+  const [allStages, setAllStages] =
     useState<Record<DealPipeline, DealStage[]>>(DEAL_PIPELINE_STAGES);
 
   const currentPipelineStages = (allStages && allStages[activePipeline]) || [];
 
+  // Transform current pipeline stages into column options format required by EntityHeader
+  const columnOptions = useMemo(() => {
+    return currentPipelineStages.map((stage) => ({
+      id: stage.id,
+      label: stage.title,
+      visible: stage.visible ?? true,
+    }));
+  }, [currentPipelineStages]);
+
+  const visibleColumnIds = useMemo(() => {
+    return columnOptions.filter((c) => c.visible).map((c) => c.id);
+  }, [columnOptions]);
+
   const stageOptions = useMemo(() => {
-    return currentPipelineStages.map((stage) => stage.title);
+    return currentPipelineStages
+      .filter((stage) => stage.visible ?? true)
+      .map((stage) => stage.title);
   }, [currentPipelineStages]);
 
   const totalCount = useMemo(() => {
-    return currentPipelineStages.reduce(
-      (acc, stage) => acc + (stage?.deals?.length || 0),
-      0,
-    );
+    return currentPipelineStages
+      .filter((stage) => stage.visible ?? true)
+      .reduce((acc, stage) => acc + (stage?.deals?.length || 0), 0);
   }, [currentPipelineStages]);
 
   function handleToggleField(field: string) {
@@ -61,8 +75,32 @@ export default function DealsPage() {
     });
   }
 
+  function handleColumnToggle(id: string) {
+    setAllStages((prev) => {
+      const pipelineStages = prev[activePipeline] || [];
+      const updated = pipelineStages.map((stage) =>
+        stage.id === id
+          ? { ...stage, visible: !(stage.visible ?? true) }
+          : stage,
+      );
+      return { ...prev, [activePipeline]: updated };
+    });
+  }
+
+  function reorderColumn(draggedId: string, targetId: string) {
+    setAllStages((prev) => {
+      const pipelineStages = [...(prev[activePipeline] || [])];
+      const fromIndex = pipelineStages.findIndex((s) => s.id === draggedId);
+      const toIndex = pipelineStages.findIndex((s) => s.id === targetId);
+      if (fromIndex === -1 || toIndex === -1) return prev;
+      const [moved] = pipelineStages.splice(fromIndex, 1);
+      pipelineStages.splice(toIndex, 0, moved);
+      return { ...prev, [activePipeline]: pipelineStages };
+    });
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50 p-2 pr-4">
+    <div className="min-h-screen bg-slate-50 p-2 pr-4 dark:bg-zinc-950">
       <FocusHighlight />
       <EntityHeader
         entityLabel="Deal"
@@ -78,6 +116,9 @@ export default function DealsPage() {
           setActivePipeline(pipeline as DealPipeline);
           setFilters(EMPTY_DEAL_FILTERS);
         }}
+        columnOptions={columnOptions}
+        onColumnToggle={handleColumnToggle}
+        onColumnReorder={reorderColumn}
       />
 
       <div className="mt-3 flex items-start gap-4">
@@ -97,7 +138,11 @@ export default function DealsPage() {
           className={cn("flex-1 overflow-x-auto", viewEnter)}
         >
           {viewMode === "kanban" ? (
-            <DealsKanbanBoard pipeline={activePipeline} filters={filters} />
+            <DealsKanbanBoard
+              pipeline={activePipeline}
+              filters={filters}
+              visibleColumnIds={visibleColumnIds}
+            />
           ) : (
             <DealsListView pipeline={activePipeline} filters={filters} />
           )}
