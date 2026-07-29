@@ -64,10 +64,13 @@ export function WorkQueueView() {
   const [query, setQuery] = React.useState("");
   const [filters, setFilters] =
     React.useState<QueueTableFilters>(DEFAULT_FILTERS);
-  const [categories, setCategories] = React.useState<WorkqueueCategoryDef[]>(
-    CATEGORIES_DEFAULT,
-  );
+  const [categories, setCategories] =
+    React.useState<WorkqueueCategoryDef[]>(CATEGORIES_DEFAULT);
   const [manageOpen, setManageOpen] = React.useState(false);
+
+  const [isAddUserOpen, setIsAddUserOpen] = React.useState(false);
+  const [newUserName, setNewUserName] = React.useState("");
+  const [newUserRole, setNewUserRole] = React.useState("");
 
   React.useEffect(() => {
     setCategories(readStoredCategories());
@@ -138,6 +141,14 @@ export function WorkQueueView() {
     const start = (page - 1) * PAGE_SIZE;
     return filteredRows.slice(start, start + PAGE_SIZE);
   }, [filteredRows, page]);
+
+  const handleAddUser = () => {
+    if (!newUserName.trim()) return;
+    // TODO: call your create-user mutation/handler here, e.g.
+    setNewUserName("");
+    setNewUserRole("");
+    setIsAddUserOpen(false);
+  };
 
   const title = getActivityTitle(activeNav);
 
@@ -255,6 +266,7 @@ export function WorkQueueView() {
         <button
           type="button"
           aria-label="Add person"
+          onClick={() => setIsAddUserOpen(true)}
           className="ml-1 flex h-9 w-9 shrink-0 items-center self-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-[var(--wq-surface)] hover:text-gray-600"
         >
           <Plus className="h-4 w-4" />
@@ -309,6 +321,63 @@ export function WorkQueueView() {
         onClose={() => setManageOpen(false)}
         onSave={saveCategories}
       />
+
+      {isAddUserOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setIsAddUserOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl bg-white p-5 shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-sm font-semibold text-gray-900">Add person</h2>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Name
+                </label>
+                <input
+                  autoFocus
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-[var(--wq-accent)]"
+                  placeholder="e.g. Priya Shrestha"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Role
+                </label>
+                <input
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-[var(--wq-accent)]"
+                  placeholder="e.g. Sales Rep"
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAddUserOpen(false)}
+                className="rounded-lg px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddUser}
+                className="rounded-lg bg-[var(--wq-accent)] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
