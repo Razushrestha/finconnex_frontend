@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Trophy, XCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Trophy, XCircle } from "lucide-react";
 import { type KanbanColumn } from "@/lib/leads/types";
 import { listLeadColumns, saveLeadColumns } from "@/lib/leads/store";
 import {
@@ -53,6 +53,7 @@ interface PendingLostDrop {
 interface LeadKanbanBoardProps {
   filters?: LeadFilters;
   visibleColumnIds?: string[];
+  onAddLead?: (columnId: string) => void;
 }
 
 // Adjust this offset to match whatever chrome (nav bar, filter bar, tabs)
@@ -62,6 +63,7 @@ const BOARD_HEIGHT = "h-[calc(100vh-5rem)]";
 export function LeadKanbanBoard({
   filters,
   visibleColumnIds,
+  onAddLead,
 }: LeadKanbanBoardProps) {
   const [columns, setColumns] = useState<KanbanColumn[]>(() =>
     listLeadColumns(),
@@ -369,8 +371,8 @@ export function LeadKanbanBoard({
                 "group relative flex flex-col gap-2 transition-all duration-200",
                 BOARD_HEIGHT,
                 isCollapsed
-                  ? "w-14 min-w-[3.5rem] flex-shrink-0"
-                  : "w-[300px] flex-shrink-0",
+                  ? "w-12 min-w-[3.5rem] flex-shrink-0"
+                  : "w-[272px] flex-shrink-0",
               )}
             >
               {isCollapsed ? (
@@ -391,8 +393,8 @@ export function LeadKanbanBoard({
               ) : (
                 <>
                   {/* Header box */}
-                  <div className="rounded-sm border border-slate-200/60 bg-slate-100/60 p-3">
-                    <div className="flex items-center justify-between px-1 py-0.5">
+                  <div className="rounded-xs border border-slate-200/60 bg-slate-100/60 p-1">
+                    <div className="mb-1 flex items-center justify-between px-1">
                       <div className="flex items-center gap-2">
                         <h2 className="max-w-[15rem] text-xs font-semibold leading-snug text-slate-800 xl:text-sm">
                           {column.title}
@@ -402,47 +404,49 @@ export function LeadKanbanBoard({
                         </span>
                       </div>
                     </div>
-                    <div className="mt-2 px-1 text-sm font-medium text-slate-500">
+                    <div className="px-1 text-xs font-medium text-slate-500">
                       {column.totalAmount} total
                     </div>
                   </div>
 
                   {/* Card list box */}
                   <div
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      if (dragInfo) {
-                        setOverColumnId(column.id);
-                        if (
-                          !dropTargetPos ||
-                          dropTargetPos.columnId !== column.id
-                        ) {
-                          setDropTargetPos({
-                            columnId: column.id,
-                            targetIndex: visibleCardCount(column),
-                          });
-                        }
-                      }
-                    }}
-                    onDragLeave={() =>
-                      setOverColumnId((prev) =>
-                        prev === column.id ? null : prev,
-                      )
-                    }
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleDrop(column.id, dropTargetPos?.targetIndex);
-                    }}
                     className={cn(
-                      "relative flex min-h-0 flex-1 flex-col rounded-sm border p-3",
+                      "relative flex min-h-0 flex-1 flex-col rounded-sm border p-1",
                       dropTargetIdle,
                       isOver
                         ? dropTargetActive
                         : "border-slate-200/60 bg-slate-100/60",
                     )}
                   >
-                    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-8 no-scrollbar">
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (dragInfo) {
+                          setOverColumnId(column.id);
+                          if (
+                            !dropTargetPos ||
+                            dropTargetPos.columnId !== column.id
+                          ) {
+                            setDropTargetPos({
+                              columnId: column.id,
+                              targetIndex: visibleCardCount(column),
+                            });
+                          }
+                        }
+                      }}
+                      onDragLeave={() =>
+                        setOverColumnId((prev) =>
+                          prev === column.id ? null : prev,
+                        )
+                      }
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDrop(column.id, dropTargetPos?.targetIndex);
+                      }}
+                      className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-8 no-scrollbar"
+                    >
                       {(() => {
                         let visibleIndex = 0;
                         const rendered: React.ReactNode[] = [];
@@ -460,7 +464,7 @@ export function LeadKanbanBoard({
                             rendered.push(
                               <div
                                 key={`placeholder-${card.id}`}
-                                className="mb-3 h-[88px] rounded-md border-2 border-dashed border-indigo-300 bg-indigo-50/60 transition-all duration-150 ease-out"
+                                className="h-[88px] rounded-md border-2 border-dashed border-indigo-300 bg-indigo-50/60 transition-all duration-150 ease-out"
                               />,
                             );
                           }
@@ -552,14 +556,25 @@ export function LeadKanbanBoard({
                     </div>
 
                     {/* Collapse control */}
-                    <button
-                      type="button"
-                      onClick={() => toggleCollapsed(column.id)}
-                      aria-label={`Collapse ${column.title}`}
-                      className="absolute inset-x-0 bottom-2 mx-auto flex h-6 w-6 items-center justify-center self-center rounded-full border border-slate-200 bg-white text-slate-500 opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100 hover:bg-slate-50"
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="mt-2 flex shrink-0 items-center justify-between gap-2 px-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                      <button
+                        type="button"
+                        onClick={() => onAddLead?.(column.id)}
+                        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-white hover:text-slate-900"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        Create lead
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleCollapsed(column.id)}
+                        aria-label={`Collapse ${column.title}`}
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50"
+                      >
+                        <ChevronLeft className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </>
               )}
@@ -660,12 +675,17 @@ function CollapsedColumn({
           {column.cards.length}
         </span>
       </div>
-      <p
-        className="flex-1 py-3 text-xs font-semibold text-slate-600 [writing-mode:vertical-rl]"
-        title={column.title}
-      >
-        {column.title}
-      </p>
+      <div className="flex flex-col items-center gap-3 flex-1 py-3">
+        <p
+          className="text-xs font-semibold text-slate-600 [writing-mode:vertical-rl]"
+          title={column.title}
+        >
+          {column.title}
+        </p>
+        <div className="text-[10px] font-medium text-slate-500 [writing-mode:vertical-rl]">
+          {column.totalAmount} total
+        </div>
+      </div>
       <button
         type="button"
         onClick={onExpand}
