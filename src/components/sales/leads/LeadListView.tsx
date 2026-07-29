@@ -9,7 +9,6 @@ import {
   CheckSquare,
   StickyNote,
   Paperclip,
-  SlidersHorizontal,
 } from "lucide-react";
 import { type KanbanColumn, type LeadStatus } from "@/lib/leads/types";
 import { listLeadColumns } from "@/lib/leads/store";
@@ -41,6 +40,11 @@ import {
   type LeadPanelState,
 } from "./panels/LeadCardPanelHost";
 import { cn } from "@/lib/utils";
+import { TableDisplayOptionsMenu } from "@/components/common/TableDisplayOptionsMenu";
+import {
+  ManageColumnsModal,
+  type ManageColumn,
+} from "@/components/work-queue/ManageColumnsModal";
 
 interface LeadListViewProps {
   columns?: KanbanColumn[];
@@ -67,7 +71,238 @@ const QUICK_LABELS: Record<LeadCardQuickActionState["kind"], string> = {
   attachment: "Attachment",
 };
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50];
+const DEFAULT_LEAD_COLUMNS: ManageColumn[] = [
+  { id: "lead", label: "Lead", checked: true, required: true },
+  { id: "company", label: "Company", checked: true },
+  { id: "status", label: "Status", checked: true },
+  { id: "sla", label: "Pipeline SLA", checked: true },
+  { id: "owner", label: "Owner", checked: true },
+  { id: "activity", label: "Activity", checked: true },
+  { id: "lastActivity", label: "Last activity", checked: true },
+  { id: "actions", label: "Actions", checked: true },
+];
+
+type LeadRow = ReturnType<typeof buildAllLeadsShape>;
+// Helper purely for type inference — never called
+function buildAllLeadsShape(columns: KanbanColumn[]) {
+  return columns.flatMap((column) =>
+    column.cards.map((card) => ({
+      ...card,
+      statusTitle: column.leadStatus,
+      stageTitle: column.title,
+      statusDotColor: column.dotColorClass,
+    })),
+  )[0];
+}
+
+type LeadVM = ReturnType<typeof buildLeadCardViewModelFromCard>;
+
+interface ColumnRenderer {
+  th: React.ReactNode;
+  thClassName?: string;
+  td: (lead: LeadRow, vm: LeadVM, summaryTitle: string) => React.ReactNode;
+  tdClassName?: string;
+}
+
+function buildColumnRenderers(
+  setPanel: (p: LeadPanelState | null) => void,
+): Record<string, ColumnRenderer> {
+  return {
+    lead: {
+      th: "Lead",
+      tdClassName: "px-3 py-2 whitespace-nowrap",
+      td: (lead) => (
+        <div className="flex items-center gap-2.5">
+          <div
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${lead.avatarBgClass}`}
+          >
+            {lead.initials}
+          </div>
+          <div className="min-w-0">
+            <p className="font-semibold text-slate-900">{lead.name}</p>
+            <p className="truncate text-[10px] text-slate-400">{lead.email}</p>
+          </div>
+        </div>
+      ),
+    },
+    company: {
+      th: "Company",
+      tdClassName: "px-3 py-2 whitespace-nowrap text-slate-600",
+      td: (lead) => lead.company || "",
+    },
+    status: {
+      th: "Status",
+      tdClassName: "px-3 py-2 whitespace-nowrap",
+      td: (lead) => (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+          <span className={`h-1.5 w-1.5 rounded-full ${lead.statusDotColor}`} />
+          {lead.stageTitle}
+        </span>
+      ),
+    },
+    sla: {
+      th: "Pipeline SLA",
+      thClassName: "min-w-[140px] px-3 py-2.5",
+      tdClassName: "px-3 py-2",
+      td: (lead, vm) =>
+        vm.sla &&
+        vm.sla.badgeLabel !== "No SLA" &&
+        (vm.sla.stageClock || vm.sla.milestoneClock) ? (
+          <div className="space-y-1">
+            <LeadSlaChip sla={vm.sla} variant="badge" />
+            <p className="truncate text-[10px] text-slate-500">
+              {vm.sla.milestoneClock
+                ? `${vm.sla.milestoneClock.label} · ${vm.sla.milestoneClock.detail}`
+                : vm.sla.stageClock?.detail}
+            </p>
+          </div>
+        ) : (
+          <span className="text-[11px] text-slate-300">—</span>
+        ),
+    },
+    owner: {
+      th: "Owner",
+      tdClassName: "px-3 py-2 whitespace-nowrap text-slate-600",
+      td: (lead) => lead.owner,
+    },
+    activity: {
+      th: "Activity",
+      thClassName: "min-w-[200px] px-3 py-2.5",
+      tdClassName: "px-3 py-2",
+      td: (lead, vm, summaryTitle) => {
+        const summary = vm.activitySummary;
+        return summary.primary && summary.urgency ? (
+          <button
+            type="button"
+            onClick={() =>
+              setPanel({
+                type: "activity-summary",
+                leadId: lead.id,
+                leadName: lead.name,
+                status: lead.statusTitle,
+              })
+            }
+            className={cn(
+              "w-full max-w-[240px] rounded-md px-2 py-1.5 text-left transition-colors",
+              URGENCY_SURFACE[summary.urgency],
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1",
+            )}
+            aria-label={[
+              "Activity Summary",
+              URGENCY_WORDS[summary.urgency],
+              summary.primary.title,
+              summary.dueLabel,
+              summary.moreCount > 0
+                ? `Plus ${summary.moreCount} more pending`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(". ")}
+            title={summary.primary.title}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <span className="min-w-0 truncate text-[11px] font-semibold">
+                {summaryTitle}
+              </span>
+              {summary.moreCount > 0 && (
+                <span className="shrink-0 text-[10px] font-medium opacity-90">
+                  +{summary.moreCount}
+                </span>
+              )}
+            </div>
+            <div className="mt-0.5 text-[10px] opacity-90">
+              {summary.dueLabel}
+            </div>
+          </button>
+        ) : (
+          <span className="text-[11px] text-slate-300">—</span>
+        );
+      },
+    },
+    lastActivity: {
+      th: "Last activity",
+      tdClassName: "px-3 py-2 whitespace-nowrap",
+      td: (lead, vm) =>
+        vm.lastActivity ? (
+          <button
+            type="button"
+            onClick={() =>
+              setPanel({
+                type: "last-activity",
+                leadId: lead.id,
+                leadName: lead.name,
+                status: lead.statusTitle,
+              })
+            }
+            className="max-w-[160px] truncate text-left text-[10px] text-slate-400 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-1"
+            aria-label={`Last activity: ${vm.lastActivity.label}, ${vm.lastActivity.relativeTime}. Open activity history.`}
+            title={`${vm.lastActivity.label} · ${vm.lastActivity.relativeTime}`}
+          >
+            {vm.lastActivity.relativeTime}
+          </button>
+        ) : (
+          <span className="text-[11px] text-slate-300">—</span>
+        ),
+    },
+    actions: {
+      th: "Actions",
+      thClassName: "px-3 py-2.5 text-right",
+      tdClassName: "px-3 py-2",
+      td: (lead, vm) => (
+        <div
+          className="flex items-center justify-end gap-0.5"
+          role="toolbar"
+          aria-label={`Quick actions for ${lead.name}`}
+        >
+          {vm.quickActions.map((action) => {
+            const Icon = QUICK_ICONS[action.kind];
+            const badge =
+              action.badgeCount >= 2 ? String(action.badgeCount) : null;
+            const stateHint = QUICK_STATE_WORDS[action.urgency];
+            const countHint = badge ? `, ${badge} pending` : "";
+            return (
+              <button
+                key={action.kind}
+                type="button"
+                onClick={() =>
+                  setPanel({
+                    type: "quick-action",
+                    kind: action.kind as QuickActionKind,
+                    leadId: lead.id,
+                    leadName: lead.name,
+                    status: lead.statusTitle,
+                    email: lead.email,
+                    phone: lead.phone,
+                  })
+                }
+                aria-label={`${QUICK_LABELS[action.kind]} — ${stateHint}${countHint}`}
+                title={`${QUICK_LABELS[action.kind]} (${stateHint})`}
+                className={cn(
+                  "relative flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1",
+                  QUICK_URGENCY[action.urgency],
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" aria-hidden />
+                {badge && (
+                  <span
+                    className={cn(
+                      "absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-0.5 text-[8px] font-bold leading-none",
+                      QUICK_BADGE[action.urgency],
+                    )}
+                    aria-hidden
+                  >
+                    {badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      ),
+    },
+  };
+}
 
 export function LeadListView({
   columns: columnsProp,
@@ -84,7 +319,9 @@ export function LeadListView({
   const [toast, setToast] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pageSize, setPageSize] = useState<number>(10);
-  const [pageSizeMenuOpen, setPageSizeMenuOpen] = useState(false);
+  const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
+  const [manageColumns, setManageColumns] =
+    useState<ManageColumn[]>(DEFAULT_LEAD_COLUMNS);
 
   useEffect(() => {
     return onLeadActivityChange(() => setRevision((n) => n + 1));
@@ -139,6 +376,12 @@ export function LeadListView({
   const someSelected =
     pagedLeads.some((l) => selectedIds.has(l.id)) && !allSelected;
 
+  const columnRenderers = useMemo(() => buildColumnRenderers(setPanel), []);
+  const orderedVisibleColumns = useMemo(
+    () => manageColumns.filter((c) => c.checked),
+    [manageColumns],
+  );
+
   function toggleAll() {
     setSelectedIds((prev) => {
       if (allSelected) return new Set();
@@ -164,8 +407,8 @@ export function LeadListView({
     <div className="w-full overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1100px] text-left text-[12px]">
-          <thead className="border-b border-slate-100 bg-slate-50/80 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
-            <tr>
+          <thead className="border-b border-slate-100 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+            <tr className="sticky top-0 z-10 bg-slate-50/80">
               <th className="w-8 px-3 py-2.5">
                 <input
                   type="checkbox"
@@ -178,43 +421,30 @@ export function LeadListView({
                   className="h-3.5 w-3.5 rounded border-slate-300"
                 />
               </th>
-              <th className="px-3 py-2.5">Lead</th>
-              <th className="px-3 py-2.5">Company</th>
-              <th className="px-3 py-2.5">Status</th>
-              <th className="min-w-[140px] px-3 py-2.5">Pipeline SLA</th>
-              <th className="px-3 py-2.5">Owner</th>
-              <th className="min-w-[200px] px-3 py-2.5">Activity</th>
-              <th className="px-3 py-2.5">Last activity</th>
-              <th className="px-3 py-2.5 text-right">Actions</th>
-              <th className="relative px-3 py-2.5 text-right">
-                <button
-                  type="button"
-                  onClick={() => setPageSizeMenuOpen((o) => !o)}
-                  aria-label="Table display options"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+
+              {orderedVisibleColumns.map((col) => (
+                <th
+                  key={col.id}
+                  className={
+                    columnRenderers[col.id]?.thClassName ?? "px-3 py-2.5"
+                  }
                 >
-                  <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
-                </button>
-                {pageSizeMenuOpen && (
-                  <div className="absolute right-0 top-full z-10 mt-1 w-32 rounded-md border border-slate-100 bg-white py-1 text-left text-[11px] font-normal normal-case text-slate-600 shadow-lg">
-                    {PAGE_SIZE_OPTIONS.map((size) => (
-                      <button
-                        key={size}
-                        type="button"
-                        onClick={() => {
-                          setPageSize(size);
-                          setPageSizeMenuOpen(false);
-                        }}
-                        className={cn(
-                          "flex w-full items-center justify-between px-3 py-1.5 hover:bg-slate-50",
-                          pageSize === size && "font-semibold text-slate-900",
-                        )}
-                      >
-                        Show {size}
-                      </button>
-                    ))}
-                  </div>
+                  {columnRenderers[col.id]?.th}
+                </th>
+              ))}
+
+              <th
+                className={cn(
+                  "sticky right-0 z-20 -mr-3 bg-slate-50/80 pr-3 pl-3 text-right",
+                  "shadow-[-12px_0_12px_-8px_rgba(15,23,42,0.06)]",
                 )}
+              >
+                <TableDisplayOptionsMenu
+                  pageSize={pageSize}
+                  onPageSizeChange={setPageSize}
+                  onManageColumns={() => setManageColumnsOpen(true)}
+                  className="flex justify-end"
+                />
               </th>
             </tr>
           </thead>
@@ -249,177 +479,18 @@ export function LeadListView({
                       className="h-3.5 w-3.5 rounded border-slate-300"
                     />
                   </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <div className="flex items-center gap-2.5">
-                      <div
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${lead.avatarBgClass}`}
-                      >
-                        {lead.initials}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-slate-900">
-                          {lead.name}
-                        </p>
-                        <p className="truncate text-[10px] text-slate-400">
-                          {lead.email}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-slate-600">
-                    {lead.company || ""}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
-                      <span
-                        className={`h-1.5 w-1.5 rounded-full ${lead.statusDotColor}`}
-                      />
-                      {lead.stageTitle}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2">
-                    {vm.sla &&
-                    vm.sla.badgeLabel !== "No SLA" &&
-                    (vm.sla.stageClock || vm.sla.milestoneClock) ? (
-                      <div className="space-y-1">
-                        <LeadSlaChip sla={vm.sla} variant="badge" />
-                        <p className="truncate text-[10px] text-slate-500">
-                          {vm.sla.milestoneClock
-                            ? `${vm.sla.milestoneClock.label} · ${vm.sla.milestoneClock.detail}`
-                            : vm.sla.stageClock?.detail}
-                        </p>
-                      </div>
-                    ) : (
-                      <span className="text-[11px] text-slate-300">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap text-slate-600">
-                    {lead.owner}
-                  </td>
-                  <td className="px-3 py-2">
-                    {summary.primary && summary.urgency ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPanel({
-                            type: "activity-summary",
-                            leadId: lead.id,
-                            leadName: lead.name,
-                            status: lead.statusTitle,
-                          })
-                        }
-                        className={cn(
-                          "w-full max-w-[240px] rounded-md px-2 py-1.5 text-left transition-colors",
-                          URGENCY_SURFACE[summary.urgency],
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1",
-                        )}
-                        aria-label={[
-                          "Activity Summary",
-                          URGENCY_WORDS[summary.urgency],
-                          summary.primary.title,
-                          summary.dueLabel,
-                          summary.moreCount > 0
-                            ? `Plus ${summary.moreCount} more pending`
-                            : null,
-                        ]
-                          .filter(Boolean)
-                          .join(". ")}
-                        title={summary.primary.title}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="min-w-0 truncate text-[11px] font-semibold">
-                            {summaryTitle}
-                          </span>
-                          {summary.moreCount > 0 && (
-                            <span className="shrink-0 text-[10px] font-medium opacity-90">
-                              +{summary.moreCount}
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-0.5 text-[10px] opacity-90">
-                          {summary.dueLabel}
-                        </div>
-                      </button>
-                    ) : (
-                      <span className="text-[11px] text-slate-300">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {vm.lastActivity ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPanel({
-                            type: "last-activity",
-                            leadId: lead.id,
-                            leadName: lead.name,
-                            status: lead.statusTitle,
-                          })
-                        }
-                        className="max-w-[160px] truncate text-left text-[10px] text-slate-400 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-1"
-                        aria-label={`Last activity: ${vm.lastActivity.label}, ${vm.lastActivity.relativeTime}. Open activity history.`}
-                        title={`${vm.lastActivity.label} · ${vm.lastActivity.relativeTime}`}
-                      >
-                        {vm.lastActivity.relativeTime}
-                      </button>
-                    ) : (
-                      <span className="text-[11px] text-slate-300">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <div
-                      className="flex items-center justify-end gap-0.5"
-                      role="toolbar"
-                      aria-label={`Quick actions for ${lead.name}`}
+
+                  {orderedVisibleColumns.map((col) => (
+                    <td
+                      key={col.id}
+                      className={
+                        columnRenderers[col.id]?.tdClassName ?? "px-3 py-2"
+                      }
                     >
-                      {vm.quickActions.map((action) => {
-                        const Icon = QUICK_ICONS[action.kind];
-                        const badge =
-                          action.badgeCount >= 2
-                            ? String(action.badgeCount)
-                            : null;
-                        const stateHint = QUICK_STATE_WORDS[action.urgency];
-                        const countHint = badge ? `, ${badge} pending` : "";
-                        return (
-                          <button
-                            key={action.kind}
-                            type="button"
-                            onClick={() =>
-                              setPanel({
-                                type: "quick-action",
-                                kind: action.kind as QuickActionKind,
-                                leadId: lead.id,
-                                leadName: lead.name,
-                                status: lead.statusTitle,
-                                email: lead.email,
-                                phone: lead.phone,
-                              })
-                            }
-                            aria-label={`${QUICK_LABELS[action.kind]} — ${stateHint}${countHint}`}
-                            title={`${QUICK_LABELS[action.kind]} (${stateHint})`}
-                            className={cn(
-                              "relative flex h-7 w-7 items-center justify-center rounded-md transition-colors",
-                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1",
-                              QUICK_URGENCY[action.urgency],
-                            )}
-                          >
-                            <Icon className="h-3.5 w-3.5" aria-hidden />
-                            {badge && (
-                              <span
-                                className={cn(
-                                  "absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-0.5 text-[8px] font-bold leading-none",
-                                  QUICK_BADGE[action.urgency],
-                                )}
-                                aria-hidden
-                              >
-                                {badge}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </td>
+                      {columnRenderers[col.id]?.td(lead, vm, summaryTitle)}
+                    </td>
+                  ))}
+
                   <td className="px-3 py-2" />
                 </tr>
               );
@@ -438,6 +509,16 @@ export function LeadListView({
         onQuickActionSuccess={(message) => {
           flash(message);
           setRevision((n) => n + 1);
+        }}
+      />
+
+      <ManageColumnsModal
+        open={manageColumnsOpen}
+        columns={manageColumns}
+        onClose={() => setManageColumnsOpen(false)}
+        onSave={(cols) => {
+          setManageColumns(cols);
+          setManageColumnsOpen(false);
         }}
       />
 

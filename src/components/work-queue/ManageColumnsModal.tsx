@@ -42,11 +42,11 @@ export function ManageColumnsModal({
   onClose: () => void;
   onSave: (columns: ManageColumn[]) => void;
 }) {
-  const [working, setWorking] = React.useState<ManageColumn[]>(columns);
-  const [search, setSearch] = React.useState("");
-  const [dragIndex, setDragIndex] = React.useState<number | null>(null);
+  const [working, setWorking] = useState<ManageColumn[]>(columns);
+  const [search, setSearch] = useState("");
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (open) {
       setWorking(columns);
       setSearch("");
