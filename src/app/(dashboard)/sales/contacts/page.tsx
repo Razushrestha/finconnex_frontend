@@ -57,7 +57,7 @@ export default function ContactsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 p-2 pr-3 dark:bg-zinc-950">
+    <div className="h-screen bg-slate-50 p-2 pr-3 dark:bg-zinc-950">
       <FocusHighlight />
       <EntityHeader
         entityLabel="Contact"
