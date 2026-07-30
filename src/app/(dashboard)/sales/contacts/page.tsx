@@ -20,11 +20,22 @@ const DEFAULT_CONTACT_COLUMNS = CONTACT_GROUPS.map((group) => ({
   visible: true,
 }));
 
+// Define your sort options for contacts
+const CONTACT_SORT_OPTIONS = [
+  { label: "Newest First", value: "newest" },
+  { label: "Oldest First", value: "oldest" },
+  { label: "Name (A-Z)", value: "name_asc" },
+  { label: "Name (Z-A)", value: "name_desc" },
+];
+
 export default function ContactsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [filters, setFilters] = useState<ContactFilters>(EMPTY_CONTACT_FILTERS);
   const [columns, setColumns] = useState(DEFAULT_CONTACT_COLUMNS);
+
+  // Add sort state
+  const [activeSort, setActiveSort] = useState("newest");
 
   function toggleFilterField(section: "source" | "status", field: string) {
     setFilters((prev) => {
@@ -74,6 +85,10 @@ export default function ContactsPage() {
         onViewChange={setViewMode}
         isFilterOpen={isFilterOpen}
         onToggleFilter={() => setIsFilterOpen((v) => !v)}
+        // Pass sort props to render the sort dropdown
+        sortOptions={CONTACT_SORT_OPTIONS}
+        activeSort={activeSort}
+        onSortChange={(value) => setActiveSort(value)}
       />
 
       <div className="mt-3 flex items-start gap-4">
@@ -92,9 +107,10 @@ export default function ContactsPage() {
             <ContactsKanbanBoard
               filters={filters}
               visibleColumnIds={visibleColumnIds}
+              sortValue={activeSort}
             />
           ) : (
-            <ContactsListView filters={filters} />
+            <ContactsListView filters={filters} sortValue={activeSort} />
           )}
         </div>
       </div>

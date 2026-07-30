@@ -16,6 +16,7 @@ import {
 import type { ContactCardData } from "@/lib/contacts/types";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion } from "@/lib/motion";
+import Link from "next/link";
 
 interface ContactRecordCardProps {
   contact: ContactCardData;
@@ -43,7 +44,10 @@ export function ContactRecordCard({
         isDragging && cardDragging,
       )}
     >
-      <div className="mb-3 flex items-center gap-2.5">
+      <Link
+        href={`/sales/contacts/detail/${contact.id}`}
+        className="mb-3 flex items-center gap-2.5"
+      >
         <div
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${contact.avatarBgClass}`}
         >
@@ -52,7 +56,7 @@ export function ContactRecordCard({
         <h3 className="truncate text-[13px] font-semibold text-slate-800">
           {contact.name}
         </h3>
-      </div>
+      </Link>
 
       <div className="space-y-1.5 text-[11px] text-slate-500">
         <div className="flex items-center gap-2">
