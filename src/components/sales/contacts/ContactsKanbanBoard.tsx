@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, MoreVertical } from "lucide-react";
-import { type ContactGroup } from "@/lib/contacts/types";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { type ContactGroup, type ContactCardData } from "@/lib/contacts/types";
 import { listContactGroups, saveContactGroups } from "@/lib/contacts/store";
 import type { ContactFilters } from "./FilterContactsPanel";
 import { ContactRecordCard } from "./ContactRecordCard";
@@ -18,6 +18,7 @@ interface ContactsKanbanBoardProps {
   filters?: ContactFilters;
   visibleColumnIds?: string[];
   onAddLead?: (columnId: string) => void;
+  sortValue?: string; // Added sortValue prop
 }
 
 const BOARD_HEIGHT = "h-[calc(100vh-5rem)]";
@@ -26,6 +27,7 @@ export function ContactsKanbanBoard({
   filters,
   visibleColumnIds,
   onAddLead,
+  sortValue = "newest", // Default sort
 }: ContactsKanbanBoardProps) {
   const [groups, setGroups] = useState<ContactGroup[]>([]);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
@@ -63,15 +65,45 @@ export function ContactsKanbanBoard({
           .filter((g): g is ContactGroup => !!g)
       : groups;
 
+    // Helper to parse DD/MM/YYYY dates
+    const parseDate = (dateStr: string) => {
+      const [day, month, year] = dateStr.split("/").map(Number);
+      return new Date(year, month - 1, day).getTime();
+    };
+
     return result
       .filter((g) => !hasStatusFilter || filters!.statuses.includes(g.title))
-      .map((g) => ({
-        ...g,
-        contacts: hasSourceFilter
+      .map((g) => {
+        // Filter contacts by source first
+        const filteredContacts = hasSourceFilter
           ? g.contacts.filter((c) => filters!.sources.includes(c.source))
-          : g.contacts,
-      }));
-  }, [groups, filters, visibleColumnIds]);
+          : [...g.contacts];
+
+        // Sort contacts within the column based on sortValue
+        filteredContacts.sort((a, b) => {
+          if (sortValue === "name_asc") {
+            return a.name.localeCompare(b.name);
+          }
+          if (sortValue === "name_desc") {
+            return b.name.localeCompare(a.name);
+          }
+
+          const timeA = parseDate(a.createdDate);
+          const timeB = parseDate(b.createdDate);
+
+          if (sortValue === "oldest") {
+            return timeA - timeB;
+          }
+          // Default: "newest"
+          return timeB - timeA;
+        });
+
+        return {
+          ...g,
+          contacts: filteredContacts,
+        };
+      });
+  }, [groups, filters, visibleColumnIds, sortValue]);
 
   function handleDragStart(
     e: React.DragEvent<HTMLDivElement>,

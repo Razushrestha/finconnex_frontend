@@ -10,10 +10,12 @@ import {
   ManageColumnsModal,
   type ManageColumn,
 } from "@/components/work-queue/ManageColumnsModal";
+import Link from "next/link";
 
 interface ContactsListViewProps {
   groups?: ContactGroup[];
   filters?: ContactFilters;
+  sortValue?: string; // Added sortValue prop
 }
 
 const DEFAULT_CONTACT_COLUMNS: ManageColumn[] = [
@@ -28,9 +30,8 @@ const DEFAULT_CONTACT_COLUMNS: ManageColumn[] = [
   { id: "actions", label: "Actions", checked: true },
 ];
 
-// Row shape as produced by the allContacts useMemo below
 type ContactRow = ReturnType<typeof buildAllContactsShape>;
-// Helper purely for type inference — never called
+
 function buildAllContactsShape(groups: ContactGroup[]) {
   return groups.flatMap((group) =>
     group.contacts.map((c) => ({
@@ -53,14 +54,19 @@ const columnRenderers: Record<string, ColumnRenderer> = {
     th: "Contact",
     tdClassName: "px-3 py-2 whitespace-nowrap",
     td: (contact) => (
-      <div className="flex items-center gap-2.5">
+      <Link
+        href={`/sales/contacts/detail/${contact.id}`}
+        className="group flex items-center gap-2.5"
+      >
         <div
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${contact.avatarBgClass}`}
         >
           {contact.initials}
         </div>
-        <span className="font-semibold text-slate-900">{contact.name}</span>
-      </div>
+        <span className="font-semibold text-slate-900 group-hover:text-indigo-600 group-hover:underline">
+          {contact.name}
+        </span>
+      </Link>
     ),
   },
   company: {
@@ -124,6 +130,7 @@ const columnRenderers: Record<string, ColumnRenderer> = {
 export function ContactsListView({
   groups = CONTACT_GROUPS,
   filters,
+  sortValue = "newest",
 }: ContactsListViewProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pageSize, setPageSize] = useState<number>(10);
@@ -136,7 +143,7 @@ export function ContactsListView({
     const hasStatusFilter = !!filters?.statuses.length;
     const hasSourceFilter = !!filters?.sources.length;
 
-    return groups
+    const filtered = groups
       .filter(
         (group) => !hasStatusFilter || filters!.statuses.includes(group.title),
       )
@@ -151,7 +158,31 @@ export function ContactsListView({
             statusDotColor: group.dotColorClass,
           })),
       );
-  }, [groups, filters]);
+
+    return filtered.sort((a, b) => {
+      if (sortValue === "name_asc") {
+        return a.name.localeCompare(b.name);
+      }
+      if (sortValue === "name_desc") {
+        return b.name.localeCompare(a.name);
+      }
+
+      // Helper to convert "DD/MM/YYYY" to timestamp
+      const parseDate = (dateStr: string) => {
+        const [day, month, year] = dateStr.split("/").map(Number);
+        return new Date(year, month - 1, day).getTime();
+      };
+
+      const timeA = parseDate(a.createdDate);
+      const timeB = parseDate(b.createdDate);
+
+      if (sortValue === "oldest") {
+        return timeA - timeB;
+      }
+      // Default: "newest"
+      return timeB - timeA;
+    });
+  }, [groups, filters, sortValue]);
 
   const pagedContacts = useMemo(
     () => allContacts.slice(0, pageSize),

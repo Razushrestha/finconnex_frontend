@@ -81,7 +81,6 @@ export const CONTACT_GROUPS: ContactGroup[] = [
         company: "Northwind Traders",
         email: "olivia.bennett@northwind.com",
         phone: "+61 400 100 001",
-        mobile: "+61 411 100 001",
         owner: "John Smith",
         source: "Website",
         createdDate: "23/07/2026",

@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Columns3,
   GripVertical,
+  ArrowUpDown,
 } from "lucide-react";
 
 const DEFAULT_LAYOUT_ID = "standard";
@@ -23,25 +24,22 @@ export interface PipelineOption {
   value: string;
 }
 
-export interface ColumnOption {
-  /** Stage id, e.g. "new_leads", "appointment_booked", "lost", "settled". */
-  id: string;
-  /** Display label, e.g. "New Leads", "Appointment Booked". */
+export interface SortOption {
   label: string;
-  /** Whether the column is currently shown on the board. */
+  value: string;
+}
+
+export interface ColumnOption {
+  id: string;
+  label: string;
   visible: boolean;
 }
 
 export interface EntityHeaderProps {
-  /** Singular entity name: drives the Create button label. */
   entityLabel: string;
-  /** Plural form for the page title / search placeholder. */
   entityLabelPlural?: string;
-  /** Route the Create button pushes to. */
   createRoute: string;
-  /** Breadcrumb trail after Home. */
   breadcrumb?: string[];
-  /** Total record count badge. Omit to hide. */
   totalCount?: number;
 
   pipelineOptions?: PipelineOption[];
@@ -50,6 +48,10 @@ export interface EntityHeaderProps {
 
   onToggleFilter?: () => void;
   isFilterOpen?: boolean;
+
+  sortOptions?: SortOption[];
+  activeSort?: string;
+  onSortChange?: (sortValue: string) => void;
 
   searchValue?: string;
   onSearchChange?: (value: string) => void;
@@ -61,11 +63,8 @@ export interface EntityHeaderProps {
   onExport?: () => void;
   onRefresh?: () => void;
 
-  /** Stage/column list for the "manage columns" picker. Omit to hide the control. */
   columnOptions?: ColumnOption[];
-  /** Called with a column's id when its checkbox is toggled. */
   onColumnToggle?: (columnId: string) => void;
-  /** Called when a column is dragged onto another — move draggedId to targetId's position. */
   onColumnReorder?: (draggedId: string, targetId: string) => void;
 }
 
@@ -80,12 +79,14 @@ export function EntityHeader({
   onPipelineChange,
   onToggleFilter,
   isFilterOpen,
+  sortOptions,
+  activeSort,
+  onSortChange,
   searchValue,
   onSearchChange,
   searchPlaceholder = `Search ${entityLabelPlural}`,
   viewMode = "kanban",
   onViewChange,
-  onExport,
   onRefresh,
   columnOptions,
   onColumnToggle,
@@ -97,12 +98,14 @@ export function EntityHeader({
     : entityLabelPlural;
 
   const [isColumnMenuOpen, setIsColumnMenuOpen] = useState(false);
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const columnMenuRef = useRef<HTMLDivElement>(null);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
   const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
 
+  // Close menus when clicking outside
   useEffect(() => {
-    if (!isColumnMenuOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (
         columnMenuRef.current &&
@@ -110,14 +113,22 @@ export function EntityHeader({
       ) {
         setIsColumnMenuOpen(false);
       }
+      if (
+        sortMenuRef.current &&
+        !sortMenuRef.current.contains(e.target as Node)
+      ) {
+        setIsSortMenuOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isColumnMenuOpen]);
+  }, []);
+
+  const activeSortLabel =
+    sortOptions?.find((opt) => opt.value === activeSort)?.label || "Sort";
 
   return (
     <div className="w-full border-b border-slate-200/80 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-      {/* Single compact toolbar */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-1 py-2 sm:gap-x-3">
         <nav className="hidden items-center gap-1 text-[11px] text-slate-400 md:flex">
           <Link
@@ -164,6 +175,7 @@ export function EntityHeader({
         ) : null}
 
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          {/* Filter Button */}
           <button
             type="button"
             onClick={onToggleFilter}
@@ -178,6 +190,56 @@ export function EntityHeader({
             <span className="hidden sm:inline">Filter</span>
             <ChevronDown className="hidden h-3.5 w-3.5 text-slate-400 sm:block" />
           </button>
+
+          {/* Sort Button & Dropdown (Right after Filter) */}
+          {sortOptions ? (
+            <div className="relative" ref={sortMenuRef}>
+              <button
+                type="button"
+                onClick={() => setIsSortMenuOpen((open) => !open)}
+                aria-label="Sort options"
+                aria-pressed={isSortMenuOpen}
+                aria-haspopup="true"
+                aria-expanded={isSortMenuOpen}
+                className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium transition-colors ${
+                  isSortMenuOpen
+                    ? "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-300"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-slate-300"
+                }`}
+              >
+                <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
+                <span className="hidden sm:inline">{activeSortLabel}</span>
+                <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+              </button>
+
+              {isSortMenuOpen && (
+                <div className="absolute right-0 z-20 mt-1.5 w-48 rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                  <p className="px-2 py-1 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+                    Sort By
+                  </p>
+                  <div className="flex flex-col">
+                    {sortOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          onSortChange?.(opt.value);
+                          setIsSortMenuOpen(false);
+                        }}
+                        className={`flex items-center rounded px-2 py-1.5 text-left text-[12px] font-medium transition-colors ${
+                          activeSort === opt.value
+                            ? "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+                            : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-zinc-800"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
 
           <div className="relative hidden sm:block">
             <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
