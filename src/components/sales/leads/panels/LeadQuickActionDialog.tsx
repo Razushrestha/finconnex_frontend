@@ -18,7 +18,18 @@ import {
 } from "@/lib/leads/panel-actions";
 import type { Priority } from "@/lib/tasks/types";
 import Link from "next/link";
-import { ExternalLink, Phone, Mail, MessageSquare, X } from "lucide-react";
+import {
+  ExternalLink,
+  Phone,
+  Mail,
+  MessageSquare,
+  X,
+  ChevronDown,
+  Paperclip,
+  StickyNote,
+  CheckSquare,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const TITLES: Record<QuickActionKind, string> = {
   call: "Call",
@@ -29,6 +40,151 @@ const TITLES: Record<QuickActionKind, string> = {
   note: "Add note",
   attachment: "Upload attachment",
 };
+
+// TODO(api): replace with a real fetch, e.g.
+//   listLeadActivities(leadId, kind) from a future @/lib/leads/activity-store
+interface PastRecordEntry {
+  id: string;
+  title: string;
+  snippet?: string;
+  timestamp: string;
+  status?: "Sent" | "Failed" | "Draft" | "Open" | "Done";
+  owner?: string;
+}
+
+const MOCK_PAST_RECORDS: Partial<Record<QuickActionKind, PastRecordEntry[]>> = {
+  sms: [
+    {
+      id: "sms-1",
+      title: "Follow-up reminder",
+      snippet: "Hi, just checking in on the rate lock paperwork…",
+      timestamp: "Jul 24, 2026 · 3:12 PM",
+      status: "Sent",
+      owner: "Priya Shrestha",
+    },
+    {
+      id: "sms-2",
+      title: "Appointment confirmation",
+      snippet: "Confirming our call tomorrow at 10am.",
+      timestamp: "Jul 18, 2026 · 11:05 AM",
+      status: "Sent",
+      owner: "Priya Shrestha",
+    },
+  ],
+  email: [
+    {
+      id: "email-1",
+      title: "Pre-approval next steps",
+      snippet: "Attached the checklist for your pre-approval application…",
+      timestamp: "Jul 22, 2026 · 9:40 AM",
+      status: "Sent",
+      owner: "Priya Shrestha",
+    },
+  ],
+  task: [
+    {
+      id: "task-1",
+      title: "Send disclosure documents",
+      timestamp: "Due Jul 30, 2026",
+      status: "Open",
+      owner: "Priya Shrestha",
+    },
+    {
+      id: "task-2",
+      title: "Confirm income verification",
+      timestamp: "Completed Jul 20, 2026",
+      status: "Done",
+      owner: "Priya Shrestha",
+    },
+  ],
+  note: [
+    {
+      id: "note-1",
+      title: "Call recap",
+      snippet:
+        "Client is comparing rates with two other lenders, wants to close by end of Q3.",
+      timestamp: "Jul 21, 2026 · 4:50 PM",
+      owner: "Priya Shrestha",
+    },
+  ],
+  attachment: [
+    {
+      id: "attach-1",
+      title: "rate-lock.pdf",
+      timestamp: "Jul 19, 2026 · 2:15 PM",
+      owner: "Priya Shrestha",
+    },
+    {
+      id: "attach-2",
+      title: "income-verification.pdf",
+      timestamp: "Jul 12, 2026 · 10:30 AM",
+      owner: "Priya Shrestha",
+    },
+  ],
+};
+
+const HISTORY_ICONS: Partial<Record<QuickActionKind, typeof Mail>> = {
+  sms: MessageSquare,
+  email: Mail,
+  task: CheckSquare,
+  note: StickyNote,
+  attachment: Paperclip,
+};
+
+const STATUS_STYLES: Record<NonNullable<PastRecordEntry["status"]>, string> = {
+  Sent: "bg-emerald-50 text-emerald-700",
+  Failed: "bg-rose-50 text-rose-700",
+  Draft: "bg-slate-100 text-slate-600",
+  Open: "bg-amber-50 text-amber-700",
+  Done: "bg-emerald-50 text-emerald-700",
+};
+
+function PastRecordsList({ kind }: { kind: QuickActionKind }) {
+  const records = MOCK_PAST_RECORDS[kind] ?? [];
+
+  if (records.length === 0) {
+    return (
+      <p className="px-5 py-6 text-center text-xs text-slate-400">
+        No past {TITLES[kind].toLowerCase()} activity yet.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="max-h-48 divide-y divide-slate-100 overflow-y-auto">
+      {records.map((r) => (
+        <li key={r.id} className="flex items-start gap-2.5 px-5 py-2.5">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <p className="truncate text-[13px] font-semibold text-slate-800">
+                {r.title}
+              </p>
+              {r.status && (
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold",
+                    STATUS_STYLES[r.status],
+                  )}
+                >
+                  {r.status}
+                </span>
+              )}
+            </div>
+            {r.snippet && (
+              <p className="mt-0.5 truncate text-xs text-slate-500">
+                {r.snippet}
+              </p>
+            )}
+            <p className="mt-1 text-[11px] text-slate-400">
+              {r.timestamp}
+              {r.owner ? ` · ${r.owner}` : ""}
+            </p>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 interface LeadQuickActionDialogProps {
   open: boolean;
@@ -52,8 +208,12 @@ export function LeadQuickActionDialog({
   const [draft, setDraft] = useState(() => defaultQuickActionDraft(kind));
   const [error, setError] = useState<string | null>(null);
   const [intentError, setIntentError] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
-  function update<K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) {
+  function update<K extends keyof typeof draft>(
+    key: K,
+    value: (typeof draft)[K],
+  ) {
     setDraft((d) => ({ ...d, [key]: value }));
   }
 
@@ -101,11 +261,14 @@ export function LeadQuickActionDialog({
     phone: leadPhone,
   });
 
-  const needsSchedule = kind === "call" || kind === "meeting" || kind === "task";
+  const needsSchedule =
+    kind === "call" || kind === "meeting" || kind === "task";
   const needsBody =
-    kind === "sms" || kind === "email" || kind === "note" || kind === "attachment";
-  const isContactIntent =
-    kind === "call" || kind === "sms" || kind === "email";
+    kind === "sms" ||
+    kind === "email" ||
+    kind === "note" ||
+    kind === "attachment";
+  const isContactIntent = kind === "call" || kind === "sms" || kind === "email";
   const titleLabel =
     kind === "attachment"
       ? "File name"
@@ -114,6 +277,10 @@ export function LeadQuickActionDialog({
         : kind === "call"
           ? "Log subject (optional)"
           : "Title";
+
+  const showsHistory = kind !== "call";
+  const HistoryIcon = HISTORY_ICONS[kind];
+  const historyCount = MOCK_PAST_RECORDS[kind]?.length ?? 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -179,6 +346,35 @@ export function LeadQuickActionDialog({
             <p className="text-[10px] text-slate-400">
               Or log the activity below so it appears on the Lead Card timeline.
             </p>
+          </div>
+        )}
+
+        {showsHistory && (
+          <div className="border-b border-slate-100">
+            <button
+              type="button"
+              onClick={() => setHistoryOpen((v) => !v)}
+              className="flex w-full items-center justify-between px-5 py-2.5 text-left"
+            >
+              <span className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                {HistoryIcon && (
+                  <HistoryIcon className="h-3.5 w-3.5 text-slate-400" />
+                )}
+                Past {TITLES[kind].toLowerCase()}
+                {historyCount > 0 && (
+                  <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+                    {historyCount}
+                  </span>
+                )}
+              </span>
+              <ChevronDown
+                className={cn(
+                  "h-3.5 w-3.5 text-slate-400 transition-transform",
+                  historyOpen && "rotate-180",
+                )}
+              />
+            </button>
+            {historyOpen && <PastRecordsList kind={kind} />}
           </div>
         )}
 
@@ -270,9 +466,7 @@ export function LeadQuickActionDialog({
               Priority
               <select
                 value={draft.priority}
-                onChange={(e) =>
-                  update("priority", e.target.value as Priority)
-                }
+                onChange={(e) => update("priority", e.target.value as Priority)}
                 className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
               >
                 <option value="High">High</option>
