@@ -66,7 +66,7 @@ export default function LeadsPage() {
   const visibleColumnIds = columns.filter((c) => c.visible).map((c) => c.id);
 
   return (
-    <div className="min-h-screen bg-slate-50 p-2 pr-4">
+    <div className="h-screen bg-slate-50 p-2 pr-4">
       <FocusHighlight />
       <EntityHeader
         entityLabel="Lead"

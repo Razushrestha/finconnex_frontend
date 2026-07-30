@@ -26,7 +26,7 @@ interface CompaniesKanbanBoardProps {
   onAddLead?: (columnId: string) => void;
 }
 
-const BOARD_HEIGHT = "h-[calc(100vh-10rem)]";
+const BOARD_HEIGHT = "h-[calc(100vh-5rem)]";
 
 export function CompaniesKanbanBoard({
   filters,

@@ -346,9 +346,8 @@ export function LeadKanbanBoard({
   }
 
   return (
-    <div className="relative w-full overflow-x-auto bg-slate-50/50 no-scrollbar">
-      {/* Changed from grid to a flex container with a min-width to support horizontal scrolling if necessary */}
-      <div className="flex min-w-[1400px] items-start gap-3 p-1">
+    <div className="relative w-full h-full overflow-x-auto bg-slate-50/50 no-scrollbar">
+      <div className="flex items-start gap-3 p-1">
         {visibleColumns.map((column) => {
           const isOver = overColumnId === column.id;
           const isCollapsed = collapsedColumns.has(column.id);
@@ -356,17 +355,6 @@ export function LeadKanbanBoard({
           return (
             <div
               key={column.id}
-              onDragOver={(e) => {
-                e.preventDefault();
-                if (dragInfo) setOverColumnId(column.id);
-              }}
-              onDragLeave={() =>
-                setOverColumnId((prev) => (prev === column.id ? null : prev))
-              }
-              onDrop={(e) => {
-                e.preventDefault();
-                handleDrop(column.id);
-              }}
               className={cn(
                 "group relative flex flex-col gap-2 transition-all duration-200",
                 BOARD_HEIGHT,
@@ -411,6 +399,19 @@ export function LeadKanbanBoard({
 
                   {/* Card list box */}
                   <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (dragInfo) setOverColumnId(column.id);
+                    }}
+                    onDragLeave={() =>
+                      setOverColumnId((prev) =>
+                        prev === column.id ? null : prev,
+                      )
+                    }
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleDrop(column.id);
+                    }}
                     className={cn(
                       "relative flex min-h-0 flex-1 flex-col rounded-sm border p-1",
                       dropTargetIdle,
@@ -435,11 +436,6 @@ export function LeadKanbanBoard({
                           }
                         }
                       }}
-                      onDragLeave={() =>
-                        setOverColumnId((prev) =>
-                          prev === column.id ? null : prev,
-                        )
-                      }
                       onDrop={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
