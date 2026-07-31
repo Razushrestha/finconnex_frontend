@@ -69,8 +69,6 @@ const dashboardItems: NavItem[] = [
       { label: "Notes", href: "/activities/notes" },
       { label: "Attachments", href: "/activities/attachments" },
       { label: "Reminders", href: "/activities/reminders" },
-      { label: "Calendar", href: "/activities/calendar" },
-      { label: "Team Chat", href: "/activities/team-chat" },
     ],
   },
   { label: "Booking", href: "/booking", icon: CalendarClock },
@@ -118,22 +116,6 @@ const dashboardItems: NavItem[] = [
   { label: "Journeys", href: "/journeys", icon: Route },
   { label: "Rules", href: "/rules", icon: Scale },
   { label: "Settings", href: "/settings", icon: Settings },
-];
-
-const workItems: NavItem[] = [
-  {
-    label: "Tasks & Projects",
-    href: "/activities/tasks",
-    swatch: "bg-red-500",
-  },
-  { label: "User Management", href: "/team", swatch: "bg-violet-600" },
-  { label: "Activities", href: "/activities/calendar", swatch: "bg-amber-500" },
-  {
-    label: "Deals",
-    href: "/sales/deals",
-    swatch: "bg-indigo-500",
-    badge: "+24%",
-  },
 ];
 
 interface SidebarProps {
@@ -373,35 +355,6 @@ export function Sidebar({
           </nav>
 
           <div className="my-4 border-t border-border" />
-
-          <nav className="flex flex-col gap-0.5">
-            {workItems.map((item) => (
-              <Link
-                key={item.label}
-                href={item.href!}
-                title={collapsed ? item.label : undefined}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm text-foreground/80 hover:bg-accent md:py-2",
-                  iconOnly,
-                )}
-              >
-                <span
-                  className={cn("h-4 w-4 shrink-0 rounded-[5px]", item.swatch)}
-                />
-                <span className={cn("flex-1", hideLabel)}>{item.label}</span>
-                {item.badge && (
-                  <Badge
-                    className={cn(
-                      "bg-emerald-500 px-2 py-0 text-[11px] font-medium text-white hover:bg-emerald-500",
-                      hideLabel,
-                    )}
-                  >
-                    {item.badge}
-                  </Badge>
-                )}
-              </Link>
-            ))}
-          </nav>
         </div>
       </aside>
     </>

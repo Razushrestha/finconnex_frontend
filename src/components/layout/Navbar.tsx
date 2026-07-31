@@ -134,8 +134,6 @@ export function Navbar({
   const tenantLabel = user.tenantName ?? "FinConnex HQ";
   const isInbox = pathname.startsWith("/marketing/inbox");
   const isCalendar = pathname.startsWith("/activities/calendar");
-  const isLeads = pathname.startsWith("/sales/leads");
-  const isSettingsOrg = pathname.startsWith("/settings/organization");
 
   return (
     <header className="sticky top-0 z-30 flex h-16 w-full items-center gap-2 border-b border-border/60 bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:gap-3 sm:px-4 md:gap-4">
@@ -173,51 +171,11 @@ export function Navbar({
           Search anything&apos;s
         </span>
         <kbd className="ml-auto hidden rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline">
-          Ctrl/⌘K
+          ⌘K
         </kbd>
       </button>
 
       <SearchModal open={searchOpen} onOpenChange={setSearchOpen} />
-
-      <Link
-        href="/settings/organization"
-        aria-label={`Organization: ${tenantLabel}`}
-        className={cn(
-          "hidden h-10 shrink-0 items-center gap-2 rounded-full border px-4 transition-colors lg:flex",
-          isSettingsOrg
-            ? "border-violet-300 bg-violet-100 dark:border-violet-700 dark:bg-violet-900/60"
-            : "border-violet-100 bg-violet-50 hover:bg-violet-100/80 dark:border-violet-900 dark:bg-violet-950 dark:hover:bg-violet-900/50",
-        )}
-      >
-        <Building2 className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
-        <span className="max-w-[140px] truncate text-sm font-medium text-violet-700 dark:text-violet-300">
-          {tenantLabel}
-        </span>
-      </Link>
-
-      <Link
-        href="/sales/leads"
-        aria-label={`${newLeadsCount} new leads today`}
-        className={cn(
-          "hidden h-10 shrink-0 items-center gap-2 rounded-full border px-4 transition-colors md:flex",
-          isLeads
-            ? "border-violet-300 bg-violet-50 dark:border-violet-700"
-            : "border-border hover:bg-muted/60",
-        )}
-      >
-        <span className="whitespace-nowrap text-sm font-medium text-foreground">
-          Today New Leads
-        </span>
-        <Badge
-          key={newLeadsCount}
-          className={cn(
-            "rounded-full bg-violet-600 px-2 py-0 text-xs font-semibold text-white hover:bg-violet-600 dark:bg-violet-500",
-            badgePop,
-          )}
-        >
-          {newLeadsCount}
-        </Badge>
-      </Link>
 
       <div className="flex-1" />
 
@@ -258,7 +216,7 @@ export function Navbar({
 
       <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
         <Link
-          href="/marketing/inbox"
+          href="/activities/team-chat"
           aria-label={
             inboxUnread > 0 ? `Messages, ${inboxUnread} unread` : "Messages"
           }
