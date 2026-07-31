@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, Trophy, XCircle } from "lucide-react";
-import { type KanbanColumn } from "@/lib/leads/types";
+import { type KanbanColumn, type LeadPipelineStage } from "@/lib/leads/types";
 import { listLeadColumns, saveLeadColumns } from "@/lib/leads/store";
 import {
   emitLeadActivityChange,
@@ -48,7 +48,7 @@ interface PendingLostDrop {
   card: LeadCardRecord;
   sourceColumnId: string;
   targetColumnId: string;
-  targetColumnTitle: string;
+  targetColumnTitle: LeadPipelineStage;
 }
 
 interface LeadKanbanBoardProps {

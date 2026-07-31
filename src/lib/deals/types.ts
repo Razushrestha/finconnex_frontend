@@ -57,6 +57,8 @@ export interface DealStage {
   title: string;
   dotColorClass: string;
   deals: DealRecord[];
+  /** Column visibility in board header; defaults to true when omitted */
+  visible?: boolean;
 }
 
 const AVATAR_COLORS = [

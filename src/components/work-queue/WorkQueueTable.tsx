@@ -25,6 +25,7 @@ import type { QueueRow } from "@/lib/work-queue/live";
 import {
   DEFAULT_MANAGE_COLUMNS,
   ManageColumnsModal,
+  type ManageColumn,
 } from "./ManageColumnsModal";
 
 export type QueueTableFilters = {
