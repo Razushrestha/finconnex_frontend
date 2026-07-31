@@ -52,13 +52,12 @@ export function CompanyCard({
   onDragEnd,
   onQuickAction,
 }: CompanyCardProps) {
-  // Default action kinds to display in the toolbar if company.quickActions aren't provided directly
-  const actions = company.quickActions ?? [
-    { kind: "call", urgency: "neutral", badgeCount: 0 },
-    { kind: "email", urgency: "neutral", badgeCount: 0 },
-    { kind: "meeting", urgency: "neutral", badgeCount: 0 },
-    { kind: "task", urgency: "neutral", badgeCount: 0 },
-    { kind: "note", urgency: "neutral", badgeCount: 0 },
+  const actions = [
+    { kind: "call" as const, urgency: "neutral" as const, badgeCount: 0 },
+    { kind: "email" as const, urgency: "neutral" as const, badgeCount: 0 },
+    { kind: "meeting" as const, urgency: "neutral" as const, badgeCount: 0 },
+    { kind: "task" as const, urgency: "neutral" as const, badgeCount: 0 },
+    { kind: "note" as const, urgency: "neutral" as const, badgeCount: 0 },
   ];
 
   return (
