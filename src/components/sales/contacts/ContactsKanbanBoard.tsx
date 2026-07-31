@@ -1,48 +1,61 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { type ContactGroup, type ContactCardData } from "@/lib/contacts/types";
-import { listContactGroups, saveContactGroups } from "@/lib/contacts/store";
+import { CONTACT_GROUPS, type ContactGroup } from "@/lib/contacts/types";
 import type { ContactFilters } from "./FilterContactsPanel";
-import { ContactRecordCard } from "./ContactRecordCard";
+import {
+  ContactRecordCard,
+  type ContactQuickActionKind,
+} from "./ContactRecordCard";
+import {
+  ContactCardPanelHost,
+  type ContactPanelState,
+} from "./ContactCardPanelHost";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 interface DragInfo {
   contactId: string;
   sourceGroupId: string;
 }
 
+interface DropTargetPosition {
+  groupId: string;
+  targetIndex: number;
+}
+
+type ContactRecord = ContactGroup["contacts"][number];
+
 interface ContactsKanbanBoardProps {
   filters?: ContactFilters;
   visibleColumnIds?: string[];
-  onAddLead?: (columnId: string) => void;
-  sortValue?: string; // Added sortValue prop
+  onAddContact?: (groupId: string) => void;
 }
-
-const BOARD_HEIGHT = "h-[calc(100vh-5rem)]";
 
 export function ContactsKanbanBoard({
   filters,
   visibleColumnIds,
-  onAddLead,
-  sortValue = "newest", // Default sort
+  onAddContact,
 }: ContactsKanbanBoardProps) {
-  const [groups, setGroups] = useState<ContactGroup[]>([]);
+  const router = useRouter();
+
+  const [groups, setGroups] = useState<ContactGroup[]>(CONTACT_GROUPS);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
+  const [dropTargetPos, setDropTargetPos] = useState<DropTargetPosition | null>(
+    null,
+  );
   const [overGroupId, setOverGroupId] = useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     () => new Set(),
   );
+  const [panel, setPanel] = useState<ContactPanelState | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
-  useEffect(() => {
-    setGroups(listContactGroups());
-  }, []);
-
-  function persist(next: ContactGroup[]) {
-    saveContactGroups(next);
-    setGroups(next);
+  function flash(msg: string) {
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 2400);
   }
 
   function toggleCollapsed(groupId: string) {
@@ -65,45 +78,22 @@ export function ContactsKanbanBoard({
           .filter((g): g is ContactGroup => !!g)
       : groups;
 
-    // Helper to parse DD/MM/YYYY dates
-    const parseDate = (dateStr: string) => {
-      const [day, month, year] = dateStr.split("/").map(Number);
-      return new Date(year, month - 1, day).getTime();
-    };
-
     return result
       .filter((g) => !hasStatusFilter || filters!.statuses.includes(g.title))
-      .map((g) => {
-        // Filter contacts by source first
-        const filteredContacts = hasSourceFilter
+      .map((g) => ({
+        ...g,
+        contacts: hasSourceFilter
           ? g.contacts.filter((c) => filters!.sources.includes(c.source))
-          : [...g.contacts];
+          : g.contacts,
+      }));
+  }, [groups, filters, visibleColumnIds]);
 
-        // Sort contacts within the column based on sortValue
-        filteredContacts.sort((a, b) => {
-          if (sortValue === "name_asc") {
-            return a.name.localeCompare(b.name);
-          }
-          if (sortValue === "name_desc") {
-            return b.name.localeCompare(a.name);
-          }
-
-          const timeA = parseDate(a.createdDate);
-          const timeB = parseDate(b.createdDate);
-
-          if (sortValue === "oldest") {
-            return timeA - timeB;
-          }
-          // Default: "newest"
-          return timeB - timeA;
-        });
-
-        return {
-          ...g,
-          contacts: filteredContacts,
-        };
-      });
-  }, [groups, filters, visibleColumnIds, sortValue]);
+  function visibleContactCount(group: ContactGroup) {
+    if (dragInfo && dragInfo.sourceGroupId === group.id) {
+      return group.contacts.length - 1;
+    }
+    return group.contacts.length;
+  }
 
   function handleDragStart(
     e: React.DragEvent<HTMLDivElement>,
@@ -116,54 +106,78 @@ export function ContactsKanbanBoard({
 
   function handleDragEnd() {
     setDragInfo(null);
+    setDropTargetPos(null);
     setOverGroupId(null);
   }
 
-  function handleDrop(targetGroupId: string) {
+  /** Shared move: pulls the contact out of the source group, drops it into the target at targetIndex. */
+  function moveContact(
+    contact: ContactRecord,
+    sourceGroup: ContactGroup,
+    targetGroup: ContactGroup,
+    updatedContact: ContactRecord,
+    targetIndex?: number,
+  ) {
+    setGroups((prev) =>
+      prev.map((g) => {
+        if (g.id === sourceGroup.id && g.id === targetGroup.id) {
+          const filtered = g.contacts.filter((c) => c.id !== contact.id);
+          const insertAt =
+            targetIndex !== undefined ? targetIndex : filtered.length;
+          const next = [...filtered];
+          next.splice(insertAt, 0, updatedContact);
+          return { ...g, contacts: next };
+        }
+        if (g.id === sourceGroup.id) {
+          return {
+            ...g,
+            contacts: g.contacts.filter((c) => c.id !== contact.id),
+          };
+        }
+        if (g.id === targetGroup.id) {
+          const filtered = g.contacts.filter((c) => c.id !== contact.id);
+          const insertAt =
+            targetIndex !== undefined ? targetIndex : filtered.length;
+          const next = [...filtered];
+          next.splice(insertAt, 0, updatedContact);
+          return { ...g, contacts: next };
+        }
+        return g;
+      }),
+    );
+  }
+
+  function handleDrop(targetGroupId: string, targetIndex?: number) {
     setOverGroupId(null);
+    setDropTargetPos(null);
     if (!dragInfo) return;
     const { contactId, sourceGroupId } = dragInfo;
-
-    if (sourceGroupId === targetGroupId) {
-      setDragInfo(null);
-      return;
-    }
 
     const sourceGroup = groups.find((g) => g.id === sourceGroupId);
     const targetGroup = groups.find((g) => g.id === targetGroupId);
     const contact = sourceGroup?.contacts.find((c) => c.id === contactId);
 
-    if (!contact || !targetGroup) {
+    if (!contact || !sourceGroup || !targetGroup) {
       setDragInfo(null);
       return;
     }
 
-    const updatedContact = {
-      ...contact,
-      accentColorClass: targetGroup.dotColorClass,
-    };
+    const updatedContact =
+      sourceGroup.id === targetGroup.id
+        ? contact
+        : { ...contact, accentColorClass: targetGroup.dotColorClass };
 
-    persist(
-      groups.map((g) => {
-        if (g.id === sourceGroupId) {
-          return {
-            ...g,
-            contacts: g.contacts.filter((c) => c.id !== contactId),
-          };
-        }
-        if (g.id === targetGroupId) {
-          return { ...g, contacts: [updatedContact, ...g.contacts] };
-        }
-        return g;
-      }),
-    );
-
+    moveContact(contact, sourceGroup, targetGroup, updatedContact, targetIndex);
     setDragInfo(null);
+
+    if (sourceGroup.id !== targetGroup.id) {
+      flash(`${contact.name} moved to ${targetGroup.title}`);
+    }
   }
 
   return (
-    <div className="relative w-full overflow-x-auto bg-slate-50/50 no-scrollbar">
-      <div className="flex min-w-[900px] items-start gap-3 p-1">
+    <div className="relative h-full w-full overflow-x-auto bg-slate-50/50 no-scrollbar">
+      <div className="flex h-full items-start gap-3 p-1">
         {visibleGroups.map((group) => {
           const isOver = overGroupId === group.id;
           const isCollapsed = collapsedGroups.has(group.id);
@@ -171,20 +185,8 @@ export function ContactsKanbanBoard({
           return (
             <div
               key={group.id}
-              onDragOver={(e) => {
-                e.preventDefault();
-                if (dragInfo) setOverGroupId(group.id);
-              }}
-              onDragLeave={() =>
-                setOverGroupId((prev) => (prev === group.id ? null : prev))
-              }
-              onDrop={(e) => {
-                e.preventDefault();
-                handleDrop(group.id);
-              }}
               className={cn(
-                "group relative flex flex-col gap-2 transition-all duration-200",
-                BOARD_HEIGHT,
+                "group relative flex h-full flex-col gap-2 transition-all duration-200",
                 isCollapsed
                   ? "w-12 min-w-[3.5rem] flex-shrink-0"
                   : "w-[272px] flex-shrink-0",
@@ -207,6 +209,7 @@ export function ContactsKanbanBoard({
                 </div>
               ) : (
                 <>
+                  {/* Header box */}
                   <div className="rounded-xs border border-slate-200/60 bg-slate-100/60 p-1">
                     <div className="flex items-center justify-between px-1">
                       <div className="flex items-center gap-2">
@@ -220,7 +223,21 @@ export function ContactsKanbanBoard({
                     </div>
                   </div>
 
+                  {/* Card list box */}
                   <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (dragInfo) setOverGroupId(group.id);
+                    }}
+                    onDragLeave={() =>
+                      setOverGroupId((prev) =>
+                        prev === group.id ? null : prev,
+                      )
+                    }
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleDrop(group.id);
+                    }}
                     className={cn(
                       "relative flex min-h-0 flex-1 flex-col rounded-sm border p-1",
                       dropTargetIdle,
@@ -229,35 +246,127 @@ export function ContactsKanbanBoard({
                         : "border-slate-200/60 bg-slate-100/60",
                     )}
                   >
-                    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-8 no-scrollbar">
-                      {group.contacts.map((contact) => (
-                        <ContactRecordCard
-                          key={contact.id}
-                          contact={contact}
-                          isDragging={dragInfo?.contactId === contact.id}
-                          onDragStart={(e) =>
-                            handleDragStart(e, contact.id, group.id)
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (dragInfo) {
+                          setOverGroupId(group.id);
+                          if (
+                            !dropTargetPos ||
+                            dropTargetPos.groupId !== group.id
+                          ) {
+                            setDropTargetPos({
+                              groupId: group.id,
+                              targetIndex: visibleContactCount(group),
+                            });
                           }
-                          onDragEnd={handleDragEnd}
-                        />
-                      ))}
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDrop(group.id, dropTargetPos?.targetIndex);
+                      }}
+                      className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-8 no-scrollbar"
+                    >
+                      {(() => {
+                        let visibleIndex = 0;
+                        const rendered: React.ReactNode[] = [];
 
-                      {group.contacts.length === 0 && (
-                        <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 py-8 text-center text-xs text-slate-400">
-                          Drop a contact here
-                        </div>
-                      )}
+                        const showPlaceholderAt = (idx: number) =>
+                          dragInfo &&
+                          dropTargetPos?.groupId === group.id &&
+                          dropTargetPos.targetIndex === idx;
+
+                        group.contacts.forEach((contact) => {
+                          const isDraggedContact =
+                            dragInfo?.contactId === contact.id;
+                          const myIndex = visibleIndex;
+
+                          if (!isDraggedContact && showPlaceholderAt(myIndex)) {
+                            rendered.push(
+                              <div
+                                key={`placeholder-${contact.id}`}
+                                className="h-[168px] rounded-md border-2 border-dashed border-indigo-300 bg-indigo-50/60 transition-all duration-150 ease-out"
+                              />,
+                            );
+                          }
+
+                          rendered.push(
+                            <div
+                              key={contact.id}
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (!dragInfo || isDraggedContact) return;
+
+                                const rect =
+                                  e.currentTarget.getBoundingClientRect();
+                                const midpoint = rect.top + rect.height / 2;
+                                const insertIndex =
+                                  e.clientY < midpoint ? myIndex : myIndex + 1;
+
+                                setDropTargetPos({
+                                  groupId: group.id,
+                                  targetIndex: insertIndex,
+                                });
+                              }}
+                            >
+                              <ContactRecordCard
+                                contact={contact}
+                                isDragging={isDraggedContact}
+                                onDragStart={(e) =>
+                                  handleDragStart(e, contact.id, group.id)
+                                }
+                                onDragEnd={handleDragEnd}
+                                onQuickAction={(kind: ContactQuickActionKind) =>
+                                  setPanel({
+                                    type: "quick-action",
+                                    kind,
+                                    contactId: contact.id,
+                                    contactName: contact.name,
+                                    email: contact.email,
+                                    phone: contact.phone,
+                                  })
+                                }
+                              />
+                            </div>,
+                          );
+
+                          if (!isDraggedContact) visibleIndex++;
+                        });
+
+                        if (showPlaceholderAt(visibleIndex)) {
+                          rendered.push(
+                            <div
+                              key="placeholder-end"
+                              className="h-[168px] rounded-md border-2 border-dashed border-indigo-300 bg-indigo-50/60 transition-all duration-150 ease-out"
+                            />,
+                          );
+                        }
+
+                        return (
+                          <>
+                            {rendered}
+                            {group.contacts.length === 0 && (
+                              <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 py-8 text-center text-xs text-slate-400">
+                                No contacts found
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {/* Collapse control */}
-                    <div className="mt-2 flex shrink-0 items-center justify-between gap-2 px-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                    <div className="mt-2 flex shrink-0 items-center justify-between gap-2 px-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                       <button
                         type="button"
-                        onClick={() => onAddLead?.(group.id)}
+                        onClick={() => router.push("/sales/contacts/create")}
                         className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-white hover:text-slate-900"
                       >
                         <Plus className="h-3.5 w-3.5" />
-                        Create Contact
+                        Create contact
                       </button>
 
                       <button
@@ -277,11 +386,23 @@ export function ContactsKanbanBoard({
         })}
 
         {visibleGroups.length === 0 && (
-          <div className="col-span-full rounded-xl border border-dashed border-slate-300 bg-white/60 py-12 text-center text-sm text-slate-400">
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 py-12 text-center text-sm text-slate-400">
             No contacts match the current filters.
           </div>
         )}
       </div>
+
+      <ContactCardPanelHost
+        panel={panel}
+        onClose={() => setPanel(null)}
+        onQuickActionSuccess={(message) => flash(message)}
+      />
+
+      {toast && (
+        <div className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

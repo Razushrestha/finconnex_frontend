@@ -43,6 +43,10 @@ import {
   DEFAULT_LEAD_CARD_SETTINGS,
   type LeadCardCustomizationSettings,
 } from "@/components/sales/leads/CustomizeLeadCardDrawer";
+import {
+  QuickActionsBar,
+  type QuickActionItem,
+} from "@/components/sales/QuickActionsBar";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion } from "@/lib/motion";
 
@@ -125,6 +129,25 @@ export function LeadCard({
   const summaryTitle = summary.primary
     ? truncateActivityTitle(summary.primary.title, ACTIVITY_TITLE_TRUNCATE_AT)
     : "";
+
+  const quickActionItems: QuickActionItem<LeadCardQuickActionState["kind"]>[] =
+    vm.quickActions.map((action) => {
+      const label = QUICK_LABELS[action.kind];
+      const stateHint = QUICK_STATE_WORDS[action.urgency];
+      const badge = action.badgeCount >= 2 ? String(action.badgeCount) : null;
+      const countHint = badge ? `, ${badge} pending` : "";
+
+      return {
+        kind: action.kind,
+        icon: QUICK_ICONS[action.kind],
+        label,
+        badgeCount: action.badgeCount,
+        ariaLabel: `${label} — ${stateHint}${countHint}`,
+        title: `${label} (${stateHint})`,
+        colorClassName: QUICK_URGENCY[action.urgency],
+        badgeClassName: QUICK_BADGE[action.urgency],
+      };
+    });
 
   return (
     <>
@@ -273,19 +296,12 @@ export function LeadCard({
           </button>
         )}
 
-        <div
-          className="flex items-center justify-between gap-0.5 border-t border-slate-100 pt-2"
-          role="toolbar"
-          aria-label={`Quick actions for ${vm.name}`}
-        >
-          {vm.quickActions.map((action) => (
-            <QuickActionButton
-              key={action.kind}
-              action={action}
-              onAction={onQuickAction}
-            />
-          ))}
-        </div>
+        <QuickActionsBar
+          actions={quickActionItems}
+          onAction={onQuickAction}
+          ariaLabel={`Quick actions for ${vm.name}`}
+          className="border-t border-slate-100 pt-2"
+        />
       </article>
 
       <CustomizeLeadCardDrawer
@@ -384,51 +400,6 @@ function MenuItem({
     >
       <Icon className="h-3.5 w-3.5 text-slate-400" />
       {label}
-    </button>
-  );
-}
-
-function QuickActionButton({
-  action,
-  onAction,
-}: {
-  action: LeadCardQuickActionState;
-  onAction?: (kind: LeadCardQuickActionState["kind"]) => void;
-}) {
-  const Icon = QUICK_ICONS[action.kind];
-  const label = QUICK_LABELS[action.kind];
-  const badge = action.badgeCount >= 2 ? String(action.badgeCount) : null;
-  const stateHint = QUICK_STATE_WORDS[action.urgency];
-  const countHint = badge ? `, ${badge} pending` : "";
-
-  return (
-    <button
-      type="button"
-      onMouseDown={(e) => e.stopPropagation()}
-      onClick={(e) => {
-        e.stopPropagation();
-        onAction?.(action.kind);
-      }}
-      aria-label={`${label} — ${stateHint}${countHint}`}
-      title={`${label} (${stateHint})`}
-      className={cn(
-        "relative flex h-7 w-7 items-center justify-center rounded-md transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1",
-        QUICK_URGENCY[action.urgency],
-      )}
-    >
-      <Icon className="h-3.5 w-3.5" aria-hidden />
-      {badge && (
-        <span
-          className={cn(
-            "absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-0.5 text-[8px] font-bold leading-none",
-            QUICK_BADGE[action.urgency],
-          )}
-          aria-hidden
-        >
-          {badge}
-        </span>
-      )}
     </button>
   );
 }

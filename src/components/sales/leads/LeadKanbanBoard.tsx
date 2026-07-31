@@ -29,6 +29,7 @@ import {
 } from "./panels/LeadCardPanelHost";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 interface DragInfo {
   cardId: string;
@@ -65,6 +66,8 @@ export function LeadKanbanBoard({
   visibleColumnIds,
   onAddLead,
 }: LeadKanbanBoardProps) {
+  const router = useRouter();
+
   const [columns, setColumns] = useState<KanbanColumn[]>(() =>
     listLeadColumns(),
   );
@@ -555,7 +558,7 @@ export function LeadKanbanBoard({
                     <div className="mt-2 flex shrink-0 items-center justify-between gap-2 px-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                       <button
                         type="button"
-                        onClick={() => onAddLead?.(column.id)}
+                        onClick={() => router.push("/sales/leads/create")}
                         className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-white hover:text-slate-900"
                       >
                         <Plus className="h-3.5 w-3.5" />
@@ -581,7 +584,7 @@ export function LeadKanbanBoard({
 
       {/* Win / Lost drop zones — shown only while a card is being dragged */}
       {dragInfo && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center gap-4">
+        <div className="pointer-events-none w-fu fixed inset-x-0 bottom-6 z-50 flex justify-center gap-4">
           <div
             onDragOver={(e) => {
               e.preventDefault();
