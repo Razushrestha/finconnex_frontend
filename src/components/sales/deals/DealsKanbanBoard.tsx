@@ -15,6 +15,7 @@ import type { DealFilters } from "./FilterDealsPanel";
 import { DealRecordCard } from "./DealRecordCard";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 interface DragInfo {
   dealId: string;
@@ -53,6 +54,8 @@ export function DealsKanbanBoard({
   visibleColumnIds,
   onAddDeal,
 }: DealsKanbanBoardProps) {
+  const router = useRouter();
+
   const [allStages, setAllStages] = useState<Record<DealPipeline, DealStage[]>>(
     {} as Record<DealPipeline, DealStage[]>,
   );
@@ -506,7 +509,7 @@ export function DealsKanbanBoard({
                     <div className="mt-2 flex shrink-0 items-center justify-between gap-2 px-2 pb-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                       <button
                         type="button"
-                        onClick={() => onAddDeal?.(stage.id)}
+                        onClick={() => router.push("/sales/deals/create")}
                         className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-white hover:text-slate-900"
                       >
                         <Plus className="h-3.5 w-3.5" />

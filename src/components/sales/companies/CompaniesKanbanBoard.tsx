@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, MoreVertical } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { COMPANY_GROUPS, type CompanyGroup } from "@/lib/companies/types";
 import type { CompanyFilters } from "./FilterCompaniesPanel";
 import { CompanyCard } from "./CompanyCard";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 interface DragInfo {
   companyId: string;
@@ -24,6 +25,7 @@ interface CompaniesKanbanBoardProps {
   filters?: CompanyFilters;
   visibleColumnIds?: string[];
   onAddLead?: (columnId: string) => void;
+  onQuickAction?: (kind: any, company: CompanyRecord) => void;
 }
 
 const BOARD_HEIGHT = "h-[calc(100vh-5rem)]";
@@ -32,7 +34,10 @@ export function CompaniesKanbanBoard({
   filters,
   visibleColumnIds,
   onAddLead,
+  onQuickAction,
 }: CompaniesKanbanBoardProps) {
+  const router = useRouter();
+
   const [groups, setGroups] = useState<CompanyGroup[]>(COMPANY_GROUPS);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const [dropTargetPos, setDropTargetPos] = useState<DropTargetPosition | null>(
@@ -292,6 +297,9 @@ export function CompaniesKanbanBoard({
                                   handleDragStart(e, company.id, group.id)
                                 }
                                 onDragEnd={handleDragEnd}
+                                onQuickAction={(kind) =>
+                                  onQuickAction?.(kind, company)
+                                }
                               />
                             </div>,
                           );
@@ -325,7 +333,7 @@ export function CompaniesKanbanBoard({
                     <div className="mt-2 flex shrink-0 items-center justify-between gap-2 px-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                       <button
                         type="button"
-                        onClick={() => onAddLead?.(group.id)}
+                        onClick={() => router.push("/sales/companies/create")}
                         className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-white hover:text-slate-900"
                       >
                         <Plus className="h-3.5 w-3.5" />

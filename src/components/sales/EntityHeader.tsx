@@ -323,7 +323,7 @@ export function EntityHeader({
               {isColumnMenuOpen && (
                 <div className="absolute right-0 z-20 mt-1.5 w-56 rounded-md border border-slate-200 bg-white p-1.5 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
                   <p className="px-2 py-1 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
-                    Columns
+                    Stages
                   </p>
                   <div className="max-h-64 overflow-y-auto">
                     {columnOptions.map((col) => (
