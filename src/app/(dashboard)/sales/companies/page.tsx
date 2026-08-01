@@ -25,7 +25,7 @@ export default function CompaniesPage() {
   const [filters, setFilters] = useState<CompanyFilters>(EMPTY_COMPANY_FILTERS);
   const [columns, setColumns] = useState(DEFAULT_COMPANY_COLUMNS);
 
-  function toggleFilterField(section: "source" | "status", field: string) {
+  function toggleFilterField(field: string) {
     setFilters((prev) => {
       const key = section === "source" ? "sources" : "statuses";
       const current = prev[key] as string[];

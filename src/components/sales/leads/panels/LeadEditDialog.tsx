@@ -180,7 +180,9 @@ function TasksSection({
   const [formOpen, setFormOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const [assignedTo, setAssignedTo] = useState(ACTIVITY_OWNERS[0] ?? "");
+  const [assignedTo, setAssignedTo] = useState<string>(
+    ACTIVITY_OWNERS[0] ?? "",
+  );
   const [priority, setPriority] = useState<Priority>("Medium");
 
   const filtered = useMemo(

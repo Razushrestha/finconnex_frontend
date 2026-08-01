@@ -27,6 +27,7 @@ import {
   DEFAULT_MANAGE_COLUMNS,
   ManageColumn,
   ManageColumnsModal,
+  type ManageColumn,
 } from "./ManageColumnsModal";
 
 export type QueueTableFilters = {
