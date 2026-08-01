@@ -202,7 +202,7 @@ export function CompaniesKanbanBoard({
                 </div>
               ) : (
                 <>
-                  <div className="rounded-xs border border-slate-200/60 bg-slate-100/60 p-1">
+                  <div className="rounded-xs border border-slate-200/60 bg-primary/10 p-1">
                     <div className="flex items-center justify-between px-1">
                       <div className="flex items-center gap-2">
                         <h2 className="max-w-[15rem] text-xs font-semibold leading-snug text-slate-800 xl:text-sm">

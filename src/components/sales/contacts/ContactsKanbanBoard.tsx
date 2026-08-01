@@ -35,6 +35,8 @@ interface ContactsKanbanBoardProps {
   onAddContact?: (groupId: string) => void;
 }
 
+const BOARD_HEIGHT = "h-[calc(100vh-5rem)]";
+
 export function ContactsKanbanBoard({
   filters,
   visibleColumnIds,
@@ -177,8 +179,8 @@ export function ContactsKanbanBoard({
   }
 
   return (
-    <div className="relative h-full w-full overflow-x-auto bg-slate-50/50 no-scrollbar">
-      <div className="flex h-full items-start gap-3 p-1">
+    <div className="relative w-full overflow-x-auto bg-slate-50/50 no-scrollbar">
+      <div className="flex items-start gap-3 p-1">
         {visibleGroups.map((group) => {
           const isOver = overGroupId === group.id;
           const isCollapsed = collapsedGroups.has(group.id);
@@ -186,8 +188,20 @@ export function ContactsKanbanBoard({
           return (
             <div
               key={group.id}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (dragInfo) setOverGroupId(group.id);
+              }}
+              onDragLeave={() =>
+                setOverGroupId((prev) => (prev === group.id ? null : prev))
+              }
+              onDrop={(e) => {
+                e.preventDefault();
+                handleDrop(group.id);
+              }}
               className={cn(
-                "group relative flex h-full flex-col gap-2 transition-all duration-200",
+                "group relative flex flex-col gap-2 transition-all duration-200",
+                BOARD_HEIGHT,
                 isCollapsed
                   ? "w-12 min-w-[3.5rem] flex-shrink-0"
                   : "w-[272px] flex-shrink-0",
@@ -211,7 +225,7 @@ export function ContactsKanbanBoard({
               ) : (
                 <>
                   {/* Header box */}
-                  <div className="rounded-xs border border-slate-200/60 bg-slate-100/60 p-1">
+                  <div className="rounded-xs border border-slate-200/60 bg-primary/10 p-1">
                     <div className="flex items-center justify-between px-1">
                       <div className="flex items-center gap-2">
                         <h2 className="max-w-[15rem] text-xs font-semibold leading-snug text-slate-800 xl:text-sm">
@@ -226,19 +240,6 @@ export function ContactsKanbanBoard({
 
                   {/* Card list box */}
                   <div
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      if (dragInfo) setOverGroupId(group.id);
-                    }}
-                    onDragLeave={() =>
-                      setOverGroupId((prev) =>
-                        prev === group.id ? null : prev,
-                      )
-                    }
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      handleDrop(group.id);
-                    }}
                     className={cn(
                       "relative flex min-h-0 flex-1 flex-col rounded-sm border p-1",
                       dropTargetIdle,
