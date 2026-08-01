@@ -48,18 +48,15 @@ export function NotesKanbanColumn({
           ? cn("min-h-[420px]", isOver && dropTargetActive)
           : cn(
               "w-72 shrink-0 rounded-2xl border p-3",
-              isOver
-                ? dropTargetActive
-                : "border-slate-200/70 bg-slate-50/80",
+              isOver ? dropTargetActive : "border-slate-200/70 bg-slate-50/80",
             ),
       )}
     >
+      {/* Separated Column Header */}
       <div
         className={cn(
-          "shrink-0",
-          embedded
-            ? "border-b border-slate-100 px-3 py-2"
-            : "mb-3",
+          "flex shrink-0 items-center justify-between",
+          embedded ? "border-b border-slate-100 px-3 py-2.5" : "mb-3 px-1",
         )}
       >
         <span
@@ -70,12 +67,13 @@ export function NotesKanbanColumn({
           )}
         >
           {column.title}
-          <span className="rounded-full bg-white/25 px-1.5 py-px text-[10px]">
+          <span className="rounded-full bg-white/25 px-1.5 py-px text-[10px] tabular-nums">
             {column.notes.length}
           </span>
         </span>
       </div>
 
+      {/* Column Content */}
       <div
         className={cn(
           "flex-1 space-y-2 overflow-y-auto [scrollbar-width:thin]",

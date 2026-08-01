@@ -59,8 +59,7 @@ export function MeetingCard({
       data-meeting-id={meeting.id}
       data-column-id={columnId}
       className={cn(
-        "cursor-grab select-none rounded-xl border border-slate-100 border-l-[3px] bg-white p-3.5 shadow-sm active:cursor-grabbing",
-        STATUS_BORDER[meeting.status],
+        "cursor-grab select-none rounded-sm border border-slate-100 bg-white p-3 shadow-sm active:cursor-grabbing",
         cardMotion,
         isDragging && cardDragging,
       )}

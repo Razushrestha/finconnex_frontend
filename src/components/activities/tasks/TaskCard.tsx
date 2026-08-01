@@ -857,13 +857,13 @@ export function TaskCard({
           >
             <Reply className="h-3.5 w-3.5" />
           </button>
-          <button
+          {/* <button
             type="button"
             title="More"
             className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-600"
           >
             <MoreHorizontal className="h-3.5 w-3.5" />
-          </button>
+          </button> */}
         </div>
       </div>
 

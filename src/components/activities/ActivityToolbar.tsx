@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
   Pencil,
   Sparkles,
+  Search,
   type LucideIcon,
 } from "lucide-react";
 
@@ -35,7 +36,10 @@ export interface PrintViewItem {
 export interface ActivityToolbarProps {
   entityLabel: string;
   createRoute: string;
+  activeTab?: string;
   tabs: string[];
+  onTabChange?: (tab: string) => void;
+  tabCounts?: Record<string, number>;
 
   view: ActivityView;
   onViewChange: (view: ActivityView) => void;
@@ -45,6 +49,9 @@ export interface ActivityToolbarProps {
 
   sortActive?: boolean;
   onClearSort?: () => void;
+
+  search?: string;
+  onSearchChange?: (search: string) => void;
 
   showRefresh?: boolean;
 
@@ -62,13 +69,18 @@ const DEFAULT_LAYOUT_ID = "standard";
 export function ActivityToolbar({
   entityLabel,
   createRoute,
+  activeTab: externalActiveTab,
   tabs,
+  onTabChange,
+  tabCounts,
   view,
   onViewChange,
   filterOpen,
   onToggleFilter,
   sortActive,
   onClearSort,
+  search,
+  onSearchChange,
   showRefresh = false,
   moreMenuItems,
   printViewItems,
@@ -77,12 +89,19 @@ export function ActivityToolbar({
   extraViewIcons = [],
 }: ActivityToolbarProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState(tabs[0]);
+  const [internalActiveTab, setInternalActiveTab] = useState(tabs[0]);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [savedViewMenuOpen, setSavedViewMenuOpen] = useState(false);
   const [savedView, setSavedView] = useState(
     defaultSavedView ?? savedViews?.[0],
   );
+
+  const activeTab = externalActiveTab ?? internalActiveTab;
+
+  function handleTabClick(tab: string) {
+    setInternalActiveTab(tab);
+    onTabChange?.(tab);
+  }
 
   const showSortClear = sortActive !== undefined && onClearSort !== undefined;
 
@@ -90,20 +109,34 @@ export function ActivityToolbar({
     <div className="mb-1.5">
       <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5 border-b border-slate-200 px-1 py-1.5 dark:border-zinc-800">
         <div className="flex min-w-0 items-center gap-0.5 overflow-x-auto scrollbar-none">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`shrink-0 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors ${
-                activeTab === tab
-                  ? "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300"
-                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+          {tabs.map((tab) => {
+            const count = tabCounts?.[tab];
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => handleTabClick(tab)}
+                className={`shrink-0 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors flex items-center gap-1.5 ${
+                  activeTab === tab
+                    ? "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                }`}
+              >
+                <span>{tab}</span>
+                {count !== undefined && (
+                  <span
+                    className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[10px] ${
+                      activeTab === tab
+                        ? "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200"
+                        : "bg-slate-100 text-slate-600 dark:bg-zinc-800 dark:text-zinc-400"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
           <button
             type="button"
             aria-label="More tabs"
@@ -114,6 +147,19 @@ export function ActivityToolbar({
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-1">
+          {onSearchChange && (
+            <div className="relative flex items-center">
+              <Search className="absolute left-2.5 h-3.5 w-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder={`Search ${entityLabel.toLowerCase()}s...`}
+                value={search ?? ""}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="h-7 w-40 rounded-md border border-slate-200 bg-white pl-8 pr-2 text-[12px] text-slate-800 placeholder-slate-400 focus:border-violet-500 focus:outline-none sm:w-52"
+              />
+            </div>
+          )}
+
           <button
             type="button"
             onClick={onToggleFilter}
@@ -290,7 +336,7 @@ export function ActivityToolbar({
       </div>
 
       {savedViews && savedViews.length > 0 && (
-        <div className="flex items-center gap-1.5 px-1 py-1.5">
+        <div className="flex items-center gap-1.5 px-3 py-1.5">
           <div className="relative">
             <button
               type="button"

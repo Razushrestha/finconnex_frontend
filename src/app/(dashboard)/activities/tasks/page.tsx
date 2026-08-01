@@ -58,7 +58,7 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="flex min-h-full w-full min-w-0 flex-col overflow-hidden bg-slate-50/50  lg:p-4">
+    <div className="flex min-h-full w-full min-w-0 flex-col overflow-hidden bg-slate-50/50 px-4 py-1">
       <FocusHighlight />
       <div className="shrink-0">
         <ActivityToolbar
@@ -89,7 +89,7 @@ export default function TasksPage() {
           />
         )}
 
-        <div className="min-h-0 min-w-0 flex-1 overflow-auto rounded-2xl [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100">
+        <div className="min-h-0 min-w-0 flex-1 overflow-auto [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100">
           {view === "kanban" ? (
             <KanbanBoard filters={filters} />
           ) : (
