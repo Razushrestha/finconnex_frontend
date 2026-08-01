@@ -18,12 +18,10 @@ export type WorkqueueItemId =
   | "followup"
   | "my-deals"
   | "closing-soon"
-  | "pending-deal-tags"
   | "stalled"
   | "pending-review"
   | "missing-info"
   | "awaiting-action"
-  | "pending-approval"
   | "waiting-approval"
   | "overdue"
   | "high-priority"
@@ -105,7 +103,6 @@ export const CATEGORIES_DEFAULT: WorkqueueCategoryDef[] = [
         label: "Deals Closing This Month",
         checked: true,
       },
-      { id: "pending-deal-tags", label: "Pending Deal Tags", checked: true },
       { id: "stalled", label: "Stalled Deals", checked: false },
     ],
   },
@@ -118,14 +115,7 @@ export const CATEGORIES_DEFAULT: WorkqueueCategoryDef[] = [
       { id: "missing-info", label: "Missing Information", checked: false },
     ],
   },
-  {
-    id: "approvals",
-    label: "Approvals",
-    checked: true,
-    items: [
-      { id: "pending-approval", label: "Pending My Approval", checked: true },
-    ],
-  },
+
   {
     id: "attention",
     label: "Attention Required",

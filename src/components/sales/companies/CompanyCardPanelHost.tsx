@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
-import type { CompanyQuickActionKind } from "@/components/sales/companies/CompanyRecordCard";
+import type { CompanyQuickActionKind } from "@/components/sales/companies/CompanyCard";
 
 export interface CompanyQuickActionPanelState {
   type: "quick-action";

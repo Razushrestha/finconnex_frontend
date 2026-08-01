@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowUpDown,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -24,6 +25,7 @@ import { cn } from "@/lib/utils";
 import type { QueueRow } from "@/lib/work-queue/live";
 import {
   DEFAULT_MANAGE_COLUMNS,
+  ManageColumn,
   ManageColumnsModal,
 } from "./ManageColumnsModal";
 
@@ -161,24 +163,36 @@ export function WorkQueueTable({
             />
           </button>
         </div>
-        <button
-          type="button"
-          onClick={() => setFilterOpen((v) => !v)}
-          className={cn(
-            "inline-flex h-9 items-center gap-1.5 rounded-lg border bg-white px-3 text-[13px] font-medium shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-colors",
-            filterOpen || activeFilterCount > 0
-              ? "border-blue-200 bg-blue-50 text-blue-700"
-              : "border-[var(--wq-line)] text-gray-700 hover:bg-[var(--wq-surface)]",
-          )}
-        >
-          <ListFilter className="h-3.5 w-3.5" />
-          Filter
-          {activeFilterCount > 0 ? (
-            <span className="rounded-md bg-blue-600 px-1.5 py-px text-[10px] font-semibold text-white">
-              {activeFilterCount}
-            </span>
-          ) : null}
-        </button>
+
+        {/* Actions Group (Filter & Sort side-by-side) */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFilterOpen((v) => !v)}
+            className={cn(
+              "inline-flex h-9 items-center gap-1.5 rounded-md border bg-white px-3 text-[13px] font-medium shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-colors",
+              filterOpen || activeFilterCount > 0
+                ? "border-blue-200 bg-blue-50 text-blue-700"
+                : "border-[var(--wq-line)] text-gray-700 hover:bg-[var(--wq-surface)]",
+            )}
+          >
+            <ListFilter className="h-3.5 w-3.5" />
+            Filter
+            {activeFilterCount > 0 ? (
+              <span className="rounded-md bg-blue-600 px-1.5 py-px text-[10px] font-semibold text-white">
+                {activeFilterCount}
+              </span>
+            ) : null}
+          </button>
+
+          <button
+            type="button"
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--wq-line)] bg-white px-3 text-[13px] font-medium text-gray-700 shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-colors hover:bg-[var(--wq-surface)]"
+          >
+            <ArrowUpDown className="h-3.5 w-3.5" />
+            Sort
+          </button>
+        </div>
       </div>
 
       {filterOpen ? (

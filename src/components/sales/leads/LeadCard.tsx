@@ -62,13 +62,7 @@ interface LeadCardProps {
   onOpenActivitySummary?: () => void;
   onOpenLastActivity?: () => void;
   onQuickAction?: (kind: LeadCardQuickActionState["kind"]) => void;
-  /**
-   * Called when the customize-card drawer is saved. Card display settings
-   * are board-wide, so the parent (LeadKanbanBoard) should own the real
-   * persisted value and pass it back down — this callback is the hook for
-   * that. Until it's wired up there, the drawer still opens/saves locally
-   * per-card so the UI works end to end.
-   */
+
   onSaveCardSettings?: (settings: LeadCardCustomizationSettings) => void;
 }
 

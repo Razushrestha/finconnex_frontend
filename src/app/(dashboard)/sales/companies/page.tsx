@@ -28,7 +28,7 @@ export default function CompaniesPage() {
   function toggleFilterField(section: "source" | "status", field: string) {
     setFilters((prev) => {
       const key = section === "source" ? "sources" : "statuses";
-      const current = prev[key];
+      const current = prev[key] as string[];
       const next = current.includes(field)
         ? current.filter((f) => f !== field)
         : [...current, field];

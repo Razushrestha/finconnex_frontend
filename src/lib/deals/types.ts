@@ -56,6 +56,7 @@ export interface DealStage {
   id: string;
   title: string;
   dotColorClass: string;
+  visible?: boolean;
   deals: DealRecord[];
 }
 

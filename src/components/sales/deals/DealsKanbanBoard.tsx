@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, Plus, Trophy, XCircle } from "lucide-react";
 import { type DealPipeline, type DealStage } from "@/lib/deals/types";
 import { listDealPipelines, saveDealPipelines } from "@/lib/deals/store";
@@ -55,6 +55,11 @@ export function DealsKanbanBoard({
   onAddDeal,
 }: DealsKanbanBoardProps) {
   const router = useRouter();
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [boardBounds, setBoardBounds] = useState<{
+    left: number;
+    width: number;
+  } | null>(null);
 
   const [allStages, setAllStages] = useState<Record<DealPipeline, DealStage[]>>(
     {} as Record<DealPipeline, DealStage[]>,
@@ -72,6 +77,26 @@ export function DealsKanbanBoard({
   const [pendingLostDrop, setPendingLostDrop] =
     useState<PendingLostDrop | null>(null);
   const [lostReason, setLostReason] = useState("");
+
+  useEffect(() => {
+    function updateBounds() {
+      if (boardRef.current) {
+        const rect = boardRef.current.getBoundingClientRect();
+        setBoardBounds({ left: rect.left, width: rect.width });
+      }
+    }
+    updateBounds();
+    window.addEventListener("resize", updateBounds);
+    return () => window.removeEventListener("resize", updateBounds);
+  }, []);
+
+  // recompute right when a drag starts too, in case layout shifted (sidebar toggle, etc.)
+  useEffect(() => {
+    if (dragInfo && boardRef.current) {
+      const rect = boardRef.current.getBoundingClientRect();
+      setBoardBounds({ left: rect.left, width: rect.width });
+    }
+  }, [dragInfo]);
 
   useEffect(() => {
     setAllStages(listDealPipelines());
@@ -327,7 +352,10 @@ export function DealsKanbanBoard({
   }
 
   return (
-    <div className="relative w-full overflow-x-auto bg-slate-50/50 no-scrollbar">
+    <div
+      ref={boardRef}
+      className="relative w-full overflow-x-auto bg-slate-50/50 no-scrollbar"
+    >
       <div className="flex items-start gap-3 p-1">
         {visibleStages.map((stage) => {
           const isOver = overStageId === stage.id;
@@ -540,52 +568,57 @@ export function DealsKanbanBoard({
       </div>
 
       {/* Win / Lost drop zones — shown only while a deal is being dragged */}
-      {dragInfo && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center gap-4">
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setOverOutcome("won");
-            }}
-            onDragLeave={() =>
-              setOverOutcome((prev) => (prev === "won" ? null : prev))
-            }
-            onDrop={(e) => {
-              e.preventDefault();
-              handleOutcomeDrop("won");
-            }}
-            className={cn(
-              "pointer-events-auto flex w-40 items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-3 text-sm font-semibold shadow-lg backdrop-blur-sm transition-colors",
-              overOutcome === "won"
-                ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                : "border-emerald-300 bg-white/90 text-emerald-600",
-            )}
-          >
-            <Trophy className="h-4 w-4" />
-            Won
-          </div>
+      {dragInfo && boardBounds && (
+        <div
+          className="pointer-events-none fixed bottom-6 z-50 flex justify-center px-6"
+          style={{ left: boardBounds.left, width: boardBounds.width }}
+        >
+          <div className="flex w-full gap-4">
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setOverOutcome("won");
+              }}
+              onDragLeave={() =>
+                setOverOutcome((prev) => (prev === "won" ? null : prev))
+              }
+              onDrop={(e) => {
+                e.preventDefault();
+                handleOutcomeDrop("won");
+              }}
+              className={cn(
+                "pointer-events-auto flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-4 text-sm font-semibold shadow-lg backdrop-blur-sm transition-colors",
+                overOutcome === "won"
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                  : "border-emerald-300 bg-white/90 text-emerald-600",
+              )}
+            >
+              <Trophy className="h-4 w-4" />
+              Won
+            </div>
 
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setOverOutcome("lost");
-            }}
-            onDragLeave={() =>
-              setOverOutcome((prev) => (prev === "lost" ? null : prev))
-            }
-            onDrop={(e) => {
-              e.preventDefault();
-              handleOutcomeDrop("lost");
-            }}
-            className={cn(
-              "pointer-events-auto flex w-40 items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-3 text-sm font-semibold shadow-lg backdrop-blur-sm transition-colors",
-              overOutcome === "lost"
-                ? "border-rose-500 bg-rose-50 text-rose-700"
-                : "border-rose-300 bg-white/90 text-rose-600",
-            )}
-          >
-            <XCircle className="h-4 w-4" />
-            Lost
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setOverOutcome("lost");
+              }}
+              onDragLeave={() =>
+                setOverOutcome((prev) => (prev === "lost" ? null : prev))
+              }
+              onDrop={(e) => {
+                e.preventDefault();
+                handleOutcomeDrop("lost");
+              }}
+              className={cn(
+                "pointer-events-auto flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-4 text-sm font-semibold shadow-lg backdrop-blur-sm transition-colors",
+                overOutcome === "lost"
+                  ? "border-rose-500 bg-rose-50 text-rose-700"
+                  : "border-rose-300 bg-white/90 text-rose-600",
+              )}
+            >
+              <XCircle className="h-4 w-4" />
+              Lost
+            </div>
           </div>
         </div>
       )}
