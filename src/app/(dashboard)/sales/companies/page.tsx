@@ -27,10 +27,12 @@ export default function CompaniesPage() {
 
   function toggleFilterField(field: string) {
     setFilters((prev) => {
-      const next = prev.statuses.includes(field)
-        ? prev.statuses.filter((f) => f !== field)
-        : [...prev.statuses, field];
-      return { ...prev, statuses: next };
+      const key = section === "source" ? "sources" : "statuses";
+      const current = prev[key] as string[];
+      const next = current.includes(field)
+        ? current.filter((f) => f !== field)
+        : [...current, field];
+      return { ...prev, [key]: next };
     });
   }
 

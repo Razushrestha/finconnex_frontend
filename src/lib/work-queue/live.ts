@@ -39,7 +39,8 @@ export type WorkQueueTimeFilter =
   | "today-overdue"
   | "today"
   | "this-week"
-  | "all";
+  | "all"
+  | "specific-date";
 
 export type WorkQueueScope = string;
 
@@ -276,6 +277,9 @@ function emailOwnedBy(e: Email, scope: WorkQueueScope) {
 
 function hrefFor(module: keyof typeof HREF, id: string, q?: string) {
   const base = HREF[module];
+  if (module === "tasks") {
+    return `${base}/${id}`;
+  }
   const params = new URLSearchParams();
   params.set("focus", id);
   if (q) params.set("q", q);

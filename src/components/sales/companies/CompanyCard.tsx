@@ -164,8 +164,7 @@ export function CompanyCard({
         data-focus-id={company.id}
         data-company-id={company.id}
         className={cn(
-          "group w-[272px] shrink-0 cursor-grab rounded-md border border-slate-200/80 bg-white shadow-2xs active:cursor-grabbing",
-          isCompact ? "p-2.5" : "p-3.5",
+          "group w-full shrink-0 cursor-grab rounded-md border border-slate-200/80 bg-white p-3 shadow-2xs active:cursor-grabbing",
           cardMotion,
           isDragging && cardDragging,
         )}

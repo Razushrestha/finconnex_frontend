@@ -31,6 +31,7 @@ type ContactRecord = ContactGroup["contacts"][number];
 interface ContactsKanbanBoardProps {
   filters?: ContactFilters;
   visibleColumnIds?: string[];
+  sortValue?: string;
   onAddContact?: (groupId: string) => void;
 }
 
