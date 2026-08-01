@@ -10,7 +10,7 @@ import {
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 
 export default function MessagesPage() {
-  const [view, setView] = useState<ActivityView>("list");
+  const [view, setView] = useState<ActivityView>("kanban");
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortActive, setSortActive] = useState(true);
 

@@ -11,7 +11,7 @@ import {
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 
 export default function CallsPage() {
-  const [view, setView] = useState<ActivityView>("list");
+  const [view, setView] = useState<ActivityView>("kanban");
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortActive, setSortActive] = useState(true);
 
@@ -39,10 +39,10 @@ export default function CallsPage() {
         )}
 
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl">
-          {view === "list" ? (
-            <CallsListTable sortActive={sortActive} filterOpen={filterOpen} />
-          ) : (
+          {view === "kanban" ? (
             <CallsKanbanBoard />
+          ) : (
+            <CallsListTable sortActive={sortActive} filterOpen={filterOpen} />
           )}
         </div>
       </div>

@@ -3,15 +3,31 @@
 import { useState } from "react";
 import { NotesKanbanColumn } from "./NotesKanbanColumn";
 import { NoteColumn, noteColumns } from "@/lib/notes/types";
+import { cn } from "@/lib/utils";
 
 interface DragInfo {
   noteId: string;
   sourceColumnId: string;
 }
 
-export function NotesKanbanBoard() {
-  const [columns, setColumns] = useState<NoteColumn[]>(noteColumns);
+interface NotesKanbanBoardProps {
+  columnsOverride?: NoteColumn[];
+  onDropOverride?: (targetColumnId: string, dragInfo: DragInfo) => void;
+  embedded?: boolean;
+  typeFilter?: string;
+}
+
+export function NotesKanbanBoard({
+  columnsOverride,
+  onDropOverride,
+  embedded = false,
+  typeFilter = "All",
+}: NotesKanbanBoardProps) {
+  const [internalColumns, setInternalColumns] =
+    useState<NoteColumn[]>(noteColumns);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
+
+  const columns = columnsOverride ?? internalColumns;
 
   function handleDragStartNote(
     e: React.DragEvent<HTMLDivElement>,
@@ -28,6 +44,13 @@ export function NotesKanbanBoard() {
 
   function handleDropNote(targetColumnId: string) {
     if (!dragInfo) return;
+
+    if (onDropOverride) {
+      onDropOverride(targetColumnId, dragInfo);
+      setDragInfo(null);
+      return;
+    }
+
     const { noteId, sourceColumnId } = dragInfo;
 
     if (sourceColumnId === targetColumnId) {
@@ -35,7 +58,7 @@ export function NotesKanbanBoard() {
       return;
     }
 
-    setColumns((prev) => {
+    setInternalColumns((prev) => {
       const sourceColumn = prev.find((c) => c.id === sourceColumnId);
       const note = sourceColumn?.notes.find((n) => n.id === noteId);
       if (!note) return prev;
@@ -45,7 +68,7 @@ export function NotesKanbanBoard() {
           return {
             ...col,
             notes: col.notes.filter((n) => n.id !== noteId),
-            count: col.count - 1,
+            count: Math.max(0, col.count - 1),
           };
         }
         if (col.id === targetColumnId) {
@@ -63,7 +86,17 @@ export function NotesKanbanBoard() {
   }
 
   return (
-    <div className="flex h-full items-stretch gap-4">
+    <div
+      className={cn(
+        "flex h-full min-h-[420px] overflow-x-auto",
+        embedded
+          ? cn(
+              "rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm",
+              typeFilter === "All" ? "divide-x divide-slate-100" : "",
+            )
+          : "items-stretch gap-4",
+      )}
+    >
       {columns.map((column) => (
         <NotesKanbanColumn
           key={column.id}
@@ -72,6 +105,7 @@ export function NotesKanbanBoard() {
           onDragStartNote={handleDragStartNote}
           onDragEndNote={handleDragEndNote}
           onDropNote={handleDropNote}
+          embedded={embedded}
         />
       ))}
     </div>
