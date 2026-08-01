@@ -350,7 +350,7 @@ export function LeadKanbanBoard({
 
   return (
     <div className="relative w-full h-full overflow-x-auto bg-slate-50/50 no-scrollbar">
-      <div className="flex items-start gap-3 p-1">
+      <div className="flex h-full items-start gap-3 p-1">
         {visibleColumns.map((column) => {
           const isOver = overColumnId === column.id;
           const isCollapsed = collapsedColumns.has(column.id);
@@ -384,7 +384,7 @@ export function LeadKanbanBoard({
               ) : (
                 <>
                   {/* Header box */}
-                  <div className="rounded-xs border border-slate-200/60 bg-slate-100/60 p-1">
+                  <div className="rounded-xs border border-slate-200/60 bg-primary/10 p-1">
                     <div className="mb-1 flex items-center justify-between px-1">
                       <div className="flex items-center gap-2">
                         <h2 className="max-w-[15rem] text-xs font-semibold leading-snug text-slate-800 xl:text-sm">
@@ -444,7 +444,7 @@ export function LeadKanbanBoard({
                         e.stopPropagation();
                         handleDrop(column.id, dropTargetPos?.targetIndex);
                       }}
-                      className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-8 no-scrollbar"
+                      className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-8"
                     >
                       {(() => {
                         let visibleIndex = 0;

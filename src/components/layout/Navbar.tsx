@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import {
   ChevronsLeft,
   Menu,
@@ -16,15 +15,13 @@ import {
   Calendar,
   ChevronDown,
   LogOut,
-  Building2,
   Settings,
   UserRound,
   ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { menuEnter, badgePop } from "@/lib/motion";
-import { logAuth, onRulesChange } from "@/lib/rules";
-import { listLeadColumns } from "@/lib/leads/store";
+import { menuEnter } from "@/lib/motion";
+import { logAuth } from "@/lib/rules";
 import { listInboxConversations } from "@/lib/marketing/inbox/types";
 import { SearchModal } from "@/components/layout/SearchModal";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -33,8 +30,6 @@ interface NavbarProps {
   onToggleSidebar?: () => void;
   onOpenMobileMenu?: () => void;
   collapsed?: boolean;
-  /** Override live lead count (optional). */
-  newLeadsCount?: number;
   user?: {
     name: string;
     role: string;
@@ -53,12 +48,6 @@ function userInitials(name: string) {
     .join("");
 }
 
-/** Leads in New Lead column: live board store. */
-function countNewLeads() {
-  const col = listLeadColumns().find((c) => c.title === "New Lead");
-  return col?.cards.length ?? 0;
-}
-
 function countInboxUnread() {
   return listInboxConversations().reduce((n, c) => n + (c.unreadCount ?? 0), 0);
 }
@@ -67,7 +56,6 @@ export function Navbar({
   onToggleSidebar,
   onOpenMobileMenu,
   collapsed = false,
-  newLeadsCount: newLeadsProp,
   user = { name: "John Smith", role: "Manager" },
 }: NavbarProps) {
   const router = useRouter();
@@ -77,24 +65,10 @@ export function Navbar({
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [newLeadsCount, setNewLeadsCount] = useState(newLeadsProp ?? 0);
   const [inboxUnread, setInboxUnread] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setMounted(true), []);
-
-  React.useEffect(() => {
-    function refresh() {
-      if (newLeadsProp === undefined) setNewLeadsCount(countNewLeads());
-      setInboxUnread(countInboxUnread());
-    }
-    refresh();
-    return onRulesChange(() => refresh());
-  }, [newLeadsProp, pathname]);
-
-  useEffect(() => {
-    if (newLeadsProp !== undefined) setNewLeadsCount(newLeadsProp);
-  }, [newLeadsProp]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
