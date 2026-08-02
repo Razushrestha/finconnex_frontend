@@ -28,7 +28,6 @@ export type WorkqueueItemId =
   | "escalated"
   /** Session 18 — Pipeline SLA Work Queue */
   | "sla-attention"
-  | "sla-overdue"
   | "sla-milestone-overdue"
   | "sla-due-today"
   | "sla-at-risk";
@@ -136,7 +135,6 @@ export const CATEGORIES_DEFAULT: WorkqueueCategoryDef[] = [
     label: "Pipeline SLA",
     checked: true,
     items: [
-      { id: "sla-overdue", label: "Overdue", checked: true, danger: true },
       {
         id: "sla-milestone-overdue",
         label: "Milestone Overdue",
