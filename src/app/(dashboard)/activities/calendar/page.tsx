@@ -9,9 +9,10 @@ import {
   CalendarDays,
   Plus,
   Sparkles,
+  X,
 } from "lucide-react";
 import {
-  calendarItems,
+  calendarItems as seedCalendarItems,
   type CalendarItem,
   type CalendarItemType,
 } from "@/lib/calendar/types";
@@ -64,26 +65,37 @@ const TYPE_FILTERS: (CalendarItemType | "All")[] = [
 const TODAY = new Date(2026, 6, 22);
 
 export default function CalendarPage() {
+  const [calendarItems, setCalendarItems] =
+    useState<CalendarItem[]>(seedCalendarItems);
   const [view, setView] = useState<CalendarView>("Week");
-  const [typeFilter, setTypeFilter] = useState<(typeof TYPE_FILTERS)[number]>(
-    "All",
-  );
+  const [typeFilter, setTypeFilter] =
+    useState<(typeof TYPE_FILTERS)[number]>("All");
   const [anchor, setAnchor] = useState(() => new Date(TODAY));
+
+  // Modal State for adding events
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newType, setNewType] = useState<CalendarItemType>("Event");
+  const [newDate, setNewDate] = useState(isoDate(TODAY));
+  const [newTime, setNewTime] = useState("09:00");
+
+  // Drag and drop state tracking
+  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     return calendarItems.filter(
       (item) => typeFilter === "All" || item.type === typeFilter,
     );
-  }, [typeFilter]);
+  }, [calendarItems, typeFilter]);
 
   const counts = useMemo(() => {
     const base = { Event: 0, Task: 0, Meeting: 0, Reminder: 0, All: 0 };
     for (const item of calendarItems) {
-      base[item.type] += 1;
+      if (base[item.type] !== undefined) base[item.type] += 1;
       base.All += 1;
     }
     return base;
-  }, []);
+  }, [calendarItems]);
 
   const weekDays = useMemo(() => {
     const start = startOfWeek(anchor);
@@ -128,9 +140,52 @@ export default function CalendarPage() {
     setAnchor(d);
   }
 
+  function handleCreateEvent(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newTitle.trim()) return;
+
+    const newItem: CalendarItem = {
+      id: `item-${Date.now()}`,
+      title: newTitle.trim(),
+      type: newType,
+      start: `${newDate}T${newTime}:00`,
+      end: `${newDate}T${Number(newTime.slice(0, 2)) + 1}${newTime.slice(2)}:00`,
+      owner: "Current User",
+      relatedTo: "General",
+      colorClass: "bg-violet-500",
+    };
+
+    setCalendarItems((prev) => [newItem, ...prev]);
+    setNewTitle("");
+    setIsAddOpen(false);
+  }
+
+  function handleDropOnDay(targetDateStr: string) {
+    if (!draggedItemId) return;
+    setCalendarItems((prev) =>
+      prev.map((item) => {
+        if (item.id === draggedItemId) {
+          const timePart = item.start.includes("T")
+            ? item.start.split("T")[1]
+            : "09:00:00";
+          const endPart =
+            item.end && item.end.includes("T")
+              ? item.end.split("T")[1]
+              : "10:00:00";
+          return {
+            ...item,
+            start: `${targetDateStr}T${timePart}`,
+            end: `${targetDateStr}T${endPart}`,
+          };
+        }
+        return item;
+      }),
+    );
+    setDraggedItemId(null);
+  }
+
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
-
       <div className="relative mx-auto flex max-w-[1400px] flex-col p-2.5 sm:p-3 lg:p-4">
         {/* Compact page chrome */}
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
@@ -158,6 +213,7 @@ export default function CalendarPage() {
 
           <button
             type="button"
+            onClick={() => setIsAddOpen(true)}
             className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-md shadow-violet-600/20 transition-all hover:bg-violet-700"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -166,7 +222,7 @@ export default function CalendarPage() {
         </div>
 
         {/* ONE surface: toolbar + grid */}
-        <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
+        <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col overflow-hidden rounded-md border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
           {/* Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 sm:px-4">
             <div className="flex min-w-0 items-center gap-2">
@@ -228,7 +284,7 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          {/* Type filters: same surface */}
+          {/* Type filters */}
           <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-100 px-3 py-1.5 sm:px-4">
             {TYPE_FILTERS.map((t) => {
               const active = typeFilter === t;
@@ -275,6 +331,8 @@ export default function CalendarPage() {
                 days={view === "Day" ? [anchor] : weekDays}
                 filtered={filtered}
                 columns={view === "Day" ? 1 : 7}
+                onDragStartItem={setDraggedItemId}
+                onDropOnDay={handleDropOnDay}
               />
             )}
             {view === "Month" && (
@@ -282,12 +340,103 @@ export default function CalendarPage() {
                 days={monthDays}
                 anchor={anchor}
                 filtered={filtered}
+                onDragStartItem={setDraggedItemId}
+                onDropOnDay={handleDropOnDay}
               />
             )}
             {view === "Agenda" && <AgendaList filtered={filtered} />}
           </div>
         </div>
       </div>
+
+      {/* Add Event Modal */}
+      {isAddOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">Add New Item</h3>
+              <button
+                type="button"
+                onClick={() => setIsAddOpen(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateEvent} className="space-y-3">
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="e.g. Q3 Strategy Review"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-violet-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                    Type
+                  </label>
+                  <select
+                    value={newType}
+                    onChange={(e) =>
+                      setNewType(e.target.value as CalendarItemType)
+                    }
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-violet-500 bg-white"
+                  >
+                    <option value="Event">Event</option>
+                    <option value="Task">Task</option>
+                    <option value="Meeting">Meeting</option>
+                    <option value="Reminder">Reminder</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                    Time
+                  </label>
+                  <input
+                    type="time"
+                    value={newTime}
+                    onChange={(e) => setNewTime(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-violet-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-slate-600">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-violet-500"
+                />
+              </div>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddOpen(false)}
+                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md shadow-violet-600/20 hover:bg-violet-700"
+                >
+                  Save Item
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -296,10 +445,14 @@ function WeekDayGrid({
   days,
   filtered,
   columns,
+  onDragStartItem,
+  onDropOnDay,
 }: {
   days: Date[];
   filtered: CalendarItem[];
   columns: number;
+  onDragStartItem: (id: string) => void;
+  onDropOnDay: (dateStr: string) => void;
 }) {
   return (
     <div
@@ -318,8 +471,10 @@ function WeekDayGrid({
         return (
           <div
             key={key}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={() => onDropOnDay(key)}
             className={cn(
-              "flex min-h-0 flex-col",
+              "flex min-h-0 flex-col transition-colors",
               isToday && "bg-violet-50/35",
             )}
           >
@@ -335,9 +490,7 @@ function WeekDayGrid({
               <span
                 className={cn(
                   "flex h-6 min-w-6 items-center justify-center rounded-full text-[12px] font-bold tabular-nums",
-                  isToday
-                    ? "bg-violet-600 text-white"
-                    : "text-slate-800",
+                  isToday ? "bg-violet-600 text-white" : "text-slate-800",
                 )}
               >
                 {day.getDate()}
@@ -346,7 +499,14 @@ function WeekDayGrid({
 
             <div className="flex flex-1 flex-col gap-1 p-1.5">
               {items.map((item) => (
-                <EventChip key={item.id} item={item} />
+                <div
+                  key={item.id}
+                  draggable
+                  onDragStart={() => onDragStartItem(item.id)}
+                  className="cursor-grab active:cursor-grabbing"
+                >
+                  <EventChip item={item} />
+                </div>
               ))}
             </div>
           </div>
@@ -360,10 +520,14 @@ function MonthGrid({
   days,
   anchor,
   filtered,
+  onDragStartItem,
+  onDropOnDay,
 }: {
   days: Date[];
   anchor: Date;
   filtered: CalendarItem[];
+  onDragStartItem: (id: string) => void;
+  onDropOnDay: (dateStr: string) => void;
 }) {
   return (
     <div className="grid h-full grid-cols-7">
@@ -384,8 +548,10 @@ function MonthGrid({
         return (
           <div
             key={key}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={() => onDropOnDay(key)}
             className={cn(
-              "min-h-[88px] border-b border-slate-100 p-1",
+              "min-h-[88px] border-b border-slate-100 p-1 transition-colors",
               idx % 7 !== 0 && "border-l border-slate-100",
               !inMonth && "bg-slate-50/40",
               isToday && "bg-violet-50/40",
@@ -409,8 +575,10 @@ function MonthGrid({
                 return (
                   <div
                     key={item.id}
+                    draggable
+                    onDragStart={() => onDragStartItem(item.id)}
                     className={cn(
-                      "truncate rounded px-1 py-0.5 text-[9px] font-medium",
+                      "cursor-grab truncate rounded px-1 py-0.5 text-[9px] font-medium active:cursor-grabbing",
                       meta.soft,
                       meta.text,
                     )}
@@ -484,7 +652,12 @@ function AgendaList({ filtered }: { filtered: CalendarItem[] }) {
                   </p>
                 ) : null}
               </div>
-              <span className={cn("mt-1.5 h-8 w-0.5 shrink-0 rounded-full", meta.bar)} />
+              <span
+                className={cn(
+                  "mt-1.5 h-8 w-0.5 shrink-0 rounded-full",
+                  meta.bar,
+                )}
+              />
               <div className="min-w-0 flex-1">
                 <div className="mb-0.5 flex items-center gap-1.5">
                   <span className={cn("text-[10px] font-semibold", meta.text)}>
@@ -509,15 +682,16 @@ function AgendaList({ filtered }: { filtered: CalendarItem[] }) {
 function EventChip({ item }: { item: CalendarItem }) {
   const meta = TYPE_META[item.type];
   return (
-    <button
-      type="button"
+    <div
       className={cn(
         "w-full rounded-md px-1.5 py-1.5 text-left transition-colors hover:brightness-[0.97]",
         meta.soft,
       )}
     >
       <div className="flex items-start gap-1.5">
-        <span className={cn("mt-1 h-3 w-0.5 shrink-0 rounded-full", meta.bar)} />
+        <span
+          className={cn("mt-1 h-3 w-0.5 shrink-0 rounded-full", meta.bar)}
+        />
         <div className="min-w-0 flex-1">
           <p className={cn("text-[9px] font-semibold", meta.text)}>
             {formatTime(item.start)}
@@ -528,7 +702,7 @@ function EventChip({ item }: { item: CalendarItem }) {
           </p>
         </div>
       </div>
-    </button>
+    </div>
   );
 }
 

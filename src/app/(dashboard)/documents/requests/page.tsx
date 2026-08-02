@@ -33,15 +33,6 @@ import { cn } from "@/lib/utils";
 type ViewMode = "list" | "kanban";
 type StatusTab = "All" | DocumentRequestStatus;
 
-const STATUS_DOT: Record<DocumentRequestStatus, string> = {
-  Requested: "bg-sky-500",
-  Pending: "bg-amber-500",
-  Received: "bg-violet-500",
-  Approved: "bg-emerald-500",
-  Rejected: "bg-rose-500",
-  Expired: "bg-slate-400",
-};
-
 export default function DocumentRequestsPage() {
   const router = useRouter();
   const [view, setView] = useState<ViewMode>("list");
@@ -123,10 +114,7 @@ export default function DocumentRequestsPage() {
           return { ...col, requests, count: requests.length };
         }
         if (col.id === targetColumnId) {
-          const requests = [
-            { ...request, status: col.title },
-            ...col.requests,
-          ];
+          const requests = [{ ...request, status: col.title }, ...col.requests];
           return { ...col, requests, count: requests.length };
         }
         return col;
@@ -174,7 +162,6 @@ export default function DocumentRequestsPage() {
 
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
-
       <div className="relative mx-auto flex max-w-[1400px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -223,7 +210,7 @@ export default function DocumentRequestsPage() {
           </div>
         </div>
 
-        <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
+        <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col overflow-hidden rounded-md border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 sm:px-4">
             <div className="flex flex-wrap items-center gap-0.5 rounded-lg bg-slate-50 p-0.5">
               <TabBtn
@@ -283,44 +270,6 @@ export default function DocumentRequestsPage() {
                 </button>
               </div>
             </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-100 px-3 py-1.5 sm:px-4">
-            {DOCUMENT_REQUEST_STATUSES.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setStatusTab(statusTab === s ? "All" : s)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold transition-all",
-                  statusTab === s
-                    ? "bg-violet-50 text-violet-700"
-                    : "text-slate-500 hover:bg-slate-50",
-                )}
-              >
-                <span className={cn("h-1.5 w-1.5 rounded-full", STATUS_DOT[s])} />
-                {s}
-                <span className="tabular-nums text-slate-400">
-                  {statusCounts[s]}
-                </span>
-              </button>
-            ))}
-            <span className="mx-1 hidden h-4 w-px bg-slate-200 sm:inline" />
-            {DOCUMENT_REQUEST_TYPES.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setTypeFilter(typeFilter === t ? "All" : t)}
-                className={cn(
-                  "rounded-md px-2 py-1 text-[10px] font-semibold transition-all",
-                  typeFilter === t
-                    ? "bg-violet-50 text-violet-700"
-                    : "text-slate-400 hover:text-slate-600",
-                )}
-              >
-                {t}
-              </button>
-            ))}
           </div>
 
           <div className="min-h-0 flex-1 overflow-auto">

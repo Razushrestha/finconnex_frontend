@@ -51,6 +51,7 @@ const ACCESS_STYLE: Record<DocumentAccessLevel, string> = {
 
 export default function DocumentLibraryPage() {
   const [docs, setDocs] = useState<LibraryDocument[]>(seedDocs);
+  const [folders, setFolders] = useState<string[]>([...LIBRARY_FOLDERS]);
   const [folder, setFolder] = useState<LibraryFolder>("All Files");
   const [search, setSearch] = useState("");
   const [accessFilter, setAccessFilter] = useState<DocumentAccessLevel | "All">(
@@ -58,6 +59,8 @@ export default function DocumentLibraryPage() {
   );
   const [selected, setSelected] = useState<LibraryDocument | null>(null);
   const [drawer, setDrawer] = useState<"versions" | "upload" | null>(null);
+  const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
 
@@ -73,12 +76,12 @@ export default function DocumentLibraryPage() {
 
   const folderCounts = useMemo(() => {
     const map: Record<string, number> = { "All Files": docs.length };
-    for (const f of LIBRARY_FOLDERS) {
+    for (const f of folders) {
       if (f === "All Files") continue;
       map[f] = docs.filter((d) => d.folder === f).length;
     }
     return map;
-  }, [docs]);
+  }, [docs, folders]);
 
   const filtered = useMemo(() => {
     let data = docs;
@@ -113,18 +116,16 @@ export default function DocumentLibraryPage() {
     const name = window.prompt("Rename file", doc.fileName);
     if (!name?.trim()) return;
     setDocs((prev) =>
-      prev.map((d) =>
-        d.id === doc.id ? { ...d, fileName: name.trim() } : d,
-      ),
+      prev.map((d) => (d.id === doc.id ? { ...d, fileName: name.trim() } : d)),
     );
     flash("File renamed");
     setMenuId(null);
   }
 
   function moveDoc(doc: LibraryDocument) {
-    const options = LIBRARY_FOLDERS.filter((f) => f !== "All Files").join(", ");
+    const options = folders.filter((f) => f !== "All Files").join(", ");
     const next = window.prompt(`Move to folder (${options})`, doc.folder);
-    if (!next || !LIBRARY_FOLDERS.includes(next as LibraryFolder)) return;
+    if (!next || !folders.includes(next)) return;
     if (next === "All Files") return;
     setDocs((prev) =>
       prev.map((d) => (d.id === doc.id ? { ...d, folder: next } : d)),
@@ -170,9 +171,22 @@ export default function DocumentLibraryPage() {
     flash("File uploaded to library");
   }
 
+  function handleCreateFolder(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = newFolderName.trim();
+    if (!trimmed) return;
+    if (folders.includes(trimmed)) {
+      flash("Folder already exists");
+      return;
+    }
+    setFolders((prev) => [...prev, trimmed]);
+    setNewFolderName("");
+    setIsFolderModalOpen(false);
+    flash(`Folder "${trimmed}" created`);
+  }
+
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
-
       <div className="relative mx-auto flex max-w-[1400px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -206,18 +220,28 @@ export default function DocumentLibraryPage() {
           </button>
         </div>
 
-        <div className="flex min-h-[calc(100dvh-7.5rem)] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
+        <div className="flex min-h-[calc(100dvh-7.5rem)] overflow-hidden rounded-md border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
           {/* Folder rail */}
           <aside className="hidden w-[200px] shrink-0 flex-col border-r border-slate-100 bg-slate-50/50 sm:flex">
-            <p className="px-3 pt-3 pb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-              Folders
-            </p>
+            <div className="flex items-center justify-between px-3 pt-3 pb-2">
+              <p className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+                Folders
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsFolderModalOpen(true)}
+                className="flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:bg-slate-200/60 hover:text-slate-700"
+                title="Add folder"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
             <div className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-3">
-              {LIBRARY_FOLDERS.map((f) => (
+              {folders.map((f) => (
                 <button
                   key={f}
                   type="button"
-                  onClick={() => setFolder(f)}
+                  onClick={() => setFolder(f as LibraryFolder)}
                   className={cn(
                     "flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-[12px] font-medium transition-all",
                     folder === f
@@ -225,9 +249,9 @@ export default function DocumentLibraryPage() {
                       : "text-slate-600 hover:bg-white/70",
                   )}
                 >
-                  <span className="flex items-center gap-2">
-                    <FolderOpen className="h-3.5 w-3.5 opacity-60" />
-                    {f}
+                  <span className="flex items-center gap-2 truncate">
+                    <FolderOpen className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                    <span className="truncate">{f}</span>
                   </span>
                   <span className="text-[10px] tabular-nums text-slate-400">
                     {folderCounts[f] ?? 0}
@@ -245,7 +269,7 @@ export default function DocumentLibraryPage() {
                   onChange={(e) => setFolder(e.target.value as LibraryFolder)}
                   className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[11px]"
                 >
-                  {LIBRARY_FOLDERS.map((f) => (
+                  {folders.map((f) => (
                     <option key={f} value={f}>
                       {f}
                     </option>
@@ -438,6 +462,54 @@ export default function DocumentLibraryPage() {
         </div>
       </div>
 
+      {/* New Folder Modal */}
+      {isFolderModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-[1px]">
+          <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <div className="flex items-center justify-between pb-3">
+              <h3 className="text-[14px] font-semibold text-slate-900">
+                Create new folder
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsFolderModalOpen(false)}
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateFolder} className="space-y-3 pt-1">
+              <Field label="Folder name">
+                <InputShell icon={FolderOpen}>
+                  <input
+                    autoFocus
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    placeholder="e.g. Invoices"
+                    className={elevatedInputClass(true)}
+                  />
+                </InputShell>
+              </Field>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsFolderModalOpen(false)}
+                  className="h-9 flex-1 rounded-lg border border-slate-200 text-[12px] font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="h-9 flex-1 rounded-lg bg-violet-600 text-[12px] font-semibold text-white shadow-sm hover:bg-violet-700"
+                >
+                  Create Folder
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
       {drawer === "versions" && selected ? (
         <Drawer onClose={() => setDrawer(null)} title="Version history">
           <p className="mb-3 truncate text-[13px] font-semibold text-slate-900">
@@ -562,8 +634,7 @@ function UploadForm({
   const [relatedKind, setRelatedKind] = useState<RelatedEntityKind | "">("");
   const [relatedName, setRelatedName] = useState("");
   const [tags, setTags] = useState("");
-  const [accessLevel, setAccessLevel] =
-    useState<DocumentAccessLevel>("Team");
+  const [accessLevel, setAccessLevel] = useState<DocumentAccessLevel>("Team");
   const [error, setError] = useState("");
 
   const relatedOptions = relatedKind

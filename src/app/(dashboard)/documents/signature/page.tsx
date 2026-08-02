@@ -3,13 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Home,
-  Plus,
-  Search,
-  PenLine,
-  Download,
-} from "lucide-react";
+import { Home, Plus, Search, PenLine, Download } from "lucide-react";
 import {
   SIGNATURE_STATUSES,
   signatureRequests as seed,
@@ -28,16 +22,6 @@ const STATUS_STYLE: Record<SignatureStatus, string> = {
   Declined: "bg-rose-50 text-rose-700",
   Expired: "bg-slate-100 text-slate-500",
   Cancelled: "bg-slate-100 text-slate-500",
-};
-
-const STATUS_DOT: Record<SignatureStatus, string> = {
-  Draft: "bg-slate-400",
-  Sent: "bg-sky-500",
-  Viewed: "bg-amber-500",
-  Signed: "bg-emerald-500",
-  Declined: "bg-rose-500",
-  Expired: "bg-slate-400",
-  Cancelled: "bg-slate-400",
 };
 
 export default function ESignaturePage() {
@@ -123,7 +107,6 @@ export default function ESignaturePage() {
 
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
-
       <div className="relative mx-auto flex max-w-[1400px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -171,7 +154,7 @@ export default function ESignaturePage() {
           </div>
         </div>
 
-        <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
+        <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col overflow-hidden rounded-md border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 sm:px-4">
             <div className="flex flex-wrap items-center gap-0.5 rounded-lg bg-slate-50 p-0.5">
               <TabBtn
@@ -202,107 +185,89 @@ export default function ESignaturePage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-1.5 border-b border-slate-100 px-3 py-1.5 sm:px-4">
-            {SIGNATURE_STATUSES.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setStatusTab(statusTab === s ? "All" : s)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold",
-                  statusTab === s
-                    ? "bg-violet-50 text-violet-700"
-                    : "text-slate-500 hover:bg-slate-50",
-                )}
-              >
-                <span className={cn("h-1.5 w-1.5 rounded-full", STATUS_DOT[s])} />
-                {s}
-                <span className="tabular-nums text-slate-400">{counts[s]}</span>
-              </button>
-            ))}
-          </div>
-
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 overflow-auto">
-            <table className="w-full min-w-[920px] text-left text-[12px]">
-              <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
-                <tr>
-                  <th className="px-4 py-2.5">Document</th>
-                  <th className="px-4 py-2.5">Signer</th>
-                  <th className="px-4 py-2.5">Related To</th>
-                  <th className="px-4 py-2.5">Status</th>
-                  <th className="px-4 py-2.5">Sent</th>
-                  <th className="px-4 py-2.5">Expiry</th>
-                  <th className="px-4 py-2.5">Created By</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {paginated.map((r) => (
-                  <tr
-                    key={r.id}
-                    className="cursor-pointer transition-colors hover:bg-violet-50/40"
-                    onClick={() => router.push(`/documents/signature/${r.id}`)}
-                  >
-                    <td className="max-w-[240px] px-4 py-3">
-                      <p className="truncate font-semibold text-slate-900">
-                        {r.documentName}
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        {r.signatureRequestId}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-slate-700">{r.signer}</p>
-                      <p className="text-[10px] text-slate-400">
-                        {r.signerEmail}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 text-slate-500">
-                      {r.relatedTo ?? ""}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={cn(
-                          "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                          STATUS_STYLE[r.status],
-                        )}
-                      >
-                        {r.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-slate-500">
-                      {r.sentDate ?? ""}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-slate-500">
-                      {r.expiryDate}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+              <table className="w-full min-w-[920px] text-left text-[12px]">
+                <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+                  <tr>
+                    <th className="px-4 py-2.5">Document</th>
+                    <th className="px-4 py-2.5">Signer</th>
+                    <th className="px-4 py-2.5">Related To</th>
+                    <th className="px-4 py-2.5">Status</th>
+                    <th className="px-4 py-2.5">Sent</th>
+                    <th className="px-4 py-2.5">Expiry</th>
+                    <th className="px-4 py-2.5">Created By</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {paginated.map((r) => (
+                    <tr
+                      key={r.id}
+                      className="cursor-pointer transition-colors hover:bg-violet-50/40"
+                      onClick={() =>
+                        router.push(`/documents/signature/${r.id}`)
+                      }
+                    >
+                      <td className="max-w-[240px] px-4 py-3">
+                        <p className="truncate font-semibold text-slate-900">
+                          {r.documentName}
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          {r.signatureRequestId}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-slate-700">{r.signer}</p>
+                        <p className="text-[10px] text-slate-400">
+                          {r.signerEmail}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">
+                        {r.relatedTo ?? ""}
+                      </td>
+                      <td className="px-4 py-3">
                         <span
                           className={cn(
-                            "flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold",
-                            avatarColor(r.createdBy),
+                            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                            STATUS_STYLE[r.status],
                           )}
                         >
-                          {initials(r.createdBy)}
+                          {r.status}
                         </span>
-                        {r.createdBy}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {paginated.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="px-4 py-16 text-center text-sm text-slate-400"
-                    >
-                      No signature requests match.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-500">
+                        {r.sentDate ?? ""}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-500">
+                        {r.expiryDate}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={cn(
+                              "flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold",
+                              avatarColor(r.createdBy),
+                            )}
+                          >
+                            {initials(r.createdBy)}
+                          </span>
+                          {r.createdBy}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {paginated.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="px-4 py-16 text-center text-sm text-slate-400"
+                      >
+                        No signature requests match.
+                      </td>
+                    </tr>
+                  ) : null}
+                </tbody>
+              </table>
             </div>
             {filtered.length > 0 ? (
               <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2.5 text-[11px] text-slate-500">
