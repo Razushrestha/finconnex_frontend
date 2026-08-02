@@ -28,6 +28,7 @@ export type WorkqueueItemId =
   | "escalated"
   /** Session 18 — Pipeline SLA Work Queue */
   | "sla-attention"
+  | "sla-overdue"
   | "sla-milestone-overdue"
   | "sla-due-today"
   | "sla-at-risk";

@@ -707,8 +707,7 @@ export function listWorkqueueItemRows(
       return dealRows(deals);
     case "closing-soon":
       return dealRows(deals.filter((d) => closingThisMonth(d.closeDate, now)));
-    case "pending-deal-tags":
-      return dealRows(deals.filter((d) => !d.contact));
+
     case "stalled": {
       const today0 = startOfDay(now).getTime();
       return dealRows(
@@ -738,13 +737,7 @@ export function listWorkqueueItemRows(
         ),
         ...listActivityRows("calls", scope, timeFilter, now),
       ].sort((a, b) => a.sortKey - b.sortKey);
-    case "pending-approval":
-      return dealRows(
-        deals.filter(
-          (d) => d.status === "Approval" || d.status === "Negotiation",
-        ),
-        "High",
-      );
+
     case "waiting-approval":
       return dealRows(deals.filter((d) => d.status === "Proposal"));
     case "overdue":

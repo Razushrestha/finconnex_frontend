@@ -28,7 +28,6 @@ export default function CallsPage() {
           onViewChange={setView}
           filterOpen={filterOpen}
           onToggleFilter={() => setFilterOpen((v) => !v)}
-          sortActive={sortActive}
           onClearSort={() => setSortActive(false)}
         />
       </div>

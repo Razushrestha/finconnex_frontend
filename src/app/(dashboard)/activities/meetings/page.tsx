@@ -140,7 +140,6 @@ export default function MeetingsPage() {
           onViewChange={setView}
           filterOpen={filterOpen}
           onToggleFilter={() => setFilterOpen((v) => !v)}
-          sortActive={sortActive}
           onClearSort={() => setSortActive(false)}
           search={search}
           onSearchChange={setSearch}

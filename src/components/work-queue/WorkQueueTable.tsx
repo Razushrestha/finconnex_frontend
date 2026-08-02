@@ -25,7 +25,6 @@ import { cn } from "@/lib/utils";
 import type { QueueRow } from "@/lib/work-queue/live";
 import {
   DEFAULT_MANAGE_COLUMNS,
-  ManageColumn,
   ManageColumnsModal,
   type ManageColumn,
 } from "./ManageColumnsModal";

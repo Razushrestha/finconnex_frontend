@@ -24,10 +24,11 @@ interface CompanyCardPanelHostProps {
 const PANEL_TITLES: Record<CompanyQuickActionKind, string> = {
   call: "Log a Call",
   email: "Send Email",
-  message: "Send Message",
+  sms: "Send SMS",
+  meeting: "Schedule Appointment",
+  task: "Create Task",
   note: "Add a Note",
-  checkSquare: "Create Task",
-  calendar: "Schedule Appointment",
+  attachment: "Add Attachment",
 };
 
 export function CompanyCardPanelHost({
@@ -91,10 +92,10 @@ const FIELD_CONFIG: Record<
   },
   email: {
     label: "Message",
-    placeholder: (p) => `Write your email to ${p.website}...`,
+    placeholder: (p) => `Write your email to ${p.website || p.companyName}...`,
     successVerb: "Sent email to",
   },
-  message: {
+  sms: {
     label: "Message",
     placeholder: (p) => `Write your message to ${p.companyName}...`,
     successVerb: "Sent message to",
@@ -104,15 +105,20 @@ const FIELD_CONFIG: Record<
     placeholder: (p) => `Add a note about ${p.companyName}...`,
     successVerb: "Added note for",
   },
-  checkSquare: {
+  task: {
     label: "Task",
     placeholder: (p) => `What needs to be done for ${p.companyName}?`,
     successVerb: "Created task for",
   },
-  calendar: {
+  meeting: {
     label: "Details",
     placeholder: (p) => `Appointment details with ${p.companyName}...`,
     successVerb: "Scheduled appointment with",
+  },
+  attachment: {
+    label: "Details",
+    placeholder: (p) => `Attachment details for ${p.companyName}...`,
+    successVerb: "Added attachment for",
   },
 };
 

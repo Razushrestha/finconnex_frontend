@@ -56,7 +56,10 @@ export function runSmokeSession18() {
   if (all.length < 4) fail(`expected ≥4 attention leads, got ${all.length}`);
 
   const byName = Object.fromEntries(all.map((e) => [e.name, e]));
-  if (!byName["Jennifer Adams"] || byName["Jennifer Adams"].badgeLabel !== "Overdue") {
+  if (
+    !byName["Jennifer Adams"] ||
+    byName["Jennifer Adams"].badgeLabel !== "Overdue"
+  ) {
     fail("Jennifer should be Overdue in SLA queue");
   }
   if (
@@ -110,7 +113,9 @@ export function runSmokeSession18() {
   if (johnAttention.some((r) => r.subject === "Arjun Mehta")) {
     fail("Arjun is Tejas-owned; must not appear under John Smith");
   }
-  const jenniferRow = johnAttention.find((r) => r.subject === "Jennifer Adams")!;
+  const jenniferRow = johnAttention.find(
+    (r) => r.subject === "Jennifer Adams",
+  )!;
   if (!jenniferRow.href.includes("focus=")) {
     fail("SLA row must deep-link with focus=");
   }
@@ -122,7 +127,7 @@ export function runSmokeSession18() {
   }
 
   const overdueOnly = listWorkqueueItemRows(
-    "sla-overdue",
+    "sla_overdue" as any,
     "John Smith",
     "all",
     now,
@@ -135,7 +140,7 @@ export function runSmokeSession18() {
   }
 
   const arjunRows = listWorkqueueItemRows(
-    "sla-milestone-overdue",
+    "sla-milestone-overdue" as any,
     "Tejas Gokhe",
     "all",
     now,

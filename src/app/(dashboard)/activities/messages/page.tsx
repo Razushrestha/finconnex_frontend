@@ -26,7 +26,6 @@ export default function MessagesPage() {
           onViewChange={setView}
           filterOpen={filterOpen}
           onToggleFilter={() => setFilterOpen((v) => !v)}
-          sortActive={sortActive}
           onClearSort={() => setSortActive(false)}
         />
       </div>
