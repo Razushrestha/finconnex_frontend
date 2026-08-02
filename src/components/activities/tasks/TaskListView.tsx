@@ -37,15 +37,21 @@ const columns = [
 
 interface TaskListViewProps {
   filters?: TaskFilters;
+  sortField?: string;
+  sortDirection?: "asc" | "desc";
+  onSortChange?: (field: string, direction: "asc" | "desc") => void;
+  onClearSort?: () => void;
 }
 
-export function TaskListView({ filters }: TaskListViewProps) {
+export function TaskListView({
+  filters,
+  sortField,
+  sortDirection,
+  onSortChange,
+  onClearSort,
+}: TaskListViewProps) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [sortConfig, setSortConfig] = useState<{
-    key: string;
-    direction: "asc" | "desc";
-  } | null>(null);
 
   const itemsPerPage = 8;
 
@@ -77,22 +83,22 @@ export function TaskListView({ filters }: TaskListViewProps) {
       );
     }
 
-    if (sortConfig) {
+    if (sortField) {
       data.sort((a, b) => {
         const av = String(
-          (a as unknown as Record<string, unknown>)[sortConfig.key] ?? "",
+          (a as unknown as Record<string, unknown>)[sortField] ?? "",
         );
         const bv = String(
-          (b as unknown as Record<string, unknown>)[sortConfig.key] ?? "",
+          (b as unknown as Record<string, unknown>)[sortField] ?? "",
         );
-        if (av < bv) return sortConfig.direction === "asc" ? -1 : 1;
-        if (av > bv) return sortConfig.direction === "asc" ? 1 : -1;
+        if (av < bv) return sortDirection === "asc" ? -1 : 1;
+        if (av > bv) return sortDirection === "asc" ? 1 : -1;
         return 0;
       });
     }
 
     return data;
-  }, [search, sortConfig, filters]);
+  }, [search, sortField, sortDirection, filters]);
 
   const totalPages = Math.max(
     1,
@@ -103,18 +109,16 @@ export function TaskListView({ filters }: TaskListViewProps) {
     page * itemsPerPage,
   );
 
-  const handleSort = (key: string) => {
-    setSortConfig((current) =>
-      current?.key === key && current.direction === "desc"
-        ? null
-        : {
-            key,
-            direction:
-              current?.key === key && current.direction === "asc"
-                ? "desc"
-                : "asc",
-          },
-    );
+  const handleHeaderSort = (key: string) => {
+    if (!onSortChange) return;
+    // third click on the same column clears the sort, matching prior behavior
+    if (sortField === key && sortDirection === "desc") {
+      onClearSort?.();
+      return;
+    }
+    const nextDirection: "asc" | "desc" =
+      sortField === key && sortDirection === "asc" ? "desc" : "asc";
+    onSortChange(key, nextDirection);
   };
 
   return (
@@ -146,11 +150,18 @@ export function TaskListView({ filters }: TaskListViewProps) {
                   {col.sortable ? (
                     <button
                       type="button"
-                      onClick={() => handleSort(col.key)}
-                      className="inline-flex items-center gap-1 hover:text-slate-700"
+                      onClick={() => handleHeaderSort(col.key)}
+                      className={`inline-flex items-center gap-1 hover:text-slate-700 ${
+                        sortField === col.key ? "text-violet-700" : ""
+                      }`}
                     >
                       {col.label}
                       <ArrowUpDown className="h-3 w-3" />
+                      {sortField === col.key && (
+                        <span className="text-[10px]">
+                          {sortDirection === "asc" ? "↑" : "↓"}
+                        </span>
+                      )}
                     </button>
                   ) : (
                     col.label

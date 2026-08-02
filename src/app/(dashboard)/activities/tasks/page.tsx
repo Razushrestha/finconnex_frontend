@@ -33,10 +33,19 @@ const printViewItems = [
   { key: "print-canvas", label: "Print Using Canvas", premium: true },
 ];
 
+const taskSortOptions = [
+  { key: "dueDate", label: "Due Date" },
+  { key: "priority", label: "Priority" },
+  { key: "taskId", label: "Task ID" },
+  { key: "title", label: "Task Name" },
+];
+
 export default function TasksPage() {
   const [view, setView] = useState<ActivityView>("kanban");
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState<TaskFilters>(EMPTY_TASK_FILTERS);
+  const [sortField, setSortField] = useState<string | undefined>();
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   function toggleField(
     sectionId: "status" | "priority" | "type",
@@ -57,6 +66,15 @@ export default function TasksPage() {
     });
   }
 
+  function handleSortChange(field: string, direction: "asc" | "desc") {
+    setSortField(field);
+    setSortDirection(direction);
+  }
+
+  function handleClearSort() {
+    setSortField(undefined);
+  }
+
   return (
     <div className="flex min-h-full w-full min-w-0 flex-col overflow-hidden bg-slate-50/50 px-4 py-1">
       <FocusHighlight />
@@ -69,6 +87,11 @@ export default function TasksPage() {
           onViewChange={setView}
           filterOpen={filterOpen}
           onToggleFilter={() => setFilterOpen((v) => !v)}
+          sortOptions={taskSortOptions}
+          sortField={sortField}
+          sortDirection={sortDirection}
+          onSortChange={handleSortChange}
+          onClearSort={handleClearSort}
           showRefresh
           moreMenuItems={moreMenuItems}
           printViewItems={printViewItems}
@@ -93,7 +116,13 @@ export default function TasksPage() {
           {view === "kanban" ? (
             <KanbanBoard filters={filters} />
           ) : (
-            <TaskListView filters={filters} />
+            <TaskListView
+              filters={filters}
+              sortField={sortField}
+              sortDirection={sortDirection}
+              onSortChange={handleSortChange}
+              onClearSort={handleClearSort}
+            />
           )}
         </div>
       </div>

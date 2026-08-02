@@ -33,6 +33,11 @@ export interface PrintViewItem {
   premium?: boolean;
 }
 
+export interface SortOption {
+  key: string;
+  label: string;
+}
+
 export interface ActivityToolbarProps {
   entityLabel: string;
   createRoute: string;
@@ -47,7 +52,10 @@ export interface ActivityToolbarProps {
   filterOpen: boolean;
   onToggleFilter: () => void;
 
-  sortActive?: boolean;
+  sortOptions?: SortOption[];
+  sortField?: string;
+  sortDirection?: "asc" | "desc";
+  onSortChange?: (field: string, direction: "asc" | "desc") => void;
   onClearSort?: () => void;
 
   search?: string;
@@ -77,7 +85,10 @@ export function ActivityToolbar({
   onViewChange,
   filterOpen,
   onToggleFilter,
-  sortActive,
+  sortOptions,
+  sortField,
+  sortDirection,
+  onSortChange,
   onClearSort,
   search,
   onSearchChange,
@@ -92,6 +103,7 @@ export function ActivityToolbar({
   const [internalActiveTab, setInternalActiveTab] = useState(tabs[0]);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [savedViewMenuOpen, setSavedViewMenuOpen] = useState(false);
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [savedView, setSavedView] = useState(
     defaultSavedView ?? savedViews?.[0],
   );
@@ -103,7 +115,16 @@ export function ActivityToolbar({
     onTabChange?.(tab);
   }
 
-  const showSortClear = sortActive !== undefined && onClearSort !== undefined;
+  const sortActive = Boolean(sortField);
+  const showSortClear = sortActive && Boolean(onClearSort);
+  const activeSortLabel = sortOptions?.find((o) => o.key === sortField)?.label;
+
+  function handleSortSelect(key: string) {
+    if (!onSortChange) return;
+    const nextDirection: "asc" | "desc" =
+      sortField === key && sortDirection === "asc" ? "desc" : "asc";
+    onSortChange(key, nextDirection);
+  }
 
   return (
     <div className="mb-1.5">
@@ -174,15 +195,30 @@ export function ActivityToolbar({
             <span className="hidden sm:inline">Filter</span>
           </button>
 
-          <div className="flex items-center">
+          <div className="relative flex items-center">
             <button
               type="button"
-              className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-slate-600 hover:bg-slate-50"
+              onClick={() => sortOptions && setSortMenuOpen((v) => !v)}
+              aria-pressed={sortActive}
+              aria-expanded={sortMenuOpen}
+              className={`inline-flex h-7 items-center gap-1 rounded-md px-2 text-[12px] font-medium transition-colors ${
+                sortActive
+                  ? "bg-violet-50 text-violet-700"
+                  : "text-slate-600 hover:bg-slate-50"
+              }`}
             >
               <ArrowUpDown className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Sort</span>
+              <span className="hidden sm:inline">
+                {activeSortLabel ?? "Sort"}
+              </span>
+              {sortActive && (
+                <span className="text-[10px] text-slate-400">
+                  {sortDirection === "asc" ? "↑" : "↓"}
+                </span>
+              )}
             </button>
-            {showSortClear && sortActive && (
+
+            {showSortClear && (
               <button
                 type="button"
                 onClick={onClearSort}
@@ -191,6 +227,42 @@ export function ActivityToolbar({
               >
                 <X className="h-3.5 w-3.5" />
               </button>
+            )}
+
+            {sortOptions && sortMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setSortMenuOpen(false)}
+                />
+                <div className="absolute left-0 top-full z-20 mt-1 w-48 rounded-lg border border-slate-100 bg-white py-1 shadow-lg">
+                  {sortOptions.map((opt) => {
+                    const isActive = sortField === opt.key;
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => {
+                          handleSortSelect(opt.key);
+                          setSortMenuOpen(false);
+                        }}
+                        className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-slate-50 ${
+                          isActive
+                            ? "font-medium text-violet-700"
+                            : "text-slate-700"
+                        }`}
+                      >
+                        <span>{opt.label}</span>
+                        {isActive && (
+                          <span className="text-xs text-slate-400">
+                            {sortDirection === "asc" ? "Asc" : "Desc"}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </div>
 

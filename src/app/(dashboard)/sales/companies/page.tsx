@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { EntityHeader } from "@/components/sales/EntityHeader";
+import { ActionOption, EntityHeader } from "@/components/sales/EntityHeader";
 import { CompaniesKanbanBoard } from "@/components/sales/companies/CompaniesKanbanBoard";
 import { CompaniesListView } from "@/components/sales/companies/CompaniesListView";
 import {
@@ -12,6 +12,15 @@ import {
 import { COMPANY_GROUPS } from "@/lib/companies/types";
 import { viewEnter } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import {
+  ArrowLeftRight,
+  Download,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  Tag,
+  Trash2,
+} from "lucide-react";
 
 const DEFAULT_COMPANY_COLUMNS = COMPANY_GROUPS.map((group) => ({
   id: group.id,
@@ -25,7 +34,21 @@ export default function CompaniesPage() {
   const [filters, setFilters] = useState<CompanyFilters>(EMPTY_COMPANY_FILTERS);
   const [columns, setColumns] = useState(DEFAULT_COMPANY_COLUMNS);
 
-  function toggleFilterField(field: string) {
+  const [isMassTransferOpen, setMassTransferOpen] = useState(false);
+  const [isMassDeleteOpen, setMassDeleteOpen] = useState(false);
+  const [isMassUpdateOpen, setMassUpdateOpen] = useState(false);
+  const [isManageTagsOpen, setManageTagsOpen] = useState(false);
+  const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
+
+  function exportTasks() {
+    console.log("export tasks clicked");
+  }
+
+  function openPrintView() {
+    console.log("print view clicked");
+  }
+
+  function toggleFilterField(section: "status" | "source", field: string) {
     setFilters((prev) => {
       const key = section === "source" ? "sources" : "statuses";
       const current = prev[key] as string[];
@@ -55,24 +78,80 @@ export default function CompaniesPage() {
     0,
   );
 
+  const actionOptions: ActionOption[] = [
+    {
+      id: "mass-transfer",
+      label: "Mass Transfer",
+      icon: <ArrowLeftRight className="h-3.5 w-3.5 text-slate-400" />,
+      onClick: () => setMassTransferOpen(true),
+    },
+    {
+      id: "mass-delete",
+      label: "Mass Delete",
+      icon: <Trash2 className="h-3.5 w-3.5 text-slate-400" />,
+      onClick: () => setMassDeleteOpen(true),
+    },
+    {
+      id: "mass-update",
+      label: "Mass Update",
+      icon: <RefreshCw className="h-3.5 w-3.5 text-slate-400" />,
+      onClick: () => setMassUpdateOpen(true),
+    },
+    {
+      id: "manage-tags",
+      label: "Manage Tags",
+      icon: <Tag className="h-3.5 w-3.5 text-slate-400" />,
+      onClick: () => setManageTagsOpen(true),
+    },
+    {
+      id: "assignment-rules",
+      label: "Assignment Rules",
+      icon: <ShieldCheck className="h-3.5 w-3.5 text-slate-400" />,
+      onClick: () => setAssignmentRulesOpen(true),
+    },
+    {
+      id: "export-tasks",
+      label: "Export Tasks",
+      icon: <Download className="h-3.5 w-3.5 text-slate-400" />,
+      onClick: () => exportTasks(),
+    },
+  ];
+
+  const footerOptions: ActionOption[] = [
+    {
+      id: "print-view",
+      label: "Print View",
+      icon: <Sparkles className="h-3.5 w-3.5 text-amber-400" />,
+      onClick: () => openPrintView(),
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-slate-50 p-2 pr-4">
       <EntityHeader
         entityLabel="Company"
         entityLabelPlural="Companies"
-        columnOptions={columns}
-        onColumnToggle={(id) =>
-          setColumns((prev) =>
-            prev.map((c) => (c.id === id ? { ...c, visible: !c.visible } : c)),
-          )
-        }
-        onColumnReorder={reorderColumn}
         createRoute="/sales/companies/create"
+        importOptions={[
+          {
+            id: "import-companies",
+            label: "Import Companies",
+            badge: "New",
+            onClick: () => console.log("button clicked"),
+          },
+          {
+            id: "import-notes",
+            label: "Import Notes",
+            onClick: () => console.log("button clicked"),
+          },
+        ]}
         totalCount={totalCompanies}
         viewMode={viewMode}
         onViewChange={setViewMode}
         isFilterOpen={isFilterOpen}
         onToggleFilter={() => setIsFilterOpen((v) => !v)}
+        actionOptions={actionOptions}
+        footerOptions={footerOptions}
       />
 
       <div className="mt-3 flex items-start gap-4">

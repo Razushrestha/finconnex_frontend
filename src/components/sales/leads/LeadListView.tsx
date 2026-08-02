@@ -110,7 +110,7 @@ function buildColumnRenderers(
   return {
     lead: {
       th: "Lead",
-      tdClassName: "px-3 py-2 whitespace-nowrap",
+      tdClassName: "px-3 py-1 whitespace-nowrap",
       td: (lead) => (
         <div className="flex items-center gap-2.5">
           <div
@@ -119,22 +119,24 @@ function buildColumnRenderers(
             {lead.initials}
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-slate-900">{lead.name}</p>
-            <p className="truncate text-[10px] text-slate-400">{lead.email}</p>
+            <p className="font-semibold text-[13px] text-slate-900">
+              {lead.name}
+            </p>
+            <p className="truncate text-[11px] text-slate-400">{lead.email}</p>
           </div>
         </div>
       ),
     },
     company: {
       th: "Company",
-      tdClassName: "px-3 py-2 whitespace-nowrap text-slate-600",
+      tdClassName: "px-3 py-1 whitespace-nowrap text-[13px] text-slate-600",
       td: (lead) => lead.company || "",
     },
     status: {
       th: "Status",
-      tdClassName: "px-3 py-2 whitespace-nowrap",
+      tdClassName: "px-3 py-1 whitespace-nowrap",
       td: (lead) => (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
           <span className={`h-1.5 w-1.5 rounded-full ${lead.statusDotColor}`} />
           {lead.stageTitle}
         </span>
@@ -142,33 +144,33 @@ function buildColumnRenderers(
     },
     sla: {
       th: "Pipeline SLA",
-      thClassName: "min-w-[140px] px-3 py-2.5",
-      tdClassName: "px-3 py-2",
+      thClassName: "min-w-[140px] px-3 py-2",
+      tdClassName: "px-3 py-1",
       td: (lead, vm) =>
         vm.sla &&
         vm.sla.badgeLabel !== "No SLA" &&
         (vm.sla.stageClock || vm.sla.milestoneClock) ? (
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             <LeadSlaChip sla={vm.sla} variant="badge" />
-            <p className="truncate text-[10px] text-slate-500">
+            <p className="truncate text-[11px] text-slate-500">
               {vm.sla.milestoneClock
                 ? `${vm.sla.milestoneClock.label} · ${vm.sla.milestoneClock.detail}`
                 : vm.sla.stageClock?.detail}
             </p>
           </div>
         ) : (
-          <span className="text-[11px] text-slate-300">—</span>
+          <span className="text-[12px] text-slate-300">—</span>
         ),
     },
     owner: {
       th: "Owner",
-      tdClassName: "px-3 py-2 whitespace-nowrap text-slate-600",
+      tdClassName: "px-3 py-1 whitespace-nowrap text-[13px] text-slate-600",
       td: (lead) => lead.owner,
     },
     activity: {
       th: "Activity",
-      thClassName: "min-w-[200px] px-3 py-2.5",
-      tdClassName: "px-3 py-2",
+      thClassName: "min-w-[200px] px-3 py-2",
+      tdClassName: "px-3 py-1",
       td: (lead, vm, summaryTitle) => {
         const summary = vm.activitySummary;
         return summary.primary && summary.urgency ? (
@@ -183,7 +185,7 @@ function buildColumnRenderers(
               })
             }
             className={cn(
-              "w-full max-w-[240px] rounded-md px-2 py-1.5 text-left transition-colors",
+              "w-full max-w-[240px] rounded-md px-2 py-1 text-left transition-colors",
               URGENCY_SURFACE[summary.urgency],
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1",
             )}
@@ -201,27 +203,27 @@ function buildColumnRenderers(
             title={summary.primary.title}
           >
             <div className="flex items-start justify-between gap-2">
-              <span className="min-w-0 truncate text-[11px] font-semibold">
+              <span className="min-w-0 truncate text-[12px] font-semibold">
                 {summaryTitle}
               </span>
               {summary.moreCount > 0 && (
-                <span className="shrink-0 text-[10px] font-medium opacity-90">
+                <span className="shrink-0 text-[11px] font-medium opacity-90">
                   +{summary.moreCount}
                 </span>
               )}
             </div>
-            <div className="mt-0.5 text-[10px] opacity-90">
+            <div className="mt-0.5 text-[11px] opacity-90">
               {summary.dueLabel}
             </div>
           </button>
         ) : (
-          <span className="text-[11px] text-slate-300">—</span>
+          <span className="text-[12px] text-slate-300">—</span>
         );
       },
     },
     lastActivity: {
       th: "Last activity",
-      tdClassName: "px-3 py-2 whitespace-nowrap",
+      tdClassName: "px-3 py-1 whitespace-nowrap",
       td: (lead, vm) =>
         vm.lastActivity ? (
           <button
@@ -234,20 +236,20 @@ function buildColumnRenderers(
                 status: lead.statusTitle,
               })
             }
-            className="max-w-[160px] truncate text-left text-[10px] text-slate-400 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-1"
+            className="max-w-[160px] truncate text-left text-[11px] text-slate-400 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-1"
             aria-label={`Last activity: ${vm.lastActivity.label}, ${vm.lastActivity.relativeTime}. Open activity history.`}
             title={`${vm.lastActivity.label} · ${vm.lastActivity.relativeTime}`}
           >
             {vm.lastActivity.relativeTime}
           </button>
         ) : (
-          <span className="text-[11px] text-slate-300">—</span>
+          <span className="text-[12px] text-slate-300">—</span>
         ),
     },
     actions: {
       th: "Actions",
-      thClassName: "px-3 py-2.5 text-right",
-      tdClassName: "px-3 py-2",
+      thClassName: "px-3 py-2 text-right",
+      tdClassName: "px-3 py-1",
       td: (lead, vm) => (
         <div
           className="flex items-center justify-end gap-0.5"

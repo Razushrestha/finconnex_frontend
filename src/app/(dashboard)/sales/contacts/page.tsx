@@ -1,7 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { EntityHeader } from "@/components/sales/EntityHeader";
+import {
+  EntityHeader,
+  type SortDirection,
+  type ActionOption,
+} from "@/components/sales/EntityHeader";
+import {
+  ArrowLeftRight,
+  Trash2,
+  RefreshCw,
+  Tag,
+  ShieldCheck,
+  Download,
+  Sparkles,
+} from "lucide-react";
 import { ContactsKanbanBoard } from "@/components/sales/contacts/ContactsKanbanBoard";
 import { ContactsListView } from "@/components/sales/contacts/ContactsListView";
 import {
@@ -34,8 +47,22 @@ export default function ContactsPage() {
   const [filters, setFilters] = useState<ContactFilters>(EMPTY_CONTACT_FILTERS);
   const [columns, setColumns] = useState(DEFAULT_CONTACT_COLUMNS);
 
-  // Add sort state
+  // Sort state — field and direction are tracked separately now, matching
+  // the EntityHeader "Sort By" panel (field select + Ascending/Descending).
   const [activeSort, setActiveSort] = useState("newest");
+  const [activeSortDirection, setActiveSortDirection] =
+    useState<SortDirection>("asc");
+
+  // TODO: wire these up to the actual modals/handlers once they exist.
+  const [isMassTransferOpen, setMassTransferOpen] = useState(false);
+  const [isMassDeleteOpen, setMassDeleteOpen] = useState(false);
+  const [isMassUpdateOpen, setMassUpdateOpen] = useState(false);
+  const [isManageTagsOpen, setManageTagsOpen] = useState(false);
+  const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
+
+  function exportTasks() {
+    console.log("export tasks clicked");
+  }
 
   function toggleFilterField(section: "source" | "status", field: string) {
     setFilters((prev) => {
@@ -67,28 +94,91 @@ export default function ContactsPage() {
     0,
   );
 
+  const actionOptions: ActionOption[] = [
+    {
+      id: "mass-transfer",
+      label: "Mass Transfer",
+      icon: <ArrowLeftRight className="h-3.5 w-3.5 text-slate-400" />,
+      onClick: () => setMassTransferOpen(true),
+    },
+    {
+      id: "mass-delete",
+      label: "Mass Delete",
+      icon: <Trash2 className="h-3.5 w-3.5 text-slate-400" />,
+      onClick: () => setMassDeleteOpen(true),
+    },
+    {
+      id: "mass-update",
+      label: "Mass Update",
+      icon: <RefreshCw className="h-3.5 w-3.5 text-slate-400" />,
+      onClick: () => setMassUpdateOpen(true),
+    },
+    {
+      id: "manage-tags",
+      label: "Manage Tags",
+      icon: <Tag className="h-3.5 w-3.5 text-slate-400" />,
+      onClick: () => setManageTagsOpen(true),
+    },
+    {
+      id: "assignment-rules",
+      label: "Assignment Rules",
+      icon: <ShieldCheck className="h-3.5 w-3.5 text-slate-400" />,
+      onClick: () => setAssignmentRulesOpen(true),
+    },
+    {
+      id: "export-tasks",
+      label: "Export Tasks",
+      icon: <Download className="h-3.5 w-3.5 text-slate-400" />,
+      onClick: () => exportTasks(),
+    },
+  ];
+
+  function openPrintView() {
+    console.log("print view clicked");
+  }
+
+  const footerOptions: ActionOption[] = [
+    {
+      id: "print-view",
+      label: "Print View",
+      icon: <Sparkles className="h-3.5 w-3.5 text-amber-400" />,
+      onClick: () => openPrintView(),
+    },
+  ];
+
   return (
     <div className="h-screen bg-slate-50 p-2 pr-3 dark:bg-zinc-950">
       <FocusHighlight />
       <EntityHeader
         entityLabel="Contact"
-        columnOptions={columns}
-        onColumnToggle={(id) =>
-          setColumns((prev) =>
-            prev.map((c) => (c.id === id ? { ...c, visible: !c.visible } : c)),
-          )
-        }
-        onColumnReorder={reorderColumn}
+        actionOptions={actionOptions}
         createRoute="/sales/contacts/create"
+        importOptions={[
+          {
+            id: "import-contacts",
+            label: "Import Contacts",
+            badge: "New",
+            onClick: () => console.log("button clicked"),
+          },
+          {
+            id: "import-notes",
+            label: "Import Notes",
+            onClick: () => console.log("button clicked"),
+          },
+        ]}
         totalCount={totalContacts}
         viewMode={viewMode}
         onViewChange={setViewMode}
         isFilterOpen={isFilterOpen}
         onToggleFilter={() => setIsFilterOpen((v) => !v)}
-        // Pass sort props to render the sort dropdown
         sortOptions={CONTACT_SORT_OPTIONS}
         activeSort={activeSort}
-        onSortChange={(value) => setActiveSort(value)}
+        activeSortDirection={activeSortDirection}
+        onSortChange={(field, direction) => {
+          setActiveSort(field);
+          setActiveSortDirection(direction);
+        }}
+        footerOptions={footerOptions}
       />
 
       <div className="mt-3 flex items-start gap-4">
