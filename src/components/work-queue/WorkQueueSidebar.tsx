@@ -22,6 +22,7 @@ import type {
   WorkQueueTimeFilter,
   WorkqueueSidebarCategory,
 } from "@/lib/work-queue/live";
+import CreateQueueModal, { QueuePayload } from "./CreateQueueModal";
 
 const iconMap: Record<
   ActivityIconId,
@@ -81,6 +82,14 @@ export function WorkQueueSidebar({
   const [specificDateValue, setSpecificDateValue] = useState<string | null>(
     null,
   );
+
+  const [isQueueModalOpen, setIsQueueModalOpen] = useState(false);
+
+  function handleSaveQueue(payload: QueuePayload) {
+    // TODO: replace with your actual create-queue API call
+    console.log("New queue:", payload);
+    setIsQueueModalOpen(false);
+  }
 
   const formattedSelectedDate = selectedDate
     ? selectedDate.toLocaleDateString("en-US", {
@@ -257,6 +266,7 @@ export function WorkQueueSidebar({
               <button
                 type="button"
                 aria-label="Add workqueue view"
+                onClick={() => setIsQueueModalOpen(true)}
                 className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-white hover:text-gray-700"
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -339,6 +349,12 @@ export function WorkQueueSidebar({
           </div>
         </div>
       )}
+
+      <CreateQueueModal
+        open={isQueueModalOpen}
+        onClose={() => setIsQueueModalOpen(false)}
+        onSave={handleSaveQueue}
+      />
     </div>
   );
 }
