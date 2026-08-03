@@ -24,8 +24,26 @@ export function ManageQueueModal({
   const [viewType, setViewType] = React.useState<"category" | "list">(
     "category",
   );
+
+  // Which category/item is currently allowed to initiate a native drag.
+  // Only set while the mouse is held down on that row's grip handle, so
+  // clicking a checkbox or label never accidentally starts a drag.
+  const [armedCatId, setArmedCatId] = React.useState<string | null>(null);
+  const [armedItem, setArmedItem] = React.useState<{
+    catId: string;
+    itemId: string;
+  } | null>(null);
+
   const [dragCatId, setDragCatId] = React.useState<string | null>(null);
   const [dragItem, setDragItem] = React.useState<{
+    catId: string;
+    itemId: string;
+  } | null>(null);
+
+  // Row currently being hovered while a drag is active — drives the
+  // insertion-line feedback so it's clear where the drop will land.
+  const [overCatId, setOverCatId] = React.useState<string | null>(null);
+  const [overItem, setOverItem] = React.useState<{
     catId: string;
     itemId: string;
   } | null>(null);
@@ -39,8 +57,18 @@ export function ManageQueueModal({
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
+    function onWindowMouseUp() {
+      // If the mouse is released without a drag ever starting (a plain
+      // click on the handle), clear the "armed" state.
+      setArmedCatId(null);
+      setArmedItem(null);
+    }
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("mouseup", onWindowMouseUp);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("mouseup", onWindowMouseUp);
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -85,44 +113,42 @@ export function ManageQueueModal({
   }
 
   function onCatDrop(targetId: string) {
-    if (!dragCatId || dragCatId === targetId) {
-      setDragCatId(null);
-      return;
+    if (dragCatId && dragCatId !== targetId) {
+      setDraft((prev) => {
+        const arr = [...prev];
+        const from = arr.findIndex((c) => c.id === dragCatId);
+        const to = arr.findIndex((c) => c.id === targetId);
+        if (from < 0 || to < 0) return prev;
+        const [moved] = arr.splice(from, 1);
+        arr.splice(to, 0, moved);
+        return arr;
+      });
     }
-    setDraft((prev) => {
-      const arr = [...prev];
-      const from = arr.findIndex((c) => c.id === dragCatId);
-      const to = arr.findIndex((c) => c.id === targetId);
-      if (from < 0 || to < 0) return prev;
-      const [moved] = arr.splice(from, 1);
-      arr.splice(to, 0, moved);
-      return arr;
-    });
     setDragCatId(null);
+    setOverCatId(null);
   }
 
   function onItemDrop(catId: string, targetItemId: string) {
     if (
-      !dragItem ||
-      dragItem.catId !== catId ||
-      dragItem.itemId === targetItemId
+      dragItem &&
+      dragItem.catId === catId &&
+      dragItem.itemId !== targetItemId
     ) {
-      setDragItem(null);
-      return;
+      setDraft((prev) =>
+        prev.map((c) => {
+          if (c.id !== catId) return c;
+          const items = [...c.items];
+          const from = items.findIndex((it) => it.id === dragItem.itemId);
+          const to = items.findIndex((it) => it.id === targetItemId);
+          if (from < 0 || to < 0) return c;
+          const [moved] = items.splice(from, 1);
+          items.splice(to, 0, moved);
+          return { ...c, items };
+        }),
+      );
     }
-    setDraft((prev) =>
-      prev.map((c) => {
-        if (c.id !== catId) return c;
-        const items = [...c.items];
-        const from = items.findIndex((it) => it.id === dragItem.itemId);
-        const to = items.findIndex((it) => it.id === targetItemId);
-        if (from < 0 || to < 0) return c;
-        const [moved] = items.splice(from, 1);
-        items.splice(to, 0, moved);
-        return { ...c, items };
-      }),
-    );
     setDragItem(null);
+    setOverItem(null);
   }
 
   const flatItems =
@@ -173,9 +199,7 @@ export function ManageQueueModal({
           </span>
           <select
             value={viewType}
-            onChange={(e) =>
-              setViewType(e.target.value as "category" | "list")
-            }
+            onChange={(e) => setViewType(e.target.value as "category" | "list")}
             className="h-8 rounded border border-gray-200 bg-white px-2.5 text-[12.5px] font-medium text-gray-900 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/15"
           >
             <option value="category">Category View</option>
@@ -188,21 +212,42 @@ export function ManageQueueModal({
             ? draft.map((cat) => (
                 <div
                   key={cat.id}
-                  draggable
-                  onDragStart={() => setDragCatId(cat.id)}
-                  onDragOver={(e) => e.preventDefault()}
+                  draggable={armedCatId === cat.id}
+                  onDragStart={(e) => {
+                    setDragCatId(cat.id);
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragOver={(e) => {
+                    if (!dragCatId || dragCatId === cat.id) return;
+                    e.preventDefault();
+                    setOverCatId(cat.id);
+                  }}
+                  onDragLeave={() => {
+                    setOverCatId((prev) => (prev === cat.id ? null : prev));
+                  }}
                   onDrop={(e) => {
                     e.preventDefault();
                     onCatDrop(cat.id);
                   }}
-                  onDragEnd={() => setDragCatId(null)}
+                  onDragEnd={() => {
+                    setDragCatId(null);
+                    setArmedCatId(null);
+                    setOverCatId(null);
+                  }}
                   className={cn(
-                    "flex flex-col gap-0.5 rounded-xl border border-gray-200 bg-[var(--wq-surface,#FAFAFA)] p-2.5 px-3 transition-opacity",
+                    "flex flex-col gap-0.5 rounded-xl border border-gray-200 bg-[var(--wq-surface,#FAFAFA)] p-2.5 px-3 transition-[opacity,box-shadow]",
                     dragCatId === cat.id && "opacity-40",
+                    overCatId === cat.id &&
+                      dragCatId &&
+                      dragCatId !== cat.id &&
+                      "ring-2 ring-violet-400",
                   )}
                 >
                   <div className="flex items-center gap-2.5 px-0.5 py-1">
-                    <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-gray-300" />
+                    <GripVertical
+                      onMouseDown={() => setArmedCatId(cat.id)}
+                      className="h-3.5 w-3.5 shrink-0 cursor-grab text-gray-300 active:cursor-grabbing"
+                    />
                     <Checkbox
                       checked={cat.checked}
                       onToggle={() => toggleCategory(cat.id)}
@@ -214,24 +259,53 @@ export function ManageQueueModal({
                   {cat.items.map((it) => (
                     <div
                       key={it.id}
-                      draggable
+                      draggable={
+                        armedItem?.catId === cat.id &&
+                        armedItem?.itemId === it.id
+                      }
                       onDragStart={(e) => {
                         e.stopPropagation();
                         setDragItem({ catId: cat.id, itemId: it.id });
+                        e.dataTransfer.effectAllowed = "move";
                       }}
-                      onDragOver={(e) => e.preventDefault()}
+                      onDragOver={(e) => {
+                        if (!dragItem || dragItem.itemId === it.id) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setOverItem({ catId: cat.id, itemId: it.id });
+                      }}
+                      onDragLeave={(e) => {
+                        e.stopPropagation();
+                        setOverItem((prev) =>
+                          prev?.itemId === it.id ? null : prev,
+                        );
+                      }}
                       onDrop={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         onItemDrop(cat.id, it.id);
                       }}
-                      onDragEnd={() => setDragItem(null)}
+                      onDragEnd={() => {
+                        setDragItem(null);
+                        setArmedItem(null);
+                        setOverItem(null);
+                      }}
                       className={cn(
                         "group flex h-8 items-center gap-2.5 rounded-lg px-1.5 transition-colors hover:bg-violet-50",
                         dragItem?.itemId === it.id && "opacity-40",
+                        overItem?.itemId === it.id &&
+                          dragItem &&
+                          dragItem.itemId !== it.id &&
+                          "bg-violet-50 ring-1 ring-inset ring-violet-300",
                       )}
                     >
-                      <GripVertical className="h-3 w-3 shrink-0 cursor-grab text-gray-300 opacity-50" />
+                      <GripVertical
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          setArmedItem({ catId: cat.id, itemId: it.id });
+                        }}
+                        className="h-3 w-3 shrink-0 cursor-grab text-gray-300 opacity-50 active:cursor-grabbing"
+                      />
                       <Checkbox
                         checked={it.checked}
                         onToggle={() => toggleItem(cat.id, it.id)}
