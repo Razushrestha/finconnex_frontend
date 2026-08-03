@@ -26,20 +26,13 @@ import { CONTACT_GROUPS } from "@/lib/contacts/types";
 import { viewEnter } from "@/lib/motion";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
+import { SORT_OPTIONS } from "../leads/page";
 
 const DEFAULT_CONTACT_COLUMNS = CONTACT_GROUPS.map((group) => ({
   id: group.id,
   label: group.title,
   visible: true,
 }));
-
-// Define your sort options for contacts
-const CONTACT_SORT_OPTIONS = [
-  { label: "Newest First", value: "newest" },
-  { label: "Oldest First", value: "oldest" },
-  { label: "Name (A-Z)", value: "name_asc" },
-  { label: "Name (Z-A)", value: "name_desc" },
-];
 
 export default function ContactsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -49,7 +42,7 @@ export default function ContactsPage() {
 
   // Sort state — field and direction are tracked separately now, matching
   // the EntityHeader "Sort By" panel (field select + Ascending/Descending).
-  const [activeSort, setActiveSort] = useState("newest");
+  const [activeSort, setActiveSort] = useState("Sort");
   const [activeSortDirection, setActiveSortDirection] =
     useState<SortDirection>("asc");
 
@@ -171,7 +164,7 @@ export default function ContactsPage() {
         onViewChange={setViewMode}
         isFilterOpen={isFilterOpen}
         onToggleFilter={() => setIsFilterOpen((v) => !v)}
-        sortOptions={CONTACT_SORT_OPTIONS}
+        sortOptions={SORT_OPTIONS}
         activeSort={activeSort}
         activeSortDirection={activeSortDirection}
         onSortChange={(field, direction) => {

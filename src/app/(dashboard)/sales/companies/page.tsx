@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ActionOption, EntityHeader } from "@/components/sales/EntityHeader";
+import {
+  ActionOption,
+  EntityHeader,
+  type SortDirection,
+} from "@/components/sales/EntityHeader";
 import { CompaniesKanbanBoard } from "@/components/sales/companies/CompaniesKanbanBoard";
 import { CompaniesListView } from "@/components/sales/companies/CompaniesListView";
 import {
@@ -21,6 +25,7 @@ import {
   Tag,
   Trash2,
 } from "lucide-react";
+import { SORT_OPTIONS } from "../leads/page";
 
 const DEFAULT_COMPANY_COLUMNS = COMPANY_GROUPS.map((group) => ({
   id: group.id,
@@ -33,6 +38,10 @@ export default function CompaniesPage() {
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [filters, setFilters] = useState<CompanyFilters>(EMPTY_COMPANY_FILTERS);
   const [columns, setColumns] = useState(DEFAULT_COMPANY_COLUMNS);
+
+  const [activeSort, setActiveSort] = useState("Sort");
+  const [activeSortDirection, setActiveSortDirection] =
+    useState<SortDirection>("asc");
 
   const [isMassTransferOpen, setMassTransferOpen] = useState(false);
   const [isMassDeleteOpen, setMassDeleteOpen] = useState(false);
@@ -150,6 +159,13 @@ export default function CompaniesPage() {
         onViewChange={setViewMode}
         isFilterOpen={isFilterOpen}
         onToggleFilter={() => setIsFilterOpen((v) => !v)}
+        sortOptions={SORT_OPTIONS}
+        activeSort={activeSort}
+        activeSortDirection={activeSortDirection}
+        onSortChange={(field, direction) => {
+          setActiveSort(field);
+          setActiveSortDirection(direction);
+        }}
         actionOptions={actionOptions}
         footerOptions={footerOptions}
       />

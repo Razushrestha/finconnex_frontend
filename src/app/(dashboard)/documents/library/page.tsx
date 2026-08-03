@@ -328,9 +328,9 @@ export default function DocumentLibraryPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {filtered.map((doc) => (
+                  {filtered.map((doc, index) => (
                     <tr
-                      key={doc.id}
+                      key={`${doc.id}-${index}`}
                       className="transition-colors hover:bg-violet-50/40"
                     >
                       <td className="max-w-[220px] px-4 py-3">

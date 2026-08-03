@@ -2,13 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  FileStack,
-  User,
-  Link2,
-  Calendar,
-  FileType,
-} from "lucide-react";
+import { FileStack, User, Link2, Calendar, FileType } from "lucide-react";
 import {
   DOCUMENT_REQUEST_TYPES,
   DOCUMENT_REQUEST_STATUSES,
@@ -73,7 +67,8 @@ export function CreateDocumentRequestForm({
   function validate() {
     const next: Record<string, string> = {};
     if (!title.trim()) next.title = "Title is required";
-    if (!requestedFrom.trim()) next.requestedFrom = "Requested From is required";
+    if (!requestedFrom.trim())
+      next.requestedFrom = "Requested From is required";
     if (!documentType) next.documentType = "Document Type is required";
     if (!status) next.status = "Status is required";
     setErrors(next);
@@ -124,12 +119,17 @@ export function CreateDocumentRequestForm({
       tip="Title, Requested From, Document Type & Status are required."
       cardIcon={FileStack}
       cardTitle="Request details"
-      cardDescription="SRS §9.2: trackable instead of an email thread"
+      cardDescription=""
       listHref="/documents/requests"
       saveLabel="Save request"
       onSave={onSave}
     >
-      <Field label="Title" required error={errors.title} className="col-span-full">
+      <Field
+        label="Title"
+        required
+        error={errors.title}
+        className="col-span-full"
+      >
         <InputShell icon={FileStack} error={!!errors.title}>
           <input
             value={title}
@@ -173,9 +173,7 @@ export function CreateDocumentRequestForm({
         <InputShell>
           <select
             value={status}
-            onChange={(e) =>
-              setStatus(e.target.value as DocumentRequestStatus)
-            }
+            onChange={(e) => setStatus(e.target.value as DocumentRequestStatus)}
             className={elevatedSelectClass()}
           >
             {DOCUMENT_REQUEST_STATUSES.map((s) => (

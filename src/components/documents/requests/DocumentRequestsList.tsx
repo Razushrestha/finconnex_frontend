@@ -7,45 +7,57 @@ import {
   User,
   Link2,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Inbox,
 } from "lucide-react";
-import type { DocumentRequest, DocumentRequestType } from "@/lib/documents/requests/types";
+import type {
+  DocumentRequest,
+  DocumentRequestType,
+} from "@/lib/documents/requests/types";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 const STATUS_META: Record<
   string,
-  { soft: string; text: string; border: string }
+  { soft: string; text: string; border: string; dot: string }
 > = {
   Requested: {
     soft: "bg-sky-50",
     text: "text-sky-700",
     border: "border-l-sky-500",
+    dot: "bg-sky-500",
   },
   Pending: {
     soft: "bg-amber-50",
     text: "text-amber-800",
     border: "border-l-amber-500",
+    dot: "bg-amber-500",
   },
   Received: {
     soft: "bg-violet-50",
     text: "text-violet-700",
     border: "border-l-violet-500",
+    dot: "bg-violet-500",
   },
   Approved: {
     soft: "bg-emerald-50",
     text: "text-emerald-700",
     border: "border-l-emerald-500",
+    dot: "bg-emerald-500",
   },
   Rejected: {
     soft: "bg-rose-50",
     text: "text-rose-700",
     border: "border-l-rose-500",
+    dot: "bg-rose-500",
   },
   Expired: {
     soft: "bg-slate-100",
     text: "text-slate-600",
     border: "border-l-slate-400",
+    dot: "bg-slate-400",
   },
 };
 
@@ -80,83 +92,117 @@ export function DocumentRequestsList({
     <div
       className={cn(
         "flex h-full min-w-0 flex-col overflow-hidden",
-        !embedded &&
-          "rounded-2xl border border-slate-200/80 bg-white shadow-sm",
+        !embedded && "rounded-xl border border-slate-200/80 bg-white shadow-sm",
       )}
     >
       <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[960px] text-left text-[12px]">
-          <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+        <table className="w-full min-w-[960px] border-separate border-spacing-0 text-left text-[13px]">
+          <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm">
             <tr>
-              <th className="px-4 py-2.5">Request</th>
-              <th className="px-4 py-2.5">From</th>
-              <th className="px-4 py-2.5">Type</th>
-              <th className="px-4 py-2.5">Related To</th>
-              <th className="px-4 py-2.5">Due</th>
-              <th className="px-4 py-2.5">Status</th>
-              <th className="px-4 py-2.5">Requested By</th>
+              {[
+                "Request",
+                "From",
+                "Type",
+                "Related To",
+                "Due",
+                "Status",
+                "Requested By",
+              ].map((label) => (
+                <th
+                  key={label}
+                  className="border-b border-slate-200 px-4 py-3 text-[11px] font-semibold tracking-wide text-slate-500 uppercase"
+                >
+                  {label}
+                </th>
+              ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
-            {paginated.map((r) => {
+          <tbody>
+            {paginated.map((r, i) => {
               const meta = STATUS_META[r.status];
               return (
                 <tr
                   key={r.id}
-                  className="transition-colors hover:bg-violet-50/40"
+                  className={cn(
+                    "group transition-colors hover:bg-violet-50/50",
+                    i % 2 === 1 && "bg-slate-50/40",
+                  )}
                 >
-                  <td className="max-w-[240px] px-4 py-3">
+                  <td className="max-w-[260px] border-b border-slate-100 px-4 py-3">
                     <Link
                       href={`/documents/requests/${r.id}`}
-                      className="block"
+                      className="flex items-center gap-2.5"
                     >
-                      <p className="truncate font-semibold text-slate-900 hover:text-violet-700">
-                        {r.title}
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        {r.requestId}
-                      </p>
+                      <span
+                        className={cn(
+                          "h-8 w-1 shrink-0 rounded-full",
+                          meta?.text.replace("text-", "bg-") ?? "bg-slate-300",
+                        )}
+                      />
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold text-slate-900 group-hover:text-violet-700">
+                          {r.title}
+                        </span>
+                        {"requestId" in r && (r as any).requestId ? (
+                          <span className="block text-[10px] font-medium text-slate-400">
+                            {(r as any).requestId}
+                          </span>
+                        ) : null}
+                      </span>
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{r.requestedFrom}</td>
-                  <td className="px-4 py-3">
+                  <td className="border-b border-slate-100 px-4 py-3 text-slate-600">
+                    {r.requestedFrom}
+                  </td>
+                  <td className="border-b border-slate-100 px-4 py-3">
                     <span
                       className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                        "inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold",
                         TYPE_SOFT[r.documentType],
                       )}
                     >
                       {r.documentType}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-500">
-                    {r.relatedTo ?? ""}
+                  <td className="max-w-[160px] truncate border-b border-slate-100 px-4 py-3 text-slate-500">
+                    {r.relatedTo ?? <span className="text-slate-300">—</span>}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-slate-500">
-                    {r.dueDate}
+                  <td className="border-b border-slate-100 px-4 py-3 whitespace-nowrap text-slate-500">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                      {r.dueDate}
+                    </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="border-b border-slate-100 px-4 py-3">
                     <span
                       className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                        meta.soft,
-                        meta.text,
+                        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold",
+                        meta?.soft,
+                        meta?.text,
                       )}
                     >
+                      <span
+                        className={cn(
+                          "h-1.5 w-1.5 rounded-full",
+                          meta?.dot ?? "bg-slate-400",
+                        )}
+                      />
                       {r.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="border-b border-slate-100 px-4 py-3">
                     <div className="flex items-center gap-2">
                       <span
                         className={cn(
-                          "flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold",
+                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold ring-2 ring-white",
                           avatarColor(r.requestedBy),
                         )}
                       >
                         {initials(r.requestedBy)}
                       </span>
-                      <span className="text-slate-700">{r.requestedBy}</span>
+                      <span className="truncate text-slate-700">
+                        {r.requestedBy}
+                      </span>
                     </div>
                   </td>
                 </tr>
@@ -164,38 +210,53 @@ export function DocumentRequestsList({
             })}
             {paginated.length === 0 ? (
               <tr>
-                <td
-                  colSpan={7}
-                  className="px-4 py-16 text-center text-sm text-slate-400"
-                >
-                  No requests match your filters.
+                <td colSpan={7} className="px-4 py-16 text-center">
+                  <div className="flex flex-col items-center gap-2 text-slate-400">
+                    <Inbox className="h-8 w-8 text-slate-300" />
+                    <p className="text-sm font-medium text-slate-500">
+                      No requests match your filters
+                    </p>
+                    <p className="text-[12px] text-slate-400">
+                      Try adjusting or clearing your filters.
+                    </p>
+                  </div>
                 </td>
               </tr>
             ) : null}
           </tbody>
         </table>
       </div>
-      <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2.5 text-[11px] text-slate-500">
+      <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/60 px-4 py-2.5 text-[11.5px] text-slate-500">
         <span>
-          Showing {(safePage - 1) * pageSize + 1}–
-          {Math.min(safePage * pageSize, data.length)} of {data.length}
+          Showing{" "}
+          <span className="font-medium text-slate-700">
+            {data.length === 0 ? 0 : (safePage - 1) * pageSize + 1}–
+            {Math.min(safePage * pageSize, data.length)}
+          </span>{" "}
+          of <span className="font-medium text-slate-700">{data.length}</span>
         </span>
-        <div className="flex gap-1">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             disabled={safePage === 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className="rounded-lg border border-slate-200 px-2 py-1 disabled:opacity-40"
+            className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white"
           >
+            <ChevronLeft className="h-3.5 w-3.5" />
             Prev
           </button>
+          <span className="px-1 text-slate-400">
+            Page <span className="font-medium text-slate-700">{safePage}</span>{" "}
+            of {totalPages}
+          </span>
           <button
             type="button"
             disabled={safePage === totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            className="rounded-lg border border-slate-200 px-2 py-1 disabled:opacity-40"
+            className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white"
           >
             Next
+            <ChevronRight className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
