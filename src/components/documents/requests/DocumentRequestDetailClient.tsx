@@ -177,7 +177,6 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
 
   return (
     <div className="relative flex min-h-full flex-col bg-slate-50">
-
       <div className="relative flex flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
         {/* Compact header */}
         <div className="mb-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
@@ -220,7 +219,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
             {request.title}
           </p>
           <div className="ml-auto flex flex-wrap items-center gap-1.5">
-            <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600">
+            <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-2.5 text-[10px] font-semibold text-slate-600">
               <Calendar className="h-3 w-3 text-slate-400" />
               Due {request.dueDate}
             </span>
@@ -238,7 +237,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
         </div>
 
         {/* One surface: fills remaining viewport */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-slate-200/80 bg-white shadow-sm">
           {/* Status progress */}
           <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
             <div className="flex items-center gap-0">
@@ -266,7 +265,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
                         />
                         <span
                           className={cn(
-                            "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold transition-colors",
+                            "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold transition-colors",
                             active
                               ? "bg-violet-600 text-white ring-4 ring-violet-100"
                               : past
@@ -293,7 +292,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
                       </div>
                       <span
                         className={cn(
-                          "truncate text-[10px] font-semibold",
+                          "truncate text-[12px] font-semibold",
                           active
                             ? "text-violet-700"
                             : past
@@ -446,7 +445,10 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
                 </p>
                 <ol className="relative space-y-0">
                   {timeline.map((e, i) => (
-                    <li key={e.id} className="relative flex gap-3 pb-4 last:pb-0">
+                    <li
+                      key={e.id}
+                      className="relative flex gap-3 pb-4 last:pb-0"
+                    >
                       {i < timeline.length - 1 ? (
                         <span
                           aria-hidden

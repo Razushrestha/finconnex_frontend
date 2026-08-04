@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { PenLine, FileText, User, Link2, Calendar, Mail } from "lucide-react";
+import {
+  PenLine,
+  FileText,
+  User,
+  Link2,
+  Calendar,
+  Mail,
+  Sparkles,
+} from "lucide-react";
 import {
   ACTIVITY_OWNERS,
   RELATED_ENTITY_KINDS,
@@ -37,6 +45,32 @@ function formatExpiry(iso: string) {
   return `${day}/${m}/${y}`;
 }
 
+function SectionHeading({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: React.ElementType;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="col-span-full mt-1 mb-1 flex items-center gap-2 first:mt-0">
+      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-violet-50 text-violet-600">
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <div>
+        <p className="text-[12px] font-semibold tracking-wide text-slate-600 uppercase">
+          {title}
+        </p>
+        {description ? (
+          <p className="text-[12px] text-slate-400">{description}</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
   const router = useRouter();
   const [documentName, setDocumentName] = useState("");
@@ -52,6 +86,14 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
   const relatedOptions = relatedKind
     ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === relatedKind)
     : RELATED_RECORD_OPTIONS;
+
+  const resolvedFileName = documentFile.trim()
+    ? documentFile.trim().endsWith(".pdf")
+      ? documentFile.trim()
+      : `${documentFile.trim()}.pdf`
+    : "";
+
+  const resolvedExpiry = formatExpiry(expiryDate);
 
   function validate() {
     const next: Record<string, string> = {};
@@ -72,14 +114,12 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
       id: ids.id,
       signatureRequestId: ids.signatureRequestId,
       documentName: documentName.trim(),
-      documentFile: documentFile.trim().endsWith(".pdf")
-        ? documentFile.trim()
-        : `${documentFile.trim()}.pdf`,
+      documentFile: resolvedFileName,
       signer: signer.trim(),
       signerEmail: signerEmail.trim(),
       relatedTo,
       status: "Draft",
-      expiryDate: formatExpiry(expiryDate),
+      expiryDate: resolvedExpiry,
       createdBy,
       manageToken: ids.manageToken,
       audit: [
@@ -119,11 +159,17 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
       tip="Document name, file, and signer are required."
       cardIcon={PenLine}
       cardTitle="Signature request"
-      cardDescription="SRS §9.3: status starts as Draft until you send"
+      cardDescription=""
       listHref="/documents/signature"
       saveLabel="Save draft"
       onSave={onSave}
     >
+      <SectionHeading
+        icon={FileText}
+        title="Document"
+        description="What you're sending out for signature"
+      />
+
       <Field
         label="Document name"
         required
@@ -154,7 +200,22 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
             className={elevatedInputClass(true)}
           />
         </InputShell>
+        {resolvedFileName ? (
+          <p className="mt-1 flex items-center gap-1 text-[12px] text-slate-400">
+            <Sparkles className="h-3 w-3 text-violet-400" />
+            Will be saved as{" "}
+            <span className="font-medium text-slate-600">
+              {resolvedFileName}
+            </span>
+          </p>
+        ) : null}
       </Field>
+
+      <SectionHeading
+        icon={User}
+        title="Signer"
+        description="Who needs to sign this document"
+      />
 
       <Field label="Signer" required error={errors.signer}>
         <InputShell icon={User} error={!!errors.signer}>
@@ -179,6 +240,12 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
         </InputShell>
       </Field>
 
+      <SectionHeading
+        icon={Calendar}
+        title="Details"
+        description="Expiry, ownership, and linked record"
+      />
+
       <Field label="Expiry date">
         <InputShell icon={Calendar}>
           <input
@@ -188,6 +255,18 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
             className={elevatedInputClass(true)}
           />
         </InputShell>
+        <p className="mt-1 text-[12px] text-slate-400">
+          {expiryDate ? (
+            <>
+              Signer has until{" "}
+              <span className="font-medium text-slate-600">
+                {resolvedExpiry}
+              </span>
+            </>
+          ) : (
+            <>Defaults to 14 days from today if left blank</>
+          )}
+        </p>
       </Field>
 
       <Field label="Created by">
@@ -242,6 +321,11 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
             ))}
           </select>
         </InputShell>
+        {!relatedKind ? (
+          <p className="mt-1 text-[12px] text-slate-400">
+            Choose a related kind first to filter this list
+          </p>
+        ) : null}
       </Field>
     </CreateEntityFormShell>
   );

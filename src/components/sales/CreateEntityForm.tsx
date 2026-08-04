@@ -171,10 +171,7 @@ export function CreateEntityFormShell({
             <Home className="h-3.5 w-3.5" />
           </Link>
           <span>/</span>
-          <Link
-            href={breadcrumbParent.href}
-            className="hover:text-slate-600"
-          >
+          <Link href={breadcrumbParent.href} className="hover:text-slate-600">
             {breadcrumbParent.label}
           </Link>
           <span>/</span>
@@ -228,7 +225,7 @@ export function CreateEntityFormShell({
       <div className="shrink-0 border-t border-slate-200/80 bg-slate-50/95 px-3 py-2 sm:px-4 lg:px-5 dark:border-zinc-800 dark:bg-zinc-900/95">
         <div className="flex w-full flex-wrap items-center justify-between gap-2">
           <p className="hidden text-[11px] text-slate-400 sm:block">
-            Local until you save
+            {/* Local until you save */}
           </p>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <button
