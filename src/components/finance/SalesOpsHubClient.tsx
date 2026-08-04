@@ -66,8 +66,7 @@ export function SalesOpsHubClient() {
     );
     const unpaidInv = invoices.filter(
       (i) =>
-        i.amountDue > 0 &&
-        !["Paid", "Cancelled", "Void"].includes(i.status),
+        i.amountDue > 0 && !["Paid", "Cancelled", "Void"].includes(i.status),
     );
     const overdue = invoices.filter((i) => i.status === "Overdue");
     const completedPay = payments.filter((p) => p.status === "Completed");
@@ -94,7 +93,8 @@ export function SalesOpsHubClient() {
       {
         key: "est",
         href: "/finance/estimates",
-        createHref: "/finance/estimates/create?layoutid=standard&redirect=false",
+        createHref:
+          "/finance/estimates/create?layoutid=standard&redirect=false",
         label: "Estimates",
         section: "§20.1",
         icon: FileText,
@@ -105,7 +105,8 @@ export function SalesOpsHubClient() {
       {
         key: "quo",
         href: "/finance/quotations",
-        createHref: "/finance/quotations/create?layoutid=standard&redirect=false",
+        createHref:
+          "/finance/quotations/create?layoutid=standard&redirect=false",
         label: "Quotations",
         section: "§20.2",
         icon: FileText,
@@ -123,9 +124,7 @@ export function SalesOpsHubClient() {
         section: "§20.3",
         icon: Receipt,
         headline: ready ? `${metrics.invoicesUnpaid} unpaid` : "",
-        sub: ready
-          ? `${metrics.invoicesOverdue} overdue`
-          : "Generate & send",
+        sub: ready ? `${metrics.invoicesOverdue} overdue` : "Generate & send",
         cta: "New invoice",
       },
       {
@@ -161,8 +160,8 @@ export function SalesOpsHubClient() {
   return (
     <FinanceOpsShell title="Sales operations" section="§20">
       <p className="mb-3 max-w-2xl text-[12px] leading-relaxed text-slate-500">
-        Standalone estimates, quotations, invoices, payments, and catalogue 
-        use each module on its own, or convert along the chain when you need to.
+        Standalone estimates, quotations, invoices, payments, and catalogue use
+        each module on its own, or convert along the chain when you need to.
       </p>
 
       <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
@@ -273,8 +272,9 @@ export function SalesOpsHubClient() {
               . Sales Ops stays focused on documents and payments.
             </p>
             <p className={cn("text-[11px] text-slate-400")}>
-              Optional client journey links still appear on quotation detail when
-              a proposal-to-payment path exists: they are not required here.
+              Optional client journey links still appear on quotation detail
+              when a proposal-to-payment path exists: they are not required
+              here.
             </p>
           </div>
         ) : null}
