@@ -1,5 +1,5 @@
+import SalesOpsHubClient from "@/components/finance/hub/SalesOpshubClient";
 import type { Metadata } from "next";
-import { SalesOpsHubClient } from "@/components/finance/SalesOpsHubClient";
 
 export const metadata: Metadata = {
   title: "Sales Operations: FinConnex",
