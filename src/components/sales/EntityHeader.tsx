@@ -18,6 +18,7 @@ import {
   GripVertical,
   ArrowUpDown,
 } from "lucide-react";
+import { SearchInput } from "../ui/search-input";
 
 const DEFAULT_LAYOUT_ID = "standard";
 
@@ -131,6 +132,8 @@ export function EntityHeader({
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
+  const [search, setSearch] = useState("");
+
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const sortMenuRef = useRef<HTMLDivElement>(null);
   const importMenuRef = useRef<HTMLDivElement>(null);
@@ -322,16 +325,7 @@ export function EntityHeader({
             </div>
           ) : null}
 
-          <div className="relative hidden sm:block">
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchValue ?? ""}
-              onChange={(e) => onSearchChange?.(e.target.value)}
-              placeholder={searchPlaceholder}
-              className="h-8 w-44 rounded-md border border-slate-200 bg-white pr-2.5 pl-8 text-[12px] text-slate-800 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none lg:w-56 dark:border-zinc-700 dark:bg-zinc-900 dark:text-slate-100"
-            />
-          </div>
+          <SearchInput value={search} onChange={setSearch} />
 
           <div className="flex h-8 items-center rounded-md border border-slate-200 bg-white p-0.5 dark:border-zinc-700 dark:bg-zinc-900">
             <button
