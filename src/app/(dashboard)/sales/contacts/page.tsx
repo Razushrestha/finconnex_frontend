@@ -27,6 +27,7 @@ import { viewEnter } from "@/lib/motion";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
 import { SORT_OPTIONS } from "../leads/page";
+import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 
 const DEFAULT_CONTACT_COLUMNS = CONTACT_GROUPS.map((group) => ({
   id: group.id,
@@ -45,6 +46,8 @@ export default function ContactsPage() {
   const [activeSort, setActiveSort] = useState("Sort");
   const [activeSortDirection, setActiveSortDirection] =
     useState<SortDirection>("asc");
+
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // TODO: wire these up to the actual modals/handlers once they exist.
   const [isMassTransferOpen, setMassTransferOpen] = useState(false);
@@ -66,6 +69,12 @@ export default function ContactsPage() {
         : [...current, field];
       return { ...prev, [key]: next };
     });
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    );
   }
 
   function reorderColumn(draggedId: string, targetId: string) {
@@ -174,6 +183,32 @@ export default function ContactsPage() {
         footerOptions={footerOptions}
       />
 
+      {selectedIds.length > 0 ? (
+        <EntitySelectionToolbar
+          selectedCount={selectedIds.length}
+          onClear={() => setSelectedIds([])}
+          onSendMail={() => console.log("send mail clicked")}
+          onAddTag={() => console.log("add tag clicked")}
+          onRemoveTag={() => console.log("remove tag clicked")}
+          onRunMacro={() => console.log("run macro clicked")}
+          onCreateTask={() => console.log("create task clicked")}
+          onSetReminder={() => console.log("set reminder clicked")}
+          onMassUpdate={() => console.log("mass update clicked")}
+          onChangeOwner={() => console.log("change owner clicked")}
+          onCadences={() => console.log("cadences clicked")}
+          onAddToCampaigns={() => console.log("add to campaigns clicked")}
+          onPrintMailingLabels={() =>
+            console.log("print mailing labels clicked")
+          }
+          onMailMerge={() => console.log("mail merge clicked")}
+          onMassConvert={() => console.log("mass convert clicked")}
+          onDelete={() => console.log("delete clicked")}
+          onExportSelectedRecords={() =>
+            console.log("export selected records clicked")
+          }
+        />
+      ) : null}
+
       <div className="mt-3 flex items-start gap-4">
         {isFilterOpen && (
           <div className="sticky top-6">
@@ -191,6 +226,8 @@ export default function ContactsPage() {
               filters={filters}
               visibleColumnIds={visibleColumnIds}
               sortValue={activeSort}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelected}
             />
           ) : (
             <ContactsListView filters={filters} sortValue={activeSort} />

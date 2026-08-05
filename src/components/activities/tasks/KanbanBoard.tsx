@@ -5,6 +5,7 @@ import {
   taskColumns as initialColumns,
   type TaskColumn,
   type TaskFilters,
+  type Task,
 } from "@/lib/tasks/types";
 import { listTaskColumns, saveTaskColumns } from "@/lib/tasks/store";
 import { KanbanColumn } from "./KanbanColumn";
@@ -14,6 +15,11 @@ interface DragInfo {
   sourceColumnId: string;
 }
 
+export interface DropTargetPos {
+  columnId: string;
+  targetIndex: number;
+}
+
 interface KanbanBoardProps {
   filters?: TaskFilters;
 }
@@ -21,6 +27,9 @@ interface KanbanBoardProps {
 export function KanbanBoard({ filters }: KanbanBoardProps) {
   const [columns, setColumns] = useState<TaskColumn[]>(initialColumns);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
+  const [dropTargetPos, setDropTargetPos] = useState<DropTargetPos | null>(
+    null,
+  );
 
   useEffect(() => {
     setColumns(listTaskColumns());
@@ -64,28 +73,35 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
 
   function handleDragEndTask() {
     setDragInfo(null);
+    setDropTargetPos(null);
   }
 
-  function handleDropTask(targetColumnId: string) {
+  function handleDropTask(targetColumnId: string, targetIndex?: number) {
     if (!dragInfo) return;
     const { taskId, sourceColumnId } = dragInfo;
-
-    if (sourceColumnId === targetColumnId) {
-      setDragInfo(null);
-      return;
-    }
 
     const sourceColumn = columns.find((c) => c.id === sourceColumnId);
     const targetColumn = columns.find((c) => c.id === targetColumnId);
     const task = sourceColumn?.tasks.find((t) => t.taskId === taskId);
+
     if (!task || !targetColumn) {
-      setDragInfo(null);
+      handleDragEndTask();
       return;
     }
 
     const moved = { ...task, status: targetColumn.title };
+
     persist(
       columns.map((col) => {
+        if (col.id === sourceColumnId && col.id === targetColumnId) {
+          // Reordering within the same column
+          const tasksWithoutTask = col.tasks.filter((t) => t.taskId !== taskId);
+          const finalIndex = targetIndex ?? tasksWithoutTask.length;
+          const updatedTasks = [...tasksWithoutTask];
+          updatedTasks.splice(finalIndex, 0, moved);
+          return { ...col, tasks: updatedTasks };
+        }
+
         if (col.id === sourceColumnId) {
           return {
             ...col,
@@ -93,18 +109,23 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
             count: col.count - 1,
           };
         }
+
         if (col.id === targetColumnId) {
+          const updatedTasks = [...col.tasks];
+          const finalIndex = targetIndex ?? updatedTasks.length;
+          updatedTasks.splice(finalIndex, 0, moved);
           return {
             ...col,
-            tasks: [moved, ...col.tasks],
+            tasks: updatedTasks,
             count: col.count + 1,
           };
         }
+
         return col;
       }),
     );
 
-    setDragInfo(null);
+    handleDragEndTask();
   }
 
   return (
@@ -114,6 +135,8 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
           key={column.id}
           column={column}
           draggingTaskId={dragInfo?.taskId ?? null}
+          dropTargetPos={dropTargetPos}
+          setDropTargetPos={setDropTargetPos}
           onDragStartTask={handleDragStartTask}
           onDragEndTask={handleDragEndTask}
           onDropTask={handleDropTask}

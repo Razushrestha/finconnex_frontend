@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 
 interface DragInfo {
-  dealId: string;
+  dealIds: string[];
   sourceStageId: string;
 }
 
@@ -31,7 +31,7 @@ type DealRecord = DealStage["deals"][number];
 
 /** A "mark as lost" drop that's waiting on a reason before it's committed. */
 interface PendingLostDrop {
-  deal: DealRecord;
+  deals: DealRecord[];
   sourceStageId: string;
   targetStageId: string;
   targetStageTitle: string;
@@ -42,6 +42,9 @@ interface DealsKanbanBoardProps {
   filters?: DealFilters;
   visibleColumnIds?: string[];
   onAddDeal?: (stageId: string) => void;
+  selectedIds?: string[];
+  onToggleSelect?: (id: string) => void;
+  onQuickAction?: (kind: any, company: DealRecord) => void;
 }
 
 // Adjust this offset to match whatever chrome (nav bar, filter bar, tabs)
@@ -53,6 +56,9 @@ export function DealsKanbanBoard({
   filters,
   visibleColumnIds,
   onAddDeal,
+  selectedIds = [],
+  onToggleSelect,
+  onQuickAction,
 }: DealsKanbanBoardProps) {
   const router = useRouter();
   const boardRef = useRef<HTMLDivElement>(null);
@@ -64,6 +70,17 @@ export function DealsKanbanBoard({
   const [allStages, setAllStages] = useState<Record<DealPipeline, DealStage[]>>(
     {} as Record<DealPipeline, DealStage[]>,
   );
+
+  const [internalSelectedIds, setInternalSelectedIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
+
+  // Sync internal/external selection
+  const activeSelectedIds = useMemo(() => {
+    return selectedIds.length > 0 ? new Set(selectedIds) : internalSelectedIds;
+  }, [selectedIds, internalSelectedIds]);
+
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const [dropTargetPos, setDropTargetPos] = useState<DropTargetPosition | null>(
     null,
@@ -90,7 +107,6 @@ export function DealsKanbanBoard({
     return () => window.removeEventListener("resize", updateBounds);
   }, []);
 
-  // recompute right when a drag starts too, in case layout shifted (sidebar toggle, etc.)
   useEffect(() => {
     if (dragInfo && boardRef.current) {
       const rect = boardRef.current.getBoundingClientRect();
@@ -147,12 +163,93 @@ export function DealsKanbanBoard({
     window.setTimeout(() => setToast(null), 2400);
   }
 
+  function handleSelectDeal(
+    dealId: string,
+    stageDeals: DealRecord[],
+    e: React.MouseEvent | React.ChangeEvent<HTMLInputElement>,
+  ) {
+    if (onToggleSelect) {
+      // If external handler is provided, delegate to it
+      onToggleSelect(dealId);
+      return;
+    }
+
+    const isShift = "shiftKey" in e && (e as React.MouseEvent).shiftKey;
+    const isMeta =
+      ("metaKey" in e && (e as React.MouseEvent).metaKey) ||
+      ("ctrlKey" in e && (e as React.MouseEvent).ctrlKey);
+
+    setInternalSelectedIds((prev) => {
+      const next = new Set(prev);
+
+      if (isShift && lastSelectedId) {
+        const startIdx = stageDeals.findIndex((d) => d.id === lastSelectedId);
+        const endIdx = stageDeals.findIndex((d) => d.id === dealId);
+        if (startIdx !== -1 && endIdx !== -1) {
+          const [min, max] =
+            startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+          for (let i = min; i <= max; i++) {
+            next.add(stageDeals[i].id);
+          }
+        }
+      } else if (isMeta) {
+        if (next.has(dealId)) {
+          next.delete(dealId);
+        } else {
+          next.add(dealId);
+          setLastSelectedId(dealId);
+        }
+      } else {
+        if (next.size === 1 && next.has(dealId)) {
+          next.clear();
+          setLastSelectedId(null);
+        } else {
+          next.clear();
+          next.add(dealId);
+          setLastSelectedId(dealId);
+        }
+      }
+      return next;
+    });
+  }
+
+  function handleSelectAllStage(stage: DealStage) {
+    const stageDealIds = stage.deals.map((d) => d.id);
+    const allSelected = stageDealIds.every((id) => activeSelectedIds.has(id));
+
+    if (onToggleSelect) {
+      stageDealIds.forEach((id) => {
+        if (allSelected && activeSelectedIds.has(id)) {
+          onToggleSelect(id);
+        } else if (!allSelected && !activeSelectedIds.has(id)) {
+          onToggleSelect(id);
+        }
+      });
+      return;
+    }
+
+    setInternalSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) {
+        stageDealIds.forEach((id) => next.delete(id));
+      } else {
+        stageDealIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
+  }
+
   function handleDragStart(
     e: React.DragEvent<HTMLDivElement>,
     dealId: string,
     stageId: string,
   ) {
-    setDragInfo({ dealId, sourceStageId: stageId });
+    let activeIds = activeSelectedIds;
+    if (!activeIds.has(dealId)) {
+      activeIds = new Set([dealId]);
+      if (!onToggleSelect) setInternalSelectedIds(activeIds);
+    }
+    setDragInfo({ dealIds: Array.from(activeIds), sourceStageId: stageId });
     e.dataTransfer.effectAllowed = "move";
   }
 
@@ -164,72 +261,84 @@ export function DealsKanbanBoard({
 
   function visibleDealCount(stage: DealStage) {
     if (dragInfo && dragInfo.sourceStageId === stage.id) {
-      return stage.deals.length - 1;
+      const draggedSet = new Set(dragInfo.dealIds);
+      return stage.deals.filter((d) => !draggedSet.has(d.id)).length;
     }
     return stage.deals.length;
   }
 
-  /** Shared move: pulls the deal out of the source stage, drops it into the target. */
-  function moveDeal(
-    deal: DealRecord,
+  function moveDeals(
+    dealsToMove: DealRecord[],
     sourceStage: DealStage,
     targetStage: DealStage,
-    updatedDeal: DealRecord,
+    updatedDeals: DealRecord[],
     targetIndex?: number,
   ) {
+    const moveIdsSet = new Set(dealsToMove.map((d) => d.id));
+
     const nextStages = allStages[pipeline].map((s) => {
       if (s.id === sourceStage.id && s.id === targetStage.id) {
-        // Reordering within the same stage: remove then re-insert at the new index.
-        const filteredDeals = s.deals.filter((d) => d.id !== deal.id);
+        const filteredDeals = s.deals.filter((d) => !moveIdsSet.has(d.id));
         const insertAt =
-          targetIndex !== undefined ? targetIndex : filteredDeals.length;
+          targetIndex !== undefined
+            ? Math.min(targetIndex, filteredDeals.length)
+            : filteredDeals.length;
         const newDeals = [...filteredDeals];
-        newDeals.splice(insertAt, 0, updatedDeal);
+        newDeals.splice(insertAt, 0, ...updatedDeals);
         return { ...s, deals: newDeals };
       }
       if (s.id === sourceStage.id) {
-        return { ...s, deals: s.deals.filter((d) => d.id !== deal.id) };
+        return { ...s, deals: s.deals.filter((d) => !moveIdsSet.has(d.id)) };
       }
       if (s.id === targetStage.id) {
-        const filteredDeals = s.deals.filter((d) => d.id !== deal.id);
+        const filteredDeals = s.deals.filter((d) => !moveIdsSet.has(d.id));
         const insertAt =
-          targetIndex !== undefined ? targetIndex : filteredDeals.length;
+          targetIndex !== undefined
+            ? Math.min(targetIndex, filteredDeals.length)
+            : filteredDeals.length;
         const newDeals = [...filteredDeals];
-        newDeals.splice(insertAt, 0, updatedDeal);
+        newDeals.splice(insertAt, 0, ...updatedDeals);
         return { ...s, deals: newDeals };
       }
       return s;
     });
+
     persist({ ...allStages, [pipeline]: nextStages });
 
-    logStatusChange(
-      "sales.deals",
-      deal.owner,
-      deal.id,
-      deal.name,
-      sourceStage.title,
-      targetStage.title,
-    );
-    notifyStatusChanged({
-      recipient: deal.owner,
-      entityLabel: `Deal ${deal.name}`,
-      from: sourceStage.title,
-      to: targetStage.title,
-      relatedTo: deal.name,
-      relatedHref: "/sales/deals",
-    });
-    if (
-      targetStage.title === "Closed Won" ||
-      targetStage.title === "Closed Lost"
-    ) {
-      notifyDealClosed({
-        owner: deal.owner,
-        manager: getOrgManager(),
-        dealName: deal.name,
-        stage: targetStage.title,
+    dealsToMove.forEach((deal) => {
+      logStatusChange(
+        "sales.deals",
+        deal.owner,
+        deal.id,
+        deal.name,
+        sourceStage.title,
+        targetStage.title,
+      );
+      notifyStatusChanged({
+        recipient: deal.owner,
+        entityLabel: `Deal ${deal.name}`,
+        from: sourceStage.title,
+        to: targetStage.title,
         relatedTo: deal.name,
         relatedHref: "/sales/deals",
       });
+      if (
+        targetStage.title === "Closed Won" ||
+        targetStage.title === "Closed Lost"
+      ) {
+        notifyDealClosed({
+          owner: deal.owner,
+          manager: getOrgManager(),
+          dealName: deal.name,
+          stage: targetStage.title,
+          relatedTo: deal.name,
+          relatedHref: "/sales/deals",
+        });
+      }
+    });
+
+    if (!onToggleSelect) {
+      setInternalSelectedIds(new Set());
     }
   }
 
@@ -237,14 +346,19 @@ export function DealsKanbanBoard({
     setOverStageId(null);
     setDropTargetPos(null);
     if (!dragInfo) return;
-    const { dealId, sourceStageId } = dragInfo;
+    const { dealIds, sourceStageId } = dragInfo;
 
     const currentStages = allStages[pipeline];
     const sourceStage = currentStages.find((s) => s.id === sourceStageId);
     const targetStage = currentStages.find((s) => s.id === targetStageId);
-    const deal = sourceStage?.deals.find((d) => d.id === dealId);
 
-    if (!deal || !sourceStage || !targetStage) {
+    if (!sourceStage || !targetStage) {
+      setDragInfo(null);
+      return;
+    }
+
+    const dealsToMove = sourceStage.deals.filter((d) => dealIds.includes(d.id));
+    if (dealsToMove.length === 0) {
       setDragInfo(null);
       return;
     }
@@ -256,10 +370,9 @@ export function DealsKanbanBoard({
       return;
     }
 
-    // If dropped directly into the "Closed Lost" stage via normal column drop, intercept to prompt for lost reason
     if (/lost/i.test(targetStage.title)) {
       setPendingLostDrop({
-        deal,
+        deals: dealsToMove,
         sourceStageId: sourceStage.id,
         targetStageId: targetStage.id,
         targetStageTitle: targetStage.title,
@@ -269,20 +382,22 @@ export function DealsKanbanBoard({
       return;
     }
 
-    const updatedDeal = {
+    const updatedDeals = dealsToMove.map((deal) => ({
       ...deal,
       accentColorClass: targetStage.dotColorClass,
-    };
+    }));
 
-    moveDeal(deal, sourceStage, targetStage, updatedDeal, targetIndex);
+    moveDeals(dealsToMove, sourceStage, targetStage, updatedDeals, targetIndex);
     setDragInfo(null);
+    flash(
+      `Moved ${dealsToMove.length} deal${dealsToMove.length > 1 ? "s" : ""} to ${targetStage.title}`,
+    );
   }
 
-  /** Drop onto the floating Win / Lost zone rather than a stage. */
   function handleOutcomeDrop(outcome: "won" | "lost") {
     setOverOutcome(null);
     if (!dragInfo) return;
-    const { dealId, sourceStageId } = dragInfo;
+    const { dealIds, sourceStageId } = dragInfo;
 
     const targetStage = outcome === "won" ? wonStage : lostStage;
     if (!targetStage) {
@@ -295,15 +410,20 @@ export function DealsKanbanBoard({
 
     const currentStages = allStages[pipeline];
     const sourceStage = currentStages.find((s) => s.id === sourceStageId);
-    const deal = sourceStage?.deals.find((d) => d.id === dealId);
-    if (!deal || !sourceStage || sourceStage.id === targetStage.id) {
+    if (!sourceStage || sourceStage.id === targetStage.id) {
+      setDragInfo(null);
+      return;
+    }
+
+    const dealsToMove = sourceStage.deals.filter((d) => dealIds.includes(d.id));
+    if (dealsToMove.length === 0) {
       setDragInfo(null);
       return;
     }
 
     if (outcome === "lost") {
       setPendingLostDrop({
-        deal,
+        deals: dealsToMove,
         sourceStageId: sourceStage.id,
         targetStageId: targetStage.id,
         targetStageTitle: targetStage.title,
@@ -313,18 +433,20 @@ export function DealsKanbanBoard({
       return;
     }
 
-    const updatedDeal = {
+    const updatedDeals = dealsToMove.map((deal) => ({
       ...deal,
       accentColorClass: targetStage.dotColorClass,
-    };
-    moveDeal(deal, sourceStage, targetStage, updatedDeal);
+    }));
+    moveDeals(dealsToMove, sourceStage, targetStage, updatedDeals);
     setDragInfo(null);
-    flash(`${deal.name} marked as won`);
+    flash(
+      `${dealsToMove.length} deal${dealsToMove.length > 1 ? "s" : ""} marked as won`,
+    );
   }
 
   function confirmLostDrop() {
     if (!pendingLostDrop) return;
-    const { deal, sourceStageId, targetStageId } = pendingLostDrop;
+    const { deals, sourceStageId, targetStageId } = pendingLostDrop;
 
     const currentStages = allStages[pipeline];
     const sourceStage = currentStages.find((s) => s.id === sourceStageId);
@@ -334,14 +456,14 @@ export function DealsKanbanBoard({
       return;
     }
 
-    const updatedDeal = {
+    const updatedDeals = deals.map((deal) => ({
       ...deal,
       accentColorClass: targetStage.dotColorClass,
       lostReason: lostReason.trim(),
-    };
+    }));
 
-    moveDeal(deal, sourceStage, targetStage, updatedDeal);
-    flash(`${deal.name} marked as lost`);
+    moveDeals(deals, sourceStage, targetStage, updatedDeals);
+    flash(`${deals.length} deal${deals.length > 1 ? "s" : ""} marked as lost`);
     setPendingLostDrop(null);
     setLostReason("");
   }
@@ -354,12 +476,19 @@ export function DealsKanbanBoard({
   return (
     <div
       ref={boardRef}
-      className="relative w-full overflow-x-auto bg-slate-50/50 no-scrollbar"
+      className="relative w-full overflow-x-auto bg-slate-50/50"
     >
       <div className="flex items-start gap-3 p-1">
         {visibleStages.map((stage) => {
           const isOver = overStageId === stage.id;
           const isCollapsed = collapsedStages.has(stage.id);
+          const stageDealIds = stage.deals.map((d) => d.id);
+          const allStageSelected =
+            stageDealIds.length > 0 &&
+            stageDealIds.every((id) => activeSelectedIds.has(id));
+          const someStageSelected = stageDealIds.some((id) =>
+            activeSelectedIds.has(id),
+          );
 
           return (
             <div
@@ -458,6 +587,9 @@ export function DealsKanbanBoard({
                       {(() => {
                         let visibleIndex = 0;
                         const rendered: React.ReactNode[] = [];
+                        const draggedSet = dragInfo
+                          ? new Set(dragInfo.dealIds)
+                          : new Set();
 
                         const showPlaceholderAt = (idx: number) =>
                           dragInfo &&
@@ -465,7 +597,7 @@ export function DealsKanbanBoard({
                           dropTargetPos.targetIndex === idx;
 
                         stage.deals.forEach((deal) => {
-                          const isDraggedDeal = dragInfo?.dealId === deal.id;
+                          const isDraggedDeal = draggedSet.has(deal.id);
                           const myIndex = visibleIndex;
 
                           if (!isDraggedDeal && showPlaceholderAt(myIndex)) {
@@ -476,6 +608,8 @@ export function DealsKanbanBoard({
                               />,
                             );
                           }
+
+                          const isSelected = activeSelectedIds.has(deal.id);
 
                           rendered.push(
                             <div
@@ -496,14 +630,22 @@ export function DealsKanbanBoard({
                                   targetIndex: insertIndex,
                                 });
                               }}
+                              className="relative group/card"
                             >
                               <DealRecordCard
                                 deal={deal}
                                 isDragging={isDraggedDeal}
+                                isSelected={activeSelectedIds.has(deal.id)}
+                                onSelect={(e) =>
+                                  handleSelectDeal(deal.id, stage.deals, e)
+                                }
                                 onDragStart={(e) =>
                                   handleDragStart(e, deal.id, stage.id)
                                 }
                                 onDragEnd={handleDragEnd}
+                                onQuickAction={(kind) =>
+                                  onQuickAction?.(kind, deal)
+                                }
                               />
                             </div>,
                           );
@@ -533,7 +675,6 @@ export function DealsKanbanBoard({
                       })()}
                     </div>
 
-                    {/* Collapse control */}
                     <div className="mt-2 flex shrink-0 items-center justify-between gap-2 px-2 pb-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                       <button
                         type="button"
@@ -567,7 +708,23 @@ export function DealsKanbanBoard({
         )}
       </div>
 
-      {/* Win / Lost drop zones — shown only while a deal is being dragged */}
+      {activeSelectedIds.size > 0 && !dragInfo && !selectedIds.length && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl bg-slate-900/90 px-4 py-3 text-white shadow-2xl backdrop-blur-md">
+          <span className="text-xs font-medium">
+            {activeSelectedIds.size} deal{activeSelectedIds.size > 1 ? "s" : ""}{" "}
+            selected
+          </span>
+          <div className="h-4 w-px bg-slate-700" />
+          <button
+            type="button"
+            onClick={() => setInternalSelectedIds(new Set())}
+            className="text-xs text-slate-400 hover:text-white transition-colors"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
+
       {dragInfo && boardBounds && (
         <div
           className="pointer-events-none fixed bottom-6 z-50 flex justify-center px-6"
@@ -594,7 +751,7 @@ export function DealsKanbanBoard({
               )}
             >
               <Trophy className="h-4 w-4" />
-              Won
+              Won ({dragInfo.dealIds.length})
             </div>
 
             <div
@@ -617,7 +774,7 @@ export function DealsKanbanBoard({
               )}
             >
               <XCircle className="h-4 w-4" />
-              Lost
+              Lost ({dragInfo.dealIds.length})
             </div>
           </div>
         </div>
@@ -625,7 +782,12 @@ export function DealsKanbanBoard({
 
       {pendingLostDrop && (
         <LostReasonModal
-          dealName={pendingLostDrop.deal.name}
+          dealCount={pendingLostDrop.deals.length}
+          dealName={
+            pendingLostDrop.deals.length === 1
+              ? pendingLostDrop.deals[0].name
+              : undefined
+          }
           reason={lostReason}
           onReasonChange={setLostReason}
           onCancel={cancelLostDrop}
@@ -683,13 +845,15 @@ function CollapsedStage({
 }
 
 function LostReasonModal({
+  dealCount,
   dealName,
   reason,
   onReasonChange,
   onCancel,
   onConfirm,
 }: {
-  dealName: string;
+  dealCount: number;
+  dealName?: string;
   reason: string;
   onReasonChange: (value: string) => void;
   onCancel: () => void;
@@ -706,10 +870,10 @@ function LostReasonModal({
       >
         <div className="border-b border-slate-100 px-5 py-3">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-rose-600">
-            Mark as lost
+            Mark {dealCount > 1 ? `${dealCount} deals` : "as lost"} as lost
           </p>
           <p className="mt-0.5 text-[13px] font-semibold text-slate-900">
-            {dealName}
+            {dealName ? dealName : `${dealCount} selected deals`}
           </p>
         </div>
 
@@ -722,7 +886,7 @@ function LostReasonModal({
             onChange={(e) => onReasonChange(e.target.value)}
             rows={3}
             autoFocus
-            placeholder="Why was this deal lost?"
+            placeholder="Why were these deals lost?"
             className="w-full resize-none rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] text-slate-900 outline-none placeholder:text-slate-300 focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
           />
         </div>

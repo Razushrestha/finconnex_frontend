@@ -13,7 +13,7 @@ import {
   EMPTY_COMPANY_FILTERS,
   type CompanyFilters,
 } from "@/components/sales/companies/FilterCompaniesPanel";
-import { COMPANY_GROUPS } from "@/lib/companies/types";
+import { COMPANY_GROUPS, type CompanyGroup } from "@/lib/companies/types";
 import { viewEnter } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
@@ -24,8 +24,15 @@ import {
   Sparkles,
   Tag,
   Trash2,
+  ChevronDown,
+  Pencil,
 } from "lucide-react";
 import { SORT_OPTIONS } from "../leads/page";
+import type { CompanyQuickActionKind } from "@/components/sales/companies/CompanyCard";
+import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
+import { FocusHighlight } from "@/components/shared/FocusHighlight";
+
+type CompanyRecord = CompanyGroup["companies"][number];
 
 const DEFAULT_COMPANY_COLUMNS = COMPANY_GROUPS.map((group) => ({
   id: group.id,
@@ -43,6 +50,8 @@ export default function CompaniesPage() {
   const [activeSortDirection, setActiveSortDirection] =
     useState<SortDirection>("asc");
 
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
   const [isMassTransferOpen, setMassTransferOpen] = useState(false);
   const [isMassDeleteOpen, setMassDeleteOpen] = useState(false);
   const [isMassUpdateOpen, setMassUpdateOpen] = useState(false);
@@ -55,6 +64,19 @@ export default function CompaniesPage() {
 
   function openPrintView() {
     console.log("print view clicked");
+  }
+
+  function handleQuickAction(
+    kind: CompanyQuickActionKind,
+    company: CompanyRecord,
+  ) {
+    console.log(`Quick action "${kind}" triggered for company:`, company.name);
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    );
   }
 
   function toggleFilterField(section: "status" | "source", field: string) {
@@ -136,8 +158,8 @@ export default function CompaniesPage() {
   ];
 
   return (
-    // <div className="min-h-screen bg-slate-50 p-2 pr-4">
     <div className="h-screen bg-slate-50 p-2 pr-3 dark:bg-zinc-950">
+      <FocusHighlight />
       <EntityHeader
         entityLabel="Company"
         entityLabelPlural="Companies"
@@ -171,6 +193,32 @@ export default function CompaniesPage() {
         footerOptions={footerOptions}
       />
 
+      {selectedIds.length > 0 ? (
+        <EntitySelectionToolbar
+          selectedCount={selectedIds.length}
+          onClear={() => setSelectedIds([])}
+          onSendMail={() => console.log("send mail clicked")}
+          onAddTag={() => console.log("add tag clicked")}
+          onRemoveTag={() => console.log("remove tag clicked")}
+          onRunMacro={() => console.log("run macro clicked")}
+          onCreateTask={() => console.log("create task clicked")}
+          onSetReminder={() => console.log("set reminder clicked")}
+          onMassUpdate={() => console.log("mass update clicked")}
+          onChangeOwner={() => console.log("change owner clicked")}
+          onCadences={() => console.log("cadences clicked")}
+          onAddToCampaigns={() => console.log("add to campaigns clicked")}
+          onPrintMailingLabels={() =>
+            console.log("print mailing labels clicked")
+          }
+          onMailMerge={() => console.log("mail merge clicked")}
+          onMassConvert={() => console.log("mass convert clicked")}
+          onDelete={() => console.log("delete clicked")}
+          onExportSelectedRecords={() =>
+            console.log("export selected records clicked")
+          }
+        />
+      ) : null}
+
       <div className="mt-3 flex items-start gap-4">
         {isFilterOpen && (
           <div className="sticky top-6">
@@ -187,6 +235,7 @@ export default function CompaniesPage() {
             <CompaniesKanbanBoard
               filters={filters}
               visibleColumnIds={visibleColumnIds}
+              onQuickAction={handleQuickAction}
             />
           ) : (
             <CompaniesListView filters={filters} />

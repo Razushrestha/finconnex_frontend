@@ -10,9 +10,17 @@ interface DragInfo {
   sourceColumnId: string;
 }
 
+export interface DropTargetPos {
+  columnId: string;
+  targetIndex: number;
+}
+
 export function CallsKanbanBoard() {
   const [columns, setColumns] = useState<CallColumn[]>([]);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
+  const [dropTargetPos, setDropTargetPos] = useState<DropTargetPos | null>(
+    null,
+  );
 
   useEffect(() => {
     setColumns(listCallColumns());
@@ -29,16 +37,12 @@ export function CallsKanbanBoard() {
 
   function handleDragEndCall() {
     setDragInfo(null);
+    setDropTargetPos(null);
   }
 
-  function handleDropCall(targetColumnId: string) {
+  function handleDropCall(targetColumnId: string, targetIndex?: number) {
     if (!dragInfo) return;
     const { callId, sourceColumnId } = dragInfo;
-
-    if (sourceColumnId === targetColumnId) {
-      setDragInfo(null);
-      return;
-    }
 
     setColumns((prev) => {
       const sourceColumn = prev.find((c) => c.id === sourceColumnId);
@@ -49,6 +53,14 @@ export function CallsKanbanBoard() {
       const moved = { ...call, status: targetColumn.title };
 
       const next = prev.map((col) => {
+        if (col.id === sourceColumnId && col.id === targetColumnId) {
+          const callsWithoutItem = col.calls.filter((c) => c.id !== callId);
+          const finalIndex = targetIndex ?? callsWithoutItem.length;
+          const updatedCalls = [...callsWithoutItem];
+          updatedCalls.splice(finalIndex, 0, moved);
+          return { ...col, calls: updatedCalls };
+        }
+
         if (col.id === sourceColumnId) {
           return {
             ...col,
@@ -56,29 +68,37 @@ export function CallsKanbanBoard() {
             count: col.count - 1,
           };
         }
+
         if (col.id === targetColumnId) {
+          const updatedCalls = [...col.calls];
+          const finalIndex = targetIndex ?? updatedCalls.length;
+          updatedCalls.splice(finalIndex, 0, moved);
           return {
             ...col,
-            calls: [moved, ...col.calls],
+            calls: updatedCalls,
             count: col.count + 1,
           };
         }
+
         return col;
       });
+
       saveCallColumns(next);
       return next;
     });
 
-    setDragInfo(null);
+    handleDragEndCall();
   }
 
   return (
-    <div className="flex h-full min-h-0 gap-4 overflow-x-auto p-1">
+    <div className="flex h-full min-h-0 items-stretch gap-4 overflow-x-auto p-1">
       {columns.map((column) => (
         <CallsKanbanColumn
           key={column.id}
           column={column}
           draggingCallId={dragInfo?.callId ?? null}
+          dropTargetPos={dropTargetPos}
+          setDropTargetPos={setDropTargetPos}
           onDragStartCall={handleDragStartCall}
           onDragEndCall={handleDragEndCall}
           onDropCall={handleDropCall}

@@ -24,6 +24,10 @@ interface DealRecordCardProps {
   onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
   onQuickAction?: (kind: string) => void;
+  isSelected?: boolean;
+  onSelect?: (
+    e: React.MouseEvent | React.ChangeEvent<HTMLInputElement>,
+  ) => void;
 }
 
 const QUICK_ICONS = {
@@ -52,6 +56,8 @@ export function DealRecordCard({
   onDragStart,
   onDragEnd,
   onQuickAction,
+  isSelected = false,
+  onSelect,
 }: DealRecordCardProps) {
   const weighted =
     deal.probability > 0 ? `Weighted ${deal.probability}%` : "Lost";
@@ -73,20 +79,45 @@ export function DealRecordCard({
       data-focus-id={deal.id}
       data-deal-id={deal.id}
       className={cn(
-        "w-full cursor-grab rounded-md border border-slate-200/80 bg-white p-3.5 shadow-2xs active:cursor-grabbing",
+        "group/card relative w-full cursor-grab rounded-md border bg-white p-3.5 shadow-2xs active:cursor-grabbing transition-all",
         cardMotion,
         isDragging && cardDragging,
+        isSelected
+          ? "border-indigo-500 ring-1 ring-indigo-500 bg-indigo-50/20"
+          : "border-slate-200/80 hover:border-slate-300",
       )}
     >
-      <div className="mb-3 flex items-center gap-2.5">
-        <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${deal.avatarBgClass}`}
-        >
-          {deal.initials}
+      <div className="mb-3 flex items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${deal.avatarBgClass}`}
+          >
+            {deal.initials}
+          </div>
+          <h3 className="truncate text-[13px] font-semibold text-slate-800">
+            {deal.name}
+          </h3>
         </div>
-        <h3 className="truncate text-[13px] font-semibold text-slate-800">
-          {deal.name}
-        </h3>
+
+        {onSelect && (
+          <div
+            className={cn(
+              "shrink-0 transition-opacity",
+              isSelected
+                ? "opacity-100"
+                : "opacity-0 group-hover/card:opacity-100",
+            )}
+          >
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={onSelect}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Select deal ${deal.name}`}
+              className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+            />
+          </div>
+        )}
       </div>
 
       <div className="space-y-1.5 text-[11px] text-slate-500">

@@ -14,16 +14,6 @@ import {
   Paperclip,
   PhoneCall,
   Mail as MailIcon,
-  Send,
-  Plus,
-  Minus,
-  Bell,
-  FileText,
-  UserCog,
-  MoreHorizontal,
-  Speaker,
-  Trash2,
-  Settings,
 } from "lucide-react";
 import type { CompanyCardData } from "@/lib/companies/types";
 import { cn } from "@/lib/utils";
@@ -54,6 +44,10 @@ interface CompanyCardProps {
   onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
   onQuickAction?: (kind: CompanyQuickActionKind) => void;
+  /** Whether this card's checkbox is checked — driven by the board/page. */
+  isSelected: boolean;
+  /** Called when the checkbox is toggled — parent owns the selection list. */
+  onToggleSelect: (id: string) => void;
   onSaveCardSettings?: (settings: CompanyCardCustomizationSettings) => void;
 }
 
@@ -120,9 +114,10 @@ export function CompanyCard({
   onDragStart,
   onDragEnd,
   onQuickAction,
+  isSelected,
+  onToggleSelect,
   onSaveCardSettings,
 }: CompanyCardProps) {
-  const [selected, setSelected] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customization, setCustomization] =
     useState<CompanyCardCustomizationSettings>(DEFAULT_COMPANY_CARD_SETTINGS);
@@ -146,15 +141,6 @@ export function CompanyCard({
           badgeClassName: "bg-slate-900 text-white",
         }));
 
-  const isCompact = customization.layout === "compact";
-  const showFields =
-    (customization.showWebsite && company.website) ||
-    (customization.showIndustry && company.industry) ||
-    (customization.showPhone && company.phone) ||
-    (customization.showOwner && company.owner) ||
-    (customization.showAnnualRevenue && company.annualRevenue) ||
-    (customization.showCity && company.city);
-
   return (
     <>
       <div
@@ -169,138 +155,95 @@ export function CompanyCard({
           isDragging && cardDragging,
         )}
       >
-        <div
-          className={cn(
-            "flex items-center justify-between gap-2",
-            isCompact ? "mb-2" : "mb-3",
-          )}
-        >
+        <div className="mb-3 flex items-center justify-between gap-2">
           <Link
             href={`/sales/companies/detail/${company.id}`}
             className="flex min-w-0 items-center gap-2.5"
           >
             <div
-              className={cn(
-                "flex shrink-0 items-center justify-center rounded-full font-semibold",
-                isCompact ? "h-7 w-7 text-[10px]" : "h-9 w-9 text-[11px]",
-                company.avatarBgClass,
-              )}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${company.avatarBgClass}`}
             >
               {company.initials}
             </div>
-            <h3
-              className={cn(
-                "truncate font-semibold text-slate-800",
-                isCompact ? "text-[12px]" : "text-[13px]",
-              )}
-            >
+            <h3 className="truncate text-[13px] font-semibold text-slate-800">
               {company.name}
             </h3>
           </Link>
 
-          <div className="relative flex shrink-0 items-center">
-            <input
-              type="checkbox"
-              checked={selected}
-              onChange={(e) => setSelected(e.target.checked)}
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-              aria-label={`Select ${company.name}`}
-              className={cn(
-                "h-3.5 w-3.5 rounded border-slate-300 transition-opacity",
-                selected ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-              )}
-            />
-
-            {selected && (
-              <CompanyCardActionsMenu
-                onClose={() => setSelected(false)}
-                onCustomizeCard={() => {
-                  setSelected(false);
-                  setCustomizeOpen(true);
-                }}
-              />
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(company.id)}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Select ${company.name}`}
+            className={cn(
+              "h-3.5 w-3.5 shrink-0 rounded border-slate-300 transition-opacity",
+              isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100",
             )}
-          </div>
+          />
         </div>
 
-        {showFields && (
-          <div
-            className={cn(
-              "space-y-1.5 text-slate-500",
-              isCompact ? "text-[10px]" : "text-[11px]",
-            )}
-          >
-            {customization.showWebsite && company.website && (
-              <div className="flex items-center gap-2">
-                <Globe className="h-3 w-3 shrink-0 text-slate-400" />
-                <span className="truncate">{company.website}</span>
-              </div>
-            )}
-            {customization.showIndustry && company.industry && (
-              <div className="flex items-center gap-2">
-                <Building2 className="h-3 w-3 shrink-0 text-slate-400" />
-                <span className="truncate font-medium text-slate-700">
-                  {company.industry}
-                </span>
-              </div>
-            )}
-            {customization.showPhone && company.phone && (
-              <div className="flex items-center gap-2">
-                <Phone className="h-3 w-3 shrink-0 text-slate-400" />
-                <span>{company.phone}</span>
-              </div>
-            )}
-            {customization.showOwner && company.owner && (
-              <div className="flex items-center gap-2">
-                <User className="h-3 w-3 shrink-0 text-slate-400" />
-                <span>{company.owner}</span>
-              </div>
-            )}
-            {customization.showAnnualRevenue && company.annualRevenue && (
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-3 w-3 shrink-0 text-slate-400" />
-                <span>{company.annualRevenue}</span>
-              </div>
-            )}
-            {customization.showCity && company.city && (
-              <div className="flex items-center gap-2">
-                <Building2 className="h-3 w-3 shrink-0 text-slate-400" />
-                <span>{company.city}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {(customization.showIndustry || customization.showBottomIcons) && (
-          <>
-            <div
-              className={cn(
-                "border-t border-slate-100",
-                isCompact ? "my-2" : "my-3",
-              )}
-            />
-
-            <div className="flex items-center justify-between gap-1">
-              {customization.showIndustry && company.industry ? (
-                <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700">
-                  {company.industry}
-                </span>
-              ) : (
-                <span />
-              )}
-              {customization.showBottomIcons && (
-                <QuickActionsBar
-                  actions={quickActionItems}
-                  onAction={onQuickAction}
-                  ariaLabel={`Quick actions for ${company.name}`}
-                  hoverClassName="text-slate-400 hover:bg-slate-100 hover:text-violet-600"
-                  size="sm"
-                />
-              )}
+        <div className="space-y-1.5 text-[11px] text-slate-500">
+          {company.website && (
+            <div className="flex items-center gap-2">
+              <Globe className="h-3 w-3 shrink-0 text-slate-400" />
+              <span className="truncate">{company.website}</span>
             </div>
-          </>
-        )}
+          )}
+          {company.industry && (
+            <div className="flex items-center gap-2">
+              <Building2 className="h-3 w-3 shrink-0 text-slate-400" />
+              <span className="truncate font-medium text-slate-700">
+                {company.industry}
+              </span>
+            </div>
+          )}
+          {company.phone && (
+            <div className="flex items-center gap-2">
+              <Phone className="h-3 w-3 shrink-0 text-slate-400" />
+              <span>{company.phone}</span>
+            </div>
+          )}
+          {company.owner && (
+            <div className="flex items-center gap-2">
+              <User className="h-3 w-3 shrink-0 text-slate-400" />
+              <span>{company.owner}</span>
+            </div>
+          )}
+          {company.annualRevenue && (
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-3 w-3 shrink-0 text-slate-400" />
+              <span>{company.annualRevenue}</span>
+            </div>
+          )}
+          {company.city && (
+            <div className="flex items-center gap-2">
+              <Building2 className="h-3 w-3 shrink-0 text-slate-400" />
+              <span>{company.city}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="my-3 border-t border-slate-100" />
+
+        <div className="flex items-center justify-between gap-1">
+          {company.industry ? (
+            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700">
+              {company.industry}
+            </span>
+          ) : (
+            <span />
+          )}
+
+          <QuickActionsBar
+            actions={quickActionItems}
+            onAction={onQuickAction}
+            ariaLabel={`Quick actions for ${company.name}`}
+            hoverClassName="text-slate-400 hover:bg-slate-100 hover:text-violet-600"
+            size="sm"
+          />
+        </div>
       </div>
 
       <CustomizeCompanyCardDrawer
@@ -314,90 +257,5 @@ export function CompanyCard({
         }}
       />
     </>
-  );
-}
-
-function CompanyCardActionsMenu({
-  onClose,
-  onCustomizeCard,
-}: {
-  onClose: () => void;
-  onCustomizeCard: () => void;
-}) {
-  return (
-    <>
-      <div
-        className="fixed inset-0 z-20"
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
-      />
-      <div
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-        className="absolute right-0 top-full z-30 mt-1 w-48 overflow-hidden rounded-md border border-slate-200 bg-white py-1.5 text-left shadow-lg"
-      >
-        <MenuItem icon={Send} label="Send mail" />
-
-        <MenuDivider />
-        <MenuSectionLabel>Tags</MenuSectionLabel>
-        <MenuItem icon={Plus} label="Add tag" />
-        <MenuItem icon={Minus} label="Remove tag" />
-
-        <MenuDivider />
-        <div className="flex items-center justify-between px-3 pb-0.5 pt-1">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-            More
-          </span>
-          <MoreHorizontal className="h-3 w-3 text-slate-300" />
-        </div>
-        <MenuItem icon={CheckSquare} label="Create task" />
-        <MenuItem icon={Bell} label="Set reminder" />
-        <MenuItem icon={FileText} label="Mass update" />
-        <MenuItem icon={UserCog} label="Change owner" />
-        <MenuItem icon={Speaker} label="Add to campaign" />
-        <MenuItem icon={Trash2} label="Delete" />
-        <MenuItem
-          icon={Settings}
-          label="Customize Card"
-          onClick={onCustomizeCard}
-        />
-      </div>
-    </>
-  );
-}
-
-function MenuSectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="px-3 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-      {children}
-    </p>
-  );
-}
-
-function MenuDivider() {
-  return <div className="my-1 border-t border-slate-100" />;
-}
-
-function MenuItem({
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
-    >
-      <Icon className="h-3.5 w-3.5 text-slate-400" />
-      {label}
-    </button>
   );
 }

@@ -9,6 +9,8 @@ import {
   Tag,
   ShieldCheck,
   Download,
+  Pencil,
+  ChevronDown,
 } from "lucide-react";
 import {
   EntityHeader,
@@ -17,6 +19,7 @@ import {
   type ActionOption,
   type SortDirection,
 } from "@/components/sales/EntityHeader";
+import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import { DealsKanbanBoard } from "@/components/sales/deals/DealsKanbanBoard";
 import { DealsListView } from "@/components/sales/deals/DealsListView";
 import {
@@ -54,6 +57,9 @@ export default function DealsPage() {
   const [activeSort, setActiveSort] = useState("Sort");
   const [activeSortDirection, setActiveSortDirection] =
     useState<SortDirection>("asc");
+
+  // Selection state for deals across columns/list items
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const [isImportDealsOpen, setIsImportDealsOpen] = useState(false);
   const [isImportNotesOpen, setIsImportNotesOpen] = useState(false);
@@ -94,11 +100,36 @@ export default function DealsPage() {
       .map((stage) => stage.title);
   }, [currentPipelineStages]);
 
-  const totalCount = useMemo(() => {
-    return currentPipelineStages
-      .filter((stage) => stage.visible ?? true)
-      .reduce((acc, stage) => acc + (stage?.deals?.length || 0), 0);
-  }, [currentPipelineStages]);
+  const allVisibleDealIds = useMemo(() => {
+    const ids: string[] = [];
+    currentPipelineStages
+      .filter(
+        (stage) =>
+          (stage.visible ?? true) && visibleColumnIds.includes(stage.id),
+      )
+      .forEach((stage) => {
+        stage.deals?.forEach((deal) => {
+          ids.push(deal.id);
+        });
+      });
+    return ids;
+  }, [currentPipelineStages, visibleColumnIds]);
+
+  const totalCount = allVisibleDealIds.length;
+
+  function handleToggleSelect(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  }
+
+  function handleSelectAll() {
+    if (selectedIds.length === allVisibleDealIds.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds([...allVisibleDealIds]);
+    }
+  }
 
   const importOptions: ImportOption[] = [
     {
@@ -172,30 +203,6 @@ export default function DealsPage() {
     });
   }
 
-  function handleColumnToggle(id: string) {
-    setAllStages((prev) => {
-      const pipelineStages = prev[activePipeline] || [];
-      const updated = pipelineStages.map((stage) =>
-        stage.id === id
-          ? { ...stage, visible: !(stage.visible ?? true) }
-          : stage,
-      );
-      return { ...prev, [activePipeline]: updated };
-    });
-  }
-
-  function reorderColumn(draggedId: string, targetId: string) {
-    setAllStages((prev) => {
-      const pipelineStages = [...(prev[activePipeline] || [])];
-      const fromIndex = pipelineStages.findIndex((s) => s.id === draggedId);
-      const toIndex = pipelineStages.findIndex((s) => s.id === targetId);
-      if (fromIndex === -1 || toIndex === -1) return prev;
-      const [moved] = pipelineStages.splice(fromIndex, 1);
-      pipelineStages.splice(toIndex, 0, moved);
-      return { ...prev, [activePipeline]: pipelineStages };
-    });
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 p-2 pr-4 dark:bg-zinc-950">
       <FocusHighlight />
@@ -212,6 +219,7 @@ export default function DealsPage() {
         onPipelineChange={(pipeline) => {
           setActivePipeline(pipeline as DealPipeline);
           setFilters(EMPTY_DEAL_FILTERS);
+          setSelectedIds([]);
         }}
         sortOptions={SORT_OPTIONS}
         activeSort={activeSort}
@@ -224,6 +232,51 @@ export default function DealsPage() {
         actionOptions={actionOptions}
         footerOptions={footerOptions}
       />
+
+      {selectedIds.length > 0 ? (
+        <EntitySelectionToolbar
+          selectedCount={selectedIds.length}
+          onClear={() => setSelectedIds([])}
+          onSendMail={() => console.log("send mail clicked")}
+          onAddTag={() => console.log("add tag clicked")}
+          onRemoveTag={() => console.log("remove tag clicked")}
+          onRunMacro={() => console.log("run macro clicked")}
+          onCreateTask={() => console.log("create task clicked")}
+          onSetReminder={() => console.log("set reminder clicked")}
+          onMassUpdate={() => console.log("mass update clicked")}
+          onChangeOwner={() => console.log("change owner clicked")}
+          onCadences={() => console.log("cadences clicked")}
+          onAddToCampaigns={() => console.log("add to campaigns clicked")}
+          onPrintMailingLabels={() =>
+            console.log("print mailing labels clicked")
+          }
+          onMailMerge={() => console.log("mail merge clicked")}
+          onMassConvert={() => console.log("mass convert clicked")}
+          onDelete={() => console.log("delete clicked")}
+          onExportSelectedRecords={() =>
+            console.log("export selected records clicked")
+          }
+        />
+      ) : (
+        <div className="mt-3 flex w-fit items-center gap-2">
+          <button
+            type="button"
+            onClick={() => console.log("pipeline selector clicked")}
+            className="flex items-center gap-1.5 rounded-sm bg-card/70 hover:bg-card px-3 py-1 text-sm font-medium text-foreground/70"
+          >
+            <span>Deal Pipeline</span>
+            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => console.log("edit pipeline clicked")}
+            className="rounded-full border border-slate-200 bg-white p-1.5 text-slate-400 shadow-sm hover:text-slate-600 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:text-zinc-300"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       <div className="mt-3 flex items-start gap-4">
         {isFilterOpen && (
@@ -246,6 +299,8 @@ export default function DealsPage() {
               pipeline={activePipeline}
               filters={filters}
               visibleColumnIds={visibleColumnIds}
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
             />
           ) : (
             <DealsListView pipeline={activePipeline} filters={filters} />

@@ -7,22 +7,45 @@ import {
 } from "@/lib/meetings/types";
 import { MeetingsKanbanColumn } from "./MeetingsKanbanColumn";
 
+interface DragInfo {
+  meetingId: string;
+  sourceColumnId: string;
+}
+
+export interface DropTargetPos {
+  columnId: string;
+  targetIndex: number;
+}
+
 export function MeetingsKanbanBoard() {
   const [columns, setColumns] = useState<MeetingColumn[]>(initialColumns);
-  const [dragInfo, setDragInfo] = useState<{
-    meetingId: string;
-    sourceColumnId: string;
-  } | null>(null);
+  const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
+  const [dropTargetPos, setDropTargetPos] = useState<DropTargetPos | null>(
+    null,
+  );
 
-  function handleDropMeeting(targetColumnId: string) {
-    if (!dragInfo || dragInfo.sourceColumnId === targetColumnId) return;
+  function handleDragStartMeeting(
+    e: React.DragEvent<HTMLDivElement>,
+    meetingId: string,
+    columnId: string,
+  ) {
+    setDragInfo({ meetingId, sourceColumnId: columnId });
+    e.dataTransfer.effectAllowed = "move";
+  }
+
+  function handleDragEndMeeting() {
+    setDragInfo(null);
+    setDropTargetPos(null);
+  }
+
+  function handleDropMeeting(targetColumnId: string, targetIndex?: number) {
+    if (!dragInfo) return;
+    const { meetingId, sourceColumnId } = dragInfo;
 
     setColumns((prev) => {
-      const sourceCol = prev.find((c) => c.id === dragInfo.sourceColumnId);
+      const sourceCol = prev.find((c) => c.id === sourceColumnId);
       const targetCol = prev.find((c) => c.id === targetColumnId);
-      const meeting = sourceCol?.meetings.find(
-        (m) => m.id === dragInfo.meetingId,
-      );
+      const meeting = sourceCol?.meetings.find((m) => m.id === meetingId);
       if (!meeting || !targetCol) return prev;
 
       const moved = {
@@ -31,35 +54,53 @@ export function MeetingsKanbanBoard() {
       };
 
       return prev.map((col) => {
-        if (col.id === dragInfo.sourceColumnId)
+        if (col.id === sourceColumnId && col.id === targetColumnId) {
+          const meetingsWithoutItem = col.meetings.filter(
+            (m) => m.id !== meetingId,
+          );
+          const finalIndex = targetIndex ?? meetingsWithoutItem.length;
+          const updatedMeetings = [...meetingsWithoutItem];
+          updatedMeetings.splice(finalIndex, 0, moved);
+          return { ...col, meetings: updatedMeetings };
+        }
+
+        if (col.id === sourceColumnId) {
           return {
             ...col,
-            meetings: col.meetings.filter((m) => m.id !== dragInfo.meetingId),
+            meetings: col.meetings.filter((m) => m.id !== meetingId),
             count: col.count - 1,
           };
-        if (col.id === targetColumnId)
+        }
+
+        if (col.id === targetColumnId) {
+          const updatedMeetings = [...col.meetings];
+          const finalIndex = targetIndex ?? updatedMeetings.length;
+          updatedMeetings.splice(finalIndex, 0, moved);
           return {
             ...col,
-            meetings: [moved, ...col.meetings],
+            meetings: updatedMeetings,
             count: col.count + 1,
           };
+        }
+
         return col;
       });
     });
-    setDragInfo(null);
+
+    handleDragEndMeeting();
   }
 
   return (
-    <div className="flex h-full items-stretch gap-4">
+    <div className="flex h-full items-stretch gap-4 overflow-x-auto p-1">
       {columns.map((column) => (
         <MeetingsKanbanColumn
           key={column.id}
           column={column}
           draggingMeetingId={dragInfo?.meetingId ?? null}
-          onDragStartMeeting={(e, id, colId) =>
-            setDragInfo({ meetingId: id, sourceColumnId: colId })
-          }
-          onDragEndMeeting={() => setDragInfo(null)}
+          dropTargetPos={dropTargetPos}
+          setDropTargetPos={setDropTargetPos}
+          onDragStartMeeting={handleDragStartMeeting}
+          onDragEndMeeting={handleDragEndMeeting}
           onDropMeeting={handleDropMeeting}
         />
       ))}

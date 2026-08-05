@@ -376,7 +376,7 @@ export function LeadKanbanBoard({
   return (
     <div
       ref={boardRef}
-      className="relative w-full h-full overflow-x-auto bg-background no-scrollbar"
+      className="relative w-full h-full overflow-x-auto bg-background"
     >
       <div className="flex h-full items-start gap-3 p-1">
         {visibleColumns.map((column) => {
@@ -468,7 +468,7 @@ export function LeadKanbanBoard({
                         e.stopPropagation();
                         handleDrop(column.id, dropTargetPos?.targetIndex);
                       }}
-                      className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-8"
+                      className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-8 no-scrollbar"
                     >
                       {(() => {
                         let visibleIndex = 0;
