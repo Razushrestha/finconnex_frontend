@@ -220,3 +220,13 @@
 .dark * {
   scrollbar-color: oklch(1 0 0 / 18%) transparent;
 }
+
+.no-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}

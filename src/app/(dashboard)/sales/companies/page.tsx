@@ -136,7 +136,8 @@ export default function CompaniesPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 p-2 pr-4">
+    // <div className="min-h-screen bg-slate-50 p-2 pr-4">
+    <div className="h-screen bg-slate-50 p-2 pr-3 dark:bg-zinc-950">
       <EntityHeader
         entityLabel="Company"
         entityLabelPlural="Companies"

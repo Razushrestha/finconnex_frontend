@@ -17,10 +17,9 @@ export const cardDragging =
   "scale-[0.98] opacity-50 shadow-none ring-2 ring-slate-300/60 motion-reduce:scale-100";
 
 /** Dropdown menus (profile, notifications) */
-export const menuEnter = [
-  "animate-in fade-in-0 duration-100",
-  reduce,
-].join(" ");
+export const menuEnter = ["animate-in fade-in-0 duration-100", reduce].join(
+  " ",
+);
 
 /** Board / list content when view switches — subtle page fade only */
 export const viewEnter = [
@@ -51,4 +50,4 @@ export const dropTargetIdle =
   "transition-colors duration-150 ease-out motion-reduce:transition-none";
 
 export const dropTargetActive =
-  "border-slate-400 bg-slate-100 ring-1 ring-slate-300/80";
+  "border-slate-400 bg-foreground/10 ring-1 ring-slate-300/80";

@@ -22,11 +22,11 @@ import {
   truncateActivityTitle,
   urgencyForCandidate,
 } from "@/lib/leads/activity-summary";
-import type { ActivityUrgency, LeadActivityCandidate } from "@/lib/leads/card-types";
-import {
-  URGENCY_TEXT,
-  URGENCY_WORDS,
-} from "@/lib/leads/a11y-urgency";
+import type {
+  ActivityUrgency,
+  LeadActivityCandidate,
+} from "@/lib/leads/card-types";
+import { URGENCY_TEXT, URGENCY_WORDS } from "@/lib/leads/a11y-urgency";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
@@ -152,9 +152,7 @@ export function LeadActivityListPanel({
           )}
           {items.map((c, index) => {
             const urgency =
-              mode === "summary"
-                ? urgencyForCandidate(c, now)
-                : null;
+              mode === "summary" ? urgencyForCandidate(c, now) : null;
             const dueLabel =
               mode === "summary"
                 ? formatSummaryDueLabel(c.dueAt, {
@@ -194,7 +192,7 @@ export function LeadActivityListPanel({
                     href
                       ? "hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                       : "cursor-default opacity-90",
-                    index === 0 && mode === "summary" && "bg-slate-50/80",
+                    index === 0 && mode === "summary" && "bg-card/50",
                   )}
                 >
                   {urgency ? (
@@ -212,10 +210,10 @@ export function LeadActivityListPanel({
                     />
                   )}
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-medium text-slate-800">
+                    <span className="block truncate text-[13px] font-medium text-foreground/90">
                       {truncateActivityTitle(fullTitle, 40)}
                     </span>
-                    <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-slate-500">
+                    <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[11px] text-foreground/70">
                       <span>{KIND_LABEL[c.kind] ?? c.kind}</span>
                       {dueLabel && (
                         <span
@@ -231,7 +229,7 @@ export function LeadActivityListPanel({
                         </span>
                       )}
                       {index === 0 && mode === "summary" && (
-                        <span className="font-medium text-slate-600">
+                        <span className="font-medium text-foreground/80">
                           On card
                         </span>
                       )}
