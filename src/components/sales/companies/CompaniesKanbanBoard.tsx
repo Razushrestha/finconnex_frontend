@@ -8,6 +8,7 @@ import { CompanyCard } from "./CompanyCard";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import type { CompanyCardCustomizationSettings } from "@/components/sales/companies/CustomizeCompanyCardDrawer";
 
 interface DragInfo {
   companyId: string;
@@ -24,6 +25,8 @@ type CompanyRecord = CompanyGroup["companies"][number];
 interface CompaniesKanbanBoardProps {
   filters?: CompanyFilters;
   visibleColumnIds?: string[];
+  selectedIds?: string[];
+  onToggleSelect?: (id: string) => void;
   onAddLead?: (columnId: string) => void;
   onQuickAction?: (kind: any, company: CompanyRecord) => void;
 }
@@ -33,6 +36,8 @@ const BOARD_HEIGHT = "h-[calc(100vh-5rem)]";
 export function CompaniesKanbanBoard({
   filters,
   visibleColumnIds,
+  selectedIds = [],
+  onToggleSelect,
   onAddLead,
   onQuickAction,
 }: CompaniesKanbanBoardProps) {
@@ -47,6 +52,10 @@ export function CompaniesKanbanBoard({
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     () => new Set(),
   );
+
+  // Board-wide card customization settings
+  const [cardSettings, setCardSettings] =
+    useState<CompanyCardCustomizationSettings | null>(null);
 
   function toggleCollapsed(groupId: string) {
     setCollapsedGroups((prev) => {
@@ -157,7 +166,7 @@ export function CompaniesKanbanBoard({
   }
 
   return (
-    <div className="relative w-full overflow-x-auto bg-slate-50/50 no-scrollbar">
+    <div className="relative w-full overflow-x-auto bg-slate-50/50">
       <div className="flex items-start gap-3 p-1">
         {visibleGroups.map((group) => {
           const isOver = overGroupId === group.id;
@@ -293,12 +302,19 @@ export function CompaniesKanbanBoard({
                               <CompanyCard
                                 company={company}
                                 isDragging={isDraggedCompany}
+                                isSelected={selectedIds.includes(company.id)}
+                                onToggleSelect={() =>
+                                  onToggleSelect?.(company.id)
+                                }
                                 onDragStart={(e) =>
                                   handleDragStart(e, company.id, group.id)
                                 }
                                 onDragEnd={handleDragEnd}
                                 onQuickAction={(kind) =>
                                   onQuickAction?.(kind, company)
+                                }
+                                onSaveCardSettings={(settings) =>
+                                  setCardSettings(settings)
                                 }
                               />
                             </div>,

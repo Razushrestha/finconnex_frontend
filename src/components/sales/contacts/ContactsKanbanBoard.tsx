@@ -33,6 +33,8 @@ interface ContactsKanbanBoardProps {
   visibleColumnIds?: string[];
   sortValue?: string;
   onAddContact?: (groupId: string) => void;
+  selectedIds: string[];
+  onToggleSelect: (id: string) => void;
 }
 
 const BOARD_HEIGHT = "h-[calc(100vh-5rem)]";
@@ -41,6 +43,8 @@ export function ContactsKanbanBoard({
   filters,
   visibleColumnIds,
   onAddContact,
+  selectedIds = [],
+  onToggleSelect,
 }: ContactsKanbanBoardProps) {
   const router = useRouter();
 
@@ -179,7 +183,7 @@ export function ContactsKanbanBoard({
   }
 
   return (
-    <div className="relative w-full overflow-x-auto bg-slate-50/50 no-scrollbar">
+    <div className="relative w-full overflow-x-auto bg-slate-50/50">
       <div className="flex items-start gap-3 p-1">
         {visibleGroups.map((group) => {
           const isOver = overGroupId === group.id;
@@ -331,6 +335,8 @@ export function ContactsKanbanBoard({
                                     phone: contact.phone,
                                   })
                                 }
+                                isSelected={selectedIds.includes(contact.id)}
+                                onToggleSelect={onToggleSelect}
                               />
                             </div>,
                           );

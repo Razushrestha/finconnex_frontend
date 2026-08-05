@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   EntityHeader,
+  ImportOption,
   type ActionOption,
   type SortDirection,
 } from "@/components/sales/EntityHeader";
@@ -27,7 +28,10 @@ import {
   Tag,
   ShieldCheck,
   Download,
+  Pencil,
+  ChevronDown,
 } from "lucide-react";
+import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 
 const DEFAULT_LEAD_COLUMNS = LEAD_PIPELINE_STAGES.map((stage) => ({
   id: stageColumnId(stage),
@@ -52,6 +56,8 @@ export default function LeadsPage() {
   const [activeSort, setActiveSort] = useState("Sort");
   const [activeSortDirection, setActiveSortDirection] =
     useState<SortDirection>("asc");
+
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // TODO: wire these up to the actual modals/handlers once they exist.
   const [isMassTransferOpen, setMassTransferOpen] = useState(false);
@@ -90,6 +96,35 @@ export default function LeadsPage() {
   }
 
   const visibleColumnIds = columns.filter((c) => c.visible).map((c) => c.id);
+
+  const importOptions: ImportOption[] = [
+    {
+      id: "import-leads",
+      label: "Import Leads",
+      badge: "New",
+      onClick: () => console.log("button clicked"),
+    },
+    {
+      id: "import-notes",
+      label: "Import Notes",
+      onClick: () => console.log("button clicked"),
+    },
+    {
+      id: "facebook-ads-sync",
+      label: "Facebook Ads Sync",
+      onClick: () => console.log("button clicked"),
+    },
+    {
+      id: "linkedin-ads-sync",
+      label: "LinkedIn Ads Sync",
+      onClick: () => console.log("button clicked"),
+    },
+    {
+      id: "tiktok-ads-sync",
+      label: "Tiktok Ads Sync",
+      onClick: () => console.log("button clicked"),
+    },
+  ];
 
   const actionOptions: ActionOption[] = [
     {
@@ -145,34 +180,7 @@ export default function LeadsPage() {
       <EntityHeader
         entityLabel="Lead"
         createRoute="/sales/leads/create"
-        importOptions={[
-          {
-            id: "import-leads",
-            label: "Import Leads",
-            badge: "New",
-            onClick: () => console.log("button clicked"),
-          },
-          {
-            id: "import-notes",
-            label: "Import Notes",
-            onClick: () => console.log("button clicked"),
-          },
-          {
-            id: "facebook-ads-sync",
-            label: "Facebook Ads Sync",
-            onClick: () => console.log("button clicked"),
-          },
-          {
-            id: "linkedin-ads-sync",
-            label: "LinkedIn Ads Sync",
-            onClick: () => console.log("button clicked"),
-          },
-          {
-            id: "tiktok-ads-sync",
-            label: "Tiktok Ads Sync",
-            onClick: () => console.log("button clicked"),
-          },
-        ]}
+        importOptions={importOptions}
         actionOptions={actionOptions}
         footerOptions={footerOptions}
         totalCount={totalLeads}
@@ -188,6 +196,51 @@ export default function LeadsPage() {
           setActiveSortDirection(direction);
         }}
       />
+
+      {selectedIds.length > 0 ? (
+        <EntitySelectionToolbar
+          selectedCount={selectedIds.length}
+          onClear={() => setSelectedIds([])}
+          onSendMail={() => console.log("send mail clicked")}
+          onAddTag={() => console.log("add tag clicked")}
+          onRemoveTag={() => console.log("remove tag clicked")}
+          onRunMacro={() => console.log("run macro clicked")}
+          onCreateTask={() => console.log("create task clicked")}
+          onSetReminder={() => console.log("set reminder clicked")}
+          onMassUpdate={() => console.log("mass update clicked")}
+          onChangeOwner={() => console.log("change owner clicked")}
+          onCadences={() => console.log("cadences clicked")}
+          onAddToCampaigns={() => console.log("add to campaigns clicked")}
+          onPrintMailingLabels={() =>
+            console.log("print mailing labels clicked")
+          }
+          onMailMerge={() => console.log("mail merge clicked")}
+          onMassConvert={() => console.log("mass convert clicked")}
+          onDelete={() => console.log("delete clicked")}
+          onExportSelectedRecords={() =>
+            console.log("export selected records clicked")
+          }
+        />
+      ) : (
+        <div className="mt-3 flex w-fit items-center gap-2">
+          <button
+            type="button"
+            onClick={() => console.log("pipeline selector clicked")}
+            className="flex items-center gap-1.5 rounded-sm bg-card/70 hover:bg-card px-3 py-1 text-sm font-medium text-foreground/70"
+          >
+            <span>Lead Pipeline</span>
+            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => console.log("edit pipeline clicked")}
+            className="rounded-full border border-slate-200 bg-white p-1.5 text-slate-400 shadow-sm hover:text-slate-600 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:text-zinc-300"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       <div className="mt-3 flex items-start gap-4">
         {isFilterOpen && (

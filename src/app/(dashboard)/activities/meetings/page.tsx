@@ -20,6 +20,7 @@ import {
 } from "@/components/activities/ActivityToolbar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
+import { DropTargetPos } from "@/components/activities/meetings/MeetingsKanbanBoard";
 
 const TYPE_ICON: Record<MeetingType, React.ElementType> = {
   "Video Call": Video,
@@ -41,6 +42,9 @@ export default function MeetingsPage() {
     meetingId: string;
     sourceColumnId: string;
   } | null>(null);
+  const [dropTargetPos, setDropTargetPos] = useState<DropTargetPos | null>(
+    null,
+  );
 
   useEffect(() => {
     setColumns(listMeetingColumns());
@@ -207,8 +211,13 @@ export default function MeetingsPage() {
                     key={column.id}
                     column={{ ...column, meetings, count: meetings.length }}
                     draggingMeetingId={dragInfo?.meetingId ?? null}
+                    dropTargetPos={dropTargetPos}
+                    setDropTargetPos={setDropTargetPos}
                     onDragStartMeeting={handleDragStartMeeting}
-                    onDragEndMeeting={() => setDragInfo(null)}
+                    onDragEndMeeting={() => {
+                      setDragInfo(null);
+                      setDropTargetPos(null);
+                    }}
                     onDropMeeting={handleDropMeeting}
                     embedded
                   />

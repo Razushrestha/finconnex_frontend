@@ -1,37 +1,68 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import type { EmailColumn } from "@/lib/emails/types";
 import { EmailCard } from "./EmailCard";
 import { cn } from "@/lib/utils";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
+import { useRouter } from "next/navigation";
+import type { DropTargetPos } from "./EmailsKanbanBoard";
 
 interface EmailsKanbanColumnProps {
   column: EmailColumn;
   draggingEmailId: string | null;
+  dropTargetPos: DropTargetPos | null;
+  setDropTargetPos: React.Dispatch<React.SetStateAction<DropTargetPos | null>>;
   onDragStartEmail: (
     e: React.DragEvent<HTMLDivElement>,
     emailId: string,
     columnId: string,
   ) => void;
   onDragEndEmail: () => void;
-  onDropEmail: (targetColumnId: string) => void;
+  onDropEmail: (targetColumnId: string, targetIndex?: number) => void;
 }
 
 export function EmailsKanbanColumn({
   column,
   draggingEmailId,
+  dropTargetPos,
+  setDropTargetPos,
   onDragStartEmail,
   onDragEndEmail,
   onDropEmail,
 }: EmailsKanbanColumnProps) {
+  const router = useRouter();
   const [isOver, setIsOver] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
+  function handleDragOverContainer(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setIsOver(true);
+
+    const container = e.currentTarget;
+    const cardElements = Array.from(
+      container.querySelectorAll<HTMLElement>("[data-email-card]"),
+    );
+
+    const mouseY = e.clientY;
+    let targetIndex = column.emails.length;
+
+    for (let i = 0; i < cardElements.length; i++) {
+      const rect = cardElements[i].getBoundingClientRect();
+      const cardMidpoint = rect.top + rect.height / 2;
+      if (mouseY < cardMidpoint) {
+        targetIndex = i;
+        break;
+      }
+    }
+
+    setDropTargetPos({ columnId: column.id, targetIndex });
+  }
+
   if (isCollapsed) {
     return (
-      <div className="flex h-full w-10 shrink-0 flex-col rounded-sm">
+      <div className="mb-4 flex h-full w-10 shrink-0 flex-col rounded-sm">
         <div
           className={cn(
             "flex h-full flex-col items-center gap-3 rounded-sm p-2 shadow-sm",
@@ -62,7 +93,7 @@ export function EmailsKanbanColumn({
   }
 
   return (
-    <div className="flex h-full w-72 shrink-0 flex-col">
+    <div className="group mb-4 flex h-full w-72 shrink-0 flex-col">
       {/* Separate Header Box */}
       <div
         className={cn(
@@ -92,39 +123,79 @@ export function EmailsKanbanColumn({
 
       {/* Email List / Drop Zone Container */}
       <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setIsOver(true);
+        onDragOver={handleDragOverContainer}
+        onDragLeave={() => {
+          setIsOver(false);
+          if (dropTargetPos?.columnId === column.id) {
+            setDropTargetPos(null);
+          }
         }}
-        onDragLeave={() => setIsOver(false)}
         onDrop={(e) => {
           e.preventDefault();
           setIsOver(false);
-          onDropEmail(column.id);
+          onDropEmail(column.id, dropTargetPos?.targetIndex);
         }}
         className={cn(
-          "flex flex-1 flex-col rounded-sm border border-transparent p-2",
+          "flex min-h-0 flex-1 flex-col rounded-sm border border-transparent p-2",
           dropTargetIdle,
           isOver ? dropTargetActive : "bg-slate-200/70",
         )}
       >
-        <div className="flex-1 space-y-3 overflow-y-auto pr-1 [scrollbar-color:#94a3b8_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300">
-          {column.emails.map((email) => (
-            <EmailCard
-              key={email.id}
-              email={email}
-              columnId={column.id}
-              isDragging={draggingEmailId === email.id}
-              onDragStart={(e) => onDragStartEmail(e, email.id, column.id)}
-              onDragEnd={onDragEndEmail}
-            />
-          ))}
+        <div className="flex-1 space-y-3 overflow-y-auto pb-4 pr-1 [scrollbar-color:#94a3b8_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300">
+          {column.emails.map((email, index) => {
+            const showPlaceholderBefore =
+              dropTargetPos?.columnId === column.id &&
+              dropTargetPos.targetIndex === index &&
+              draggingEmailId !== email.id;
+
+            const showPlaceholderAfter =
+              dropTargetPos?.columnId === column.id &&
+              dropTargetPos.targetIndex === column.emails.length &&
+              index === column.emails.length - 1 &&
+              draggingEmailId !== email.id;
+
+            return (
+              <div key={email.id} className="space-y-3">
+                {showPlaceholderBefore && (
+                  <div className="h-20 w-full animate-pulse rounded-xl border-2 border-dashed border-indigo-400 bg-indigo-50/50 transition-all" />
+                )}
+
+                <div data-email-card>
+                  <EmailCard
+                    email={email}
+                    columnId={column.id}
+                    isDragging={draggingEmailId === email.id}
+                    onDragStart={(e) =>
+                      onDragStartEmail(e, email.id, column.id)
+                    }
+                    onDragEnd={onDragEndEmail}
+                  />
+                </div>
+
+                {showPlaceholderAfter && (
+                  <div className="h-20 w-full animate-pulse rounded-xl border-2 border-dashed border-indigo-400 bg-indigo-50/50 transition-all" />
+                )}
+              </div>
+            );
+          })}
 
           {column.emails.length === 0 && (
             <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 py-8 text-center text-xs text-slate-400">
               Drop an email here
             </div>
           )}
+        </div>
+
+        {/* Centered Create Email Button (Visible on Column Hover) */}
+        <div className="mt-2 flex w-full shrink-0 justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+          <button
+            type="button"
+            onClick={() => router.push("/sales/emails/create")}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-white hover:text-slate-900"
+          >
+            <Plus className="h-4 w-4" />
+            Create email
+          </button>
         </div>
       </div>
     </div>
