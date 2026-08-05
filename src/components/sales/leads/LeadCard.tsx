@@ -153,21 +153,21 @@ export function LeadCard({
         data-lead-id={card.id}
         aria-labelledby={nameId}
         className={cn(
-          "group w-full shrink-0 cursor-grab rounded-md border border-slate-200/80 bg-white p-3 shadow-2xs active:cursor-grabbing",
+          "group w-full shrink-0 cursor-grab rounded-md bg-background p-3 shadow-2xs active:cursor-grabbing",
           cardMotion,
           isDragging && cardDragging,
         )}
       >
         {/* §3 Header: name + status; SLA badge (PDF top-right); optional owner avatar */}
-        <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="mb-1.5 flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h3
               id={nameId}
-              className="truncate text-[13px] font-semibold text-slate-900"
+              className="truncate text-[13px] font-semibold text-foreground"
             >
               {vm.name}
             </h3>
-            <p className="truncate text-[11px] text-slate-500">
+            <p className="truncate text-[11px] text-foreground/70">
               <span className="sr-only">Pipeline stage: </span>
               {vm.sla?.stage ?? card.pipelineStage ?? vm.status}
             </p>
@@ -212,7 +212,7 @@ export function LeadCard({
 
         {/* §4 Dynamic fields — live, uncolored */}
         {vm.dynamicFields.length > 0 && (
-          <dl className="mb-2 space-y-0.5 text-[11px] text-slate-600">
+          <dl className="mb-1.5 space-y-0.5 text-[11px] text-foreground/90">
             {vm.dynamicFields.map((field) => (
               <div key={field.key} className="truncate" title={field.value}>
                 <dt className="sr-only">{field.label}</dt>
@@ -232,7 +232,7 @@ export function LeadCard({
               onOpenActivitySummary?.();
             }}
             className={cn(
-              "mb-2 w-full rounded-md px-2 py-1.5 text-left transition-colors",
+              "mb-1.5 w-full rounded-md px-2 py-1.5 text-left transition-colors",
               URGENCY_SURFACE[summary.urgency],
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1",
             )}
@@ -282,7 +282,7 @@ export function LeadCard({
               e.stopPropagation();
               onOpenLastActivity?.();
             }}
-            className="mb-2 block w-full truncate text-left text-[10px] text-slate-400 transition-colors hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-1"
+            className="mb-1.5 block w-full truncate text-left text-[10px] text-foreground/70 transition-colors hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-1"
             aria-label={`Last activity: ${vm.lastActivity.label}, ${isMounted ? vm.lastActivity.relativeTime : ""}. Open activity history.`}
             title={`${vm.lastActivity.label} · ${isMounted ? vm.lastActivity.relativeTime : ""}`}
           >
@@ -294,7 +294,7 @@ export function LeadCard({
           actions={quickActionItems}
           onAction={onQuickAction}
           ariaLabel={`Quick actions for ${vm.name}`}
-          className="border-t border-slate-100 pt-2"
+          className="border-t border-slate-100 pt-1.5"
         />
       </article>
 

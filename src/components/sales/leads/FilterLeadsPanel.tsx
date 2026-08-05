@@ -69,9 +69,14 @@ export function FilterLeadsPanel({
   }
 
   return (
-    <div className={cn("flex h-full w-48 shrink-0 flex-col rounded-2xl border border-slate-100 bg-white shadow-sm", filterEnter)}>
+    <div
+      className={cn(
+        "flex h-full w-48 shrink-0 flex-col rounded-md border bg-card shadow-sm",
+        filterEnter,
+      )}
+    >
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-900">
+        <h3 className="text-sm font-semibold text-foreground">
           Filter Leads by
         </h3>
         {onClose && (
@@ -109,7 +114,7 @@ export function FilterLeadsPanel({
               <button
                 type="button"
                 onClick={() => toggleSection(section.id)}
-                className="mb-1.5 flex w-full items-center justify-between py-1 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700"
+                className="mb-1.5 flex w-full items-center justify-between py-1 text-xs font-semibold uppercase tracking-wide text-foreground/90"
               >
                 {section.title}
                 {isCollapsed ? (
@@ -124,7 +129,7 @@ export function FilterLeadsPanel({
                   {section.fields.map((field) => (
                     <label
                       key={field}
-                      className="flex cursor-pointer items-center gap-2 text-sm text-slate-600"
+                      className="flex cursor-pointer items-center gap-2 text-sm text-foreground/80"
                     >
                       <input
                         type="checkbox"

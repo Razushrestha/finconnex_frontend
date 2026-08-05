@@ -54,9 +54,7 @@ function ClockRow({
           {clock.durationLabel ? ` (${clock.durationLabel})` : ""} ·{" "}
           {clock.detail}
         </p>
-        <p className="truncate opacity-80">
-          Due {formatSlaDueAt(clock.dueAt)}
-        </p>
+        <p className="truncate opacity-80">Due {formatSlaDueAt(clock.dueAt)}</p>
       </div>
     </div>
   );

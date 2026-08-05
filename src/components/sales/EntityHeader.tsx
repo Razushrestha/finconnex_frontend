@@ -182,7 +182,7 @@ export function EntityHeader({
   );
 
   return (
-    <div className="w-full border-b border-slate-200/80 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+    <div className="w-full border-b border-slate-200/80 bg-background dark:border-zinc-800">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-1 py-2 sm:gap-x-3">
         <nav className="hidden items-center gap-1 text-[11px] text-slate-400 md:flex">
           <Link
@@ -203,7 +203,7 @@ export function EntityHeader({
         <div className="hidden h-4 w-px bg-slate-200 md:block dark:bg-zinc-700" />
 
         <div className="flex min-w-0 items-center gap-2">
-          <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="truncate text-[15px] font-bold tracking-tight text-foreground">
             {title}
           </h1>
           {totalCount !== undefined && (

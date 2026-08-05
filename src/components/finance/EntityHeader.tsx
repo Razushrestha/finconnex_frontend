@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-import { SearchInput } from "../ui/search-input";
+import React from "react";
 
 interface EntityHeaderProps {
   title: string;
@@ -14,8 +13,6 @@ interface EntityHeaderProps {
 export const EntityHeader: React.FC<EntityHeaderProps> = ({
   title,
   description,
-  searchValue,
-  onSearchChange,
   actionLabel,
   onActionClick,
 }) => {
@@ -27,9 +24,6 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
       </div>
 
       <div className="flex items-center gap-3">
-        {/* Search Input */}
-        <SearchInput value={searchValue} onChange={onSearchChange} />
-
         {/* Primary Action Button */}
         <button
           onClick={onActionClick}
