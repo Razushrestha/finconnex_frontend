@@ -582,7 +582,7 @@ export function DealsKanbanBoard({
                         e.stopPropagation();
                         handleDrop(stage.id, dropTargetPos?.targetIndex);
                       }}
-                      className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-8 p-2 no-scrollbar"
+                      className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-8"
                     >
                       {(() => {
                         let visibleIndex = 0;

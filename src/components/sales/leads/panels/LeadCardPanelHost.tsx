@@ -49,7 +49,7 @@ const EDIT_DIALOG_SECTION: Partial<
   meeting: "appointment",
   task: "tasks",
   note: "notes",
-  attachment: "notes",
+  attachment: "associated",
 };
 
 export function LeadCardPanelHost({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Sparkles,
   ArrowLeftRight,
@@ -14,10 +14,10 @@ import {
 } from "lucide-react";
 import {
   EntityHeader,
-  type PipelineOption,
   type ImportOption,
   type ActionOption,
   type SortDirection,
+  ScopeOption,
 } from "@/components/sales/EntityHeader";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import { DealsKanbanBoard } from "@/components/sales/deals/DealsKanbanBoard";
@@ -37,11 +37,37 @@ import { viewEnter } from "@/lib/motion";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
 import { SORT_OPTIONS } from "../leads/page";
+import {
+  type KanbanField,
+  type KanbanViewConfig,
+  KanbanViewSettingsModal,
+} from "@/components/common/KanbanViewControls";
+
+export interface PipelineOption {
+  label: string;
+  value: string;
+}
 
 const PIPELINE_OPTIONS: PipelineOption[] = DEAL_PIPELINES.map((pipeline) => ({
   label: pipeline,
   value: pipeline,
 }));
+
+const DEAL_SCOPE_OPTIONS: ScopeOption[] = [
+  { label: "All Deals", value: "all" },
+  { label: "My Deals", value: "mine" },
+  { label: "Follower Deals", value: "follower" },
+];
+
+const DEAL_FIELDS: KanbanField[] = [
+  { id: "dealName", label: "Deal Name", required: true },
+  { id: "loanAmount", label: "Loan Amount" },
+  { id: "closeDate", label: "Close Date" },
+  { id: "broker", label: "Broker" },
+  { id: "dealOwner", label: "Deal Owner" },
+  { id: "lender", label: "Lender" },
+  { id: "tag", label: "Tag" },
+];
 
 export default function DealsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -54,12 +80,18 @@ export default function DealsPage() {
   const [allStages, setAllStages] =
     useState<Record<DealPipeline, DealStage[]>>(DEAL_PIPELINE_STAGES);
 
+  const [activeScope, setActiveScope] = useState("all");
+
   const [activeSort, setActiveSort] = useState("Sort");
   const [activeSortDirection, setActiveSortDirection] =
     useState<SortDirection>("asc");
 
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
   // Selection state for deals across columns/list items
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isPipelineMenuOpen, setIsPipelineMenuOpen] = useState(false);
+  const pipelineMenuRef = useRef<HTMLDivElement>(null);
 
   const [isImportDealsOpen, setIsImportDealsOpen] = useState(false);
   const [isImportNotesOpen, setIsImportNotesOpen] = useState(false);
@@ -70,6 +102,35 @@ export default function DealsPage() {
   const [isMassUpdateOpen, setMassUpdateOpen] = useState(false);
   const [isManageTagsOpen, setManageTagsOpen] = useState(false);
   const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
+
+  const [viewConfigs, setViewConfigs] = useState<
+    Record<DealPipeline, KanbanViewConfig>
+  >(
+    () =>
+      Object.fromEntries(
+        DEAL_PIPELINES.map((pipeline) => [
+          pipeline,
+          {
+            id: pipeline,
+            name: pipeline,
+            categorizeBy: "Stage",
+            aggregateBy: "Loan Amount",
+            headerStyle: "Multi Colour",
+            shareWith: "everyone",
+            selectedFieldIds: [
+              "dealName",
+              "loanAmount",
+              "broker",
+              "dealOwner",
+              "tag",
+            ],
+            editableFieldIds: ["dealOwner"],
+          },
+        ]),
+      ) as Record<DealPipeline, KanbanViewConfig>,
+  );
+
+  const activeViewConfig = viewConfigs[activePipeline];
 
   function exportTasks() {
     console.log("export tasks clicked");
@@ -129,6 +190,12 @@ export default function DealsPage() {
     } else {
       setSelectedIds([...allVisibleDealIds]);
     }
+  }
+
+  function handlePipelineChange(pipeline: string) {
+    setActivePipeline(pipeline as DealPipeline);
+    setFilters(EMPTY_DEAL_FILTERS);
+    setSelectedIds([]);
   }
 
   const importOptions: ImportOption[] = [
@@ -214,13 +281,9 @@ export default function DealsPage() {
         onViewChange={setViewMode}
         isFilterOpen={isFilterOpen}
         onToggleFilter={() => setIsFilterOpen((v) => !v)}
-        pipelineOptions={PIPELINE_OPTIONS}
-        activePipeline={activePipeline}
-        onPipelineChange={(pipeline) => {
-          setActivePipeline(pipeline as DealPipeline);
-          setFilters(EMPTY_DEAL_FILTERS);
-          setSelectedIds([]);
-        }}
+        scopeOptions={DEAL_SCOPE_OPTIONS}
+        activeScope={activeScope}
+        onScopeChange={setActiveScope}
         sortOptions={SORT_OPTIONS}
         activeSort={activeSort}
         activeSortDirection={activeSortDirection}
@@ -240,6 +303,7 @@ export default function DealsPage() {
           onSendMail={() => console.log("send mail clicked")}
           onAddTag={() => console.log("add tag clicked")}
           onRemoveTag={() => console.log("remove tag clicked")}
+          onClick={() => console.log("Manage button clicked")}
           onRunMacro={() => console.log("run macro clicked")}
           onCreateTask={() => console.log("create task clicked")}
           onSetReminder={() => console.log("set reminder clicked")}
@@ -259,23 +323,72 @@ export default function DealsPage() {
         />
       ) : (
         <div className="mt-3 flex w-fit items-center gap-2">
-          <button
-            type="button"
-            onClick={() => console.log("pipeline selector clicked")}
-            className="flex items-center gap-1.5 rounded-sm bg-card/70 hover:bg-card px-3 py-1 text-sm font-medium text-foreground/70"
-          >
-            <span>Deal Pipeline</span>
-            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-          </button>
+          <div className="relative" ref={pipelineMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsPipelineMenuOpen((open) => !open)}
+              aria-haspopup="true"
+              aria-expanded={isPipelineMenuOpen}
+              className="flex items-center gap-1.5 rounded-sm bg-card/70 hover:bg-card px-3 py-1 text-sm font-medium text-foreground/70"
+            >
+              <span>
+                {PIPELINE_OPTIONS.find((opt) => opt.value === activePipeline)
+                  ?.label ?? "Deal Pipeline"}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+            </button>
+
+            {isPipelineMenuOpen && (
+              <div className="absolute left-0 z-20 mt-1.5 w-48 rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                {PIPELINE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      handlePipelineChange?.(opt.value);
+                      setIsPipelineMenuOpen(false);
+                    }}
+                    className={`flex w-full items-center rounded px-2.5 py-2 text-left text-[13px] font-medium ${
+                      opt.value === activePipeline
+                        ? "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+                        : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-zinc-800"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <button
             type="button"
-            onClick={() => console.log("edit pipeline clicked")}
+            onClick={() => setIsSettingsOpen(true)}
+            aria-label="Edit Kanban view settings"
             className="rounded-full border border-slate-200 bg-white p-1.5 text-slate-400 shadow-sm hover:text-slate-600 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:text-zinc-300"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
         </div>
+      )}
+      {isSettingsOpen && (
+        <KanbanViewSettingsModal
+          view={activeViewConfig}
+          availableFields={DEAL_FIELDS}
+          categorizeByOptions={["Stage", "Lender", "Broker"]}
+          aggregateByOptions={["Loan Amount", "Deal Count", "Commission"]}
+          headerStyleOptions={["Multi Colour", "Single Colour", "None"]}
+          onClose={() => setIsSettingsOpen(false)}
+          onSave={(next) => {
+            setViewConfigs((prev) => ({ ...prev, [activePipeline]: next }));
+            setIsSettingsOpen(false);
+            // e.g. api.updateKanbanView(activePipeline, next);
+          }}
+          onDelete={() => {
+            setIsSettingsOpen(false);
+            // e.g. api.deleteKanbanView(activePipeline);
+          }}
+        />
       )}
 
       <div className="mt-3 flex items-start gap-4">

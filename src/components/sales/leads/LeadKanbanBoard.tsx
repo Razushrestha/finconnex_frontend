@@ -55,6 +55,8 @@ interface LeadKanbanBoardProps {
   filters?: LeadFilters;
   visibleColumnIds?: string[];
   onAddLead?: (columnId: string) => void;
+  selectedIds: string[];
+  onToggleSelect: (id: string) => void;
 }
 
 // Adjust this offset to match whatever chrome (nav bar, filter bar, tabs)
@@ -65,6 +67,8 @@ export function LeadKanbanBoard({
   filters,
   visibleColumnIds,
   onAddLead,
+  selectedIds,
+  onToggleSelect,
 }: LeadKanbanBoardProps) {
   const router = useRouter();
   const boardRef = useRef<HTMLDivElement>(null);
@@ -518,6 +522,8 @@ export function LeadKanbanBoard({
                                 cardSettings={cardSettings}
                                 revision={activityRevision}
                                 isDragging={isDraggedCard}
+                                isSelected={selectedIds.includes(card.id)}
+                                onToggleSelect={onToggleSelect}
                                 onDragStart={(e) =>
                                   handleDragStart(e, card.id, column.id)
                                 }
