@@ -8,7 +8,6 @@ import {
   RotateCw,
   Home,
   Filter,
-  Search,
   List,
   LayoutGrid,
   Plus,
@@ -22,7 +21,7 @@ import { SearchInput } from "../ui/search-input";
 
 const DEFAULT_LAYOUT_ID = "standard";
 
-export interface PipelineOption {
+export interface ScopeOption {
   label: string;
   value: string;
 }
@@ -63,9 +62,9 @@ export interface EntityHeaderProps {
   breadcrumb?: string[];
   totalCount?: number;
 
-  pipelineOptions?: PipelineOption[];
-  activePipeline?: string;
-  onPipelineChange?: (pipeline: string) => void;
+  scopeOptions?: ScopeOption[];
+  activeScope?: string;
+  onScopeChange?: (scope: string) => void;
 
   onToggleFilter?: () => void;
   isFilterOpen?: boolean;
@@ -102,9 +101,9 @@ export function EntityHeader({
   createRoute,
   breadcrumb = ["Sales", entityLabelPlural],
   totalCount,
-  pipelineOptions,
-  activePipeline,
-  onPipelineChange,
+  scopeOptions,
+  activeScope,
+  onScopeChange,
   onToggleFilter,
   isFilterOpen,
   sortOptions,
@@ -125,9 +124,7 @@ export function EntityHeader({
   importOptions,
 }: EntityHeaderProps) {
   const router = useRouter();
-  const title = pipelineOptions
-    ? `${activePipeline} Pipeline`
-    : entityLabelPlural;
+  const title = entityLabelPlural;
 
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
@@ -145,6 +142,9 @@ export function EntityHeader({
   const [pendingSortField, setPendingSortField] = useState(activeSort ?? "");
   const [pendingSortDirection, setPendingSortDirection] =
     useState<SortDirection>(activeSortDirection);
+
+  const [isScopeMenuOpen, setIsScopeMenuOpen] = useState(false);
+  const scopeMenuRef = useRef<HTMLDivElement>(null);
 
   // Close menus when clicking outside
   useEffect(() => {
@@ -166,6 +166,12 @@ export function EntityHeader({
         !importMenuRef.current.contains(e.target as Node)
       ) {
         setIsImportMenuOpen(false);
+      }
+      if (
+        scopeMenuRef.current &&
+        !scopeMenuRef.current.contains(e.target as Node)
+      ) {
+        setIsScopeMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -213,19 +219,44 @@ export function EntityHeader({
           )}
         </div>
 
-        {pipelineOptions ? (
-          <select
-            value={activePipeline}
-            onChange={(e) => onPipelineChange?.(e.target.value)}
-            aria-label="Pipeline"
-            className="h-8 rounded-md border border-slate-200 bg-white px-2 text-[12px] font-medium text-slate-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-slate-200"
-          >
-            {pipelineOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+        {scopeOptions ? (
+          <div className="relative" ref={scopeMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsScopeMenuOpen((open) => !open)}
+              aria-haspopup="true"
+              aria-expanded={isScopeMenuOpen}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[12px] font-medium text-slate-700 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-slate-200"
+            >
+              <span>
+                {scopeOptions.find((opt) => opt.value === activeScope)?.label ??
+                  scopeOptions[0]?.label}
+              </span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+            </button>
+
+            {isScopeMenuOpen && (
+              <div className="absolute left-0 z-20 mt-1.5 w-48 rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                {scopeOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      onScopeChange?.(opt.value);
+                      setIsScopeMenuOpen(false);
+                    }}
+                    className={`flex w-full items-center rounded px-2.5 py-2 text-left text-[13px] font-medium ${
+                      opt.value === activeScope
+                        ? "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+                        : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-zinc-800"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         ) : null}
 
         <div className="ml-auto flex flex-wrap items-center gap-1.5">

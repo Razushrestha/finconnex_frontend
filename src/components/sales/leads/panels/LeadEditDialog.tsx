@@ -23,10 +23,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type SectionId = "appointment" | "tasks" | "notes" | "associated";
+type SectionId = "appointment" | "detail" | "tasks" | "notes" | "associated";
 
 const SECTIONS: { id: SectionId; label: string }[] = [
   { id: "appointment", label: "Book or update appointment" },
+  { id: "detail", label: "Client Details" },
   { id: "tasks", label: "Tasks" },
   { id: "notes", label: "Notes" },
   { id: "associated", label: "Associated objects" },

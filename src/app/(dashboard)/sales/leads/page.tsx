@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   EntityHeader,
   ImportOption,
+  ScopeOption,
   type ActionOption,
   type SortDirection,
 } from "@/components/sales/EntityHeader";
@@ -32,12 +33,32 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
+import {
+  KanbanField,
+  KanbanViewConfig,
+  KanbanViewSettingsModal,
+} from "@/components/common/KanbanViewControls";
 
 const DEFAULT_LEAD_COLUMNS = LEAD_PIPELINE_STAGES.map((stage) => ({
   id: stageColumnId(stage),
   label: stage,
   visible: true,
 }));
+
+const LEAD_FIELDS: KanbanField[] = [
+  { id: "leadName", label: "Lead Name", required: true },
+  { id: "source", label: "Source" },
+  { id: "phone", label: "Phone" },
+  { id: "email", label: "Email" },
+  { id: "leadOwner", label: "Lead Owner" },
+  { id: "tag", label: "Tag" },
+];
+
+const LEAD_SCOPE_OPTIONS: ScopeOption[] = [
+  { label: "All Leads", value: "all" },
+  { label: "My Leads", value: "mine" },
+  { label: "Follower Leads", value: "follower" },
+];
 
 export const SORT_OPTIONS = [
   { label: "Newest First", value: "newest" },
@@ -53,6 +74,8 @@ export default function LeadsPage() {
   const [totalLeads, setTotalLeads] = useState(0);
   const [columns] = useState(DEFAULT_LEAD_COLUMNS);
 
+  const [activeScope, setActiveScope] = useState("all");
+
   const [activeSort, setActiveSort] = useState("Sort");
   const [activeSortDirection, setActiveSortDirection] =
     useState<SortDirection>("asc");
@@ -65,6 +88,18 @@ export default function LeadsPage() {
   const [isMassUpdateOpen, setMassUpdateOpen] = useState(false);
   const [isManageTagsOpen, setManageTagsOpen] = useState(false);
   const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [viewConfig, setViewConfig] = useState<KanbanViewConfig>({
+    id: "leads",
+    name: "Leads",
+    categorizeBy: "Status",
+    aggregateBy: "Lead Count",
+    headerStyle: "Multi Colour",
+    shareWith: "everyone",
+    selectedFieldIds: ["leadName", "source", "phone", "leadOwner"],
+    editableFieldIds: ["leadOwner"],
+  });
 
   function exportTasks() {
     console.log("export tasks clicked");
@@ -93,6 +128,12 @@ export default function LeadsPage() {
         : [...current, field];
       return { ...prev, [key]: next };
     });
+  }
+
+  function handleToggleSelect(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
   }
 
   const visibleColumnIds = columns.filter((c) => c.visible).map((c) => c.id);
@@ -188,6 +229,9 @@ export default function LeadsPage() {
         onViewChange={setViewMode}
         isFilterOpen={isFilterOpen}
         onToggleFilter={() => setIsFilterOpen((v) => !v)}
+        scopeOptions={LEAD_SCOPE_OPTIONS}
+        activeScope={activeScope}
+        onScopeChange={setActiveScope}
         sortOptions={SORT_OPTIONS}
         activeSort={activeSort}
         activeSortDirection={activeSortDirection}
@@ -234,7 +278,8 @@ export default function LeadsPage() {
 
           <button
             type="button"
-            onClick={() => console.log("edit pipeline clicked")}
+            onClick={() => setIsSettingsOpen(true)}
+            aria-label="Edit Kanban view settings"
             className="rounded-full border border-slate-200 bg-white p-1.5 text-slate-400 shadow-sm hover:text-slate-600 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:text-zinc-300"
           >
             <Pencil className="h-3.5 w-3.5" />
@@ -258,12 +303,34 @@ export default function LeadsPage() {
             <LeadKanbanBoard
               filters={filters}
               visibleColumnIds={visibleColumnIds}
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
             />
           ) : (
             <LeadListView filters={filters} />
           )}
         </div>
       </div>
+
+      {isSettingsOpen && (
+        <KanbanViewSettingsModal
+          view={viewConfig}
+          availableFields={LEAD_FIELDS}
+          categorizeByOptions={["Status", "Source", "Lead Owner"]}
+          aggregateByOptions={["Lead Count"]}
+          headerStyleOptions={["Multi Colour", "Single Colour", "None"]}
+          onClose={() => setIsSettingsOpen(false)}
+          onSave={(next) => {
+            setViewConfig(next);
+            setIsSettingsOpen(false);
+            // e.g. api.updateKanbanView("leads", next);
+          }}
+          onDelete={() => {
+            setIsSettingsOpen(false);
+            // e.g. api.deleteKanbanView("leads");
+          }}
+        />
+      )}
     </div>
   );
 }

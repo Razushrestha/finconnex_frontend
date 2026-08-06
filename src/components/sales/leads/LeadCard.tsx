@@ -64,6 +64,9 @@ interface LeadCardProps {
   onQuickAction?: (kind: LeadCardQuickActionState["kind"]) => void;
 
   onSaveCardSettings?: (settings: LeadCardCustomizationSettings) => void;
+
+  isSelected: boolean;
+  onToggleSelect: (id: string) => void;
 }
 
 const QUICK_ICONS = {
@@ -99,6 +102,8 @@ export function LeadCard({
   onOpenLastActivity,
   onQuickAction,
   onSaveCardSettings,
+  isSelected,
+  onToggleSelect,
 }: LeadCardProps) {
   const nameId = useId();
   const [isMounted, setIsMounted] = useState(false);
@@ -175,14 +180,16 @@ export function LeadCard({
           <div className="relative flex shrink-0 items-center gap-1.5">
             <input
               type="checkbox"
-              checked={selected}
-              onChange={(e) => setSelected(e.target.checked)}
+              checked={isSelected}
+              onChange={() => onToggleSelect(card.id)}
               onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
               aria-label={`Select ${vm.name}`}
               className={cn(
                 "h-3.5 w-3.5 rounded border-slate-300 transition-opacity",
-                selected ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                isSelected
+                  ? "opacity-100"
+                  : "opacity-0 group-hover:opacity-100",
               )}
             />
             <LeadSlaChip sla={vm.sla} variant="badge" />
