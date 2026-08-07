@@ -49,6 +49,7 @@ import {
 } from "@/components/sales/QuickActionsBar";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion } from "@/lib/motion";
+import Link from "next/link";
 
 interface LeadCardProps {
   card: LeadCardData;
@@ -170,7 +171,12 @@ export function LeadCard({
               id={nameId}
               className="truncate text-[13px] font-semibold text-foreground"
             >
-              {vm.name}
+              <Link
+                href={`/sales/leads/detail/${card.id}`}
+                className="hover:underline focus-visible:underline focus-visible:outline-none"
+              >
+                {vm.name}
+              </Link>
             </h3>
             <p className="truncate text-[11px] text-foreground/70">
               <span className="sr-only">Pipeline stage: </span>
