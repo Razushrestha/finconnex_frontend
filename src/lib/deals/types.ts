@@ -13,6 +13,12 @@ export type DealStageTitle = (typeof DEAL_STAGES)[number];
 export const DEAL_CURRENCIES = ["AUD", "USD", "NZD", "GBP", "EUR"] as const;
 export type DealCurrency = (typeof DEAL_CURRENCIES)[number];
 
+export interface DealLocation {
+  deal: DealRecord;
+  stage: DealStage;
+  pipeline: DealPipeline;
+}
+
 export const LOST_REASONS = [
   "Price",
   "Feature",
@@ -79,6 +85,16 @@ function deal(
     ...rest,
     avatarBgClass: AVATAR_COLORS[avatarIndex % AVATAR_COLORS.length],
   };
+}
+
+export function findDealById(id: string): DealLocation | undefined {
+  for (const pipeline of DEAL_PIPELINES) {
+    for (const stage of DEAL_PIPELINE_STAGES[pipeline]) {
+      const deal = stage.deals.find((d) => d.id === id);
+      if (deal) return { deal, stage, pipeline };
+    }
+  }
+  return undefined;
 }
 
 export const DEAL_PIPELINE_STAGES: Record<DealPipeline, DealStage[]> = {

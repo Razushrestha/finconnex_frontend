@@ -17,6 +17,7 @@ import {
 import type { DealRecord } from "@/lib/deals/types";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion } from "@/lib/motion";
+import Link from "next/link";
 
 interface DealRecordCardProps {
   deal: DealRecord;
@@ -95,7 +96,12 @@ export function DealRecordCard({
             {deal.initials}
           </div>
           <h3 className="truncate text-[13px] font-semibold text-slate-800">
-            {deal.name}
+            <Link
+              href={`/sales/deals/detail/${deal.id}`}
+              className="hover:underline focus-visible:underline focus-visible:outline-none"
+            >
+              {deal.name}
+            </Link>
           </h3>
         </div>
 

@@ -160,6 +160,14 @@ function toCard(
   };
 }
 
+export function findLeadCardById(id: string): LeadCardData | undefined {
+  for (const column of LEAD_COLUMNS) {
+    const card = column.cards.find((c) => c.id === id);
+    if (card) return card;
+  }
+  return undefined;
+}
+
 /** Session 17 — Kanban columns = mortgage pipeline stages (PDF). */
 export const LEAD_COLUMNS: KanbanColumn[] = [
   {
