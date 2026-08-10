@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CheckSquare,
@@ -8,6 +8,7 @@ import {
   Calendar,
   Users,
   Link2,
+  Repeat,
 } from "lucide-react";
 import {
   TASK_OWNERS,
@@ -40,6 +41,9 @@ import {
   elevatedSelectClass,
   elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
+import RelatedRecordCombobox from "./RelatedRecordComboBox";
+import RepeatModal, { defaultRepeatConfig, RepeatConfig } from "./RepeatModal";
+import AttachmentUpload from "./AttachmentUpload";
 
 interface CreateTaskFormProps {
   layoutId: string;
@@ -62,7 +66,10 @@ interface FormState {
   assignedTo: string;
   description: string;
   notes: string;
+  attachments: File[];
   collaborators: string;
+  repeatEnabled: boolean;
+  repeat: RepeatConfig;
 }
 
 const initialState: FormState = {
@@ -77,7 +84,10 @@ const initialState: FormState = {
   assignedTo: "John Smith",
   description: "",
   notes: "",
+  attachments: [],
   collaborators: "",
+  repeatEnabled: false,
+  repeat: defaultRepeatConfig,
 };
 
 export function CreateTaskForm({
@@ -91,10 +101,11 @@ export function CreateTaskForm({
     relatedKind: defaults?.relatedKind ?? "",
     relatedName: defaults?.relatedName ?? "",
   });
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
-    {},
-  );
+  const [errors, setErrors] = useState<
+    Partial<Record<keyof FormState, string>>
+  >({});
   const [submitted, setSubmitted] = useState(false);
+  const [repeatModalOpen, setRepeatModalOpen] = useState(false);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -103,6 +114,14 @@ export function CreateTaskForm({
   const relatedOptions = form.relatedKind
     ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === form.relatedKind)
     : RELATED_RECORD_OPTIONS;
+
+  const canEnableRepeat = Boolean(form.taskType) && Boolean(form.dueDate);
+
+  useEffect(() => {
+    if (!canEnableRepeat && form.repeatEnabled) {
+      update("repeatEnabled", false);
+    }
+  }, [canEnableRepeat, form.repeatEnabled]);
 
   function validate() {
     const next: Partial<Record<keyof FormState, string>> = {
@@ -145,7 +164,10 @@ export function CreateTaskForm({
       description: form.description || undefined,
       notes: form.notes || undefined,
       collaborators: form.collaborators
-        ? form.collaborators.split(",").map((s) => s.trim()).filter(Boolean)
+        ? form.collaborators
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
         : undefined,
       createdBy: form.assignedTo,
     });
@@ -188,7 +210,7 @@ export function CreateTaskForm({
       tip="Tip: Name, type, priority, status, due date & assignee are required."
       cardIcon={CheckSquare}
       cardTitle="Task Information"
-      cardDescription="Fields marked required are needed to save (SRS §7.1)"
+      cardDescription=""
       listHref="/activities/tasks"
       saveLabel="Save Task"
       onSave={handleSave}
@@ -199,10 +221,7 @@ export function CreateTaskForm({
         error={submitted ? errors.title : undefined}
         className="col-span-full"
       >
-        <InputShell
-          icon={CheckSquare}
-          error={!!(submitted && errors.title)}
-        >
+        <InputShell icon={CheckSquare} error={!!(submitted && errors.title)}>
           <input
             className={elevatedInputClass(true)}
             value={form.title}
@@ -233,19 +252,12 @@ export function CreateTaskForm({
       </Field>
       <Field label="Related Record">
         <InputShell>
-          <select
-            className={elevatedSelectClass(false)}
+          <RelatedRecordCombobox
             value={form.relatedName}
-            onChange={(e) => update("relatedName", e.target.value)}
+            onChange={(v) => update("relatedName", v)}
+            options={relatedOptions}
             disabled={!form.relatedKind}
-          >
-            <option value="">Select record</option>
-            {relatedOptions.map((r) => (
-              <option key={`${r.kind}-${r.name}`} value={r.name}>
-                {r.name}
-              </option>
-            ))}
-          </select>
+          />
         </InputShell>
       </Field>
       <Field
@@ -310,10 +322,7 @@ export function CreateTaskForm({
         required
         error={submitted ? errors.dueDate : undefined}
       >
-        <InputShell
-          icon={Calendar}
-          error={!!(submitted && errors.dueDate)}
-        >
+        <InputShell icon={Calendar} error={!!(submitted && errors.dueDate)}>
           <input
             type="datetime-local"
             className={elevatedInputClass(true)}
@@ -332,6 +341,63 @@ export function CreateTaskForm({
           />
         </InputShell>
       </Field>
+      <Field label="Repeat">
+        <div
+          className={`flex items-center justify-between rounded-md border px-3 py-2 ${
+            canEnableRepeat ? "border-gray-200" : "border-gray-100 bg-gray-50"
+          }`}
+        >
+          <button
+            type="button"
+            disabled={!canEnableRepeat}
+            onClick={() => {
+              const next = !form.repeatEnabled;
+              update("repeatEnabled", next);
+              if (next) setRepeatModalOpen(true);
+            }}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              form.repeatEnabled ? "bg-green-500" : "bg-gray-300"
+            } ${!canEnableRepeat ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            <span
+              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                form.repeatEnabled ? "translate-x-5" : "translate-x-1"
+              }`}
+            />
+          </button>
+
+          {form.repeatEnabled && canEnableRepeat && (
+            <button
+              type="button"
+              onClick={() => setRepeatModalOpen(true)}
+              className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
+            >
+              <Repeat className="h-3.5 w-3.5" />
+              {form.repeat.type}
+            </button>
+          )}
+        </div>
+        {!canEnableRepeat && (
+          <p className="mt-1 text-xs text-gray-400">
+            Set Task Type and Due Date to enable repeat.
+          </p>
+        )}
+      </Field>
+
+      <RepeatModal
+        open={repeatModalOpen}
+        value={form.repeat}
+        onCancel={() => {
+          setRepeatModalOpen(false);
+          if (form.repeat === defaultRepeatConfig && !form.repeatEnabled) {
+            // no-op guard, keeps toggle state as-is
+          }
+        }}
+        onDone={(config) => {
+          update("repeat", config);
+          setRepeatModalOpen(false);
+        }}
+      />
       <Field
         label="Assigned To"
         required
@@ -380,6 +446,13 @@ export function CreateTaskForm({
             placeholder="Internal notes…"
           />
         </TextAreaShell>
+      </Field>
+
+      <Field label="Attachments" className="col-span-full">
+        <AttachmentUpload
+          files={form.attachments}
+          onChange={(files) => update("attachments", files)}
+        />
       </Field>
     </CreateEntityFormShell>
   );

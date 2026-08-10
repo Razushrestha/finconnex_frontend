@@ -63,7 +63,7 @@ const dashboardItems: NavItem[] = [
     children: [
       { label: "Tasks", href: "/activities/tasks" },
       { label: "Calls", href: "/activities/calls" },
-      { label: "Messages", href: "/activities/messages" },
+      { label: "Messages", href: "/marketing/inbox" },
       { label: "Emails", href: "/activities/emails" },
       { label: "Meetings", href: "/activities/meetings" },
       { label: "Notes", href: "/activities/notes" },
@@ -88,7 +88,6 @@ const dashboardItems: NavItem[] = [
       { label: "Email Campaigns", href: "/marketing/email" },
       { label: "SMS Campaigns", href: "/marketing/sms" },
       { label: "WhatsApp Campaigns", href: "/marketing/whatsapp" },
-      { label: "Unified Inbox", href: "/marketing/inbox" },
       { label: "Forms", href: "/marketing/forms" },
       { label: "Broker pages", href: "/marketing/linktree" },
     ],

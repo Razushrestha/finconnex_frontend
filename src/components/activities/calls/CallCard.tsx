@@ -369,7 +369,7 @@ export function CallCard({
             </h3>
             <input
               type="text"
-              placeholder="Enter name (e.g. Deepak Shrestha)"
+              placeholder="Enter name"
               value={assignedUserText}
               onChange={(e) => setAssignedUserText(e.target.value)}
               className="mb-4 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"

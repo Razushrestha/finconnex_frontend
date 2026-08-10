@@ -35,6 +35,7 @@ interface TaskCardProps {
   onChangeStatus?: (taskId: string, status: TaskStatus) => void;
   onChangePriority?: (taskId: string, priority: Priority) => void;
   onAssignUser?: (taskId: string, user: string) => void;
+  onChangeCollaborators?: (taskId: string, collaborators: string[]) => void;
   onAddComment?: (taskId: string, comment: string) => void;
   isSelected?: boolean;
   onSelect?: (
@@ -93,6 +94,7 @@ export function TaskCard({
   onChangeStatus,
   onChangePriority,
   onAssignUser,
+  onChangeCollaborators,
   onAddComment,
   isSelected = false,
   onSelect,
@@ -114,6 +116,9 @@ export function TaskCard({
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [commentText, setCommentText] = useState("");
+  const [assignModalTab, setAssignModalTab] = useState<
+    "owner" | "collaborators"
+  >("owner");
 
   const footerRef = useRef<HTMLDivElement>(null);
   const wasDragging = useRef(false);
@@ -176,6 +181,14 @@ export function TaskCard({
     setCommentText("");
     setShowCommentModal(false);
   };
+
+  function toggleFollower(owner: string) {
+    const current = task.collaborators ?? [];
+    const next = current.includes(owner)
+      ? current.filter((f) => f !== owner)
+      : [...current, owner];
+    onChangeCollaborators?.(task.taskId, next);
+  }
 
   return (
     <>
@@ -403,7 +416,7 @@ export function TaskCard({
           <button
             type="button"
             onClick={() => setShowAssignModal(true)}
-            title="Assign user"
+            title="Assign Owner"
             className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-600"
           >
             <UserPlus className="h-3.5 w-3.5" />
@@ -414,7 +427,7 @@ export function TaskCard({
             title="Add comment"
             className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-600"
           >
-            <Reply className="h-3.5 w-3.5" />
+            <MessageCircle className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -597,7 +610,7 @@ export function TaskCard({
           >
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-900">
-                Assign user
+                {assignModalTab === "owner" ? "Assign Owner" : "Add Followers"}
               </h3>
               <button
                 type="button"
@@ -607,24 +620,93 @@ export function TaskCard({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="max-h-64 space-y-1 overflow-y-auto">
-              {TASK_OWNERS.map((owner) => (
-                <button
-                  key={owner}
-                  type="button"
-                  onClick={() => selectUser(owner)}
-                  className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] hover:bg-slate-50 ${
-                    owner === task.assignedTo
-                      ? "bg-sky-50 font-medium text-sky-700"
-                      : "text-slate-700"
-                  }`}
-                >
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600">
-                    {initialsOf(owner)}
+
+            <div className="mb-3 flex rounded-md bg-slate-100 p-0.5 text-[13px]">
+              <button
+                type="button"
+                onClick={() => setAssignModalTab("owner")}
+                className={`flex-1 rounded-[5px] py-1 font-medium transition-colors ${
+                  assignModalTab === "owner"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Owner
+              </button>
+              <button
+                type="button"
+                onClick={() => setAssignModalTab("collaborators")}
+                className={`flex-1 rounded-[5px] py-1 font-medium transition-colors ${
+                  assignModalTab === "collaborators"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Followers
+                {task.collaborators?.length ? (
+                  <span className="ml-1 text-slate-400">
+                    ({task.collaborators.length})
                   </span>
-                  {owner}
-                </button>
-              ))}
+                ) : null}
+              </button>
+            </div>
+
+            <div className="max-h-64 space-y-1 overflow-y-auto">
+              {assignModalTab === "owner"
+                ? TASK_OWNERS.map((owner) => (
+                    <button
+                      key={owner}
+                      type="button"
+                      onClick={() => selectUser(owner)}
+                      className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] hover:bg-slate-50 ${
+                        owner === task.assignedTo
+                          ? "bg-sky-50 font-medium text-sky-700"
+                          : "text-slate-700"
+                      }`}
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600">
+                        {initialsOf(owner)}
+                      </span>
+                      {owner}
+                    </button>
+                  ))
+                : TASK_OWNERS.filter((owner) => owner !== task.assignedTo).map(
+                    (owner) => {
+                      const checked =
+                        task.collaborators?.includes(owner) ?? false;
+                      return (
+                        <button
+                          key={owner}
+                          type="button"
+                          onClick={() => toggleFollower(owner)}
+                          className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] hover:bg-slate-50 ${
+                            checked
+                              ? "bg-sky-50 text-sky-700"
+                              : "text-slate-700"
+                          }`}
+                        >
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-600">
+                            {initialsOf(owner)}
+                          </span>
+                          <span className="flex-1 font-medium">{owner}</span>
+                          <span
+                            className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                              checked
+                                ? "border-sky-600 bg-sky-600"
+                                : "border-slate-300"
+                            }`}
+                          >
+                            {checked && (
+                              <Check
+                                className="h-3 w-3 text-white"
+                                strokeWidth={3}
+                              />
+                            )}
+                          </span>
+                        </button>
+                      );
+                    },
+                  )}
             </div>
           </div>
         </div>
