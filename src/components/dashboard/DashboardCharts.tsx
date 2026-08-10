@@ -375,11 +375,11 @@ export function RevenueBarChart({
         />
         <Tooltip
           content={<ChartTooltip formatter={(value) => `Revenue: ${value}K`} />}
-          cursor={{ fill: "#64748B", fillOpacity: 0.08 }}
+          cursor={{ fill: "#7C3AED", fillOpacity: 0.08 }}
         />
         <Bar
           dataKey="value"
-          fill="#64748B"
+          fill="#7C3AED"
           radius={[6, 6, 0, 0]}
           maxBarSize={28}
         />

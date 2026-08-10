@@ -35,13 +35,13 @@ const trafficSources = [
   { label: "Email Traffic", value: "3.20%", color: "bg-violet-900" },
 ];
 const earningDonutData = [
-  { value: 70, color: "#334155" },
-  { value: 30, color: "#E2E8F0" },
+  { value: 70, color: "#7C3AED" },
+  { value: 30, color: "#EDE9FE" },
 ];
 const orderStatus = [
-  { label: "Paid", value: "70%", color: "bg-slate-700" },
-  { label: "Cancelled", value: "25%", color: "bg-slate-400" },
-  { label: "Refunded", value: "5%", color: "bg-slate-200" },
+  { label: "Paid", value: "70%", color: "bg-violet-700" },
+  { label: "Cancelled", value: "25%", color: "bg-violet-400" },
+  { label: "Refunded", value: "5%", color: "bg-violet-200" },
 ];
 
 function TotalContactsCard() {
@@ -196,14 +196,14 @@ function TotalEarningCard() {
         </div>
         <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 shrink-0 rounded-sm bg-slate-700" />
+            <span className="h-2.5 w-2.5 shrink-0 rounded-sm bg-violet-700" />
             <div>
               <p className="text-sm font-semibold text-gray-900">$2.78m</p>
               <p className="text-xs text-gray-500">245 Pickups</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="h-2.5 w-2.5 shrink-0 rounded-sm bg-slate-300" />
+            <span className="h-2.5 w-2.5 shrink-0 rounded-sm bg-violet-200" />
             <div>
               <p className="text-sm font-semibold text-gray-900">$65,820</p>
               <p className="text-xs text-gray-500">120 Shipments</p>
@@ -215,10 +215,10 @@ function TotalEarningCard() {
         <h4 className="mb-2 text-sm font-semibold text-gray-900">
           Orders Status
         </h4>
-        <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-          <div className="h-full bg-slate-700" style={{ width: "70%" }} />
-          <div className="h-full bg-slate-400" style={{ width: "25%" }} />
-          <div className="h-full bg-slate-200" style={{ width: "5%" }} />
+        <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-violet-50">
+          <div className="h-full bg-violet-700" style={{ width: "70%" }} />
+          <div className="h-full bg-violet-400" style={{ width: "25%" }} />
+          <div className="h-full bg-violet-200" style={{ width: "5%" }} />
         </div>
         <ul className="mt-3 flex flex-col gap-2">
           {orderStatus.map((item) => (

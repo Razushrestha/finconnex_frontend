@@ -67,29 +67,29 @@ const pipelineStages = [
     label: "Leads",
     value: 120,
     max: 120,
-    track: "bg-violet-100",
+    track: "bg-violet-50",
     fill: "bg-violet-200",
   },
   {
     label: "Prospects",
     value: 85,
     max: 120,
-    track: "bg-emerald-50",
-    fill: "bg-emerald-100",
+    track: "bg-violet-50",
+    fill: "bg-violet-300",
   },
   {
     label: "Opportunities",
     value: 40,
     max: 120,
     track: "bg-violet-50",
-    fill: "bg-violet-100",
+    fill: "bg-violet-500",
   },
   {
     label: "Closed Deals",
     value: 20,
     max: 120,
-    track: "bg-red-50",
-    fill: "bg-red-100",
+    track: "bg-violet-50",
+    fill: "bg-violet-700",
   },
 ];
 
@@ -226,9 +226,9 @@ function DealsOverviewCard() {
             <Area
               type="stepAfter"
               dataKey="value"
-              stroke="#475569"
+              stroke="#7C3AED"
               strokeWidth={2.5}
-              fill="#64748B"
+              fill="#7C3AED"
               fillOpacity={0.15}
             />
           </AreaChart>
