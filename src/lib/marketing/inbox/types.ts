@@ -4,9 +4,7 @@ export type InboxChannel =
   | "Facebook Messenger"
   | "Instagram DM"
   | "WhatsApp"
-  | "SMS"
-  | "Email"
-  | "Web Chat";
+  | "SMS";
 
 export type InboxStatus = "Open" | "Pending" | "Resolved";
 
@@ -15,8 +13,6 @@ export const INBOX_CHANNELS: InboxChannel[] = [
   "Instagram DM",
   "WhatsApp",
   "SMS",
-  "Email",
-  "Web Chat",
 ];
 
 export const INBOX_STATUSES: InboxStatus[] = ["Open", "Pending", "Resolved"];
@@ -98,18 +94,6 @@ export const inboxChannelConnections: InboxChannelConnection[] = [
     accountLabel: "FinConnex SMS",
     via: "Twilio (mock)",
   },
-  {
-    channel: "Email",
-    connected: true,
-    accountLabel: "inbox@finconnex.example",
-    via: "IMAP / ESP",
-  },
-  {
-    channel: "Web Chat",
-    connected: false,
-    accountLabel: "Website widget",
-    via: "FinConnex Chat",
-  },
 ];
 
 export const inboxConversations: InboxConversation[] = [
@@ -154,7 +138,7 @@ export const inboxConversations: InboxConversation[] = [
   {
     id: "in2",
     conversationId: "IN-9002",
-    channel: "Email",
+    channel: "Facebook Messenger",
     contactName: "Olivia Bennett",
     contactEmail: "olivia@northwind.com",
     relatedTo: "Deal: Greystone Realty",
@@ -268,7 +252,7 @@ export const inboxConversations: InboxConversation[] = [
   {
     id: "in6",
     conversationId: "IN-9006",
-    channel: "Web Chat",
+    channel: "Instagram DM",
     contactName: "Guest visitor",
     assignedAgent: "Unassigned",
     status: "Pending",

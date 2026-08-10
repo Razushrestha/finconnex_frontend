@@ -36,8 +36,6 @@ const CHANNEL_DOT: Record<InboxChannel, string> = {
   "Instagram DM": "bg-pink-500",
   WhatsApp: "bg-emerald-500",
   SMS: "bg-sky-500",
-  Email: "bg-violet-500",
-  "Web Chat": "bg-slate-500",
 };
 
 const CHANNEL_SOFT: Record<InboxChannel, string> = {
@@ -45,8 +43,6 @@ const CHANNEL_SOFT: Record<InboxChannel, string> = {
   "Instagram DM": "bg-pink-50 text-pink-700",
   WhatsApp: "bg-emerald-50 text-emerald-700",
   SMS: "bg-sky-50 text-sky-700",
-  Email: "bg-violet-50 text-violet-700",
-  "Web Chat": "bg-slate-100 text-slate-600",
 };
 
 const STATUS_STYLE: Record<InboxStatus, string> = {
@@ -152,7 +148,8 @@ export function UnifiedInboxClient() {
       body: draft.trim(),
       at: formatInboxAt(),
       outbound: true,
-      author: active.assignedAgent === "Unassigned" ? "You" : active.assignedAgent,
+      author:
+        active.assignedAgent === "Unassigned" ? "You" : active.assignedAgent,
     };
     persist({
       ...active,
@@ -247,7 +244,6 @@ export function UnifiedInboxClient() {
 
   return (
     <div className="relative flex min-h-full flex-col overflow-hidden bg-slate-50">
-
       <div className="relative flex min-h-0 flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -268,7 +264,7 @@ export function UnifiedInboxClient() {
             </h1>
             <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
               <Inbox className="h-2.5 w-2.5" />
-              §10.4
+              10.4
             </span>
             {unreadTotal > 0 ? (
               <span className="rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-bold text-white">
@@ -285,7 +281,7 @@ export function UnifiedInboxClient() {
           </Link>
         </div>
 
-        <div className="flex min-h-[calc(100dvh-7.5rem)] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+        <div className="flex h-[calc(100dvh-7.5rem)] overflow-hidden rounded-md border border-slate-200/80 bg-white shadow-sm">
           {/* Channel rail */}
           <aside className="hidden w-[180px] shrink-0 flex-col border-r border-slate-100 bg-slate-50 lg:flex">
             <div className="border-b border-slate-100 px-3 py-3">
@@ -506,9 +502,7 @@ export function UnifiedInboxClient() {
                     Status
                     <select
                       value={active.status}
-                      onChange={(e) =>
-                        setStatus(e.target.value as InboxStatus)
-                      }
+                      onChange={(e) => setStatus(e.target.value as InboxStatus)}
                       className="h-7 rounded-md border border-slate-200 bg-white px-1.5 text-[11px] font-semibold normal-case text-slate-700 outline-none"
                     >
                       {INBOX_STATUSES.map((s) => (
@@ -663,7 +657,9 @@ export function UnifiedInboxClient() {
                     {active.contactEmail ?? ""}
                   </p>
                   <p>
-                    <span className="font-semibold text-slate-400">Related:</span>{" "}
+                    <span className="font-semibold text-slate-400">
+                      Related:
+                    </span>{" "}
                     {active.relatedTo ?? "Not linked"}
                   </p>
                 </div>
