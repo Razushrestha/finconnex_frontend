@@ -21,6 +21,8 @@ interface KanbanColumnProps {
   ) => void;
   onDragEndTask: () => void;
   onDropTask: (targetColumnId: string, targetIndex?: number) => void;
+  selectedIds?: string[];
+  onToggleSelect: (id: string) => void;
 }
 
 export function KanbanColumn({
@@ -31,6 +33,8 @@ export function KanbanColumn({
   onDragStartTask,
   onDragEndTask,
   onDropTask,
+  selectedIds,
+  onToggleSelect,
 }: KanbanColumnProps) {
   const router = useRouter();
   const [isOver, setIsOver] = useState(false);
@@ -92,7 +96,7 @@ export function KanbanColumn({
   }
 
   return (
-    <div className="group flex h-full w-72 shrink-0 flex-col mb-4">
+    <div className="flex h-full w-72 shrink-0 flex-col mb-4">
       {/* Header Box */}
       <div
         className={cn(
@@ -118,7 +122,7 @@ export function KanbanColumn({
         </div>
       </div>
 
-      {/* Task List / Drop Zone Container */}
+      {/* Task List / Drop Zone Container - Added group class here so hover state works on the column container */}
       <div
         onDragOver={handleDragOverContainer}
         onDragLeave={() => {
@@ -133,7 +137,7 @@ export function KanbanColumn({
           onDropTask(column.id, dropTargetPos?.targetIndex);
         }}
         className={cn(
-          "flex min-h-0 flex-1 flex-col rounded-sm border border-transparent p-2",
+          "group flex min-h-0 flex-1 flex-col rounded-sm border border-transparent p-2",
           dropTargetIdle,
           isOver ? dropTargetActive : "bg-slate-200/70",
         )}
@@ -163,6 +167,8 @@ export function KanbanColumn({
                     task={task}
                     columnId={column.id}
                     isDragging={draggingTaskId === task.taskId}
+                    isSelected={selectedIds?.includes(task.taskId)}
+                    onSelect={() => onToggleSelect(task.taskId)}
                     onDragStart={(e) =>
                       onDragStartTask(e, task.taskId, column.id)
                     }
@@ -189,7 +195,7 @@ export function KanbanColumn({
         <div className="mt-2 flex w-full shrink-0 justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
           <button
             type="button"
-            onClick={() => router.push("/sales/tasks/create")}
+            onClick={() => router.push("/activities/tasks/create")}
             className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-white hover:text-slate-900"
           >
             <Plus className="h-4 w-4" />

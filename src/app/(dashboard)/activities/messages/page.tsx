@@ -8,6 +8,7 @@ import {
   type ActivityView,
 } from "@/components/activities/ActivityToolbar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
+import { moreMenuItems, printViewItems } from "../tasks/page";
 
 export default function MessagesPage() {
   const [view, setView] = useState<ActivityView>("kanban");
@@ -27,6 +28,8 @@ export default function MessagesPage() {
           filterOpen={filterOpen}
           onToggleFilter={() => setFilterOpen((v) => !v)}
           onClearSort={() => setSortActive(false)}
+          moreMenuItems={moreMenuItems}
+          printViewItems={printViewItems}
         />
       </div>
       <div className="relative flex min-h-0 flex-1 items-stretch gap-4 overflow-hidden">

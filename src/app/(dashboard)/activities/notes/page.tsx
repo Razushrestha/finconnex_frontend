@@ -17,6 +17,7 @@ import {
 } from "@/components/activities/ActivityToolbar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
+import { moreMenuItems, printViewItems } from "../tasks/page";
 
 type TypeTab = "All" | NoteType;
 
@@ -138,6 +139,8 @@ export default function NotesPage() {
           onClearSort={() => setSortActive(false)}
           search={search}
           onSearchChange={setSearch}
+          moreMenuItems={moreMenuItems}
+          printViewItems={printViewItems}
         />
       </div>
 

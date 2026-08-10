@@ -9,6 +9,7 @@ import {
 import { EmailsFilterPanel } from "@/components/activities/emails/EmailsFilterPanel";
 import { EmailsKanbanBoard } from "@/components/activities/emails/EmailsKanbanBoard";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
+import { moreMenuItems, printViewItems } from "../tasks/page";
 
 export default function EmailsPage() {
   const [view, setView] = useState<ActivityView>("kanban");
@@ -28,6 +29,8 @@ export default function EmailsPage() {
           filterOpen={filterOpen}
           onToggleFilter={() => setFilterOpen((v) => !v)}
           onClearSort={() => setSortActive(false)}
+          moreMenuItems={moreMenuItems}
+          printViewItems={printViewItems}
         />
       </div>
 

@@ -128,7 +128,7 @@ export function ActivityToolbar({
 
   return (
     <div className="mb-1.5">
-      <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5 border-b border-slate-200 px-1 py-1.5 dark:border-zinc-800">
+      <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5 border-b border-slate-200  py-1.5 dark:border-zinc-800">
         <div className="flex min-w-0 items-center gap-0.5 overflow-x-auto scrollbar-none">
           {tabs.map((tab) => {
             const count = tabCounts?.[tab];

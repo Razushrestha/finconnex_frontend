@@ -36,6 +36,10 @@ interface TaskCardProps {
   onChangePriority?: (taskId: string, priority: Priority) => void;
   onAssignUser?: (taskId: string, user: string) => void;
   onAddComment?: (taskId: string, comment: string) => void;
+  isSelected?: boolean;
+  onSelect?: (
+    e: React.MouseEvent | React.ChangeEvent<HTMLInputElement>,
+  ) => void;
 }
 
 const priorityClass: Record<string, string> = {
@@ -90,6 +94,8 @@ export function TaskCard({
   onChangePriority,
   onAssignUser,
   onAddComment,
+  isSelected = false,
+  onSelect,
 }: TaskCardProps) {
   const days = task.overdue ? overdueDays(task.dueDate) : null;
   const PriorityIcon =
@@ -130,19 +136,9 @@ export function TaskCard({
 
   const handleDragEnd = () => {
     onDragEnd();
-    // Clear the flag on next tick so the click that follows drop is still suppressed
     setTimeout(() => {
       wasDragging.current = false;
     }, 0);
-  };
-
-  const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (wasDragging.current) return;
-    // Don't open details when the click originated from the footer action bar
-    if (footerRef.current && footerRef.current.contains(e.target as Node)) {
-      return;
-    }
-    setShowDetailsModal(true);
   };
 
   const markComplete = () => {
@@ -185,23 +181,58 @@ export function TaskCard({
     <>
       <div
         draggable
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onClick={(e) => {
+          if (wasDragging.current) return;
+          if (
+            footerRef.current &&
+            footerRef.current.contains(e.target as Node)
+          ) {
+            return;
+          }
+          setShowDetailsModal(true);
+        }}
         data-focus-id={task.taskId}
         data-task-id={task.taskId}
         data-column-id={columnId}
         className={cn(
-          "cursor-grab flex h-[220px] w-full bg-white flex-col p-3 sm:h-[230px] sm:p-3.5",
+          "group/card cursor-grab flex h-[220px] w-full bg-white flex-col p-3 sm:h-[230px] sm:p-3.5 relative",
           cardMotion,
           isDragging && cardDragging,
+          isSelected
+            ? "border-indigo-500 ring-1 ring-indigo-500 bg-indigo-50/20"
+            : "border-slate-200/80 hover:border-slate-300",
         )}
       >
-        <h4
-          className="mb-2 truncate text-[13px] font-semibold text-primary"
-          title={task.title}
-        >
-          {task.title}
-        </h4>
+        <div className="mb-3 flex items-center justify-between gap-2.5">
+          <h4
+            className="mb-2 truncate text-[13px] font-semibold text-primary"
+            title={task.title}
+          >
+            {task.title}
+          </h4>
+
+          {onSelect && (
+            <div
+              className={cn(
+                "shrink-0 transition-opacity",
+                isSelected
+                  ? "opacity-100"
+                  : "opacity-0 group-hover/card:opacity-100",
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={onSelect}
+                onClick={(e) => e.stopPropagation()}
+                aria-label={`Select task ${task.title}`}
+                className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+              />
+            </div>
+          )}
+        </div>
 
         <div className="mb-2.5 flex items-center justify-between gap-2">
           {days !== null ? (
@@ -385,13 +416,6 @@ export function TaskCard({
           >
             <Reply className="h-3.5 w-3.5" />
           </button>
-          {/* <button
-            type="button"
-            title="More"
-            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-          >
-            <MoreHorizontal className="h-3.5 w-3.5" />
-          </button> */}
         </div>
       </div>
 

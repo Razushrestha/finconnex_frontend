@@ -18,8 +18,9 @@ import {
 } from "@/components/activities/ActivityToolbar";
 import { EMPTY_TASK_FILTERS, type TaskFilters } from "@/lib/tasks/types";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
+import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 
-const moreMenuItems = [
+export const moreMenuItems = [
   { key: "mass-transfer", icon: ArrowRightLeft, label: "Mass Transfer" },
   { key: "mass-delete", icon: Trash2, label: "Mass Delete" },
   { key: "mass-update", icon: RefreshCw, label: "Mass Update" },
@@ -28,7 +29,7 @@ const moreMenuItems = [
   { key: "export-tasks", icon: Download, label: "Export Tasks" },
 ];
 
-const printViewItems = [
+export const printViewItems = [
   { key: "print-default", label: "Print Default view" },
   { key: "print-canvas", label: "Print Using Canvas", premium: true },
 ];
@@ -46,6 +47,9 @@ export default function TasksPage() {
   const [filters, setFilters] = useState<TaskFilters>(EMPTY_TASK_FILTERS);
   const [sortField, setSortField] = useState<string | undefined>();
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   function toggleField(
     sectionId: "status" | "priority" | "type",
@@ -76,7 +80,7 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="flex min-h-full w-full min-w-0 flex-col overflow-hidden bg-slate-50/50 px-4 py-1">
+    <div className="flex min-h-full w-full min-w-0 flex-col overflow-hidden bg-slate-50/50 px-3 py-1">
       <FocusHighlight />
       <div className="shrink-0">
         <ActivityToolbar
@@ -101,9 +105,42 @@ export default function TasksPage() {
             "Tasks by Priority",
           ]}
         />
+        {/* 
+        {selectedIds.length > 0 ? (
+        <EntitySelectionToolbar
+          selectedCount={selectedIds.length}
+          onClear={() => setSelectedIds([])}
+          onSendMail={() => console.log("send mail clicked")}
+          onAddTag={() => console.log("add tag clicked")}
+          onRemoveTag={() => console.log("remove tag clicked")}
+          onRunMacro={() => console.log("run macro clicked")}
+          onCreateTask={() => console.log("create task clicked")}
+          onSetReminder={() => console.log("set reminder clicked")}
+          onMassUpdate={() => console.log("mass update clicked")}
+          onChangeOwner={() => console.log("change owner clicked")}
+          onCadences={() => console.log("cadences clicked")}
+          onAddToCampaigns={() => console.log("add to campaigns clicked")}
+          onPrintMailingLabels={() =>
+            console.log("print mailing labels clicked")
+          }
+          onMailMerge={() => console.log("mail merge clicked")}
+          onMassConvert={() => console.log("mass convert clicked")}
+          onDelete={() => console.log("delete clicked")}
+          onExportSelectedRecords={() =>
+            console.log("export selected records clicked")
+          }
+        />
+      ) : null} */}
+
+        {selectedTaskIds.length > 0 && (
+          <EntitySelectionToolbar
+            selectedCount={selectedTaskIds.length}
+            onClear={() => setSelectedTaskIds([])}
+          />
+        )}
       </div>
 
-      <div className="flex min-h-0 flex-1 items-stretch gap-4">
+      <div className="flex min-h-0 flex-1 items-stretch gap-4 mt-2">
         {filterOpen && (
           <FilterPanel
             filters={filters}
