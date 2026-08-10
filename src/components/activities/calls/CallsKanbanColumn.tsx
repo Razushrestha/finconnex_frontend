@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { useRouter } from "next/navigation";
 import type { DropTargetPos } from "./CallsKanbanBoard";
+import type { Priority, TaskStatus } from "@/lib/tasks/types";
 
 interface CallsKanbanColumnProps {
   column: CallColumn;
@@ -21,6 +22,12 @@ interface CallsKanbanColumnProps {
   ) => void;
   onDragEndCall: () => void;
   onDropCall: (targetColumnId: string, targetIndex?: number) => void;
+  selectedCallIds?: string[];
+  onToggleSelect?: (callId: string) => void;
+  onChangeStatus?: (callId: string, status: TaskStatus) => void;
+  onChangePriority?: (callId: string, priority: Priority) => void;
+  onAssignUser?: (callId: string, user: string) => void;
+  onAddComment?: (callId: string, comment: string) => void;
 }
 
 export function CallsKanbanColumn({
@@ -31,6 +38,12 @@ export function CallsKanbanColumn({
   onDragStartCall,
   onDragEndCall,
   onDropCall,
+  selectedCallIds = [],
+  onToggleSelect,
+  onChangeStatus,
+  onChangePriority,
+  onAssignUser,
+  onAddComment,
 }: CallsKanbanColumnProps) {
   const router = useRouter();
   const [isOver, setIsOver] = useState(false);
@@ -154,6 +167,8 @@ export function CallsKanbanColumn({
               index === column.calls.length - 1 &&
               draggingCallId !== call.id;
 
+            const isSelected = selectedCallIds.includes(call.id);
+
             return (
               <div key={call.id} className="space-y-3">
                 {showPlaceholderBefore && (
@@ -167,6 +182,14 @@ export function CallsKanbanColumn({
                     isDragging={draggingCallId === call.id}
                     onDragStart={(e) => onDragStartCall(e, call.id, column.id)}
                     onDragEnd={onDragEndCall}
+                    isSelected={isSelected}
+                    onSelect={
+                      onToggleSelect ? () => onToggleSelect(call.id) : undefined
+                    }
+                    onChangeStatus={onChangeStatus}
+                    onChangePriority={onChangePriority}
+                    onAssignUser={onAssignUser}
+                    onAddComment={onAddComment}
                   />
                 </div>
 
@@ -188,7 +211,7 @@ export function CallsKanbanColumn({
         <div className="mt-2 flex w-full shrink-0 justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
           <button
             type="button"
-            onClick={() => router.push("/sales/calls/create")}
+            onClick={() => router.push("/activities/calls/create")}
             className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-white hover:text-slate-900"
           >
             <Plus className="h-4 w-4" />

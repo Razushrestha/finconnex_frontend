@@ -215,7 +215,7 @@ export function MeetingsKanbanColumn({
         <div className="mt-2 flex w-full shrink-0 justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
           <button
             type="button"
-            onClick={() => router.push("/sales/meetings/create")}
+            onClick={() => router.push("/activities/meetings/create")}
             className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-white hover:text-slate-900"
           >
             <Plus className="h-4 w-4" />

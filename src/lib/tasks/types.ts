@@ -112,7 +112,7 @@ export const taskColumns: TaskColumn[] = [
       }),
       task({
         // Extra pending competitor for William (+X coverage)
-        taskId: "T-010",
+        taskId: "T-019",
         title: "Confirm documents checklist",
         taskType: "Follow-up",
         priority: "Medium",

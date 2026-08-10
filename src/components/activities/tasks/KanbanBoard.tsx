@@ -31,6 +31,8 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
     null,
   );
 
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
   useEffect(() => {
     setColumns(listTaskColumns());
   }, []);
@@ -38,6 +40,14 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
   function persist(next: TaskColumn[]) {
     saveTaskColumns(next);
     setColumns(next);
+  }
+
+  function handleToggleSelect(taskId: string) {
+    setSelectedIds((prev) =>
+      prev.includes(taskId)
+        ? prev.filter((id) => id !== taskId)
+        : [...prev, taskId],
+    );
   }
 
   const visibleColumns = useMemo(() => {
@@ -140,6 +150,8 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
           onDragStartTask={handleDragStartTask}
           onDragEndTask={handleDragEndTask}
           onDropTask={handleDropTask}
+          selectedIds={selectedIds}
+          onToggleSelect={handleToggleSelect}
         />
       ))}
     </div>
