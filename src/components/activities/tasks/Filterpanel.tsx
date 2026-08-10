@@ -120,8 +120,30 @@ export function FilterPanel({
                       className="flex cursor-pointer items-center gap-2 text-sm text-slate-600"
                     >
                       <input
-                        type="checkbox"
+                        type={
+                          section.id === "priority" || section.id === "status"
+                            ? "radio"
+                            : "checkbox"
+                        }
+                        name={
+                          section.id === "priority"
+                            ? "task-priority-filter"
+                            : section.id === "status"
+                              ? "task-status-filter"
+                              : undefined
+                        }
                         checked={isChecked(section.id, field)}
+                        onClick={(e) => {
+                          // Allow clicking the active radio to clear the filter.
+                          if (
+                            (section.id === "priority" ||
+                              section.id === "status") &&
+                            isChecked(section.id, field)
+                          ) {
+                            e.preventDefault();
+                            onToggleField(section.id, field);
+                          }
+                        }}
                         onChange={() => onToggleField(section.id, field)}
                         className="h-3.5 w-3.5 rounded border-slate-300 text-violet-500 focus:ring-violet-300"
                       />

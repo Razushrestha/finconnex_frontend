@@ -14,8 +14,7 @@ interface StatusDropdownProps<S extends string> {
 }
 
 /**
- * Solid violet "current selection" dropdown, e.g. status for Email/SMS/WhatsApp
- * campaigns, or any other single-select filter that should read as the primary one.
+ * Compact outlined status scope control for marketing list toolbars.
  */
 export function StatusDropdown<S extends string>({
   statuses,
@@ -34,13 +33,13 @@ export function StatusDropdown<S extends string>({
         <button
           type="button"
           onClick={toggle}
-          className="inline-flex h-9 items-center gap-2 rounded-xl bg-violet-600 pr-3 pl-4 text-sm font-semibold text-white shadow-sm"
+          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[12px] font-semibold text-slate-700 hover:bg-slate-50"
         >
           {value === "All" ? allLabel : value}
-          <span className="rounded-full bg-white/20 px-1.5 text-[12px] font-bold tabular-nums">
+          <span className="rounded-full bg-violet-100 px-1.5 text-[10px] font-bold tabular-nums text-violet-700">
             {activeCount}
           </span>
-          <ChevronDown className="h-3.5 w-3.5" />
+          <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
         </button>
       )}
     >

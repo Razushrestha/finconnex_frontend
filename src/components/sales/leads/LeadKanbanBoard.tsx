@@ -30,6 +30,10 @@ import {
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import {
+  kanbanHeaderSurfaceStyle,
+  resolveKanbanHeaderColor,
+} from "@/components/common/KanbanViewControls";
 
 interface DragInfo {
   cardId: string;
@@ -57,11 +61,16 @@ interface LeadKanbanBoardProps {
   onAddLead?: (columnId: string) => void;
   selectedIds: string[];
   onToggleSelect: (id: string) => void;
+  /** Kanban Select Fields → which fields render on each card. */
+  cardFieldKeys?: readonly string[];
+  showOwnerAvatar?: boolean;
+  headerStyle?: string;
+  singleHeaderColor?: string;
+  multiHeaderColors?: Record<string, string>;
 }
 
-// Adjust this offset to match whatever chrome (nav bar, filter bar, tabs)
-// sits above the board on the page that renders it.
-const BOARD_HEIGHT = "h-[calc(100vh-5rem)]";
+// Column height fills the board area so Create lead stays on-screen.
+const BOARD_HEIGHT = "h-full";
 
 export function LeadKanbanBoard({
   filters,
@@ -69,6 +78,11 @@ export function LeadKanbanBoard({
   onAddLead,
   selectedIds,
   onToggleSelect,
+  cardFieldKeys,
+  showOwnerAvatar,
+  headerStyle = "Multi Colour",
+  singleHeaderColor,
+  multiHeaderColors,
 }: LeadKanbanBoardProps) {
   const router = useRouter();
   const boardRef = useRef<HTMLDivElement>(null);
@@ -195,7 +209,7 @@ export function LeadKanbanBoard({
   }
 
   function handleDragStart(
-    e: React.DragEvent<HTMLDivElement>,
+    e: React.DragEvent<HTMLElement>,
     cardId: string,
     columnId: string,
   ) {
@@ -380,9 +394,9 @@ export function LeadKanbanBoard({
   return (
     <div
       ref={boardRef}
-      className="relative w-full h-full overflow-x-auto bg-background"
+      className="relative h-full w-full overflow-x-auto overflow-y-hidden bg-background"
     >
-      <div className="flex h-full items-start gap-3 p-1">
+      <div className="flex h-full items-stretch gap-3 p-1">
         {visibleColumns.map((column) => {
           const isOver = overColumnId === column.id;
           const isCollapsed = collapsedColumns.has(column.id);
@@ -391,7 +405,7 @@ export function LeadKanbanBoard({
             <div
               key={column.id}
               className={cn(
-                "group relative flex flex-col gap-2 transition-all duration-200",
+                "group relative flex h-full min-h-0 flex-col gap-2 transition-all duration-200",
                 BOARD_HEIGHT,
                 isCollapsed
                   ? "w-12 min-w-[3.5rem] flex-shrink-0"
@@ -413,24 +427,40 @@ export function LeadKanbanBoard({
                 </div>
               ) : (
                 <>
-                  {/* Header box */}
-                  <div className="rounded-xs bg-primary/20 p-1">
-                    <div className="mb-1 flex items-center justify-between px-1">
-                      <div className="flex items-center gap-2">
-                        <h2 className="max-w-[15rem] text-xs font-semibold leading-snug text-foreground xl:text-sm">
-                          {column.title}
-                        </h2>
-                        <span className="rounded-full border border-slate-200/80 bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
-                          {column.cards.length}
-                        </span>
+                  {/* Header box — driven by Kanban View → Header Style */}
+                  {(() => {
+                    const hex = resolveKanbanHeaderColor(
+                      {
+                        headerStyle,
+                        singleHeaderColor,
+                        multiHeaderColors,
+                      },
+                      column.id,
+                    );
+                    const surface = kanbanHeaderSurfaceStyle(hex);
+                    return (
+                      <div
+                        className={cn("rounded-xs p-1", surface.className)}
+                        style={surface.style}
+                      >
+                        <div className="mb-1 flex items-center justify-between px-1">
+                          <div className="flex items-center gap-2">
+                            <h2 className="max-w-[15rem] text-xs font-semibold leading-snug text-foreground xl:text-sm">
+                              {column.title}
+                            </h2>
+                            <span className="rounded-full border border-slate-200/80 bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
+                              {column.cards.length}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="px-1 text-xs font-medium text-foreground/70">
+                          {column.totalAmount} total
+                        </div>
                       </div>
-                    </div>
-                    <div className="px-1 text-xs font-medium text-foreground/70">
-                      {column.totalAmount} total
-                    </div>
-                  </div>
+                    );
+                  })()}
 
-                  {/* Card list box */}
+                  {/* Card list box — cards scroll; Create lead stays pinned */}
                   <div
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -472,7 +502,7 @@ export function LeadKanbanBoard({
                         e.stopPropagation();
                         handleDrop(column.id, dropTargetPos?.targetIndex);
                       }}
-                      className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-8 no-scrollbar"
+                      className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2 no-scrollbar"
                     >
                       {(() => {
                         let visibleIndex = 0;
@@ -491,7 +521,7 @@ export function LeadKanbanBoard({
                             rendered.push(
                               <div
                                 key={`placeholder-${card.id}`}
-                                className="h-[88px] rounded-md border-2 border-dashed border-indigo-300 bg-background transition-all duration-150 ease-out"
+                                className="h-[180px] shrink-0 rounded-md border-2 border-dashed border-violet-300 bg-violet-50/50 transition-all duration-150 ease-out"
                               />,
                             );
                           }
@@ -520,6 +550,8 @@ export function LeadKanbanBoard({
                                 card={card}
                                 status={column.leadStatus}
                                 cardSettings={cardSettings}
+                                dynamicFieldKeys={cardFieldKeys}
+                                showOwnerAvatar={showOwnerAvatar}
                                 revision={activityRevision}
                                 isDragging={isDraggedCard}
                                 isSelected={selectedIds.includes(card.id)}
@@ -566,7 +598,7 @@ export function LeadKanbanBoard({
                           rendered.push(
                             <div
                               key="placeholder-end"
-                              className="h-[88px] rounded-md border-2 border-dashed border-indigo-300 bg-background transition-all duration-150 ease-out"
+                              className="h-[180px] shrink-0 rounded-md border-2 border-dashed border-violet-300 bg-violet-50/50 transition-all duration-150 ease-out"
                             />,
                           );
                         }
@@ -575,7 +607,7 @@ export function LeadKanbanBoard({
                           <>
                             {rendered}
                             {column.cards.length === 0 && (
-                              <div className="rounded-xl border border-dashed border-slate-300 bg-background py-8 text-center text-xs text-slate-400">
+                              <div className="rounded-md border border-dashed border-slate-200 bg-background py-4 text-center text-xs text-slate-400">
                                 No Lead found
                               </div>
                             )}
@@ -584,15 +616,22 @@ export function LeadKanbanBoard({
                       })()}
                     </div>
 
-                    {/* Collapse control */}
-                    <div className="mt-2 flex shrink-0 items-center justify-between gap-2 px-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                    {/* Always-visible footer on every stage column */}
+                    <div className="mt-1 flex shrink-0 items-center justify-between gap-2 border-t border-slate-100 px-1 pt-1.5">
                       <button
                         type="button"
-                        onClick={() => router.push("/sales/leads/create")}
-                        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-foreground hover:bg-accent transition-colors"
+                        onClick={() =>
+                          onAddLead
+                            ? onAddLead(column.id)
+                            : router.push(
+                                `/sales/leads/create?stage=${encodeURIComponent(column.title)}`,
+                              )
+                        }
+                        aria-label={`Create lead in ${column.title}`}
+                        className="inline-flex max-w-[calc(100%-2rem)] items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-accent"
                       >
-                        <Plus className="h-3.5 w-3.5" />
-                        Create lead
+                        <Plus className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{column.title}</span>
                       </button>
 
                       <button

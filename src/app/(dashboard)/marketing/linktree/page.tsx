@@ -206,6 +206,7 @@ import {
 } from "@/lib/marketing/linktree/types";
 import {
   CampaignHeader,
+  MarketingListShell,
   StatusDropdown,
   DataTable,
   StatusBadge,
@@ -226,7 +227,7 @@ const columns: DataTableColumn<LinktreePage>[] = [
     className: "max-w-[220px]",
     render: (p) => (
       <>
-        <p className="truncate text-[15px] font-semibold text-slate-900">
+        <p className="truncate text-[13px] font-semibold text-slate-900">
           {p.displayName || p.title}
         </p>
       </>
@@ -323,51 +324,50 @@ export default function LinktreeListPage() {
   );
 
   return (
-    <div className="relative min-h-full overflow-y-auto bg-slate-50">
-      <div className="relative mx-auto flex max-w-[1400px] flex-col p-2 sm:p-4 lg:p-6">
-        <CampaignHeader
-          breadcrumbs={[
-            { label: "Home", href: "/" },
-            { label: "Marketing" },
-            { label: "Broker pages" },
-          ]}
-          title="Marketing"
-          onCreate={() =>
-            router.push(
-              "/marketing/linktree/create?layoutid=standard&redirect=false",
-            )
-          }
-          createLabel="New page"
-        />
+    <MarketingListShell>
+      <CampaignHeader
+        breadcrumbs={[
+          { label: "Home", href: "/" },
+          { label: "Marketing" },
+          { label: "Broker pages" },
+        ]}
+        title="Broker pages"
+        totalCount={filtered.length}
+        onCreate={() =>
+          router.push(
+            "/marketing/linktree/create?layoutid=standard&redirect=false",
+          )
+        }
+        createLabel="New page"
+      />
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 py-2">
-          <StatusDropdown
-            statuses={LINKTREE_STATUSES}
-            counts={counts}
-            totalCount={rows.length}
-            value={statusTab}
-            onChange={setStatusTab}
-          />
-          <SearchInput value={search} onChange={setSearch} />
-        </div>
-
-        <DataTable
-          columns={columns}
-          rows={paginated}
-          getRowKey={(p) => p.id}
-          onRowClick={(p) => router.push(`/marketing/linktree/${p.id}`)}
-          page={safePage}
-          pageSize={pageSize}
-          totalCount={filtered.length}
-          onPageChange={setPage}
-          emptyState={
-            <>
-              <Link2 className="mx-auto mb-3 h-10 w-10 text-slate-300" />
-              No link pages match.
-            </>
-          }
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-1 py-2">
+        <StatusDropdown
+          statuses={LINKTREE_STATUSES}
+          counts={counts}
+          totalCount={rows.length}
+          value={statusTab}
+          onChange={setStatusTab}
         />
+        <SearchInput value={search} onChange={setSearch} />
       </div>
-    </div>
+
+      <DataTable
+        columns={columns}
+        rows={paginated}
+        getRowKey={(p) => p.id}
+        onRowClick={(p) => router.push(`/marketing/linktree/${p.id}`)}
+        page={safePage}
+        pageSize={pageSize}
+        totalCount={filtered.length}
+        onPageChange={setPage}
+        emptyState={
+          <>
+            <Link2 className="mx-auto mb-3 h-8 w-8 text-slate-300" />
+            No link pages match.
+          </>
+        }
+      />
+    </MarketingListShell>
   );
 }

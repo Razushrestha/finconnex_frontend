@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   EntityHeader,
   type SortDirection,
@@ -29,6 +29,29 @@ import { cn } from "@/lib/utils";
 import { SORT_OPTIONS } from "../leads/page";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 
+const CONTACT_VIEW_MODE_KEY = "finconnex.contacts.view-mode";
+
+type ContactViewMode = "kanban" | "list";
+
+function loadContactViewMode(): ContactViewMode {
+  if (typeof window === "undefined") return "kanban";
+  try {
+    const raw = localStorage.getItem(CONTACT_VIEW_MODE_KEY);
+    if (raw === "list" || raw === "kanban") return raw;
+  } catch {
+    /* ignore */
+  }
+  return "kanban";
+}
+
+function persistContactViewMode(mode: ContactViewMode) {
+  try {
+    localStorage.setItem(CONTACT_VIEW_MODE_KEY, mode);
+  } catch {
+    /* ignore */
+  }
+}
+
 const DEFAULT_CONTACT_COLUMNS = CONTACT_GROUPS.map((group) => ({
   id: group.id,
   label: group.title,
@@ -37,7 +60,7 @@ const DEFAULT_CONTACT_COLUMNS = CONTACT_GROUPS.map((group) => ({
 
 export default function ContactsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
+  const [viewMode, setViewMode] = useState<ContactViewMode>("kanban");
   const [filters, setFilters] = useState<ContactFilters>(EMPTY_CONTACT_FILTERS);
   const [columns, setColumns] = useState(DEFAULT_CONTACT_COLUMNS);
 
@@ -55,6 +78,15 @@ export default function ContactsPage() {
   const [isMassUpdateOpen, setMassUpdateOpen] = useState(false);
   const [isManageTagsOpen, setManageTagsOpen] = useState(false);
   const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
+
+  useEffect(() => {
+    setViewMode(loadContactViewMode());
+  }, []);
+
+  function handleViewChange(mode: ContactViewMode) {
+    setViewMode(mode);
+    persistContactViewMode(mode);
+  }
 
   function exportTasks() {
     console.log("export tasks clicked");
@@ -170,7 +202,7 @@ export default function ContactsPage() {
         ]}
         totalCount={totalContacts}
         viewMode={viewMode}
-        onViewChange={setViewMode}
+        onViewChange={handleViewChange}
         isFilterOpen={isFilterOpen}
         onToggleFilter={() => setIsFilterOpen((v) => !v)}
         sortOptions={SORT_OPTIONS}

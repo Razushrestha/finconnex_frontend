@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { cardDragging, cardMotion } from "@/lib/motion";
+import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
+import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 import {
   Calendar,
   Building2,
@@ -210,7 +211,8 @@ export function TaskCard({
         data-task-id={task.taskId}
         data-column-id={columnId}
         className={cn(
-          "group/card cursor-grab flex h-[220px] w-full bg-white flex-col p-3 sm:h-[230px] sm:p-3.5 relative",
+          "group/card cursor-grab flex h-[220px] w-full flex-col p-3 sm:h-[230px] sm:p-3.5 relative",
+          entityCardBox,
           cardMotion,
           isDragging && cardDragging,
           isSelected
@@ -269,10 +271,10 @@ export function TaskCard({
           </span>
         </div>
 
-        <div className="mb-1.5 flex items-center gap-1.5 text-[11px] text-slate-600">
-          <User className="h-3 w-3 shrink-0 text-slate-400" />
-          <span className="truncate">{task.assignedTo}</span>
-        </div>
+        <CardOwnerRow
+          name={task.assignedTo}
+          className="mb-1.5 text-slate-600"
+        />
 
         {task.relatedTo ? (
           <div className="mb-1.5 flex items-center gap-1.5 text-[11px] text-slate-600">

@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import { GripVertical, Pin, Search } from "lucide-react";
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 export type ManageColumn = {
   id: string;
@@ -45,6 +46,11 @@ export function ManageColumnsModal({
   const [working, setWorking] = useState<ManageColumn[]>(columns);
   const [search, setSearch] = useState("");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -53,7 +59,16 @@ export function ManageColumnsModal({
     }
   }, [open, columns]);
 
-  if (!open) return null;
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  if (!open || !mounted) return null;
 
   const filtered = working.filter((c) =>
     c.label.toLowerCase().includes(search.trim().toLowerCase()),
@@ -85,35 +100,47 @@ export function ManageColumnsModal({
     });
   }
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 pt-16 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-[2px]"
       onClick={onClose}
+      role="presentation"
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="manage-columns-title"
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[80vh] w-full max-w-sm flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="flex w-full max-w-sm flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        style={{ maxHeight: "calc(100dvh - 2rem)" }}
       >
-        <div className="px-5 pt-4 pb-3">
-          <h2 className="text-[15px] font-bold text-gray-900">
+        <div className="shrink-0 px-5 pt-4 pb-2">
+          <h2
+            id="manage-columns-title"
+            className="text-[15px] font-bold text-gray-900"
+          >
             Manage Columns
           </h2>
         </div>
 
-        <div className="px-5 pb-3">
+        <div className="shrink-0 px-5 pb-3">
           <div className="flex h-9 items-center gap-2 rounded-lg border border-[var(--wq-line)] bg-white px-2.5">
-            <Search className="h-3.5 w-3.5 text-gray-400" />
+            <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search"
-              className="h-full flex-1 text-[13px] text-gray-800 outline-none placeholder:text-gray-400"
+              className="h-full min-w-0 flex-1 text-[13px] text-gray-800 outline-none placeholder:text-gray-400"
             />
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-2">
+        {/* Explicit max-height reserves room for header + footer so buttons never clip */}
+        <div
+          className="overflow-y-auto overscroll-contain px-5"
+          style={{ maxHeight: "calc(100dvh - 2rem - 9.5rem)" }}
+        >
           {filtered.map((col) => (
             <div
               key={col.id}
@@ -168,7 +195,7 @@ export function ManageColumnsModal({
                 ) : null}
               </button>
 
-              <span className="flex-1 text-[13px] text-gray-700">
+              <span className="min-w-0 flex-1 truncate text-[13px] text-gray-700">
                 {col.label}
                 {col.required ? (
                   <span className="ml-0.5 text-rose-500">*</span>
@@ -204,7 +231,7 @@ export function ManageColumnsModal({
           ) : null}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-[var(--wq-line)] px-5 py-3">
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-[var(--wq-line)] bg-white px-5 py-3">
           <button
             type="button"
             onClick={onClose}
@@ -221,6 +248,7 @@ export function ManageColumnsModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

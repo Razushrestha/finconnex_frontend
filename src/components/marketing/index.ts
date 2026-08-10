@@ -1,4 +1,5 @@
 export { CampaignHeader, type CampaignBreadcrumb } from "./CampaignHeader";
+export { MarketingListShell } from "./MarketingListShell";
 export { StatusDropdown } from "./StatusDropdown";
 export { FilterDropdown } from "./FilterDropdown";
 export { DataTable, type DataTableColumn } from "./DataTable";

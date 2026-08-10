@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useMemo, useState, useEffect } from "react";
+import { useId, useMemo, useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   Phone,
   MessageSquare,
@@ -30,7 +31,6 @@ import { truncateActivityTitle } from "@/lib/leads/activity-summary";
 import { buildLeadCardViewModelFromCard } from "@/lib/leads/card-view-model";
 import type { LeadCardSettings } from "@/lib/leads/lead-card-settings";
 import {
-  QUICK_BADGE,
   QUICK_STATE_WORDS,
   QUICK_URGENCY,
   URGENCY_SURFACE,
@@ -48,17 +48,20 @@ import {
   type QuickActionItem,
 } from "@/components/sales/QuickActionsBar";
 import { cn } from "@/lib/utils";
-import { cardDragging, cardMotion } from "@/lib/motion";
-import Link from "next/link";
+import { cardDragging, cardMotion, entityCardShell } from "@/lib/motion";
+import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 
 interface LeadCardProps {
   card: LeadCardData;
   status: LeadStatus;
   isDragging: boolean;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragStart: (e: React.DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
   viewModel?: LeadCardViewModel;
   cardSettings?: LeadCardSettings;
+  /** From Kanban Select Fields — which dynamic rows to show on the card. */
+  dynamicFieldKeys?: readonly string[];
+  showOwnerAvatar?: boolean;
   revision?: number;
   onOpenActivitySummary?: () => void;
   onOpenLastActivity?: () => void;
@@ -98,6 +101,8 @@ export function LeadCard({
   onDragEnd,
   viewModel: viewModelProp,
   cardSettings,
+  dynamicFieldKeys,
+  showOwnerAvatar,
   revision = 0,
   onOpenActivitySummary,
   onOpenLastActivity,
@@ -106,24 +111,45 @@ export function LeadCard({
   isSelected,
   onToggleSelect,
 }: LeadCardProps) {
+  const router = useRouter();
   const nameId = useId();
+  const dragMovedRef = useRef(false);
   const [isMounted, setIsMounted] = useState(false);
   const [selected, setSelected] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customization, setCustomization] =
     useState<LeadCardCustomizationSettings>(DEFAULT_LEAD_CARD_SETTINGS);
 
+  const detailHref = `/sales/leads/detail/${card.id}`;
+
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  function openDetail() {
+    if (dragMovedRef.current || isDragging) return;
+    router.push(detailHref);
+  }
 
   const vm = useMemo(() => {
     void revision;
     return (
       viewModelProp ??
-      buildLeadCardViewModelFromCard(card, status, { cardSettings })
+      buildLeadCardViewModelFromCard(card, status, {
+        cardSettings,
+        dynamicFieldKeys,
+        showOwnerAvatar,
+      })
     );
-  }, [viewModelProp, card, status, cardSettings, revision]);
+  }, [
+    viewModelProp,
+    card,
+    status,
+    cardSettings,
+    dynamicFieldKeys,
+    showOwnerAvatar,
+    revision,
+  ]);
 
   const summary = vm.activitySummary;
   const summaryTitle = summary.primary
@@ -134,18 +160,17 @@ export function LeadCard({
     vm.quickActions.map((action) => {
       const label = QUICK_LABELS[action.kind];
       const stateHint = QUICK_STATE_WORDS[action.urgency];
-      const badge = action.badgeCount >= 2 ? String(action.badgeCount) : null;
-      const countHint = badge ? `, ${badge} pending` : "";
+      const countHint =
+        action.badgeCount >= 2 ? `, ${action.badgeCount} pending` : "";
 
       return {
         kind: action.kind,
         icon: QUICK_ICONS[action.kind],
         label,
-        badgeCount: action.badgeCount,
+        // Keep urgency in accessible labels only — icons stay visually neutral.
         ariaLabel: `${label} — ${stateHint}${countHint}`,
         title: `${label} (${stateHint})`,
-        colorClassName: QUICK_URGENCY[action.urgency],
-        badgeClassName: QUICK_BADGE[action.urgency],
+        colorClassName: QUICK_URGENCY.neutral,
       };
     });
 
@@ -153,13 +178,33 @@ export function LeadCard({
     <>
       <article
         draggable
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
+        onDragStart={(e) => {
+          dragMovedRef.current = true;
+          onDragStart(e);
+        }}
+        onDragEnd={() => {
+          onDragEnd();
+          // Allow click again after a drag settles
+          window.setTimeout(() => {
+            dragMovedRef.current = false;
+          }, 0);
+        }}
+        onClick={openDetail}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openDetail();
+          }
+        }}
+        role="link"
+        tabIndex={0}
         data-focus-id={card.id}
         data-lead-id={card.id}
+        aria-label={`Open ${vm.name}`}
         aria-labelledby={nameId}
         className={cn(
-          "group w-full shrink-0 cursor-grab rounded-md bg-background p-3 shadow-2xs active:cursor-grabbing",
+          "group w-full shrink-0 cursor-pointer",
+          entityCardShell,
           cardMotion,
           isDragging && cardDragging,
         )}
@@ -171,12 +216,7 @@ export function LeadCard({
               id={nameId}
               className="truncate text-[13px] font-semibold text-foreground"
             >
-              <Link
-                href={`/sales/leads/detail/${card.id}`}
-                className="hover:underline focus-visible:underline focus-visible:outline-none"
-              >
-                {vm.name}
-              </Link>
+              {vm.name}
             </h3>
             <p className="truncate text-[11px] text-foreground/70">
               <span className="sr-only">Pipeline stage: </span>
@@ -199,17 +239,6 @@ export function LeadCard({
               )}
             />
             <LeadSlaChip sla={vm.sla} variant="badge" />
-            {vm.showOwnerAvatar && (
-              <button
-                type="button"
-                title={vm.owner.name}
-                aria-label={`Owner ${vm.owner.name}`}
-                onMouseDown={(e) => e.stopPropagation()}
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[9px] font-semibold text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1"
-              >
-                {vm.owner.initials}
-              </button>
-            )}
 
             {selected && (
               <LeadCardActionsMenu
@@ -233,6 +262,15 @@ export function LeadCard({
               </div>
             ))}
           </dl>
+        )}
+
+        {vm.showOwnerAvatar && (
+          <div className="mb-1.5">
+            <CardOwnerRow
+              name={vm.owner.name}
+              initials={vm.owner.initials}
+            />
+          </div>
         )}
 
         {/* §5 Activity Summary — omit entirely when empty (§12) */}

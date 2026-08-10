@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from "react";
 import {
   Phone,
   Clock,
-  User,
   Flag,
   UserPlus,
   Reply,
@@ -17,9 +16,9 @@ import { toast } from "sonner";
 import type { Call } from "@/lib/calls/types";
 import type { Priority, TaskStatus } from "@/lib/tasks/types";
 import { TASK_PRIORITIES, TASK_STATUSES } from "@/lib/tasks/types";
-import { initials, avatarColor } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
-import { cardDragging, cardMotion } from "@/lib/motion";
+import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
+import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 
 interface CallCardProps {
   call: Call;
@@ -152,7 +151,8 @@ export function CallCard({
         data-call-id={call.id}
         data-column-id={columnId}
         className={cn(
-          "group/card cursor-grab select-none rounded-xl border bg-white p-3.5 shadow-sm active:cursor-grabbing relative flex flex-col justify-between transition-all",
+          entityCardBox,
+          "group/card relative flex flex-col justify-between",
           cardMotion,
           isDragging && cardDragging,
           isSelected
@@ -192,14 +192,14 @@ export function CallCard({
                     onChange={onSelect}
                     onClick={(e) => e.stopPropagation()}
                     aria-label={`Select call ${call.subject}`}
-                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    className="h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                   />
                 </div>
               )}
             </div>
           </div>
 
-          <h4 className="mb-1 text-[13px] font-semibold text-slate-900 truncate">
+          <h4 className="mb-1 truncate text-[13px] font-semibold text-slate-900">
             {call.subject}
           </h4>
           <p className="mb-3 truncate text-[11px] text-slate-500">
@@ -214,17 +214,7 @@ export function CallCard({
                 <span className="text-slate-400">· {call.duration}</span>
               ) : null}
             </div>
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 truncate">
-                <User className="h-3 w-3 shrink-0 text-slate-400" />
-                <span className="truncate">{call.assignedTo}</span>
-              </div>
-              <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${avatarColor(call.assignedTo)}`}
-              >
-                {initials(call.assignedTo)}
-              </span>
-            </div>
+            <CardOwnerRow name={call.assignedTo} />
           </div>
 
           {/* Optional Meta Counters (Comments/Attachments) */}

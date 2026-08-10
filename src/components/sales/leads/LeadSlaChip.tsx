@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Clock, Crosshair } from "lucide-react";
 import type { LeadSlaViewModel, SlaClockView } from "@/lib/pipeline-sla/types";
 import {
@@ -9,6 +10,10 @@ import {
   SLA_CLOCK_TEXT,
   formatSlaDueAt,
 } from "@/lib/pipeline-sla/ui";
+import {
+  arePipelineSlaBadgesVisible,
+  onPipelineSlaChange,
+} from "@/lib/pipeline-sla/settings";
 import { cn } from "@/lib/utils";
 
 type LeadSlaChipProps = {
@@ -60,9 +65,23 @@ function ClockRow({
   );
 }
 
+function useSlaBadgesVisible() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    setVisible(arePipelineSlaBadgesVisible());
+    return onPipelineSlaChange(() => {
+      setVisible(arePipelineSlaBadgesVisible());
+    });
+  }, []);
+
+  return visible;
+}
+
 /**
  * Pipeline Stage / Milestone SLA — independent of Activity Summary urgency.
  * PDF: top-right badge + Stage Due (clock) + Milestone (target), each colored by its own band.
+ * Hidden unless Settings → Pipelines → “Show SLA badges” is enabled.
  */
 export function LeadSlaChip({
   sla,
@@ -70,6 +89,9 @@ export function LeadSlaChip({
   dense,
   variant = "panel",
 }: LeadSlaChipProps) {
+  const badgesVisible = useSlaBadgesVisible();
+
+  if (!badgesVisible) return null;
   if (!sla || sla.badgeLabel === "No SLA") return null;
   if (!hasClocks(sla) && variant !== "badge") return null;
 

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { Send } from "lucide-react";
 import type { ActivityComposerProps } from "./types";
 import { Panel } from "./shared";
 
-/** Identical for Lead and Deal — just point onSubmit at the right entity id. */
 export function ActivityComposer({
   placeholder = "Share a quick update, note or a log",
   onSubmit,
@@ -20,22 +20,28 @@ export function ActivityComposer({
   }
 
   return (
-    <Panel padded={false} className="p-2">
-      <div className="flex items-center gap-2 px-2 py-1.5">
+    <Panel className="p-3">
+      <div className="flex items-center gap-2">
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleSubmit();
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSubmit();
+            }
           }}
           placeholder={placeholder}
-          className="flex-1 border-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+          className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-[13px] text-slate-800 placeholder:text-slate-400 outline-none transition-colors focus:border-violet-300 focus:bg-white focus:ring-2 focus:ring-violet-100"
         />
         <button
+          type="button"
           onClick={handleSubmit}
-          className="shrink-0 rounded-lg bg-primary px-3.5 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-xs"
+          disabled={!value.trim()}
+          className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl bg-violet-600 px-4 text-[13px] font-semibold text-white shadow-sm shadow-violet-600/15 transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {submitLabel}
+          <Send className="h-3.5 w-3.5" />
         </button>
       </div>
     </Panel>

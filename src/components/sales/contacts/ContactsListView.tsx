@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { MoreVertical } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { CONTACT_GROUPS, type ContactGroup } from "@/lib/contacts/types";
 import type { ContactFilters } from "./FilterContactsPanel";
 import { cn } from "@/lib/utils";
@@ -11,6 +10,15 @@ import {
   type ManageColumn,
 } from "@/components/work-queue/ManageColumnsModal";
 import Link from "next/link";
+import { QuickActionsBar } from "@/components/sales/QuickActionsBar";
+import {
+  CONTACT_QUICK_ACTIONS,
+  type ContactQuickActionKind,
+} from "@/components/sales/contacts/ContactRecordCard";
+import {
+  ContactCardPanelHost,
+  type ContactPanelState,
+} from "@/components/sales/contacts/ContactCardPanelHost";
 
 interface ContactsListViewProps {
   groups?: ContactGroup[];
@@ -49,83 +57,91 @@ interface ColumnRenderer {
   tdClassName?: string;
 }
 
-const columnRenderers: Record<string, ColumnRenderer> = {
-  contact: {
-    th: "Contact",
-    tdClassName: "px-3 py-2 whitespace-nowrap",
-    td: (contact) => (
-      <Link
-        href={`/sales/contacts/detail/${contact.id}`}
-        className="group flex items-center gap-2.5"
-      >
-        <div
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${contact.avatarBgClass}`}
+function buildColumnRenderers(
+  onQuickAction: (
+    kind: ContactQuickActionKind,
+    contact: ContactRow,
+  ) => void,
+): Record<string, ColumnRenderer> {
+  return {
+    contact: {
+      th: "Contact",
+      tdClassName: "px-3 py-2 whitespace-nowrap",
+      td: (contact) => (
+        <Link
+          href={`/sales/contacts/detail/${contact.id}`}
+          className="group flex items-center gap-2.5"
         >
-          {contact.initials}
-        </div>
-        <span className="font-semibold text-slate-900 group-hover:text-indigo-600 group-hover:underline">
-          {contact.name}
+          <div
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${contact.avatarBgClass}`}
+          >
+            {contact.initials}
+          </div>
+          <span className="font-semibold text-slate-900 group-hover:text-indigo-600 group-hover:underline">
+            {contact.name}
+          </span>
+        </Link>
+      ),
+    },
+    company: {
+      th: "Company",
+      tdClassName: "px-3 py-2 whitespace-nowrap text-slate-600",
+      td: (contact) => contact.company || "",
+    },
+    email: {
+      th: "Email",
+      tdClassName: "px-3 py-2 whitespace-nowrap text-slate-500",
+      td: (contact) => contact.email,
+    },
+    phone: {
+      th: "Phone",
+      tdClassName: "px-3 py-2 whitespace-nowrap text-slate-600",
+      td: (contact) => contact.phone || "",
+    },
+    status: {
+      th: "Status",
+      tdClassName: "px-3 py-2 whitespace-nowrap",
+      td: (contact) => (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${contact.statusDotColor}`}
+          />
+          {contact.statusTitle}
         </span>
-      </Link>
-    ),
-  },
-  company: {
-    th: "Company",
-    tdClassName: "px-3 py-2 whitespace-nowrap text-slate-600",
-    td: (contact) => contact.company || "",
-  },
-  email: {
-    th: "Email",
-    tdClassName: "px-3 py-2 whitespace-nowrap text-slate-500",
-    td: (contact) => contact.email,
-  },
-  phone: {
-    th: "Phone",
-    tdClassName: "px-3 py-2 whitespace-nowrap text-slate-600",
-    td: (contact) => contact.phone || "",
-  },
-  status: {
-    th: "Status",
-    tdClassName: "px-3 py-2 whitespace-nowrap",
-    td: (contact) => (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
-        <span
-          className={`h-1.5 w-1.5 rounded-full ${contact.statusDotColor}`}
+      ),
+    },
+    owner: {
+      th: "Owner",
+      tdClassName: "px-3 py-2 whitespace-nowrap text-slate-600",
+      td: (contact) => contact.owner,
+    },
+    source: {
+      th: "Source",
+      tdClassName: "px-3 py-2 whitespace-nowrap text-slate-500",
+      td: (contact) => contact.source,
+    },
+    created: {
+      th: "Created",
+      tdClassName: "px-3 py-2 whitespace-nowrap text-slate-500",
+      td: (contact) => contact.createdDate,
+    },
+    actions: {
+      th: "Actions",
+      thClassName: "px-3 py-2.5 text-right",
+      tdClassName: "px-2 py-1.5 whitespace-nowrap",
+      td: (contact) => (
+        <QuickActionsBar
+          actions={CONTACT_QUICK_ACTIONS}
+          onAction={(kind) => onQuickAction(kind, contact)}
+          ariaLabel={`Quick actions for ${contact.name}`}
+          hoverClassName="text-slate-400 hover:bg-slate-100 hover:text-violet-600"
+          size="md"
+          className="justify-end"
         />
-        {contact.statusTitle}
-      </span>
-    ),
-  },
-  owner: {
-    th: "Owner",
-    tdClassName: "px-3 py-2 whitespace-nowrap text-slate-600",
-    td: (contact) => contact.owner,
-  },
-  source: {
-    th: "Source",
-    tdClassName: "px-3 py-2 whitespace-nowrap text-slate-500",
-    td: (contact) => contact.source,
-  },
-  created: {
-    th: "Created",
-    tdClassName: "px-3 py-2 whitespace-nowrap text-slate-500",
-    td: (contact) => contact.createdDate,
-  },
-  actions: {
-    th: "Actions",
-    thClassName: "px-3 py-2.5 text-right",
-    tdClassName: "px-3 py-2 text-right",
-    td: () => (
-      <button
-        type="button"
-        aria-label="More actions"
-        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-      >
-        <MoreVertical className="h-3.5 w-3.5" />
-      </button>
-    ),
-  },
-};
+      ),
+    },
+  };
+}
 
 export function ContactsListView({
   groups = CONTACT_GROUPS,
@@ -137,6 +153,29 @@ export function ContactsListView({
   const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
   const [manageColumns, setManageColumns] = useState<ManageColumn[]>(
     DEFAULT_CONTACT_COLUMNS,
+  );
+  const [panel, setPanel] = useState<ContactPanelState | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 2500);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
+  const columnRenderers = useMemo(
+    () =>
+      buildColumnRenderers((kind, contact) =>
+        setPanel({
+          type: "quick-action",
+          kind,
+          contactId: contact.id,
+          contactName: contact.name,
+          email: contact.email,
+          phone: contact.phone,
+        }),
+      ),
+    [],
   );
 
   const allContacts = useMemo(() => {
@@ -219,7 +258,7 @@ export function ContactsListView({
   return (
     <div className="w-full overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[900px] text-left text-[12px]">
+        <table className="w-full min-w-[1040px] text-left text-[12px]">
           <thead className="border-b border-slate-100 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
             <tr className="sticky top-0 z-10 bg-slate-50/80">
               <th className="w-8 px-3 py-2.5">
@@ -319,6 +358,18 @@ export function ContactsListView({
           setManageColumnsOpen(false);
         }}
       />
+
+      <ContactCardPanelHost
+        panel={panel}
+        onClose={() => setPanel(null)}
+        onQuickActionSuccess={(message) => setToast(message)}
+      />
+
+      {toast && (
+        <div className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

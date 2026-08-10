@@ -4,7 +4,6 @@ import {
   Building2,
   DollarSign,
   Calendar,
-  User,
   Percent,
   Phone,
   MessageSquare,
@@ -16,22 +15,35 @@ import {
 } from "lucide-react";
 import type { DealRecord } from "@/lib/deals/types";
 import { cn } from "@/lib/utils";
-import { cardDragging, cardMotion } from "@/lib/motion";
+import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
 import Link from "next/link";
+import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
+
+export type DealQuickActionKind =
+  | "call"
+  | "sms"
+  | "email"
+  | "meeting"
+  | "task"
+  | "note"
+  | "attachment";
 
 interface DealRecordCardProps {
   deal: DealRecord;
   isDragging: boolean;
   onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
-  onQuickAction?: (kind: string) => void;
+  onQuickAction?: (kind: DealQuickActionKind) => void;
   isSelected?: boolean;
   onSelect?: (
     e: React.MouseEvent | React.ChangeEvent<HTMLInputElement>,
   ) => void;
 }
 
-const QUICK_ICONS = {
+const QUICK_ICONS: Record<
+  DealQuickActionKind,
+  React.ComponentType<{ className?: string }>
+> = {
   call: Phone,
   sms: MessageSquare,
   email: Mail,
@@ -39,9 +51,9 @@ const QUICK_ICONS = {
   task: CheckSquare,
   note: StickyNote,
   attachment: Paperclip,
-} as const;
+};
 
-const QUICK_LABELS: Record<string, string> = {
+const QUICK_LABELS: Record<DealQuickActionKind, string> = {
   call: "Call",
   sms: "SMS",
   email: "Email",
@@ -50,6 +62,16 @@ const QUICK_LABELS: Record<string, string> = {
   note: "Note",
   attachment: "Attachment",
 };
+
+const DEFAULT_DEAL_QUICK_ACTIONS: { kind: DealQuickActionKind; badgeCount: number }[] =
+  [
+    { kind: "call", badgeCount: 0 },
+    { kind: "email", badgeCount: 0 },
+    { kind: "meeting", badgeCount: 0 },
+    { kind: "task", badgeCount: 0 },
+    { kind: "note", badgeCount: 0 },
+    { kind: "attachment", badgeCount: 0 },
+  ];
 
 export function DealRecordCard({
   deal,
@@ -63,14 +85,9 @@ export function DealRecordCard({
   const weighted =
     deal.probability > 0 ? `Weighted ${deal.probability}%` : "Lost";
 
-  // Default action kinds to display in the toolbar if deal.quickActions aren't provided directly
-  const actions = (deal as any).quickActions ?? [
-    { kind: "call", urgency: "neutral", badgeCount: 0 },
-    { kind: "email", urgency: "neutral", badgeCount: 0 },
-    { kind: "meeting", urgency: "neutral", badgeCount: 0 },
-    { kind: "task", urgency: "neutral", badgeCount: 0 },
-    { kind: "note", urgency: "neutral", badgeCount: 0 },
-  ];
+  const actions =
+    (deal as DealRecord & { quickActions?: { kind: DealQuickActionKind; badgeCount?: number }[] })
+      .quickActions ?? DEFAULT_DEAL_QUICK_ACTIONS;
 
   return (
     <div
@@ -80,30 +97,24 @@ export function DealRecordCard({
       data-focus-id={deal.id}
       data-deal-id={deal.id}
       className={cn(
-        "group/card relative w-full cursor-grab rounded-md border bg-white p-3.5 shadow-2xs active:cursor-grabbing transition-all",
+        "group/card relative w-full",
+        entityCardBox,
         cardMotion,
         isDragging && cardDragging,
         isSelected
           ? "border-indigo-500 ring-1 ring-indigo-500 bg-indigo-50/20"
-          : "border-slate-200/80 hover:border-slate-300",
+          : "hover:border-slate-300",
       )}
     >
       <div className="mb-3 flex items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${deal.avatarBgClass}`}
+        <h3 className="min-w-0 truncate text-[13px] font-semibold text-slate-800">
+          <Link
+            href={`/sales/deals/detail/${deal.id}`}
+            className="hover:underline focus-visible:underline focus-visible:outline-none"
           >
-            {deal.initials}
-          </div>
-          <h3 className="truncate text-[13px] font-semibold text-slate-800">
-            <Link
-              href={`/sales/deals/detail/${deal.id}`}
-              className="hover:underline focus-visible:underline focus-visible:outline-none"
-            >
-              {deal.name}
-            </Link>
-          </h3>
-        </div>
+            {deal.name}
+          </Link>
+        </h3>
 
         {onSelect && (
           <div
@@ -120,7 +131,7 @@ export function DealRecordCard({
               onChange={onSelect}
               onClick={(e) => e.stopPropagation()}
               aria-label={`Select deal ${deal.name}`}
-              className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+              className="h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
             />
           </div>
         )}
@@ -137,10 +148,7 @@ export function DealRecordCard({
           <Building2 className="h-3 w-3 shrink-0 text-slate-400" />
           <span className="truncate">{deal.account}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <User className="h-3 w-3 shrink-0 text-slate-400" />
-          <span>{deal.owner}</span>
-        </div>
+        <CardOwnerRow name={deal.owner} />
         <div className="flex items-center gap-2">
           <Calendar className="h-3 w-3 shrink-0 text-slate-400" />
           <span>{deal.closeDate}</span>
@@ -156,12 +164,16 @@ export function DealRecordCard({
         role="toolbar"
         aria-label={`Quick actions for ${deal.name}`}
       >
-        {actions.map((action: any) => {
+        {actions.map((action) => {
           const kind = typeof action === "string" ? action : action.kind;
-          const Icon = QUICK_ICONS[kind as keyof typeof QUICK_ICONS];
-          const label = QUICK_LABELS[kind as keyof typeof QUICK_LABELS] || kind;
+          const Icon = QUICK_ICONS[kind];
+          const label = QUICK_LABELS[kind] || kind;
           const badge =
-            action.badgeCount >= 2 ? String(action.badgeCount) : null;
+            typeof action !== "string" &&
+            action.badgeCount &&
+            action.badgeCount >= 2
+              ? String(action.badgeCount)
+              : null;
 
           if (!Icon) return null;
 

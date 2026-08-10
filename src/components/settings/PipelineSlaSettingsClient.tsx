@@ -110,8 +110,9 @@ export function PipelineSlaSettingsClient() {
               Two clocks per lead: <strong className="font-semibold text-slate-700">Stage SLA</strong>{" "}
               (resets when the stage changes) and{" "}
               <strong className="font-semibold text-slate-700">Milestone SLA</strong>{" "}
-              (runs from pipeline start until the target stage). Badges on the Lead
-              Card: On Track, Due Today, At Risk, Overdue, Milestone Overdue.
+              (runs from pipeline start until the target stage). Optional badges on
+              Lead cards/lists: On Track, Due Today, At Risk, Overdue, Milestone
+              Overdue — off by default below.
             </p>
           </div>
           <Link
@@ -125,6 +126,38 @@ export function PipelineSlaSettingsClient() {
       </div>
 
       <div className="space-y-8 p-5 sm:p-6">
+        <section>
+          <h3 className="text-[13px] font-semibold text-slate-900">
+            Display on cards &amp; lists
+          </h3>
+          <p className="mt-0.5 text-[11px] text-slate-400">
+            SLA clocks still run for Work Queue. Turn this on only if you want the
+            colored status pills on Leads (and related surfaces).
+          </p>
+          <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-3">
+            <input
+              type="checkbox"
+              checked={config.showBadgesOnCards === true}
+              onChange={(e) =>
+                setConfig((prev) => ({
+                  ...prev,
+                  showBadgesOnCards: e.target.checked,
+                }))
+              }
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-400"
+            />
+            <span>
+              <span className="block text-[12px] font-semibold text-slate-800">
+                Show SLA badges (On Track, At Risk, Overdue, …)
+              </span>
+              <span className="mt-0.5 block text-[11px] text-slate-500">
+                Disabled by default. Enable when your team wants status pills next
+                to lead selection.
+              </span>
+            </span>
+          </label>
+        </section>
+
         <section>
           <h3 className="text-[13px] font-semibold text-slate-900">
             Stage SLAs

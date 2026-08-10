@@ -9,7 +9,8 @@ import {
 } from "lucide-react";
 import type { Meeting, MeetingStatus, MeetingType } from "@/lib/meetings/types";
 import { cn } from "@/lib/utils";
-import { cardDragging, cardMotion } from "@/lib/motion";
+import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
+import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 
 const STATUS_BORDER: Record<MeetingStatus, string> = {
   Scheduled: "border-l-sky-500",
@@ -59,7 +60,7 @@ export function MeetingCard({
       data-meeting-id={meeting.id}
       data-column-id={columnId}
       className={cn(
-        "cursor-grab select-none rounded-sm border border-slate-100 bg-white p-3 shadow-sm active:cursor-grabbing",
+        entityCardBox,
         cardMotion,
         isDragging && cardDragging,
       )}
@@ -99,18 +100,16 @@ export function MeetingCard({
         )}
       </div>
 
-      <div className="mt-3 flex items-center justify-between border-t border-slate-50 pt-2.5">
+      <div className="mt-3 space-y-2 border-t border-slate-50 pt-2.5">
         <span
           className={cn(
-            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            "inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold",
             TYPE_SOFT[meeting.type],
           )}
         >
           {meeting.type}
         </span>
-        <span className="max-w-[100px] truncate text-[10px] text-slate-400">
-          {meeting.organizer.split("@")[0]}
-        </span>
+        <CardOwnerRow name={meeting.organizer} />
       </div>
     </div>
   );

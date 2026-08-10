@@ -292,6 +292,7 @@ import {
 } from "@/lib/marketing/whatsapp/types";
 import {
   CampaignHeader,
+  MarketingListShell,
   StatusDropdown,
   DataTable,
   StatusBadge,
@@ -323,7 +324,7 @@ const columns: DataTableColumn<WhatsAppCampaign>[] = [
     className: "max-w-[220px]",
     render: (r) => (
       <>
-        <p className="truncate text-[15px] font-semibold text-slate-900">
+        <p className="truncate text-[13px] font-semibold text-slate-900">
           {r.name}
         </p>
       </>
@@ -471,52 +472,51 @@ export default function WhatsAppCampaignsPage() {
   }
 
   return (
-    <div className="relative min-h-full overflow-y-auto bg-slate-50">
-      <div className="relative mx-auto flex max-w-[1400px] flex-col p-2 sm:p-4 lg:p-6">
-        <CampaignHeader
-          breadcrumbs={[
-            { label: "Home", href: "/" },
-            { label: "Marketing" },
-            { label: "WhatsApp Campaigns" },
-          ]}
-          title="Marketing"
-          onExport={exportCsv}
-          onCreate={() =>
-            router.push(
-              "/marketing/whatsapp/create?layoutid=standard&redirect=false",
-            )
-          }
-          createLabel="New campaign"
-        />
+    <MarketingListShell>
+      <CampaignHeader
+        breadcrumbs={[
+          { label: "Home", href: "/" },
+          { label: "Marketing" },
+          { label: "WhatsApp Campaigns" },
+        ]}
+        title="WhatsApp Campaigns"
+        totalCount={filtered.length}
+        onExport={exportCsv}
+        onCreate={() =>
+          router.push(
+            "/marketing/whatsapp/create?layoutid=standard&redirect=false",
+          )
+        }
+        createLabel="New campaign"
+      />
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 py-2">
-          <StatusDropdown
-            statuses={WHATSAPP_CAMPAIGN_STATUSES}
-            counts={counts}
-            totalCount={rows.length}
-            value={statusTab}
-            onChange={setStatusTab}
-          />
-          <SearchInput value={search} onChange={setSearch} />
-        </div>
-
-        <DataTable
-          columns={columns}
-          rows={paginated}
-          getRowKey={(r) => r.id}
-          onRowClick={(r) => router.push(`/marketing/whatsapp/${r.id}`)}
-          page={safePage}
-          pageSize={pageSize}
-          totalCount={filtered.length}
-          onPageChange={setPage}
-          emptyState={
-            <>
-              <MessageCircle className="mx-auto mb-3 h-10 w-10 text-slate-300" />
-              No WhatsApp campaigns match.
-            </>
-          }
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-1 py-2">
+        <StatusDropdown
+          statuses={WHATSAPP_CAMPAIGN_STATUSES}
+          counts={counts}
+          totalCount={rows.length}
+          value={statusTab}
+          onChange={setStatusTab}
         />
+        <SearchInput value={search} onChange={setSearch} />
       </div>
-    </div>
+
+      <DataTable
+        columns={columns}
+        rows={paginated}
+        getRowKey={(r) => r.id}
+        onRowClick={(r) => router.push(`/marketing/whatsapp/${r.id}`)}
+        page={safePage}
+        pageSize={pageSize}
+        totalCount={filtered.length}
+        onPageChange={setPage}
+        emptyState={
+          <>
+            <MessageCircle className="mx-auto mb-3 h-8 w-8 text-slate-300" />
+            No WhatsApp campaigns match.
+          </>
+        }
+      />
+    </MarketingListShell>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface DataTableColumn<T> {
@@ -22,12 +23,11 @@ interface DataTableProps<T> {
   /** Total row count across all pages (post-filter), used for the pager label. */
   totalCount: number;
   onPageChange: (page: number) => void;
+  className?: string;
 }
 
 /**
- * Generic sortable-free data table with sticky header and simple pager.
- * Each campaign surface (Email, SMS, WhatsApp, ...) supplies its own
- * `columns` and row shape `T` — the table itself has no campaign-specific logic.
+ * Dense full-height data table shared by marketing list pages.
  */
 export function DataTable<T>({
   columns,
@@ -39,81 +39,90 @@ export function DataTable<T>({
   pageSize,
   totalCount,
   onPageChange,
+  className,
 }: DataTableProps<T>) {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const safePage = Math.min(page, totalPages);
 
   return (
-    <div className="flex min-h-[calc(100dvh-9rem)] flex-col overflow-hidden rounded-md border border-slate-200/80 bg-white shadow-sm">
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full min-w-[1100px] text-left text-sm">
-            <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[12px] font-semibold tracking-wide text-slate-400 uppercase">
-              <tr>
+    <div
+      className={cn(
+        "flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm",
+        className,
+      )}
+    >
+      <div className="min-h-0 flex-1 overflow-auto">
+        <table className="w-full min-w-[960px] text-left text-[12px]">
+          <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+            <tr>
+              {columns.map((c) => (
+                <th key={c.key} className={cn("px-3 py-2.5 sm:px-4", c.className)}>
+                  {c.header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {rows.map((row) => (
+              <tr
+                key={getRowKey(row)}
+                onClick={() => onRowClick?.(row)}
+                className={cn(
+                  "transition-colors hover:bg-violet-50/40",
+                  onRowClick && "cursor-pointer",
+                )}
+              >
                 {columns.map((c) => (
-                  <th key={c.key} className={cn("px-6 py-2", c.className)}>
-                    {c.header}
-                  </th>
+                  <td key={c.key} className={cn("px-3 py-2.5 sm:px-4", c.className)}>
+                    {c.render(row)}
+                  </td>
                 ))}
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {rows.map((row) => (
-                <tr
-                  key={getRowKey(row)}
-                  onClick={() => onRowClick?.(row)}
-                  className={cn(
-                    "transition-colors hover:bg-violet-50/40",
-                    onRowClick && "cursor-pointer",
-                  )}
+            ))}
+            {rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={columns.length}
+                  className="px-4 py-16 text-center text-sm text-slate-400"
                 >
-                  {columns.map((c) => (
-                    <td key={c.key} className={cn("px-6 py-1.5", c.className)}>
-                      {c.render(row)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              {rows.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={columns.length}
-                    className="px-6 py-24 text-center text-base text-slate-400"
-                  >
-                    {emptyState}
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-        {totalCount > 0 ? (
-          <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3.5 text-sm text-slate-500">
-            <span>
-              Showing {(safePage - 1) * pageSize + 1}–
-              {Math.min(safePage * pageSize, totalCount)} of {totalCount}
-            </span>
-            <div className="flex gap-1.5">
-              <button
-                type="button"
-                disabled={safePage === 1}
-                onClick={() => onPageChange(Math.max(1, safePage - 1))}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-40"
-              >
-                Prev
-              </button>
-              <button
-                type="button"
-                disabled={safePage === totalPages}
-                onClick={() => onPageChange(Math.min(totalPages, safePage + 1))}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        ) : null}
+                  {emptyState}
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
       </div>
+      {totalCount > 0 ? (
+        <div className="flex shrink-0 items-center justify-between border-t border-slate-100 px-3 py-2.5 text-[12px] text-slate-500 sm:px-4">
+          <span>
+            Showing {(safePage - 1) * pageSize + 1}–
+            {Math.min(safePage * pageSize, totalCount)} of {totalCount}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={safePage === 1}
+              onClick={() => onPageChange(Math.max(1, safePage - 1))}
+              aria-label="Previous page"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 disabled:opacity-40"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <span className="px-1.5 tabular-nums">
+              {safePage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={safePage === totalPages}
+              onClick={() => onPageChange(Math.min(totalPages, safePage + 1))}
+              aria-label="Next page"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 disabled:opacity-40"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

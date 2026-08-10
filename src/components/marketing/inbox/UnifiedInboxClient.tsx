@@ -243,129 +243,128 @@ export function UnifiedInboxClient() {
     .reduce((n, c) => n + c.unreadCount, 0);
 
   return (
-    <div className="relative flex min-h-full flex-col overflow-hidden bg-slate-50">
-      <div className="relative flex min-h-0 flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
-        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-              <Link
-                href="/"
-                className="flex items-center gap-0.5 hover:text-slate-600"
-              >
-                <Home className="h-3 w-3" />
-                Home
-              </Link>
-              <span>/</span>
-              <span className="text-slate-500">Marketing</span>
-              <span>/</span>
-            </nav>
-            <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
+    <div className="flex min-h-0 min-h-full w-full flex-1 flex-col overflow-hidden bg-background p-2 pr-3">
+      <div className="w-full shrink-0 border-b border-slate-200/80 bg-background">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-1 py-2 sm:gap-x-3">
+          <nav className="hidden items-center gap-1 text-[11px] text-slate-400 md:flex">
+            <Link
+              href="/"
+              className="flex items-center gap-0.5 hover:text-slate-600"
+              aria-label="Home"
+            >
+              <Home className="h-3.5 w-3.5" />
+            </Link>
+            <span>/</span>
+            <span className="text-slate-500">Marketing</span>
+            <span>/</span>
+            <span className="text-slate-500">Unified Inbox</span>
+          </nav>
+          <div className="hidden h-4 w-px bg-slate-200 md:block" />
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
               Unified Inbox
             </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
-              <Inbox className="h-2.5 w-2.5" />
-              10.4
-            </span>
             {unreadTotal > 0 ? (
-              <span className="rounded-full bg-violet-600 px-2 py-0.5 text-[10px] font-bold text-white">
+              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
                 {unreadTotal} unread
               </span>
             ) : null}
           </div>
           <Link
             href="/marketing/inbox/settings"
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+            className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[12px] font-semibold text-slate-600 hover:bg-slate-50"
           >
             <Settings className="h-3.5 w-3.5" />
             Channels
           </Link>
         </div>
+      </div>
 
-        <div className="flex h-[calc(100dvh-7.5rem)] overflow-hidden rounded-md border border-slate-200/80 bg-white shadow-sm">
-          {/* Channel rail */}
-          <aside className="hidden w-[180px] shrink-0 flex-col border-r border-slate-100 bg-slate-50 lg:flex">
-            <div className="border-b border-slate-100 px-3 py-3">
-              <p className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                Channels
-              </p>
-            </div>
-            <div className="flex-1 space-y-0.5 overflow-auto p-2">
+      <div className="mt-2 flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+        {/* Channel rail */}
+        <aside className="hidden w-[180px] shrink-0 flex-col border-r border-slate-100 bg-slate-50/80 lg:flex">
+          <div className="border-b border-slate-100 px-3 py-2.5">
+            <p className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+              Channels
+            </p>
+          </div>
+          <div className="flex-1 space-y-0.5 overflow-auto p-2">
+            <ChannelBtn
+              active={channelFilter === "All"}
+              onClick={() => setChannelFilter("All")}
+              label="All channels"
+              count={rows.filter((c) => !c.archived).length}
+            />
+            {INBOX_CHANNELS.map((ch) => (
               <ChannelBtn
-                active={channelFilter === "All"}
-                onClick={() => setChannelFilter("All")}
-                label="All channels"
-                count={rows.filter((c) => !c.archived).length}
+                key={ch}
+                active={channelFilter === ch}
+                onClick={() => setChannelFilter(ch)}
+                label={ch}
+                count={channelCounts[ch]}
+                dot={CHANNEL_DOT[ch]}
               />
-              {INBOX_CHANNELS.map((ch) => (
-                <ChannelBtn
-                  key={ch}
-                  active={channelFilter === ch}
-                  onClick={() => setChannelFilter(ch)}
-                  label={ch}
-                  count={channelCounts[ch]}
-                  dot={CHANNEL_DOT[ch]}
-                />
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowArchived((v) => !v)}
+            className={cn(
+              "m-2 flex items-center gap-2 rounded-md px-2.5 py-2 text-[11px] font-semibold",
+              showArchived
+                ? "bg-slate-200 text-slate-800"
+                : "text-slate-500 hover:bg-slate-100",
+            )}
+          >
+            <Archive className="h-3.5 w-3.5" />
+            {showArchived ? "Hide archived" : "Show archived"}
+          </button>
+        </aside>
+
+        {/* Conversation list */}
+        <div className="flex w-full max-w-[320px] shrink-0 flex-col border-r border-slate-100 sm:max-w-[340px]">
+          <div className="space-y-2 border-b border-slate-100 p-2.5">
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search conversations…"
+                className="h-8 w-full rounded-md border border-slate-200/90 bg-white pr-2.5 pl-8 text-[12px] outline-none focus:border-violet-500 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.12)]"
+              />
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {INBOX_STATUSES.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() =>
+                    setStatusFilter(statusFilter === s ? "All" : s)
+                  }
+                  className={cn(
+                    "rounded-md px-2 py-0.5 text-[10px] font-semibold",
+                    statusFilter === s
+                      ? "bg-violet-50 text-violet-700"
+                      : "text-slate-400 hover:bg-slate-50",
+                  )}
+                >
+                  {s}
+                </button>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={() => setShowArchived((v) => !v)}
-              className={cn(
-                "m-2 flex items-center gap-2 rounded-lg px-2.5 py-2 text-[11px] font-semibold",
-                showArchived
-                  ? "bg-slate-200 text-slate-800"
-                  : "text-slate-500 hover:bg-slate-100",
-              )}
+            <select
+              value={agentFilter}
+              onChange={(e) => setAgentFilter(e.target.value)}
+              className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-[12px] outline-none"
             >
-              <Archive className="h-3.5 w-3.5" />
-              {showArchived ? "Hide archived" : "Show archived"}
-            </button>
-          </aside>
-
-          {/* Conversation list */}
-          <div className="flex w-full max-w-[320px] shrink-0 flex-col border-r border-slate-100 sm:max-w-[340px]">
-            <div className="space-y-2 border-b border-slate-100 p-2.5">
-              <div className="relative">
-                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search conversations…"
-                  className="h-8 w-full rounded-lg border border-slate-200/90 bg-white pr-2.5 pl-8 text-[11px] outline-none focus:border-violet-500 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.12)]"
-                />
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {INBOX_STATUSES.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() =>
-                      setStatusFilter(statusFilter === s ? "All" : s)
-                    }
-                    className={cn(
-                      "rounded-md px-2 py-0.5 text-[10px] font-semibold",
-                      statusFilter === s
-                        ? "bg-violet-50 text-violet-700"
-                        : "text-slate-400 hover:bg-slate-50",
-                    )}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-              <select
-                value={agentFilter}
-                onChange={(e) => setAgentFilter(e.target.value)}
-                className="h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-[11px] outline-none"
-              >
-                <option value="All">All agents</option>
-                {INBOX_AGENTS.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </select>
-            </div>
+              <option value="All">All agents</option>
+              {INBOX_AGENTS.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </div>
 
             <div className="min-h-0 flex-1 overflow-auto">
               {filtered.map((c) => (
@@ -667,7 +666,6 @@ export function UnifiedInboxClient() {
             </aside>
           ) : null}
         </div>
-      </div>
 
       {toast ? (
         <div className="fixed right-4 bottom-4 z-50 rounded-xl bg-slate-900 px-4 py-2.5 text-[12px] font-medium text-white shadow-lg">

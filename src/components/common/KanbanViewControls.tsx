@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { ChevronDown, HelpCircle, Pencil, Search, X } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -9,6 +9,8 @@ import { ChevronDown, HelpCircle, Pencil, Search, X } from "lucide-react";
 
 export type ShareWith = "only-me" | "everyone" | "selected-users";
 
+export type KanbanHeaderStyle = "Multi Colour" | "Single Colour" | "None";
+
 export interface KanbanField {
   id: string;
   label: string;
@@ -16,17 +18,97 @@ export interface KanbanField {
   required?: boolean;
 }
 
+/** Shared swatches for Single / Multi Colour header styles. */
+export const KANBAN_HEADER_PALETTE = [
+  "#3B82F6", // blue
+  "#06B6D4", // cyan
+  "#8B5CF6", // violet
+  "#EC4899", // pink
+  "#F59E0B", // amber
+  "#F97316", // orange
+  "#10B981", // emerald
+  "#14B8A6", // teal
+  "#EF4444", // red
+  "#64748B", // slate
+] as const;
+
+export const DEFAULT_SINGLE_HEADER_COLOR = "#6366F1";
+
 export interface KanbanViewConfig {
   id: string;
   name: string;
   categorizeBy: string;
   aggregateBy: string;
-  headerStyle: string;
+  headerStyle: KanbanHeaderStyle | string;
   shareWith: ShareWith;
   /** Ordered list of selected field ids. */
   selectedFieldIds: string[];
   /** Which of the selected fields can be inline-edited directly on the card. */
   editableFieldIds: string[];
+  /** Hex for Single Colour headers. */
+  singleHeaderColor?: string;
+  /** Hex per category/stage key for Multi Colour headers. */
+  multiHeaderColors?: Record<string, string>;
+}
+
+export interface KanbanHeaderColorOption {
+  id: string;
+  label: string;
+}
+
+/** Resolve the header fill for a column given the saved view config. */
+export function resolveKanbanHeaderColor(
+  view: Pick<
+    KanbanViewConfig,
+    "headerStyle" | "singleHeaderColor" | "multiHeaderColors"
+  >,
+  columnKey: string,
+  fallbackHex?: string,
+): string | null {
+  if (view.headerStyle === "None") return null;
+  if (view.headerStyle === "Single Colour") {
+    return view.singleHeaderColor || DEFAULT_SINGLE_HEADER_COLOR;
+  }
+  // Multi Colour
+  return (
+    view.multiHeaderColors?.[columnKey] ||
+    fallbackHex ||
+    DEFAULT_SINGLE_HEADER_COLOR
+  );
+}
+
+/** Soft tint + solid accent for a column header. */
+export function kanbanHeaderSurfaceStyle(hex: string | null): {
+  className: string;
+  style?: CSSProperties;
+} {
+  if (!hex) {
+    return { className: "border border-slate-200/80 bg-slate-50" };
+  }
+  return {
+    className: "border border-transparent",
+    style: {
+      backgroundColor: hexToRgba(hex, 0.16),
+      boxShadow: `inset 3px 0 0 0 ${hex}`,
+    },
+  };
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const raw = hex.replace("#", "");
+  const full =
+    raw.length === 3
+      ? raw
+          .split("")
+          .map((c) => c + c)
+          .join("")
+      : raw;
+  const n = Number.parseInt(full, 16);
+  if (!Number.isFinite(n)) return `rgba(99, 102, 241, ${alpha})`;
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 export interface KanbanViewControlsProps {
@@ -37,6 +119,8 @@ export interface KanbanViewControlsProps {
   categorizeByOptions: string[];
   aggregateByOptions: string[];
   headerStyleOptions: string[];
+  /** Categories/stages shown in the Multi Colour palette picker. */
+  headerColorOptions?: KanbanHeaderColorOption[];
 
   /** Called when the "Lead Pipeline ▾" label itself is clicked (e.g. open a view switcher). */
   onSelectorClick?: () => void;
@@ -60,6 +144,7 @@ export function KanbanViewControls({
   categorizeByOptions,
   aggregateByOptions,
   headerStyleOptions,
+  headerColorOptions,
   onSelectorClick,
   onSave,
   onDelete,
@@ -97,6 +182,7 @@ export function KanbanViewControls({
           categorizeByOptions={categorizeByOptions}
           aggregateByOptions={aggregateByOptions}
           headerStyleOptions={headerStyleOptions}
+          headerColorOptions={headerColorOptions}
           onHelp={onHelp}
           onClose={() => setIsSettingsOpen(false)}
           onDelete={
@@ -127,10 +213,51 @@ interface KanbanViewSettingsModalProps {
   categorizeByOptions: string[];
   aggregateByOptions: string[];
   headerStyleOptions: string[];
+  headerColorOptions?: KanbanHeaderColorOption[];
   onHelp?: () => void;
   onClose: () => void;
   onSave: (next: KanbanViewConfig) => void;
   onDelete?: () => void;
+}
+
+function ColorSwatchRow({
+  value,
+  onChange,
+  label,
+}: {
+  value: string;
+  onChange: (hex: string) => void;
+  label?: string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      {label ? (
+        <p className="truncate text-[12px] font-medium text-slate-600 dark:text-zinc-300">
+          {label}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-1.5">
+        {KANBAN_HEADER_PALETTE.map((hex) => {
+          const selected = value.toLowerCase() === hex.toLowerCase();
+          return (
+            <button
+              key={hex}
+              type="button"
+              aria-label={`Color ${hex}`}
+              title={hex}
+              onClick={() => onChange(hex)}
+              className={`h-6 w-6 rounded-full border-2 transition-transform ${
+                selected
+                  ? "scale-110 border-slate-800 dark:border-white"
+                  : "border-transparent hover:scale-105"
+              }`}
+              style={{ backgroundColor: hex }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export function KanbanViewSettingsModal({
@@ -139,6 +266,7 @@ export function KanbanViewSettingsModal({
   categorizeByOptions,
   aggregateByOptions,
   headerStyleOptions,
+  headerColorOptions = [],
   onHelp,
   onClose,
   onSave,
@@ -156,6 +284,22 @@ export function KanbanViewSettingsModal({
     view.editableFieldIds,
   );
   const [search, setSearch] = useState("");
+  const [singleHeaderColor, setSingleHeaderColor] = useState(
+    view.singleHeaderColor || DEFAULT_SINGLE_HEADER_COLOR,
+  );
+  const [multiHeaderColors, setMultiHeaderColors] = useState<
+    Record<string, string>
+  >(() => {
+    const base: Record<string, string> = { ...(view.multiHeaderColors ?? {}) };
+    headerColorOptions.forEach((opt, i) => {
+      if (!base[opt.id]) {
+        base[opt.id] =
+          KANBAN_HEADER_PALETTE[i % KANBAN_HEADER_PALETTE.length] ??
+          DEFAULT_SINGLE_HEADER_COLOR;
+      }
+    });
+    return base;
+  });
 
   const fieldsById = useMemo(
     () => new Map(availableFields.map((f) => [f.id, f])),
@@ -182,13 +326,9 @@ export function KanbanViewSettingsModal({
     setEditableIds((prev) => prev.filter((f) => f !== id));
   };
 
-  const toggleEditable = (id: string) =>
-    setEditableIds((prev) =>
-      prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id],
-    );
-
   const showColourNote =
-    headerStyle === "Multi Colour" && categorizeBy === "Lead Status";
+    headerStyle === "Multi Colour" &&
+    (categorizeBy === "Lead Status" || categorizeBy === "Status");
 
   const handleSave = () => {
     if (!name.trim()) return;
@@ -201,6 +341,8 @@ export function KanbanViewSettingsModal({
       shareWith,
       selectedFieldIds: selectedIds,
       editableFieldIds: editableIds.filter((id) => selectedIds.includes(id)),
+      singleHeaderColor,
+      multiHeaderColors,
     });
   };
 
@@ -269,6 +411,44 @@ export function KanbanViewSettingsModal({
                 header style.
               </p>
             )}
+
+            {headerStyle === "Single Colour" ? (
+              <div className="mt-3 rounded-md border border-slate-200 bg-slate-50/80 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
+                <p className="mb-2 text-[12px] font-medium text-slate-600 dark:text-zinc-300">
+                  Header colour
+                </p>
+                <ColorSwatchRow
+                  value={singleHeaderColor}
+                  onChange={setSingleHeaderColor}
+                />
+              </div>
+            ) : null}
+
+            {headerStyle === "Multi Colour" ? (
+              <div className="mt-3 max-h-48 space-y-3 overflow-y-auto rounded-md border border-slate-200 bg-slate-50/80 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
+                <p className="text-[12px] font-medium text-slate-600 dark:text-zinc-300">
+                  Colour per column
+                </p>
+                {(headerColorOptions.length
+                  ? headerColorOptions
+                  : [{ id: "default", label: "All columns" }]
+                ).map((opt) => (
+                  <ColorSwatchRow
+                    key={opt.id}
+                    label={opt.label}
+                    value={
+                      multiHeaderColors[opt.id] || DEFAULT_SINGLE_HEADER_COLOR
+                    }
+                    onChange={(hex) =>
+                      setMultiHeaderColors((prev) => ({
+                        ...prev,
+                        [opt.id]: hex,
+                      }))
+                    }
+                  />
+                ))}
+              </div>
+            ) : null}
           </Field>
 
           {/* Share with */}

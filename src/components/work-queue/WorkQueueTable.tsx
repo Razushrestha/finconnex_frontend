@@ -4,19 +4,19 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowUpDown,
-  CheckCircle2,
+  Check,
   ChevronLeft,
   ChevronRight,
   Columns3,
   Edit,
+  EllipsisVertical,
+  FileText,
   Inbox,
   ListFilter,
-  MoreHorizontal,
   RefreshCw,
   Rows3,
   Ruler,
   Settings2,
-  StickyNote,
   Trash2,
   X,
 } from "lucide-react";
@@ -57,10 +57,151 @@ interface WorkQueueTableProps {
   onCompleteRow?: (row: QueueRow) => void;
 }
 
-const COLS =
-  "grid min-w-[1180px] grid-cols-[64px_minmax(220px,2fr)_minmax(110px,0.9fr)_minmax(110px,0.9fr)_minmax(80px,0.7fr)_minmax(160px,1.3fr)_minmax(140px,1.1fr)_minmax(120px,1fr)_minmax(110px,0.9fr)_40px] gap-x-3";
+const ACTIONS_COL = "96px";
+const SETTINGS_COL = "40px";
 
+/** Preferred track sizes keyed by Manage Column id. */
+const COL_TRACK: Record<string, string> = {
+  subject: "minmax(200px,2.2fr)",
+  dueDate: "minmax(100px,0.85fr)",
+  status: "minmax(100px,0.85fr)",
+  priority: "minmax(80px,0.7fr)",
+  relatedTo: "minmax(140px,1.2fr)",
+  contactName: "minmax(120px,1fr)",
+  fileHandler: "minmax(110px,0.95fr)",
+  tag: "minmax(90px,0.8fr)",
+  taskOwner: "minmax(110px,0.95fr)",
+  createdTime: "minmax(120px,0.95fr)",
+  modifiedBy: "minmax(110px,0.9fr)",
+  modifiedTime: "minmax(120px,0.95fr)",
+  closedTime: "minmax(120px,0.95fr)",
+  createdBy: "minmax(110px,0.9fr)",
+  description: "minmax(160px,1.4fr)",
+  lastActivityTime: "minmax(130px,1fr)",
+};
+
+const COL_MIN_PX: Record<string, number> = {
+  subject: 200,
+  dueDate: 100,
+  status: 100,
+  priority: 80,
+  relatedTo: 140,
+  contactName: 120,
+  fileHandler: 110,
+  tag: 90,
+  taskOwner: 110,
+  createdTime: 120,
+  modifiedBy: 110,
+  modifiedTime: 120,
+  closedTime: 120,
+  createdBy: 110,
+  description: 160,
+  lastActivityTime: 130,
+};
+
+const STORAGE_KEY = "finconnex.work-queue.manage-columns";
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
+
+function loadManageColumns(): ManageColumn[] {
+  if (typeof window === "undefined") return DEFAULT_MANAGE_COLUMNS;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return DEFAULT_MANAGE_COLUMNS;
+    const saved = JSON.parse(raw) as ManageColumn[];
+    if (!Array.isArray(saved) || saved.length === 0) {
+      return DEFAULT_MANAGE_COLUMNS;
+    }
+    const byId = new Map(saved.map((c) => [c.id, c]));
+    // Merge defaults so newly added column defs still appear.
+    const merged = DEFAULT_MANAGE_COLUMNS.map((def) => {
+      const s = byId.get(def.id);
+      if (!s) return def;
+      return {
+        ...def,
+        checked: def.required ? true : Boolean(s.checked),
+        pinned: Boolean(s.pinned),
+      };
+    });
+    // Preserve saved order for known ids, append any new defaults at end.
+    const order = saved.map((c) => c.id).filter((id) => merged.some((m) => m.id === id));
+    const ordered = order
+      .map((id) => merged.find((m) => m.id === id)!)
+      .concat(merged.filter((m) => !order.includes(m.id)));
+    return ordered;
+  } catch {
+    return DEFAULT_MANAGE_COLUMNS;
+  }
+}
+
+function persistManageColumns(cols: ManageColumn[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cols));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function visibleColumns(columns: ManageColumn[]): ManageColumn[] {
+  const checked = columns.filter((c) => c.checked);
+  const pinned = checked.filter((c) => c.pinned || c.required);
+  const rest = checked.filter((c) => !c.pinned && !c.required);
+  return [...pinned, ...rest];
+}
+
+function buildGridTemplate(cols: ManageColumn[]): string {
+  const tracks = cols.map((c) => COL_TRACK[c.id] ?? "minmax(110px,1fr)");
+  return `${ACTIONS_COL} ${tracks.join(" ")} ${SETTINGS_COL}`;
+}
+
+function buildMinWidth(cols: ManageColumn[]): number {
+  const gap = 12; // gap-x-3
+  const n = cols.length + 2; // actions + settings
+  const sum =
+    96 +
+    40 +
+    cols.reduce((acc, c) => acc + (COL_MIN_PX[c.id] ?? 110), 0) +
+    gap * (n - 1);
+  return sum;
+}
+
+function cellText(row: QueueRow, colId: string): string {
+  switch (colId) {
+    case "subject":
+      return row.subject;
+    case "dueDate":
+      return row.dueLabel || "";
+    case "status":
+      return row.status;
+    case "priority":
+      return row.priority;
+    case "relatedTo":
+      return row.related;
+    case "contactName":
+      return row.contactName ?? "";
+    case "fileHandler":
+      return row.fileHandler ?? "";
+    case "tag":
+      return row.tag ?? "";
+    case "taskOwner":
+      return row.taskOwner ?? "";
+    case "createdTime":
+      return row.createdTime ?? "";
+    case "modifiedBy":
+      return row.modifiedBy ?? "";
+    case "modifiedTime":
+      return row.modifiedTime ?? "";
+    case "closedTime":
+      return row.closedTime ?? "";
+    case "createdBy":
+      return row.createdBy ?? "";
+    case "description":
+      return row.description ?? "";
+    case "lastActivityTime":
+      return row.lastActivityTime ?? "";
+    default:
+      return "";
+  }
+}
 
 export function WorkQueueTable({
   rows,
@@ -100,6 +241,31 @@ export function WorkQueueTable({
   const [manageColumnsOpen, setManageColumnsOpen] = React.useState(false);
   const [manageColumns, setManageColumns] = React.useState<ManageColumn[]>(
     DEFAULT_MANAGE_COLUMNS,
+  );
+
+  React.useEffect(() => {
+    setManageColumns(loadManageColumns());
+  }, []);
+
+  const visibleCols = React.useMemo(
+    () => visibleColumns(manageColumns),
+    [manageColumns],
+  );
+  const gridTemplate = React.useMemo(
+    () => buildGridTemplate(visibleCols),
+    [visibleCols],
+  );
+  const tableMinWidth = React.useMemo(
+    () => buildMinWidth(visibleCols),
+    [visibleCols],
+  );
+  const gridStyle = React.useMemo(
+    () =>
+      ({
+        gridTemplateColumns: gridTemplate,
+        minWidth: tableMinWidth,
+      }) as React.CSSProperties,
+    [gridTemplate, tableMinWidth],
   );
 
   // Close row action popup when clicking outside
@@ -147,16 +313,20 @@ export function WorkQueueTable({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-white">
-      <div className="flex shrink-0 items-center justify-between gap-3 px-5 pt-5 pb-4 sm:px-7">
-        <div className="flex min-w-0 items-center gap-2">
-          <h2 className="truncate text-[22px] leading-7 font-bold tracking-tight text-gray-900">
+      <div className="flex shrink-0 items-center justify-between gap-3 px-5 pt-4 pb-3 sm:px-6">
+        <div className="flex min-w-0 items-baseline gap-2.5">
+          <h2 className="truncate text-[18px] leading-6 font-semibold tracking-tight text-slate-900">
             {title}
           </h2>
+          <span className="shrink-0 text-[12px] font-medium tabular-nums text-slate-400">
+            {total}
+          </span>
           <button
             type="button"
             aria-label={`Refresh ${title}`}
+            title="Refresh"
             onClick={onRefresh}
-            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-[var(--wq-surface)] hover:text-gray-600"
+            className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
           >
             <RefreshCw
               className={cn("h-3.5 w-3.5", spinning && "animate-spin")}
@@ -164,22 +334,21 @@ export function WorkQueueTable({
           </button>
         </div>
 
-        {/* Actions Group (Filter & Sort side-by-side) */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => setFilterOpen((v) => !v)}
             className={cn(
-              "inline-flex h-9 items-center gap-1.5 rounded-md border bg-white px-3 text-[13px] font-medium shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-colors",
+              "inline-flex h-8 items-center gap-1.5 px-2.5 text-[13px] font-medium transition-colors",
               filterOpen || activeFilterCount > 0
-                ? "border-blue-200 bg-blue-50 text-blue-700"
-                : "border-[var(--wq-line)] text-gray-700 hover:bg-[var(--wq-surface)]",
+                ? "text-[var(--wq-accent)]"
+                : "text-slate-600 hover:text-slate-900",
             )}
           >
             <ListFilter className="h-3.5 w-3.5" />
             Filter
             {activeFilterCount > 0 ? (
-              <span className="rounded-md bg-blue-600 px-1.5 py-px text-[10px] font-semibold text-white">
+              <span className="text-[11px] font-semibold tabular-nums">
                 {activeFilterCount}
               </span>
             ) : null}
@@ -187,7 +356,7 @@ export function WorkQueueTable({
 
           <button
             type="button"
-            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--wq-line)] bg-white px-3 text-[13px] font-medium text-gray-700 shadow-[0_1px_0_rgba(15,23,42,0.02)] transition-colors hover:bg-[var(--wq-surface)]"
+            className="inline-flex h-8 items-center gap-1.5 px-2.5 text-[13px] font-medium text-slate-600 transition-colors hover:text-slate-900"
           >
             <ArrowUpDown className="h-3.5 w-3.5" />
             Sort
@@ -196,9 +365,9 @@ export function WorkQueueTable({
       </div>
 
       {filterOpen ? (
-        <div className="mx-5 mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--wq-line)] bg-[var(--wq-surface)] px-4 py-3 sm:mx-7">
-          <label className="flex min-w-[120px] flex-1 flex-col gap-1">
-            <span className="text-[11px] font-semibold tracking-wide text-gray-400 uppercase">
+        <div className="flex flex-wrap items-end gap-x-5 gap-y-3 border-y border-[var(--wq-line)] bg-[var(--wq-surface)]/60 px-5 py-3 sm:px-6">
+          <label className="flex min-w-[120px] flex-col gap-1">
+            <span className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
               Priority
             </span>
             <select
@@ -209,7 +378,7 @@ export function WorkQueueTable({
                   priority: e.target.value as QueueTableFilters["priority"],
                 })
               }
-              className="h-9 rounded-lg border border-[var(--wq-line)] bg-white px-2.5 text-[13px] text-gray-800 outline-none focus:border-blue-600"
+              className="h-8 border-0 border-b border-slate-200 bg-transparent px-0 text-[13px] text-slate-800 outline-none focus:border-[var(--wq-accent)]"
             >
               <option value="all">All</option>
               <option value="High">High</option>
@@ -217,8 +386,8 @@ export function WorkQueueTable({
               <option value="Low">Low</option>
             </select>
           </label>
-          <label className="flex min-w-[140px] flex-1 flex-col gap-1">
-            <span className="text-[11px] font-semibold tracking-wide text-gray-400 uppercase">
+          <label className="flex min-w-[140px] flex-col gap-1">
+            <span className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
               Status
             </span>
             <select
@@ -226,7 +395,7 @@ export function WorkQueueTable({
               onChange={(e) =>
                 onFiltersChange({ ...filters, status: e.target.value })
               }
-              className="h-9 rounded-lg border border-[var(--wq-line)] bg-white px-2.5 text-[13px] text-gray-800 outline-none focus:border-blue-600"
+              className="h-8 border-0 border-b border-slate-200 bg-transparent px-0 text-[13px] text-slate-800 outline-none focus:border-[var(--wq-accent)]"
             >
               <option value="all">All</option>
               {statusOptions.map((s) => (
@@ -236,8 +405,8 @@ export function WorkQueueTable({
               ))}
             </select>
           </label>
-          <label className="flex min-w-[140px] flex-1 flex-col gap-1">
-            <span className="text-[11px] font-semibold tracking-wide text-gray-400 uppercase">
+          <label className="flex min-w-[140px] flex-col gap-1">
+            <span className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
               Due
             </span>
             <select
@@ -248,7 +417,7 @@ export function WorkQueueTable({
                   due: e.target.value as QueueTableFilters["due"],
                 })
               }
-              className="h-9 rounded-lg border border-[var(--wq-line)] bg-white px-2.5 text-[13px] text-gray-800 outline-none focus:border-blue-600"
+              className="h-8 border-0 border-b border-slate-200 bg-transparent px-0 text-[13px] text-slate-800 outline-none focus:border-[var(--wq-accent)]"
             >
               <option value="all">All</option>
               <option value="overdue">Overdue</option>
@@ -265,7 +434,7 @@ export function WorkQueueTable({
                 due: "all",
               });
             }}
-            className="inline-flex h-9 items-center gap-1 rounded-lg px-2.5 text-[12.5px] font-medium text-gray-500 hover:bg-white hover:text-gray-800"
+            className="inline-flex h-8 items-center gap-1 text-[12.5px] font-medium text-slate-500 transition-colors hover:text-slate-800"
           >
             <X className="h-3.5 w-3.5" />
             Clear
@@ -273,37 +442,25 @@ export function WorkQueueTable({
         </div>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-auto border-t border-[var(--wq-line)]">
+      <div className="min-h-0 flex-1 overflow-auto">
         <div className="min-h-[420px]">
           <div
-            className={cn(
-              COLS,
-              "sticky top-0 z-10 border-b border-[var(--wq-line)] bg-white px-5 py-2.5 sm:px-7",
-            )}
+            style={gridStyle}
+            className="sticky top-0 z-10 grid gap-x-3 border-b border-[var(--wq-line)] bg-white px-5 py-2 sm:px-6"
           >
             <span aria-hidden />
-            {[
-              "Subject",
-              "Due Date",
-              "Status",
-              "Priority",
-              "Related To",
-              "Contact Name",
-              "File Handler",
-              "Tag",
-            ].map((h) => (
+            {visibleCols.map((col) => (
               <span
-                key={h}
-                className="truncate text-[12px] font-semibold tracking-wide text-gray-500"
+                key={col.id}
+                className="truncate text-[11px] font-semibold tracking-[0.04em] text-slate-400 uppercase"
               >
-                {h}
+                {col.label}
               </span>
             ))}
 
             <div
               className={cn(
-                "sticky right-0 z-20 -mr-5 flex justify-end bg-white pr-5 pl-3 sm:-mr-7 sm:pr-7",
-                "shadow-[-12px_0_12px_-8px_rgba(15,23,42,0.06)]",
+                "sticky right-0 z-20 -mr-5 flex justify-end bg-white pr-5 pl-3 sm:-mr-6 sm:pr-6",
               )}
             >
               <button
@@ -321,7 +478,8 @@ export function WorkQueueTable({
                   setOptionsMenuOpen((v) => !v);
                 }}
                 aria-label="Table display options"
-                className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                title="Column options"
+                className="flex h-6 w-6 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
               >
                 <Settings2 className="h-3.5 w-3.5" />
               </button>
@@ -335,7 +493,7 @@ export function WorkQueueTable({
                         top: menuPos.top,
                         right: menuPos.right,
                       }}
-                      className="z-50 w-56 rounded-xl border border-[var(--wq-line)] bg-white py-1.5 text-[13px] shadow-lg"
+                      className="z-50 w-56 border border-[var(--wq-line)] bg-white py-1 text-[13px] shadow-lg"
                     >
                       <button
                         type="button"
@@ -343,18 +501,18 @@ export function WorkQueueTable({
                           setManageColumnsOpen(true);
                           setOptionsMenuOpen(false);
                         }}
-                        className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-gray-700 hover:bg-[var(--wq-surface)]"
+                        className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50"
                       >
-                        <Columns3 className="h-4 w-4 text-gray-400" />
+                        <Columns3 className="h-4 w-4 text-slate-400" />
                         Manage Columns
                       </button>
 
                       <button
                         type="button"
                         disabled
-                        className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-left text-gray-300"
+                        className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-left text-slate-300"
                       >
-                        <Ruler className="h-4 w-4 text-gray-300" />
+                        <Ruler className="h-4 w-4 text-slate-300" />
                         Reset Column Size
                       </button>
 
@@ -367,20 +525,20 @@ export function WorkQueueTable({
                       >
                         <button
                           type="button"
-                          className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-gray-700 hover:bg-[var(--wq-surface)]"
+                          className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50"
                         >
                           <span className="flex items-center gap-2.5">
-                            <Rows3 className="h-4 w-4 text-gray-400" />
+                            <Rows3 className="h-4 w-4 text-slate-400" />
                             Records per page
                           </span>
-                          <span className="flex items-center gap-0.5 text-gray-400">
+                          <span className="flex items-center gap-0.5 text-slate-400">
                             {pageSize}
                             <ChevronRight className="h-3.5 w-3.5" />
                           </span>
                         </button>
 
                         {pageSizeFlyoutOpen ? (
-                          <div className="absolute right-full top-0 mr-1 w-28 rounded-xl border border-[var(--wq-line)] bg-white py-1.5 shadow-lg">
+                          <div className="absolute right-full top-0 mr-1 w-28 border border-[var(--wq-line)] bg-white py-1 shadow-lg">
                             {PAGE_SIZE_OPTIONS.map((size) => (
                               <button
                                 key={size}
@@ -390,9 +548,9 @@ export function WorkQueueTable({
                                   setOptionsMenuOpen(false);
                                 }}
                                 className={cn(
-                                  "flex w-full items-center justify-between px-3.5 py-1.5 text-left text-gray-700 hover:bg-[var(--wq-surface)]",
+                                  "flex w-full items-center justify-between px-3.5 py-1.5 text-left text-slate-700 hover:bg-slate-50",
                                   pageSize === size &&
-                                    "font-semibold text-gray-900",
+                                    "font-semibold text-slate-900",
                                 )}
                               >
                                 {size}
@@ -409,15 +567,15 @@ export function WorkQueueTable({
           </div>
 
           {rows.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 px-4 py-16 text-center">
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--wq-surface)] text-gray-300">
+            <div className="flex flex-col items-center justify-center gap-2 px-4 py-20 text-center">
+              <span className="flex h-10 w-10 items-center justify-center text-slate-300">
                 <Inbox className="h-5 w-5" />
               </span>
-              <p className="text-[13.5px] font-medium text-gray-500">
+              <p className="text-[13.5px] font-medium text-slate-600">
                 {emptyLabel}
               </p>
-              <p className="text-[12px] text-gray-400">
-                Try another person, time filter, or clear search/filters.
+              <p className="max-w-xs text-[12.5px] text-slate-400">
+                Try another person, time range, or clear search and filters.
               </p>
             </div>
           ) : (
@@ -439,13 +597,13 @@ export function WorkQueueTable({
                       router.push(row.href);
                     }
                   }}
+                  style={gridStyle}
                   className={cn(
-                    COLS,
-                    "group w-full cursor-pointer items-center gap-x-3 border-b border-gray-100 px-5 py-1.5 text-left transition-colors last:border-b-0 hover:bg-[var(--wq-surface)] sm:px-7",
-                    overdue && "bg-red-50/30 hover:bg-red-50/60",
+                    "group grid w-full cursor-pointer items-center gap-x-3 border-b border-slate-100 px-5 py-2 text-left transition-colors last:border-b-0 hover:bg-slate-50/80 sm:px-6",
+                    overdue && "bg-red-50/40 hover:bg-red-50/70",
                   )}
                 >
-                  <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="flex items-center gap-1">
                     <div
                       className="relative inline-block text-left"
                       ref={isMenuOpen ? menuRef : undefined}
@@ -453,17 +611,22 @@ export function WorkQueueTable({
                       <button
                         type="button"
                         aria-label="More actions"
+                        title="More actions"
                         onClick={(e) => {
                           e.stopPropagation();
                           setActiveMenuId(isMenuOpen ? null : row.id);
                         }}
-                        className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 hover:bg-white hover:text-gray-600"
+                        className={cn(
+                          "flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors",
+                          "hover:bg-slate-100 hover:text-slate-800",
+                          isMenuOpen && "bg-slate-100 text-slate-800",
+                        )}
                       >
-                        <MoreHorizontal className="h-3.5 w-3.5" />
+                        <EllipsisVertical className="h-4 w-4" strokeWidth={2} />
                       </button>
 
                       {isMenuOpen && (
-                        <div className="absolute left-0 top-7 z-50 mt-1 w-36 origin-top-left rounded-lg bg-white py-1 shadow-lg ring-1 ring-black/5 focus:outline-none">
+                        <div className="absolute left-0 top-9 z-50 mt-0.5 w-40 origin-top-left rounded-lg border border-slate-200/80 bg-white py-1 shadow-lg ring-1 ring-black/5 focus:outline-none">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -471,9 +634,9 @@ export function WorkQueueTable({
                               setActiveMenuId(null);
                               onEditRow?.(row);
                             }}
-                            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-700 transition-colors hover:bg-gray-50"
+                            className="flex w-full items-center gap-2 px-3 py-2 text-[13px] text-slate-700 transition-colors hover:bg-slate-50"
                           >
-                            <Edit className="h-3.5 w-3.5 text-gray-400" />
+                            <Edit className="h-4 w-4 text-slate-400" />
                             Edit
                           </button>
 
@@ -484,9 +647,9 @@ export function WorkQueueTable({
                               setActiveMenuId(null);
                               onDeleteRow?.(row);
                             }}
-                            className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-rose-600 transition-colors hover:bg-rose-50"
+                            className="flex w-full items-center gap-2 px-3 py-2 text-[13px] text-rose-600 transition-colors hover:bg-rose-50"
                           >
-                            <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                            <Trash2 className="h-4 w-4 text-rose-500" />
                             Delete
                           </button>
                         </div>
@@ -496,54 +659,75 @@ export function WorkQueueTable({
                     <button
                       type="button"
                       aria-label="Add note"
+                      title="Add note"
                       onClick={(e) => {
                         e.stopPropagation();
                         onAddNote?.(row);
                       }}
-                      className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 hover:bg-white hover:text-gray-600"
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
                     >
-                      <StickyNote className="h-3.5 w-3.5" />
+                      <FileText className="h-4 w-4" strokeWidth={2} />
                     </button>
                     <button
                       type="button"
                       aria-label="Mark complete"
+                      title="Mark complete"
                       onClick={(e) => {
                         e.stopPropagation();
                         onCompleteRow?.(row);
                       }}
-                      className="flex h-6 w-6 items-center justify-center rounded-full text-emerald-500 hover:bg-emerald-50"
+                      className="flex h-8 w-8 items-center justify-center rounded-md text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
                     >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      <Check className="h-4 w-4" strokeWidth={2.5} />
                     </button>
                   </div>
 
-                  <span className="truncate pr-3 text-[13.5px] leading-[18px] font-medium text-gray-900">
-                    {row.subject}
-                  </span>
-                  <span
-                    className="text-[13.5px] leading-[18px] font-semibold tabular-nums"
-                    style={{ color: row.dueColor }}
-                  >
-                    {row.dueLabel || ""}
-                  </span>
-                  <span className="truncate text-[13.5px] leading-[18px] text-gray-600">
-                    {row.status}
-                  </span>
-                  <span className="truncate text-[13.5px] leading-[18px] text-gray-600">
-                    {row.priority}
-                  </span>
-                  <span className="truncate text-[13.5px] leading-[18px] font-medium text-[var(--wq-accent)]">
-                    {row.related}
-                  </span>
-                  <span className="truncate text-[13.5px] leading-[18px] text-gray-600">
-                    {row.contactName ?? ""}
-                  </span>
-                  <span className="truncate text-[13.5px] leading-[18px] text-gray-600">
-                    {row.fileHandler ?? ""}
-                  </span>
-                  <span className="truncate text-[13.5px] leading-[18px] text-gray-600">
-                    {row.tag ?? ""}
-                  </span>
+                  {visibleCols.map((col) => {
+                    const text = cellText(row, col.id);
+                    if (col.id === "subject") {
+                      return (
+                        <span
+                          key={col.id}
+                          className="truncate pr-3 text-[13.5px] leading-[18px] font-medium text-slate-900"
+                        >
+                          {text}
+                        </span>
+                      );
+                    }
+                    if (col.id === "dueDate") {
+                      return (
+                        <span
+                          key={col.id}
+                          className="text-[13px] leading-[18px] font-medium tabular-nums"
+                          style={{ color: row.dueColor }}
+                        >
+                          {text}
+                        </span>
+                      );
+                    }
+                    if (col.id === "relatedTo") {
+                      return (
+                        <span
+                          key={col.id}
+                          className="truncate text-[13px] leading-[18px] font-medium text-[var(--wq-accent)]"
+                        >
+                          {text}
+                        </span>
+                      );
+                    }
+                    return (
+                      <span
+                        key={col.id}
+                        className="truncate text-[13px] leading-[18px] text-slate-600"
+                        title={text || undefined}
+                      >
+                        {text}
+                      </span>
+                    );
+                  })}
+
+                  {/* Spacer cell aligned with sticky settings column */}
+                  <span aria-hidden />
                 </div>
               );
             })
@@ -551,15 +735,17 @@ export function WorkQueueTable({
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--wq-line)] px-5 py-3.5 sm:px-7">
-        <span className="text-[13px] font-medium text-gray-600">
-          Total Records{" "}
-          <span className="font-bold text-gray-900 tabular-nums">{total}</span>
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--wq-line)] px-5 py-2.5 sm:px-6">
+        <span className="text-[12.5px] text-slate-500">
+          <span className="font-semibold text-slate-800 tabular-nums">
+            {total}
+          </span>{" "}
+          records
         </span>
 
         <div className="flex items-center gap-2">
-          <span className="text-[13px] font-medium text-gray-400 tabular-nums">
-            {from} to {to}
+          <span className="text-[12.5px] text-slate-400 tabular-nums">
+            {from}–{to}
           </span>
           {totalPages > 1 ? (
             <div className="ml-1 flex items-center gap-0.5">
@@ -568,7 +754,7 @@ export function WorkQueueTable({
                 aria-label="Previous page"
                 disabled={page <= 1}
                 onClick={() => onPageChange(page - 1)}
-                className="flex h-7 w-7 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-[var(--wq-surface)] disabled:pointer-events-none disabled:opacity-35"
+                className="flex h-7 w-7 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 disabled:pointer-events-none disabled:opacity-35"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -583,16 +769,16 @@ export function WorkQueueTable({
                   return (
                     <span key={n} className="contents">
                       {showGap ? (
-                        <span className="px-0.5 text-xs text-gray-300">…</span>
+                        <span className="px-0.5 text-xs text-slate-300">…</span>
                       ) : null}
                       <button
                         type="button"
                         onClick={() => onPageChange(n)}
                         className={cn(
-                          "flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-semibold transition-colors",
+                          "flex h-7 w-7 items-center justify-center text-[12px] font-semibold transition-colors",
                           n === page
-                            ? "bg-[var(--wq-accent)] text-white shadow-sm"
-                            : "text-gray-600 hover:bg-[var(--wq-surface)]",
+                            ? "bg-[var(--wq-accent)] text-white"
+                            : "text-slate-600 hover:bg-slate-100",
                         )}
                       >
                         {n}
@@ -605,7 +791,7 @@ export function WorkQueueTable({
                 aria-label="Next page"
                 disabled={page >= totalPages}
                 onClick={() => onPageChange(page + 1)}
-                className="flex h-7 w-7 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-[var(--wq-surface)] disabled:pointer-events-none disabled:opacity-35"
+                className="flex h-7 w-7 items-center justify-center text-slate-500 transition-colors hover:bg-slate-100 disabled:pointer-events-none disabled:opacity-35"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -620,6 +806,7 @@ export function WorkQueueTable({
         onClose={() => setManageColumnsOpen(false)}
         onSave={(cols) => {
           setManageColumns(cols);
+          persistManageColumns(cols);
           onManageColumns?.();
           setManageColumnsOpen(false);
         }}

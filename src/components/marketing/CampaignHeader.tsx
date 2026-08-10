@@ -11,8 +11,9 @@ export interface CampaignBreadcrumb {
 interface CampaignHeaderProps {
   /** e.g. [{ label: "Home", href: "/" }, { label: "Marketing" }, { label: "Email Campaigns" }] */
   breadcrumbs: CampaignBreadcrumb[];
-  /** Big page title, e.g. "Marketing" */
+  /** Page title — the entity name (Email Campaigns, Forms, …), not "Marketing". */
   title: string;
+  totalCount?: number;
   onExport?: () => void;
   exportLabel?: string;
   onCreate?: () => void;
@@ -20,31 +21,33 @@ interface CampaignHeaderProps {
 }
 
 /**
- * Page header shared across every campaign surface (Email, SMS, WhatsApp, ...).
- * Only the copy and the two callbacks change per surface.
+ * Compact page chrome shared across marketing list surfaces.
+ * Matches EntityHeader density used on Sales pages.
  */
 export function CampaignHeader({
   breadcrumbs,
   title,
+  totalCount,
   onExport,
   exportLabel = "Export",
   onCreate,
   createLabel = "New",
 }: CampaignHeaderProps) {
   return (
-    <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
-      <div className="flex min-w-0 flex-col gap-1">
-        <nav className="flex items-center gap-1.5 text-[13px] text-slate-400">
+    <div className="w-full shrink-0 border-b border-slate-200/80 bg-background">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-1 py-2 sm:gap-x-3">
+        <nav className="hidden items-center gap-1 text-[11px] text-slate-400 md:flex">
           {breadcrumbs.map((crumb, i) => (
-            <span key={crumb.label} className="flex items-center gap-1.5">
+            <span key={`${crumb.label}-${i}`} className="flex items-center gap-1">
               {i > 0 ? <span>/</span> : null}
               {crumb.href ? (
                 <Link
                   href={crumb.href}
-                  className="flex items-center gap-1 hover:text-slate-600"
+                  className="flex items-center gap-0.5 hover:text-slate-600"
+                  aria-label={i === 0 ? "Home" : crumb.label}
                 >
                   {i === 0 ? <Home className="h-3.5 w-3.5" /> : null}
-                  {crumb.label}
+                  {i === 0 ? null : crumb.label}
                 </Link>
               ) : (
                 <span className="text-slate-500">{crumb.label}</span>
@@ -52,31 +55,42 @@ export function CampaignHeader({
             </span>
           ))}
         </nav>
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-          {title}
-        </h1>
-      </div>
-      <div className="flex items-center gap-2.5">
-        {onExport ? (
-          <button
-            type="button"
-            onClick={onExport}
-            className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-          >
-            <Download className="h-4 w-4" />
-            {exportLabel}
-          </button>
-        ) : null}
-        {onCreate ? (
-          <button
-            type="button"
-            onClick={onCreate}
-            className="inline-flex h-9 items-center gap-2 rounded-md bg-violet-600 px-4 text-sm font-semibold text-white shadow-md shadow-violet-600/20 hover:bg-violet-700"
-          >
-            <Plus className="h-4 w-4" />
-            {createLabel}
-          </button>
-        ) : null}
+
+        <div className="hidden h-4 w-px bg-slate-200 md:block" />
+
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
+            {title}
+          </h1>
+          {totalCount !== undefined ? (
+            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
+              {totalCount}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="ml-auto flex items-center gap-1.5">
+          {onExport ? (
+            <button
+              type="button"
+              onClick={onExport}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-[12px] font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {exportLabel}
+            </button>
+          ) : null}
+          {onCreate ? (
+            <button
+              type="button"
+              onClick={onCreate}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-violet-600 px-3 text-[12px] font-semibold text-white hover:bg-violet-700"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {createLabel}
+            </button>
+          ) : null}
+        </div>
       </div>
     </div>
   );

@@ -147,6 +147,10 @@ export function buildLeadCardViewModel(
   const settings = opts.cardSettings ?? loadLeadCardSettings();
   const showOwnerAvatar = opts.showOwnerAvatar ?? settings.showOwnerAvatar;
   const fieldKeys = opts.dynamicFieldKeys ?? settings.dynamicFieldKeys;
+  // Explicit view keys are shown in full; settings-store fields stay capped.
+  const maxFields = opts.dynamicFieldKeys
+    ? opts.dynamicFieldKeys.length
+    : MAX_DYNAMIC_FIELDS;
   const cardLike: LeadCardData = {
     id: lead.id,
     name,
@@ -178,7 +182,7 @@ export function buildLeadCardViewModel(
       initials: personInitials(lead.owner),
     },
     showOwnerAvatar,
-    dynamicFields: buildDynamicFields(lead, fieldKeys),
+    dynamicFields: buildDynamicFields(lead, fieldKeys, maxFields),
     activitySummary: pickActivitySummary(candidates, now),
     lastActivity: pickLastCompletedActivity(candidates, now),
     quickActions: buildQuickActionStates(candidates, now),

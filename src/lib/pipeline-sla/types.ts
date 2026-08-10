@@ -41,6 +41,12 @@ export type PipelineSlaConfig = {
   pipelineName: string;
   stageSlas: StageSlaRow[];
   milestones: MilestoneSlaRow[];
+  /**
+   * When false (default), On Track / At Risk / Overdue pills are hidden on
+   * Lead cards, lists, and other surfaces. Stage/milestone clocks still compute
+   * for Work Queue. Toggle in Settings → Pipelines.
+   */
+  showBadgesOnCards: boolean;
 };
 
 /** Visual band on the Lead Card. */

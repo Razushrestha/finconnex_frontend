@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Home, ArrowLeft, Settings, Plug, Unplug } from "lucide-react";
+import {
+  Home,
+  ArrowLeft,
+  Plug,
+  Unplug,
+} from "lucide-react";
 import {
   listChannelConnections,
   upsertChannelConnection,
@@ -37,98 +42,87 @@ export default function InboxSettingsPage() {
   }
 
   return (
-    <div className="relative flex min-h-full flex-col overflow-hidden bg-slate-50">
-      <div className="relative flex min-h-0 flex-1 flex-col items-center p-2.5 sm:p-3 lg:p-4">
-        <div className="w-full max-w-[1250px]">
-          <div className="mb-2.5 flex flex-wrap items-center gap-2">
+    <div className="flex min-h-0 min-h-full w-full flex-1 flex-col overflow-hidden bg-background p-2 pr-3">
+      <div className="w-full shrink-0 border-b border-slate-200/80 bg-background">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-1 py-2 sm:gap-x-3">
+          <Link
+            href="/marketing/inbox"
+            className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+            aria-label="Back to inbox"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+          </Link>
+          <nav className="hidden items-center gap-1 text-[11px] text-slate-400 md:flex">
             <Link
-              href="/marketing/inbox"
-              className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
+              href="/"
+              className="flex items-center gap-0.5 hover:text-slate-600"
+              aria-label="Home"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
+              <Home className="h-3.5 w-3.5" />
             </Link>
-            <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-              <Link
-                href="/"
-                className="flex items-center gap-0.5 hover:text-slate-600"
-              >
-                <Home className="h-3 w-3" />
-                Home
-              </Link>
-              <span>/</span>
-              <Link href="/marketing/inbox" className="hover:text-slate-600">
-                Inbox
-              </Link>
-              <span>/</span>
-            </nav>
-            <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
-              Channel connections
-            </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
-              <Settings className="h-2.5 w-2.5" />
-              Settings
-            </span>
-          </div>
+            <span>/</span>
+            <Link href="/marketing/inbox" className="text-slate-500 hover:text-slate-600">
+              Unified Inbox
+            </Link>
+            <span>/</span>
+            <span className="text-slate-500">Channels</span>
+          </nav>
+          <div className="hidden h-4 w-px bg-slate-200 md:block" />
+          <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
+            Channel connections
+          </h1>
+        </div>
+      </div>
 
-          <div className="flex h-[calc(100dvh-7.5rem)] flex-col overflow-hidden rounded-md border border-slate-200/80 bg-white shadow-sm">
-            <div className="shrink-0 border-b border-slate-100 px-4 py-3">
-              <p className="text-[12px] text-slate-500">
-                Connect Facebook Page, Instagram Business, WhatsApp Business,
-                SMS, Email, and Web Chat. OAuth is mocked for v1.
-              </p>
-            </div>
-            <ul className="min-h-0 flex-1 divide-y divide-slate-50 overflow-y-auto">
-              {connections.map((c) => (
-                <li
-                  key={c.channel}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-4"
-                >
-                  <div>
-                    <p className="text-[13px] font-semibold text-slate-900">
-                      {c.channel}
-                    </p>
-                    <p className="text-[11px] text-slate-500">
-                      {c.accountLabel} · via {c.via}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                        c.connected
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-slate-100 text-slate-500",
-                      )}
-                    >
-                      {c.connected ? "Connected" : "Disconnected"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => toggle(c)}
-                      className={cn(
-                        "inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[11px] font-semibold",
-                        c.connected
-                          ? "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                          : "bg-violet-600 text-white hover:bg-violet-700",
-                      )}
-                    >
-                      {c.connected ? (
-                        <>
-                          <Unplug className="h-3.5 w-3.5" />
-                          Disconnect
-                        </>
-                      ) : (
-                        <>
-                          <Plug className="h-3.5 w-3.5" />
-                          Connect
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+      <div className="mt-2 min-h-0 flex-1 overflow-auto">
+        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-4 py-3">
+            <p className="text-[12px] text-slate-500">
+              Connect Facebook Page, Instagram Business, WhatsApp Business,
+              SMS, Email, and Web Chat. OAuth is mocked for v1.
+            </p>
           </div>
+          <ul className="divide-y divide-slate-50">
+            {connections.map((conn) => (
+              <li
+                key={conn.channel}
+                className="flex items-center justify-between gap-3 px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-slate-900">
+                    {conn.channel}
+                  </p>
+                  <p className="truncate text-[11px] text-slate-400">
+                    {conn.connected
+                      ? conn.accountLabel || "Connected"
+                      : "Not connected"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => toggle(conn)}
+                  className={cn(
+                    "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-semibold",
+                    conn.connected
+                      ? "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      : "bg-violet-600 text-white hover:bg-violet-700",
+                  )}
+                >
+                  {conn.connected ? (
+                    <>
+                      <Unplug className="h-3.5 w-3.5" />
+                      Disconnect
+                    </>
+                  ) : (
+                    <>
+                      <Plug className="h-3.5 w-3.5" />
+                      Connect
+                    </>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
 

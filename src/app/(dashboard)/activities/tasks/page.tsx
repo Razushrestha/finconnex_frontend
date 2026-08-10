@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowRightLeft,
   Trash2,
@@ -16,9 +16,35 @@ import {
   ActivityToolbar,
   type ActivityView,
 } from "@/components/activities/ActivityToolbar";
-import { EMPTY_TASK_FILTERS, type TaskFilters } from "@/lib/tasks/types";
+import {
+  EMPTY_TASK_FILTERS,
+  type Priority,
+  type TaskFilters,
+  type TaskStatus,
+} from "@/lib/tasks/types";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
+
+const TASK_VIEW_MODE_KEY = "finconnex.tasks.view-mode";
+
+function loadTaskViewMode(): ActivityView {
+  if (typeof window === "undefined") return "kanban";
+  try {
+    const raw = localStorage.getItem(TASK_VIEW_MODE_KEY);
+    if (raw === "list" || raw === "kanban") return raw;
+  } catch {
+    /* ignore */
+  }
+  return "kanban";
+}
+
+function persistTaskViewMode(mode: ActivityView) {
+  try {
+    localStorage.setItem(TASK_VIEW_MODE_KEY, mode);
+  } catch {
+    /* ignore */
+  }
+}
 
 export const moreMenuItems = [
   { key: "mass-transfer", icon: ArrowRightLeft, label: "Mass Transfer" },
@@ -37,8 +63,11 @@ export const printViewItems = [
 const taskSortOptions = [
   { key: "dueDate", label: "Due Date" },
   { key: "priority", label: "Priority" },
+  { key: "status", label: "Status" },
   { key: "taskId", label: "Task ID" },
   { key: "title", label: "Task Name" },
+  { key: "assignedTo", label: "Assigned To" },
+  { key: "taskType", label: "Type" },
 ];
 
 export default function TasksPage() {
@@ -51,22 +80,46 @@ export default function TasksPage() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  useEffect(() => {
+    setView(loadTaskViewMode());
+  }, []);
+
+  function handleViewChange(mode: ActivityView) {
+    setView(mode);
+    persistTaskViewMode(mode);
+  }
+
   function toggleField(
     sectionId: "status" | "priority" | "type",
     field: string,
   ) {
     setFilters((prev) => {
-      const key =
-        sectionId === "status"
-          ? "statuses"
-          : sectionId === "priority"
-            ? "priorities"
-            : "types";
-      const current = prev[key] as string[];
-      const next = current.includes(field)
+      // Exclusive: pick one Priority or Status → table shows only that value.
+      if (sectionId === "priority") {
+        const selected = field as Priority;
+        const already =
+          prev.priorities.length === 1 && prev.priorities[0] === selected;
+        return {
+          ...prev,
+          priorities: already ? [] : [selected],
+        };
+      }
+
+      if (sectionId === "status") {
+        const selected = field as TaskStatus;
+        const already =
+          prev.statuses.length === 1 && prev.statuses[0] === selected;
+        return {
+          ...prev,
+          statuses: already ? [] : [selected],
+        };
+      }
+
+      const current = prev.types;
+      const next = current.includes(field as (typeof current)[number])
         ? current.filter((f) => f !== field)
-        : [...current, field];
-      return { ...prev, [key]: next };
+        : [...current, field as (typeof current)[number]];
+      return { ...prev, types: next };
     });
   }
 
@@ -88,7 +141,7 @@ export default function TasksPage() {
           createRoute="/activities/tasks/create"
           tabs={["All Tasks", "My Overdue Tasks"]}
           view={view}
-          onViewChange={setView}
+          onViewChange={handleViewChange}
           filterOpen={filterOpen}
           onToggleFilter={() => setFilterOpen((v) => !v)}
           sortOptions={taskSortOptions}
@@ -155,6 +208,7 @@ export default function TasksPage() {
           ) : (
             <TaskListView
               filters={filters}
+              onToggleField={toggleField}
               sortField={sortField}
               sortDirection={sortDirection}
               onSortChange={handleSortChange}

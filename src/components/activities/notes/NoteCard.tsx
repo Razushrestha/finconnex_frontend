@@ -2,9 +2,9 @@
 
 import { Pin, Lock, Link2, Clock } from "lucide-react";
 import type { Note, NoteType } from "@/lib/notes/types";
-import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
-import { cardDragging, cardMotion } from "@/lib/motion";
+import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
+import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 
 const TYPE_META: Record<
   NoteType,
@@ -62,7 +62,8 @@ export function NoteCard({
       data-note-id={note.id}
       data-column-id={columnId}
       className={cn(
-        "cursor-grab select-none rounded-xl border border-slate-100 border-l-[3px] bg-white p-3.5 shadow-sm active:cursor-grabbing",
+        entityCardBox,
+        "border-l-[3px]",
         meta.border,
         cardMotion,
         isDragging && cardDragging,
@@ -97,29 +98,17 @@ export function NoteCard({
         </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between border-t border-slate-50 pt-2.5">
+      <div className="mt-3 space-y-2 border-t border-slate-50 pt-2.5">
         <span
           className={cn(
-            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            "inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold",
             meta.soft,
             meta.text,
           )}
         >
           {note.noteType}
         </span>
-        <div className="flex items-center gap-1.5">
-          <span
-            className={cn(
-              "flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold",
-              avatarColor(note.createdBy),
-            )}
-          >
-            {initials(note.createdBy)}
-          </span>
-          <span className="max-w-[72px] truncate text-[10px] text-slate-500">
-            {note.createdBy.split(" ")[0]}
-          </span>
-        </div>
+        <CardOwnerRow name={note.createdBy} />
       </div>
     </div>
   );

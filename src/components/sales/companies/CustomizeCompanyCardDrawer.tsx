@@ -8,7 +8,6 @@ import {
   Globe,
   Building2,
   Phone,
-  User,
   DollarSign,
   PhoneCall,
   Mail,
@@ -18,6 +17,8 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { entityCardShell } from "@/lib/motion";
+import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 
 export interface CompanyCardCustomizationSettings {
   showWebsite: boolean;
@@ -203,9 +204,6 @@ function CompanyCardPreview({
   const isCompact = settings.layout === "compact";
 
   const companyName = company?.name || "Northwind Traders";
-  const companyInitials = company?.initials || "NT";
-  const companyAvatarBgClass =
-    company?.avatarBgClass || "bg-amber-50 text-amber-600";
   const companyWebsite = company?.website || "northwind.com";
   const companyIndustry = company?.industry || "Wholesale";
   const companyPhone = company?.phone || "+61 2 9000 1001";
@@ -223,23 +221,9 @@ function CompanyCardPreview({
 
   return (
     <div
-      className={cn(
-        "rounded-md border border-slate-200/80 bg-white shadow-2xs",
-        isCompact ? "p-2.5" : "p-3.5",
-      )}
+      className={cn(entityCardShell, isCompact ? "p-2.5" : null)}
     >
-      <div
-        className={cn("flex items-center gap-2.5", isCompact ? "mb-2" : "mb-3")}
-      >
-        <div
-          className={cn(
-            "flex shrink-0 items-center justify-center rounded-full font-semibold",
-            isCompact ? "h-7 w-7 text-[10px]" : "h-9 w-9 text-[11px]",
-            companyAvatarBgClass,
-          )}
-        >
-          {companyInitials}
-        </div>
+      <div className={cn(isCompact ? "mb-2" : "mb-3")}>
         <h4
           className={cn(
             "truncate font-semibold text-slate-800",
@@ -278,10 +262,7 @@ function CompanyCardPreview({
             </div>
           )}
           {settings.showOwner && companyOwner && (
-            <div className="flex items-center gap-2">
-              <User className="h-3 w-3 shrink-0 text-slate-400" />
-              <span>{companyOwner}</span>
-            </div>
+            <CardOwnerRow name={companyOwner} />
           )}
           {settings.showAnnualRevenue && companyAnnualRevenue && (
             <div className="flex items-center gap-2">

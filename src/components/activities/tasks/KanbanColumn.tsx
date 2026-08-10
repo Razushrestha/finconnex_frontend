@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
-import type { TaskColumn } from "@/lib/tasks/types";
+import type { Priority, TaskColumn, TaskStatus } from "@/lib/tasks/types";
 import { TaskCard } from "./TaskCard";
 import { cn } from "@/lib/utils";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
@@ -23,6 +23,8 @@ interface KanbanColumnProps {
   onDropTask: (targetColumnId: string, targetIndex?: number) => void;
   selectedIds?: string[];
   onToggleSelect: (id: string) => void;
+  onChangePriority?: (taskId: string, priority: Priority) => void;
+  onChangeStatus?: (taskId: string, status: TaskStatus) => void;
 }
 
 export function KanbanColumn({
@@ -35,6 +37,8 @@ export function KanbanColumn({
   onDropTask,
   selectedIds,
   onToggleSelect,
+  onChangePriority,
+  onChangeStatus,
 }: KanbanColumnProps) {
   const router = useRouter();
   const [isOver, setIsOver] = useState(false);
@@ -173,6 +177,8 @@ export function KanbanColumn({
                       onDragStartTask(e, task.taskId, column.id)
                     }
                     onDragEnd={onDragEndTask}
+                    onChangePriority={onChangePriority}
+                    onChangeStatus={onChangeStatus}
                   />
                 </div>
 

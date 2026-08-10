@@ -6,12 +6,12 @@ interface StatusBadgeProps {
   colorClassName: string;
 }
 
-/** Small rounded status pill used in table rows across every campaign type. */
+/** Compact status pill used in marketing tables. */
 export function StatusBadge({ label, colorClassName }: StatusBadgeProps) {
   return (
     <span
       className={cn(
-        "rounded-full px-3 py-1 text-[12px] font-semibold",
+        "inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold",
         colorClassName,
       )}
     >

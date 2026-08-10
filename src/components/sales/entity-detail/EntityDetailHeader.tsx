@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { ChevronLeft, MoreHorizontal, Pencil } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, MoreHorizontal, Pencil } from "lucide-react";
 import type { EntityDetailHeaderProps } from "./types";
 import { Panel, cn, toneClasses } from "./shared";
 
@@ -21,30 +22,30 @@ export function EntityDetailHeader({
 }: EntityDetailHeaderProps) {
   return (
     <div className="space-y-3">
-      <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
+      <nav className="flex flex-wrap items-center gap-1 text-[12px] text-slate-400">
         {breadcrumb.map((crumb, i) => (
-          <span key={crumb.href} className="flex items-center gap-1.5">
-            {i === 0 && <ChevronLeft className="h-4 w-4" />}
-            <a
-              href={crumb.href}
-              className="hover:text-foreground transition-colors"
-            >
-              {crumb.label}
-            </a>
-            {i < breadcrumb.length - 1 && (
-              <span className="text-muted-foreground/50">/</span>
+          <span key={`${crumb.href}-${i}`} className="flex items-center gap-1">
+            {i > 0 && <ChevronRight className="h-3 w-3 text-slate-300" />}
+            {i < breadcrumb.length - 1 ? (
+              <Link
+                href={crumb.href}
+                className="font-medium text-slate-500 transition-colors hover:text-violet-700"
+              >
+                {crumb.label}
+              </Link>
+            ) : (
+              <span className="font-medium text-slate-700">{crumb.label}</span>
             )}
           </span>
         ))}
       </nav>
 
-      <Panel>
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          {/* Left side: Avatar, Name, Status, Subtitle, Tags */}
-          <div className="flex items-start gap-3">
+      <Panel className="p-4 sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-start gap-3.5">
             <div className="relative shrink-0">
               {avatarUrl ? (
-                <div className="relative h-12 w-12 overflow-hidden rounded-full">
+                <div className="relative h-14 w-14 overflow-hidden rounded-2xl ring-1 ring-slate-200">
                   <Image
                     src={avatarUrl}
                     alt={name}
@@ -53,40 +54,47 @@ export function EntityDetailHeader({
                   />
                 </div>
               ) : (
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50 text-[15px] font-semibold tracking-tight text-violet-700 ring-1 ring-violet-100">
                   {initials}
                 </div>
               )}
               {isOnline && (
-                <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card bg-emerald-500" />
+                <span
+                  className="absolute -right-0.5 -bottom-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500"
+                  title="Online"
+                />
               )}
             </div>
 
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-semibold text-foreground">
+            <div className="min-w-0 space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="truncate text-[20px] font-semibold tracking-tight text-slate-900">
                   {name}
                 </h1>
                 <span
                   className={cn(
-                    "rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
+                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset",
                     toneClasses(status.tone),
                   )}
                 >
                   {status.label}
                 </span>
               </div>
-              <p className="text-sm text-muted-foreground">
-                {subtitleParts.join(" · ")}
-              </p>
+
+              {subtitleParts.length > 0 && (
+                <p className="truncate text-[13px] text-slate-500">
+                  {subtitleParts.join(" · ")}
+                </p>
+              )}
+
               {tags.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                   {tags.map((tag) => (
                     <span
                       key={tag.label}
-                      className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600"
                     >
-                      {tag.icon && <tag.icon className="h-3 w-3" />}
+                      {tag.icon && <tag.icon className="h-3 w-3 text-slate-400" />}
                       {tag.label}
                     </span>
                   ))}
@@ -95,56 +103,54 @@ export function EntityDetailHeader({
             </div>
           </div>
 
-          {/* Right side: Stacked rows for actions */}
-          <div className="flex flex-col items-end gap-2 shrink-0">
-            {/* Top Row: Primary Action + Quick Actions */}
-            <div className="flex items-center gap-2">
-              {primaryAction && (
-                <button
-                  onClick={primaryAction.onClick}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors shadow-xs"
-                >
-                  {primaryAction.icon && (
-                    <primaryAction.icon className="h-4 w-4" />
-                  )}
-                  {primaryAction.label}
-                </button>
-              )}
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+            {primaryAction && (
+              <button
+                type="button"
+                onClick={primaryAction.onClick}
+                className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-violet-600 px-4 text-[13px] font-semibold text-white shadow-sm shadow-violet-600/20 transition-colors hover:bg-violet-700"
+              >
+                {primaryAction.icon && (
+                  <primaryAction.icon className="h-4 w-4" />
+                )}
+                {primaryAction.label}
+              </button>
+            )}
 
-              {quickActions.map((action) => (
-                <button
-                  key={action.label}
-                  onClick={action.onClick}
-                  aria-label={action.label}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shadow-xs"
-                >
-                  {action.icon && <action.icon className="h-4 w-4" />}
-                </button>
-              ))}
-            </div>
+            {quickActions.map((action) => (
+              <button
+                key={action.label}
+                type="button"
+                onClick={action.onClick}
+                aria-label={action.label}
+                title={action.label}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-colors hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700"
+              >
+                {action.icon && <action.icon className="h-4 w-4" />}
+              </button>
+            ))}
 
-            {/* Bottom Row: Edit Details & More Actions */}
-            <div className="flex items-center gap-2">
-              {onEditDetails && (
-                <button
-                  onClick={onEditDetails}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-input bg-background px-3 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shadow-xs"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                  Edit Details
-                </button>
-              )}
+            {onEditDetails && (
+              <button
+                type="button"
+                onClick={onEditDetails}
+                className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-[13px] font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit Details
+              </button>
+            )}
 
-              {onMoreActions && (
-                <button
-                  onClick={onMoreActions}
-                  aria-label="More Actions"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-input bg-background text-muted-foreground hover:bg-muted hover:text-foreground transition-colors shadow-xs"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+            {onMoreActions && (
+              <button
+                type="button"
+                onClick={onMoreActions}
+                aria-label="More actions"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-800"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </Panel>

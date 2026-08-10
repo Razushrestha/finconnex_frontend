@@ -7,8 +7,14 @@ import {
   type TaskFilters,
   type Task,
 } from "@/lib/tasks/types";
-import { listTaskColumns, saveTaskColumns } from "@/lib/tasks/store";
+import {
+  listTaskColumns,
+  saveTaskColumns,
+  updateTaskPriority,
+  updateTaskStatus,
+} from "@/lib/tasks/store";
 import { KanbanColumn } from "./KanbanColumn";
+import type { Priority, TaskStatus } from "@/lib/tasks/types";
 
 interface DragInfo {
   taskId: string;
@@ -138,6 +144,16 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
     handleDragEndTask();
   }
 
+  function handleChangePriority(taskId: string, priority: Priority) {
+    const updated = updateTaskPriority(taskId, priority);
+    if (updated) setColumns(listTaskColumns());
+  }
+
+  function handleChangeStatus(taskId: string, status: TaskStatus) {
+    const updated = updateTaskStatus(taskId, status);
+    if (updated) setColumns(listTaskColumns());
+  }
+
   return (
     <div className="flex h-full items-stretch gap-4">
       {visibleColumns.map((column) => (
@@ -152,6 +168,8 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
           onDropTask={handleDropTask}
           selectedIds={selectedIds}
           onToggleSelect={handleToggleSelect}
+          onChangePriority={handleChangePriority}
+          onChangeStatus={handleChangeStatus}
         />
       ))}
     </div>

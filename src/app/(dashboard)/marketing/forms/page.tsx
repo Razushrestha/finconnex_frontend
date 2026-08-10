@@ -208,6 +208,7 @@ import {
 } from "@/lib/marketing/forms/types";
 import {
   CampaignHeader,
+  MarketingListShell,
   StatusDropdown,
   DataTable,
   StatusBadge,
@@ -229,7 +230,7 @@ const columns: DataTableColumn<MarketingForm>[] = [
     className: "max-w-[220px]",
     render: (f) => (
       <>
-        <p className="truncate text-[15px] font-semibold text-slate-900">
+        <p className="truncate text-[13px] font-semibold text-slate-900">
           {f.name}
         </p>
       </>
@@ -341,51 +342,50 @@ export default function MarketingFormsPage() {
   );
 
   return (
-    <div className="relative min-h-full overflow-y-auto bg-slate-50">
-      <div className="relative mx-auto flex max-w-[1400px] flex-col p-2 sm:p-4 lg:p-6">
-        <CampaignHeader
-          breadcrumbs={[
-            { label: "Home", href: "/" },
-            { label: "Marketing" },
-            { label: "Forms" },
-          ]}
-          title="Marketing"
-          onCreate={() =>
-            router.push(
-              "/marketing/forms/create?layoutid=standard&redirect=false",
-            )
-          }
-          createLabel="New form"
-        />
+    <MarketingListShell>
+      <CampaignHeader
+        breadcrumbs={[
+          { label: "Home", href: "/" },
+          { label: "Marketing" },
+          { label: "Forms" },
+        ]}
+        title="Forms"
+        totalCount={filtered.length}
+        onCreate={() =>
+          router.push(
+            "/marketing/forms/create?layoutid=standard&redirect=false",
+          )
+        }
+        createLabel="New form"
+      />
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 py-2">
-          <StatusDropdown
-            statuses={FORM_STATUSES}
-            counts={counts}
-            totalCount={rows.length}
-            value={statusTab}
-            onChange={setStatusTab}
-          />
-          <SearchInput value={search} onChange={setSearch} />
-        </div>
-
-        <DataTable
-          columns={columns}
-          rows={paginated}
-          getRowKey={(f) => f.id}
-          onRowClick={(f) => router.push(`/marketing/forms/${f.id}`)}
-          page={safePage}
-          pageSize={pageSize}
-          totalCount={filtered.length}
-          onPageChange={setPage}
-          emptyState={
-            <>
-              <ClipboardList className="mx-auto mb-3 h-10 w-10 text-slate-300" />
-              No forms match.
-            </>
-          }
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-1 py-2">
+        <StatusDropdown
+          statuses={FORM_STATUSES}
+          counts={counts}
+          totalCount={rows.length}
+          value={statusTab}
+          onChange={setStatusTab}
         />
+        <SearchInput value={search} onChange={setSearch} />
       </div>
-    </div>
+
+      <DataTable
+        columns={columns}
+        rows={paginated}
+        getRowKey={(f) => f.id}
+        onRowClick={(f) => router.push(`/marketing/forms/${f.id}`)}
+        page={safePage}
+        pageSize={pageSize}
+        totalCount={filtered.length}
+        onPageChange={setPage}
+        emptyState={
+          <>
+            <ClipboardList className="mx-auto mb-3 h-8 w-8 text-slate-300" />
+            No forms match.
+          </>
+        }
+      />
+    </MarketingListShell>
   );
 }

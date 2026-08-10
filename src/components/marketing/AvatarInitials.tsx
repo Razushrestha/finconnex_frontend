@@ -1,4 +1,4 @@
-import { avatarColor, initials } from "@/lib/activities/shared";
+import { CardInitialsAvatar } from "@/components/shared/CardInitialsAvatar";
 import { cn } from "@/lib/utils";
 
 interface AvatarInitialsProps {
@@ -6,17 +6,7 @@ interface AvatarInitialsProps {
   className?: string;
 }
 
-/** "Created by" avatar used in every campaign table. */
+/** Created-by initials — same size/placement language as board cards. */
 export function AvatarInitials({ name, className }: AvatarInitialsProps) {
-  return (
-    <span
-      className={cn(
-        "flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-semibold",
-        avatarColor(name),
-        className,
-      )}
-    >
-      {initials(name)}
-    </span>
-  );
+  return <CardInitialsAvatar name={name} className={cn(className)} />;
 }

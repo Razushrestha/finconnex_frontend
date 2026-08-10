@@ -63,9 +63,33 @@ export interface QueueRow {
   contactName?: string;
   fileHandler?: string;
   tag?: string;
+  taskOwner?: string;
+  createdTime?: string;
+  modifiedBy?: string;
+  modifiedTime?: string;
+  closedTime?: string;
+  createdBy?: string;
+  description?: string;
+  lastActivityTime?: string;
   sortKey: number;
   href: string;
 }
+
+/** Extra display fields for Manage Columns (beyond the core toRow args). */
+export type QueueRowExtras = Pick<
+  QueueRow,
+  | "contactName"
+  | "fileHandler"
+  | "tag"
+  | "taskOwner"
+  | "createdTime"
+  | "modifiedBy"
+  | "modifiedTime"
+  | "closedTime"
+  | "createdBy"
+  | "description"
+  | "lastActivityTime"
+>;
 
 export interface ActivityNavItem {
   id: ActivityNavId;
@@ -277,9 +301,6 @@ function emailOwnedBy(e: Email, scope: WorkQueueScope) {
 
 function hrefFor(module: keyof typeof HREF, id: string, q?: string) {
   const base = HREF[module];
-  if (module === "tasks") {
-    return `${base}/${id}`;
-  }
   const params = new URLSearchParams();
   params.set("focus", id);
   if (q) params.set("q", q);
@@ -296,7 +317,7 @@ function toRow(
   timeFilter: WorkQueueTimeFilter,
   now: Date,
   href: string,
-  opts?: { requireDue?: boolean },
+  opts?: { requireDue?: boolean } & QueueRowExtras,
 ): QueueRow | null {
   const due = parseFlexibleDate(dueRaw);
   if (opts?.requireDue !== false && !matchesTimeFilter(due, timeFilter, now)) {
@@ -306,6 +327,7 @@ function toRow(
     if (!matchesTimeFilter(due, timeFilter, now)) return null;
   }
   const dueLabel = due ? formatDueLabel(due, now) : "";
+  const { requireDue: _requireDue, ...extras } = opts ?? {};
   return {
     id,
     subject,
@@ -316,6 +338,7 @@ function toRow(
     related,
     sortKey: buildSortKey(due, priority, now),
     href,
+    ...extras,
   };
 }
 
@@ -339,6 +362,10 @@ export function listActivityRows(
       for (const t of col.tasks) {
         if (!OPEN_TASK.has(t.status)) continue;
         if (!ownerMatches(t.assignedTo, scope)) continue;
+        const contactName =
+          t.relatedTo?.kind === "Contact" || t.relatedTo?.kind === "Lead"
+            ? t.relatedTo.name
+            : undefined;
         const row = toRow(
           t.taskId,
           t.title,
@@ -349,6 +376,14 @@ export function listActivityRows(
           timeFilter,
           now,
           hrefFor("tasks", t.taskId, t.title),
+          {
+            contactName,
+            fileHandler: t.assignedTo,
+            taskOwner: t.assignedTo,
+            createdBy: t.createdBy,
+            description: t.description,
+            closedTime: t.completedDate,
+          },
         );
         if (row) rows.push(row);
       }
@@ -369,6 +404,11 @@ export function listActivityRows(
         timeFilter,
         now,
         hrefFor("calls", c.id, c.subject),
+        {
+          contactName: c.contact || undefined,
+          taskOwner: c.assignedTo,
+          fileHandler: c.assignedTo,
+        },
       );
       if (row) rows.push(row);
     }
@@ -388,6 +428,10 @@ export function listActivityRows(
         timeFilter,
         now,
         hrefFor("reminders", r.id, r.title),
+        {
+          taskOwner: r.owner,
+          fileHandler: r.owner,
+        },
       );
       if (row) rows.push(row);
     }
@@ -561,6 +605,10 @@ function leadRows(items: LeadRow[], priority = "Medium"): QueueRow[] {
       status: it.status,
       priority,
       related: it.company ? `Company: ${it.company}` : "",
+      contactName: it.name,
+      taskOwner: it.owner,
+      fileHandler: it.owner,
+      createdTime: it.createdDate,
       sortKey: due ? -due.getTime() : i,
       href: hrefFor("leads", it.id, it.name),
     };
@@ -626,6 +674,8 @@ function contactRows(items: ContactRow[], priority = "Medium"): QueueRow[] {
       status: it.status,
       priority,
       related: it.company ? `Company: ${it.company}` : "",
+      contactName: it.name,
+      createdTime: it.createdDate,
       sortKey: due ? -due.getTime() : i,
       href: hrefFor("contacts", it.id, it.name),
     };
@@ -648,6 +698,7 @@ function dealRows(items: DealRow[], priority = "Medium"): QueueRow[] {
         : it.account
           ? `Company: ${it.account}`
           : "",
+      contactName: it.contact,
       sortKey: buildSortKey(due, priority),
       href: hrefFor("deals", it.id, it.name),
     };

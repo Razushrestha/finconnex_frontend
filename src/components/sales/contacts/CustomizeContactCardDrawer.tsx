@@ -8,7 +8,6 @@ import {
   Building2,
   Mail,
   Phone,
-  User,
   Calendar,
   PhoneCall,
   MessageSquare,
@@ -17,6 +16,8 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { entityCardShell } from "@/lib/motion";
+import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 
 export interface ContactCardCustomizationSettings {
   showCompany: boolean;
@@ -202,22 +203,9 @@ function ContactCardPreview({
 
   return (
     <div
-      className={cn(
-        "rounded-md border border-slate-200/80 bg-white shadow-2xs",
-        isCompact ? "p-2" : "p-3.5",
-      )}
+      className={cn(entityCardShell, isCompact ? "p-2" : null)}
     >
-      <div
-        className={cn("flex items-center gap-2.5", isCompact ? "mb-2" : "mb-3")}
-      >
-        <div
-          className={cn(
-            "flex shrink-0 items-center justify-center rounded-full bg-teal-50 font-semibold text-teal-600",
-            isCompact ? "h-7 w-7 text-[10px]" : "h-9 w-9 text-[11px]",
-          )}
-        >
-          OB
-        </div>
+      <div className={cn(isCompact ? "mb-2" : "mb-3")}>
         <h4
           className={cn(
             "truncate font-semibold text-slate-800",
@@ -255,12 +243,7 @@ function ContactCardPreview({
               <span>+61 400 100 001</span>
             </div>
           )}
-          {settings.showOwner && (
-            <div className="flex items-center gap-2">
-              <User className="h-3 w-3 shrink-0 text-slate-400" />
-              <span>John Smith</span>
-            </div>
-          )}
+          {settings.showOwner && <CardOwnerRow name="John Smith" />}
           {settings.showCreatedDate && (
             <div className="flex items-center gap-2">
               <Calendar className="h-3 w-3 shrink-0 text-slate-400" />

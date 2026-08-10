@@ -86,6 +86,8 @@ function parseConfig(raw: unknown): PipelineSlaConfig {
   return {
     pipelineId: o.pipelineId || base.pipelineId,
     pipelineName: o.pipelineName || base.pipelineName,
+    // Default off — only show when explicitly enabled in settings.
+    showBadgesOnCards: o.showBadgesOnCards === true,
     stageSlas,
     milestones: milestones.length ? milestones : base.milestones,
   };
@@ -102,6 +104,13 @@ export function loadPipelineSlaConfig(): PipelineSlaConfig {
   } catch {
     return structuredClone(DEFAULT_MORTGAGE_PIPELINE_SLA);
   }
+}
+
+/** Whether Lead Card / List SLA pills should render (Settings → Pipelines). */
+export function arePipelineSlaBadgesVisible(
+  config?: PipelineSlaConfig,
+): boolean {
+  return (config ?? loadPipelineSlaConfig()).showBadgesOnCards === true;
 }
 
 export function savePipelineSlaConfig(config: PipelineSlaConfig): PipelineSlaConfig {

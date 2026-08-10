@@ -13,6 +13,11 @@ import {
 } from "@/lib/rules";
 import type { DealFilters } from "./FilterDealsPanel";
 import { DealRecordCard } from "./DealRecordCard";
+import type { DealQuickActionKind } from "./DealRecordCard";
+import {
+  DealCardPanelHost,
+  type DealPanelState,
+} from "./DealCardPanelHost";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -44,7 +49,7 @@ interface DealsKanbanBoardProps {
   onAddDeal?: (stageId: string) => void;
   selectedIds?: string[];
   onToggleSelect?: (id: string) => void;
-  onQuickAction?: (kind: any, company: DealRecord) => void;
+  onQuickAction?: (kind: DealQuickActionKind, deal: DealRecord) => void;
 }
 
 // Adjust this offset to match whatever chrome (nav bar, filter bar, tabs)
@@ -75,6 +80,25 @@ export function DealsKanbanBoard({
     new Set(),
   );
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
+  const [panel, setPanel] = useState<DealPanelState | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  function flash(msg: string) {
+    setToast(msg);
+    window.setTimeout(() => setToast(null), 2400);
+  }
+
+  function openQuickAction(kind: DealQuickActionKind, deal: DealRecord) {
+    setPanel({
+      type: "quick-action",
+      kind,
+      dealId: deal.id,
+      dealName: deal.name,
+      account: deal.account,
+      owner: deal.owner,
+    });
+    onQuickAction?.(kind, deal);
+  }
 
   // Sync internal/external selection
   const activeSelectedIds = useMemo(() => {
@@ -87,7 +111,6 @@ export function DealsKanbanBoard({
   );
   const [overStageId, setOverStageId] = useState<string | null>(null);
   const [overOutcome, setOverOutcome] = useState<"won" | "lost" | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [collapsedStages, setCollapsedStages] = useState<Set<string>>(
     () => new Set(),
   );
@@ -157,11 +180,6 @@ export function DealsKanbanBoard({
     () => stages.find((s) => /lost/i.test(s.title)),
     [stages],
   );
-
-  function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2400);
-  }
 
   function handleSelectDeal(
     dealId: string,
@@ -644,7 +662,7 @@ export function DealsKanbanBoard({
                                 }
                                 onDragEnd={handleDragEnd}
                                 onQuickAction={(kind) =>
-                                  onQuickAction?.(kind, deal)
+                                  openQuickAction(kind, deal)
                                 }
                               />
                             </div>,
@@ -794,6 +812,12 @@ export function DealsKanbanBoard({
           onConfirm={confirmLostDrop}
         />
       )}
+
+      <DealCardPanelHost
+        panel={panel}
+        onClose={() => setPanel(null)}
+        onQuickActionSuccess={(message) => flash(message)}
+      />
 
       {toast && (
         <div className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">

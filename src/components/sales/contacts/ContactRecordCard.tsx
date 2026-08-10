@@ -5,7 +5,6 @@ import {
   Building2,
   Mail,
   Phone,
-  User,
   Calendar,
   PhoneCall,
   Mail as MailIcon,
@@ -16,7 +15,7 @@ import {
 } from "lucide-react";
 import type { ContactCardData } from "@/lib/contacts/types";
 import { cn } from "@/lib/utils";
-import { cardDragging, cardMotion } from "@/lib/motion";
+import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
 import Link from "next/link";
 import {
   CustomizeContactCardDrawer,
@@ -27,6 +26,7 @@ import {
   QuickActionsBar,
   type QuickActionItem,
 } from "@/components/sales/QuickActionsBar";
+import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 
 interface ContactRecordCardProps {
   contact: ContactCardData;
@@ -63,6 +63,8 @@ const CONTACT_QUICK_ACTIONS: QuickActionItem<ContactQuickActionKind>[] = [
   { kind: "appointment", icon: CalendarDays, label: "Appointments" },
 ];
 
+export { CONTACT_QUICK_ACTIONS };
+
 export function ContactRecordCard({
   contact,
   isDragging,
@@ -86,7 +88,8 @@ export function ContactRecordCard({
         data-focus-id={contact.id}
         data-contact-id={contact.id}
         className={cn(
-          "group w-full shrink-0 cursor-grab rounded-md border border-slate-200/80 bg-white p-3 shadow-2xs active:cursor-grabbing",
+          "group w-full shrink-0",
+          entityCardBox,
           cardMotion,
           isDragging && cardDragging,
         )}
@@ -94,13 +97,8 @@ export function ContactRecordCard({
         <div className="mb-3 flex items-center justify-between gap-2">
           <Link
             href={`/sales/contacts/detail/${contact.id}`}
-            className="flex min-w-0 items-center gap-2.5"
+            className="min-w-0"
           >
-            <div
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${contact.avatarBgClass}`}
-            >
-              {contact.initials}
-            </div>
             <h3 className="truncate text-[13px] font-semibold text-slate-800">
               {contact.name}
             </h3>
@@ -135,10 +133,7 @@ export function ContactRecordCard({
             <Phone className="h-3 w-3 shrink-0 text-slate-400" />
             <span>{contact.phone || ""}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <User className="h-3 w-3 shrink-0 text-slate-400" />
-            <span>{contact.owner}</span>
-          </div>
+          <CardOwnerRow name={contact.owner} />
           <div className="flex items-center gap-2">
             <Calendar className="h-3 w-3 shrink-0 text-slate-400" />
             <span>{contact.createdDate}</span>

@@ -6,20 +6,19 @@ export function cn(...classes: Array<string | false | null | undefined>) {
 
 const TONE_CLASSES: Record<BadgeTone, string> = {
   success:
-    "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 ring-emerald-500/20",
-  warning:
-    "bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-amber-500/20",
-  danger: "bg-rose-500/10 text-rose-600 dark:text-rose-400 ring-rose-500/20",
-  info: "bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-blue-500/20",
-  neutral: "bg-muted text-muted-foreground ring-border",
+    "bg-emerald-50 text-emerald-700 ring-emerald-200/80",
+  warning: "bg-amber-50 text-amber-700 ring-amber-200/80",
+  danger: "bg-rose-50 text-rose-700 ring-rose-200/80",
+  info: "bg-sky-50 text-sky-700 ring-sky-200/80",
+  neutral: "bg-slate-100 text-slate-600 ring-slate-200/80",
 };
 
 const TONE_DOT: Record<BadgeTone, string> = {
   success: "bg-emerald-500",
   warning: "bg-amber-500",
   danger: "bg-rose-500",
-  info: "bg-blue-500",
-  neutral: "bg-muted-foreground",
+  info: "bg-sky-500",
+  neutral: "bg-slate-400",
 };
 
 export function toneClasses(tone: BadgeTone) {
@@ -30,7 +29,7 @@ export function toneDotClass(tone: BadgeTone) {
   return TONE_DOT[tone];
 }
 
-/** Shared card shell so every panel on the page has the same border/radius/shadow. */
+/** Shared card shell — flat professional surface, consistent radius/border. */
 export function Panel({
   children,
   className,
@@ -43,12 +42,29 @@ export function Panel({
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-card text-card-foreground shadow-xs",
+        "rounded-2xl border border-slate-200/90 bg-white text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
         padded && "p-4",
         className,
       )}
     >
       {children}
+    </div>
+  );
+}
+
+export function PanelTitle({
+  children,
+  action,
+}: {
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-3 flex items-center justify-between gap-2">
+      <h3 className="text-[11px] font-semibold tracking-[0.06em] text-slate-500 uppercase">
+        {children}
+      </h3>
+      {action}
     </div>
   );
 }

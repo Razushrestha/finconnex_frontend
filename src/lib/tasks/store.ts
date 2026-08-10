@@ -37,8 +37,8 @@ function normalize(cols: TaskColumn[]): TaskColumn[] {
 }
 
 const board = createBoardStore({
-  // v2: lead-card Phase 7 seeds (William +X task, overdue flags)
-  key: "activities:tasks:board:v2",
+  // v3: unique taskIds (T-010 was duplicated across Not Started + Review)
+  key: "activities:tasks:board:v3",
   seed: cloneSeed,
 });
 
@@ -113,10 +113,141 @@ export function deleteTask(taskId: string): Task | null {
   return found;
 }
 
+/** Move a task into the Completed column (or mark status Completed). */
+export function completeTask(taskId: string): Task | null {
+  const found = findTaskById(taskId);
+  if (!found) return null;
+  if (found.task.status === "Completed") return found.task;
+
+  const cols = listTaskColumns();
+  const completedCol =
+    cols.find((c) => c.title === "Completed") ??
+    cols.find((c) => c.id === "completed");
+
+  const updated: Task = {
+    ...found.task,
+    status: "Completed",
+    completedDate: new Date().toISOString().slice(0, 10),
+    overdue: false,
+  };
+
+  const without = cols.map((c) => ({
+    ...c,
+    tasks: c.tasks.filter((t) => t.taskId !== taskId),
+    count: c.tasks.filter((t) => t.taskId !== taskId).length,
+  }));
+
+  if (completedCol) {
+    saveTaskColumns(
+      without.map((c) =>
+        c.id === completedCol.id
+          ? {
+              ...c,
+              tasks: [updated, ...c.tasks],
+              count: c.tasks.length + 1,
+            }
+          : c,
+      ),
+    );
+  } else {
+    saveTaskColumns(without);
+  }
+  return updated;
+}
+
 export function findTaskById(taskId: string) {
   for (const col of listTaskColumns()) {
     const task = col.tasks.find((t) => t.taskId === taskId);
     if (task) return { task, status: col.title, columnId: col.id };
   }
   return null;
+}
+
+export function updateTaskPriority(
+  taskId: string,
+  priority: Priority,
+): Task | null {
+  const cols = listTaskColumns();
+  let updated: Task | null = null;
+  let matched = false;
+  const next = cols.map((col) => ({
+    ...col,
+    tasks: col.tasks.map((t) => {
+      // Only update the first match — IDs must be unique.
+      if (matched || t.taskId !== taskId) return t;
+      matched = true;
+      updated = { ...t, priority };
+      return updated;
+    }),
+  }));
+  if (updated) saveTaskColumns(next);
+  return updated;
+}
+
+/** Move a task into the column matching `status`. */
+export function updateTaskStatus(
+  taskId: string,
+  status: TaskStatus,
+): Task | null {
+  const found = findTaskById(taskId);
+  if (!found) return null;
+  if (found.task.status === status && found.status === status) {
+    return found.task;
+  }
+
+  const cols = listTaskColumns();
+  const targetCol =
+    cols.find((c) => c.title === status) ??
+    cols.find((c) => c.id === status.toLowerCase().replace(/\s+/g, "-"));
+
+  const updated: Task = {
+    ...found.task,
+    status,
+    completedDate:
+      status === "Completed"
+        ? new Date().toISOString().slice(0, 10)
+        : found.task.completedDate,
+    overdue: status === "Completed" ? false : found.task.overdue,
+  };
+
+  const without = cols.map((c) => ({
+    ...c,
+    tasks: c.tasks.filter((t) => t.taskId !== taskId),
+    count: c.tasks.filter((t) => t.taskId !== taskId).length,
+  }));
+
+  if (targetCol) {
+    saveTaskColumns(
+      without.map((c) =>
+        c.id === targetCol.id
+          ? {
+              ...c,
+              tasks: [updated, ...c.tasks],
+              count: c.tasks.length + 1,
+            }
+          : c,
+      ),
+    );
+  } else {
+    // No matching column — update in place
+    saveTaskColumns(
+      cols.map((c) => ({
+        ...c,
+        tasks: c.tasks.map((t) => (t.taskId === taskId ? updated : t)),
+      })),
+    );
+  }
+  return updated;
+}
+
+/** Sort rank: Critical → High → Medium → Low (not alphabetical). */
+export const PRIORITY_RANK: Record<Priority, number> = {
+  Critical: 0,
+  High: 1,
+  Medium: 2,
+  Low: 3,
+};
+
+export function compareTaskPriority(a: Priority, b: Priority): number {
+  return PRIORITY_RANK[a] - PRIORITY_RANK[b];
 }

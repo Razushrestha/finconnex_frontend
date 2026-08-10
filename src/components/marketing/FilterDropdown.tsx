@@ -14,8 +14,7 @@ interface FilterDropdownProps<T extends string> {
 }
 
 /**
- * Secondary, outlined filter dropdown — used for campaign type, channel,
- * template, or any other single-select filter that sits next to search.
+ * Compact secondary filter for marketing list toolbars.
  */
 export function FilterDropdown<T extends string>({
   label = "Filter",
@@ -35,13 +34,13 @@ export function FilterDropdown<T extends string>({
           type="button"
           onClick={toggle}
           className={cn(
-            "inline-flex h-9 items-center gap-2 rounded-xl border px-4 text-sm font-semibold transition-colors",
+            "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-semibold transition-colors",
             isActive
               ? "border-violet-200 bg-violet-50 text-violet-700"
               : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
           )}
         >
-          <Filter className="h-4 w-4" />
+          <Filter className="h-3.5 w-3.5" />
           {label}
           {isActive ? (
             <span className="flex h-4 w-4 items-center justify-center rounded-full bg-violet-600 text-[10px] font-bold text-white">

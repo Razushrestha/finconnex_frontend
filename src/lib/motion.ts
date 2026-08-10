@@ -5,6 +5,20 @@
 
 const reduce = "motion-reduce:animate-none motion-reduce:transition-none";
 
+/**
+ * Canonical record-card box — same as All Calls `CallCard`.
+ * Use on every kanban / board record card for a consistent shell.
+ */
+export const entityCardShell =
+  "rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm";
+
+/** Drag affordance for board cards */
+export const entityCardInteractive =
+  "cursor-grab select-none active:cursor-grabbing";
+
+/** Full CallCard-equivalent shell (shell + interactive). Pair with cardMotion. */
+export const entityCardBox = `${entityCardShell} ${entityCardInteractive}`;
+
 /** Kanban / draggable record cards — quiet hover, no lift cascade */
 export const cardMotion = [
   "transition-[opacity,box-shadow,border-color] duration-150 ease-out",
@@ -15,6 +29,7 @@ export const cardMotion = [
 /** Drag ghost — keep */
 export const cardDragging =
   "scale-[0.98] opacity-50 shadow-none ring-2 ring-slate-300/60 motion-reduce:scale-100";
+
 
 /** Dropdown menus (profile, notifications) */
 export const menuEnter = ["animate-in fade-in-0 duration-100", reduce].join(

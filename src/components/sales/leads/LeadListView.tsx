@@ -18,7 +18,7 @@ import {
   onLeadCardSettingsChange,
   type LeadCardSettings,
 } from "@/lib/leads/lead-card-settings";
-import { onPipelineSlaChange } from "@/lib/pipeline-sla/settings";
+import { onPipelineSlaChange, arePipelineSlaBadgesVisible } from "@/lib/pipeline-sla/settings";
 import { buildLeadCardViewModelFromCard } from "@/lib/leads/card-view-model";
 import { truncateActivityTitle } from "@/lib/leads/activity-summary";
 import {
@@ -26,7 +26,6 @@ import {
   type LeadCardQuickActionState,
 } from "@/lib/leads/card-types";
 import {
-  QUICK_BADGE,
   QUICK_STATE_WORDS,
   QUICK_URGENCY,
   URGENCY_SURFACE,
@@ -49,6 +48,13 @@ import {
 interface LeadListViewProps {
   columns?: KanbanColumn[];
   filters?: LeadFilters;
+  /** Controlled list columns from List View settings. */
+  manageColumns?: ManageColumn[];
+  onManageColumnsChange?: (cols: ManageColumn[]) => void;
+  pageSize?: number;
+  onPageSizeChange?: (size: number) => void;
+  /** Open List View settings from the table gear (optional). */
+  onOpenListSettings?: () => void;
 }
 
 const QUICK_ICONS = {
@@ -71,7 +77,7 @@ const QUICK_LABELS: Record<LeadCardQuickActionState["kind"], string> = {
   attachment: "Attachment",
 };
 
-const DEFAULT_LEAD_COLUMNS: ManageColumn[] = [
+export const DEFAULT_LEAD_LIST_COLUMNS: ManageColumn[] = [
   { id: "lead", label: "Lead", checked: true, required: true },
   { id: "company", label: "Company", checked: true },
   { id: "status", label: "Status", checked: true },
@@ -81,6 +87,8 @@ const DEFAULT_LEAD_COLUMNS: ManageColumn[] = [
   { id: "lastActivity", label: "Last activity", checked: true },
   { id: "actions", label: "Actions", checked: true },
 ];
+
+const DEFAULT_LEAD_COLUMNS = DEFAULT_LEAD_LIST_COLUMNS;
 
 type LeadRow = ReturnType<typeof buildAllLeadsShape>;
 // Helper purely for type inference — never called
@@ -147,6 +155,7 @@ function buildColumnRenderers(
       thClassName: "min-w-[140px] px-3 py-2",
       tdClassName: "px-3 py-1",
       td: (lead, vm) =>
+        arePipelineSlaBadgesVisible() &&
         vm.sla &&
         vm.sla.badgeLabel !== "No SLA" &&
         (vm.sla.stageClock || vm.sla.milestoneClock) ? (
@@ -258,10 +267,9 @@ function buildColumnRenderers(
         >
           {vm.quickActions.map((action) => {
             const Icon = QUICK_ICONS[action.kind];
-            const badge =
-              action.badgeCount >= 2 ? String(action.badgeCount) : null;
             const stateHint = QUICK_STATE_WORDS[action.urgency];
-            const countHint = badge ? `, ${badge} pending` : "";
+            const countHint =
+              action.badgeCount >= 2 ? `, ${action.badgeCount} pending` : "";
             return (
               <button
                 key={action.kind}
@@ -282,21 +290,10 @@ function buildColumnRenderers(
                 className={cn(
                   "relative flex h-7 w-7 items-center justify-center rounded-md transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1",
-                  QUICK_URGENCY[action.urgency],
+                  QUICK_URGENCY.neutral,
                 )}
               >
                 <Icon className="h-3.5 w-3.5" aria-hidden />
-                {badge && (
-                  <span
-                    className={cn(
-                      "absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-0.5 text-[8px] font-bold leading-none",
-                      QUICK_BADGE[action.urgency],
-                    )}
-                    aria-hidden
-                  >
-                    {badge}
-                  </span>
-                )}
               </button>
             );
           })}
@@ -309,6 +306,11 @@ function buildColumnRenderers(
 export function LeadListView({
   columns: columnsProp,
   filters,
+  manageColumns: manageColumnsProp,
+  onManageColumnsChange,
+  pageSize: pageSizeProp,
+  onPageSizeChange,
+  onOpenListSettings,
 }: LeadListViewProps) {
   const [columns] = useState<KanbanColumn[]>(
     () => columnsProp ?? listLeadColumns(),
@@ -320,10 +322,15 @@ export function LeadListView({
   const [panel, setPanel] = useState<LeadPanelState | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [pageSize, setPageSize] = useState<number>(10);
+  const [internalPageSize, setInternalPageSize] = useState<number>(10);
   const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
-  const [manageColumns, setManageColumns] =
+  const [internalManageColumns, setInternalManageColumns] =
     useState<ManageColumn[]>(DEFAULT_LEAD_COLUMNS);
+
+  const pageSize = pageSizeProp ?? internalPageSize;
+  const setPageSize = onPageSizeChange ?? setInternalPageSize;
+  const manageColumns = manageColumnsProp ?? internalManageColumns;
+  const setManageColumns = onManageColumnsChange ?? setInternalManageColumns;
 
   useEffect(() => {
     return onLeadActivityChange(() => setRevision((n) => n + 1));
@@ -444,7 +451,10 @@ export function LeadListView({
                 <TableDisplayOptionsMenu
                   pageSize={pageSize}
                   onPageSizeChange={setPageSize}
-                  onManageColumns={() => setManageColumnsOpen(true)}
+                  onManageColumns={() => {
+                    if (onOpenListSettings) onOpenListSettings();
+                    else setManageColumnsOpen(true);
+                  }}
                   className="flex justify-end"
                 />
               </th>

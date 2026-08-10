@@ -3,12 +3,8 @@
 import Image from "next/image";
 import { Building2 } from "lucide-react";
 import type { OrgInfoCardProps } from "./types";
-import { Panel } from "./shared";
+import { Panel, PanelTitle } from "./shared";
 
-/**
- * Company/org summary panel. Reused as-is on a Deal detail page — a deal
- * belongs to the same company its source lead did.
- */
 export function OrgInfoCard({
   name,
   domain,
@@ -32,43 +28,43 @@ export function OrgInfoCard({
       )}
 
       <div className="p-4">
+        <PanelTitle>Company</PanelTitle>
+
         <div className="flex items-center gap-2.5">
           {logoUrl ? (
-            <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-md border border-border">
+            <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl border border-slate-200">
               <Image src={logoUrl} alt={name} fill className="object-cover" />
             </div>
           ) : (
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-500">
               <Building2 className="h-4 w-4" />
             </div>
           )}
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold tracking-tight text-foreground">
+            <p className="truncate text-[14px] font-semibold text-slate-900">
               {name}
             </p>
             {domain &&
               (domainHref ? (
                 <a
                   href={domainHref}
-                  className="truncate text-xs text-primary hover:underline block"
+                  className="block truncate text-[12px] text-violet-700 hover:underline"
                 >
                   {domain}
                 </a>
               ) : (
-                <p className="truncate text-xs text-muted-foreground">
-                  {domain}
-                </p>
+                <p className="truncate text-[12px] text-slate-400">{domain}</p>
               ))}
           </div>
         </div>
 
-        <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2.5">
+        <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-3 border-t border-slate-100 pt-3">
           {fields.map((field) => (
             <div key={field.label} className="min-w-0">
-              <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              <dt className="text-[10px] font-semibold tracking-[0.06em] text-slate-400 uppercase">
                 {field.label}
               </dt>
-              <dd className="truncate text-sm font-medium text-foreground">
+              <dd className="mt-0.5 truncate text-[13px] font-semibold text-slate-800">
                 {field.value}
               </dd>
             </div>

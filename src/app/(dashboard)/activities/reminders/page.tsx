@@ -8,7 +8,6 @@ import {
   Bell,
   Plus,
   Clock,
-  User,
   Link2,
   List,
   LayoutGrid,
@@ -27,7 +26,10 @@ import {
   type ReminderStatus,
   type NotificationMethod,
 } from "@/lib/reminders/types";
-import { avatarColor, initials } from "@/lib/activities/shared";
+import {
+  CardInitialsAvatar,
+  CardOwnerRow,
+} from "@/components/shared/CardInitialsAvatar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
 
@@ -388,14 +390,7 @@ export default function RemindersPage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <span
-                              className={cn(
-                                "flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold",
-                                avatarColor(r.owner),
-                              )}
-                            >
-                              {initials(r.owner)}
-                            </span>
+                            <CardInitialsAvatar name={r.owner} />
                             {r.owner}
                           </div>
                         </td>
@@ -548,20 +543,7 @@ function ReminderCard({
             {reminder.relatedTo || "No related record"}
           </span>
         </div>
-        <div className="flex items-center justify-between gap-2 pt-0.5">
-          <div className="flex items-center gap-1.5">
-            <User className="h-3 w-3 shrink-0 text-slate-400" />
-            <span>{reminder.owner}</span>
-          </div>
-          <span
-            className={cn(
-              "flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold",
-              avatarColor(reminder.owner),
-            )}
-          >
-            {initials(reminder.owner)}
-          </span>
-        </div>
+        <CardOwnerRow name={reminder.owner} className="pt-0.5" />
       </div>
 
       <div className="mt-3 flex gap-1.5 border-t border-slate-50 pt-3">

@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   Globe,
   Phone,
-  User,
   Building2,
   DollarSign,
   MessageSquare,
@@ -17,7 +16,7 @@ import {
 } from "lucide-react";
 import type { CompanyCardData } from "@/lib/companies/types";
 import { cn } from "@/lib/utils";
-import { cardDragging, cardMotion } from "@/lib/motion";
+import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
 import Link from "next/link";
 import {
   CustomizeCompanyCardDrawer,
@@ -28,6 +27,7 @@ import {
   QuickActionsBar,
   type QuickActionItem,
 } from "@/components/sales/QuickActionsBar";
+import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 
 export type CompanyQuickActionKind =
   | "call"
@@ -150,7 +150,8 @@ export function CompanyCard({
         data-focus-id={company.id}
         data-company-id={company.id}
         className={cn(
-          "group w-full shrink-0 cursor-grab rounded-md border border-slate-200/80 bg-white p-3 shadow-2xs active:cursor-grabbing",
+          "group w-full shrink-0",
+          entityCardBox,
           cardMotion,
           isDragging && cardDragging,
         )}
@@ -158,13 +159,8 @@ export function CompanyCard({
         <div className="mb-3 flex items-center justify-between gap-2">
           <Link
             href={`/sales/companies/detail/${company.id}`}
-            className="flex min-w-0 items-center gap-2.5"
+            className="min-w-0"
           >
-            <div
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${company.avatarBgClass}`}
-            >
-              {company.initials}
-            </div>
             <h3 className="truncate text-[13px] font-semibold text-slate-800">
               {company.name}
             </h3>
@@ -205,12 +201,7 @@ export function CompanyCard({
               <span>{company.phone}</span>
             </div>
           )}
-          {company.owner && (
-            <div className="flex items-center gap-2">
-              <User className="h-3 w-3 shrink-0 text-slate-400" />
-              <span>{company.owner}</span>
-            </div>
-          )}
+          {company.owner && <CardOwnerRow name={company.owner} />}
           {company.annualRevenue && (
             <div className="flex items-center gap-2">
               <DollarSign className="h-3 w-3 shrink-0 text-slate-400" />

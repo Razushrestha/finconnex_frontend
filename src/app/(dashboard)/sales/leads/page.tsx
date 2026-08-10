@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   EntityHeader,
   ImportOption,
@@ -9,7 +9,7 @@ import {
   type SortDirection,
 } from "@/components/sales/EntityHeader";
 import { LeadKanbanBoard } from "@/components/sales/leads/LeadKanbanBoard";
-import { LeadListView } from "@/components/sales/leads/LeadListView";
+import { LeadListView, DEFAULT_LEAD_LIST_COLUMNS } from "@/components/sales/leads/LeadListView";
 import {
   FilterLeadsPanel,
   EMPTY_LEAD_FILTERS,
@@ -34,10 +34,27 @@ import {
 } from "lucide-react";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import {
+  DEFAULT_SINGLE_HEADER_COLOR,
+  KANBAN_HEADER_PALETTE,
   KanbanField,
   KanbanViewConfig,
   KanbanViewSettingsModal,
 } from "@/components/common/KanbanViewControls";
+import {
+  ListViewSettingsModal,
+  listConfigToManageColumns,
+  type ListViewConfig,
+} from "@/components/common/ListViewSettingsModal";
+import type { ManageColumn } from "@/components/work-queue/ManageColumnsModal";
+import {
+  loadLeadCardSettings,
+  saveLeadCardSettings,
+} from "@/lib/leads/lead-card-settings";
+import {
+  kanbanSelectedIdsToCardKeys,
+  kanbanShowsOwnerAvatar,
+} from "@/lib/leads/kanban-view-fields";
+import { MORTGAGE_PIPELINE_STAGES } from "@/lib/pipeline-sla/types";
 
 const DEFAULT_LEAD_COLUMNS = LEAD_PIPELINE_STAGES.map((stage) => ({
   id: stageColumnId(stage),
@@ -53,6 +70,138 @@ const LEAD_FIELDS: KanbanField[] = [
   { id: "leadOwner", label: "Lead Owner" },
   { id: "tag", label: "Tag" },
 ];
+
+const HEADER_COLOR_OPTIONS = MORTGAGE_PIPELINE_STAGES.map((stage) => ({
+  id: stageColumnId(stage),
+  label: stage,
+}));
+
+const DEFAULT_MULTI_HEADER_COLORS: Record<string, string> =
+  HEADER_COLOR_OPTIONS.reduce(
+    (acc, opt, i) => {
+      acc[opt.id] =
+        KANBAN_HEADER_PALETTE[i % KANBAN_HEADER_PALETTE.length] ??
+        DEFAULT_SINGLE_HEADER_COLOR;
+      return acc;
+    },
+    {} as Record<string, string>,
+  );
+
+const LEAD_VIEW_STORAGE_KEY = "finconnex.leads.kanban-view";
+const LEAD_LIST_STORAGE_KEY = "finconnex.leads.list-view";
+
+const DEFAULT_LIST_VIEW: ListViewConfig = {
+  id: "leads-list",
+  name: "All Leads",
+  sortBy: "newest",
+  sortDirection: "desc",
+  pageSize: 10,
+  shareWith: "everyone",
+  selectedColumnIds: DEFAULT_LEAD_LIST_COLUMNS.filter((c) => c.checked).map(
+    (c) => c.id,
+  ),
+};
+
+const LIST_SORT_OPTIONS = [
+  { value: "newest", label: "Newest First" },
+  { value: "oldest", label: "Oldest First" },
+  { value: "name_asc", label: "Name (A-Z)" },
+  { value: "name_desc", label: "Name (Z-A)" },
+];
+
+function loadListViewConfig(): ListViewConfig {
+  if (typeof window === "undefined") return DEFAULT_LIST_VIEW;
+  try {
+    const raw = localStorage.getItem(LEAD_LIST_STORAGE_KEY);
+    if (!raw) return DEFAULT_LIST_VIEW;
+    const parsed = JSON.parse(raw) as Partial<ListViewConfig>;
+    return {
+      ...DEFAULT_LIST_VIEW,
+      ...parsed,
+      selectedColumnIds:
+        Array.isArray(parsed.selectedColumnIds) &&
+        parsed.selectedColumnIds.length
+          ? parsed.selectedColumnIds
+          : DEFAULT_LIST_VIEW.selectedColumnIds,
+    };
+  } catch {
+    return DEFAULT_LIST_VIEW;
+  }
+}
+
+function persistListViewConfig(config: ListViewConfig) {
+  try {
+    localStorage.setItem(LEAD_LIST_STORAGE_KEY, JSON.stringify(config));
+  } catch {
+    /* ignore */
+  }
+}
+
+const DEFAULT_VIEW_CONFIG: KanbanViewConfig = {
+  id: "leads",
+  name: "Leads",
+  categorizeBy: "Status",
+  aggregateBy: "Lead Count",
+  headerStyle: "Multi Colour",
+  shareWith: "everyone",
+  selectedFieldIds: ["leadName", "source", "phone", "leadOwner"],
+  editableFieldIds: ["leadOwner"],
+  singleHeaderColor: DEFAULT_SINGLE_HEADER_COLOR,
+  multiHeaderColors: DEFAULT_MULTI_HEADER_COLORS,
+};
+
+function loadViewConfig(): KanbanViewConfig {
+  if (typeof window === "undefined") return DEFAULT_VIEW_CONFIG;
+  try {
+    const raw = localStorage.getItem(LEAD_VIEW_STORAGE_KEY);
+    if (!raw) return DEFAULT_VIEW_CONFIG;
+    const parsed = JSON.parse(raw) as Partial<KanbanViewConfig>;
+    const selectedFieldIds =
+      Array.isArray(parsed.selectedFieldIds) && parsed.selectedFieldIds.length
+        ? parsed.selectedFieldIds
+        : DEFAULT_VIEW_CONFIG.selectedFieldIds;
+    return {
+      ...DEFAULT_VIEW_CONFIG,
+      ...parsed,
+      selectedFieldIds,
+      editableFieldIds: Array.isArray(parsed.editableFieldIds)
+        ? parsed.editableFieldIds
+        : DEFAULT_VIEW_CONFIG.editableFieldIds,
+      singleHeaderColor:
+        typeof parsed.singleHeaderColor === "string"
+          ? parsed.singleHeaderColor
+          : DEFAULT_VIEW_CONFIG.singleHeaderColor,
+      multiHeaderColors: {
+        ...DEFAULT_MULTI_HEADER_COLORS,
+        ...(parsed.multiHeaderColors &&
+        typeof parsed.multiHeaderColors === "object"
+          ? parsed.multiHeaderColors
+          : {}),
+      },
+    };
+  } catch {
+    return DEFAULT_VIEW_CONFIG;
+  }
+}
+
+function persistViewConfig(config: KanbanViewConfig) {
+  try {
+    localStorage.setItem(LEAD_VIEW_STORAGE_KEY, JSON.stringify(config));
+  } catch {
+    /* ignore */
+  }
+}
+
+function applyViewFieldsToCards(config: KanbanViewConfig) {
+  const keys = kanbanSelectedIdsToCardKeys(config.selectedFieldIds);
+  const current = loadLeadCardSettings();
+  // Settings store stays capped; Kanban cards use the full selection via props.
+  saveLeadCardSettings({
+    ...current,
+    dynamicFieldKeys: keys.length ? keys : current.dynamicFieldKeys,
+    showOwnerAvatar: kanbanShowsOwnerAvatar(config.selectedFieldIds),
+  });
+}
 
 const LEAD_SCOPE_OPTIONS: ScopeOption[] = [
   { label: "All Leads", value: "all" },
@@ -89,17 +238,28 @@ export default function LeadsPage() {
   const [isManageTagsOpen, setManageTagsOpen] = useState(false);
   const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
 
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [viewConfig, setViewConfig] = useState<KanbanViewConfig>({
-    id: "leads",
-    name: "Leads",
-    categorizeBy: "Status",
-    aggregateBy: "Lead Count",
-    headerStyle: "Multi Colour",
-    shareWith: "everyone",
-    selectedFieldIds: ["leadName", "source", "phone", "leadOwner"],
-    editableFieldIds: ["leadOwner"],
-  });
+  const [isKanbanSettingsOpen, setIsKanbanSettingsOpen] = useState(false);
+  const [isListSettingsOpen, setIsListSettingsOpen] = useState(false);
+  const [viewConfig, setViewConfig] = useState<KanbanViewConfig>(
+    DEFAULT_VIEW_CONFIG,
+  );
+  const [listViewConfig, setListViewConfig] =
+    useState<ListViewConfig>(DEFAULT_LIST_VIEW);
+
+  const cardFieldKeys = useMemo(
+    () => kanbanSelectedIdsToCardKeys(viewConfig.selectedFieldIds),
+    [viewConfig.selectedFieldIds],
+  );
+  const showOwnerOnCard = kanbanShowsOwnerAvatar(viewConfig.selectedFieldIds);
+
+  const listManageColumns = useMemo(
+    () =>
+      listConfigToManageColumns(
+        DEFAULT_LEAD_LIST_COLUMNS,
+        listViewConfig.selectedColumnIds,
+      ),
+    [listViewConfig.selectedColumnIds],
+  );
 
   function exportTasks() {
     console.log("export tasks clicked");
@@ -108,6 +268,19 @@ export default function LeadsPage() {
   function openPrintView() {
     console.log("print view clicked");
   }
+
+  function openViewSettings() {
+    if (viewMode === "list") {
+      setIsListSettingsOpen(true);
+      return;
+    }
+    setIsKanbanSettingsOpen(true);
+  }
+
+  useEffect(() => {
+    setViewConfig(loadViewConfig());
+    setListViewConfig(loadListViewConfig());
+  }, []);
 
   useEffect(() => {
     function refresh() {
@@ -118,6 +291,40 @@ export default function LeadsPage() {
     refresh();
     return onRulesChange(() => refresh());
   }, [viewMode]);
+
+  function saveKanbanView(next: KanbanViewConfig) {
+    setViewConfig(next);
+    persistViewConfig(next);
+    applyViewFieldsToCards(next);
+    setIsKanbanSettingsOpen(false);
+  }
+
+  function saveListView(next: ListViewConfig) {
+    const normalized: ListViewConfig = {
+      ...next,
+      selectedColumnIds: next.selectedColumnIds.length
+        ? next.selectedColumnIds
+        : DEFAULT_LIST_VIEW.selectedColumnIds,
+    };
+    setListViewConfig(normalized);
+    persistListViewConfig(normalized);
+    setIsListSettingsOpen(false);
+  }
+
+  function handleListManageColumnsChange(cols: ManageColumn[]) {
+    const next: ListViewConfig = {
+      ...listViewConfig,
+      selectedColumnIds: cols.filter((c) => c.checked).map((c) => c.id),
+    };
+    setListViewConfig(next);
+    persistListViewConfig(next);
+  }
+
+  function handleListPageSizeChange(size: number) {
+    const next: ListViewConfig = { ...listViewConfig, pageSize: size };
+    setListViewConfig(next);
+    persistListViewConfig(next);
+  }
 
   function toggleFilterField(section: "source" | "status", field: string) {
     setFilters((prev) => {
@@ -216,80 +423,91 @@ export default function LeadsPage() {
   ];
 
   return (
-    <div className="h-screen bg-background p-2 pr-3">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background p-2 pr-3">
       {/* <FocusHighlight /> */}
-      <EntityHeader
-        entityLabel="Lead"
-        createRoute="/sales/leads/create"
-        importOptions={importOptions}
-        actionOptions={actionOptions}
-        footerOptions={footerOptions}
-        totalCount={totalLeads}
-        viewMode={viewMode}
-        onViewChange={setViewMode}
-        isFilterOpen={isFilterOpen}
-        onToggleFilter={() => setIsFilterOpen((v) => !v)}
-        scopeOptions={LEAD_SCOPE_OPTIONS}
-        activeScope={activeScope}
-        onScopeChange={setActiveScope}
-        sortOptions={SORT_OPTIONS}
-        activeSort={activeSort}
-        activeSortDirection={activeSortDirection}
-        onSortChange={(field, direction) => {
-          setActiveSort(field);
-          setActiveSortDirection(direction);
-        }}
-      />
-
-      {selectedIds.length > 0 ? (
-        <EntitySelectionToolbar
-          selectedCount={selectedIds.length}
-          onClear={() => setSelectedIds([])}
-          onSendMail={() => console.log("send mail clicked")}
-          onAddTag={() => console.log("add tag clicked")}
-          onRemoveTag={() => console.log("remove tag clicked")}
-          onRunMacro={() => console.log("run macro clicked")}
-          onCreateTask={() => console.log("create task clicked")}
-          onSetReminder={() => console.log("set reminder clicked")}
-          onMassUpdate={() => console.log("mass update clicked")}
-          onChangeOwner={() => console.log("change owner clicked")}
-          onCadences={() => console.log("cadences clicked")}
-          onAddToCampaigns={() => console.log("add to campaigns clicked")}
-          onPrintMailingLabels={() =>
-            console.log("print mailing labels clicked")
-          }
-          onMailMerge={() => console.log("mail merge clicked")}
-          onMassConvert={() => console.log("mass convert clicked")}
-          onDelete={() => console.log("delete clicked")}
-          onExportSelectedRecords={() =>
-            console.log("export selected records clicked")
-          }
+      <div className="shrink-0">
+        <EntityHeader
+          entityLabel="Lead"
+          createRoute="/sales/leads/create"
+          importOptions={importOptions}
+          actionOptions={actionOptions}
+          footerOptions={footerOptions}
+          totalCount={totalLeads}
+          viewMode={viewMode}
+          onViewChange={setViewMode}
+          isFilterOpen={isFilterOpen}
+          onToggleFilter={() => setIsFilterOpen((v) => !v)}
+          scopeOptions={LEAD_SCOPE_OPTIONS}
+          activeScope={activeScope}
+          onScopeChange={setActiveScope}
+          sortOptions={SORT_OPTIONS}
+          activeSort={activeSort}
+          activeSortDirection={activeSortDirection}
+          onSortChange={(field, direction) => {
+            setActiveSort(field);
+            setActiveSortDirection(direction);
+          }}
         />
-      ) : (
-        <div className="mt-3 flex w-fit items-center gap-2">
-          <button
-            type="button"
-            onClick={() => console.log("pipeline selector clicked")}
-            className="flex items-center gap-1.5 rounded-sm bg-card/70 hover:bg-card px-3 py-1 text-sm font-medium text-foreground/70"
-          >
-            <span>Lead Pipeline</span>
-            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-          </button>
 
-          <button
-            type="button"
-            onClick={() => setIsSettingsOpen(true)}
-            aria-label="Edit Kanban view settings"
-            className="rounded-full border border-slate-200 bg-white p-1.5 text-slate-400 shadow-sm hover:text-slate-600 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:text-zinc-300"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
+        {selectedIds.length > 0 ? (
+          <EntitySelectionToolbar
+            selectedCount={selectedIds.length}
+            onClear={() => setSelectedIds([])}
+            onSendMail={() => console.log("send mail clicked")}
+            onAddTag={() => console.log("add tag clicked")}
+            onRemoveTag={() => console.log("remove tag clicked")}
+            onRunMacro={() => console.log("run macro clicked")}
+            onCreateTask={() => console.log("create task clicked")}
+            onSetReminder={() => console.log("set reminder clicked")}
+            onMassUpdate={() => console.log("mass update clicked")}
+            onChangeOwner={() => console.log("change owner clicked")}
+            onCadences={() => console.log("cadences clicked")}
+            onAddToCampaigns={() => console.log("add to campaigns clicked")}
+            onPrintMailingLabels={() =>
+              console.log("print mailing labels clicked")
+            }
+            onMailMerge={() => console.log("mail merge clicked")}
+            onMassConvert={() => console.log("mass convert clicked")}
+            onDelete={() => console.log("delete clicked")}
+            onExportSelectedRecords={() =>
+              console.log("export selected records clicked")
+            }
+          />
+        ) : (
+          <div className="mt-3 flex w-fit items-center gap-2">
+            <button
+              type="button"
+              onClick={() => console.log("pipeline selector clicked")}
+              className="flex items-center gap-1.5 rounded-sm bg-card/70 hover:bg-card px-3 py-1 text-sm font-medium text-foreground/70"
+            >
+              <span>Lead Pipeline</span>
+              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+            </button>
 
-      <div className="mt-3 flex items-start gap-4">
+            <button
+              type="button"
+              onClick={openViewSettings}
+              aria-label={
+                viewMode === "list"
+                  ? "Edit list view settings"
+                  : "Edit Kanban view settings"
+              }
+              title={
+                viewMode === "list"
+                  ? "List View Settings"
+                  : "Kanban View Settings"
+              }
+              className="rounded-full border border-slate-200 bg-white p-1.5 text-slate-400 shadow-sm hover:text-slate-600 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:text-zinc-300"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 flex min-h-0 flex-1 items-stretch gap-4 overflow-hidden">
         {isFilterOpen && (
-          <div className="sticky top-6">
+          <div className="shrink-0 overflow-y-auto">
             <FilterLeadsPanel
               filters={filters}
               onToggleField={toggleFilterField}
@@ -298,37 +516,62 @@ export default function LeadsPage() {
           </div>
         )}
 
-        <div key={viewMode} className={cn("flex-1 overflow-x-auto", viewEnter)}>
+        <div
+          key={viewMode}
+          className={cn("min-h-0 min-w-0 flex-1 overflow-hidden", viewEnter)}
+        >
           {viewMode === "kanban" ? (
             <LeadKanbanBoard
               filters={filters}
               visibleColumnIds={visibleColumnIds}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
+              cardFieldKeys={cardFieldKeys}
+              showOwnerAvatar={showOwnerOnCard}
+              headerStyle={viewConfig.headerStyle}
+              singleHeaderColor={viewConfig.singleHeaderColor}
+              multiHeaderColors={viewConfig.multiHeaderColors}
             />
           ) : (
-            <LeadListView filters={filters} />
+            <div className="h-full overflow-auto">
+              <LeadListView
+                filters={filters}
+                manageColumns={listManageColumns}
+                onManageColumnsChange={handleListManageColumnsChange}
+                pageSize={listViewConfig.pageSize}
+                onPageSizeChange={handleListPageSizeChange}
+                onOpenListSettings={() => setIsListSettingsOpen(true)}
+              />
+            </div>
           )}
         </div>
       </div>
 
-      {isSettingsOpen && (
+      {isKanbanSettingsOpen && (
         <KanbanViewSettingsModal
           view={viewConfig}
           availableFields={LEAD_FIELDS}
           categorizeByOptions={["Status", "Source", "Lead Owner"]}
           aggregateByOptions={["Lead Count"]}
           headerStyleOptions={["Multi Colour", "Single Colour", "None"]}
-          onClose={() => setIsSettingsOpen(false)}
-          onSave={(next) => {
-            setViewConfig(next);
-            setIsSettingsOpen(false);
-            // e.g. api.updateKanbanView("leads", next);
-          }}
+          headerColorOptions={HEADER_COLOR_OPTIONS}
+          onClose={() => setIsKanbanSettingsOpen(false)}
+          onSave={saveKanbanView}
           onDelete={() => {
-            setIsSettingsOpen(false);
-            // e.g. api.deleteKanbanView("leads");
+            setIsKanbanSettingsOpen(false);
           }}
+        />
+      )}
+
+      {isListSettingsOpen && (
+        <ListViewSettingsModal
+          open={isListSettingsOpen}
+          view={listViewConfig}
+          availableColumns={DEFAULT_LEAD_LIST_COLUMNS}
+          sortOptions={LIST_SORT_OPTIONS}
+          onClose={() => setIsListSettingsOpen(false)}
+          onSave={saveListView}
+          onDelete={() => setIsListSettingsOpen(false)}
         />
       )}
     </div>

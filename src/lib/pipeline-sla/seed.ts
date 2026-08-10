@@ -4,6 +4,7 @@ import type { PipelineSlaConfig } from "@/lib/pipeline-sla/types";
 export const DEFAULT_MORTGAGE_PIPELINE_SLA: PipelineSlaConfig = {
   pipelineId: "mortgage",
   pipelineName: "Mortgage Pipeline",
+  showBadgesOnCards: false,
   stageSlas: [
     { stage: "New Lead", duration: { amount: 30, unit: "minutes" } },
     { stage: "Appointment Booked", duration: { amount: 2, unit: "days" } },

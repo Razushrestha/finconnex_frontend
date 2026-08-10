@@ -48,14 +48,15 @@ interface WorkQueueSidebarProps {
   onOpenManage: () => void;
 }
 
-function CountBadge({ count, active }: { count: number; active?: boolean }) {
+function Count({ count, active }: { count: number; active?: boolean }) {
+  if (count <= 0) {
+    return <span className="text-[12px] tabular-nums text-slate-300">0</span>;
+  }
   return (
     <span
       className={cn(
-        "min-w-[22px] rounded-md px-1.5 py-0.5 text-center text-[11px] font-semibold tabular-nums transition-colors",
-        active
-          ? "bg-[var(--wq-accent-badge)] text-[var(--wq-accent)]"
-          : "bg-slate-100 text-slate-500",
+        "text-[12px] font-semibold tabular-nums transition-colors",
+        active ? "text-[var(--wq-accent)]" : "text-slate-500",
       )}
     >
       {count}
@@ -78,15 +79,12 @@ export function WorkQueueSidebar({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(
     new Date(),
   );
-
   const [specificDateValue, setSpecificDateValue] = useState<string | null>(
     null,
   );
-
   const [isQueueModalOpen, setIsQueueModalOpen] = useState(false);
 
   function handleSaveQueue(payload: QueuePayload) {
-    // TODO: replace with your actual create-queue API call
     console.log("New queue:", payload);
     setIsQueueModalOpen(false);
   }
@@ -106,17 +104,17 @@ export function WorkQueueSidebar({
 
   if (collapsed) {
     return (
-      <aside className="flex w-10 shrink-0 flex-col items-center border-b border-[var(--wq-line)] bg-[var(--wq-surface)] py-3 lg:border-r lg:border-b-0">
+      <aside className="flex w-11 shrink-0 flex-col items-center border-b border-[var(--wq-line)] bg-white py-3 lg:border-r lg:border-b-0">
         <button
           type="button"
           onClick={onToggleCollapse}
           aria-label="Expand sidebar"
           title="Expand sidebar"
-          className="flex h-8 w-8 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-slate-800"
+          className="flex h-8 w-8 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
-        <div className="mt-3 flex flex-col items-center gap-1">
+        <div className="mt-4 flex flex-col items-center gap-1">
           {activityItems.map((item) => {
             const active = activeItem === item.id;
             const Icon = iconMap[item.icon];
@@ -124,21 +122,19 @@ export function WorkQueueSidebar({
               <button
                 key={item.id}
                 type="button"
-                title={item.label}
+                title={`${item.label} (${item.count})`}
                 aria-label={item.label}
                 onClick={() => onActiveItemChange(item.id)}
                 className={cn(
-                  "relative flex h-8 w-8 items-center justify-center rounded transition-colors",
+                  "relative flex h-8 w-8 items-center justify-center transition-colors",
                   active
-                    ? "bg-[var(--wq-accent-soft)] text-[var(--wq-accent)]"
-                    : "text-slate-400 hover:bg-white hover:text-slate-700",
+                    ? "text-[var(--wq-accent)]"
+                    : "text-slate-400 hover:text-slate-700",
                 )}
               >
                 <Icon strokeWidth={1.75} className="h-4 w-4" />
                 {item.count > 0 ? (
-                  <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded bg-[var(--wq-accent)] px-0.5 text-[9px] font-semibold text-white">
-                    {item.count > 9 ? "9+" : item.count}
-                  </span>
+                  <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-[var(--wq-accent)]" />
                 ) : null}
               </button>
             );
@@ -150,185 +146,170 @@ export function WorkQueueSidebar({
 
   return (
     <div className="relative flex">
-      <aside className="w-full shrink-0 overflow-y-auto border-b border-[var(--wq-line)] bg-[var(--wq-surface)] px-3.5 py-3 sm:px-4 lg:w-[272px] lg:border-r lg:border-b-0">
-        <div className="mb-3 flex items-center justify-between px-1.5">
-          <h2 className="text-[13.5px] font-semibold tracking-tight text-slate-900">
-            My Open Activity
+      <aside className="w-full shrink-0 overflow-y-auto border-b border-[var(--wq-line)] bg-white px-3 py-3 sm:px-4 lg:w-[248px] lg:border-r lg:border-b-0">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-[11px] font-semibold tracking-[0.08em] text-slate-400 uppercase">
+            Open activity
           </h2>
           <button
             type="button"
             onClick={onToggleCollapse}
             aria-label="Minimize sidebar"
             title="Minimize sidebar"
-            className="flex h-7 w-7 items-center justify-center rounded text-slate-400 transition-colors hover:bg-white hover:text-slate-700"
+            className="flex h-7 w-7 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
         </div>
 
-        <section className="mb-4 border-b border-[var(--wq-line)] pb-4">
-          <div className="relative mb-2.5">
-            <select
-              value={currentSelectValue}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (value === "specific-date") {
-                  setIsCalendarOpen(true);
-                } else {
-                  setIsCalendarOpen(false);
-                  setSpecificDateValue(null);
-                  onTimeFilterChange(value as WorkQueueTimeFilter);
-                }
-              }}
-              className="h-9 w-full appearance-none rounded border border-[var(--wq-line)] bg-white px-3 pr-8 text-[12.5px] font-medium text-slate-700 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/15"
-              aria-label="Activity time filter"
-            >
-              <option value="today-overdue">Today &amp; Overdue</option>
-              <option value="today">Today</option>
-              <option value="tomorrow">Tomorrow</option>
-              <option value="overdue">Overdue</option>
-              <option value="this-week">This Week</option>
-              <option value="next-week">Next Week</option>
-              <option value="this-month">This Month</option>
-              <option value="next-month">Next Month</option>
+        <div className="relative mb-3">
+          <select
+            value={currentSelectValue}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === "specific-date") {
+                setIsCalendarOpen(true);
+              } else {
+                setIsCalendarOpen(false);
+                setSpecificDateValue(null);
+                onTimeFilterChange(value as WorkQueueTimeFilter);
+              }
+            }}
+            className="h-8 w-full appearance-none border-0 border-b border-[var(--wq-line)] bg-transparent pr-6 text-[12.5px] font-medium text-slate-700 outline-none focus:border-slate-400"
+            aria-label="Activity time filter"
+          >
+            <option value="today-overdue">Today &amp; Overdue</option>
+            <option value="today">Today</option>
+            <option value="tomorrow">Tomorrow</option>
+            <option value="overdue">Overdue</option>
+            <option value="this-week">This Week</option>
+            <option value="next-week">Next Week</option>
+            <option value="this-month">This Month</option>
+            <option value="next-month">Next Month</option>
+            {specificDateValue ? (
+              <option value={specificDateValue}>{formattedSelectedDate}</option>
+            ) : null}
+            <option value="specific-date">On a Specific Date…</option>
+          </select>
+          <ChevronDown className="pointer-events-none absolute top-1/2 right-0 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+        </div>
 
-              {specificDateValue && (
-                <option value={specificDateValue}>
-                  {formattedSelectedDate}
-                </option>
-              )}
-
-              <option value="specific-date">On a Specific Date...</option>
-            </select>
-            <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-          </div>
-
-          <div className="flex flex-col gap-0.5">
-            {activityItems.map((item) => {
-              const active = activeItem === item.id;
-              const Icon = iconMap[item.icon];
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => onActiveItemChange(item.id)}
+        <nav className="mb-5 flex flex-col" aria-label="Open activity">
+          {activityItems.map((item) => {
+            const active = activeItem === item.id;
+            const Icon = iconMap[item.icon];
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onActiveItemChange(item.id)}
+                className={cn(
+                  "group flex h-8 items-center gap-2.5 border-l-2 pl-2.5 text-left transition-colors",
+                  active
+                    ? "border-[var(--wq-accent)] text-[var(--wq-accent)]"
+                    : "border-transparent text-slate-600 hover:text-slate-900",
+                )}
+              >
+                <Icon
+                  strokeWidth={1.75}
                   className={cn(
-                    "group flex h-9 items-center gap-2 rounded-lg pr-2 pl-1 text-left transition-all duration-150",
-                    active ? "bg-[var(--wq-accent-soft)]" : "hover:bg-white/80",
+                    "h-[15px] w-[15px] shrink-0",
+                    active
+                      ? "text-[var(--wq-accent)]"
+                      : "text-slate-400 group-hover:text-slate-600",
+                  )}
+                />
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 truncate text-[13px] leading-none",
+                    active ? "font-semibold" : "font-medium",
                   )}
                 >
-                  <span
+                  {item.label}
+                </span>
+                <Count count={item.count} active={active} />
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="mb-2.5 flex items-center justify-between">
+          <h2 className="text-[11px] font-semibold tracking-[0.08em] text-slate-400 uppercase">
+            My queues
+          </h2>
+          <div className="flex items-center">
+            <button
+              type="button"
+              aria-label="Manage Queue"
+              title="Manage queues"
+              onClick={onOpenManage}
+              className="flex h-7 w-7 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
+            >
+              <Settings2 className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label="Add workqueue view"
+              title="Add queue"
+              onClick={() => setIsQueueModalOpen(true)}
+              className="flex h-7 w-7 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          {sidebarCategories.map((cat) => (
+            <div key={cat.id} className="flex flex-col">
+              <div className="mb-1 px-0.5 text-[11px] font-medium text-slate-400">
+                {cat.label}
+              </div>
+              {cat.items.map((item) => {
+                const active = activeItem === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => onActiveItemChange(item.id)}
                     className={cn(
-                      "h-4 w-[3px] rounded-full transition-colors",
-                      active ? "bg-[var(--wq-accent)]" : "bg-transparent",
-                    )}
-                  />
-                  <Icon
-                    strokeWidth={1.75}
-                    className={cn(
-                      "h-[15px] w-[15px] shrink-0 transition-colors",
+                      "flex h-8 items-center gap-2 border-l-2 pl-2.5 text-left transition-colors",
                       active
-                        ? "text-[var(--wq-accent)]"
-                        : "text-gray-400 group-hover:text-gray-600",
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      "min-w-0 flex-1 truncate text-[13.5px] leading-none transition-colors",
-                      active
-                        ? "font-semibold text-[var(--wq-accent)]"
-                        : "font-medium text-gray-800",
+                        ? "border-[var(--wq-accent)] text-[var(--wq-accent)]"
+                        : "border-transparent text-slate-600 hover:text-slate-900",
                     )}
                   >
-                    {item.label}
-                  </span>
-                  <CountBadge count={item.count} active={active} />
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        <section>
-          <div className="mb-2.5 flex items-center justify-between px-1.5">
-            <h2 className="text-[13.5px] font-semibold tracking-tight text-gray-900">
-              My Workqueue
-            </h2>
-            <div className="flex items-center gap-0.5">
-              <button
-                type="button"
-                aria-label="Manage Queue"
-                onClick={onOpenManage}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-white hover:text-gray-700"
-              >
-                <Settings2 className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                aria-label="Add workqueue view"
-                onClick={() => setIsQueueModalOpen(true)}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-white hover:text-gray-700"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-4">
-            {sidebarCategories.map((cat) => (
-              <div key={cat.id} className="flex flex-col gap-0.5">
-                <div className="px-1.5 pb-1 text-[11px] font-semibold tracking-[0.06em] text-gray-400 uppercase">
-                  {cat.label}
-                </div>
-                {cat.items.map((item) => {
-                  const active = activeItem === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => onActiveItemChange(item.id)}
+                    <span
                       className={cn(
-                        "flex h-8 items-center gap-2 rounded-lg px-2 text-left transition-all duration-150",
-                        active
-                          ? "bg-[var(--wq-accent-soft)]"
-                          : "hover:bg-white/80",
+                        "min-w-0 flex-1 truncate text-[13px] leading-none",
+                        active ? "font-semibold" : "font-medium",
                       )}
                     >
-                      <span
-                        className={cn(
-                          "min-w-0 flex-1 truncate text-[13px] leading-none transition-colors",
-                          active
-                            ? "font-semibold text-[var(--wq-accent)]"
-                            : "font-medium text-gray-800",
-                        )}
-                      >
-                        {item.label}
-                      </span>
-                      <CountBadge count={item.count} active={active} />
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </section>
+                      {item.label}
+                    </span>
+                    <Count count={item.count} active={active} />
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </aside>
 
-      {/* Calendar Popover positioned strictly to the right side */}
-      {isCalendarOpen && (
-        <div className="absolute top-2 left-full ml-3 w-auto rounded-2xl bg-white p-4 shadow-xl border border-gray-100 z-50">
+      {isCalendarOpen ? (
+        <div className="absolute top-2 left-full z-50 ml-2 w-auto border border-[var(--wq-line)] bg-white p-3 shadow-lg">
           <Calendar
             mode="single"
             selected={selectedDate}
             onSelect={setSelectedDate}
-            className="rounded-md border-0"
+            className="rounded-none border-0"
           />
-          <div className="h-px bg-gray-100 my-3" />
+          <div className="my-2 h-px bg-[var(--wq-line)]" />
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setIsCalendarOpen(false)}
-              className="flex-1 rounded-xl border border-gray-200 bg-white py-2 text-center text-xs font-semibold text-gray-800 hover:bg-gray-50 transition-colors"
+              className="flex-1 py-1.5 text-center text-[12px] font-medium text-slate-600 hover:text-slate-900"
             >
               Cancel
             </button>
@@ -342,13 +323,13 @@ export function WorkQueueSidebar({
                 }
                 setIsCalendarOpen(false);
               }}
-              className="flex-1 rounded-xl bg-violet-600 py-2 text-center text-xs font-semibold text-white shadow-sm hover:bg-violet-700 transition-colors"
+              className="flex-1 bg-[var(--wq-accent)] py-1.5 text-center text-[12px] font-semibold text-white hover:opacity-90"
             >
               Done
             </button>
           </div>
         </div>
-      )}
+      ) : null}
 
       <CreateQueueModal
         open={isQueueModalOpen}

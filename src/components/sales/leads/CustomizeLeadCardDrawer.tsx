@@ -12,6 +12,7 @@ import {
   CheckSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { entityCardShell } from "@/lib/motion";
 
 export interface LeadCardCustomizationSettings {
   showEmail: boolean;
@@ -179,10 +180,7 @@ function LeadCardPreview({
 
   return (
     <div
-      className={cn(
-        "rounded-md border border-slate-200/80 bg-white shadow-2xs",
-        isCompact ? "p-2" : "p-3",
-      )}
+      className={cn(entityCardShell, isCompact ? "p-2" : null)}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">

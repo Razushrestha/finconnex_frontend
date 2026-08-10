@@ -468,6 +468,7 @@ import {
 } from "@/lib/marketing/email/types";
 import {
   CampaignHeader,
+  MarketingListShell,
   StatusDropdown,
   FilterDropdown,
   DataTable,
@@ -492,7 +493,7 @@ const columns: DataTableColumn<EmailCampaign>[] = [
     header: "Type",
     className: "max-w-[220px]",
     render: (r) => (
-      <p className="truncate text-[15px] font-semibold text-slate-900">
+      <p className="truncate text-[13px] font-semibold text-slate-900">
         {r.name}
       </p>
     ),
@@ -644,60 +645,59 @@ export default function EmailCampaignsPage() {
   }
 
   return (
-    <div className="relative min-h-full overflow-y-auto bg-slate-50">
-      <div className="relative mx-auto flex max-w-[1400px] flex-col p-2 sm:p-4 lg:p-6">
-        <CampaignHeader
-          breadcrumbs={[
-            { label: "Home", href: "/" },
-            { label: "Marketing" },
-            { label: "Email Campaigns" },
-          ]}
-          title="Marketing"
-          onExport={exportCsv}
-          onCreate={() =>
-            router.push(
-              "/marketing/email/create?layoutid=standard&redirect=false",
-            )
-          }
-          createLabel="New campaign"
-        />
+    <MarketingListShell>
+      <CampaignHeader
+        breadcrumbs={[
+          { label: "Home", href: "/" },
+          { label: "Marketing" },
+          { label: "Email Campaigns" },
+        ]}
+        title="Email Campaigns"
+        totalCount={filtered.length}
+        onExport={exportCsv}
+        onCreate={() =>
+          router.push(
+            "/marketing/email/create?layoutid=standard&redirect=false",
+          )
+        }
+        createLabel="New campaign"
+      />
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 py-2">
-          <StatusDropdown
-            statuses={EMAIL_CAMPAIGN_STATUSES}
-            counts={counts}
-            totalCount={rows.length}
-            value={statusTab}
-            onChange={setStatusTab}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-1 py-2">
+        <StatusDropdown
+          statuses={EMAIL_CAMPAIGN_STATUSES}
+          counts={counts}
+          totalCount={rows.length}
+          value={statusTab}
+          onChange={setStatusTab}
+        />
+        <div className="flex items-center gap-2">
+          <SearchInput value={search} onChange={setSearch} />
+          <FilterDropdown
+            options={EMAIL_CAMPAIGN_TYPES}
+            value={typeFilter}
+            onChange={setTypeFilter}
+            allLabel="All types"
           />
-          <div className="flex items-center gap-2.5">
-            <SearchInput value={search} onChange={setSearch} />
-            <FilterDropdown
-              options={EMAIL_CAMPAIGN_TYPES}
-              value={typeFilter}
-              onChange={setTypeFilter}
-              allLabel="All types"
-            />
-          </div>
         </div>
-
-        <DataTable
-          columns={columns}
-          rows={paginated}
-          getRowKey={(r) => r.id}
-          onRowClick={(r) => router.push(`/marketing/email/${r.id}`)}
-          page={safePage}
-          pageSize={pageSize}
-          totalCount={filtered.length}
-          onPageChange={setPage}
-          emptyState={
-            <>
-              <Mail className="mx-auto mb-3 h-10 w-10 text-slate-300" />
-              No campaigns match. Create one to start nurturing.
-            </>
-          }
-        />
       </div>
-    </div>
+
+      <DataTable
+        columns={columns}
+        rows={paginated}
+        getRowKey={(r) => r.id}
+        onRowClick={(r) => router.push(`/marketing/email/${r.id}`)}
+        page={safePage}
+        pageSize={pageSize}
+        totalCount={filtered.length}
+        onPageChange={setPage}
+        emptyState={
+          <>
+            <Mail className="mx-auto mb-3 h-8 w-8 text-slate-300" />
+            No campaigns match. Create one to start nurturing.
+          </>
+        }
+      />
+    </MarketingListShell>
   );
 }
