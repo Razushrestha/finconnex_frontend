@@ -16,8 +16,23 @@ export const CALL_STATUSES = [
   "No Answer",
   "Voicemail Left",
   "Cancelled",
+  "Left Voicemail",
+  "Busy",
+  "Wrong Number",
 ] as const;
 export type CallStatus = (typeof CALL_STATUSES)[number];
+
+export interface NextStepTask {
+  enabled: boolean;
+  title: string;
+  dueDate: string;
+  assignee: string;
+}
+
+export interface CallRecording {
+  durationSeconds: number;
+  audioUrl?: string;
+}
 
 export interface Call {
   id: string;
@@ -30,6 +45,9 @@ export interface Call {
   duration?: string;
   notes?: string;
   assignedTo: string;
+  recording?: CallRecording;
+  nextStep?: NextStepTask;
+  outcome?: string;
 }
 
 export interface CallColumn {

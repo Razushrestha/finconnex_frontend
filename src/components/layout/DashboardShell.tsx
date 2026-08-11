@@ -24,7 +24,7 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
   }, [session.userId, session.name, session.role]);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-zinc-50 font-sans dark:bg-black">
+    <div className="flex h-screen w-screen overflow-hidden bg-background font-sans">
       {/* On mobile the sidebar renders as a fixed off-canvas drawer (out of
           document flow), so this wrapper takes up no space there: width
           only matters at md+, where the sidebar is back in normal flow. */}
