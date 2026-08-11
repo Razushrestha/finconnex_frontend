@@ -934,7 +934,7 @@ export function formatBookingWhen(start: string, end: string) {
   });
   const tStart = formatTime(start);
   const tEnd = formatTime(end);
-  return `${date} · ${tStart} – ${tEnd}`;
+  return `${date} · ${tStart} - ${tEnd}`;
 }
 
 function formatTime(iso: string) {

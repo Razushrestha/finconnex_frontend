@@ -845,7 +845,7 @@ export function BookingPageForm({
                     <div className="flex flex-wrap gap-1">
                       <PresetBtn
                         onClick={setWeekdaysOnly}
-                        label="Weekdays 9–5"
+                        label="Weekdays 9-5"
                       />
                       <PresetBtn onClick={setAllDays} label="Every day" />
                       <PresetBtn
@@ -970,7 +970,7 @@ export function BookingPageForm({
                         </div>
                         {!selected.enabled ? (
                           <p className="w-full text-[10px] text-slate-400 sm:w-auto">
-                            Off — tap the day name to enable
+                            Off - tap the day name to enable
                           </p>
                         ) : null}
                       </div>
@@ -978,7 +978,7 @@ export function BookingPageForm({
                   })()}
                 </section>
 
-                {/* LOCATION — non-consultation only; consultations use Meeting via */}
+                {/* LOCATION - non-consultation only; consultations use Meeting via */}
                 {!isConsultation ? (
                 <section id="booking-section-location" className="p-2.5 sm:p-3">
                   <SectionHead
@@ -1089,7 +1089,7 @@ export function BookingPageForm({
                   <SectionHead
                     step="5"
                     title="Confirmation & reminders"
-                    body="Templates — click tokens to insert."
+                    body="Templates: click tokens to insert."
                   />
                   <div className="mt-2.5 grid gap-2.5 lg:grid-cols-2">
                     <div>

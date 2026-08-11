@@ -46,6 +46,7 @@ const FIELD_KINDS: {
 export function PlaceFieldsClient({ id }: { id: string }) {
   const router = useRouter();
   const [req, setReq] = useState<SignatureRequest | null>(null);
+  const [hydrated, setHydrated] = useState(false);
   const [fields, setFields] = useState<SignatureField[]>([]);
   const [activeSignerId, setActiveSignerId] = useState<string>("");
   const [placeKind, setPlaceKind] = useState<SignatureFieldKind>("signature");
@@ -73,15 +74,18 @@ export function PlaceFieldsClient({ id }: { id: string }) {
     const live = getSignatureRequestById(id);
     if (!live) {
       setReq(null);
+      setHydrated(true);
       return;
     }
-    const normalized = ensureDefaultFields(live);
+    const normalized =
+      live.fields.length === 0 ? ensureDefaultFields(live) : live;
     if (live.fields.length === 0) {
       upsertSignatureRequest(normalized);
     }
     setReq(normalized);
     setFields(normalized.fields);
     setActiveSignerId(normalized.signers[0]?.id ?? "");
+    setHydrated(true);
   }, [id]);
 
   useEffect(() => {
@@ -204,6 +208,14 @@ export function PlaceFieldsClient({ id }: { id: string }) {
     markRequestSent(withFields, withFields.createdBy);
     flash("Sent to signers");
     router.push(`/documents/signature/${id}`);
+  }
+
+  if (!hydrated) {
+    return (
+      <div className="flex min-h-full items-center justify-center bg-slate-50 text-[13px] text-slate-400">
+        Loading…
+      </div>
+    );
   }
 
   if (!req) {

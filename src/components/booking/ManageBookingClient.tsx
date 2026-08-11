@@ -86,7 +86,7 @@ export function ManageBookingClient({
         <CheckCircle2 className="mb-3 h-12 w-12 text-emerald-500" />
         <h1 className="text-xl font-bold text-slate-900">Ready to reschedule</h1>
         <p className="mt-1 text-[13px] text-slate-500">
-          Your previous slot is released. Pick a new time — your details stay
+          Your previous slot is released. Pick a new time - your details stay
           filled in.
         </p>
         <Link

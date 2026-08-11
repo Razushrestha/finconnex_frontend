@@ -82,7 +82,7 @@ export function SignatureDetailClient({ id }: { id: string }) {
     );
     if (missing.length) {
       flash(`Place a signature field for ${missing[0].name} first`);
-      router.push(`/documents/signature/${id}/place`);
+      router.push(`/documents/signature/place/${id}`);
       return;
     }
     const sent = markRequestSent(req, req.createdBy);
@@ -259,7 +259,7 @@ export function SignatureDetailClient({ id }: { id: string }) {
                 <button
                   type="button"
                   onClick={() =>
-                    router.push(`/documents/signature/${id}/place`)
+                    router.push(`/documents/signature/place/${id}`)
                   }
                   className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 text-[11px] font-semibold text-violet-700"
                 >
@@ -441,7 +441,7 @@ export function SignatureDetailClient({ id }: { id: string }) {
                   </p>
                   {req.status === "Draft" ? (
                     <Link
-                      href={`/documents/signature/${id}/place`}
+                      href={`/documents/signature/place/${id}`}
                       className="text-[10px] font-semibold text-violet-600 hover:underline"
                     >
                       Edit field placement
@@ -465,7 +465,7 @@ export function SignatureDetailClient({ id }: { id: string }) {
                   <>
                     <ActionBtn
                       onClick={() =>
-                        router.push(`/documents/signature/${id}/place`)
+                        router.push(`/documents/signature/place/${id}`)
                       }
                       icon={LayoutTemplate}
                       label="Place / adjust fields"

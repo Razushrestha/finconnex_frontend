@@ -44,7 +44,9 @@ export function Field({
       </label>
       {children}
       {error ? (
-        <p className="text-[11px] font-medium text-rose-500">{error}</p>
+        <p data-field-error className="text-[11px] font-medium text-rose-500">
+          {error}
+        </p>
       ) : null}
     </div>
   );
@@ -194,9 +196,11 @@ export function CreateEntityFormShell({
             <Sparkles className="h-2.5 w-2.5" />
             {badge}
           </span>
-          <span className="hidden truncate text-[12px] text-slate-400 lg:inline">
-            · {cardDescription}
-          </span>
+          {cardDescription.trim() ? (
+            <span className="hidden truncate text-[12px] text-slate-400 lg:inline">
+              {cardDescription}
+            </span>
+          ) : null}
         </div>
 
         <div

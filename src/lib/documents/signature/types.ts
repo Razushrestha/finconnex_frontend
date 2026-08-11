@@ -188,6 +188,7 @@ function defaultFieldsForSigner(
 /** Normalize legacy single-signer records into multi-signer shape. */
 export function normalizeSignatureRequest(
   raw: SignatureRequest,
+  opts?: { allowEmptyFields?: boolean },
 ): SignatureRequest {
   const signers = raw.signers?.length
     ? raw.signers.map((s, i) => ({
@@ -219,9 +220,12 @@ export function normalizeSignatureRequest(
         }),
       ];
 
-  const fields =
-    raw.fields?.length > 0
-      ? raw.fields
+  const hasFields = Array.isArray(raw.fields) && raw.fields.length > 0;
+  const fields = hasFields
+    ? raw.fields
+    : opts?.allowEmptyFields ||
+        (raw.status === "Draft" && Array.isArray(raw.fields) && raw.fields.length === 0)
+      ? []
       : signers.flatMap((s) => defaultFieldsForSigner(s.id, s.order));
 
   const primary = signers[0];
@@ -523,7 +527,7 @@ function readStore(): SignatureRequest[] | null {
     const legacy = sessionStorage.getItem(LEGACY_STORE_KEY);
     if (legacy) {
       const parsed = JSON.parse(legacy) as SignatureRequest[];
-      const migrated = parsed.map(normalizeSignatureRequest);
+      const migrated = parsed.map((r) => normalizeSignatureRequest(r));
       sessionStorage.setItem(STORE_KEY, JSON.stringify(migrated));
       return migrated;
     }
@@ -540,14 +544,17 @@ function writeStore(list: SignatureRequest[]) {
 
 export function listSignatureRequests(): SignatureRequest[] {
   const stored = readStore();
-  if (stored) return stored.map(normalizeSignatureRequest);
+  if (stored) return stored.map((r) => normalizeSignatureRequest(r));
   const seeded = signatureRequests.map((r) => normalizeSignatureRequest({ ...r }));
   writeStore(seeded);
   return seeded;
 }
 
-export function upsertSignatureRequest(req: SignatureRequest) {
-  const normalized = normalizeSignatureRequest(req);
+export function upsertSignatureRequest(
+  req: SignatureRequest,
+  opts?: { allowEmptyFields?: boolean },
+) {
+  const normalized = normalizeSignatureRequest(req, opts);
   const list = listSignatureRequests();
   const i = list.findIndex((r) => r.id === normalized.id);
   if (i >= 0) list[i] = normalized;
