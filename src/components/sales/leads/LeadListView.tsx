@@ -168,7 +168,7 @@ function buildColumnRenderers(
             </p>
           </div>
         ) : (
-          <span className="text-[12px] text-slate-300">—</span>
+          <span className="text-[12px] text-slate-300" />
         ),
     },
     owner: {
@@ -226,7 +226,7 @@ function buildColumnRenderers(
             </div>
           </button>
         ) : (
-          <span className="text-[12px] text-slate-300">—</span>
+          <span className="text-[12px] text-slate-300" />
         );
       },
     },
@@ -252,7 +252,7 @@ function buildColumnRenderers(
             {vm.lastActivity.relativeTime}
           </button>
         ) : (
-          <span className="text-[12px] text-slate-300">—</span>
+          <span className="text-[12px] text-slate-300" />
         ),
     },
     actions: {
@@ -285,7 +285,7 @@ function buildColumnRenderers(
                     phone: lead.phone,
                   })
                 }
-                aria-label={`${QUICK_LABELS[action.kind]} — ${stateHint}${countHint}`}
+                aria-label={`${QUICK_LABELS[action.kind]}: ${stateHint}${countHint}`}
                 title={`${QUICK_LABELS[action.kind]} (${stateHint})`}
                 className={cn(
                   "relative flex h-7 w-7 items-center justify-center rounded-md transition-colors",

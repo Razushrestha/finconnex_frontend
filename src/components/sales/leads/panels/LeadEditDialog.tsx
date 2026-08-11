@@ -94,7 +94,7 @@ const MOCK_ASSOCIATED: AssociatedEntry[] = [
   {
     id: "assoc-1",
     type: "Deal",
-    label: "Refinance — 1204 Birch Ave",
+    label: "Refinance, 1204 Birch Ave",
     subtitle: "$340,000",
   },
   { id: "assoc-2", type: "Company", label: "Sugimoto Holdings LLC" },
@@ -241,7 +241,7 @@ function loadPreviousActions(leadName: string): ActionEntry[] {
             hour: "numeric",
             minute: "2-digit",
           })
-        : "—";
+        : "";
     return {
       id: c.id,
       title: c.title,
@@ -257,7 +257,7 @@ function loadPreviousActions(leadName: string): ActionEntry[] {
   return [
     {
       id: `action-1-${leadName}`,
-      title: "Outbound call — left voicemail",
+      title: "Outbound call, left voicemail",
       kind: "calls",
       whenLabel: "Jul 20, 2026 · 3:15 PM",
       bucket: "completed",

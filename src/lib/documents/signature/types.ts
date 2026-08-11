@@ -1,4 +1,4 @@
-/** SRS §9.3 E-Signature */
+/** SRS §9.3 E-Signature — multi-signer + field placement */
 
 export type SignatureStatus =
   | "Draft"
@@ -19,6 +19,21 @@ export const SIGNATURE_STATUSES: SignatureStatus[] = [
   "Cancelled",
 ];
 
+export type SignerRole = "Signer" | "Approver" | "CC";
+export type SignerStatus =
+  | "Pending"
+  | "Sent"
+  | "Viewed"
+  | "Signed"
+  | "Declined";
+export type SigningOrderMode = "sequential" | "parallel";
+export type SignatureFieldKind =
+  | "signature"
+  | "initials"
+  | "date"
+  | "name"
+  | "text";
+
 export interface SignatureAuditEvent {
   id: string;
   at: string;
@@ -27,15 +42,51 @@ export interface SignatureAuditEvent {
   ip?: string;
 }
 
+export interface SignatureSigner {
+  id: string;
+  name: string;
+  email: string;
+  /** 1-based signing order when sequential */
+  order: number;
+  role: SignerRole;
+  status: SignerStatus;
+  /** Unique public link token for this signer */
+  token: string;
+  signedAt?: string;
+  /** typed:… or data-URL */
+  signatureData?: string;
+  colorIndex: number;
+}
+
+export interface SignatureField {
+  id: string;
+  kind: SignatureFieldKind;
+  label: string;
+  /** Percent of preview width (0–100) */
+  x: number;
+  /** Percent of preview height (0–100) */
+  y: number;
+  w: number;
+  h: number;
+  page: number;
+  signerId: string;
+  required: boolean;
+  value?: string;
+}
+
 export interface SignatureRequest {
   id: string;
   signatureRequestId: string;
   documentName: string;
   documentFile: string;
+  /** @deprecated use signers[0] — kept for table/bridge compat */
   signer: string;
+  /** @deprecated use signers[0] */
   signerEmail: string;
+  signers: SignatureSigner[];
+  fields: SignatureField[];
+  signingOrder: SigningOrderMode;
   relatedTo?: string;
-  /** When created from a quotation (§13.3) */
   relatedQuotationId?: string;
   status: SignatureStatus;
   sentDate?: string;
@@ -43,22 +94,243 @@ export interface SignatureRequest {
   expiryDate: string;
   ipAddress?: string;
   createdBy: string;
+  /** Legacy primary token — mirrors first signer token */
   manageToken: string;
   audit: SignatureAuditEvent[];
-  /** typed name or data-URL from draw canvas */
+  /** @deprecated use signers[].signatureData */
   signatureData?: string;
 }
 
-const STORE_KEY = "signature:requests";
+const STORE_KEY = "signature:requests:v2";
+const LEGACY_STORE_KEY = "signature:requests";
+
+export const SIGNER_COLORS = [
+  {
+    bg: "bg-violet-100",
+    text: "text-violet-800",
+    border: "border-violet-400",
+    hex: "#7C3AED",
+  },
+  {
+    bg: "bg-sky-100",
+    text: "text-sky-800",
+    border: "border-sky-400",
+    hex: "#0284C7",
+  },
+  {
+    bg: "bg-amber-100",
+    text: "text-amber-900",
+    border: "border-amber-400",
+    hex: "#D97706",
+  },
+  {
+    bg: "bg-emerald-100",
+    text: "text-emerald-800",
+    border: "border-emerald-400",
+    hex: "#059669",
+  },
+  {
+    bg: "bg-rose-100",
+    text: "text-rose-800",
+    border: "border-rose-400",
+    hex: "#E11D48",
+  },
+] as const;
+
+function makeSigner(partial: {
+  id: string;
+  name: string;
+  email: string;
+  order: number;
+  token: string;
+  colorIndex?: number;
+  status?: SignerStatus;
+  role?: SignerRole;
+  signedAt?: string;
+  signatureData?: string;
+}): SignatureSigner {
+  return {
+    id: partial.id,
+    name: partial.name,
+    email: partial.email,
+    order: partial.order,
+    role: partial.role ?? "Signer",
+    status: partial.status ?? "Pending",
+    token: partial.token,
+    colorIndex:
+      partial.colorIndex ?? (partial.order - 1) % SIGNER_COLORS.length,
+    signedAt: partial.signedAt,
+    signatureData: partial.signatureData,
+  };
+}
+
+function defaultFieldsForSigner(
+  signerId: string,
+  order: number,
+): SignatureField[] {
+  const y = 62 + (order - 1) * 10;
+  return [
+    {
+      id: `fld-${signerId}-sig`,
+      kind: "signature",
+      label: "Signature",
+      x: 12,
+      y: Math.min(y, 88),
+      w: 36,
+      h: 7,
+      page: 1,
+      signerId,
+      required: true,
+    },
+  ];
+}
+
+/** Normalize legacy single-signer records into multi-signer shape. */
+export function normalizeSignatureRequest(
+  raw: SignatureRequest,
+): SignatureRequest {
+  const signers = raw.signers?.length
+    ? raw.signers.map((s, i) => ({
+        ...s,
+        order: s.order || i + 1,
+        colorIndex: s.colorIndex ?? i % SIGNER_COLORS.length,
+        role: s.role ?? ("Signer" as SignerRole),
+        status: s.status ?? ("Pending" as SignerStatus),
+      }))
+    : [
+        makeSigner({
+          id: `sg-${raw.id}-1`,
+          name: raw.signer,
+          email: raw.signerEmail,
+          order: 1,
+          token: raw.manageToken,
+          status:
+            raw.status === "Signed"
+              ? "Signed"
+              : raw.status === "Viewed"
+                ? "Viewed"
+                : raw.status === "Sent"
+                  ? "Sent"
+                  : raw.status === "Declined"
+                    ? "Declined"
+                    : "Pending",
+          signedAt: raw.signedDate,
+          signatureData: raw.signatureData,
+        }),
+      ];
+
+  const fields =
+    raw.fields?.length > 0
+      ? raw.fields
+      : signers.flatMap((s) => defaultFieldsForSigner(s.id, s.order));
+
+  const primary = signers[0];
+  return {
+    ...raw,
+    signers,
+    fields,
+    signingOrder: raw.signingOrder ?? "sequential",
+    signer: primary?.name ?? raw.signer,
+    signerEmail: primary?.email ?? raw.signerEmail,
+    manageToken: primary?.token ?? raw.manageToken,
+    signatureData: primary?.signatureData ?? raw.signatureData,
+  };
+}
+
+export function primarySignerLabel(req: SignatureRequest): string {
+  const n = normalizeSignatureRequest(req);
+  if (n.signers.length <= 1) return n.signer;
+  return `${n.signer} +${n.signers.length - 1}`;
+}
+
+export function signedCount(req: SignatureRequest): number {
+  return normalizeSignatureRequest(req).signers.filter(
+    (s) => s.status === "Signed",
+  ).length;
+}
+
+export function computeOverallStatus(req: SignatureRequest): SignatureStatus {
+  const n = normalizeSignatureRequest(req);
+  if (
+    n.status === "Cancelled" ||
+    n.status === "Expired" ||
+    n.status === "Draft"
+  ) {
+    return n.status;
+  }
+  const actionable = n.signers.filter((s) => s.role !== "CC");
+  if (actionable.some((s) => s.status === "Declined")) return "Declined";
+  if (actionable.length > 0 && actionable.every((s) => s.status === "Signed"))
+    return "Signed";
+  // In-progress: keep Viewed once anyone opens; otherwise Sent while awaiting.
+  if (actionable.some((s) => s.status === "Viewed" || s.status === "Signed"))
+    return "Viewed";
+  if (actionable.some((s) => s.status === "Sent")) return "Sent";
+  return n.status === "Sent" ? "Sent" : n.status;
+}
+
+export function getActiveSigner(
+  req: SignatureRequest,
+): SignatureSigner | null {
+  const n = normalizeSignatureRequest(req);
+  if (n.signingOrder === "parallel") {
+    return (
+      n.signers.find(
+        (s) =>
+          s.role !== "CC" &&
+          s.status !== "Signed" &&
+          s.status !== "Declined",
+      ) ?? null
+    );
+  }
+  const ordered = [...n.signers]
+    .filter((s) => s.role !== "CC")
+    .sort((a, b) => a.order - b.order);
+  return (
+    ordered.find((s) => s.status !== "Signed" && s.status !== "Declined") ??
+    null
+  );
+}
+
+export function canSignerAccess(
+  req: SignatureRequest,
+  signerId: string,
+): boolean {
+  const n = normalizeSignatureRequest(req);
+  if (
+    n.status === "Cancelled" ||
+    n.status === "Expired" ||
+    n.status === "Draft"
+  )
+    return false;
+  const signer = n.signers.find((s) => s.id === signerId);
+  if (!signer || signer.role === "CC") return false;
+  if (signer.status === "Signed") return true;
+  if (n.signingOrder === "parallel") return true;
+  const active = getActiveSigner(n);
+  return active?.id === signerId;
+}
 
 export const signatureRequests: SignatureRequest[] = [
-  {
+  normalizeSignatureRequest({
     id: "sr1",
     signatureRequestId: "ES-2001",
     documentName: "Engagement Letter: Anderson",
     documentFile: "Anderson_Engagement_Letter.pdf",
     signer: "William Anderson",
     signerEmail: "william@example.com",
+    signers: [
+      makeSigner({
+        id: "sg-sr1-1",
+        name: "William Anderson",
+        email: "william@example.com",
+        order: 1,
+        token: "sig-anderson-1",
+        status: "Sent",
+      }),
+    ],
+    fields: [],
+    signingOrder: "sequential",
     relatedTo: "Lead: William Anderson",
     status: "Sent",
     sentDate: "18/07/2026",
@@ -79,14 +351,39 @@ export const signatureRequests: SignatureRequest[] = [
         actor: "John Smith",
       },
     ],
-  },
-  {
+  }),
+  normalizeSignatureRequest({
     id: "sr2",
     signatureRequestId: "ES-2002",
     documentName: "Greystone Proposal Acceptance",
     documentFile: "Greystone_Proposal.pdf",
     signer: "Olivia Bennett",
     signerEmail: "olivia@northwind.com",
+    signers: [
+      makeSigner({
+        id: "sg-sr2-1",
+        name: "Olivia Bennett",
+        email: "olivia@northwind.com",
+        order: 1,
+        token: "sig-olivia-1",
+        status: "Signed",
+        signedAt: "12/07/2026",
+        signatureData: "typed:Olivia Bennett",
+      }),
+      makeSigner({
+        id: "sg-sr2-2",
+        name: "James Greystone",
+        email: "james@greystone.example",
+        order: 2,
+        token: "sig-james-1",
+        status: "Signed",
+        signedAt: "12/07/2026",
+        signatureData: "typed:James Greystone",
+        colorIndex: 1,
+      }),
+    ],
+    fields: [],
+    signingOrder: "sequential",
     relatedTo: "Deal: Greystone Realty",
     relatedQuotationId: "quo1",
     status: "Signed",
@@ -119,19 +416,38 @@ export const signatureRequests: SignatureRequest[] = [
       {
         id: "a4",
         at: "12/07/2026 14:05",
-        action: "Signed",
+        action: "Signed by Olivia Bennett",
         actor: "Olivia Bennett",
         ip: "203.0.113.42",
       },
+      {
+        id: "a5",
+        at: "12/07/2026 16:20",
+        action: "Signed by James Greystone",
+        actor: "James Greystone",
+        ip: "203.0.113.55",
+      },
     ],
-  },
-  {
+  }),
+  normalizeSignatureRequest({
     id: "sr-quo2",
     signatureRequestId: "ES-2004",
     documentName: "Engagement: Harbour packaging quotation",
     documentFile: "QUO-3102_Contract.pdf",
     signer: "Marcus Chen",
     signerEmail: "marcus@harbour.example",
+    signers: [
+      makeSigner({
+        id: "sg-quo2-1",
+        name: "Marcus Chen",
+        email: "marcus@harbour.example",
+        order: 1,
+        token: "sig-harbour-quo2",
+        status: "Sent",
+      }),
+    ],
+    fields: [],
+    signingOrder: "sequential",
     relatedTo: "Quotation: QUO-3102",
     relatedQuotationId: "quo2",
     status: "Sent",
@@ -153,14 +469,35 @@ export const signatureRequests: SignatureRequest[] = [
         actor: "Tejas Gokhe",
       },
     ],
-  },
-  {
+  }),
+  normalizeSignatureRequest({
     id: "sr3",
     signatureRequestId: "ES-2003",
     documentName: "NDA: Fabrikam",
     documentFile: "NDA_Fabrikam.pdf",
     signer: "Marcus Lin",
     signerEmail: "marcus@fabrikam.com",
+    signers: [
+      makeSigner({
+        id: "sg-sr3-1",
+        name: "Marcus Lin",
+        email: "marcus@fabrikam.com",
+        order: 1,
+        token: "sig-marcus-draft",
+        status: "Pending",
+      }),
+      makeSigner({
+        id: "sg-sr3-2",
+        name: "Priya Shah",
+        email: "priya@fabrikam.com",
+        order: 2,
+        token: "sig-priya-draft",
+        status: "Pending",
+        colorIndex: 1,
+      }),
+    ],
+    fields: [],
+    signingOrder: "sequential",
     relatedTo: "Company: Fabrikam Inc.",
     status: "Draft",
     expiryDate: "30/07/2026",
@@ -174,14 +511,23 @@ export const signatureRequests: SignatureRequest[] = [
         actor: "Roshna Abraham",
       },
     ],
-  },
+  }),
 ];
 
 function readStore(): SignatureRequest[] | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = sessionStorage.getItem(STORE_KEY);
-    return raw ? (JSON.parse(raw) as SignatureRequest[]) : null;
+    if (raw) return JSON.parse(raw) as SignatureRequest[];
+
+    const legacy = sessionStorage.getItem(LEGACY_STORE_KEY);
+    if (legacy) {
+      const parsed = JSON.parse(legacy) as SignatureRequest[];
+      const migrated = parsed.map(normalizeSignatureRequest);
+      sessionStorage.setItem(STORE_KEY, JSON.stringify(migrated));
+      return migrated;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -192,26 +538,41 @@ function writeStore(list: SignatureRequest[]) {
   sessionStorage.setItem(STORE_KEY, JSON.stringify(list));
 }
 
-/** Seed + any session mutations / newly created drafts */
 export function listSignatureRequests(): SignatureRequest[] {
-  return readStore() ?? signatureRequests.map((r) => ({ ...r }));
+  const stored = readStore();
+  if (stored) return stored.map(normalizeSignatureRequest);
+  const seeded = signatureRequests.map((r) => normalizeSignatureRequest({ ...r }));
+  writeStore(seeded);
+  return seeded;
 }
 
 export function upsertSignatureRequest(req: SignatureRequest) {
+  const normalized = normalizeSignatureRequest(req);
   const list = listSignatureRequests();
-  const i = list.findIndex((r) => r.id === req.id);
-  if (i >= 0) list[i] = req;
-  else list.unshift(req);
+  const i = list.findIndex((r) => r.id === normalized.id);
+  if (i >= 0) list[i] = normalized;
+  else list.unshift(normalized);
   writeStore(list);
-  return req;
+  return normalized;
 }
 
 export function getSignatureRequestById(id: string) {
   return listSignatureRequests().find((r) => r.id === id);
 }
 
-export function getSignatureByToken(token: string) {
-  return listSignatureRequests().find((r) => r.manageToken === token);
+/** Resolve by request manageToken OR any signer token. */
+export function getSignatureByToken(token: string): {
+  request: SignatureRequest;
+  signer: SignatureSigner;
+} | null {
+  for (const req of listSignatureRequests()) {
+    const signer = req.signers.find((s) => s.token === token);
+    if (signer) return { request: req, signer };
+    if (req.manageToken === token && req.signers[0]) {
+      return { request: req, signer: req.signers[0] };
+    }
+  }
+  return null;
 }
 
 export function nextSignatureIds() {
@@ -228,6 +589,237 @@ export function nextSignatureIds() {
   };
 }
 
+export function newSignerId() {
+  return `sg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+export function newSignerToken(name: string) {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 16);
+  return `sig-${slug || "signer"}-${Date.now().toString(36)}`;
+}
+
+export function buildSignersFromDraft(
+  rows: { name: string; email: string }[],
+): SignatureSigner[] {
+  return rows.map((row, i) =>
+    makeSigner({
+      id: newSignerId(),
+      name: row.name.trim(),
+      email: row.email.trim(),
+      order: i + 1,
+      token: newSignerToken(row.name),
+      colorIndex: i % SIGNER_COLORS.length,
+      status: "Pending",
+    }),
+  );
+}
+
+export function ensureDefaultFields(req: SignatureRequest): SignatureRequest {
+  const n = normalizeSignatureRequest(req);
+  if (n.fields.length > 0) return n;
+  return {
+    ...n,
+    fields: n.signers.flatMap((s) => defaultFieldsForSigner(s.id, s.order)),
+  };
+}
+
+export function markRequestSent(req: SignatureRequest, actor: string) {
+  const n = ensureDefaultFields(req);
+  const today = new Date().toLocaleDateString("en-AU");
+  const actionable = n.signers
+    .filter((s) => s.role !== "CC")
+    .sort((a, b) => a.order - b.order);
+
+  const nextActive =
+    n.signingOrder === "parallel"
+      ? null
+      : actionable.find(
+          (s) => s.status !== "Signed" && s.status !== "Declined",
+        ) ?? null;
+
+  const signers = n.signers.map((s) => {
+    if (s.role === "CC") return s;
+    if (s.status === "Signed" || s.status === "Declined") return s;
+    if (n.signingOrder === "parallel") {
+      return { ...s, status: "Sent" as SignerStatus };
+    }
+    if (nextActive && s.id === nextActive.id) {
+      return { ...s, status: "Sent" as SignerStatus };
+    }
+    return { ...s, status: "Pending" as SignerStatus };
+  });
+
+  const overall = computeOverallStatus({
+    ...n,
+    signers,
+    status: n.status === "Draft" ? "Sent" : n.status,
+  });
+
+  return upsertSignatureRequest({
+    ...n,
+    signers,
+    status: overall === "Signed" ? "Signed" : "Sent",
+    sentDate: n.sentDate ?? today,
+    signer: signers[0]?.name ?? n.signer,
+    signerEmail: signers[0]?.email ?? n.signerEmail,
+    manageToken: signers[0]?.token ?? n.manageToken,
+    audit: [
+      ...n.audit,
+      {
+        id: `a-send-${Date.now()}`,
+        at: formatAuditAt(),
+        action: `Sent for signature · ${actionable.length} signer(s)`,
+        actor,
+      },
+    ],
+  });
+}
+
+export function applySignerSignature(
+  req: SignatureRequest,
+  signerId: string,
+  signatureData: string,
+): SignatureRequest {
+  const n = normalizeSignatureRequest(req);
+  const today = new Date().toLocaleDateString("en-AU");
+  const signers = n.signers.map((s) => {
+    if (s.id !== signerId) return s;
+    return {
+      ...s,
+      status: "Signed" as SignerStatus,
+      signedAt: today,
+      signatureData,
+    };
+  });
+
+  let nextSigners = signers;
+  if (n.signingOrder === "sequential") {
+    const ordered = [...signers]
+      .filter((s) => s.role !== "CC")
+      .sort((a, b) => a.order - b.order);
+    const nextPending = ordered.find((s) => s.status === "Pending");
+    if (nextPending) {
+      nextSigners = signers.map((s) =>
+        s.id === nextPending.id ? { ...s, status: "Sent" as SignerStatus } : s,
+      );
+    }
+  }
+
+  const fields = n.fields.map((f) => {
+    if (f.signerId !== signerId) return f;
+    if (f.kind === "signature" || f.kind === "initials")
+      return { ...f, value: signatureData };
+    if (f.kind === "name")
+      return {
+        ...f,
+        value: signers.find((s) => s.id === signerId)?.name,
+      };
+    if (f.kind === "date") return { ...f, value: today };
+    return f;
+  });
+
+  const actor = signers.find((s) => s.id === signerId)?.name ?? "Signer";
+  const draft: SignatureRequest = {
+    ...n,
+    signers: nextSigners,
+    fields,
+    audit: [
+      ...n.audit,
+      {
+        id: `a-sign-${Date.now()}`,
+        at: formatAuditAt(),
+        action: `Signed by ${actor}`,
+        actor,
+        ip: DEMO_SIGNER_IP,
+      },
+    ],
+  };
+
+  const overall = computeOverallStatus(draft);
+  const primary = nextSigners[0];
+  return upsertSignatureRequest({
+    ...draft,
+    status: overall,
+    signedDate: overall === "Signed" ? today : draft.signedDate,
+    ipAddress: DEMO_SIGNER_IP,
+    signatureData: primary?.signatureData,
+    signer: primary?.name ?? draft.signer,
+    signerEmail: primary?.email ?? draft.signerEmail,
+  });
+}
+
+export function applySignerViewed(
+  req: SignatureRequest,
+  signerId: string,
+): SignatureRequest {
+  const n = normalizeSignatureRequest(req);
+  const signer = n.signers.find((s) => s.id === signerId);
+  if (!signer) return n;
+  if (
+    signer.status === "Signed" ||
+    signer.status === "Declined" ||
+    signer.status === "Viewed"
+  ) {
+    return n;
+  }
+
+  const signers = n.signers.map((s) =>
+    s.id === signerId ? { ...s, status: "Viewed" as SignerStatus } : s,
+  );
+  const draft: SignatureRequest = {
+    ...n,
+    signers,
+    audit: [
+      ...n.audit,
+      {
+        id: `a-view-${Date.now()}`,
+        at: formatAuditAt(),
+        action: `Viewed by ${signer.name}`,
+        actor: signer.name,
+        ip: DEMO_SIGNER_IP,
+      },
+    ],
+  };
+  return upsertSignatureRequest({
+    ...draft,
+    status: computeOverallStatus(draft),
+  });
+}
+
+export function applySignerDecline(
+  req: SignatureRequest,
+  signerId: string,
+): SignatureRequest {
+  const n = normalizeSignatureRequest(req);
+  const signer = n.signers.find((s) => s.id === signerId);
+  if (!signer) return n;
+  const signers = n.signers.map((s) =>
+    s.id === signerId ? { ...s, status: "Declined" as SignerStatus } : s,
+  );
+  const draft: SignatureRequest = {
+    ...n,
+    signers,
+    audit: [
+      ...n.audit,
+      {
+        id: `a-dec-${Date.now()}`,
+        at: formatAuditAt(),
+        action: `Declined by ${signer.name}`,
+        actor: signer.name,
+        ip: DEMO_SIGNER_IP,
+      },
+    ],
+  };
+  return upsertSignatureRequest({
+    ...draft,
+    status: "Declined",
+  });
+}
+
 export function formatAuditAt(d = new Date()) {
   return d.toLocaleString("en-AU", {
     day: "2-digit",
@@ -239,3 +831,18 @@ export function formatAuditAt(d = new Date()) {
 }
 
 export const DEMO_SIGNER_IP = "203.0.113.99";
+
+export function fieldKindLabel(kind: SignatureFieldKind): string {
+  switch (kind) {
+    case "signature":
+      return "Signature";
+    case "initials":
+      return "Initials";
+    case "date":
+      return "Date";
+    case "name":
+      return "Full name";
+    case "text":
+      return "Text";
+  }
+}

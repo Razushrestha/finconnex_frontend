@@ -165,7 +165,7 @@ export function DocumentRequestsList({
                     </span>
                   </td>
                   <td className="max-w-[160px] truncate border-b border-slate-100 px-4 py-3 text-slate-500">
-                    {r.relatedTo ?? <span className="text-slate-300">—</span>}
+                    {r.relatedTo || ""}
                   </td>
                   <td className="border-b border-slate-100 px-4 py-3 whitespace-nowrap text-slate-500">
                     <span className="inline-flex items-center gap-1.5">

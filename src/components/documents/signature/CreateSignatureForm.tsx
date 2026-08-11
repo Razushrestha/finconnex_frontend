@@ -10,6 +10,11 @@ import {
   Calendar,
   Mail,
   Sparkles,
+  Plus,
+  Trash2,
+  Users,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import {
   ACTIVITY_OWNERS,
@@ -25,15 +30,21 @@ import {
   elevatedSelectClass,
 } from "@/components/sales/CreateEntityForm";
 import {
+  buildSignersFromDraft,
+  ensureDefaultFields,
   formatAuditAt,
   nextSignatureIds,
   upsertSignatureRequest,
+  type SigningOrderMode,
 } from "@/lib/documents/signature/types";
+import { cn } from "@/lib/utils";
 
 interface Props {
   layoutId: string;
   redirect: boolean;
 }
+
+type SignerRow = { key: string; name: string; email: string };
 
 function formatExpiry(iso: string) {
   if (!iso) {
@@ -71,12 +82,21 @@ function SectionHeading({
   );
 }
 
+function newRow(): SignerRow {
+  return {
+    key: `row-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    name: "",
+    email: "",
+  };
+}
+
 export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
   const router = useRouter();
   const [documentName, setDocumentName] = useState("");
   const [documentFile, setDocumentFile] = useState("");
-  const [signer, setSigner] = useState("");
-  const [signerEmail, setSignerEmail] = useState("");
+  const [signers, setSigners] = useState<SignerRow[]>([newRow()]);
+  const [signingOrder, setSigningOrder] =
+    useState<SigningOrderMode>("sequential");
   const [relatedKind, setRelatedKind] = useState<RelatedEntityKind | "">("");
   const [relatedName, setRelatedName] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
@@ -95,13 +115,36 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
 
   const resolvedExpiry = formatExpiry(expiryDate);
 
+  function updateSigner(key: string, patch: Partial<SignerRow>) {
+    setSigners((prev) =>
+      prev.map((s) => (s.key === key ? { ...s, ...patch } : s)),
+    );
+  }
+
+  function moveSigner(index: number, dir: -1 | 1) {
+    setSigners((prev) => {
+      const next = [...prev];
+      const j = index + dir;
+      if (j < 0 || j >= next.length) return prev;
+      [next[index], next[j]] = [next[j], next[index]];
+      return next;
+    });
+  }
+
   function validate() {
     const next: Record<string, string> = {};
     if (!documentName.trim()) next.documentName = "Document name is required";
     if (!documentFile.trim()) next.documentFile = "Document file is required";
-    if (!signer.trim()) next.signer = "Signer is required";
-    if (!signerEmail.trim() || !signerEmail.includes("@"))
-      next.signerEmail = "Valid email required";
+    if (signers.length === 0) next.signers = "Add at least one signer";
+    signers.forEach((s, i) => {
+      if (!s.name.trim()) next[`signer-name-${i}`] = "Name required";
+      if (!s.email.trim() || !s.email.includes("@"))
+        next[`signer-email-${i}`] = "Valid email required";
+    });
+    const emails = signers.map((s) => s.email.trim().toLowerCase()).filter(Boolean);
+    if (new Set(emails).size !== emails.length) {
+      next.signers = "Each signer needs a unique email";
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -110,27 +153,36 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
     const ids = nextSignatureIds();
     const relatedTo =
       relatedKind && relatedName ? `${relatedKind}: ${relatedName}` : undefined;
-    return upsertSignatureRequest({
-      id: ids.id,
-      signatureRequestId: ids.signatureRequestId,
-      documentName: documentName.trim(),
-      documentFile: resolvedFileName,
-      signer: signer.trim(),
-      signerEmail: signerEmail.trim(),
-      relatedTo,
-      status: "Draft",
-      expiryDate: resolvedExpiry,
-      createdBy,
-      manageToken: ids.manageToken,
-      audit: [
-        {
-          id: `a-${Date.now()}`,
-          at: formatAuditAt(),
-          action: "Created",
-          actor: createdBy,
-        },
-      ],
-    });
+    const builtSigners = buildSignersFromDraft(
+      signers.map((s) => ({ name: s.name, email: s.email })),
+    );
+    const primary = builtSigners[0];
+    return upsertSignatureRequest(
+      ensureDefaultFields({
+        id: ids.id,
+        signatureRequestId: ids.signatureRequestId,
+        documentName: documentName.trim(),
+        documentFile: resolvedFileName,
+        signer: primary.name,
+        signerEmail: primary.email,
+        signers: builtSigners,
+        fields: [],
+        signingOrder,
+        relatedTo,
+        status: "Draft",
+        expiryDate: resolvedExpiry,
+        createdBy,
+        manageToken: primary.token,
+        audit: [
+          {
+            id: `a-${Date.now()}`,
+            at: formatAuditAt(),
+            action: `Created · ${builtSigners.length} signer(s)`,
+            actor: createdBy,
+          },
+        ],
+      }),
+    );
   }
 
   function onSave(createAnother: boolean) {
@@ -139,29 +191,29 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
     if (createAnother) {
       setDocumentName("");
       setDocumentFile("");
-      setSigner("");
-      setSignerEmail("");
+      setSigners([newRow()]);
+      setSigningOrder("sequential");
       setRelatedKind("");
       setRelatedName("");
       setExpiryDate("");
       setErrors({});
       return;
     }
-    router.push(`/documents/signature/${draft.id}`);
+    router.push(`/documents/signature/${draft.id}/place`);
   }
 
   return (
     <CreateEntityFormShell
       breadcrumbParent={{ label: "E-Signature", href: "/documents/signature" }}
-      badge="Native sign"
+      badge="Multi-signer"
       title="Create Signature Request"
-      subtitle="Upload a document and send it for signature without leaving FinConnex."
-      tip="Document name, file, and signer are required."
+      subtitle="Add signers, then place fields on the document before sending."
+      tip="Document and at least one signer are required. Next step places signature fields."
       cardIcon={PenLine}
       cardTitle="Signature request"
       cardDescription=""
       listHref="/documents/signature"
-      saveLabel="Save draft"
+      saveLabel="Continue to place fields"
       onSave={onSave}
     >
       <SectionHeading
@@ -212,33 +264,136 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
       </Field>
 
       <SectionHeading
-        icon={User}
-        title="Signer"
-        description="Who needs to sign this document"
+        icon={Users}
+        title="Signers"
+        description="Add everyone who must sign. Order applies when sequential"
       />
 
-      <Field label="Signer" required error={errors.signer}>
-        <InputShell icon={User} error={!!errors.signer}>
-          <input
-            value={signer}
-            onChange={(e) => setSigner(e.target.value)}
-            placeholder="Full name"
-            className={elevatedInputClass(true)}
-          />
-        </InputShell>
-      </Field>
+      <div className="col-span-full flex flex-wrap items-center gap-2">
+        <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
+          Signing order
+        </p>
+        <div className="inline-flex rounded-lg bg-slate-100 p-0.5">
+          {(
+            [
+              ["sequential", "One after another"],
+              ["parallel", "All at once"],
+            ] as const
+          ).map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setSigningOrder(mode)}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-[11px] font-semibold transition-colors",
+                signingOrder === mode
+                  ? "bg-white text-violet-700 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {errors.signers ? (
+          <p className="text-[12px] font-medium text-rose-600">
+            {errors.signers}
+          </p>
+        ) : null}
+      </div>
 
-      <Field label="Signer email" required error={errors.signerEmail}>
-        <InputShell icon={Mail} error={!!errors.signerEmail}>
-          <input
-            type="email"
-            value={signerEmail}
-            onChange={(e) => setSignerEmail(e.target.value)}
-            placeholder="signer@email.com"
-            className={elevatedInputClass(true)}
-          />
-        </InputShell>
-      </Field>
+      <div className="col-span-full space-y-2">
+        {signers.map((s, i) => (
+          <div
+            key={s.key}
+            className="grid gap-2 rounded-xl border border-slate-200/80 bg-slate-50/60 p-3 sm:grid-cols-[auto_1fr_1fr_auto]"
+          >
+            <div className="flex items-center gap-2 sm:flex-col sm:items-center sm:justify-center sm:gap-1">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-[11px] font-bold text-violet-700">
+                {i + 1}
+              </span>
+              {signingOrder === "sequential" && signers.length > 1 ? (
+                <div className="flex gap-0.5 sm:flex-col">
+                  <button
+                    type="button"
+                    disabled={i === 0}
+                    onClick={() => moveSigner(i, -1)}
+                    className="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700 disabled:opacity-30"
+                    aria-label="Move up"
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={i === signers.length - 1}
+                    onClick={() => moveSigner(i, 1)}
+                    className="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700 disabled:opacity-30"
+                    aria-label="Move down"
+                  >
+                    <ArrowDown className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : null}
+            </div>
+
+            <Field
+              label="Full name"
+              required
+              error={errors[`signer-name-${i}`]}
+            >
+              <InputShell icon={User} error={!!errors[`signer-name-${i}`]}>
+                <input
+                  value={s.name}
+                  onChange={(e) => updateSigner(s.key, { name: e.target.value })}
+                  placeholder="Full name"
+                  className={elevatedInputClass(true)}
+                />
+              </InputShell>
+            </Field>
+
+            <Field
+              label="Email"
+              required
+              error={errors[`signer-email-${i}`]}
+            >
+              <InputShell icon={Mail} error={!!errors[`signer-email-${i}`]}>
+                <input
+                  type="email"
+                  value={s.email}
+                  onChange={(e) =>
+                    updateSigner(s.key, { email: e.target.value })
+                  }
+                  placeholder="signer@email.com"
+                  className={elevatedInputClass(true)}
+                />
+              </InputShell>
+            </Field>
+
+            <div className="flex items-end justify-end pb-0.5">
+              <button
+                type="button"
+                disabled={signers.length <= 1}
+                onClick={() =>
+                  setSigners((prev) => prev.filter((x) => x.key !== s.key))
+                }
+                className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-30"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+
+        <button
+          type="button"
+          onClick={() => setSigners((prev) => [...prev, newRow()])}
+          className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-dashed border-violet-300 bg-violet-50/50 px-3 text-[12px] font-semibold text-violet-700 hover:bg-violet-50"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Add signer
+        </button>
+      </div>
 
       <SectionHeading
         icon={Calendar}
@@ -258,7 +413,7 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
         <p className="mt-1 text-[12px] text-slate-400">
           {expiryDate ? (
             <>
-              Signer has until{" "}
+              Signers have until{" "}
               <span className="font-medium text-slate-600">
                 {resolvedExpiry}
               </span>

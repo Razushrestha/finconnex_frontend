@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   getFormBySlug,
   processFormSubmission,
   visibleFields,
   type MarketingForm,
 } from "@/lib/marketing/forms/types";
+import { publicBookUrl } from "@/lib/booking/types";
 import { CheckCircle2, ClipboardList } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +17,10 @@ export function PublicFormClient({ slug }: { slug: string }) {
   const [hydrated, setHydrated] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
   const [thankYou, setThankYou] = useState<string | null>(null);
+  const [bookingCta, setBookingCta] = useState<{
+    slug: string;
+    label: string;
+  } | null>(null);
   const [recordRef, setRecordRef] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -70,6 +76,14 @@ export function PublicFormClient({ slug }: { slug: string }) {
             Routed as {form.destination}: {recordRef}
           </p>
         ) : null}
+        {bookingCta ? (
+          <Link
+            href={publicBookUrl(bookingCta.slug)}
+            className="mt-5 inline-flex h-10 items-center rounded-xl bg-violet-600 px-4 text-[12px] font-semibold text-white hover:bg-violet-700"
+          >
+            {bookingCta.label}
+          </Link>
+        ) : null}
       </div>
     );
   }
@@ -84,6 +98,12 @@ export function PublicFormClient({ slug }: { slug: string }) {
     setErrors({});
     setThankYou(out.result.thankYou);
     setRecordRef(out.result.submission.createdRecordRef);
+    if (out.result.bookingSlug) {
+      setBookingCta({
+        slug: out.result.bookingSlug,
+        label: out.result.bookingLabel || "Book a call",
+      });
+    }
   }
 
   return (

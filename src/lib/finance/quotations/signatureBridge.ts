@@ -1,8 +1,11 @@
 /** Quote ↔ §9.3 e-signature bridge for proposal-to-payment */
 
 import {
+  buildSignersFromDraft,
+  ensureDefaultFields,
   formatAuditAt,
   getSignatureRequestById,
+  markRequestSent,
   nextSignatureIds,
   upsertSignatureRequest,
   type SignatureRequest,
@@ -42,35 +45,38 @@ function createSignatureFromQuote(
   quote: Quotation,
   fresh: { id: string; signatureRequestId: string; manageToken: string },
 ): SignatureRequest {
-  return upsertSignatureRequest({
-    id: fresh.id,
-    signatureRequestId: fresh.signatureRequestId,
-    documentName: `Engagement: ${quote.title}`,
-    documentFile: `${quote.quotationId}_Contract.pdf`,
-    signer: quote.contactName,
-    signerEmail: quote.contactEmail,
-    relatedTo: `Quotation: ${quote.quotationId}`,
-    relatedQuotationId: quote.id,
-    status: "Sent",
-    sentDate: formatFinanceDate(),
-    expiryDate: quote.validUntil || expiryPlusDays(14),
-    createdBy: quote.owner,
-    manageToken: fresh.manageToken,
-    audit: [
-      {
-        id: `a-${Date.now()}`,
-        at: formatAuditAt(),
-        action: "Created from quotation",
-        actor: quote.owner,
-      },
-      {
-        id: `a-send-${Date.now()}`,
-        at: formatAuditAt(),
-        action: "Sent for signature",
-        actor: quote.owner,
-      },
-    ],
-  });
+  const signers = buildSignersFromDraft([
+    { name: quote.contactName, email: quote.contactEmail },
+  ]);
+  const primary = signers[0];
+  const draft = upsertSignatureRequest(
+    ensureDefaultFields({
+      id: fresh.id,
+      signatureRequestId: fresh.signatureRequestId,
+      documentName: `Engagement: ${quote.title}`,
+      documentFile: `${quote.quotationId}_Contract.pdf`,
+      signer: primary.name,
+      signerEmail: primary.email,
+      signers,
+      fields: [],
+      signingOrder: "sequential",
+      relatedTo: `Quotation: ${quote.quotationId}`,
+      relatedQuotationId: quote.id,
+      status: "Draft",
+      expiryDate: quote.validUntil || expiryPlusDays(14),
+      createdBy: quote.owner,
+      manageToken: primary.token,
+      audit: [
+        {
+          id: `a-${Date.now()}`,
+          at: formatAuditAt(),
+          action: "Created from quotation",
+          actor: quote.owner,
+        },
+      ],
+    }),
+  );
+  return markRequestSent(draft, quote.owner);
 }
 
 /** Create or resend a real §9.3 signature request from a quotation. */
@@ -84,24 +90,16 @@ export function sendQuotationContract(quote: Quotation): {
   if (quote.signatureRequestId) {
     const existing = getSignatureRequestById(quote.signatureRequestId);
     if (existing && existing.status !== "Signed") {
-      signature = upsertSignatureRequest({
-        ...existing,
-        status: "Sent",
-        sentDate: formatFinanceDate(),
-        signer: quote.contactName,
-        signerEmail: quote.contactEmail,
-        relatedTo: `Quotation: ${quote.quotationId}`,
-        relatedQuotationId: quote.id,
-        audit: [
-          ...existing.audit,
-          {
-            id: `a-resend-${Date.now()}`,
-            at: formatAuditAt(),
-            action: "Resent for signature",
-            actor: quote.owner,
-          },
-        ],
-      });
+      signature = markRequestSent(
+        {
+          ...existing,
+          signer: quote.contactName,
+          signerEmail: quote.contactEmail,
+          relatedTo: `Quotation: ${quote.quotationId}`,
+          relatedQuotationId: quote.id,
+        },
+        quote.owner,
+      );
     } else {
       signature = createSignatureFromQuote(quote, nextSignatureIds());
     }
@@ -109,12 +107,14 @@ export function sendQuotationContract(quote: Quotation): {
     signature = createSignatureFromQuote(quote, nextSignatureIds());
   }
 
+  const token = signature.signers[0]?.token ?? signature.manageToken;
+
   let quotation = appendQuotationAudit(
     {
       ...quote,
       signatureStatus: "Pending",
       signatureRequestId: signature.id,
-      signatureToken: signature.manageToken,
+      signatureToken: token,
       status: quote.status === "Draft" ? "Sent" : quote.status,
       sentAt: quote.sentAt ?? formatFinanceAt(),
     },
@@ -138,7 +138,7 @@ export function sendQuotationContract(quote: Quotation): {
   return {
     quotation,
     signature,
-    signUrl: publicSignPath(signature.manageToken),
+    signUrl: publicSignPath(token),
   };
 }
 

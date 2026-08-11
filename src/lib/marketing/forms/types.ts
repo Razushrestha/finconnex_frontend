@@ -88,6 +88,9 @@ export interface MarketingForm {
   embedSlug: string;
   description?: string;
   thankYouMessage?: string;
+  /** Optional public booking page slug shown after submit */
+  bookingSlug?: string;
+  bookingLabel?: string;
 }
 
 export interface FormSubmission {
@@ -194,6 +197,8 @@ export const marketingForms: MarketingForm[] = [
     embedSlug: "home-loan-lead",
     description: "Capture new mortgage enquiries from your website.",
     thankYouMessage: "Thanks: a broker will be in touch shortly.",
+    bookingSlug: "john-discovery",
+    bookingLabel: "Or book a discovery call now",
   },
   {
     id: "mf2",
@@ -416,6 +421,8 @@ export function journeyOptionsForForms() {
 export type ProcessResult = {
   submission: FormSubmission;
   thankYou: string;
+  bookingSlug?: string;
+  bookingLabel?: string;
 };
 
 /** Validate visible required fields, route into CRM, optional journey enroll. */
@@ -538,6 +545,8 @@ export function processFormSubmission(
       thankYou:
         form.thankYouMessage ||
         `Thanks: your ${form.destination.toLowerCase()} was created (${createdRecordRef}).`,
+      bookingSlug: form.bookingSlug,
+      bookingLabel: form.bookingLabel || "Book a call",
     },
   };
 }

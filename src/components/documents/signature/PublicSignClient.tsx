@@ -2,19 +2,25 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  applySignerDecline,
+  applySignerSignature,
+  applySignerViewed,
+  canSignerAccess,
   DEMO_SIGNER_IP,
-  formatAuditAt,
   getSignatureByToken,
-  upsertSignatureRequest,
+  type SignatureField,
   type SignatureRequest,
+  type SignatureSigner,
 } from "@/lib/documents/signature/types";
 import { syncQuotationFromSignature } from "@/lib/finance/quotations/signatureBridge";
 import { pushLibraryDoc } from "@/lib/documents/library/types";
-import { CheckCircle2, Eraser, PenLine } from "lucide-react";
+import { SignatureDocPreview } from "./SignatureDocPreview";
+import { CheckCircle2, Clock, Eraser, PenLine } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function PublicSignClient({ token }: { token: string }) {
   const [req, setReq] = useState<SignatureRequest | null>(null);
+  const [signer, setSigner] = useState<SignatureSigner | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [mode, setMode] = useState<"draw" | "type">("type");
   const [typed, setTyped] = useState("");
@@ -23,25 +29,33 @@ export function PublicSignClient({ token }: { token: string }) {
   const drawing = useRef(false);
 
   useEffect(() => {
-    let live = getSignatureByToken(token) ?? null;
-    if (live?.status === "Sent") {
-      live = {
-        ...live,
-        status: "Viewed",
-        audit: [
-          ...live.audit,
-          {
-            id: `a-view-${Date.now()}`,
-            at: formatAuditAt(),
-            action: "Viewed",
-            actor: live.signer,
-            ip: DEMO_SIGNER_IP,
-          },
-        ],
-      };
-      upsertSignatureRequest(live);
+    const hit = getSignatureByToken(token);
+    if (!hit) {
+      setReq(null);
+      setSigner(null);
+      setHydrated(true);
+      return;
     }
-    setReq(live);
+
+    let liveReq = hit.request;
+    let liveSigner = hit.signer;
+
+    if (
+      liveReq.status !== "Draft" &&
+      liveReq.status !== "Cancelled" &&
+      liveReq.status !== "Expired" &&
+      liveSigner.status !== "Signed" &&
+      liveSigner.status !== "Declined" &&
+      canSignerAccess(liveReq, liveSigner.id)
+    ) {
+      liveReq = applySignerViewed(liveReq, liveSigner.id);
+      liveSigner =
+        liveReq.signers.find((s) => s.id === liveSigner.id) ?? liveSigner;
+    }
+
+    setReq(liveReq);
+    setSigner(liveSigner);
+    setTyped(liveSigner.name);
     setHydrated(true);
   }, [token]);
 
@@ -105,9 +119,11 @@ export function PublicSignClient({ token }: { token: string }) {
     setHasInk(false);
   }
 
-  function persist(next: SignatureRequest) {
-    upsertSignatureRequest(next);
+  function afterPersist(next: SignatureRequest) {
     setReq(next);
+    const nextSigner =
+      next.signers.find((s) => s.id === signer?.id) ?? signer;
+    setSigner(nextSigner);
     if (next.status === "Signed" || next.status === "Declined") {
       syncQuotationFromSignature(next);
     }
@@ -138,49 +154,21 @@ export function PublicSignClient({ token }: { token: string }) {
   }
 
   function submit() {
-    if (!req) return;
+    if (!req || !signer) return;
     if (mode === "type" && !typed.trim()) return;
     if (mode === "draw" && !hasInk) return;
     const signatureData =
       mode === "type"
         ? `typed:${typed.trim()}`
         : (canvasRef.current?.toDataURL("image/png") ?? "");
-    const next: SignatureRequest = {
-      ...req,
-      status: "Signed",
-      signedDate: new Date().toLocaleDateString("en-AU"),
-      ipAddress: DEMO_SIGNER_IP,
-      signatureData,
-      audit: [
-        ...req.audit,
-        {
-          id: `a-sign-${Date.now()}`,
-          at: formatAuditAt(),
-          action: "Signed",
-          actor: req.signer,
-          ip: DEMO_SIGNER_IP,
-        },
-      ],
-    };
-    persist(next);
+    const next = applySignerSignature(req, signer.id, signatureData);
+    afterPersist(next);
   }
 
   function decline() {
-    if (!req) return;
-    persist({
-      ...req,
-      status: "Declined",
-      audit: [
-        ...req.audit,
-        {
-          id: `a-dec-${Date.now()}`,
-          at: formatAuditAt(),
-          action: "Declined",
-          actor: req.signer,
-          ip: DEMO_SIGNER_IP,
-        },
-      ],
-    });
+    if (!req || !signer) return;
+    const next = applySignerDecline(req, signer.id);
+    afterPersist(next);
   }
 
   if (!hydrated) {
@@ -191,7 +179,7 @@ export function PublicSignClient({ token }: { token: string }) {
     );
   }
 
-  if (!req) {
+  if (!req || !signer) {
     return (
       <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-4 text-center">
         <PenLine className="mb-3 h-10 w-10 text-slate-300" />
@@ -203,38 +191,14 @@ export function PublicSignClient({ token }: { token: string }) {
     );
   }
 
-  if (req.status === "Declined") {
+  if (req.status === "Draft") {
     return (
       <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-4 text-center">
-        <h1 className="text-xl font-bold text-slate-900">Declined</h1>
+        <Clock className="mb-3 h-10 w-10 text-slate-300" />
+        <h1 className="text-lg font-bold text-slate-900">Not sent yet</h1>
         <p className="mt-1 text-[13px] text-slate-500">
-          You declined to sign {req.documentName}.
+          This document has not been sent for signature.
         </p>
-      </div>
-    );
-  }
-
-  if (req.status === "Signed") {
-    return (
-      <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-4 text-center">
-        <CheckCircle2 className="mb-3 h-12 w-12 text-emerald-500" />
-        <h1 className="text-xl font-bold text-slate-900">Document signed</h1>
-        <p className="mt-1 text-[13px] text-slate-500">
-          {req.documentName}
-          <br />A copy has been recorded in FinConnex.
-        </p>
-        {req.signatureData?.startsWith("typed:") ? (
-          <p className="mt-4 font-serif text-2xl text-slate-800">
-            {req.signatureData.replace(/^typed:/, "")}
-          </p>
-        ) : req.signatureData?.startsWith("data:") ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={req.signatureData}
-            alt="Your signature"
-            className="mt-4 h-16 object-contain"
-          />
-        ) : null}
       </div>
     );
   }
@@ -252,8 +216,78 @@ export function PublicSignClient({ token }: { token: string }) {
     );
   }
 
-  const canSubmit =
-    mode === "type" ? typed.trim().length > 0 : hasInk;
+  if (signer.status === "Declined" || req.status === "Declined") {
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-4 text-center">
+        <h1 className="text-xl font-bold text-slate-900">Declined</h1>
+        <p className="mt-1 text-[13px] text-slate-500">
+          You declined to sign {req.documentName}.
+        </p>
+      </div>
+    );
+  }
+
+  if (signer.status === "Signed") {
+    const waitingOthers =
+      req.status !== "Signed" &&
+      req.signers.some(
+        (s) =>
+          s.role !== "CC" &&
+          s.id !== signer.id &&
+          s.status !== "Signed",
+      );
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-4 text-center">
+        <CheckCircle2 className="mb-3 h-12 w-12 text-emerald-500" />
+        <h1 className="text-xl font-bold text-slate-900">
+          {waitingOthers ? "You're done" : "Document signed"}
+        </h1>
+        <p className="mt-1 text-[13px] text-slate-500">
+          {req.documentName}
+          <br />
+          {waitingOthers
+            ? "Waiting for the remaining signers."
+            : "A copy has been recorded in FinConnex."}
+        </p>
+        {signer.signatureData?.startsWith("typed:") ? (
+          <p className="mt-4 font-serif text-2xl text-slate-800">
+            {signer.signatureData.replace(/^typed:/, "")}
+          </p>
+        ) : signer.signatureData?.startsWith("data:") ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={signer.signatureData}
+            alt="Your signature"
+            className="mt-4 h-16 object-contain"
+          />
+        ) : null}
+      </div>
+    );
+  }
+
+  if (!canSignerAccess(req, signer.id)) {
+    const earlier = [...req.signers]
+      .filter((s) => s.role !== "CC")
+      .sort((a, b) => a.order - b.order)
+      .find((s) => s.status !== "Signed" && s.status !== "Declined");
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-4 text-center">
+        <Clock className="mb-3 h-10 w-10 text-amber-400" />
+        <h1 className="text-lg font-bold text-slate-900">Not your turn yet</h1>
+        <p className="mt-1 text-[13px] text-slate-500">
+          This request uses sequential signing.
+          {earlier
+            ? ` Waiting for ${earlier.name} to sign first.`
+            : " Please check back later."}
+        </p>
+      </div>
+    );
+  }
+
+  const myFields: SignatureField[] = req.fields.filter(
+    (f) => f.signerId === signer.id,
+  );
+  const canSubmit = mode === "type" ? typed.trim().length > 0 : hasInk;
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-lg flex-col px-4 py-10">
@@ -266,27 +300,24 @@ export function PublicSignClient({ token }: { token: string }) {
         </h1>
         <p className="mt-1 text-[13px] text-slate-500">{req.documentName}</p>
         <p className="mt-0.5 text-[11px] text-slate-400">
-          Requested by {req.createdBy} · Expires {req.expiryDate}
+          Signing as {signer.name} · Requested by {req.createdBy} · Expires{" "}
+          {req.expiryDate}
         </p>
       </div>
 
-      <div className="mb-5 aspect-[3/4] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex h-full flex-col justify-between p-8">
-          <div className="space-y-2">
-            <div className="h-3 w-2/3 rounded bg-slate-200" />
-            <div className="h-2 w-full rounded bg-slate-100" />
-            <div className="h-2 w-full rounded bg-slate-100" />
-            <div className="h-2 w-5/6 rounded bg-slate-100" />
-            <p className="pt-4 text-[12px] font-medium text-slate-300">
-              {req.documentFile}
-            </p>
-          </div>
-          <div className="rounded-lg border border-dashed border-violet-300 bg-violet-50/50 px-3 py-4 text-center">
-            <p className="text-[11px] font-semibold text-violet-700">
-              Signature field
-            </p>
-          </div>
-        </div>
+      <div className="mb-5">
+        <SignatureDocPreview
+          fileName={req.documentFile}
+          fields={req.fields}
+          signers={req.signers}
+          highlightSignerId={signer.id}
+          className="shadow-sm"
+        />
+        {myFields.length ? (
+          <p className="mt-2 text-center text-[11px] text-slate-400">
+            Your fields are highlighted · {myFields.length} assigned to you
+          </p>
+        ) : null}
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">

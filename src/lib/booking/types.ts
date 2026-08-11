@@ -14,12 +14,42 @@ export type BookingStatus =
   | "Cancelled"
   | "Completed";
 
+/** Consultation sub-modes (shown when eventType is Consultation) */
+export type ConsultationMode =
+  | "one_to_one"
+  | "group"
+  | "collective"
+  | "resource";
+
+export type MeetingMode = "one_time" | "recurring";
+
+export type MeetingVia = "video" | "phone" | "in_person" | "custom";
+
 export const BOOKING_EVENT_TYPES: BookingEventType[] = [
   "Call",
   "Meeting",
   "Site Visit",
   "Consultation",
 ];
+
+export const CONSULTATION_MODES: ConsultationMode[] = [
+  "one_to_one",
+  "group",
+  "collective",
+  "resource",
+];
+
+export const MEETING_MODES: MeetingMode[] = ["one_time", "recurring"];
+
+export const MEETING_VIA_OPTIONS: MeetingVia[] = [
+  "video",
+  "phone",
+  "in_person",
+  "custom",
+];
+
+export const BOOKING_CURRENCIES = ["AUD", "USD", "NPR", "INR", "GBP"] as const;
+export type BookingCurrency = (typeof BOOKING_CURRENCIES)[number];
 
 export const WEEKDAYS = [
   "Monday",
@@ -65,8 +95,24 @@ export interface BookingPage {
   status: BookingPageStatus;
   views: number;
   bookingsCount: number;
-  cancelRate: number; // 0–100
+  cancelRate: number;
   createdAt: string;
+  /** Hours before start that guests can still book (default 2). */
+  minNoticeHours?: number;
+  /** How far ahead guests can book, in days (default 60). */
+  maxAdvanceDays?: number;
+  /** Consultation-only fields */
+  consultationMode?: ConsultationMode;
+  meetingMode?: MeetingMode;
+  coverImageUrl?: string;
+  price?: number;
+  currency?: BookingCurrency;
+  meetingVia?: MeetingVia;
+  meetingViaDetail?: string;
+  /** Group booking capacity */
+  maxAttendees?: number;
+  /** Assigned consultant name(s). One for most modes; many for collective. */
+  consultants?: string[];
 }
 
 export interface Booking {
@@ -77,14 +123,26 @@ export interface Booking {
   guestName: string;
   guestEmail: string;
   guestPhone?: string;
-  start: string; // ISO-ish local
+  start: string;
   end: string;
   answers: Record<string, string>;
   status: BookingStatus;
   manageToken: string;
   createdLead?: boolean;
   meetingId?: string;
+  leadId?: string;
+  contactId?: string;
+  confirmationMessage?: string;
+  reminderMessage?: string;
+  confirmationSentAt?: string;
+  reminderQueuedAt?: string;
+  cancelledAt?: string;
+  createdAt?: string;
+  /** When this booking replaced an earlier slot (same manage token). */
+  rescheduledFrom?: string;
 }
+
+const STORE_KEY = "booking:pages:v2";
 
 const defaultAvailability = (): AvailabilityRule[] =>
   WEEKDAYS.map((day) => ({
@@ -93,6 +151,163 @@ const defaultAvailability = (): AvailabilityRule[] =>
     start: "09:00",
     end: "17:00",
   }));
+
+export const CONSULTATION_MODE_META: Record<
+  ConsultationMode,
+  {
+    title: string;
+    description: string;
+    showFrequency: boolean;
+    multiConsultant: boolean;
+  }
+> = {
+  one_to_one: {
+    title: "One-to-One",
+    description:
+      "Ideal for support calls, client meetings, and any one-to-one meetings",
+    showFrequency: true,
+    multiConsultant: false,
+  },
+  group: {
+    title: "Group Booking",
+    description: "Ideal for workshops, webinars, and classes",
+    showFrequency: true,
+    multiConsultant: false,
+  },
+  collective: {
+    title: "Collective Booking",
+    description:
+      "Ideal for panel interviews, board meetings, and any many-to-one meetings.",
+    showFrequency: false,
+    multiConsultant: true,
+  },
+  resource: {
+    title: "Resource",
+    description: "Ideal for conference room bookings and equipment rentals",
+    showFrequency: false,
+    multiConsultant: false,
+  },
+};
+
+/** People available to assign on consultation booking pages */
+export interface BookingConsultant {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+}
+
+export const BOOKING_CONSULTANTS: BookingConsultant[] = [
+  {
+    id: "c-john",
+    name: "John Smith",
+    role: "Senior Consultant",
+    email: "john.smith@finconnex.com",
+  },
+  {
+    id: "c-shiva",
+    name: "Shiva Kadhka",
+    role: "Mortgage Specialist",
+    email: "shiva.kadhka@finconnex.com",
+  },
+  {
+    id: "c-tejas",
+    name: "Tejas Gokhe",
+    role: "Product Consultant",
+    email: "tejas.gokhe@finconnex.com",
+  },
+  {
+    id: "c-roshna",
+    name: "Roshna Abraham",
+    role: "Client Success",
+    email: "roshna.abraham@finconnex.com",
+  },
+  {
+    id: "c-priya",
+    name: "Priya Shah",
+    role: "Lending Advisor",
+    email: "priya.shah@finconnex.com",
+  },
+  {
+    id: "c-marcus",
+    name: "Marcus Chen",
+    role: "Relationship Manager",
+    email: "marcus.chen@finconnex.com",
+  },
+];
+
+export function consultantsAllowMultiple(mode?: ConsultationMode) {
+  if (!mode) return false;
+  return CONSULTATION_MODE_META[mode].multiConsultant;
+}
+
+export function consultationModeLabel(mode?: ConsultationMode) {
+  if (!mode) return "";
+  return CONSULTATION_MODE_META[mode].title;
+}
+
+export function meetingModeLabel(mode?: MeetingMode) {
+  if (mode === "recurring") return "Recurring";
+  if (mode === "one_time") return "One Time";
+  return "";
+}
+
+export function meetingViaLabel(via?: MeetingVia) {
+  switch (via) {
+    case "video":
+      return "Video";
+    case "phone":
+      return "Phone";
+    case "in_person":
+      return "In person";
+    case "custom":
+      return "Custom";
+    default:
+      return "";
+  }
+}
+
+export function formatBookingPrice(
+  price?: number,
+  currency: BookingCurrency = "AUD",
+) {
+  if (price == null || price <= 0) return "Free";
+  try {
+    return new Intl.NumberFormat("en-AU", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    }).format(price);
+  } catch {
+    return `${currency} ${price}`;
+  }
+}
+
+/** Keep legacy location/videoLink in sync with Meeting via. */
+export function applyMeetingViaToLegacy(page: BookingPage): BookingPage {
+  if (page.eventType !== "Consultation" || !page.meetingVia) return page;
+  const detail = page.meetingViaDetail?.trim() || undefined;
+  switch (page.meetingVia) {
+    case "video":
+      return { ...page, videoLink: detail, location: undefined };
+    case "in_person":
+      return { ...page, location: detail, videoLink: undefined };
+    case "phone":
+      return {
+        ...page,
+        location: detail ? `Phone: ${detail}` : "Phone",
+        videoLink: undefined,
+      };
+    case "custom":
+      return {
+        ...page,
+        location: detail,
+        videoLink: undefined,
+      };
+    default:
+      return page;
+  }
+}
 
 export const bookingPages: BookingPage[] = [
   {
@@ -161,9 +376,7 @@ export const bookingPages: BookingPage[] = [
     availability: defaultAvailability().map((r) =>
       r.day === "Friday" ? { ...r, enabled: false } : r,
     ),
-    questions: [
-      { id: "q1", label: "Parking needed?", required: false },
-    ],
+    questions: [{ id: "q1", label: "Parking needed?", required: false }],
     confirmationTemplate:
       "Hi {{name}}, your site visit is confirmed for {{datetime}} at {{location}}.",
     reminderTemplate: "Site visit tomorrow: see you at Market St.",
@@ -179,10 +392,19 @@ export const bookingPages: BookingPage[] = [
     slug: "shiva-consult",
     owner: "Shiva Kadhka",
     eventType: "Consultation",
+    consultationMode: "one_to_one",
+    meetingMode: "one_time",
     durationMinutes: 30,
     bufferMinutes: 5,
     timezone: "Australia/Sydney",
     videoLink: "https://meet.google.com/fin-consult",
+    meetingVia: "video",
+    meetingViaDetail: "https://meet.google.com/fin-consult",
+    consultants: ["Shiva Kadhka"],
+    coverImageUrl:
+      "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&q=80",
+    price: 0,
+    currency: "AUD",
     description: "One-to-one advice on product fit and next steps.",
     availability: defaultAvailability(),
     questions: [
@@ -264,16 +486,177 @@ export const bookings: Booking[] = [
   },
 ];
 
+function readStore(): BookingPage[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(STORE_KEY);
+    return raw ? (JSON.parse(raw) as BookingPage[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStore(list: BookingPage[]) {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(STORE_KEY, JSON.stringify(list));
+}
+
+export function listBookingPages(): BookingPage[] {
+  const stored = readStore();
+  if (stored) return stored;
+  const seeded = bookingPages.map((p) => ({ ...p }));
+  writeStore(seeded);
+  return seeded;
+}
+
+export function upsertBookingPage(page: BookingPage) {
+  const normalized = applyMeetingViaToLegacy(page);
+  const list = listBookingPages();
+  const i = list.findIndex((p) => p.id === normalized.id);
+  if (i >= 0) list[i] = normalized;
+  else list.unshift(normalized);
+  writeStore(list);
+  return normalized;
+}
+
 export function getBookingPageBySlug(slug: string) {
+  if (typeof window !== "undefined") {
+    return listBookingPages().find((p) => p.slug === slug);
+  }
   return bookingPages.find((p) => p.slug === slug);
 }
 
 export function getBookingPageById(id: string) {
+  if (typeof window !== "undefined") {
+    return listBookingPages().find((p) => p.id === id);
+  }
   return bookingPages.find((p) => p.id === id);
 }
 
+const BOOKINGS_STORE_KEY = "booking:appointments:v1";
+
+function readBookingsStore(): Booking[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(BOOKINGS_STORE_KEY);
+    return raw ? (JSON.parse(raw) as Booking[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeBookingsStore(list: Booking[]) {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(BOOKINGS_STORE_KEY, JSON.stringify(list));
+}
+
+function migrateLegacyBookingTokens(list: Booking[]): Booking[] {
+  if (typeof window === "undefined") return list;
+  const next = [...list];
+  try {
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (!key?.startsWith("booking:tok-") && !key?.startsWith("booking:tok"))
+        continue;
+      // legacy keys look like booking:${token}
+    }
+    const keys: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith("booking:") && key !== STORE_KEY && key !== BOOKINGS_STORE_KEY) {
+        keys.push(key);
+      }
+    }
+    for (const key of keys) {
+      const token = key.slice("booking:".length);
+      if (!token || next.some((b) => b.manageToken === token)) continue;
+      try {
+        const raw = sessionStorage.getItem(key);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw) as Booking;
+        if (parsed?.manageToken) next.push(parsed);
+      } catch {
+        /* ignore */
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return next;
+}
+
+export function listBookings(): Booking[] {
+  const stored = readBookingsStore();
+  if (stored) {
+    const migrated = migrateLegacyBookingTokens(stored);
+    if (migrated.length !== stored.length) writeBookingsStore(migrated);
+    return migrated;
+  }
+  const seeded = bookings.map((b) => ({ ...b }));
+  const withLegacy = migrateLegacyBookingTokens(seeded);
+  writeBookingsStore(withLegacy);
+  return withLegacy;
+}
+
+export function upsertBooking(booking: Booking) {
+  const list = listBookings();
+  const i = list.findIndex(
+    (b) => b.id === booking.id || b.manageToken === booking.manageToken,
+  );
+  if (i >= 0) list[i] = booking;
+  else list.unshift(booking);
+  writeBookingsStore(list);
+  try {
+    sessionStorage.setItem(
+      `booking:${booking.manageToken}`,
+      JSON.stringify(booking),
+    );
+  } catch {
+    /* ignore */
+  }
+  return booking;
+}
+
 export function getBookingByToken(token: string) {
+  if (typeof window !== "undefined") {
+    const fromList = listBookings().find((b) => b.manageToken === token);
+    if (fromList) return fromList;
+    try {
+      const raw = sessionStorage.getItem(`booking:${token}`);
+      if (raw) return JSON.parse(raw) as Booking;
+    } catch {
+      /* ignore */
+    }
+  }
   return bookings.find((b) => b.manageToken === token);
+}
+
+export function getBookingsForPage(pageId: string) {
+  return listBookings().filter((b) => b.pageId === pageId);
+}
+
+export function recomputePageStats(pageId: string) {
+  const page = getBookingPageById(pageId);
+  if (!page) return;
+  const pageBooks = getBookingsForPage(pageId);
+  const active = pageBooks.filter(
+    (b) => b.status === "Confirmed" || b.status === "Completed",
+  );
+  const cancelled = pageBooks.filter((b) => b.status === "Cancelled").length;
+  upsertBookingPage({
+    ...page,
+    bookingsCount: Math.max(active.length, page.bookingsCount),
+    cancelRate:
+      pageBooks.length === 0
+        ? 0
+        : Math.round((cancelled / pageBooks.length) * 100),
+  });
+}
+
+export function recordBookingPageView(pageId: string) {
+  const page = getBookingPageById(pageId);
+  if (!page) return;
+  upsertBookingPage({ ...page, views: (page.views ?? 0) + 1 });
 }
 
 export function publicBookUrl(slug: string) {
@@ -284,14 +667,90 @@ export function publicManageUrl(slug: string, token: string) {
   return `/book/${slug}/manage/${token}`;
 }
 
-/** Generate simple slot labels for a given date from availability rules */
+export function publicRescheduleUrl(slug: string, token: string) {
+  return `/book/${slug}?reschedule=${encodeURIComponent(token)}`;
+}
+
+export function nextBookingPageId() {
+  return `bp-${Date.now()}`;
+}
+
+export function nextBookingId() {
+  return `bk-${Date.now().toString(36)}`;
+}
+
+export function nextManageToken() {
+  return `tok-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+export function toLocalDateStr(date: Date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export function parseLocalDateTime(iso: string) {
+  const normalized = iso.includes("T") ? iso : `${iso}T00:00:00`;
+  const [datePart, timePart = "00:00"] = normalized.split("T");
+  const [y, mo, d] = datePart.split("-").map(Number);
+  const [h, mi] = timePart.split(":").map(Number);
+  return new Date(y, mo - 1, d, h || 0, mi || 0, 0, 0);
+}
+
+function rangesOverlap(
+  aStart: number,
+  aEnd: number,
+  bStart: number,
+  bEnd: number,
+) {
+  return aStart < bEnd && bStart < aEnd;
+}
+
+export function activeBookingsForSlot(
+  pageId: string,
+  startIso: string,
+  endIso: string,
+  excludeToken?: string,
+) {
+  const startMs = parseLocalDateTime(startIso).getTime();
+  const endMs = parseLocalDateTime(endIso).getTime();
+  return listBookings().filter((b) => {
+    if (b.pageId !== pageId) return false;
+    if (excludeToken && b.manageToken === excludeToken) return false;
+    if (b.status === "Cancelled") return false;
+    if (b.status === "Rescheduled") return false;
+    if (b.status !== "Confirmed" && b.status !== "Completed") return false;
+    const bStart = parseLocalDateTime(b.start).getTime();
+    const bEnd = parseLocalDateTime(b.end).getTime();
+    return rangesOverlap(startMs, endMs, bStart, bEnd);
+  });
+}
+
+/** Generate slot labels for a date from availability, conflicts, notice & horizon. */
 export function slotsForDate(
   page: BookingPage,
   date: Date,
+  opts?: { now?: Date; excludeToken?: string },
 ): { start: string; label: string }[] {
-  const dayName = WEEKDAYS[(date.getDay() + 6) % 7]; // Mon=0 in WEEKDAYS
+  const dayName = WEEKDAYS[(date.getDay() + 6) % 7];
   const rule = page.availability.find((a) => a.day === dayName);
   if (!rule?.enabled) return [];
+
+  const now = opts?.now ?? new Date();
+  const minNoticeHours = page.minNoticeHours ?? 2;
+  const maxAdvanceDays = page.maxAdvanceDays ?? 60;
+  const dateStr = toLocalDateStr(date);
+  const todayStr = toLocalDateStr(now);
+
+  if (dateStr < todayStr) return [];
+
+  const horizon = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + maxAdvanceDays,
+  );
+  if (date > horizon) return [];
 
   const [sh, sm] = rule.start.split(":").map(Number);
   const [eh, em] = rule.end.split(":").map(Number);
@@ -299,12 +758,33 @@ export function slotsForDate(
   const endMins = eh * 60 + em;
   const step = page.durationMinutes + page.bufferMinutes;
   const slots: { start: string; label: string }[] = [];
+  const isGroup =
+    page.eventType === "Consultation" && page.consultationMode === "group";
+  const capacity = isGroup ? page.maxAttendees ?? 20 : 1;
 
   for (let m = startMins; m + page.durationMinutes <= endMins; m += step) {
     const h = Math.floor(m / 60);
     const min = m % 60;
     const hh = String(h).padStart(2, "0");
     const mm = String(min).padStart(2, "0");
+    const startIso = `${dateStr}T${hh}:${mm}`;
+    const endTotal = m + page.durationMinutes;
+    const endH = String(Math.floor(endTotal / 60)).padStart(2, "0");
+    const endM = String(endTotal % 60).padStart(2, "0");
+    const endIso = `${dateStr}T${endH}:${endM}`;
+
+    const slotStart = parseLocalDateTime(startIso);
+    const earliest = new Date(now.getTime() + minNoticeHours * 60 * 60 * 1000);
+    if (slotStart < earliest) continue;
+
+    const conflicts = activeBookingsForSlot(
+      page.id,
+      startIso,
+      endIso,
+      opts?.excludeToken,
+    );
+    if (conflicts.length >= capacity) continue;
+
     const ampm = h >= 12 ? "PM" : "AM";
     const h12 = h % 12 || 12;
     slots.push({
@@ -315,8 +795,137 @@ export function slotsForDate(
   return slots;
 }
 
+export function renderBookingTemplate(
+  template: string,
+  tokens: { name: string; datetime: string; location: string },
+) {
+  return template
+    .replace(/\{\{name\}\}/gi, tokens.name)
+    .replace(/\{\{datetime\}\}/gi, tokens.datetime)
+    .replace(/\{\{location\}\}/gi, tokens.location);
+}
+
+export function bookingLocationLabel(page: BookingPage) {
+  if (page.eventType === "Consultation" && page.meetingVia) {
+    const via = meetingViaLabel(page.meetingVia);
+    return page.meetingViaDetail
+      ? `${via} · ${page.meetingViaDetail}`
+      : via || "Meeting";
+  }
+  return page.videoLink || page.location || "Video call";
+}
+
+export function bookingEmbedSnippet(slug: string, title?: string) {
+  const href = publicBookUrl(slug);
+  const label = title ? `Book: ${title}` : "Book a meeting";
+  return `<a href="${href}" target="_blank" rel="noopener">${label}</a>`;
+}
+
+export function bookingIframeSnippet(slug: string) {
+  const href = publicBookUrl(slug);
+  return `<iframe src="${href}" style="width:100%;min-height:720px;border:0;border-radius:12px;" title="Book a meeting"></iframe>`;
+}
+
+function toUtcStamp(isoLocal: string) {
+  const d = parseLocalDateTime(isoLocal);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    d.getUTCFullYear() +
+    pad(d.getUTCMonth() + 1) +
+    pad(d.getUTCDate()) +
+    "T" +
+    pad(d.getUTCHours()) +
+    pad(d.getUTCMinutes()) +
+    pad(d.getUTCSeconds()) +
+    "Z"
+  );
+}
+
+export function buildBookingIcs(input: {
+  title: string;
+  description: string;
+  location: string;
+  start: string;
+  end: string;
+  guestEmail: string;
+}) {
+  const uid = `${Date.now()}@finconnex.booking`;
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//FinConnex//Booking//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${uid}`,
+    `DTSTAMP:${toUtcStamp(input.start)}`,
+    `DTSTART:${toUtcStamp(input.start)}`,
+    `DTEND:${toUtcStamp(input.end)}`,
+    `SUMMARY:${escapeIcs(input.title)}`,
+    `DESCRIPTION:${escapeIcs(input.description)}`,
+    `LOCATION:${escapeIcs(input.location)}`,
+    `ATTENDEE:MAILTO:${input.guestEmail}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ];
+  return lines.join("\r\n");
+}
+
+function escapeIcs(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+}
+
+export function googleCalendarUrl(input: {
+  title: string;
+  details: string;
+  location: string;
+  start: string;
+  end: string;
+}) {
+  const start = toUtcStamp(input.start);
+  const end = toUtcStamp(input.end);
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: input.title,
+    details: input.details,
+    location: input.location,
+    dates: `${start}/${end}`,
+  });
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+export function outlookCalendarUrl(input: {
+  title: string;
+  details: string;
+  location: string;
+  start: string;
+  end: string;
+}) {
+  const params = new URLSearchParams({
+    path: "/calendar/action/compose",
+    rru: "addevent",
+    subject: input.title,
+    body: input.details,
+    location: input.location,
+    startdt: parseLocalDateTime(input.start).toISOString(),
+    enddt: parseLocalDateTime(input.end).toISOString(),
+  });
+  return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`;
+}
+
+export function downloadBookingIcs(filename: string, ics: string) {
+  if (typeof window === "undefined") return;
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function formatBookingWhen(start: string, end: string) {
-  const d = new Date(start.includes("T") ? start : start + "T12:00:00");
+  const d = parseLocalDateTime(start);
   const date = d.toLocaleDateString("en-AU", {
     weekday: "short",
     day: "numeric",

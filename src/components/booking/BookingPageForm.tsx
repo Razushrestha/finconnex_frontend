@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -24,17 +24,31 @@ import {
   Building2,
   Sparkles,
   Globe,
+  DollarSign,
 } from "lucide-react";
 import {
   BOOKING_EVENT_TYPES,
   WEEKDAYS,
+  consultationModeLabel,
+  formatBookingPrice,
+  getBookingPageById,
+  meetingModeLabel,
+  meetingViaLabel,
+  nextBookingPageId,
+  upsertBookingPage,
+  bookingEmbedSnippet,
+  bookingIframeSnippet,
+  type BookingCurrency,
   type BookingEventType,
   type BookingPage,
   type BookingPageStatus,
   type AvailabilityRule,
   type BookingQuestion,
+  type ConsultationMode,
+  type MeetingMode,
+  type MeetingVia,
 } from "@/lib/booking/types";
-import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import { ACTIVITY_OWNERS, avatarColor, initials } from "@/lib/activities/shared";
 import {
   Field,
   InputShell,
@@ -43,16 +57,23 @@ import {
   elevatedSelectClass,
   elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
+import {
+  ConsultationSetup,
+  type ConsultationSetupValue,
+} from "@/components/booking/ConsultationSetup";
 import { cn } from "@/lib/utils";
 
 interface BookingPageFormProps {
   layoutId: string;
   redirect: boolean;
   initial?: BookingPage;
+  pageId?: string;
 }
 
 const DURATION_PRESETS = [15, 30, 45, 60, 90];
 const BUFFER_PRESETS = [0, 5, 10, 15, 30];
+const NOTICE_PRESETS = [0, 1, 2, 4, 12, 24];
+const ADVANCE_PRESETS = [7, 14, 30, 60, 90];
 
 const EVENT_META: Record<
   BookingEventType,
@@ -78,7 +99,7 @@ const EVENT_META: Record<
   },
   Consultation: {
     icon: Sparkles,
-    hint: "Advisory session",
+    hint: "Pick mode below",
     soft: "bg-emerald-50",
     text: "text-emerald-700",
   },
@@ -107,9 +128,11 @@ export function BookingPageForm({
   layoutId: _layoutId,
   redirect: _redirect,
   initial,
+  pageId: pageIdProp,
 }: BookingPageFormProps) {
   const router = useRouter();
-  const isEdit = Boolean(initial);
+  const [pageId] = useState(pageIdProp ?? initial?.id ?? nextBookingPageId());
+  const isEdit = Boolean(initial || pageIdProp);
 
   const [title, setTitle] = useState(initial?.title ?? "");
   const [slug, setSlug] = useState(initial?.slug ?? "");
@@ -118,11 +141,46 @@ export function BookingPageForm({
   const [eventType, setEventType] = useState<BookingEventType>(
     initial?.eventType ?? "Call",
   );
+  const [consultationMode, setConsultationMode] = useState<
+    ConsultationMode | ""
+  >(initial?.consultationMode ?? "");
+  const [meetingMode, setMeetingMode] = useState<MeetingMode>(
+    initial?.meetingMode ?? "one_time",
+  );
+  const [coverImageUrl, setCoverImageUrl] = useState(
+    initial?.coverImageUrl ?? "",
+  );
+  const [price, setPrice] = useState(initial?.price ?? 0);
+  const [currency, setCurrency] = useState<BookingCurrency>(
+    initial?.currency ?? "AUD",
+  );
+  const [isFree, setIsFree] = useState(
+    initial?.price == null || initial.price <= 0,
+  );
+  const [meetingVia, setMeetingVia] = useState<MeetingVia>(
+    initial?.meetingVia ?? "video",
+  );
+  const [meetingViaDetail, setMeetingViaDetail] = useState(
+    initial?.meetingViaDetail ?? initial?.videoLink ?? initial?.location ?? "",
+  );
+  const [maxAttendees, setMaxAttendees] = useState(
+    initial?.maxAttendees ?? 10,
+  );
+  const [consultants, setConsultants] = useState<string[]>(
+    initial?.consultants ??
+      (initial?.owner ? [initial.owner] : []),
+  );
   const [durationMinutes, setDurationMinutes] = useState(
     initial?.durationMinutes ?? 30,
   );
   const [bufferMinutes, setBufferMinutes] = useState(
     initial?.bufferMinutes ?? 10,
+  );
+  const [minNoticeHours, setMinNoticeHours] = useState(
+    initial?.minNoticeHours ?? 2,
+  );
+  const [maxAdvanceDays, setMaxAdvanceDays] = useState(
+    initial?.maxAdvanceDays ?? 60,
   );
   const [timezone, setTimezone] = useState(
     initial?.timezone ?? "Australia/Sydney",
@@ -132,6 +190,11 @@ export function BookingPageForm({
   const [description, setDescription] = useState(initial?.description ?? "");
   const [availability, setAvailability] = useState<AvailabilityRule[]>(
     initial?.availability ?? defaultAvailability(),
+  );
+  const [selectedAvailDay, setSelectedAvailDay] = useState(
+    () =>
+      (initial?.availability ?? defaultAvailability()).find((r) => r.enabled)
+        ?.day ?? "Monday",
   );
   const [questions, setQuestions] = useState<BookingQuestion[]>(
     initial?.questions ?? [
@@ -151,22 +214,120 @@ export function BookingPageForm({
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
+  const [hydrated, setHydrated] = useState(!pageIdProp);
+
+  useEffect(() => {
+    if (!pageIdProp) {
+      setHydrated(true);
+      return;
+    }
+    const live = getBookingPageById(pageIdProp);
+    if (live) {
+      setTitle(live.title);
+      setSlug(live.slug);
+      setSlugTouched(true);
+      setOwner(live.owner);
+      setEventType(live.eventType);
+      setConsultationMode(live.consultationMode ?? "");
+      setMeetingMode(live.meetingMode ?? "one_time");
+      setCoverImageUrl(live.coverImageUrl ?? "");
+      setPrice(live.price ?? 0);
+      setCurrency(live.currency ?? "AUD");
+      setIsFree(live.price == null || live.price <= 0);
+      setMeetingVia(live.meetingVia ?? "video");
+      setMeetingViaDetail(
+        live.meetingViaDetail ?? live.videoLink ?? live.location ?? "",
+      );
+      setMaxAttendees(live.maxAttendees ?? 10);
+      setConsultants(
+        live.consultants?.length
+          ? live.consultants
+          : live.owner
+            ? [live.owner]
+            : [],
+      );
+      setDurationMinutes(live.durationMinutes);
+      setBufferMinutes(live.bufferMinutes);
+      setMinNoticeHours(live.minNoticeHours ?? 2);
+      setMaxAdvanceDays(live.maxAdvanceDays ?? 60);
+      setTimezone(live.timezone);
+      setLocation(live.location ?? "");
+      setVideoLink(live.videoLink ?? "");
+      setDescription(live.description);
+      setAvailability(live.availability);
+      setSelectedAvailDay(
+        live.availability.find((r) => r.enabled)?.day ??
+          live.availability[0]?.day ??
+          "Monday",
+      );
+      setQuestions(live.questions);
+      setConfirmationTemplate(live.confirmationTemplate);
+      setReminderTemplate(live.reminderTemplate);
+      setStatus(live.status);
+    }
+    setHydrated(true);
+  }, [pageIdProp]);
 
   const enabledDays = availability.filter((a) => a.enabled).length;
   const publicPath = slug ? `/book/${slug}` : "/book/…";
+  const isConsultation = eventType === "Consultation";
 
-  const previewTokens = useMemo(
-    () => ({
-      name: "Alex Guest",
-      datetime: "Thu 23 Jul · 10:00 AM",
-      location: location || "Video call",
-    }),
-    [location],
-  );
+  const consultationValue: ConsultationSetupValue = {
+    consultationMode,
+    meetingMode,
+    title,
+    durationMinutes,
+    coverImageUrl,
+    price,
+    currency,
+    isFree,
+    meetingVia,
+    meetingViaDetail,
+    maxAttendees,
+    consultants,
+  };
+
+  useEffect(() => {
+    if (!isConsultation) return;
+    if (meetingVia === "video") setVideoLink(meetingViaDetail);
+    else if (meetingVia === "in_person") setLocation(meetingViaDetail);
+  }, [isConsultation, meetingVia, meetingViaDetail]);
 
   function applyTitle(value: string) {
     setTitle(value);
     if (!slugTouched) setSlug(slugify(value));
+  }
+
+  function selectEventType(t: BookingEventType) {
+    setEventType(t);
+    if (t !== "Consultation") {
+      setConsultationMode("");
+    } else if (!consultationMode) {
+      setConsultationMode("one_to_one");
+      setMeetingMode("one_time");
+    }
+  }
+
+  function patchConsultation(patch: Partial<ConsultationSetupValue>) {
+    if (patch.consultationMode !== undefined)
+      setConsultationMode(patch.consultationMode);
+    if (patch.meetingMode !== undefined) setMeetingMode(patch.meetingMode);
+    if (patch.durationMinutes !== undefined)
+      setDurationMinutes(patch.durationMinutes);
+    if (patch.coverImageUrl !== undefined)
+      setCoverImageUrl(patch.coverImageUrl);
+    if (patch.price !== undefined) setPrice(patch.price);
+    if (patch.currency !== undefined) setCurrency(patch.currency);
+    if (patch.isFree !== undefined) {
+      setIsFree(patch.isFree);
+      if (patch.isFree) setPrice(0);
+    }
+    if (patch.meetingVia !== undefined) setMeetingVia(patch.meetingVia);
+    if (patch.meetingViaDetail !== undefined)
+      setMeetingViaDetail(patch.meetingViaDetail);
+    if (patch.maxAttendees !== undefined)
+      setMaxAttendees(patch.maxAttendees);
+    if (patch.consultants !== undefined) setConsultants(patch.consultants);
   }
 
   function updateAvail(day: string, patch: Partial<AvailabilityRule>) {
@@ -223,7 +384,10 @@ export function BookingPageForm({
 
   function validate() {
     const next: Record<string, string> = {};
-    if (!title.trim()) next.title = "Title is required";
+    if (!title.trim())
+      next.title = isConsultation
+        ? "Consultation name is required"
+        : "Title is required";
     if (!slug.trim()) next.slug = "URL slug is required";
     else if (!/^[a-z0-9-]+$/.test(slug))
       next.slug = "Use lowercase letters, numbers, hyphens only";
@@ -231,8 +395,81 @@ export function BookingPageForm({
     if (enabledDays === 0) next.availability = "Enable at least one day";
     if (questions.some((q) => !q.label.trim()))
       next.questions = "Every question needs a label";
+    if (isConsultation) {
+      if (!consultationMode)
+        next.consultationMode = "Choose a consultation type";
+      if (!meetingMode) next.meetingMode = "Choose One Time or Recurring";
+      if (!isFree && (!price || price <= 0))
+        next.price = "Enter a price or mark as Free";
+      if (!meetingViaDetail.trim())
+        next.meetingViaDetail = "Add how guests will join";
+      if (consultationMode === "group" && maxAttendees < 2)
+        next.maxAttendees = "Group needs at least 2 attendees";
+      if (consultants.length === 0)
+        next.consultants = "Assign at least one consultant";
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
+  }
+
+  function buildPage(): BookingPage {
+    const today = new Date().toLocaleDateString("en-AU");
+    const live = getBookingPageById(pageId);
+    return {
+      id: pageId,
+      title: title.trim(),
+      slug: slug.trim(),
+      owner,
+      eventType,
+      durationMinutes,
+      bufferMinutes,
+      minNoticeHours,
+      maxAdvanceDays,
+      timezone,
+      location: isConsultation
+        ? meetingVia === "in_person" ||
+          meetingVia === "phone" ||
+          meetingVia === "custom"
+          ? meetingViaDetail.trim() || undefined
+          : undefined
+        : location.trim() || undefined,
+      videoLink: isConsultation
+        ? meetingVia === "video"
+          ? meetingViaDetail.trim() || undefined
+          : undefined
+        : videoLink.trim() || undefined,
+      description: description.trim(),
+      availability,
+      questions: questions.map((q) => ({
+        ...q,
+        label: q.label.trim(),
+      })),
+      confirmationTemplate,
+      reminderTemplate,
+      status,
+      views: live?.views ?? initial?.views ?? 0,
+      bookingsCount: live?.bookingsCount ?? initial?.bookingsCount ?? 0,
+      cancelRate: live?.cancelRate ?? initial?.cancelRate ?? 0,
+      createdAt: initial?.createdAt ?? live?.createdAt ?? today,
+      consultationMode: isConsultation
+        ? consultationMode || undefined
+        : undefined,
+      meetingMode: isConsultation ? meetingMode : undefined,
+      coverImageUrl: isConsultation
+        ? coverImageUrl.trim() || undefined
+        : undefined,
+      price: isConsultation ? (isFree ? 0 : price) : undefined,
+      currency: isConsultation ? currency : undefined,
+      meetingVia: isConsultation ? meetingVia : undefined,
+      meetingViaDetail: isConsultation
+        ? meetingViaDetail.trim() || undefined
+        : undefined,
+      maxAttendees:
+        isConsultation && consultationMode === "group"
+          ? maxAttendees
+          : undefined,
+      consultants: isConsultation ? consultants : undefined,
+    };
   }
 
   function onSave(createAnother: boolean) {
@@ -242,12 +479,21 @@ export function BookingPageForm({
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
+    upsertBookingPage(buildPage());
     if (createAnother) {
       setTitle("");
       setSlug("");
       setSlugTouched(false);
       setDescription("");
       setStatus("Draft");
+      setConsultationMode("");
+      setMeetingMode("one_time");
+      setCoverImageUrl("");
+      setPrice(0);
+      setIsFree(true);
+      setMeetingVia("video");
+      setMeetingViaDetail("");
+      setConsultants([]);
       setErrors({});
       return;
     }
@@ -268,14 +514,22 @@ export function BookingPageForm({
     else setReminderTemplate((p) => p + t);
   }
 
+  if (!hydrated) {
+    return (
+      <div className="flex min-h-full items-center justify-center text-[13px] text-slate-400">
+        Loading…
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-slate-50">
       {/* Scrollable body */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="relative mx-auto max-w-[1200px] p-3 sm:p-4 lg:p-5">
+        <div className="relative w-full p-2.5 sm:p-3 lg:p-4">
 
           {/* Compact header */}
-          <div className="relative mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="relative mb-2.5 flex flex-wrap items-center justify-between gap-2">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <nav className="flex items-center gap-1 text-[10px] text-slate-400">
                 <Link
@@ -320,19 +574,24 @@ export function BookingPageForm({
             ) : null}
           </div>
 
-          {/* ONE surface: all sections visible */}
-          <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
-            <div className="grid lg:grid-cols-[minmax(0,1fr)_280px]">
+          {/* ONE surface: fills available width */}
+          <div className="relative flex min-h-[calc(100dvh-8.5rem)] flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
+            <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="min-w-0 divide-y divide-slate-100 border-b border-slate-100 lg:border-r lg:border-b-0">
                 {/* BASICS */}
-                <section id="booking-section-basics" className="p-4 sm:p-5">
+                <section id="booking-section-basics" className="p-2.5 sm:p-3">
                   <SectionHead
                     step="1"
                     title="Basics"
-                    body="Title, public URL, event type, and duration."
+                    body={
+                      isConsultation
+                        ? "URL, consultation type, and schedule."
+                        : "Title, URL, event type, and duration."
+                    }
                   />
 
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
+                    {!isConsultation ? (
                     <Field
                       label="Title"
                       required
@@ -348,6 +607,7 @@ export function BookingPageForm({
                         />
                       </InputShell>
                     </Field>
+                    ) : null}
 
                     <Field
                       label="Public URL"
@@ -415,11 +675,11 @@ export function BookingPageForm({
                     </Field>
                   </div>
 
-                  <div className="mt-5">
-                    <p className="mb-2 text-[12px] font-semibold text-slate-700">
+                  <div className="mt-2.5">
+                    <p className="mb-1.5 text-[11px] font-semibold text-slate-700">
                       Event type
                     </p>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-4">
                       {BOOKING_EVENT_TYPES.map((t) => {
                         const meta = EVENT_META[t];
                         const Icon = meta.icon;
@@ -428,47 +688,55 @@ export function BookingPageForm({
                           <button
                             key={t}
                             type="button"
-                            onClick={() => setEventType(t)}
+                            onClick={() => selectEventType(t)}
                             className={cn(
-                              "rounded-xl border px-3 py-3 text-left transition-all",
+                              "flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-all",
                               active
-                                ? "border-violet-300 bg-violet-50 shadow-[0_0_0_3px_rgba(139,92,246,0.12)]"
+                                ? "border-violet-300 bg-violet-50 shadow-[0_0_0_2px_rgba(139,92,246,0.12)]"
                                 : "border-slate-200 bg-white hover:border-violet-200",
                             )}
                           >
                             <span
                               className={cn(
-                                "mb-2 flex h-8 w-8 items-center justify-center rounded-lg",
+                                "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
                                 meta.soft,
                                 meta.text,
                               )}
                             >
                               <Icon className="h-3.5 w-3.5" />
                             </span>
-                            <p className="text-[12px] font-semibold text-slate-900">
-                              {t}
-                            </p>
-                            <p className="mt-0.5 text-[10px] text-slate-400">
-                              {meta.hint}
-                            </p>
+                            <span className="min-w-0">
+                              <span className="block truncate text-[11px] font-semibold text-slate-900">
+                                {t}
+                              </span>
+                            </span>
                           </button>
                         );
                       })}
                     </div>
+                    {isConsultation ? (
+                      <ConsultationSetup
+                        value={consultationValue}
+                        errors={errors}
+                        onChange={patchConsultation}
+                        onTitleChange={applyTitle}
+                      />
+                    ) : null}
                   </div>
 
-                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  {!isConsultation ? (
+                  <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
                     <div>
-                      <p className="mb-2 text-[12px] font-semibold text-slate-700">
+                      <p className="mb-1.5 text-[11px] font-semibold text-slate-700">
                         Duration
                       </p>
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-1">
                         {DURATION_PRESETS.map((m) => (
                           <Chip
                             key={m}
                             active={durationMinutes === m}
                             onClick={() => setDurationMinutes(m)}
-                            label={`${m} min`}
+                            label={`${m}m`}
                           />
                         ))}
                       </div>
@@ -479,31 +747,81 @@ export function BookingPageForm({
                       ) : null}
                     </div>
                     <div>
-                      <p className="mb-2 text-[12px] font-semibold text-slate-700">
-                        Buffer between bookings
+                      <p className="mb-1.5 text-[11px] font-semibold text-slate-700">
+                        Buffer
                       </p>
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-1">
                         {BUFFER_PRESETS.map((m) => (
                           <Chip
                             key={m}
                             active={bufferMinutes === m}
                             onClick={() => setBufferMinutes(m)}
-                            label={m === 0 ? "None" : `${m} min`}
+                            label={m === 0 ? "None" : `${m}m`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  ) : (
+                  <div className="mt-2.5">
+                    <p className="mb-1.5 text-[11px] font-semibold text-slate-700">
+                      Buffer
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {BUFFER_PRESETS.map((m) => (
+                        <Chip
+                          key={m}
+                          active={bufferMinutes === m}
+                          onClick={() => setBufferMinutes(m)}
+                          label={m === 0 ? "None" : `${m}m`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  )}
+
+                  <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
+                    <div>
+                      <p className="mb-1.5 text-[11px] font-semibold text-slate-700">
+                        Min notice
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {NOTICE_PRESETS.map((h) => (
+                          <Chip
+                            key={h}
+                            active={minNoticeHours === h}
+                            onClick={() => setMinNoticeHours(h)}
+                            label={h === 0 ? "None" : `${h}h`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="mb-1.5 text-[11px] font-semibold text-slate-700">
+                        Book ahead
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {ADVANCE_PRESETS.map((d) => (
+                          <Chip
+                            key={d}
+                            active={maxAdvanceDays === d}
+                            onClick={() => setMaxAdvanceDays(d)}
+                            label={`${d}d`}
                           />
                         ))}
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-4">
+                  <div className="mt-2.5">
                     <Field label="Description shown to guests">
                       <TextAreaShell>
                         <textarea
                           value={description}
                           onChange={(e) => setDescription(e.target.value)}
-                          placeholder="What should guests expect on this call?"
-                          className={elevatedTextareaClass}
-                          rows={3}
+                          placeholder="What should guests expect?"
+                          className={cn(elevatedTextareaClass, "!min-h-[64px]")}
+                          rows={2}
                         />
                       </TextAreaShell>
                     </Field>
@@ -511,100 +829,164 @@ export function BookingPageForm({
                 </section>
 
                 {/* SCHEDULE */}
-                <section id="booking-section-schedule" className="p-4 sm:p-5">
+                <section id="booking-section-schedule" className="p-2.5 sm:p-3">
                   <SectionHead
                     step="2"
                     title="Availability"
-                    body="Weekly hours guests can book. Buffer applies between slots."
+                    body="Weekly hours guests can book."
                   />
                   {errors.availability ? (
-                    <p className="mt-2 text-[11px] font-medium text-rose-500">
+                    <p className="mt-1.5 text-[11px] font-medium text-rose-500">
                       {errors.availability}
                     </p>
                   ) : null}
 
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    <PresetBtn onClick={setWeekdaysOnly} label="Weekdays 9–5" />
-                    <PresetBtn onClick={setAllDays} label="Every day" />
-                    <PresetBtn onClick={clearWeekend} label="Clear weekend" />
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5">
+                    <div className="flex flex-wrap gap-1">
+                      <PresetBtn
+                        onClick={setWeekdaysOnly}
+                        label="Weekdays 9–5"
+                      />
+                      <PresetBtn onClick={setAllDays} label="Every day" />
+                      <PresetBtn
+                        onClick={clearWeekend}
+                        label="Clear weekend"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      {enabledDays} open · {durationMinutes}m · {bufferMinutes}
+                      m buffer
+                    </p>
                   </div>
 
-                  <div className="mt-3 overflow-hidden rounded-xl border border-slate-100">
-                    <div className="grid grid-cols-[minmax(0,1fr)_100px_100px] gap-2 border-b border-slate-100 bg-slate-50/80 px-3 py-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                      <span>Day</span>
-                      <span>Start</span>
-                      <span>End</span>
-                    </div>
-                    {availability.map((r) => (
-                      <div
-                        key={r.day}
-                        className={cn(
-                          "grid grid-cols-[minmax(0,1fr)_100px_100px] items-center gap-2 border-b border-slate-50 px-3 py-2.5 last:border-0",
-                          !r.enabled && "bg-slate-50/40",
-                        )}
-                      >
-                        <label className="flex cursor-pointer items-center gap-2.5 text-[12px] font-medium text-slate-700">
+                  <div className="mt-2 grid grid-cols-7 gap-1">
+                    {availability.map((r) => {
+                      const selected = selectedAvailDay === r.day;
+                      const short = r.day.slice(0, 3);
+                      return (
+                        <button
+                          key={r.day}
+                          type="button"
+                          onClick={() => setSelectedAvailDay(r.day)}
+                          className={cn(
+                            "relative flex flex-col items-center rounded-lg border px-1 py-1.5 transition-all",
+                            selected
+                              ? "border-violet-400 bg-violet-50 shadow-[0_0_0_2px_rgba(139,92,246,0.15)]"
+                              : r.enabled
+                                ? "border-violet-200 bg-white hover:border-violet-300"
+                                : "border-slate-200 bg-slate-50/80 text-slate-400 hover:border-slate-300",
+                          )}
+                        >
                           <span
                             className={cn(
-                              "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-all",
-                              r.enabled
-                                ? "border-violet-600 bg-violet-600 text-white"
-                                : "border-slate-300 bg-white",
+                              "text-[11px] font-semibold",
+                              selected || r.enabled
+                                ? "text-slate-900"
+                                : "text-slate-400",
                             )}
                           >
-                            {r.enabled ? <Check className="h-3 w-3" /> : null}
+                            {short}
                           </span>
-                          <input
-                            type="checkbox"
-                            className="sr-only"
-                            checked={r.enabled}
-                            onChange={(e) =>
-                              updateAvail(r.day, { enabled: e.target.checked })
-                            }
-                          />
-                          {r.day}
-                        </label>
-                        <input
-                          type="time"
-                          disabled={!r.enabled}
-                          value={r.start}
-                          onChange={(e) =>
-                            updateAvail(r.day, { start: e.target.value })
-                          }
-                          className={cn(
-                            "h-9 w-full rounded-lg border border-slate-200 px-2 text-[12px] outline-none focus:border-violet-500 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.12)]",
-                            !r.enabled && "opacity-40",
+                          {r.enabled ? (
+                            <span className="mt-0.5 h-1 w-1 rounded-full bg-violet-500" />
+                          ) : (
+                            <span className="mt-0.5 h-1 w-1 rounded-full bg-transparent" />
                           )}
-                        />
-                        <input
-                          type="time"
-                          disabled={!r.enabled}
-                          value={r.end}
-                          onChange={(e) =>
-                            updateAvail(r.day, { end: e.target.value })
-                          }
-                          className={cn(
-                            "h-9 w-full rounded-lg border border-slate-200 px-2 text-[12px] outline-none focus:border-violet-500 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.12)]",
-                            !r.enabled && "opacity-40",
-                          )}
-                        />
-                      </div>
-                    ))}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <p className="mt-2 text-[11px] text-slate-400">
-                    {enabledDays} day{enabledDays === 1 ? "" : "s"} open ·{" "}
-                    {durationMinutes} min slots · {bufferMinutes} min buffer
-                  </p>
+
+                  {(() => {
+                    const selected =
+                      availability.find((r) => r.day === selectedAvailDay) ??
+                      availability[0];
+                    if (!selected) return null;
+                    return (
+                      <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/50 px-2.5 py-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateAvail(selected.day, {
+                              enabled: !selected.enabled,
+                            })
+                          }
+                          className={cn(
+                            "inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-semibold transition-all",
+                            selected.enabled
+                              ? "border-violet-300 bg-violet-600 text-white"
+                              : "border-slate-200 bg-white text-slate-500",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "flex h-3.5 w-3.5 items-center justify-center rounded border",
+                              selected.enabled
+                                ? "border-white/40 bg-white/20"
+                                : "border-slate-300",
+                            )}
+                          >
+                            {selected.enabled ? (
+                              <Check className="h-2.5 w-2.5" />
+                            ) : null}
+                          </span>
+                          {selected.day}
+                        </button>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase">
+                            Start
+                          </label>
+                          <input
+                            type="time"
+                            disabled={!selected.enabled}
+                            value={selected.start}
+                            onChange={(e) =>
+                              updateAvail(selected.day, {
+                                start: e.target.value,
+                              })
+                            }
+                            className={cn(
+                              "h-7 w-[7.25rem] rounded-md border border-slate-200 bg-white px-1.5 text-[11px] outline-none focus:border-violet-500",
+                              !selected.enabled && "opacity-40",
+                            )}
+                          />
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase">
+                            End
+                          </label>
+                          <input
+                            type="time"
+                            disabled={!selected.enabled}
+                            value={selected.end}
+                            onChange={(e) =>
+                              updateAvail(selected.day, {
+                                end: e.target.value,
+                              })
+                            }
+                            className={cn(
+                              "h-7 w-[7.25rem] rounded-md border border-slate-200 bg-white px-1.5 text-[11px] outline-none focus:border-violet-500",
+                              !selected.enabled && "opacity-40",
+                            )}
+                          />
+                        </div>
+                        {!selected.enabled ? (
+                          <p className="w-full text-[10px] text-slate-400 sm:w-auto">
+                            Off — tap the day name to enable
+                          </p>
+                        ) : null}
+                      </div>
+                    );
+                  })()}
                 </section>
 
-                {/* LOCATION */}
-                <section id="booking-section-location" className="p-4 sm:p-5">
+                {/* LOCATION — non-consultation only; consultations use Meeting via */}
+                {!isConsultation ? (
+                <section id="booking-section-location" className="p-2.5 sm:p-3">
                   <SectionHead
                     step="3"
                     title="Location"
-                    body="Video link and/or physical address for guests."
+                    body="Video link and/or address."
                   />
-                  <div className="mt-4 space-y-4">
+                  <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
                     <Field label="Video link">
                       <InputShell icon={Video}>
                         <input
@@ -620,46 +1002,47 @@ export function BookingPageForm({
                         <input
                           value={location}
                           onChange={(e) => setLocation(e.target.value)}
-                          placeholder="Office address or room name"
+                          placeholder="Office address or room"
                           className={elevatedInputClass(true)}
                         />
                       </InputShell>
                     </Field>
                   </div>
                 </section>
+                ) : null}
 
                 {/* QUESTIONS */}
-                <section id="booking-section-questions" className="p-4 sm:p-5">
-                  <div className="flex items-start justify-between gap-3">
+                <section id="booking-section-questions" className="p-2.5 sm:p-3">
+                  <div className="flex items-start justify-between gap-2">
                     <SectionHead
                       step="4"
                       title="Booking questions"
-                      body="Extra fields guests answer before confirming."
+                      body="Extra fields before confirm."
                     />
                     <button
                       type="button"
                       onClick={addQuestion}
-                      className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg bg-violet-50 px-2.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-100"
+                      className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md bg-violet-50 px-2 text-[11px] font-semibold text-violet-700 hover:bg-violet-100"
                     >
-                      <Plus className="h-3.5 w-3.5" />
+                      <Plus className="h-3 w-3" />
                       Add
                     </button>
                   </div>
                   {errors.questions ? (
-                    <p className="mt-2 text-[11px] font-medium text-rose-500">
+                    <p className="mt-1.5 text-[11px] font-medium text-rose-500">
                       {errors.questions}
                     </p>
                   ) : null}
-                  <div className="mt-4 space-y-2">
+                  <div className="mt-2 space-y-1.5">
                     {questions.map((q, idx) => (
                       <div
                         key={q.id}
-                        className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/50 p-3"
+                        className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-100 bg-slate-50/50 p-2"
                       >
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-[11px] font-bold text-slate-400 shadow-sm">
+                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-white text-[10px] font-bold text-slate-400 shadow-sm">
                           {idx + 1}
                         </span>
-                        <div className="min-w-[180px] flex-1">
+                        <div className="min-w-[160px] flex-1">
                           <InputShell>
                             <input
                               value={q.label}
@@ -679,7 +1062,7 @@ export function BookingPageForm({
                             updateQuestion(q.id, { required: !q.required })
                           }
                           className={cn(
-                            "inline-flex h-9 items-center rounded-lg border px-2.5 text-[11px] font-semibold",
+                            "inline-flex h-8 items-center rounded-md border px-2 text-[10px] font-semibold",
                             q.required
                               ? "border-rose-200 bg-rose-50 text-rose-600"
                               : "border-slate-200 bg-white text-slate-500",
@@ -691,7 +1074,7 @@ export function BookingPageForm({
                           type="button"
                           onClick={() => removeQuestion(q.id)}
                           disabled={questions.length <= 1}
-                          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30"
+                          className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30"
                           aria-label="Remove"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -702,17 +1085,17 @@ export function BookingPageForm({
                 </section>
 
                 {/* MESSAGES */}
-                <section id="booking-section-messages" className="p-4 sm:p-5">
+                <section id="booking-section-messages" className="p-2.5 sm:p-3">
                   <SectionHead
                     step="5"
                     title="Confirmation & reminders"
-                    body="Email/SMS templates. Click tokens to insert."
+                    body="Templates — click tokens to insert."
                   />
-                  <div className="mt-4 space-y-5">
+                  <div className="mt-2.5 grid gap-2.5 lg:grid-cols-2">
                     <div>
-                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                        <label className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-700">
-                          <Mail className="h-3.5 w-3.5 text-violet-600" />
+                      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5">
+                        <label className="flex items-center gap-1 text-[11px] font-semibold text-slate-700">
+                          <Mail className="h-3 w-3 text-violet-600" />
                           Confirmation
                         </label>
                         <TokenBar
@@ -725,28 +1108,15 @@ export function BookingPageForm({
                           onChange={(e) =>
                             setConfirmationTemplate(e.target.value)
                           }
-                          className={elevatedTextareaClass}
-                          rows={3}
+                          className={cn(elevatedTextareaClass, "!min-h-[56px]")}
+                          rows={2}
                         />
                       </TextAreaShell>
-                      <p className="mt-1.5 text-[10px] leading-relaxed text-slate-400">
-                        Preview:{" "}
-                        {confirmationTemplate
-                          .replace(/\{\{name\}\}/g, previewTokens.name)
-                          .replace(
-                            /\{\{datetime\}\}/g,
-                            previewTokens.datetime,
-                          )
-                          .replace(
-                            /\{\{location\}\}/g,
-                            previewTokens.location,
-                          )}
-                      </p>
                     </div>
                     <div>
-                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                        <label className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-700">
-                          <Bell className="h-3.5 w-3.5 text-violet-600" />
+                      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5">
+                        <label className="flex items-center gap-1 text-[11px] font-semibold text-slate-700">
+                          <Bell className="h-3 w-3 text-violet-600" />
                           Reminder
                         </label>
                         <TokenBar
@@ -757,8 +1127,8 @@ export function BookingPageForm({
                         <textarea
                           value={reminderTemplate}
                           onChange={(e) => setReminderTemplate(e.target.value)}
-                          className={elevatedTextareaClass}
-                          rows={3}
+                          className={cn(elevatedTextareaClass, "!min-h-[56px]")}
+                          rows={2}
                         />
                       </TextAreaShell>
                     </div>
@@ -766,125 +1136,163 @@ export function BookingPageForm({
                 </section>
 
                 {/* PUBLISH */}
-                <section id="booking-section-publish" className="p-4 sm:p-5">
+                <section id="booking-section-publish" className="p-2.5 sm:p-3">
                   <SectionHead
                     step="6"
                     title="Publish"
-                    body="Draft stays private. Live is bookable from any link."
+                    body="Draft private · Live bookable."
                   />
-                  <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <div className="mt-2.5 flex gap-1.5">
                     <button
                       type="button"
                       onClick={() => setStatus("Draft")}
                       className={cn(
-                        "flex-1 rounded-xl border px-4 py-3.5 text-left transition-all",
+                        "flex-1 rounded-lg border px-3 py-2 text-left transition-all",
                         status === "Draft"
                           ? "border-slate-300 bg-slate-50 shadow-sm"
                           : "border-slate-100 hover:border-slate-200",
                       )}
                     >
-                      <p className="text-[13px] font-semibold text-slate-900">
+                      <p className="text-[12px] font-semibold text-slate-900">
                         Draft
                       </p>
-                      <p className="mt-0.5 text-[11px] text-slate-500">
-                        Only you can open the link
-                      </p>
+                      <p className="text-[10px] text-slate-500">Private link</p>
                     </button>
                     <button
                       type="button"
                       onClick={() => setStatus("Live")}
                       className={cn(
-                        "flex-1 rounded-xl border px-4 py-3.5 text-left transition-all",
+                        "flex-1 rounded-lg border px-3 py-2 text-left transition-all",
                         status === "Live"
-                          ? "border-emerald-300 bg-emerald-50 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]"
+                          ? "border-emerald-300 bg-emerald-50 shadow-[0_0_0_2px_rgba(16,185,129,0.12)]"
                           : "border-slate-100 hover:border-emerald-200",
                       )}
                     >
-                      <p className="text-[13px] font-semibold text-emerald-800">
+                      <p className="text-[12px] font-semibold text-emerald-800">
                         Live
                       </p>
-                      <p className="mt-0.5 text-[11px] text-emerald-700/80">
-                        Anyone with the link can book
+                      <p className="text-[10px] text-emerald-700/80">
+                        Public bookable
                       </p>
                     </button>
                   </div>
 
-                  <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
-                    <p className="mb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+                  <div className="mt-2.5 rounded-lg border border-slate-100 bg-slate-50/60 p-2.5">
+                    <p className="mb-1.5 text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
                       Share URL
                     </p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <code className="max-w-full truncate rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-[12px] text-slate-700">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <code className="max-w-full truncate rounded-md border border-slate-200 bg-white px-2 py-1.5 font-mono text-[11px] text-slate-700">
                         {publicPath}
                       </code>
                       <button
                         type="button"
                         onClick={copyLink}
                         disabled={!slug}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white disabled:opacity-40"
+                        className="inline-flex h-8 items-center gap-1 rounded-md bg-violet-600 px-2.5 text-[11px] font-semibold text-white disabled:opacity-40"
                       >
-                        <Copy className="h-3.5 w-3.5" />
+                        <Copy className="h-3 w-3" />
                         {copied ? "Copied" : "Copy"}
                       </button>
                     </div>
-                    <p className="mt-3 text-[11px] text-slate-500">
-                      Embed for Linktree / Forms
-                    </p>
-                    <pre className="mt-1 overflow-x-auto rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-[10px] text-slate-600">
-                      {`<a href="${publicPath}">Book a ${title || "meeting"}</a>`}
-                    </pre>
+                    {slug ? (
+                      <div className="mt-2 space-y-1.5">
+                        <p className="text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
+                          Linktree / email embed
+                        </p>
+                        <pre className="overflow-x-auto rounded-md border border-slate-200 bg-white px-2 py-1.5 font-mono text-[10px] text-slate-600">
+                          {bookingEmbedSnippet(slug, title || undefined)}
+                        </pre>
+                        <p className="text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
+                          Iframe embed
+                        </p>
+                        <pre className="overflow-x-auto rounded-md border border-slate-200 bg-white px-2 py-1.5 font-mono text-[10px] text-slate-600">
+                          {bookingIframeSnippet(slug)}
+                        </pre>
+                      </div>
+                    ) : null}
                   </div>
 
-                  <ul className="mt-4 space-y-1.5 text-[12px] text-slate-600">
-                    <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 text-emerald-500" />
-                      Auto-create Lead on booking
+                  <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-600">
+                    <li className="flex items-center gap-1">
+                      <Check className="h-3 w-3 text-emerald-500" />
+                      Lead + contact on book
                     </li>
-                    <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 text-emerald-500" />
-                      Sync to Calendar &amp; Meetings
+                    <li className="flex items-center gap-1">
+                      <Check className="h-3 w-3 text-emerald-500" />
+                      Meeting + .ics / Google / Outlook
                     </li>
-                    <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 text-emerald-500" />
-                      Guest self-service reschedule / cancel
+                    <li className="flex items-center gap-1">
+                      <Check className="h-3 w-3 text-emerald-500" />
+                      Guest reschedule / cancel
+                    </li>
+                    <li className="flex items-center gap-1">
+                      <Check className="h-3 w-3 text-emerald-500" />
+                      Confirm + reminder queued
                     </li>
                   </ul>
                 </section>
               </div>
 
               {/* Preview: sticky on desktop */}
-              <aside className="bg-slate-50/70 p-4 lg:sticky lg:top-0 lg:self-start">
-                <p className="mb-3 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+              <aside className="bg-slate-50/70 p-2.5 sm:p-3 lg:sticky lg:top-0 lg:self-stretch">
+                <p className="mb-2 text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
                   Guest preview
                 </p>
-                <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
-                  <p className="text-[10px] font-semibold tracking-wide text-violet-600 uppercase">
+                <div className="rounded-lg border border-slate-200/80 bg-white p-3 shadow-sm">
+                  {isConsultation && coverImageUrl.trim() ? (
+                    <div className="mb-2 -mx-3 -mt-3 overflow-hidden rounded-t-lg">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={coverImageUrl}
+                        alt=""
+                        className="h-16 w-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    </div>
+                  ) : null}
+                  <p className="text-[9px] font-semibold tracking-wide text-violet-600 uppercase">
                     FinConnex
                   </p>
-                  <h3 className="mt-1 text-[15px] font-bold text-slate-900">
+                  <h3 className="mt-0.5 text-[13px] font-bold text-slate-900">
                     {title || "Untitled booking"}
                   </h3>
-                  <p className="mt-1 line-clamp-3 text-[11px] leading-relaxed text-slate-500">
+                  <p className="mt-0.5 line-clamp-2 text-[10px] leading-relaxed text-slate-500">
                     {description ||
                       "Description will appear here for guests…"}
                   </p>
-                  <div className="mt-3 flex flex-wrap gap-2 text-[10px] text-slate-500">
-                    <span className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-1">
-                      <Clock className="h-3 w-3" />
-                      {durationMinutes} min
+                  <div className="mt-2 flex flex-wrap gap-1 text-[9px] text-slate-500">
+                    <span className="inline-flex items-center gap-0.5 rounded bg-slate-50 px-1.5 py-0.5">
+                      <Clock className="h-2.5 w-2.5" />
+                      {durationMinutes}m
                     </span>
                     <span
                       className={cn(
-                        "inline-flex items-center gap-1 rounded-md px-2 py-1",
+                        "inline-flex items-center gap-0.5 rounded px-1.5 py-0.5",
                         EVENT_META[eventType].soft,
                         EVENT_META[eventType].text,
                       )}
                     >
-                      {eventType}
+                      {isConsultation && consultationMode
+                        ? consultationModeLabel(consultationMode)
+                        : eventType}
                     </span>
+                    {isConsultation && meetingMode ? (
+                      <span className="inline-flex items-center rounded bg-slate-50 px-1.5 py-0.5">
+                        {meetingModeLabel(meetingMode)}
+                      </span>
+                    ) : null}
+                    {isConsultation ? (
+                      <span className="inline-flex items-center gap-0.5 rounded bg-amber-50 px-1.5 py-0.5 text-amber-800">
+                        <DollarSign className="h-2.5 w-2.5" />
+                        {formatBookingPrice(isFree ? 0 : price, currency)}
+                      </span>
+                    ) : null}
                     <span
                       className={cn(
-                        "inline-flex items-center rounded-md px-2 py-1 text-[10px] font-semibold",
+                        "inline-flex items-center rounded px-1.5 py-0.5 text-[9px] font-semibold",
                         status === "Live"
                           ? "bg-emerald-50 text-emerald-700"
                           : "bg-slate-100 text-slate-600",
@@ -893,35 +1301,78 @@ export function BookingPageForm({
                       {status}
                     </span>
                   </div>
-                  {(videoLink || location) && (
-                    <div className="mt-3 space-y-1 border-t border-slate-50 pt-3 text-[10px] text-slate-500">
-                      {videoLink ? (
+                  {(isConsultation
+                    ? meetingViaDetail || meetingVia
+                    : videoLink || location) && (
+                    <div className="mt-2 space-y-0.5 border-t border-slate-50 pt-2 text-[9px] text-slate-500">
+                      {isConsultation ? (
                         <p className="flex items-center gap-1">
-                          <Video className="h-3 w-3 shrink-0" />
-                          Video call
+                          {meetingVia === "video" ? (
+                            <Video className="h-2.5 w-2.5 shrink-0" />
+                          ) : meetingVia === "in_person" ? (
+                            <MapPin className="h-2.5 w-2.5 shrink-0" />
+                          ) : (
+                            <Phone className="h-2.5 w-2.5 shrink-0" />
+                          )}
+                          {meetingViaLabel(meetingVia)}
+                          {meetingViaDetail ? ` · ${meetingViaDetail}` : ""}
                         </p>
-                      ) : null}
-                      {location ? (
-                        <p className="flex items-center gap-1 truncate">
-                          <MapPin className="h-3 w-3 shrink-0" />
-                          {location}
-                        </p>
-                      ) : null}
+                      ) : (
+                        <>
+                          {videoLink ? (
+                            <p className="flex items-center gap-1">
+                              <Video className="h-2.5 w-2.5 shrink-0" />
+                              Video call
+                            </p>
+                          ) : null}
+                          {location ? (
+                            <p className="flex items-center gap-1 truncate">
+                              <MapPin className="h-2.5 w-2.5 shrink-0" />
+                              {location}
+                            </p>
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   )}
-                  {questions.some((q) => q.label.trim()) ? (
-                    <div className="mt-3 border-t border-slate-50 pt-3">
-                      <p className="mb-1.5 flex items-center gap-1 text-[10px] font-semibold text-slate-400">
-                        <MessageSquare className="h-3 w-3" />
-                        Asks
+                  {isConsultation && consultants.length > 0 ? (
+                    <div className="mt-2 border-t border-slate-50 pt-2">
+                      <p className="mb-1 text-[9px] font-semibold text-slate-400">
+                        Consultant{consultants.length > 1 ? "s" : ""}
                       </p>
                       <ul className="space-y-1">
+                        {consultants.map((name) => (
+                          <li
+                            key={name}
+                            className="flex items-center gap-1.5 text-[9px] text-slate-600"
+                          >
+                            <span
+                              className={cn(
+                                "flex h-4 w-4 items-center justify-center rounded-full text-[7px] font-semibold",
+                                avatarColor(name),
+                              )}
+                            >
+                              {initials(name)}
+                            </span>
+                            {name}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {questions.some((q) => q.label.trim()) ? (
+                    <div className="mt-2 border-t border-slate-50 pt-2">
+                      <p className="mb-1 flex items-center gap-1 text-[9px] font-semibold text-slate-400">
+                        <MessageSquare className="h-2.5 w-2.5" />
+                        Asks
+                      </p>
+                      <ul className="space-y-0.5">
                         {questions
                           .filter((q) => q.label.trim())
                           .map((q) => (
                             <li
                               key={q.id}
-                              className="truncate text-[10px] text-slate-600"
+                              className="truncate text-[9px] text-slate-600"
                             >
                               {q.label}
                               {q.required ? (
@@ -932,11 +1383,11 @@ export function BookingPageForm({
                       </ul>
                     </div>
                   ) : null}
-                  <div className="mt-4 h-8 rounded-lg bg-violet-600 text-center text-[11px] leading-8 font-semibold text-white">
+                  <div className="mt-2.5 h-7 rounded-md bg-violet-600 text-center text-[10px] leading-7 font-semibold text-white">
                     Continue
                   </div>
                 </div>
-                <p className="mt-3 text-center text-[10px] text-slate-400">
+                <p className="mt-2 text-center text-[9px] text-slate-400">
                   {enabledDays} available day{enabledDays === 1 ? "" : "s"} ·{" "}
                   {owner.split(" ")[0]}
                 </p>
@@ -947,8 +1398,8 @@ export function BookingPageForm({
       </div>
 
       {/* Footer: always visible, never covers scroll content */}
-      <div className="shrink-0 border-t border-slate-200/80 bg-white px-3 py-3 sm:px-5">
-        <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-2">
+      <div className="shrink-0 border-t border-slate-200/80 bg-white px-2.5 py-2.5 sm:px-3 lg:px-4">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
           <p className="hidden text-[11px] text-slate-400 sm:block">
             Scroll to review all sections · Required fields marked
           </p>
@@ -991,13 +1442,15 @@ function SectionHead({
   body: string;
 }) {
   return (
-    <div className="flex items-start gap-3">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-[11px] font-bold text-white shadow-sm shadow-violet-600/25">
+    <div className="flex items-center gap-2">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-violet-600 text-[10px] font-bold text-white">
         {step}
       </span>
-      <div>
-        <h2 className="text-[14px] font-semibold text-slate-900">{title}</h2>
-        <p className="mt-0.5 text-[12px] text-slate-500">{body}</p>
+      <div className="min-w-0">
+        <h2 className="text-[13px] font-semibold text-slate-900">
+          {title}
+          <span className="ml-1.5 font-normal text-slate-400">{body}</span>
+        </h2>
       </div>
     </div>
   );
@@ -1017,7 +1470,7 @@ function Chip({
       type="button"
       onClick={onClick}
       className={cn(
-        "rounded-lg px-3 py-1.5 text-[11px] font-semibold transition-all",
+        "rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all",
         active
           ? "bg-violet-600 text-white shadow-sm shadow-violet-600/25"
           : "border border-slate-200 bg-white text-slate-600 hover:border-violet-200",

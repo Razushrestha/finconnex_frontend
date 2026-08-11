@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -16,10 +16,12 @@ import {
   FileEdit,
 } from "lucide-react";
 import {
-  bookingPages as seedPages,
-  bookings as seedBookings,
+  listBookings,
+  listBookingPages,
   publicBookUrl,
   formatBookingWhen,
+  consultationModeLabel,
+  formatBookingPrice,
   type BookingPage,
   type BookingPageStatus,
   type Booking,
@@ -35,9 +37,14 @@ export default function BookingPage() {
   const [statusFilter, setStatusFilter] = useState<BookingPageStatus | "All">(
     "All",
   );
-  const [pages] = useState(seedPages);
-  const [bookings] = useState(seedBookings);
+  const [pages, setPages] = useState<BookingPage[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPages(listBookingPages());
+    setBookings(listBookings());
+  }, []);
 
   const filteredPages = useMemo(() => {
     let data: BookingPage[] = pages;
@@ -76,11 +83,14 @@ export default function BookingPage() {
     const totalBookings = pages.reduce((s, p) => s + p.bookingsCount, 0);
     const live = pages.filter((p) => p.status === "Live").length;
     const cancelled = bookings.filter((b) => b.status === "Cancelled").length;
+    const confirmed = bookings.filter((b) => b.status === "Confirmed").length;
     const cancelRate =
       bookings.length === 0
         ? 0
         : Math.round((cancelled / bookings.length) * 100);
-    return { views, totalBookings, live, cancelRate };
+    const conversion =
+      views === 0 ? 0 : Math.round((confirmed / views) * 1000) / 10;
+    return { views, totalBookings, live, cancelRate, conversion, confirmed };
   }, [pages, bookings]);
 
   function copyLink(slug: string) {
@@ -93,7 +103,7 @@ export default function BookingPage() {
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
 
-      <div className="relative mx-auto flex max-w-[1400px] flex-col p-2.5 sm:p-3 lg:p-4">
+      <div className="relative flex w-full flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <nav className="flex items-center gap-1 text-[10px] text-slate-400">
@@ -245,7 +255,17 @@ function PagesTable({
                 /book/{p.slug}
               </p>
             </td>
-            <td className="px-4 py-3 text-slate-600">{p.eventType}</td>
+            <td className="px-4 py-3">
+              <p className="font-medium text-slate-700">{p.eventType}</p>
+              {p.eventType === "Consultation" && p.consultationMode ? (
+                <p className="mt-0.5 text-[10px] text-slate-400">
+                  {consultationModeLabel(p.consultationMode)}
+                  {p.price != null
+                    ? ` · ${formatBookingPrice(p.price, p.currency ?? "AUD")}`
+                    : ""}
+                </p>
+              ) : null}
+            </td>
             <td className="px-4 py-3 text-slate-600">
               {p.durationMinutes} min
             </td>
@@ -389,13 +409,19 @@ function AnalyticsPanel({
     totalBookings: number;
     live: number;
     cancelRate: number;
+    conversion: number;
+    confirmed: number;
   };
   pages: BookingPage[];
 }) {
   const stats = [
     { label: "Page views", value: analytics.views, icon: Eye },
     { label: "Bookings", value: analytics.totalBookings, icon: CheckCircle2 },
-    { label: "Live pages", value: analytics.live, icon: CalendarClock },
+    {
+      label: "Conversion",
+      value: `${analytics.conversion}%`,
+      icon: FileEdit,
+    },
     {
       label: "Cancel rate",
       value: `${analytics.cancelRate}%`,

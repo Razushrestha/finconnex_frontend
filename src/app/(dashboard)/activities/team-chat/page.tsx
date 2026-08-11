@@ -572,7 +572,7 @@ export default function TeamChatPage() {
                             return nextList;
                           });
                           setSidebarTab("archived");
-                          flash(setToast, "Chat archived — view in Archive tab");
+                          flash(setToast, "Chat archived. View in Archive tab");
                         }}
                       />
                       <MenuItem

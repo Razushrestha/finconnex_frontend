@@ -61,7 +61,7 @@ export function RecordDetailModal({
           {fields.map((f) => (
             <div key={f.label} className="grid grid-cols-[7rem_1fr] gap-2">
               <dt className="font-medium text-slate-400">{f.label}</dt>
-              <dd className="text-slate-800">{f.value || "—"}</dd>
+              <dd className="text-slate-800">{f.value || ""}</dd>
             </div>
           ))}
         </dl>

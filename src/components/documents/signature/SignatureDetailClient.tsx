@@ -10,23 +10,28 @@ import {
   X,
   Download,
   Copy,
-  PenLine,
-  Plus,
+  LayoutTemplate,
   Calendar,
   Mail,
-  User,
   Link2,
   RefreshCw,
+  Users,
 } from "lucide-react";
 import {
+  SIGNER_COLORS,
   formatAuditAt,
   getSignatureRequestById,
+  markRequestSent,
+  normalizeSignatureRequest,
+  signedCount,
   upsertSignatureRequest,
   type SignatureRequest,
   type SignatureStatus,
+  type SignerStatus,
 } from "@/lib/documents/signature/types";
 import { pushLibraryDoc } from "@/lib/documents/library/types";
 import { avatarColor, initials } from "@/lib/activities/shared";
+import { SignatureDocPreview } from "./SignatureDocPreview";
 import { cn } from "@/lib/utils";
 
 const STATUS_STYLE: Record<SignatureStatus, string> = {
@@ -39,23 +44,22 @@ const STATUS_STYLE: Record<SignatureStatus, string> = {
   Cancelled: "bg-slate-100 text-slate-500",
 };
 
-interface SigField {
-  id: string;
-  label: string;
-  x: number;
-  y: number;
-}
+const SIGNER_STATUS_STYLE: Record<SignerStatus, string> = {
+  Pending: "bg-slate-100 text-slate-500",
+  Sent: "bg-sky-50 text-sky-700",
+  Viewed: "bg-amber-50 text-amber-800",
+  Signed: "bg-emerald-50 text-emerald-700",
+  Declined: "bg-rose-50 text-rose-700",
+};
 
 export function SignatureDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const [req, setReq] = useState<SignatureRequest | null>(null);
-  const [fields, setFields] = useState<SigField[]>([
-    { id: "f1", label: "Sign here", x: 18, y: 68 },
-  ]);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    setReq(getSignatureRequestById(id) ?? null);
+    const live = getSignatureRequestById(id);
+    setReq(live ? normalizeSignatureRequest(live) : null);
   }, [id]);
 
   function flash(msg: string) {
@@ -64,30 +68,27 @@ export function SignatureDetailClient({ id }: { id: string }) {
   }
 
   function save(next: SignatureRequest, msg?: string) {
-    upsertSignatureRequest(next);
-    setReq(next);
+    const saved = upsertSignatureRequest(next);
+    setReq(saved);
     if (msg) flash(msg);
   }
 
   function sendForSignature() {
     if (!req) return;
-    const today = new Date().toLocaleDateString("en-AU");
-    save(
-      {
-        ...req,
-        status: "Sent",
-        sentDate: today,
-        audit: [
-          ...req.audit,
-          {
-            id: `a-${Date.now()}`,
-            at: formatAuditAt(),
-            action: "Sent for signature",
-            actor: req.createdBy,
-          },
-        ],
-      },
-      "Sent to signer · copy public link",
+    const missing = req.signers.filter(
+      (s) =>
+        s.role !== "CC" &&
+        !req.fields.some((f) => f.signerId === s.id && f.kind === "signature"),
+    );
+    if (missing.length) {
+      flash(`Place a signature field for ${missing[0].name} first`);
+      router.push(`/documents/signature/${id}/place`);
+      return;
+    }
+    const sent = markRequestSent(req, req.createdBy);
+    setReq(sent);
+    flash(
+      `Sent · ${sent.signers.filter((s) => s.role !== "CC").length} signer link(s)`,
     );
   }
 
@@ -113,6 +114,9 @@ export function SignatureDetailClient({ id }: { id: string }) {
 
   function resend() {
     if (!req) return;
+    const pending = req.signers.filter(
+      (s) => s.role !== "CC" && s.status !== "Signed" && s.status !== "Declined",
+    );
     save(
       {
         ...req,
@@ -121,39 +125,29 @@ export function SignatureDetailClient({ id }: { id: string }) {
           {
             id: `a-${Date.now()}`,
             at: formatAuditAt(),
-            action: "Resent",
+            action: `Reminder sent to ${pending.map((s) => s.name).join(", ") || "signers"}`,
             actor: req.createdBy,
           },
         ],
       },
-      `Reminder sent to ${req.signerEmail}`,
+      pending.length
+        ? `Reminder sent to ${pending.length} signer(s)`
+        : "No pending signers",
     );
   }
 
-  function copySignLink() {
-    if (!req) return;
-    const url = `${window.location.origin}/sign/${req.manageToken}`;
+  function copySignLink(token: string, name?: string) {
+    const url = `${window.location.origin}/sign/${token}`;
     void navigator.clipboard?.writeText(url);
-    flash("Sign link copied");
+    flash(name ? `Link copied · ${name}` : "Sign link copied");
   }
 
   function refreshFromStore() {
     const live = getSignatureRequestById(id);
     if (live) {
-      setReq(live);
+      setReq(normalizeSignatureRequest(live));
       flash("Synced latest status");
     }
-  }
-
-  function addField(e: React.MouseEvent<HTMLDivElement>) {
-    if (!req || req.status !== "Draft") return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    setFields((prev) => [
-      ...prev,
-      { id: `f-${Date.now()}`, label: "Sign here", x, y },
-    ]);
   }
 
   function downloadSigned() {
@@ -199,13 +193,13 @@ export function SignatureDetailClient({ id }: { id: string }) {
     );
   }
 
-  const publicUrl = `/sign/${req.manageToken}`;
-  const openForSigner =
-    req.status === "Sent" || req.status === "Viewed";
+  const openForSigner = req.status === "Sent" || req.status === "Viewed";
+  const done = signedCount(req);
+  const total = req.signers.filter((s) => s.role !== "CC").length;
+  const progressPct = total ? Math.round((done / total) * 100) : 0;
 
   return (
     <div className="relative flex min-h-full flex-col bg-slate-50">
-
       <div className="relative flex flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
           <button
@@ -241,6 +235,11 @@ export function SignatureDetailClient({ id }: { id: string }) {
           >
             {req.status}
           </span>
+          {total > 1 ? (
+            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
+              {done}/{total} signed
+            </span>
+          ) : null}
           <span className="hidden text-[11px] text-slate-400 sm:inline">·</span>
           <p className="hidden min-w-0 truncate text-[12px] font-medium text-slate-600 sm:block">
             {req.documentName}
@@ -256,23 +255,37 @@ export function SignatureDetailClient({ id }: { id: string }) {
               Sync
             </button>
             {req.status === "Draft" ? (
-              <button
-                type="button"
-                onClick={sendForSignature}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-sm shadow-violet-600/20 hover:bg-violet-700"
-              >
-                <Send className="h-3.5 w-3.5" />
-                Send for signature
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(`/documents/signature/${id}/place`)
+                  }
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 text-[11px] font-semibold text-violet-700"
+                >
+                  <LayoutTemplate className="h-3.5 w-3.5" />
+                  Place fields
+                </button>
+                <button
+                  type="button"
+                  onClick={sendForSignature}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-sm shadow-violet-600/20 hover:bg-violet-700"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  Send for signature
+                </button>
+              </>
             ) : null}
-            {openForSigner ? (
+            {openForSigner && req.signers[0] ? (
               <button
                 type="button"
-                onClick={copySignLink}
+                onClick={() =>
+                  copySignLink(req.signers[0].token, req.signers[0].name)
+                }
                 className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 text-[11px] font-semibold text-violet-700"
               >
                 <Copy className="h-3.5 w-3.5" />
-                Copy link
+                Copy first link
               </button>
             ) : null}
             {req.status === "Signed" ? (
@@ -297,9 +310,25 @@ export function SignatureDetailClient({ id }: { id: string }) {
               <p className="mt-1 text-[12px] text-slate-500">
                 {req.documentFile}
                 {req.status === "Draft"
-                  ? " · click preview to place signature fields"
-                  : ""}
+                  ? " · place and adjust fields before sending"
+                  : ` · ${req.signingOrder} signing`}
               </p>
+              {total > 0 && req.status !== "Draft" ? (
+                <div className="mt-3 max-w-xs">
+                  <div className="mb-1 flex justify-between text-[10px] font-semibold text-slate-500">
+                    <span>Progress</span>
+                    <span>
+                      {done} of {total}
+                    </span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className="h-full rounded-full bg-violet-500 transition-all"
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
+                </div>
+              ) : null}
             </div>
             <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2">
               <span
@@ -322,8 +351,16 @@ export function SignatureDetailClient({ id }: { id: string }) {
           <div className="grid min-h-0 flex-1 lg:grid-cols-[1fr_300px]">
             <div className="flex min-h-0 flex-col border-b border-slate-100 lg:border-r lg:border-b-0">
               <div className="grid border-b border-slate-100 sm:grid-cols-2 xl:grid-cols-4">
-                <MetaCell icon={User} label="Signer" value={req.signer} />
-                <MetaCell icon={Mail} label="Email" value={req.signerEmail} />
+                <MetaCell
+                  icon={Users}
+                  label="Signers"
+                  value={`${total} · ${req.signingOrder}`}
+                />
+                <MetaCell
+                  icon={Mail}
+                  label="Primary email"
+                  value={req.signerEmail}
+                />
                 <MetaCell
                   icon={Link2}
                   label="Related to"
@@ -336,82 +373,86 @@ export function SignatureDetailClient({ id }: { id: string }) {
                 />
               </div>
 
+              <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
+                <p className="mb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+                  Signer progress
+                </p>
+                <ul className="space-y-2">
+                  {req.signers.map((s) => {
+                    const color =
+                      SIGNER_COLORS[s.colorIndex % SIGNER_COLORS.length];
+                    return (
+                      <li
+                        key={s.id}
+                        className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2"
+                      >
+                        <span
+                          className={cn(
+                            "flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold",
+                            color.bg,
+                            color.text,
+                          )}
+                        >
+                          {s.order}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[12px] font-semibold text-slate-800">
+                            {s.name}
+                          </p>
+                          <p className="truncate text-[10px] text-slate-400">
+                            {s.email}
+                          </p>
+                        </div>
+                        <span
+                          className={cn(
+                            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                            SIGNER_STATUS_STYLE[s.status],
+                          )}
+                        >
+                          {s.status}
+                        </span>
+                        {openForSigner &&
+                        s.status !== "Signed" &&
+                        s.status !== "Declined" ? (
+                          <button
+                            type="button"
+                            onClick={() => copySignLink(s.token, s.name)}
+                            className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"
+                          >
+                            <Copy className="h-3 w-3" />
+                            Link
+                          </button>
+                        ) : null}
+                        {s.status === "Signed" && s.signedAt ? (
+                          <span className="text-[10px] text-emerald-600">
+                            {s.signedAt}
+                          </span>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+
               <div className="flex min-h-0 flex-1 flex-col p-4 sm:p-5">
                 <div className="mb-2 flex items-center justify-between">
                   <p className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
                     Document preview
                   </p>
                   {req.status === "Draft" ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-violet-600">
-                      <Plus className="h-3 w-3" />
-                      Click to add field
-                    </span>
-                  ) : null}
-                </div>
-                <div
-                  role={req.status === "Draft" ? "button" : undefined}
-                  onClick={addField}
-                  className={cn(
-                    "relative mx-auto aspect-[3/4] w-full max-w-md flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-inner",
-                    req.status === "Draft" && "cursor-crosshair",
-                  )}
-                >
-                  <div className="absolute inset-x-8 top-10 space-y-2">
-                    <div className="h-3 w-2/3 rounded bg-slate-200/80" />
-                    <div className="h-2 w-full rounded bg-slate-100" />
-                    <div className="h-2 w-full rounded bg-slate-100" />
-                    <div className="h-2 w-5/6 rounded bg-slate-100" />
-                    <div className="mt-6 h-2 w-full rounded bg-slate-100" />
-                    <div className="h-2 w-full rounded bg-slate-100" />
-                    <div className="h-2 w-4/5 rounded bg-slate-100" />
-                  </div>
-                  <p className="absolute top-[42%] left-1/2 -translate-x-1/2 text-[11px] font-medium text-slate-300">
-                    {req.documentFile}
-                  </p>
-                  {fields.map((f) => (
-                    <div
-                      key={f.id}
-                      className="absolute flex items-center gap-1 rounded border border-dashed border-violet-400 bg-violet-50/95 px-2 py-1 text-[10px] font-semibold text-violet-700 shadow-sm"
-                      style={{ left: `${f.x}%`, top: `${f.y}%` }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <PenLine className="h-3 w-3" />
-                      {f.label}
-                    </div>
-                  ))}
-                  {req.status === "Signed" && req.signatureData ? (
-                    <div className="absolute right-6 bottom-10 left-6 rounded-lg border border-emerald-200 bg-white/90 px-3 py-2 text-center">
-                      {req.signatureData.startsWith("typed:") ? (
-                        <p className="font-serif text-xl text-slate-800">
-                          {req.signatureData.replace(/^typed:/, "")}
-                        </p>
-                      ) : req.signatureData.startsWith("data:") ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={req.signatureData}
-                          alt="Signature"
-                          className="mx-auto h-12 object-contain"
-                        />
-                      ) : null}
-                      <p className="mt-1 text-[9px] font-semibold tracking-wide text-emerald-700 uppercase">
-                        Signed · {req.signedDate}
-                      </p>
-                    </div>
-                  ) : null}
-                </div>
-
-                {openForSigner ? (
-                  <p className="mt-3 text-center text-[11px] text-slate-400">
-                    Public link:{" "}
                     <Link
-                      href={publicUrl}
-                      className="font-semibold text-violet-700 hover:underline"
-                      target="_blank"
+                      href={`/documents/signature/${id}/place`}
+                      className="text-[10px] font-semibold text-violet-600 hover:underline"
                     >
-                      {publicUrl}
+                      Edit field placement
                     </Link>
-                  </p>
-                ) : null}
+                  ) : null}
+                </div>
+                <SignatureDocPreview
+                  fileName={req.documentFile}
+                  fields={req.fields}
+                  signers={req.signers}
+                />
               </div>
             </div>
 
@@ -421,22 +462,24 @@ export function SignatureDetailClient({ id }: { id: string }) {
               </p>
               <div className="space-y-2">
                 {req.status === "Draft" ? (
-                  <ActionBtn
-                    onClick={sendForSignature}
-                    icon={Send}
-                    label="Send for signature"
-                    tone="primary"
-                  />
-                ) : null}
-                {openForSigner ? (
                   <>
-                    <ActionBtn onClick={resend} icon={Send} label="Resend" />
                     <ActionBtn
-                      onClick={copySignLink}
-                      icon={Copy}
-                      label="Copy sign link"
+                      onClick={() =>
+                        router.push(`/documents/signature/${id}/place`)
+                      }
+                      icon={LayoutTemplate}
+                      label="Place / adjust fields"
+                    />
+                    <ActionBtn
+                      onClick={sendForSignature}
+                      icon={Send}
+                      label="Send for signature"
+                      tone="primary"
                     />
                   </>
+                ) : null}
+                {openForSigner ? (
+                  <ActionBtn onClick={resend} icon={Send} label="Resend reminders" />
                 ) : null}
                 {req.status === "Signed" ? (
                   <ActionBtn
@@ -460,9 +503,12 @@ export function SignatureDetailClient({ id }: { id: string }) {
 
               <dl className="mt-5 space-y-2.5 rounded-xl border border-slate-200/80 bg-white px-3 py-3 text-[12px]">
                 <Row label="Sent" value={req.sentDate ?? ""} />
-                <Row label="Signed" value={req.signedDate ?? ""} />
+                <Row label="Completed" value={req.signedDate ?? ""} />
                 <Row label="IP address" value={req.ipAddress ?? ""} />
-                <Row label="Token" value={req.manageToken} />
+                <Row
+                  label="Fields"
+                  value={String(req.fields.length)}
+                />
               </dl>
 
               <p className="mt-5 mb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
@@ -519,7 +565,9 @@ function MetaCell({
         <Icon className="h-3 w-3" />
         {label}
       </p>
-      <p className="truncate text-[13px] font-semibold text-slate-900">{value}</p>
+      <p className="truncate text-[13px] font-semibold text-slate-900">
+        {value || ""}
+      </p>
     </div>
   );
 }
@@ -530,7 +578,9 @@ function Row({ label, value }: { label: string; value: string }) {
       <dt className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
         {label}
       </dt>
-      <dd className="truncate text-right font-medium text-slate-800">{value}</dd>
+      <dd className="truncate text-right font-medium text-slate-800">
+        {value || ""}
+      </dd>
     </div>
   );
 }

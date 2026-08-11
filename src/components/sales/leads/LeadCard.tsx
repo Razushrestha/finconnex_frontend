@@ -168,7 +168,7 @@ export function LeadCard({
         icon: QUICK_ICONS[action.kind],
         label,
         // Keep urgency in accessible labels only — icons stay visually neutral.
-        ariaLabel: `${label} — ${stateHint}${countHint}`,
+        ariaLabel: `${label}: ${stateHint}${countHint}`,
         title: `${label} (${stateHint})`,
         colorClassName: QUICK_URGENCY.neutral,
       };

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { BookingPageForm } from "@/components/booking/BookingPageForm";
-import { getBookingPageById } from "@/lib/booking/types";
+import { bookingPages } from "@/lib/booking/types";
 
 interface EditBookingPageProps {
   params: Promise<{ id: string }>;
@@ -13,14 +13,16 @@ export default async function EditBookingPage({
 }: EditBookingPageProps) {
   const { id } = await params;
   const sp = await searchParams;
-  const page = getBookingPageById(id);
-  if (!page) notFound();
+  const seed = bookingPages.find((p) => p.id === id);
+  // Client form rehydrates from session store; seed covers SSR for known demos.
+  if (!seed && !id.startsWith("bp-")) notFound();
 
   return (
     <BookingPageForm
       layoutId={sp.layoutid ?? "standard"}
       redirect={sp.redirect !== "true"}
-      initial={page}
+      initial={seed}
+      pageId={id}
     />
   );
 }

@@ -45,6 +45,11 @@ export default function ESignaturePage() {
           r.documentName.toLowerCase().includes(q) ||
           r.signatureRequestId.toLowerCase().includes(q) ||
           r.signer.toLowerCase().includes(q) ||
+          r.signers?.some(
+            (s) =>
+              s.name.toLowerCase().includes(q) ||
+              s.email.toLowerCase().includes(q),
+          ) ||
           (r.relatedTo?.toLowerCase().includes(q) ?? false),
       );
     }

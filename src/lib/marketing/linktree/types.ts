@@ -1,6 +1,6 @@
 /** SRS §22 Linktree / Broker profile pages */
 
-import { bookingPages, publicBookUrl } from "@/lib/booking/types";
+import { bookingPages, listBookingPages, publicBookUrl } from "@/lib/booking/types";
 
 export type LinktreeStatus = "Draft" | "Live" | "Paused";
 
@@ -176,7 +176,9 @@ export function isExternalHref(href: string) {
 }
 
 export function bookingOptions() {
-  return bookingPages
+  const pages =
+    typeof window !== "undefined" ? listBookingPages() : bookingPages;
+  return pages
     .filter((p) => p.status === "Live")
     .map((p) => ({
       slug: p.slug,

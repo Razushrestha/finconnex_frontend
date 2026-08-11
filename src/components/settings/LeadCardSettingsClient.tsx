@@ -66,7 +66,7 @@ export function LeadCardSettingsClient() {
   function onSave() {
     const saved = saveLeadCardSettings(settings);
     setSettings(saved);
-    flash("Saved — leads board will refresh");
+    flash("Saved. Leads board will refresh");
   }
 
   const atCap = settings.dynamicFieldKeys.length >= MAX_DYNAMIC_FIELDS;
@@ -142,7 +142,7 @@ export function LeadCardSettingsClient() {
             <span className="font-semibold text-slate-600">
               {settings.dynamicFieldKeys.length}/{MAX_DYNAMIC_FIELDS}
             </span>
-            {atCap ? " — limit reached" : ""}
+            {atCap ? " (limit reached)" : ""}
           </p>
 
           <p className="mt-3 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">

@@ -230,7 +230,7 @@ export default function AttachmentsPage() {
           <p className="mt-0.5 text-[12px] text-slate-500">
             {activeFolder
               ? `Files in ${activeFolder}'s folder`
-              : "One folder per client — open a folder to see their documents, or upload into a client folder."}
+              : "One folder per client. Open a folder to see their documents, or upload into a client folder."}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -302,7 +302,7 @@ export default function AttachmentsPage() {
             ))}
             {visibleFolders.length === 0 && (
               <div className="col-span-full py-12 text-center text-sm text-slate-400">
-                No client folders yet — upload a file to create one.
+                No client folders yet. Upload a file to create one.
               </div>
             )}
           </div>

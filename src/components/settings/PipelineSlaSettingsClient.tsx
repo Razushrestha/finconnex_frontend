@@ -49,7 +49,7 @@ export function PipelineSlaSettingsClient() {
   function onSave() {
     const saved = savePipelineSlaConfig(config);
     setConfig(saved);
-    flash("Saved — lead cards will refresh");
+    flash("Saved. Lead cards will refresh");
   }
 
   function setStageDuration(stage: MortgagePipelineStage, value: string) {
@@ -112,7 +112,7 @@ export function PipelineSlaSettingsClient() {
               <strong className="font-semibold text-slate-700">Milestone SLA</strong>{" "}
               (runs from pipeline start until the target stage). Optional badges on
               Lead cards/lists: On Track, Due Today, At Risk, Overdue, Milestone
-              Overdue — off by default below.
+              Overdue is off by default below.
             </p>
           </div>
           <Link

@@ -79,7 +79,7 @@ function parseDueDate(dateStr: string): number {
 
 function truncateText(value: string | undefined, max = 48): string {
   const text = value?.trim() || "";
-  if (!text) return "—";
+  if (!text) return "";
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
@@ -255,14 +255,14 @@ function buildColumnRenderers(): Record<string, ColumnRenderer> {
     relatedTo: {
       label: "Related To",
       tdClassName: "px-3 py-2.5 text-slate-500",
-      td: (task) => formatRelatedTo(task.relatedTo) || "—",
+      td: (task) => formatRelatedTo(task.relatedTo) || "",
     },
     dueDate: {
       label: "Due Date",
       tdClassName: "px-3 py-2.5",
       td: (task) => (
         <span className={task.overdue ? "font-medium text-rose-500" : undefined}>
-          {task.dueDate || "—"}
+          {task.dueDate || ""}
         </span>
       ),
     },
@@ -291,24 +291,24 @@ function buildColumnRenderers(): Record<string, ColumnRenderer> {
     createdBy: {
       label: "Created By",
       tdClassName: "px-3 py-2.5 text-slate-600",
-      td: (task) => task.createdBy || "—",
+      td: (task) => task.createdBy || "",
     },
     reminderDate: {
       label: "Reminder Date",
       tdClassName: "px-3 py-2.5 text-slate-600",
-      td: (task) => task.reminderDate || "—",
+      td: (task) => task.reminderDate || "",
     },
     completedDate: {
       label: "Completed Date",
       tdClassName: "px-3 py-2.5 text-slate-600",
-      td: (task) => task.completedDate || "—",
+      td: (task) => task.completedDate || "",
     },
     collaborators: {
       label: "Collaborators",
       tdClassName: "px-3 py-2.5",
       td: (task) => {
         const people = task.collaborators ?? [];
-        if (!people.length) return <span className="text-slate-300">—</span>;
+        if (!people.length) return <span className="text-slate-300"></span>;
         const shown = people.slice(0, 3);
         const extra = people.length - shown.length;
         return (
@@ -372,7 +372,7 @@ function buildColumnRenderers(): Record<string, ColumnRenderer> {
             Overdue
           </span>
         ) : (
-          <span className="text-slate-300">—</span>
+          <span className="text-slate-300"></span>
         ),
     },
   };
@@ -692,7 +692,7 @@ export function TaskListView({
                       key={col.id}
                       className={renderer?.tdClassName ?? "px-3 py-2.5"}
                     >
-                      {renderer ? renderer.td(task) : "—"}
+                      {renderer ? renderer.td(task) : ""}
                     </td>
                   );
                 })}

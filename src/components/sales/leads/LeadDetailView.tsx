@@ -187,7 +187,7 @@ export function LeadDetailView({ card }: { card: LeadCardData }) {
               { label: "Source", value: card.source },
               {
                 label: "Est. Value",
-                value: card.estimatedValue ?? "—",
+                value: card.estimatedValue ?? "",
               },
             ]}
           />

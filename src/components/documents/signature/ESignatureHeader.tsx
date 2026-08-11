@@ -28,7 +28,7 @@ export function ESignatureHeader({
         </h1>
         <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
           <PenLine className="h-2.5 w-2.5" />
-          Native sign
+          Multi-signer
         </span>
       </div>
       <div className="flex items-center gap-1.5">

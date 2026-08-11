@@ -1,7 +1,11 @@
 import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
-import type { SignatureRequest } from "@/lib/documents/signature/types";
+import {
+  primarySignerLabel,
+  signedCount,
+  type SignatureRequest,
+} from "@/lib/documents/signature/types";
 import { STATUS_STYLE, StatusBadge } from "./StatusBadge";
 
 export function SignatureRequestsTable({
@@ -74,17 +78,23 @@ export function SignatureRequestsTable({
                   </div>
                 </td>
                 <td className="border-b border-slate-100 px-4 py-3">
-                  <p className="font-medium text-slate-700">{r.signer}</p>
-                  <p className="text-[10px] text-slate-400">{r.signerEmail}</p>
+                  <p className="font-medium text-slate-700">
+                    {primarySignerLabel(r)}
+                  </p>
+                  <p className="text-[10px] text-slate-400">
+                    {r.signers?.length > 1
+                      ? `${signedCount(r)}/${r.signers.filter((s) => s.role !== "CC").length} signed`
+                      : r.signerEmail}
+                  </p>
                 </td>
                 <td className="max-w-[160px] truncate border-b border-slate-100 px-4 py-3 text-slate-500">
-                  {r.relatedTo ?? <span className="text-slate-300">—</span>}
+                  {r.relatedTo || ""}
                 </td>
                 <td className="border-b border-slate-100 px-4 py-3">
                   <StatusBadge status={r.status} />
                 </td>
                 <td className="border-b border-slate-100 px-4 py-3 whitespace-nowrap text-slate-500">
-                  {r.sentDate ?? <span className="text-slate-300">—</span>}
+                  {r.sentDate || ""}
                 </td>
                 <td className="border-b border-slate-100 px-4 py-3 whitespace-nowrap text-slate-500">
                   {r.expiryDate}
@@ -130,7 +140,7 @@ export function SignatureRequestsTable({
           <span>
             Showing{" "}
             <span className="font-medium text-slate-700">
-              {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)}
+              {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, total)}
             </span>{" "}
             of <span className="font-medium text-slate-700">{total}</span>
           </span>
