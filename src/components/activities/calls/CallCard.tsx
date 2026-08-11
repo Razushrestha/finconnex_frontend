@@ -19,6 +19,7 @@ import { TASK_PRIORITIES, TASK_STATUSES } from "@/lib/tasks/types";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
+import { useRouter } from "next/navigation";
 
 interface CallCardProps {
   call: Call;
@@ -58,6 +59,8 @@ export function CallCard({
   isSelected = false,
   onSelect,
 }: CallCardProps) {
+  const router = useRouter();
+
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showCommentModal, setShowCommentModal] = useState(false);
@@ -199,7 +202,10 @@ export function CallCard({
             </div>
           </div>
 
-          <h4 className="mb-1 truncate text-[13px] font-semibold text-slate-900">
+          <h4
+            onClick={() => router.push(`/activities/calls/detail/${call.id}`)}
+            className="mb-1 truncate text-[13px] font-semibold text-slate-900 cursor-pointer"
+          >
             {call.subject}
           </h4>
           <p className="mb-3 truncate text-[11px] text-slate-500">

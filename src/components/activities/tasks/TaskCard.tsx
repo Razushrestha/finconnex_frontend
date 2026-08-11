@@ -8,7 +8,6 @@ import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 import {
   Calendar,
   Building2,
-  User,
   ArrowUp,
   ArrowRight,
   ArrowDown,
@@ -18,14 +17,11 @@ import {
   RotateCcw,
   Flag,
   UserPlus,
-  Reply,
   X,
-  Clock,
-  FileText,
-  UserCircle,
 } from "lucide-react";
 import type { Task, TaskStatus, Priority } from "@/lib/tasks/types";
 import { TASK_STATUSES, TASK_PRIORITIES, TASK_OWNERS } from "@/lib/tasks/types";
+import { useRouter } from "next/navigation";
 
 interface TaskCardProps {
   task: Task;
@@ -100,6 +96,7 @@ export function TaskCard({
   isSelected = false,
   onSelect,
 }: TaskCardProps) {
+  const router = useRouter();
   const days = task.overdue ? overdueDays(task.dueDate) : null;
   const PriorityIcon =
     priorityIcon[task.priority as keyof typeof priorityIcon] ?? ArrowRight;
@@ -205,7 +202,6 @@ export function TaskCard({
           ) {
             return;
           }
-          setShowDetailsModal(true);
         }}
         data-focus-id={task.taskId}
         data-task-id={task.taskId}
@@ -222,7 +218,10 @@ export function TaskCard({
       >
         <div className="mb-3 flex items-center justify-between gap-2.5">
           <h4
-            className="mb-2 truncate text-[13px] font-semibold text-primary"
+            onClick={() =>
+              router.push(`/activities/tasks/detail/${task.taskId}`)
+            }
+            className="mb-2 truncate text-[13px] font-semibold text-primary cursor-pointer"
             title={task.title}
           >
             {task.title}
@@ -433,172 +432,6 @@ export function TaskCard({
           </button>
         </div>
       </div>
-
-      {/* Task details modal */}
-      {showDetailsModal ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setShowDetailsModal(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-5 shadow-xl"
-          >
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                  {task.taskId}
-                </p>
-                <h3 className="text-[15px] font-semibold text-slate-900">
-                  {task.title}
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowDetailsModal(false)}
-                className="shrink-0 text-slate-400 hover:text-slate-600"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mb-4 flex flex-wrap items-center gap-2">
-              <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${priorityClass[task.priority]}`}
-              >
-                {task.priority}
-              </span>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                {task.status}
-              </span>
-              <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700">
-                {task.taskType}
-              </span>
-            </div>
-
-            <div className="space-y-3 text-[13px] text-slate-700">
-              <div className="flex items-start gap-2">
-                <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                <div>
-                  <p className="text-[11px] text-slate-400">Due date</p>
-                  <p
-                    className={days !== null ? "font-medium text-rose-500" : ""}
-                  >
-                    {task.dueDate}
-                    {days !== null
-                      ? ` · Overdue ${days} ${days === 1 ? "day" : "days"}`
-                      : ""}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2">
-                <UserCircle className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                <div>
-                  <p className="text-[11px] text-slate-400">Assigned to</p>
-                  <p>{task.assignedTo}</p>
-                </div>
-              </div>
-
-              {task.createdBy ? (
-                <div className="flex items-start gap-2">
-                  <User className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                  <div>
-                    <p className="text-[11px] text-slate-400">Created by</p>
-                    <p>{task.createdBy}</p>
-                  </div>
-                </div>
-              ) : null}
-
-              {task.relatedTo ? (
-                <div className="flex items-start gap-2">
-                  <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                  <div>
-                    <p className="text-[11px] text-slate-400">Related to</p>
-                    <p>
-                      {task.relatedTo.kind}:{" "}
-                      <span className="font-medium text-sky-600">
-                        {task.relatedTo.name}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-              ) : null}
-
-              {task.reminderDate ? (
-                <div className="flex items-start gap-2">
-                  <Clock className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                  <div>
-                    <p className="text-[11px] text-slate-400">Reminder</p>
-                    <p>{task.reminderDate}</p>
-                  </div>
-                </div>
-              ) : null}
-
-              {task.completedDate ? (
-                <div className="flex items-start gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
-                  <div>
-                    <p className="text-[11px] text-slate-400">Completed on</p>
-                    <p>{task.completedDate}</p>
-                  </div>
-                </div>
-              ) : null}
-
-              {task.description ? (
-                <div className="flex items-start gap-2">
-                  <FileText className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                  <div>
-                    <p className="text-[11px] text-slate-400">Description</p>
-                    <p className="whitespace-pre-wrap">{task.description}</p>
-                  </div>
-                </div>
-              ) : null}
-
-              {task.notes ? (
-                <div className="flex items-start gap-2">
-                  <MessageCircle className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                  <div>
-                    <p className="text-[11px] text-slate-400">Notes</p>
-                    <p className="whitespace-pre-wrap">{task.notes}</p>
-                  </div>
-                </div>
-              ) : null}
-
-              {collaborators.length > 0 ? (
-                <div className="flex items-start gap-2">
-                  <UserPlus className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                  <div>
-                    <p className="mb-1 text-[11px] text-slate-400">
-                      Collaborators
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {collaborators.map((name) => (
-                        <span
-                          key={name}
-                          className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600"
-                        >
-                          {name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="mt-5 flex justify-end gap-2 border-t border-slate-50 pt-3">
-              <button
-                type="button"
-                onClick={() => setShowDetailsModal(false)}
-                className="rounded-md px-3 py-1.5 text-[12px] font-medium text-slate-500 hover:bg-slate-50"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
 
       {/* Assign user modal */}
       {showAssignModal ? (

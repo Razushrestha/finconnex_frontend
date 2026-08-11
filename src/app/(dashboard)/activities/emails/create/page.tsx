@@ -1,4 +1,4 @@
-import { CreateEmailForm } from "@/components/activities/emails/CreateEmailForm";
+import { CreateEmailForm } from "@/components/activities/emails/create/CreateEmailForm";
 import { asRelatedKind } from "@/lib/activities/create-defaults";
 
 interface PageProps {
