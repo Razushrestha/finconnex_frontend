@@ -1,5 +1,6 @@
 "use client";
 
+import { Clock } from "lucide-react";
 import React from "react";
 
 interface NoteHeaderProps {
@@ -18,7 +19,7 @@ export const NoteHeader: React.FC<NoteHeaderProps> = ({
       <div>
         <h1 className="text-xl font-bold text-foreground">Create Note</h1>
         <div className="flex items-center space-x-1.5 text-xs text-muted-foreground mt-0.5">
-          <span>🕒</span>
+          <Clock className="h-4 w-4" />
           <span>{lastEdited}</span>
         </div>
       </div>
@@ -36,7 +37,6 @@ export const NoteHeader: React.FC<NoteHeaderProps> = ({
           onClick={() => onSave(false)}
           className="px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors shadow-sm flex items-center space-x-1.5"
         >
-          <span>💾</span>
           <span>Save Note</span>
         </button>
       </div>

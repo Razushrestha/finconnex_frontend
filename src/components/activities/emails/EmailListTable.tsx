@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { Email, EmailStatus } from "@/lib/emails/types";
 import { listEmails } from "@/lib/emails/store";
 import { Paperclip } from "lucide-react";
-import { RecordDetailModal } from "@/components/shared/RecordDetailModal";
+import Link from "next/link";
 
 const statusStyles: Record<EmailStatus, string> = {
   Draft: "bg-slate-100 text-slate-600",
@@ -32,15 +32,7 @@ interface EmailListTableProps {
 }
 
 export function EmailListTable({ data }: EmailListTableProps) {
-  const [detail, setDetail] = useState<Email | null>(null);
   const rows = useMemo(() => data ?? listEmails(), [data]);
-
-  useEffect(() => {
-    const focus = new URLSearchParams(window.location.search).get("focus");
-    if (!focus) return;
-    const hit = rows.find((e) => e.id === focus);
-    if (hit) setDetail(hit);
-  }, [rows]);
 
   return (
     <div className="flex h-full w-full min-w-0 flex-col rounded-2xl border border-slate-100 bg-white">
@@ -70,7 +62,6 @@ export function EmailListTable({ data }: EmailListTableProps) {
                 data-focus-id={email.id}
                 data-email-id={email.id}
                 className="group cursor-pointer border-b border-slate-50 last:border-b-0 hover:bg-slate-50/60"
-                onClick={() => setDetail(email)}
               >
                 <td className="sticky left-0 z-10 bg-white px-4 py-3 group-hover:bg-slate-50/60">
                   <input
@@ -79,9 +70,12 @@ export function EmailListTable({ data }: EmailListTableProps) {
                   />
                 </td>
                 <td className="max-w-[260px] px-4 py-3">
-                  <div className="flex items-center gap-1.5 truncate font-medium text-slate-800">
+                  <Link
+                    href={`/activities/emails/detail/${email.id}`}
+                    className="flex items-center gap-1.5 truncate font-medium text-slate-800 hover:text-primary transition-colors cursor-pointer"
+                  >
                     {email.subject}
-                  </div>
+                  </Link>
                   <p className="mt-0.5 max-w-[240px] truncate text-xs text-slate-400">
                     {email.body}
                   </p>
@@ -134,27 +128,6 @@ export function EmailListTable({ data }: EmailListTableProps) {
           </tbody>
         </table>
       </div>
-
-      <RecordDetailModal
-        open={!!detail}
-        onClose={() => setDetail(null)}
-        title={detail?.subject ?? "Email"}
-        subtitle={detail?.status}
-        fields={
-          detail
-            ? [
-                { label: "From", value: detail.from },
-                { label: "To", value: detail.to.join(", ") },
-                { label: "Related to", value: detail.relatedTo ?? "" },
-                { label: "Template", value: detail.templateUsed ?? "" },
-                { label: "Sent", value: detail.sentDate ?? "" },
-                { label: "Opened", value: detail.openedDate ?? "" },
-                { label: "Status", value: detail.status },
-              ]
-            : []
-        }
-        body={detail?.body}
-      />
     </div>
   );
 }

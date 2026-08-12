@@ -5,6 +5,7 @@ import type { Email } from "@/lib/emails/types";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
+import Link from "next/link";
 
 interface EmailCardProps {
   email: Email;
@@ -36,9 +37,14 @@ export function EmailCard({
         {email.relatedTo ?? "Unrelated"}
       </div>
 
-      <h4 className="mb-1.5 truncate text-sm font-semibold text-slate-900">
-        {email.subject}
-      </h4>
+      <Link
+        href={`/activities/emails/detail/${email.id}`}
+        className="block group cursor-pointer"
+      >
+        <h4 className="mb-1.5 truncate text-sm font-semibold text-card-foreground group-hover:text-primary transition-colors">
+          {email.subject}
+        </h4>
+      </Link>
 
       <p className="mb-1 truncate text-xs text-slate-500">
         To: {email.to.join(", ")}

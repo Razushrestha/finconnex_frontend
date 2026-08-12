@@ -15,7 +15,7 @@ import {
 import type { Meeting, MeetingStatus, MeetingType } from "@/lib/meetings/types";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
-import { MeetingDetailModal } from "./MeetingDetailModal";
+import Link from "next/link";
 
 const STATUS_META: Record<MeetingStatus, { soft: string; text: string }> = {
   Scheduled: { soft: "bg-sky-50", text: "text-sky-700" },
@@ -49,16 +49,8 @@ export function MeetingsListTable({
   embedded = false,
 }: MeetingsListTableProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [page, setPage] = useState(1);
   const pageSize = 8;
-
-  useEffect(() => {
-    const focus = new URLSearchParams(window.location.search).get("focus");
-    if (!focus) return;
-    const hit = data.find((m) => m.id === focus);
-    if (hit) setSelectedMeeting(hit);
-  }, [data]);
 
   const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -108,31 +100,31 @@ export function MeetingsListTable({
       )}
     >
       {!embedded ? (
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-        <div>
-          <h3 className="text-[14px] font-semibold text-slate-900">
-            {statusLabel}
-          </h3>
-          <p className="text-[11px] text-slate-400">
-            {data.length} meeting{data.length === 1 ? "" : "s"}
-            {selectedIds.size > 0 ? ` · ${selectedIds.size} selected` : ""}
-          </p>
-        </div>
-        {onSearchChange ? (
-          <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-            <input
-              value={search ?? ""}
-              onChange={(e) => {
-                onSearchChange(e.target.value);
-                setPage(1);
-              }}
-              placeholder="Search meetings…"
-              className="h-9 w-56 rounded-xl border border-slate-200/90 bg-white pr-3 pl-9 text-[12px] shadow-sm outline-none transition-all hover:border-violet-300 focus:border-violet-500 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.12)]"
-            />
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+          <div>
+            <h3 className="text-[14px] font-semibold text-slate-900">
+              {statusLabel}
+            </h3>
+            <p className="text-[11px] text-slate-400">
+              {data.length} meeting{data.length === 1 ? "" : "s"}
+              {selectedIds.size > 0 ? ` · ${selectedIds.size} selected` : ""}
+            </p>
           </div>
-        ) : null}
-      </div>
+          {onSearchChange ? (
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search ?? ""}
+                onChange={(e) => {
+                  onSearchChange(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Search meetings…"
+                className="h-9 w-56 rounded-xl border border-slate-200/90 bg-white pr-3 pl-9 text-[12px] shadow-sm outline-none transition-all hover:border-violet-300 focus:border-violet-500 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.12)]"
+              />
+            </div>
+          ) : null}
+        </div>
       ) : null}
       <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full min-w-[980px] text-left text-[12px]">
@@ -166,7 +158,6 @@ export function MeetingsListTable({
                   key={meeting.id}
                   data-focus-id={meeting.id}
                   data-meeting-id={meeting.id}
-                  onClick={() => setSelectedMeeting(meeting)}
                   className="group cursor-pointer transition-colors hover:bg-violet-50/40"
                 >
                   <td className="px-4 py-3">
@@ -180,9 +171,14 @@ export function MeetingsListTable({
                     />
                   </td>
                   <td className="max-w-[240px] px-4 py-3">
-                    <p className="truncate font-semibold text-slate-900">
-                      {meeting.title}
-                    </p>
+                    <Link
+                      href={`/activities/meetings/detail/${meeting.id}`}
+                      className="group block cursor-pointer"
+                    >
+                      <p className="truncate font-semibold text-slate-900 dark:text-slate-100 group-hover:text-primary transition-colors">
+                        {meeting.title}
+                      </p>
+                    </Link>
                     {meeting.agenda ? (
                       <p className="mt-0.5 line-clamp-1 text-[11px] text-slate-400">
                         {meeting.agenda}
@@ -281,13 +277,6 @@ export function MeetingsListTable({
           />
         </div>
       </div>
-
-      {selectedMeeting ? (
-        <MeetingDetailModal
-          meeting={selectedMeeting}
-          onClose={() => setSelectedMeeting(null)}
-        />
-      ) : null}
     </div>
   );
 }

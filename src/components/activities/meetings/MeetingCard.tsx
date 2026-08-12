@@ -11,6 +11,7 @@ import type { Meeting, MeetingStatus, MeetingType } from "@/lib/meetings/types";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
+import Link from "next/link";
 
 const STATUS_BORDER: Record<MeetingStatus, string> = {
   Scheduled: "border-l-sky-500",
@@ -59,16 +60,17 @@ export function MeetingCard({
       data-focus-id={meeting.id}
       data-meeting-id={meeting.id}
       data-column-id={columnId}
-      className={cn(
-        entityCardBox,
-        cardMotion,
-        isDragging && cardDragging,
-      )}
+      className={cn(entityCardBox, cardMotion, isDragging && cardDragging)}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <h4 className="text-[13px] font-semibold leading-snug text-slate-900">
-          {meeting.title}
-        </h4>
+        <Link
+          href={`/activities/meetings/detail/${meeting.id}`}
+          className="group cursor-pointer"
+        >
+          <h4 className="text-[13px] font-semibold leading-snug text-slate-900 dark:text-slate-100 group-hover:text-primary transition-colors">
+            {meeting.title}
+          </h4>
+        </Link>
         <TypeIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
       </div>
 
