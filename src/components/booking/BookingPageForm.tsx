@@ -121,6 +121,7 @@ function slugify(value: string) {
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
     .slice(0, 48);
 }
 
@@ -135,9 +136,16 @@ export function BookingPageForm({
   const isEdit = Boolean(initial || pageIdProp);
 
   const [title, setTitle] = useState(initial?.title ?? "");
-  const [slug, setSlug] = useState(initial?.slug ?? "");
+  const [slug, setSlug] = useState(() =>
+    initial?.slug ? slugify(initial.slug) : "",
+  );
   const [slugTouched, setSlugTouched] = useState(Boolean(initial?.slug));
   const [owner, setOwner] = useState<string>(initial?.owner ?? ACTIVITY_OWNERS[0]);
+
+  // Collapse any accidental "--" already in the URL field
+  useEffect(() => {
+    setSlug((s) => (s.includes("--") ? slugify(s) : s));
+  }, []);
   const [eventType, setEventType] = useState<BookingEventType>(
     initial?.eventType ?? "Call",
   );
@@ -224,7 +232,7 @@ export function BookingPageForm({
     const live = getBookingPageById(pageIdProp);
     if (live) {
       setTitle(live.title);
-      setSlug(live.slug);
+      setSlug(slugify(live.slug));
       setSlugTouched(true);
       setOwner(live.owner);
       setEventType(live.eventType);
@@ -418,7 +426,7 @@ export function BookingPageForm({
     return {
       id: pageId,
       title: title.trim(),
-      slug: slug.trim(),
+      slug: slugify(slug.trim()),
       owner,
       eventType,
       durationMinutes,
@@ -627,9 +635,13 @@ export function BookingPageForm({
                               setSlug(
                                 e.target.value
                                   .toLowerCase()
-                                  .replace(/[^a-z0-9-]/g, ""),
+                                  .replace(/[^a-z0-9-]/g, "")
+                                  .replace(/-+/g, "-"),
                               );
                             }}
+                            onBlur={() =>
+                              setSlug((s) => s.replace(/^-+|-+$/g, ""))
+                            }
                             placeholder="john-discovery"
                             className="h-10 min-w-0 flex-1 bg-transparent pr-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400"
                           />

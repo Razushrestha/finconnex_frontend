@@ -190,8 +190,8 @@ export function TaskCard({
 
   return (
     <>
-      <div
-        draggable
+    <div
+      draggable
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onClick={(e) => {
@@ -204,8 +204,8 @@ export function TaskCard({
           }
         }}
         data-focus-id={task.taskId}
-        data-task-id={task.taskId}
-        data-column-id={columnId}
+      data-task-id={task.taskId}
+      data-column-id={columnId}
         className={cn(
           "group/card cursor-grab flex h-[220px] w-full flex-col p-3 sm:h-[230px] sm:p-3.5 relative",
           entityCardBox,
@@ -224,8 +224,8 @@ export function TaskCard({
             className="mb-2 truncate text-[13px] font-semibold text-primary cursor-pointer"
             title={task.title}
           >
-            {task.title}
-          </h4>
+        {task.title}
+      </h4>
 
           {onSelect && (
             <div
@@ -294,7 +294,7 @@ export function TaskCard({
             {visibleCollaborators.length > 0 ? (
               <div className="flex items-center">
                 {visibleCollaborators.map((name, i) => (
-                  <span
+        <span
                     key={name}
                     style={{ marginLeft: i === 0 ? 0 : -8 }}
                     className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-slate-200 text-[10px] font-semibold text-slate-600"
@@ -593,8 +593,8 @@ export function TaskCard({
                 Comment
               </button>
             </div>
-          </div>
-        </div>
+      </div>
+    </div>
       ) : null}
     </>
   );

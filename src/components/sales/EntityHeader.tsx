@@ -191,20 +191,20 @@ export function EntityHeader({
     <div className="w-full border-b border-slate-200/80 bg-background dark:border-zinc-800">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-1 py-2 sm:gap-x-3">
         <nav className="hidden items-center gap-1 text-[11px] text-slate-400 md:flex">
-          <Link
-            href="/"
+        <Link
+          href="/"
             className="flex items-center gap-0.5 hover:text-slate-600"
             aria-label="Home"
-          >
+        >
             <Home className="h-3.5 w-3.5" />
-          </Link>
+        </Link>
           {breadcrumb.map((crumb) => (
             <span key={crumb} className="flex items-center gap-1">
               <span>/</span>
               <span className="text-slate-500">{crumb}</span>
-            </span>
-          ))}
-        </nav>
+          </span>
+        ))}
+      </nav>
 
         <div className="hidden h-4 w-px bg-slate-200 md:block dark:bg-zinc-700" />
 
@@ -238,9 +238,9 @@ export function EntityHeader({
             {isScopeMenuOpen && (
               <div className="absolute left-0 z-20 mt-1.5 w-48 rounded-md border border-slate-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
                 {scopeOptions.map((opt) => (
-                  <button
+            <button
                     key={opt.value}
-                    type="button"
+              type="button"
                     onClick={() => {
                       onScopeChange?.(opt.value);
                       setIsScopeMenuOpen(false);
@@ -252,7 +252,7 @@ export function EntityHeader({
                     }`}
                   >
                     {opt.label}
-                  </button>
+            </button>
                 ))}
               </div>
             )}
@@ -350,8 +350,8 @@ export function EntityHeader({
                     >
                       Apply
                     </button>
-                  </div>
-                </div>
+          </div>
+        </div>
               )}
             </div>
           ) : null}
@@ -396,13 +396,13 @@ export function EntityHeader({
 
           <div className="relative" ref={importMenuRef}>
             <div className="inline-flex h-8 items-stretch overflow-hidden rounded-md bg-violet-600">
-              <button
-                type="button"
-                onClick={() =>
-                  router.push(
-                    `${createRoute}?layoutid=${DEFAULT_LAYOUT_ID}&redirect=false`,
-                  )
-                }
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                `${createRoute}?layoutid=${DEFAULT_LAYOUT_ID}&redirect=false`,
+              )
+            }
                 className="inline-flex items-center gap-1.5 px-3 text-[12px] font-semibold text-white hover:bg-violet-700"
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -587,7 +587,7 @@ export function EntityHeader({
                               {opt.label}
                             </span>
                             <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
-                          </button>
+          </button>
                         ))}
                       </div>
                     </>
