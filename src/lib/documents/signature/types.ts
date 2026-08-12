@@ -137,7 +137,7 @@ export const SIGNER_COLORS = [
   },
 ] as const;
 
-function makeSigner(partial: {
+export function makeSigner(partial: {
   id: string;
   name: string;
   email: string;
@@ -224,7 +224,9 @@ export function normalizeSignatureRequest(
   const fields = hasFields
     ? raw.fields
     : opts?.allowEmptyFields ||
-        (raw.status === "Draft" && Array.isArray(raw.fields) && raw.fields.length === 0)
+        (raw.status === "Draft" &&
+          Array.isArray(raw.fields) &&
+          raw.fields.length === 0)
       ? []
       : signers.flatMap((s) => defaultFieldsForSigner(s.id, s.order));
 
@@ -273,17 +275,13 @@ export function computeOverallStatus(req: SignatureRequest): SignatureStatus {
   return n.status === "Sent" ? "Sent" : n.status;
 }
 
-export function getActiveSigner(
-  req: SignatureRequest,
-): SignatureSigner | null {
+export function getActiveSigner(req: SignatureRequest): SignatureSigner | null {
   const n = normalizeSignatureRequest(req);
   if (n.signingOrder === "parallel") {
     return (
       n.signers.find(
         (s) =>
-          s.role !== "CC" &&
-          s.status !== "Signed" &&
-          s.status !== "Declined",
+          s.role !== "CC" && s.status !== "Signed" && s.status !== "Declined",
       ) ?? null
     );
   }
@@ -545,7 +543,9 @@ function writeStore(list: SignatureRequest[]) {
 export function listSignatureRequests(): SignatureRequest[] {
   const stored = readStore();
   if (stored) return stored.map((r) => normalizeSignatureRequest(r));
-  const seeded = signatureRequests.map((r) => normalizeSignatureRequest({ ...r }));
+  const seeded = signatureRequests.map((r) =>
+    normalizeSignatureRequest({ ...r }),
+  );
   writeStore(seeded);
   return seeded;
 }
@@ -644,9 +644,9 @@ export function markRequestSent(req: SignatureRequest, actor: string) {
   const nextActive =
     n.signingOrder === "parallel"
       ? null
-      : actionable.find(
+      : (actionable.find(
           (s) => s.status !== "Signed" && s.status !== "Declined",
-        ) ?? null;
+        ) ?? null);
 
   const signers = n.signers.map((s) => {
     if (s.role === "CC") return s;
