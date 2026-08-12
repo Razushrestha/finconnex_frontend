@@ -39,7 +39,7 @@ export const emails: Email[] = [
     to: ["shiva.khadka@example.com"],
     relatedTo: "Shiva Khadka",
     templateUsed: "Follow-up Template",
-    status: "Opened",
+    status: "Draft",
     sentDate: "16/07/2026 10:15 AM",
     openedDate: "16/07/2026 11:40 AM",
   },
@@ -69,33 +69,28 @@ export const emails: Email[] = [
   },
 ];
 
+function buildColumn(
+  id: string,
+  title: string,
+  status: EmailStatus,
+  badgeColorClass: string,
+): EmailColumn {
+  const columnEmails = emails.filter((e) => e.status === status);
+  return {
+    id,
+    title,
+    count: columnEmails.length,
+    badgeColorClass,
+    emails: columnEmails,
+  };
+}
+
 export const emailColumns: EmailColumn[] = [
-  {
-    id: "draft",
-    title: "Draft",
-    count: 24,
-    badgeColorClass: "bg-slate-400 text-white",
-    emails: emails.filter((e) => e.status === "Draft"),
-  },
-  {
-    id: "scheduled",
-    title: "Scheduled",
-    count: 57,
-    badgeColorClass: "bg-sky-500 text-white",
-    emails: emails.filter((e) => e.status === "Scheduled"),
-  },
-  {
-    id: "sent",
-    title: "Sent",
-    count: 812,
-    badgeColorClass: "bg-emerald-400 text-white",
-    emails: emails.filter((e) => e.status === "Sent"),
-  },
-  {
-    id: "failed",
-    title: "Failed",
-    count: 19,
-    badgeColorClass: "bg-rose-400 text-white",
-    emails: emails.filter((e) => e.status === "Failed"),
-  },
+  buildColumn("draft", "Draft", "Draft", "bg-slate-400 text-white"),
+  buildColumn("scheduled", "Scheduled", "Scheduled", "bg-sky-500 text-white"),
+  buildColumn("sent", "Sent", "Sent", "bg-emerald-400 text-white"),
+  buildColumn("delivered", "Delivered", "Delivered", "bg-teal-400 text-white"),
+  buildColumn("opened", "Opened", "Opened", "bg-indigo-400 text-white"),
+  buildColumn("bounced", "Bounced", "Bounced", "bg-amber-400 text-white"),
+  buildColumn("failed", "Failed", "Failed", "bg-rose-400 text-white"),
 ];

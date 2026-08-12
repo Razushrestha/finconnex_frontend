@@ -5,6 +5,7 @@ import { Phone, ChevronLeft, ChevronRight } from "lucide-react";
 import { listCalls } from "@/lib/calls/store";
 import type { Call } from "@/lib/calls/types";
 import { RecordDetailModal } from "@/components/shared/RecordDetailModal";
+import { useRouter } from "next/navigation";
 
 interface CallsListTableProps {
   sortActive: boolean;
@@ -15,9 +16,10 @@ export function CallsListTable({
   sortActive,
   filterOpen = false,
 }: CallsListTableProps) {
+  const router = useRouter();
+
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
-  const [detail, setDetail] = useState<Call | null>(null);
   const [tick, setTick] = useState(0);
   const pageSize = 10;
 
@@ -38,8 +40,8 @@ export function CallsListTable({
     const focus = new URLSearchParams(window.location.search).get("focus");
     if (!focus) return;
     const hit = sorted.find((c) => c.id === focus);
-    if (hit) setDetail(hit);
-  }, [sorted]);
+    if (hit) router.push(`/activities/calls/detail/${hit.id}`);
+  }, [sorted, router]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -97,12 +99,11 @@ export function CallsListTable({
                 data-focus-id={call.id}
                 data-call-id={call.id}
                 className="cursor-pointer hover:bg-slate-50/60"
-                onClick={() => setDetail(call)}
+                onClick={() =>
+                  router.push(`/activities/calls/detail/${call.id}`)
+                }
               >
-                <td
-                  className="px-3 py-2"
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={selected.has(call.id)}
@@ -161,7 +162,7 @@ export function CallsListTable({
         </div>
       </div>
 
-      <RecordDetailModal
+      {/* <RecordDetailModal
         open={!!detail}
         onClose={() => setDetail(null)}
         title={detail?.subject ?? "Call"}
@@ -180,7 +181,7 @@ export function CallsListTable({
             : []
         }
         body={detail?.notes}
-      />
+      /> */}
     </div>
   );
 }
