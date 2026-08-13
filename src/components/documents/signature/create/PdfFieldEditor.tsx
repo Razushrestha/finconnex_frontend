@@ -15,6 +15,8 @@ export interface PlacedField {
   page: number; // 1-indexed
   xPct: number; // % of that specific page's width
   yPct: number; // % of that specific page's height
+  width?: number;
+  height?: number;
 }
 
 export interface DraggingFieldType {

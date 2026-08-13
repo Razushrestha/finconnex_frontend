@@ -1,5 +1,4 @@
 import React from "react";
-import { Plus } from "lucide-react";
 
 interface AdvancedOptionsProps {
   enableReminders: boolean;
@@ -55,20 +54,6 @@ export const AdvancedOptionsSection: React.FC<AdvancedOptionsProps> = ({
             <span>Days to complete (days)</span>
           </div>
         )}
-      </div>
-
-      {/* CCs */}
-      <div className="space-y-2">
-        <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
-          CCs <span className="text-slate-400 font-normal">(optional)</span>
-        </label>
-        <button
-          type="button"
-          className="flex items-center gap-2 px-3.5 py-2 rounded-lg border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 shadow-xs"
-        >
-          <Plus className="w-3.5 h-3.5 text-indigo-600" />
-          <span>Add CC recipient</span>
-        </button>
       </div>
 
       {/* Expiry */}

@@ -34,6 +34,8 @@ export type SignatureFieldKind =
   | "name"
   | "text";
 
+export type DeliveryMethod = "email" | "email_sms";
+
 export interface SignatureAuditEvent {
   id: string;
   at: string;
@@ -55,6 +57,7 @@ export interface SignatureSigner {
   signedAt?: string;
   /** typed:… or data-URL */
   signatureData?: string;
+  deliveryMethod: DeliveryMethod;
   colorIndex: number;
 }
 
@@ -155,6 +158,7 @@ export function makeSigner(partial: {
     email: partial.email,
     order: partial.order,
     role: partial.role ?? "Signer",
+    deliveryMethod: "email",
     status: partial.status ?? "Pending",
     token: partial.token,
     colorIndex:
