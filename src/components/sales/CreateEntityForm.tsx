@@ -1,16 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import {
-  Home,
-  ChevronLeft,
-  Sparkles,
+    ChevronLeft,
   CheckCircle2,
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FORM_CANVAS } from "@/lib/layout";
 import { formEnter } from "@/lib/motion";
 
 /** Span the full form grid: use for notes, long text, section blocks. */
@@ -127,21 +125,24 @@ interface CreateEntityFormShellProps {
 }
 
 export function CreateEntityFormShell({
-  breadcrumbParent,
-  badge,
+  breadcrumbParent: _breadcrumbParent,
+  badge: _badge,
   title,
   subtitle,
   tip,
   cardIcon: CardIcon,
   cardTitle: _cardTitle,
-  cardDescription,
+  cardDescription: _cardDescription,
   listHref,
   saveLabel,
   onSave,
   children,
 }: CreateEntityFormShellProps) {
   const router = useRouter();
+  void _breadcrumbParent;
+  void _badge;
   void _cardTitle;
+  void _cardDescription;
   const [saving, setSaving] = React.useState(false);
 
   async function handleSave(createAnother: boolean) {
@@ -168,20 +169,6 @@ export function CreateEntityFormShell({
           <ChevronLeft className="h-4 w-4" />
         </button>
 
-        <nav className="hidden items-center gap-1 text-[11px] text-slate-400 sm:flex">
-          <Link href="/" className="hover:text-slate-600" aria-label="Home">
-            <Home className="h-3.5 w-3.5" />
-          </Link>
-          <span>/</span>
-          <Link href={breadcrumbParent.href} className="hover:text-slate-600">
-            {breadcrumbParent.label}
-          </Link>
-          <span>/</span>
-          <span className="text-slate-500">Create</span>
-        </nav>
-
-        <div className="hidden h-4 w-px bg-slate-200 sm:block dark:bg-zinc-700" />
-
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-violet-600 text-white">
             <CardIcon className="h-3.5 w-3.5" />
@@ -192,15 +179,6 @@ export function CreateEntityFormShell({
           >
             {title}
           </h1>
-          <span className="hidden items-center gap-1 rounded-full bg-violet-100 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase sm:inline-flex dark:bg-violet-950 dark:text-violet-300">
-            <Sparkles className="h-2.5 w-2.5" />
-            {badge}
-          </span>
-          {cardDescription.trim() ? (
-            <span className="hidden truncate text-[12px] text-slate-400 lg:inline">
-              {cardDescription}
-            </span>
-          ) : null}
         </div>
 
         <div
@@ -213,16 +191,8 @@ export function CreateEntityFormShell({
       </header>
 
       {/* Form body: fills remaining viewport */}
-      <div className="min-h-0 flex-1 overflow-auto">
-        <div
-          className={cn(
-            "grid content-start gap-x-4 gap-y-3.5 px-3 py-3 sm:px-4 sm:py-4 lg:px-5",
-            "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5",
-            formEnter,
-          )}
-        >
-          {children}
-        </div>
+      <div className="min-h-0 flex-1 overflow-auto bg-slate-50/70 dark:bg-zinc-900/40">
+        <div className={cn(FORM_CANVAS, formEnter)}>{children}</div>
       </div>
 
       {/* Actions: compact sticky bar */}

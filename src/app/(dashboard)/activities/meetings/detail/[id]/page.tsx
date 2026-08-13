@@ -21,7 +21,7 @@ export default async function MeetingDetailsPage({
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col border-r border-border overflow-y-auto">
         {/* Top Header / Actions Bar */}
-        <div className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 border-b border-border bg-card/80 backdrop-blur-md">
+        <div className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 border-b border-border bg-white backdrop-blur-md">
           <Link
             href="/activities/meetings"
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -39,7 +39,7 @@ export default async function MeetingDetailsPage({
         </div>
 
         {/* Meeting Header Metadata */}
-        <div className="px-8 py-6 space-y-4 border-b border-border bg-card/20">
+        <div className="px-8 py-6 space-y-4 border-b border-border bg-white">
           <div className="flex items-center gap-3">
             <span className="px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary uppercase tracking-wider">
               {meeting.status}
@@ -91,7 +91,7 @@ export default async function MeetingDetailsPage({
       </div>
 
       {/* Right CRM Sidebar */}
-      <div className="w-96 bg-card/30 p-6 overflow-y-auto border-l border-border hidden xl:block">
+      <div className="w-96 bg-white p-6 overflow-y-auto border-l border-border hidden xl:block">
         <MeetingSidebarCard relatedTo={meeting.relatedTo} />
       </div>
     </div>

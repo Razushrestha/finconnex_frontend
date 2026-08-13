@@ -152,23 +152,10 @@
 
 //   return (
 //     <div className="relative min-h-full overflow-y-auto bg-slate-50">
-//       <div className="relative mx-auto flex max-w-[1400px] flex-col p-2 sm:p-4 lg:p-6">
+//       <div className="relative mx-auto flex max-w-[1920px] flex-col p-2 sm:p-4 lg:p-6">
 //         <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
 //           <div className="flex min-w-0 flex-col gap-1">
-//             <nav className="flex items-center gap-1.5 text-[13px] text-slate-400">
-//               <Link
-//                 href="/"
-//                 className="flex items-center gap-1 hover:text-slate-600"
-//               >
-//                 <Home className="h-3.5 w-3.5" />
-//                 Home
-//               </Link>
-//               <span>/</span>
-//               <span className="text-slate-500">Marketing</span>
-//               <span>/</span>
-//               <span className="text-slate-500">Email Campaigns</span>
-//             </nav>
-//             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+//             //             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
 //               Marketing
 //             </h1>
 //           </div>

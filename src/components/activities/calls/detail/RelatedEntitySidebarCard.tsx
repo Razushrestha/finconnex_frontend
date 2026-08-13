@@ -10,7 +10,7 @@ export function RelatedEntitySidebarCard({ relatedTo }: RelatedEntityProps) {
   if (!relatedTo) return null;
 
   return (
-    <div className="flex flex-col rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <div className="flex flex-col rounded-2xl border border-border bg-white p-5 shadow-sm">
       <h4 className="mb-3 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
         Related Item
       </h4>

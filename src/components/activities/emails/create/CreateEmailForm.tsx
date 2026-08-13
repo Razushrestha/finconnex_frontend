@@ -105,7 +105,7 @@ function formatBytes(bytes: number) {
 }
 
 const cardClass =
-  "rounded-md border border-border bg-card text-card-foreground shadow-sm";
+  "rounded-md border border-border bg-white text-card-foreground shadow-sm";
 
 export function CreateEmailForm({
   layoutId,
@@ -211,7 +211,7 @@ export function CreateEmailForm({
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border bg-card px-6 py-1">
+      <div className="flex items-center justify-between border-b border-border bg-white px-6 py-1">
         <div className="flex items-center gap-4">
           <button
             type="button"
@@ -261,9 +261,9 @@ export function CreateEmailForm({
         </div>
       ) : null}
 
-      <div className="mx-auto grid w-full grid-cols-1 gap-6 px-6 py-4 lg:grid-cols-3">
+      <div className="mx-auto grid w-full max-w-[1920px] grid-cols-1 gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,400px)] lg:gap-6 2xl:px-8">
         {/* Left column */}
-        <div className={`${cardClass} divide-y divide-border lg:col-span-2`}>
+        <div className={`${cardClass} divide-y divide-border`}>
           <EmailRecipients
             to={form.to}
             recipientDraft={recipientDraft}

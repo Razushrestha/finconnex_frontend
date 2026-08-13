@@ -71,7 +71,7 @@ export function FilterLeadsPanel({
   return (
     <div
       className={cn(
-        "flex h-full w-48 shrink-0 flex-col rounded-md border bg-card shadow-sm",
+        "flex h-full w-48 shrink-0 flex-col rounded-md border bg-white shadow-sm",
         filterEnter,
       )}
     >

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronRight, Home } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import {
   MY_PREFERENCES_TABS,
   findSettingsCategory,
@@ -44,13 +44,9 @@ export function SettingsBreadcrumb() {
       aria-label="Breadcrumb"
       className="mt-0.5 flex flex-wrap items-center text-[11px] text-slate-400"
     >
-      <Link href="/" className="flex items-center hover:text-slate-600">
-        <Home className="mr-1 h-3 w-3" />
-        Home
-      </Link>
-      {crumbs.map((c) => (
+      {crumbs.map((c, i) => (
         <span key={c.label} className="flex items-center">
-          <ChevronRight className="mx-1 h-3 w-3" />
+          {i > 0 ? <ChevronRight className="mx-1 h-3 w-3" /> : null}
           {c.href ? (
             <Link href={c.href} className="hover:text-slate-600">
               {c.label}

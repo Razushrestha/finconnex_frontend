@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  Home,
-  Inbox,
+    Inbox,
   Search,
   Send,
   Settings,
@@ -243,23 +242,9 @@ export function UnifiedInboxClient() {
     .reduce((n, c) => n + c.unreadCount, 0);
 
   return (
-    <div className="flex min-h-0 min-h-full w-full flex-1 flex-col overflow-hidden bg-background p-2 pr-3">
+    <div className="flex min-h-0 min-h-full w-full flex-1 flex-col overflow-hidden bg-slate-50 p-2 pr-3">
       <div className="w-full shrink-0 border-b border-slate-200/80 bg-background">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-1 py-2 sm:gap-x-3">
-          <nav className="hidden items-center gap-1 text-[11px] text-slate-400 md:flex">
-            <Link
-              href="/"
-              className="flex items-center gap-0.5 hover:text-slate-600"
-              aria-label="Home"
-            >
-              <Home className="h-3.5 w-3.5" />
-            </Link>
-            <span>/</span>
-            <span className="text-slate-500">Marketing</span>
-            <span>/</span>
-            <span className="text-slate-500">Unified Inbox</span>
-          </nav>
-          <div className="hidden h-4 w-px bg-slate-200 md:block" />
           <div className="flex min-w-0 items-center gap-2">
             <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
               Unified Inbox

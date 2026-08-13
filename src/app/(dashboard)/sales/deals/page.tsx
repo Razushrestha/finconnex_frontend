@@ -59,6 +59,7 @@ import {
 import { viewEnter } from "@/lib/motion";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
+import { BOARD_PAGE } from "@/lib/layout";
 import { SORT_OPTIONS } from "../leads/page";
 import {
   type KanbanField,
@@ -355,7 +356,7 @@ export default function DealsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-2 pr-4 dark:bg-zinc-950">
+    <div className={BOARD_PAGE}>
       <FocusHighlight />
       <EntityHeader
         entityLabel="Deal"
@@ -405,7 +406,7 @@ export default function DealsPage() {
               onClick={() => setIsPipelineMenuOpen((open) => !open)}
               aria-haspopup="true"
               aria-expanded={isPipelineMenuOpen}
-              className="flex items-center gap-1.5 rounded-sm bg-card/70 hover:bg-card px-3 py-1 text-sm font-medium text-foreground/70"
+              className="flex items-center gap-1.5 rounded-sm bg-white hover:bg-white px-3 py-1 text-sm font-medium text-foreground/70"
             >
               <span>
                 {PIPELINE_OPTIONS.find((opt) => opt.value === activePipeline)

@@ -25,7 +25,7 @@ export const ReminderDetailsCard: React.FC<ReminderDetailsCardProps> = ({
   onNotesChange,
 }) => {
   return (
-    <div className="bg-card text-card-foreground rounded-xl border border-border p-6 shadow-sm space-y-5">
+    <div className="bg-white text-card-foreground rounded-xl border border-border p-6 shadow-sm space-y-5">
       <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
         Reminder Details
       </h2>

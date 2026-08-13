@@ -23,7 +23,7 @@ export const PreparationTasksCard: React.FC = () => {
   };
 
   return (
-    <div className="bg-card text-card-foreground rounded-xl border border-border p-5 shadow-sm space-y-4">
+    <div className="bg-white text-card-foreground rounded-xl border border-border p-5 shadow-sm space-y-4">
       <div>
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Preparation

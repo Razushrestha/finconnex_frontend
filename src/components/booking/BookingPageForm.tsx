@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Home,
-  CalendarClock,
+    CalendarClock,
   Clock,
   MapPin,
   Video,
@@ -68,6 +67,13 @@ interface BookingPageFormProps {
   redirect: boolean;
   initial?: BookingPage;
   pageId?: string;
+  defaultEventType?: BookingEventType;
+  defaultConsultationMode?: ConsultationMode;
+  defaultTitle?: string;
+  defaultDurationMinutes?: number;
+  defaultPrice?: number;
+  defaultMeetingVia?: MeetingVia;
+  defaultMeetingViaDetail?: string;
 }
 
 const DURATION_PRESETS = [15, 30, 45, 60, 90];
@@ -139,13 +145,20 @@ export function BookingPageForm({
   layoutId: _layoutId,
   redirect: _redirect,
   initial,
+  defaultEventType,
+  defaultConsultationMode,
+  defaultTitle,
+  defaultDurationMinutes,
+  defaultPrice,
+  defaultMeetingVia,
+  defaultMeetingViaDetail,
   pageId: pageIdProp,
 }: BookingPageFormProps) {
   const router = useRouter();
   const [pageId] = useState(pageIdProp ?? initial?.id ?? nextBookingPageId());
   const isEdit = Boolean(initial || pageIdProp);
 
-  const [title, setTitle] = useState(initial?.title ?? "");
+  const [title, setTitle] = useState(initial?.title ?? defaultTitle ?? "");
   const [slug, setSlug] = useState(() =>
     initial?.slug ? normalizeBookingSlug(initial.slug) : "",
   );
@@ -157,29 +170,35 @@ export function BookingPageForm({
     setSlug((s) => normalizeBookingSlug(s));
   }, []);
   const [eventType, setEventType] = useState<BookingEventType>(
-    initial?.eventType ?? "Call",
+    initial?.eventType ?? defaultEventType ?? "Call",
   );
   const [consultationMode, setConsultationMode] = useState<
     ConsultationMode | ""
-  >(initial?.consultationMode ?? "");
+  >(initial?.consultationMode ?? defaultConsultationMode ?? "");
   const [meetingMode, setMeetingMode] = useState<MeetingMode>(
     initial?.meetingMode ?? "one_time",
   );
   const [coverImageUrl, setCoverImageUrl] = useState(
     initial?.coverImageUrl ?? "",
   );
-  const [price, setPrice] = useState(initial?.price ?? 0);
+  const [price, setPrice] = useState(initial?.price ?? defaultPrice ?? 0);
   const [currency, setCurrency] = useState<BookingCurrency>(
     initial?.currency ?? "AUD",
   );
   const [isFree, setIsFree] = useState(
-    initial?.price == null || initial.price <= 0,
+    initial?.price == null
+      ? defaultPrice == null || defaultPrice <= 0
+      : initial.price <= 0,
   );
   const [meetingVia, setMeetingVia] = useState<MeetingVia>(
-    initial?.meetingVia ?? "video",
+    initial?.meetingVia ?? defaultMeetingVia ?? "video",
   );
   const [meetingViaDetail, setMeetingViaDetail] = useState(
-    initial?.meetingViaDetail ?? initial?.videoLink ?? initial?.location ?? "",
+    initial?.meetingViaDetail ??
+      initial?.videoLink ??
+      initial?.location ??
+      defaultMeetingViaDetail ??
+      "",
   );
   const [maxAttendees, setMaxAttendees] = useState(
     initial?.maxAttendees ?? 10,
@@ -189,7 +208,7 @@ export function BookingPageForm({
       (initial?.owner ? [initial.owner] : []),
   );
   const [durationMinutes, setDurationMinutes] = useState(
-    initial?.durationMinutes ?? 30,
+    initial?.durationMinutes ?? defaultDurationMinutes ?? 30,
   );
   const [bufferMinutes, setBufferMinutes] = useState(
     initial?.bufferMinutes ?? 10,
@@ -549,27 +568,9 @@ export function BookingPageForm({
           {/* Compact header */}
           <div className="relative mb-2.5 flex flex-wrap items-center justify-between gap-2">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-                <Link
-                  href="/"
-                  className="flex items-center gap-0.5 hover:text-slate-600"
-                >
-                  <Home className="h-3 w-3" />
-                  Home
-                </Link>
-                <span>/</span>
-                <Link href="/booking" className="hover:text-slate-600">
-                  Booking
-                </Link>
-                <span>/</span>
-              </nav>
               <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
                 {isEdit ? "Edit booking page" : "Create booking page"}
               </h1>
-              <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
-                <CalendarClock className="h-2.5 w-2.5" />
-                Self-serve
-              </span>
             </div>
             {slug ? (
               <div className="flex items-center gap-1.5">

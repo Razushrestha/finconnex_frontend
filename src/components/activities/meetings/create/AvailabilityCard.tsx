@@ -5,7 +5,7 @@ import { CheckCircle2 } from "lucide-react";
 
 export const AvailabilityCard: React.FC = () => {
   return (
-    <div className="bg-card text-card-foreground rounded-xl border border-border p-5 shadow-sm space-y-4">
+    <div className="bg-white text-card-foreground rounded-xl border border-border p-5 shadow-sm space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Availability

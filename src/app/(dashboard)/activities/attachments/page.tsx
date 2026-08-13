@@ -5,8 +5,7 @@ import {
   ArrowLeft,
   Folder,
   FolderOpen,
-  Home,
-  Paperclip,
+    Paperclip,
   Plus,
   Search,
   X,
@@ -29,6 +28,7 @@ import {
 } from "@/lib/activities/shared";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
+import { BOARD_PAGE } from "@/lib/layout";
 
 /** "Lead: William Anderson" → "William Anderson" */
 export function clientNameFromRelatedTo(relatedTo?: string): string {
@@ -199,39 +199,13 @@ export default function AttachmentsPage() {
   }, [folders]);
 
   return (
-    <div className="flex h-full flex-col gap-4 p-4 sm:p-6">
+    <div className={cn(BOARD_PAGE, "gap-4")}>
       <FocusHighlight />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="mb-1 flex items-center gap-1.5 text-[11px] text-slate-400">
-            <Home className="h-3 w-3" />
-            <span>Activities</span>
-            <span>/</span>
-            <button
-              type="button"
-              onClick={() => setActiveFolder(null)}
-              className={cn(
-                "hover:text-slate-700",
-                !activeFolder ? "font-medium text-slate-600" : "text-slate-400",
-              )}
-            >
-              Attachments
-            </button>
-            {activeFolder && (
-              <>
-                <span>/</span>
-                <span className="font-medium text-slate-600">{activeFolder}</span>
-              </>
-            )}
-          </div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900">
             {activeFolder ? activeFolder : "Attachments"}
           </h1>
-          <p className="mt-0.5 text-[12px] text-slate-500">
-            {activeFolder
-              ? `Files in ${activeFolder}'s folder`
-              : "One folder per client. Open a folder to see their documents, or upload into a client folder."}
-          </p>
         </div>
         <div className="flex items-center gap-2">
           {activeFolder && (

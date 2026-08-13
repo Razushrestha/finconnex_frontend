@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Home,
-  FolderOpen,
+    FolderOpen,
   Plus,
   Search,
   FileText,
@@ -42,6 +41,7 @@ import {
   elevatedSelectClass,
 } from "@/components/sales/CreateEntityForm";
 import { cn } from "@/lib/utils";
+import { BOARD_PAGE } from "@/lib/layout";
 import { softDeleteRecord } from "@/lib/rules";
 
 const ACCESS_STYLE: Record<DocumentAccessLevel, string> = {
@@ -192,17 +192,13 @@ export default function DocumentLibraryPage() {
   }
 
   return (
-    <div className="relative min-h-full overflow-hidden bg-slate-50">
-      <div className="relative mx-auto flex w-full flex-col p-2.5 sm:p-3 lg:p-4">
+    <div className={BOARD_PAGE}>
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="px-2 text-[15px] font-bold tracking-tight text-slate-900">
+            <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Library
             </h1>
-            {/* <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
-              <FolderOpen className="h-2.5 w-2.5" />
-              Central store
-            </span> */}
           </div>
           <button
             type="button"
@@ -214,9 +210,9 @@ export default function DocumentLibraryPage() {
           </button>
         </div>
 
-        <div className="flex min-h-[calc(100dvh-7.5rem)] overflow-hidden rounded-md border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           {/* Folder rail */}
-          <aside className="hidden w-[200px] shrink-0 flex-col border-r border-slate-100 bg-slate-50/50 sm:flex">
+          <aside className="hidden w-[200px] shrink-0 flex-col rounded-sm border border-slate-200/60 bg-white sm:flex">
             <div className="flex items-center justify-between px-3 pt-3 pb-2">
               <p className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
                 Folders
@@ -513,7 +509,7 @@ export default function DocumentLibraryPage() {
             {[...selected.versions].reverse().map((v) => (
               <li
                 key={v.version}
-                className="rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-2.5"
+                className="rounded-xl border border-slate-100 bg-white px-3 py-2.5"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-[12px] font-bold text-violet-700">

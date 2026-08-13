@@ -60,7 +60,7 @@ export function TaskTimelineView({ filters }: { filters: TaskFilters }) {
   const span = Math.max(maxTime - minTime, 1);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-3">
+    <div className="rounded-xl border border-border bg-white p-3">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-foreground">Task timeline</h3>
         {flash ? (

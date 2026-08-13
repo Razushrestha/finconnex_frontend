@@ -20,6 +20,7 @@ import {
 } from "@/components/activities/ActivityToolbar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
+import { BOARD_PAGE } from "@/lib/layout";
 import { activityExportMenuItem } from "@/lib/activities/export";
 import { DropTargetPos } from "@/components/activities/meetings/MeetingsKanbanBoard";
 
@@ -128,7 +129,7 @@ export default function MeetingsPage() {
   }
 
   return (
-    <div className="flex min-h-full w-full min-w-0 flex-col overflow-hidden bg-slate-50/50 p-2 sm:p-4">
+    <div className={BOARD_PAGE}>
       <FocusHighlight />
       <div className="shrink-0">
         <ActivityToolbar
@@ -194,7 +195,7 @@ export default function MeetingsPage() {
               embedded
             />
           ) : (
-            <div className="flex h-full min-h-[420px] divide-x divide-slate-100 overflow-x-auto rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm">
+            <div className="flex h-full min-h-[420px] items-stretch gap-3 overflow-x-auto p-1">
               {visibleColumns.map((column) => {
                 const meetings = column.meetings.filter((m) => {
                   if (typeFilter !== "All" && m.type !== typeFilter)

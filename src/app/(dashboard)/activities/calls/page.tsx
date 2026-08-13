@@ -18,6 +18,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { activityExportMenuItem } from "@/lib/activities/export";
+import { BOARD_PAGE } from "@/lib/layout";
 
 const moreMenuItems = [
   { key: "mass-transfer", icon: ArrowRightLeft, label: "Mass Transfer" },
@@ -34,7 +35,7 @@ export default function CallsPage() {
   const [sortActive, setSortActive] = useState(true);
 
   return (
-    <div className="flex min-h-full w-full min-w-0 flex-col overflow-hidden bg-slate-50/50 p-4">
+    <div className={BOARD_PAGE}>
       <FocusHighlight />
       {/* Toolbar: fixed, never scrolls */}
       <div className="shrink-0">

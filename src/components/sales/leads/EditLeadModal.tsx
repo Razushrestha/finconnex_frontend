@@ -96,7 +96,7 @@ export function EditLeadModal({
         aria-modal="true"
         aria-labelledby="edit-lead-title"
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[90vh] w-full max-w-md flex-col rounded-2xl border border-border bg-card text-card-foreground shadow-2xl"
+        className="flex max-h-[90vh] w-full max-w-md flex-col rounded-2xl border border-border bg-white text-card-foreground shadow-2xl"
       >
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <h2

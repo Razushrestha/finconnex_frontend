@@ -39,7 +39,7 @@ export const RevenueExpensesChart: React.FC = () => {
               onClick={() => setChartType("bar")}
               className={`px-3 py-1.5 rounded-md transition-all ${
                 chartType === "bar"
-                  ? "bg-card text-foreground shadow-sm"
+                  ? "bg-white text-foreground shadow-sm"
                   : "text-muted-foreground"
               }`}
             >
@@ -49,7 +49,7 @@ export const RevenueExpensesChart: React.FC = () => {
               onClick={() => setChartType("line")}
               className={`px-3 py-1.5 rounded-md transition-all ${
                 chartType === "line"
-                  ? "bg-card text-foreground shadow-sm"
+                  ? "bg-white text-foreground shadow-sm"
                   : "text-muted-foreground"
               }`}
             >
@@ -62,21 +62,21 @@ export const RevenueExpensesChart: React.FC = () => {
             <select
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value as TimeRange)}
-              className="px-3 py-2 bg-muted border border-border rounded-lg text-xs font-medium text-foreground focus:outline-none focus:bg-card focus:border-ring transition-all cursor-pointer"
+              className="px-3 py-2 bg-muted border border-border rounded-lg text-xs font-medium text-foreground focus:outline-none focus:bg-white focus:border-ring transition-all cursor-pointer"
             >
-              <option value="today" className="bg-card text-foreground">
+              <option value="today" className="bg-white text-foreground">
                 Today
               </option>
-              <option value="week" className="bg-card text-foreground">
+              <option value="week" className="bg-white text-foreground">
                 Week
               </option>
-              <option value="6m" className="bg-card text-foreground">
+              <option value="6m" className="bg-white text-foreground">
                 Last 6 Months
               </option>
-              <option value="year" className="bg-card text-foreground">
+              <option value="year" className="bg-white text-foreground">
                 Full Year (Months)
               </option>
-              <option value="custom" className="bg-card text-foreground">
+              <option value="custom" className="bg-white text-foreground">
                 Custom Date
               </option>
             </select>

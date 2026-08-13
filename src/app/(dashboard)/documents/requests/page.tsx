@@ -3,12 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Home,
-  Plus,
+    Plus,
   Search,
   List,
   LayoutGrid,
-  FileStack,
   Download,
 } from "lucide-react";
 import {
@@ -28,6 +26,8 @@ import {
   DocumentRequestCard,
 } from "@/components/documents/requests/DocumentRequestsList";
 import { cn } from "@/lib/utils";
+import { BOARD_PAGE, KANBAN_HEADER, KANBAN_WELL } from "@/lib/layout";
+import { dropTargetActive } from "@/lib/motion";
 
 type ViewMode = "list" | "kanban";
 type StatusTab = "All" | DocumentRequestStatus;
@@ -159,8 +159,8 @@ export default function DocumentRequestsPage() {
   }
 
   return (
-    <div className="relative min-h-full overflow-hidden bg-slate-50">
-      <div className="relative mx-auto flex w-full flex-col p-2.5 sm:p-3 lg:p-4">
+    <div className={BOARD_PAGE}>
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
@@ -187,8 +187,8 @@ export default function DocumentRequestsPage() {
           </div>
         </div>
 
-        <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col overflow-hidden rounded-md border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 sm:px-4">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-0.5 rounded-lg bg-slate-50 p-0.5">
               <TabBtn
                 active={statusTab === "All"}
@@ -253,7 +253,7 @@ export default function DocumentRequestsPage() {
             {view === "list" ? (
               <DocumentRequestsList data={filtered} embedded />
             ) : (
-              <div className="flex h-full min-h-[420px] divide-x divide-slate-100 overflow-x-auto">
+              <div className="flex h-full min-h-[420px] items-stretch gap-3 overflow-x-auto p-1">
                 {visibleColumns.map((column) => {
                   const requests = column.requests.filter((r) => {
                     if (typeFilter !== "All" && r.documentType !== typeFilter)
@@ -270,36 +270,35 @@ export default function DocumentRequestsPage() {
                   return (
                     <div
                       key={column.id}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        setOverCol(column.id);
-                      }}
-                      onDragLeave={() =>
-                        setOverCol((p) => (p === column.id ? null : p))
-                      }
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        handleDrop(column.id);
-                      }}
-                      className={cn(
-                        "flex min-h-[420px] min-w-[220px] flex-1 flex-col transition-colors",
-                        isOver && "bg-violet-50/50",
-                      )}
+                      className="flex min-h-[420px] w-72 shrink-0 flex-col gap-2"
                     >
-                      <div className="border-b border-slate-100 px-3 py-2">
-                        <span
-                          className={cn(
-                            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
-                            column.badgeColorClass,
-                          )}
-                        >
-                          {column.title}
-                          <span className="rounded-full bg-white/25 px-1.5 py-px text-[10px]">
+                      <div className={KANBAN_HEADER}>
+                        <div className="flex items-center justify-between px-1">
+                          <h3 className="text-xs font-semibold text-slate-800 xl:text-sm">
+                            {column.title}
+                          </h3>
+                          <span className="rounded-full border border-slate-200/80 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500">
                             {requests.length}
                           </span>
-                        </span>
+                        </div>
                       </div>
-                      <div className="flex-1 space-y-2 overflow-y-auto p-2">
+                      <div
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setOverCol(column.id);
+                        }}
+                        onDragLeave={() =>
+                          setOverCol((p) => (p === column.id ? null : p))
+                        }
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          handleDrop(column.id);
+                        }}
+                        className={cn(
+                          "flex min-h-0 flex-1 flex-col space-y-2 overflow-y-auto rounded-sm border p-2",
+                          isOver ? dropTargetActive : KANBAN_WELL,
+                        )}
+                      >
                         {requests.map((request) => (
                           <DocumentRequestCard
                             key={request.id}

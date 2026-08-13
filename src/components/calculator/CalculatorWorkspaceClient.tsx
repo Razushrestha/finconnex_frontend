@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Home,
-  Calculator,
   Equal,
   RotateCcw,
   Save,
@@ -210,23 +208,9 @@ export function CalculatorWorkspaceClient() {
       <div className="relative mx-auto flex max-w-[1200px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-              <Link
-                href="/"
-                className="flex items-center gap-0.5 hover:text-slate-600"
-              >
-                <Home className="h-3 w-3" />
-                Home
-              </Link>
-              <span>/</span>
-            </nav>
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Calculator
             </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
-              <Calculator className="h-2.5 w-2.5" />
-              §17
-            </span>
           </div>
           <div className="flex items-center gap-1.5">
             <button
@@ -458,7 +442,7 @@ export function CalculatorWorkspaceClient() {
             </div>
 
             <aside className="space-y-3">
-              <div className="rounded-2xl border border-violet-100 bg-slate-50 p-4 shadow-sm">
+              <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
                 <div className="mb-1 text-[10px] font-semibold tracking-wide text-violet-600 uppercase">
                   Output result
                 </div>

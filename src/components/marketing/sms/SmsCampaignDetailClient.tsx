@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Home,
-  ArrowLeft,
+    ArrowLeft,
   Play,
   Pause,
   Calendar,
@@ -205,17 +204,6 @@ export function SmsCampaignDetailClient({ id }: { id: string }) {
           >
             <ArrowLeft className="h-3.5 w-3.5" />
           </button>
-          <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-            <Link href="/" className="flex items-center gap-0.5 hover:text-slate-600">
-              <Home className="h-3 w-3" />
-              Home
-            </Link>
-            <span>/</span>
-            <Link href="/marketing/sms" className="hover:text-slate-600">
-              SMS Campaigns
-            </Link>
-            <span>/</span>
-          </nav>
           <h1 className="text-[15px] font-bold text-slate-900">
             {campaign.campaignId}
           </h1>
@@ -257,7 +245,7 @@ export function SmsCampaignDetailClient({ id }: { id: string }) {
                 {campaign.type} · {campaign.audience}
               </p>
             </div>
-            <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2">
+            <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2">
               <span
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-semibold",
@@ -294,7 +282,7 @@ export function SmsCampaignDetailClient({ id }: { id: string }) {
               <p className="mb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
                 Message
               </p>
-              <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-4 text-[13px] leading-relaxed text-slate-800">
+              <div className="rounded-xl border border-slate-100 bg-white p-4 text-[13px] leading-relaxed text-slate-800">
                 {campaign.message}
               </div>
               <p className="mt-2 text-right text-[10px] tabular-nums text-slate-400">

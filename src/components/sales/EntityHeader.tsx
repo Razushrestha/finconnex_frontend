@@ -2,12 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   RotateCw,
-  Home,
-  Filter,
+    Filter,
   List,
   LayoutGrid,
   Plus,
@@ -99,7 +97,7 @@ export function EntityHeader({
   entityLabel,
   entityLabelPlural = `${entityLabel}s`,
   createRoute,
-  breadcrumb = ["Sales", entityLabelPlural],
+  breadcrumb: _breadcrumb = ["Sales", entityLabelPlural],
   totalCount,
   scopeOptions,
   activeScope,
@@ -124,6 +122,7 @@ export function EntityHeader({
   importOptions,
 }: EntityHeaderProps) {
   const router = useRouter();
+  void _breadcrumb;
   const title = entityLabelPlural;
 
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
@@ -190,24 +189,6 @@ export function EntityHeader({
   return (
     <div className="w-full border-b border-slate-200/80 bg-background dark:border-zinc-800">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-1 py-2 sm:gap-x-3">
-        <nav className="hidden items-center gap-1 text-[11px] text-slate-400 md:flex">
-        <Link
-          href="/"
-            className="flex items-center gap-0.5 hover:text-slate-600"
-            aria-label="Home"
-        >
-            <Home className="h-3.5 w-3.5" />
-        </Link>
-          {breadcrumb.map((crumb) => (
-            <span key={crumb} className="flex items-center gap-1">
-              <span>/</span>
-              <span className="text-slate-500">{crumb}</span>
-          </span>
-        ))}
-      </nav>
-
-        <div className="hidden h-4 w-px bg-slate-200 md:block dark:bg-zinc-700" />
-
         <div className="flex min-w-0 items-center gap-2">
           <h1 className="truncate text-[15px] font-bold tracking-tight text-foreground">
             {title}

@@ -141,7 +141,7 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
   });
 
   return (
-    <div className="relative mx-auto w-full p-3">
+    <div className="relative mx-auto w-full max-w-[1920px] p-3 lg:p-5 2xl:px-8">
       {flash ? (
         <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-semibold text-white shadow-lg">
           {flash}
@@ -175,7 +175,7 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
         onMoreActions={() => notify("More actions…")}
       />
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr_280px]">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)_minmax(260px,360px)] 2xl:gap-6">
         <div className="space-y-4">
           <ScoreGaugeCard
             title="Lead Score"

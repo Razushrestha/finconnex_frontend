@@ -63,7 +63,7 @@ export default function RelatedRecordCombobox({
         onFocus={() => setOpen(true)}
       />
       {open && visible.length > 0 && (
-        <ul className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-card shadow-lg">
+        <ul className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-white shadow-lg">
           {visible.map((r) => (
             <li
               key={`${r.kind}-${r.name}`}
@@ -85,7 +85,7 @@ export default function RelatedRecordCombobox({
         </ul>
       )}
       {open && query.trim() !== "" && visible.length === 0 && (
-        <div className="absolute z-10 mt-1 w-full rounded-md border bg-card px-3 py-2 text-sm text-foreground/70 shadow-lg">
+        <div className="absolute z-10 mt-1 w-full rounded-md border bg-white px-3 py-2 text-sm text-foreground/70 shadow-lg">
           No matches
         </div>
       )}

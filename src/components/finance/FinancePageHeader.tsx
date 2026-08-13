@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Home, FileText, Receipt, Banknote, Package } from "lucide-react";
+import { FileText, Receipt, Banknote, Package } from "lucide-react";
 
 const LINKS = [
   { href: "/finance/estimates", label: "Estimates", icon: FileText },
@@ -18,22 +18,8 @@ export function FinancePageHeader({
 }: FinancePageHeaderProps) {
   return (
     <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-2 border-b border-slate-200/80 pb-2 dark:border-zinc-800">
-      <nav className="flex items-center gap-1 text-[11px] text-slate-400">
-        <Link href="/" className="hover:text-slate-600" aria-label="Home">
-          <Home className="h-3.5 w-3.5" />
-        </Link>
-        <span>/</span>
-        <span className="text-slate-500">Finance</span>
-        <span>/</span>
-        <span className="font-medium text-slate-700 dark:text-slate-200">
-          {currentPage}
-        </span>
-      </nav>
-
-      <div className="hidden h-4 w-px bg-slate-200 sm:block dark:bg-zinc-700" />
-
       <h1 className="text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">
-        Finance overview
+        {currentPage === "Overview" ? "Finance overview" : currentPage}
       </h1>
 
       <div className="ml-auto flex flex-wrap gap-1">

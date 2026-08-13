@@ -54,7 +54,7 @@ export function SettingsSectionNav() {
 
   return (
     <div className="border-b border-slate-200/80 bg-white">
-      <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 py-2 scrollbar-none sm:px-6">
+      <div className="mx-auto flex w-full max-w-[1920px] gap-1 overflow-x-auto px-4 py-2 scrollbar-none sm:px-6 2xl:px-8">
         {SETTINGS_CATEGORIES.map((cat) => {
           const active = pathname?.startsWith(`/settings/${cat.slug}`);
           const Icon = iconMap[cat.icon] || Settings;

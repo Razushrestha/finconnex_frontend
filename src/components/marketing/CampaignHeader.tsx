@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { Home, Plus, Download } from "lucide-react";
+import { Plus, Download } from "lucide-react";
 
 export interface CampaignBreadcrumb {
   label: string;
@@ -9,8 +8,8 @@ export interface CampaignBreadcrumb {
 }
 
 interface CampaignHeaderProps {
-  /** e.g. [{ label: "Home", href: "/" }, { label: "Marketing" }, { label: "Email Campaigns" }] */
-  breadcrumbs: CampaignBreadcrumb[];
+  /** Kept for call-site compat; crumbs are no longer rendered. */
+  breadcrumbs?: CampaignBreadcrumb[];
   /** Page title — the entity name (Email Campaigns, Forms, …), not "Marketing". */
   title: string;
   totalCount?: number;
@@ -25,7 +24,7 @@ interface CampaignHeaderProps {
  * Matches EntityHeader density used on Sales pages.
  */
 export function CampaignHeader({
-  breadcrumbs,
+  breadcrumbs: _breadcrumbs,
   title,
   totalCount,
   onExport,
@@ -33,31 +32,10 @@ export function CampaignHeader({
   onCreate,
   createLabel = "New",
 }: CampaignHeaderProps) {
+  void _breadcrumbs;
   return (
     <div className="w-full shrink-0 border-b border-slate-200/80 bg-background">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-1 py-2 sm:gap-x-3">
-        <nav className="hidden items-center gap-1 text-[11px] text-slate-400 md:flex">
-          {breadcrumbs.map((crumb, i) => (
-            <span key={`${crumb.label}-${i}`} className="flex items-center gap-1">
-              {i > 0 ? <span>/</span> : null}
-              {crumb.href ? (
-                <Link
-                  href={crumb.href}
-                  className="flex items-center gap-0.5 hover:text-slate-600"
-                  aria-label={i === 0 ? "Home" : crumb.label}
-                >
-                  {i === 0 ? <Home className="h-3.5 w-3.5" /> : null}
-                  {i === 0 ? null : crumb.label}
-                </Link>
-              ) : (
-                <span className="text-slate-500">{crumb.label}</span>
-              )}
-            </span>
-          ))}
-        </nav>
-
-        <div className="hidden h-4 w-px bg-slate-200 md:block" />
-
         <div className="flex min-w-0 items-center gap-2">
           <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
             {title}

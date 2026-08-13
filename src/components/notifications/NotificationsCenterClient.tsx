@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Home,
-  Bell,
+    Bell,
   CheckCheck,
   Download,
   Settings,
@@ -127,26 +126,12 @@ export function NotificationsCenterClient() {
         </div>
       ) : null}
 
-      <div className="relative mx-auto flex max-w-[1400px] flex-col p-2.5 sm:p-3 lg:p-4">
+      <div className="relative mx-auto flex max-w-[1920px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-              <Link
-                href="/"
-                className="flex items-center gap-0.5 hover:text-slate-600"
-              >
-                <Home className="h-3 w-3" />
-                Home
-              </Link>
-              <span>/</span>
-            </nav>
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Notifications
             </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
-              <Bell className="h-2.5 w-2.5" />
-              §18
-            </span>
             {unread > 0 ? (
               <span className="rounded-full bg-violet-600 px-2 py-0.5 text-[9px] font-bold text-white">
                 {unread} unread

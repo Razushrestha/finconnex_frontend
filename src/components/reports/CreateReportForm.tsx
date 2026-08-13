@@ -9,8 +9,7 @@ import {
   Calendar,
   User,
   Type,
-  Home,
-  ArrowLeft,
+    ArrowLeft,
   Filter,
   Layers,
   ArrowUpDown,
@@ -157,7 +156,7 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
   return (
     <div className="relative flex min-h-full flex-col overflow-hidden bg-slate-50">
 
-      <div className="relative mx-auto flex w-full max-w-[1400px] flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
+      <div className="relative mx-auto flex w-full max-w-[1920px] flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <button
@@ -168,24 +167,9 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
             >
               <ArrowLeft className="h-3.5 w-3.5" />
             </button>
-            <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-              <Link href="/" className="flex items-center gap-0.5 hover:text-slate-600">
-                <Home className="h-3 w-3" />
-                Home
-              </Link>
-              <span>/</span>
-              <Link href="/reports" className="hover:text-slate-600">
-                Reports
-              </Link>
-              <span>/</span>
-            </nav>
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               New report
             </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
-              <FileBarChart className="h-2.5 w-2.5" />
-              §14
-            </span>
           </div>
           <div className="flex items-center gap-1.5">
             <button

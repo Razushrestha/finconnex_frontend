@@ -192,7 +192,7 @@ export function LeadActivityListPanel({
                     href
                       ? "hover:bg-slate-50 focus-visible:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                       : "cursor-default opacity-90",
-                    index === 0 && mode === "summary" && "bg-card/50",
+                    index === 0 && mode === "summary" && "bg-white",
                   )}
                 >
                   {urgency ? (

@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Home,
-  ArrowLeft,
+    ArrowLeft,
   ExternalLink,
   Copy,
   Link2,
@@ -151,20 +150,6 @@ export function LinktreeDetailClient({ id }: { id: string }) {
           >
             <ArrowLeft className="h-3.5 w-3.5" />
           </button>
-          <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-            <Link
-              href="/"
-              className="flex items-center gap-0.5 hover:text-slate-600"
-            >
-              <Home className="h-3 w-3" />
-              Home
-            </Link>
-            <span>/</span>
-            <Link href="/marketing/linktree" className="hover:text-slate-600">
-              Broker pages
-            </Link>
-            <span>/</span>
-          </nav>
           <h1 className="text-[15px] font-bold text-slate-900">
             {page.pageId}
           </h1>
@@ -412,7 +397,7 @@ export function LinktreeDetailClient({ id }: { id: string }) {
               {page.linkItems.map((l, index) => (
                 <div
                   key={l.id}
-                  className="grid gap-2 rounded-xl border border-slate-100 bg-slate-50/50 p-2.5 sm:grid-cols-[110px_1fr_1fr_auto]"
+                  className="grid gap-2 rounded-xl border border-slate-100 bg-white p-2.5 sm:grid-cols-[110px_1fr_1fr_auto]"
                 >
                   <select
                     value={l.type}

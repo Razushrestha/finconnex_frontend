@@ -1,8 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
-import { Home } from "lucide-react";
 import {
   FORECAST_PERIODS,
   FORECAST_ROWS,
@@ -47,19 +45,6 @@ export default function ForecastingPage() {
     <div className="min-h-screen bg-slate-50 p-3 sm:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <nav className="mb-0.5 flex items-center gap-1 text-[10px] text-slate-400">
-            <Link
-              href="/"
-              className="flex items-center gap-0.5 hover:text-slate-600"
-            >
-              <Home className="h-3 w-3" />
-              Home
-            </Link>
-            <span>/</span>
-            <span>Sales</span>
-            <span>/</span>
-            <span className="text-slate-600">Forecasting</span>
-          </nav>
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <h1 className="text-[16px] font-semibold tracking-tight text-slate-900">
               Sales Forecasting

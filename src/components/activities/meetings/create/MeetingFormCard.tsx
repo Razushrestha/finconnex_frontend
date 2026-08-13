@@ -111,7 +111,7 @@ export const MeetingFormCard: React.FC<MeetingFormCardProps> = ({
   };
 
   return (
-    <div className="bg-card text-card-foreground rounded-md border border-border p-4 shadow-sm space-y-5">
+    <div className="bg-white text-card-foreground rounded-md border border-border p-4 shadow-sm space-y-5">
       {/* Meeting Title */}
       <div className="space-y-1.5">
         <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -245,7 +245,7 @@ export const MeetingFormCard: React.FC<MeetingFormCardProps> = ({
             <button
               type="button"
               onClick={() => setIsOpen(true)}
-              className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-dashed border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors bg-card"
+              className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-dashed border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors bg-white"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Add participant</span>

@@ -6,6 +6,7 @@ import type { MeetingColumn } from "@/lib/meetings/types";
 import { MeetingCard } from "./MeetingCard";
 import { cn } from "@/lib/utils";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
+import { KANBAN_HEADER, KANBAN_WELL } from "@/lib/layout";
 import { useRouter } from "next/navigation";
 import type { DropTargetPos } from "./MeetingsKanbanBoard";
 
@@ -67,8 +68,8 @@ export function MeetingsKanbanColumn({
       <div className="mb-4 flex h-full w-10 shrink-0 flex-col rounded-sm">
         <div
           className={cn(
-            "flex h-full flex-col items-center gap-3 rounded-sm p-2 shadow-sm",
-            column.badgeColorClass,
+            "flex h-full flex-col items-center gap-3 p-2",
+            KANBAN_HEADER,
           )}
         >
           <button
@@ -103,10 +104,7 @@ export function MeetingsKanbanColumn({
     >
       {/* Separate Header Box */}
       <div
-        className={cn(
-          "mb-3 shrink-0 rounded-sm p-2 shadow-sm",
-          column.badgeColorClass,
-        )}
+        className={cn("mb-2 shrink-0", KANBAN_HEADER)}
       >
         <div className="flex items-center justify-between gap-4">
           {embedded ? (
@@ -151,11 +149,7 @@ export function MeetingsKanbanColumn({
         className={cn(
           "flex min-h-0 flex-1 flex-col rounded-sm border border-transparent p-2",
           dropTargetIdle,
-          embedded
-            ? cn("min-h-[420px]", isOver && dropTargetActive)
-            : isOver
-              ? dropTargetActive
-              : "bg-slate-200/70",
+          isOver ? dropTargetActive : KANBAN_WELL,
         )}
       >
         <div className="flex-1 space-y-2 overflow-y-auto pb-4 pr-0.5 [scrollbar-width:thin]">

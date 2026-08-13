@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { NotesKanbanColumn } from "./NotesKanbanColumn";
 import { NoteColumn, noteColumns } from "@/lib/notes/types";
-import { cn } from "@/lib/utils";
 
 interface DragInfo {
   noteId: string;
@@ -21,7 +20,6 @@ export function NotesKanbanBoard({
   columnsOverride,
   onDropOverride,
   embedded = false,
-  typeFilter = "All",
 }: NotesKanbanBoardProps) {
   const [internalColumns, setInternalColumns] =
     useState<NoteColumn[]>(noteColumns);
@@ -86,17 +84,7 @@ export function NotesKanbanBoard({
   }
 
   return (
-    <div
-      className={cn(
-        "flex h-full min-h-[420px] overflow-x-auto",
-        embedded
-          ? cn(
-              "rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm",
-              typeFilter === "All" ? "divide-x divide-slate-100" : "",
-            )
-          : "items-stretch gap-4",
-      )}
-    >
+    <div className="flex h-full min-h-[420px] items-stretch gap-3 overflow-x-auto p-1">
       {columns.map((column) => (
         <NotesKanbanColumn
           key={column.id}

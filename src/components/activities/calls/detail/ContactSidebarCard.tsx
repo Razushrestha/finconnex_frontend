@@ -11,7 +11,7 @@ export function ContactSidebarCard({ contactName }: ContactSidebarProps) {
   const router = useRouter();
 
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-border bg-card p-6 shadow-sm text-center">
+    <div className="flex flex-col items-center rounded-2xl border border-border bg-white p-6 shadow-sm text-center">
       <div className="mb-3 h-16 w-16 overflow-hidden rounded-xl border border-border bg-muted shadow-inner flex items-center justify-center">
         <UserIcon className="h-8 w-8 text-muted-foreground" />
       </div>

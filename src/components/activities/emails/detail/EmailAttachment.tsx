@@ -13,7 +13,7 @@ export function EmailAttachment({ name, size, onClick }: EmailAttachmentProps) {
   return (
     <div
       onClick={onClick}
-      className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card/60 max-w-sm hover:border-primary/50 transition-all cursor-pointer shadow-xs"
+      className="flex items-center gap-3 p-3 rounded-xl border border-border bg-white max-w-sm hover:border-primary/50 transition-all cursor-pointer shadow-xs"
     >
       <div className="p-2 rounded-lg bg-primary/10 text-primary">
         <Paperclip className="w-4 h-4" />

@@ -56,7 +56,7 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
     : RELATED_RECORD_OPTIONS;
 
   return (
-    <div className="bg-card text-card-foreground rounded-xl border border-border shadow-sm overflow-hidden flex flex-col">
+    <div className="bg-white text-card-foreground rounded-xl border border-border shadow-sm overflow-hidden flex flex-col">
       {/* Top Meta & Title Section */}
       <div className="p-5 border-b border-border space-y-4">
         <input

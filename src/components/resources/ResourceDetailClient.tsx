@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Home,
-  ArrowLeft,
+    ArrowLeft,
   Trash2,
   Download,
   Share2,
@@ -226,21 +225,7 @@ export function ResourceDetailClient({ id }: { id: string }) {
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
               </button>
-              <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-                <Link
-                  href="/"
-                  className="flex items-center gap-0.5 hover:text-slate-600"
-                >
-                  <Home className="h-3 w-3" />
-                  Home
-                </Link>
-                <span>/</span>
-                <Link href="/resources" className="hover:text-slate-600">
-                  Resources
-                </Link>
-                <span>/</span>
-              </nav>
-            </div>
+              </div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-[16px] font-bold tracking-tight text-slate-900">
                 {row.resourceId}

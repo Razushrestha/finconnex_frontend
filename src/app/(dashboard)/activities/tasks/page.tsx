@@ -37,6 +37,7 @@ import { downloadCsv, toCsv } from "@/lib/import/csv";
 import { emitRulesChange } from "@/lib/rules/storage";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
+import { BOARD_PAGE } from "@/lib/layout";
 
 const TASK_VIEW_MODE_KEY = "finconnex.tasks.view-mode";
 
@@ -222,7 +223,7 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="flex min-h-full w-full min-w-0 flex-col overflow-hidden bg-slate-50/50 px-3 py-1">
+    <div className={BOARD_PAGE}>
       <FocusHighlight />
       <div className="shrink-0">
         <ActivityToolbar

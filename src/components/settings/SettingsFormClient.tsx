@@ -87,14 +87,22 @@ export function SettingsFormClient({
         </div>
       </div>
 
-      <div className="space-y-5 p-5 sm:p-6">
+      <div className="grid grid-cols-1 gap-x-5 gap-y-4 p-5 sm:p-6 xl:grid-cols-2">
         {schema.fields.map((field) => (
-          <FieldRenderer
+          <div
             key={field.id}
-            field={field}
-            value={values[field.id]}
-            onChange={(v) => setField(field.id, v)}
-          />
+            className={
+              field.type === "textarea" || field.type === "file"
+                ? "xl:col-span-2"
+                : undefined
+            }
+          >
+            <FieldRenderer
+              field={field}
+              value={values[field.id]}
+              onChange={(v) => setField(field.id, v)}
+            />
+          </div>
         ))}
       </div>
 

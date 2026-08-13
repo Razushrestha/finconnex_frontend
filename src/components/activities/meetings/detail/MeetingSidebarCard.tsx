@@ -15,7 +15,7 @@ export function MeetingSidebarCard({ relatedTo }: MeetingSidebarCardProps) {
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
           Related Deal
         </h3>
-        <div className="p-4 rounded-xl border border-border bg-card space-y-3 shadow-xs">
+        <div className="p-4 rounded-xl border border-border bg-white space-y-3 shadow-xs">
           <div className="flex items-start justify-between">
             <div>
               <h4 className="text-sm font-semibold text-card-foreground">
@@ -48,7 +48,7 @@ export function MeetingSidebarCard({ relatedTo }: MeetingSidebarCardProps) {
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
           Prep Checklist
         </h3>
-        <div className="p-4 rounded-xl border border-border bg-card space-y-2.5 text-xs text-card-foreground">
+        <div className="p-4 rounded-xl border border-border bg-white space-y-2.5 text-xs text-card-foreground">
           <div className="flex items-center gap-2 cursor-pointer">
             <CheckSquare className="w-4 h-4 text-primary shrink-0" />
             <span className="line-through text-muted-foreground">
@@ -78,14 +78,14 @@ export function MeetingSidebarCard({ relatedTo }: MeetingSidebarCardProps) {
           Automated Tasks
         </h3>
         <div className="space-y-2">
-          <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-card/60 hover:border-primary/50 transition-all cursor-pointer">
+          <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-white hover:border-primary/50 transition-all cursor-pointer">
             <div className="flex items-center gap-2 text-xs font-medium text-card-foreground">
               <Mail className="w-3.5 h-3.5 text-primary" />
               <span>Send meeting summary email</span>
             </div>
             <Plus className="w-3.5 h-3.5 text-muted-foreground" />
           </div>
-          <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-card/60 hover:border-primary/50 transition-all cursor-pointer">
+          <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-white hover:border-primary/50 transition-all cursor-pointer">
             <div className="flex items-center gap-2 text-xs font-medium text-card-foreground">
               <ExternalLink className="w-3.5 h-3.5 text-primary" />
               <span>Update deal probability</span>

@@ -42,6 +42,7 @@ import { onRulesChange } from "@/lib/rules";
 import { viewEnter } from "@/lib/motion";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
+import { BOARD_PAGE } from "@/lib/layout";
 import { SORT_OPTIONS } from "../leads/page";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import type { ContactSource, ContactStatus } from "@/lib/contacts/types";
@@ -227,7 +228,7 @@ export default function ContactsPage() {
   ];
 
   return (
-    <div className="h-screen bg-slate-50 p-2 pr-3 dark:bg-zinc-950">
+    <div className={BOARD_PAGE}>
       <FocusHighlight />
       <EntityHeader
         entityLabel="Contact"

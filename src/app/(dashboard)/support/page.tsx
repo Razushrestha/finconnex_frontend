@@ -3,11 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Home, Plus, Search, Download, HelpCircle, Star } from "lucide-react";
+import { Plus, Search, Download } from "lucide-react";
 import {
   TICKET_PRIORITIES,
   TICKET_STATUSES,
-  csatAverage,
   listTickets,
   supportTickets as seed,
   type SupportTicket,
@@ -36,8 +35,6 @@ export default function SupportTicketsPage() {
   useEffect(() => {
     setPage(1);
   }, [statusTab, priorityFilter, search]);
-
-  const csat = useMemo(() => csatAverage(rows), [rows]);
 
   const counts = useMemo(() => {
     const map = Object.fromEntries(
@@ -114,32 +111,12 @@ export default function SupportTicketsPage() {
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
 
-      <div className="relative mx-auto flex max-w-[1400px] flex-col p-2.5 sm:p-3 lg:p-4">
+      <div className="relative mx-auto flex max-w-[1920px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-              <Link
-                href="/"
-                className="flex items-center gap-0.5 hover:text-slate-600"
-              >
-                <Home className="h-3 w-3" />
-                Home
-              </Link>
-              <span>/</span>
-            </nav>
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Support Tickets
             </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
-              <HelpCircle className="h-2.5 w-2.5" />
-              §11
-            </span>
-            {csat != null ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-semibold text-amber-800">
-                <Star className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
-                CSAT {csat}/5
-              </span>
-            ) : null}
           </div>
           <div className="flex items-center gap-1.5">
             <button

@@ -400,7 +400,7 @@ export const bookingPages: BookingPage[] = [
     videoLink: "https://meet.google.com/fin-consult",
     meetingVia: "video",
     meetingViaDetail: "https://meet.google.com/fin-consult",
-    consultants: ["Shiva Kadhka"],
+    consultants: ["Mohit Chapagain", "Priya Shah", "Shiva Kadhka"],
     coverImageUrl:
       "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&q=80",
     price: 0,
@@ -418,6 +418,61 @@ export const bookingPages: BookingPage[] = [
     bookingsCount: 9,
     cancelRate: 11,
     createdAt: "10/07/2026",
+  },
+  {
+    id: "bp5",
+    title: "Rate Review",
+    slug: "rate-review",
+    owner: "Bishnu Aryal",
+    eventType: "Consultation",
+    consultationMode: "one_to_one",
+    meetingMode: "one_time",
+    durationMinutes: 30,
+    bufferMinutes: 5,
+    timezone: "Australia/Sydney",
+    meetingVia: "video",
+    meetingViaDetail: "https://meet.google.com/fin-rate-review",
+    consultants: ["Bishnu Aryal"],
+    price: 0,
+    currency: "AUD",
+    description: "Review current rates and refinance options.",
+    availability: defaultAvailability(),
+    questions: [],
+    confirmationTemplate:
+      "Hi {{name}}, your Rate Review is confirmed for {{datetime}}.",
+    reminderTemplate: "Rate Review reminder: starting soon.",
+    status: "Live",
+    views: 31,
+    bookingsCount: 6,
+    cancelRate: 3,
+    createdAt: "02/08/2026",
+  },
+  {
+    id: "bp6",
+    title: "TEST",
+    slug: "test-natural-home",
+    owner: "Akshay",
+    eventType: "Consultation",
+    consultationMode: "one_to_one",
+    meetingMode: "one_time",
+    durationMinutes: 30,
+    bufferMinutes: 5,
+    timezone: "Australia/Sydney",
+    meetingVia: "video",
+    consultants: ["Akshay"],
+    price: 0,
+    currency: "AUD",
+    description: "Internal test consultation page.",
+    availability: defaultAvailability(),
+    questions: [],
+    confirmationTemplate:
+      "Hi {{name}}, your consultation is confirmed for {{datetime}}.",
+    reminderTemplate: "Consultation reminder: starting soon.",
+    status: "Live",
+    views: 4,
+    bookingsCount: 1,
+    cancelRate: 0,
+    createdAt: "08/08/2026",
   },
 ];
 
@@ -503,10 +558,31 @@ function writeStore(list: BookingPage[]) {
 
 export function listBookingPages(): BookingPage[] {
   const stored = readStore();
-  if (stored) return stored;
+  if (stored) return mergeMissingDemoPages(stored);
   const seeded = bookingPages.map((p) => ({ ...p }));
   writeStore(seeded);
   return seeded;
+}
+
+function mergeMissingDemoPages(stored: BookingPage[]): BookingPage[] {
+  const missing = bookingPages.filter(
+    (demo) => !stored.some((p) => p.id === demo.id),
+  );
+  if (missing.length === 0) return stored;
+  const next = [...stored, ...missing];
+  writeStore(next);
+  return next;
+}
+
+export function listConsultationPages(): BookingPage[] {
+  const order = ["bp5", "bp6", "bp4"];
+  return listBookingPages()
+    .filter((p) => p.eventType === "Consultation")
+    .sort((a, b) => {
+      const av = order.indexOf(a.id);
+      const bv = order.indexOf(b.id);
+      return (av === -1 ? 100 : av) - (bv === -1 ? 100 : bv);
+    });
 }
 
 export function upsertBookingPage(page: BookingPage) {

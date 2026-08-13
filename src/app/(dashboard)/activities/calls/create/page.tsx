@@ -49,15 +49,15 @@ export default function LogCallPage() {
   const [isPlaying, setIsPlaying] = useState(false);
 
   return (
-    <div className="w-full mx-auto px-4 py-2 space-y-6 bg-slate-50 min-h-screen">
+    <div className="mx-auto min-h-full w-full max-w-[1920px] space-y-6 bg-slate-50 px-4 py-3 sm:px-6 2xl:px-8">
       <LogActivityHeader
         onDiscard={() => console.log("Discarded")}
         onQuickSave={() => console.log("Saved")}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,400px)] lg:gap-6">
         {/* Left / Main Column */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="space-y-4">
           <ConnectionDetailsCard
             contactName={contactName}
             onContactChange={setContactName}

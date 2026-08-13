@@ -378,7 +378,7 @@ export const QuotationsPage: React.FC = () => {
   ];
 
   return (
-    <div className="w-full min-h-full h-auto bg-background/95 text-foreground p-6 overflow-y-auto pb-16">
+    <div className="h-auto min-h-full w-full overflow-y-auto bg-slate-50 p-6 pb-16 text-slate-900">
       <EntityHeader {...headerProps} />
       <EntityCards cards={cardsData} />
 

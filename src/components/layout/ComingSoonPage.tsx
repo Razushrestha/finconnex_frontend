@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Home, Construction } from "lucide-react";
+import { Construction } from "lucide-react";
 
 export function ComingSoonPage({
   title,
@@ -12,15 +12,7 @@ export function ComingSoonPage({
 }) {
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
-      <div className="relative mx-auto flex max-w-[1400px] flex-col items-start p-2.5 sm:p-3 lg:p-4">
-        <nav className="mb-2.5 flex items-center gap-1 text-[10px] text-slate-400">
-          <Link href="/" className="flex items-center gap-0.5 hover:text-slate-600">
-            <Home className="h-3 w-3" />
-            Home
-          </Link>
-          <span>/</span>
-          <span className="text-slate-600">{title}</span>
-        </nav>
+      <div className="relative mx-auto flex max-w-[1920px] flex-col items-start p-2.5 sm:p-3 lg:p-4">
         <div className="flex w-full flex-col items-center justify-center rounded-2xl border border-slate-100/80 bg-white px-6 py-16 shadow-sm">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
             <Construction className="h-6 w-6" />

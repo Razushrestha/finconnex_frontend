@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Home,
-  ArrowLeft,
+    ArrowLeft,
   ExternalLink,
   Copy,
   ClipboardList,
@@ -111,20 +110,6 @@ export function FormDetailClient({ id }: { id: string }) {
           >
             <ArrowLeft className="h-3.5 w-3.5" />
           </button>
-          <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-            <Link
-              href="/"
-              className="flex items-center gap-0.5 hover:text-slate-600"
-            >
-              <Home className="h-3 w-3" />
-              Home
-            </Link>
-            <span>/</span>
-            <Link href="/marketing/forms" className="hover:text-slate-600">
-              Forms
-            </Link>
-            <span>/</span>
-          </nav>
           <h1 className="text-[15px] font-bold text-slate-900">
             {form.formId}
           </h1>
@@ -209,7 +194,7 @@ export function FormDetailClient({ id }: { id: string }) {
                   {form.fieldDefs.map((f) => (
                     <li
                       key={f.id}
-                      className="rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-2.5"
+                      className="rounded-xl border border-slate-100 bg-white px-3 py-2.5"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div>

@@ -83,7 +83,7 @@ export function ConvertToDealModal({
         aria-modal="true"
         aria-labelledby="convert-to-deal-title"
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-xl bg-card border border-border p-5 shadow-2xl text-card-foreground"
+        className="w-full max-w-md rounded-xl bg-white border border-border p-5 shadow-2xl text-card-foreground"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

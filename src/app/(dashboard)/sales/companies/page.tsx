@@ -36,6 +36,7 @@ import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import { onRulesChange } from "@/lib/rules";
 import { viewEnter } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { BOARD_PAGE } from "@/lib/layout";
 import {
   ArrowLeftRight,
   Download,
@@ -204,7 +205,7 @@ export default function CompaniesPage() {
   void activeSortDirection;
 
   return (
-    <div className="h-screen bg-slate-50 p-2 pr-3 dark:bg-zinc-950">
+    <div className={BOARD_PAGE}>
       <FocusHighlight />
       <EntityHeader
         entityLabel="Company"

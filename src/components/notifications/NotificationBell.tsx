@@ -89,7 +89,7 @@ export function NotificationBell() {
       {open ? (
         <div
           className={cn(
-            "absolute right-0 z-50 mt-2 w-[340px] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-card shadow-lg",
+            "absolute right-0 z-50 mt-2 w-[340px] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-white shadow-lg",
             menuEnter,
           )}
         >

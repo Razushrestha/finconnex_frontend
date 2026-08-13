@@ -4,7 +4,7 @@ import { UserPlus } from "lucide-react";
 
 export function TaskSidebarParticipants() {
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+    <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           Participants

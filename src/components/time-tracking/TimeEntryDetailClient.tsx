@@ -4,8 +4,7 @@ import { useEffect, useState, type ReactNode, type ElementType } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Home,
-  ArrowLeft,
+    ArrowLeft,
   Trash2,
   Play,
   Square,
@@ -220,21 +219,6 @@ export function TimeEntryDetailClient({ id }: { id: string }) {
       <div className="relative mx-auto max-w-4xl p-2.5 sm:p-3 lg:p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
-            <nav className="mb-1 flex items-center gap-1 text-[10px] text-slate-400">
-              <Link
-                href="/"
-                className="flex items-center gap-0.5 hover:text-slate-600"
-              >
-                <Home className="h-3 w-3" />
-                Home
-              </Link>
-              <span>/</span>
-              <Link href="/time-tracking" className="hover:text-slate-600">
-                Time Tracking
-              </Link>
-              <span>/</span>
-              <span className="text-slate-600">{row.entryId}</span>
-            </nav>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-[17px] font-bold tracking-tight text-slate-900">
                 {row.entryId}

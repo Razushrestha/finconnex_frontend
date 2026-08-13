@@ -4,7 +4,7 @@ import { ExternalLink, Sparkles } from "lucide-react";
 
 export function TaskSidebarContext() {
   return (
-    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+    <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
       <h2 className="mb-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         Context
       </h2>

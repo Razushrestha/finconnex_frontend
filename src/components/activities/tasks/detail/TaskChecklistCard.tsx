@@ -31,7 +31,7 @@ export function TaskChecklistCard() {
   const completedCount = checklist.filter((item) => item.completed).length;
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+    <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
           Checklist [{completedCount}/{checklist.length}]

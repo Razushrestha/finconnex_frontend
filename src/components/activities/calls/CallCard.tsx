@@ -159,7 +159,7 @@ export function CallCard({
           cardMotion,
           isDragging && cardDragging,
           isSelected
-            ? "border-indigo-500 ring-1 ring-indigo-500 bg-indigo-50/20"
+            ? "border-indigo-500 ring-1 ring-indigo-500"
             : "border-slate-100 hover:border-slate-300",
         )}
       >

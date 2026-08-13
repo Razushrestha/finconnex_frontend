@@ -87,7 +87,7 @@ export function TaskCalendarView({ filters }: { filters: TaskFilters }) {
   });
 
   return (
-    <div className="rounded-xl border border-border bg-card p-3">
+    <div className="rounded-xl border border-border bg-white p-3">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         <div className="flex items-center gap-1">

@@ -17,7 +17,7 @@ export function CallTranscriptSection({
   );
 
   return (
-    <div className="flex flex-col rounded-2xl border border-border bg-card p-6 shadow-sm">
+    <div className="flex flex-col rounded-2xl border border-border bg-white p-6 shadow-sm">
       <div className="mb-6 flex border-b border-border">
         <button
           type="button"

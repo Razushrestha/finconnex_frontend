@@ -39,7 +39,7 @@ export function NextStepsSidebarCard({
 
   return (
     <>
-      <div className="flex flex-col rounded-2xl border border-border bg-card p-5 shadow-sm">
+      <div className="flex flex-col rounded-2xl border border-border bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <h4 className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
             Next Steps
@@ -111,7 +111,7 @@ export function NextStepsSidebarCard({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-xl"
+            className="w-full max-w-sm rounded-2xl border border-border bg-white p-5 shadow-xl"
           >
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-sm font-bold text-foreground">

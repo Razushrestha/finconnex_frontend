@@ -13,7 +13,7 @@ export function TaskMetadataCard({
   onUpdateStatus,
 }: TaskMetadataCardProps) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+    <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-foreground">{task.title}</h1>

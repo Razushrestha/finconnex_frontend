@@ -3,12 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Home,
-  ChevronLeft,
+    ChevronLeft,
   ChevronRight,
   CalendarDays,
   Plus,
-  Sparkles,
   X,
   RefreshCw,
   Share2,
@@ -28,6 +26,7 @@ import {
 } from "@/lib/calendar/store";
 import { onRulesChange } from "@/lib/rules";
 import { cn } from "@/lib/utils";
+import { BOARD_PAGE } from "@/lib/layout";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 
 type CalendarView = "Day" | "Week" | "Month" | "Agenda";
@@ -39,28 +38,28 @@ const TYPE_META: Record<
   Event: {
     label: "Event",
     dot: "bg-violet-500",
-    soft: "bg-violet-50/90",
+    soft: "bg-white",
     text: "text-violet-800",
     bar: "bg-violet-500",
   },
   Task: {
     label: "Task",
     dot: "bg-amber-500",
-    soft: "bg-amber-50/90",
+    soft: "bg-white",
     text: "text-amber-900",
     bar: "bg-amber-500",
   },
   Meeting: {
     label: "Meeting",
     dot: "bg-sky-500",
-    soft: "bg-sky-50/90",
+    soft: "bg-white",
     text: "text-sky-900",
     bar: "bg-sky-500",
   },
   Reminder: {
     label: "Reminder",
     dot: "bg-rose-500",
-    soft: "bg-rose-50/90",
+    soft: "bg-white",
     text: "text-rose-900",
     bar: "bg-rose-500",
   },
@@ -238,30 +237,14 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="relative min-h-full overflow-hidden bg-slate-50">
-      <div className="relative mx-auto flex max-w-[1400px] flex-col p-2.5 sm:p-3 lg:p-4">
+    <div className={BOARD_PAGE}>
+      <div className="relative flex min-h-0 flex-1 flex-col">
         {/* Compact page chrome */}
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-              <Link
-                href="/"
-                className="flex items-center gap-0.5 transition-colors hover:text-slate-600"
-              >
-                <Home className="h-3 w-3" />
-                Home
-              </Link>
-              <span>/</span>
-              <span className="text-slate-500">Activities</span>
-              <span>/</span>
-            </nav>
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Calendar
             </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
-              <Sparkles className="h-2.5 w-2.5" />
-              Unified
-            </span>
           </div>
 
           <button
@@ -302,9 +285,9 @@ export default function CalendarPage() {
         ) : null}
 
         {/* ONE surface: toolbar + grid */}
-        <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col overflow-hidden rounded-md border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {/* Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 sm:px-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
               <CalendarDays className="h-4 w-4 shrink-0 text-violet-600" />
               <p className="truncate text-[13px] font-semibold text-slate-900">
@@ -658,8 +641,7 @@ function MonthGrid({
                     draggable
                     onDragStart={() => onDragStartItem(item.id)}
                     className={cn(
-                      "cursor-grab truncate rounded px-1 py-0.5 text-[9px] font-medium active:cursor-grabbing",
-                      meta.soft,
+                      "cursor-grab truncate rounded border border-slate-100 bg-white px-1 py-0.5 text-[9px] font-medium shadow-sm active:cursor-grabbing",
                       meta.text,
                     )}
                     title={item.title}
@@ -764,8 +746,7 @@ function EventChip({ item }: { item: CalendarItem }) {
   return (
     <div
       className={cn(
-        "w-full rounded-md px-1.5 py-1.5 text-left transition-colors hover:brightness-[0.97]",
-        meta.soft,
+        "w-full rounded-md border border-slate-100 bg-white px-1.5 py-1.5 text-left shadow-sm transition-colors hover:border-slate-300",
       )}
     >
       <div className="flex items-start gap-1.5">

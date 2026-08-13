@@ -27,6 +27,7 @@ import { stageColumnId } from "@/lib/pipeline-sla/board";
 import { onRulesChange } from "@/lib/rules";
 import { viewEnter } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { BOARD_PAGE } from "@/lib/layout";
 import {
   Sparkles,
   ArrowLeftRight,
@@ -476,7 +477,7 @@ export default function LeadsPage() {
   ];
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background p-2 pr-3">
+    <div className={BOARD_PAGE}>
       {/* <FocusHighlight /> */}
       <div className="shrink-0">
         <EntityHeader
@@ -541,7 +542,7 @@ export default function LeadsPage() {
             <button
               type="button"
               onClick={() => console.log("pipeline selector clicked")}
-              className="flex items-center gap-1.5 rounded-sm bg-card/70 hover:bg-card px-3 py-1 text-sm font-medium text-foreground/70"
+              className="flex items-center gap-1.5 rounded-sm bg-white hover:bg-white px-3 py-1 text-sm font-medium text-foreground/70"
             >
               <span>Lead Pipeline</span>
               <ChevronDown className="h-3.5 w-3.5 text-slate-400" />

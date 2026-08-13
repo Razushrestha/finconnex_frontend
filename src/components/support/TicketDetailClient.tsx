@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Home,
-  ArrowLeft,
+    ArrowLeft,
   Trash2,
   User,
   Flag,
@@ -356,7 +355,7 @@ export function TicketDetailClient({ id }: { id: string }) {
         </div>
       ) : null}
 
-      <div className="relative mx-auto flex max-w-[1100px] flex-col p-2.5 sm:p-3 lg:p-4">
+      <div className="relative mx-auto flex w-full max-w-[1600px] flex-col p-3 sm:p-4 lg:px-6 2xl:px-8">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <button
@@ -366,20 +365,6 @@ export function TicketDetailClient({ id }: { id: string }) {
             >
               <ArrowLeft className="h-3.5 w-3.5" />
             </button>
-            <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-              <Link
-                href="/"
-                className="flex items-center gap-0.5 hover:text-slate-600"
-              >
-                <Home className="h-3 w-3" />
-                Home
-              </Link>
-              <span>/</span>
-              <Link href="/support" className="hover:text-slate-600">
-                Support
-              </Link>
-              <span>/</span>
-            </nav>
             <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
               {row.ticketId}
             </h1>

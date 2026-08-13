@@ -15,7 +15,7 @@ export function MarketingListShell({
   return (
     <div
       className={cn(
-        "flex min-h-0 min-h-full w-full flex-1 flex-col overflow-hidden bg-background p-2 pr-3",
+        "flex min-h-0 min-h-full w-full flex-1 flex-col overflow-hidden bg-slate-50 p-2 pr-3",
         className,
       )}
     >

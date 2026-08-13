@@ -71,7 +71,7 @@ export const ReminderSettingsSidebar: React.FC<
   );
 
   return (
-    <div className="bg-card text-card-foreground rounded-xl border border-border p-5 shadow-sm space-y-6">
+    <div className="bg-white text-card-foreground rounded-xl border border-border p-5 shadow-sm space-y-6">
       {/* Delivery Method */}
       <div className="space-y-3">
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">

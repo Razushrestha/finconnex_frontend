@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, Trophy, XCircle } from "lucide-react";
+import { ChevronRight, Plus, Trophy, XCircle } from "lucide-react";
 import { type KanbanColumn, type LeadPipelineStage } from "@/lib/leads/types";
 import { listLeadColumns, saveLeadColumns } from "@/lib/leads/store";
 import { onRulesChange } from "@/lib/rules";
@@ -401,7 +401,7 @@ export function LeadKanbanBoard({
   return (
     <div
       ref={boardRef}
-      className="relative h-full w-full overflow-x-auto overflow-y-hidden bg-background"
+      className="relative h-full w-full overflow-x-auto overflow-y-hidden bg-slate-50"
     >
       <div className="flex h-full items-stretch gap-3 p-1">
         {visibleColumns.map((column) => {
@@ -424,7 +424,7 @@ export function LeadKanbanBoard({
                   className={cn(
                     "flex h-full flex-col rounded-sm border p-2",
                     dropTargetIdle,
-                    isOver ? dropTargetActive : "bg-card",
+                    isOver ? dropTargetActive : "border-slate-200/60 bg-slate-100/60",
                   )}
                 >
                   <CollapsedColumn
@@ -452,9 +452,17 @@ export function LeadKanbanBoard({
                       >
                         <div className="mb-1 flex items-center justify-between px-1">
                           <div className="flex items-center gap-2">
-                            <h2 className="max-w-[15rem] text-xs font-semibold leading-snug text-foreground xl:text-sm">
-                              {column.title}
-                            </h2>
+                            <button
+                              type="button"
+                              onClick={() => toggleCollapsed(column.id)}
+                              title="Collapse"
+                              aria-label={`Collapse ${column.title}`}
+                              className="flex items-center gap-1.5 rounded-sm hover:opacity-70"
+                            >
+                              <h2 className="max-w-[15rem] text-xs font-semibold leading-snug text-foreground xl:text-sm">
+                                {column.title}
+                              </h2>
+                            </button>
                             <span className="rounded-full border border-slate-200/80 bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
                               {column.cards.length}
                             </span>
@@ -483,9 +491,9 @@ export function LeadKanbanBoard({
                       handleDrop(column.id);
                     }}
                     className={cn(
-                      "relative flex min-h-0 flex-1 flex-col rounded-sm border p-1",
+                      "group relative flex min-h-0 flex-1 flex-col rounded-sm border p-1",
                       dropTargetIdle,
-                      isOver ? dropTargetActive : "bg-card",
+                      isOver ? dropTargetActive : "border-slate-200/60 bg-slate-100/60",
                     )}
                   >
                     <div
@@ -623,8 +631,7 @@ export function LeadKanbanBoard({
                       })()}
                     </div>
 
-                    {/* Always-visible footer on every stage column */}
-                    <div className="mt-1 flex shrink-0 items-center justify-between gap-2 border-t border-slate-100 px-1 pt-1.5">
+                    <div className="mt-2 flex w-full shrink-0 justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
                       <button
                         type="button"
                         onClick={() =>
@@ -635,19 +642,10 @@ export function LeadKanbanBoard({
                               )
                         }
                         aria-label={`Create lead in ${column.title}`}
-                        className="inline-flex max-w-[calc(100%-2rem)] items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-accent"
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-white hover:text-slate-900"
                       >
-                        <Plus className="h-3.5 w-3.5 shrink-0" />
-                        <span className="truncate">{column.title}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => toggleCollapsed(column.id)}
-                        aria-label={`Collapse ${column.title}`}
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-background/90 text-slate-500 shadow-sm transition-colors hover:bg-accent"
-                      >
-                        <ChevronLeft className="h-3.5 w-3.5" />
+                        <Plus className="h-4 w-4" />
+                        Create lead
                       </button>
                     </div>
                   </div>
@@ -681,7 +679,7 @@ export function LeadKanbanBoard({
                 "pointer-events-auto flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-4 text-sm font-semibold shadow-lg backdrop-blur-sm transition-colors",
                 overOutcome === "settled"
                   ? "border-emerald-500 bg-emerald-50 text-emerald-800"
-                  : "border-emerald-300 bg-card/90 text-emerald-700",
+                  : "border-emerald-300 bg-white text-emerald-700",
               )}
             >
               <Trophy className="h-4 w-4" />
@@ -704,7 +702,7 @@ export function LeadKanbanBoard({
                 "pointer-events-auto flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-4 text-sm font-semibold shadow-lg backdrop-blur-sm transition-colors",
                 overOutcome === "lost"
                   ? "border-rose-500 bg-rose-50 text-rose-800"
-                  : "border-rose-300 bg-card/90 text-rose-700",
+                  : "border-rose-300 bg-white text-rose-700",
               )}
             >
               <XCircle className="h-4 w-4" />
@@ -798,7 +796,7 @@ function LostReasonModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm overflow-hidden rounded-2xl bg-card shadow-2xl"
+        className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl"
       >
         <div className="border-b border-slate-100 px-5 py-3">
           <p className="text-[11px] font-semibold uppercase tracking-wide text-rose-600">

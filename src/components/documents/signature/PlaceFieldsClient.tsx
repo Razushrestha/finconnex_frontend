@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
-  Home,
-  Send,
+    Send,
   Trash2,
   Save,
   PenLine,
@@ -269,24 +268,6 @@ export function PlaceFieldsClient({ id }: { id: string }) {
         >
           <ArrowLeft className="h-3.5 w-3.5" />
         </button>
-        <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-          <Link href="/" className="flex items-center gap-0.5 hover:text-slate-600">
-            <Home className="h-3 w-3" />
-            Home
-          </Link>
-          <span>/</span>
-          <Link href="/documents/signature" className="hover:text-slate-600">
-            E-Signature
-          </Link>
-          <span>/</span>
-          <Link
-            href={`/documents/signature/${id}`}
-            className="hover:text-slate-600"
-          >
-            {req.signatureRequestId}
-          </Link>
-          <span>/</span>
-        </nav>
         <h1 className="text-[14px] font-bold text-slate-900">Place fields</h1>
         <p className="hidden text-[12px] text-slate-500 sm:block">
           · {req.documentName}

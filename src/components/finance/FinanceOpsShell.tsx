@@ -4,8 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Home,
-  FileText,
+    FileText,
   Receipt,
   Banknote,
   Package,
@@ -71,40 +70,24 @@ interface Props {
 
 export function FinanceOpsShell({
   title,
-  section,
-  sectionIcon: SectionIcon,
+  section: _section,
+  sectionIcon: _SectionIcon,
   actions,
   children,
   showModuleNav = true,
 }: Props) {
+  void _section;
+  void _SectionIcon;
   const pathname = usePathname();
 
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
-      <div className="relative mx-auto flex max-w-[1400px] flex-col p-2.5 sm:p-3 lg:p-4">
+      <div className="relative mx-auto flex max-w-[1920px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-              <Link
-                href="/"
-                className="flex items-center gap-0.5 hover:text-slate-600"
-              >
-                <Home className="h-3 w-3" />
-                Home
-              </Link>
-              <span>/</span>
-              <Link href="/finance" className="hover:text-slate-600">
-                Sales Ops
-              </Link>
-              <span>/</span>
-            </nav>
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               {title}
             </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
-              {SectionIcon ? <SectionIcon className="h-2.5 w-2.5" /> : null}
-              {section}
-            </span>
           </div>
           {actions ? (
             <div className="flex flex-wrap items-center gap-1.5">{actions}</div>

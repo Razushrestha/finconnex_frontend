@@ -23,7 +23,7 @@ export const SuggestedTagsCard: React.FC<SuggestedTagsCardProps> = ({
   onSelectTag,
 }) => {
   return (
-    <div className="bg-card text-card-foreground rounded-xl p-5 border border-border shadow-sm space-y-3">
+    <div className="bg-white text-card-foreground rounded-xl p-5 border border-border shadow-sm space-y-3">
       <h3 className="text-[11px] font-bold tracking-wider text-muted-foreground uppercase">
         Suggested Tags
       </h3>

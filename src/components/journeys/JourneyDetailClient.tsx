@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Home,
-  ArrowLeft,
+    ArrowLeft,
   Play,
   Pause,
   Copy,
@@ -178,7 +177,7 @@ export function JourneyDetailClient({ id }: { id: string }) {
         </div>
       ) : null}
 
-      <div className="relative mx-auto flex max-w-[1400px] flex-col p-2.5 sm:p-3 lg:p-4">
+      <div className="relative mx-auto flex max-w-[1920px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="mb-1 flex flex-wrap items-center gap-1.5">
@@ -189,21 +188,7 @@ export function JourneyDetailClient({ id }: { id: string }) {
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
               </button>
-              <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-                <Link
-                  href="/"
-                  className="flex items-center gap-0.5 hover:text-slate-600"
-                >
-                  <Home className="h-3 w-3" />
-                  Home
-                </Link>
-                <span>/</span>
-                <Link href="/journeys" className="hover:text-slate-600">
-                  Journeys
-                </Link>
-                <span>/</span>
-              </nav>
-            </div>
+              </div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-[16px] font-bold tracking-tight text-slate-900">
                 {row.journeyId}

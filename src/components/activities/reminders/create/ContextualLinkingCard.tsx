@@ -27,7 +27,7 @@ export const ContextualLinkingCard: React.FC<ContextualLinkingCardProps> = ({
     : RELATED_RECORD_OPTIONS;
 
   return (
-    <div className="bg-card text-card-foreground rounded-xl border border-border p-6 shadow-sm space-y-4">
+    <div className="bg-white text-card-foreground rounded-xl border border-border p-6 shadow-sm space-y-4">
       <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
         Contextual Linking
       </h2>

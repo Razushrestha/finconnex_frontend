@@ -31,7 +31,7 @@ export default async function EmailDetailsPage({
       {/* Main Email Content Area */}
       <div className="flex-1 flex flex-col border-r border-border">
         {/* Top Action Bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/40 backdrop-blur-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-white backdrop-blur-md">
           <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
             <ArrowLeft className="w-4 h-4" /> Back to Emails
           </button>
@@ -43,7 +43,7 @@ export default async function EmailDetailsPage({
         </div>
 
         {/* Email Header Metadata */}
-        <div className="p-6 border-b border-border bg-card/20 space-y-4">
+        <div className="p-6 border-b border-border bg-white space-y-4">
           <div className="flex items-start justify-between">
             <h1 className="text-xl font-semibold tracking-tight text-card-foreground">
               {email.subject}
@@ -101,7 +101,7 @@ export default async function EmailDetailsPage({
       </div>
 
       {/* CRM Context Sidebar */}
-      <div className="w-80 bg-card/30 p-6 flex flex-col gap-6 overflow-y-auto border-l border-border">
+      <div className="w-80 bg-white p-6 flex flex-col gap-6 overflow-y-auto border-l border-border">
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
             Related CRM Profile

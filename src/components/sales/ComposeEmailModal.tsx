@@ -94,7 +94,7 @@ export function ComposeEmailModal({
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-[560px] overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-2xl ring-1 ring-ring/20">
+    <div className="fixed bottom-4 right-4 z-50 w-[560px] overflow-hidden rounded-xl border border-border bg-white text-card-foreground shadow-2xl ring-1 ring-ring/20">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border bg-muted/40 px-4 py-3">
         <div className="flex items-center gap-2.5">

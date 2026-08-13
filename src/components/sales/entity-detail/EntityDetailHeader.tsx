@@ -20,13 +20,16 @@ export function EntityDetailHeader({
   onEditDetails,
   onMoreActions,
 }: EntityDetailHeaderProps) {
+  const crumbs = breadcrumb.filter((crumb) => crumb.label !== "Home");
+
   return (
     <div className="space-y-3">
+      {crumbs.length > 1 ? (
       <nav className="flex flex-wrap items-center gap-1 text-[12px] text-slate-400">
-        {breadcrumb.map((crumb, i) => (
+        {crumbs.map((crumb, i) => (
           <span key={`${crumb.href}-${i}`} className="flex items-center gap-1">
             {i > 0 && <ChevronRight className="h-3 w-3 text-slate-300" />}
-            {i < breadcrumb.length - 1 ? (
+            {i < crumbs.length - 1 ? (
               <Link
                 href={crumb.href}
                 className="font-medium text-slate-500 transition-colors hover:text-violet-700"
@@ -39,6 +42,7 @@ export function EntityDetailHeader({
           </span>
         ))}
       </nav>
+      ) : null}
 
       <Panel className="p-4 sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

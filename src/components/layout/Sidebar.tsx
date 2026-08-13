@@ -71,7 +71,16 @@ const dashboardItems: NavItem[] = [
       { label: "Reminders", href: "/activities/reminders" },
     ],
   },
-  { label: "Booking", href: "/booking", icon: CalendarClock },
+  {
+    label: "Booking",
+    icon: CalendarClock,
+    children: [
+      { label: "Home", href: "/booking" },
+      { label: "Consultations", href: "/booking/consultations" },
+      { label: "Schedules", href: "/booking/schedules" },
+      { label: "Consultants", href: "/booking/consultants" },
+    ],
+  },
   {
     label: "Documents",
     icon: Folder,

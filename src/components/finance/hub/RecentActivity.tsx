@@ -41,7 +41,7 @@ export const RecentActivity: React.FC = () => {
   ];
 
   return (
-    <div className="bg-background text-card-foreground p-6 rounded-xl border border-border shadow-sm flex flex-col justify-between h-full">
+    <div className="flex h-full flex-col justify-between rounded-xl border border-slate-100 bg-white p-6 text-slate-900 shadow-sm">
       <div>
         <h3 className="text-lg font-bold text-foreground">Recent Activity</h3>
         <p className="text-xs text-muted-foreground mb-4">

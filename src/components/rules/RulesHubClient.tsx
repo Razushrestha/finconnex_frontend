@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  Home,
-  Scale,
+    Scale,
   Shield,
   Bell,
   History,
@@ -56,29 +55,9 @@ export function RulesHubClient() {
       <div className="relative mx-auto max-w-[1200px] p-2.5 sm:p-3 lg:p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <nav className="mb-1 flex items-center gap-1 text-[10px] text-slate-400">
-              <Link
-                href="/"
-                className="flex items-center gap-0.5 hover:text-slate-600"
-              >
-                <Home className="h-3 w-3" />
-                Home
-              </Link>
-              <span>/</span>
-              <span className="text-slate-600">Cross-Module Rules</span>
-            </nav>
-            <div className="flex items-center gap-2">
-              <h1 className="text-[17px] font-bold tracking-tight text-slate-900">
-                Cross-Module Rules
-              </h1>
-              <span className="rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
-                §28
-              </span>
-            </div>
-            <p className="mt-0.5 text-[12px] text-slate-500">
-              Shared integrity, transitions, notifications, audit, soft-delete,
-              and RBAC: enforced on create/edit/delete across CRM modules.
-            </p>
+            <h1 className="text-[17px] font-bold tracking-tight text-slate-900">
+              Cross-Module Rules
+            </h1>
           </div>
           <Link
             href="/settings/data-management/recycle-bin"

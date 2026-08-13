@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 export function CallAudioPlayerSection() {
   return (
-    <div className="flex items-center gap-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+    <div className="flex items-center gap-4 rounded-xl border border-border bg-white p-4 shadow-sm">
       <button
         type="button"
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md hover:opacity-90"

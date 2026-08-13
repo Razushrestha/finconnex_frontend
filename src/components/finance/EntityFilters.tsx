@@ -55,7 +55,7 @@ export const EntityFilters: React.FC<EntityFiltersProps> = ({
           <select
             value={statusValue}
             onChange={(e) => onStatusChange?.(e.target.value)}
-            className="appearance-none bg-card border border-border rounded-lg px-3.5 py-2 pr-8 text-xs font-medium text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+            className="appearance-none bg-white border border-border rounded-lg px-3.5 py-2 pr-8 text-xs font-medium text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
           >
             {statusOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -73,7 +73,7 @@ export const EntityFilters: React.FC<EntityFiltersProps> = ({
           <select
             value={dateValue}
             onChange={(e) => onDateChange?.(e.target.value)}
-            className="appearance-none bg-card border border-border rounded-lg px-3.5 py-2 pr-8 text-xs font-medium text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+            className="appearance-none bg-white border border-border rounded-lg px-3.5 py-2 pr-8 text-xs font-medium text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
           >
             {dateOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>

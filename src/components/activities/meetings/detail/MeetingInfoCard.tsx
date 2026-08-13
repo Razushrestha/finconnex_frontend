@@ -16,7 +16,7 @@ export function MeetingInfoCard({
   meetingLink,
 }: MeetingInfoCardProps) {
   return (
-    <div className="p-4 rounded-xl border border-border bg-card/60 flex items-center justify-between gap-4">
+    <div className="p-4 rounded-xl border border-border bg-white flex items-center justify-between gap-4">
       <div className="flex items-center gap-3">
         <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
           {type === "Video Call" || type === "Conference" ? (

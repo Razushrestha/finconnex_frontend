@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Home,
-  ArrowLeft,
+    ArrowLeft,
   Play,
   Trash2,
   Download,
@@ -262,7 +261,7 @@ export function ReportDetailClient({ id }: { id: string }) {
         </div>
       ) : null}
 
-      <div className="relative mx-auto flex max-w-[1400px] flex-col p-2.5 sm:p-3 lg:p-4">
+      <div className="relative mx-auto flex max-w-[1920px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <button
@@ -272,17 +271,6 @@ export function ReportDetailClient({ id }: { id: string }) {
             >
               <ArrowLeft className="h-3.5 w-3.5" />
             </button>
-            <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-              <Link href="/" className="flex items-center gap-0.5 hover:text-slate-600">
-                <Home className="h-3 w-3" />
-                Home
-              </Link>
-              <span>/</span>
-              <Link href="/reports" className="hover:text-slate-600">
-                Reports
-              </Link>
-              <span>/</span>
-            </nav>
             <h1 className="truncate text-[15px] font-bold tracking-tight text-slate-900">
               {row.reportId}
             </h1>
@@ -519,7 +507,7 @@ export function ReportDetailClient({ id }: { id: string }) {
                 {row.previewRows.map((p) => (
                   <div
                     key={p.label}
-                    className="rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3"
+                    className="rounded-xl border border-slate-100 bg-white px-4 py-3"
                   >
                     <div className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
                       {p.label}
@@ -797,7 +785,7 @@ export function ReportDetailClient({ id }: { id: string }) {
         </div>
       </div>
 
-      <div className="relative mx-auto w-full max-w-[1400px] px-2.5 pb-4 sm:px-3 lg:px-4">
+      <div className="relative mx-auto w-full max-w-[1920px] px-2.5 pb-4 sm:px-3 lg:px-4">
         <RecordAuditHistory
           module="reports"
           recordId={row.id}

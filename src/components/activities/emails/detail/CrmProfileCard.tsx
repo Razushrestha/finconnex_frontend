@@ -21,7 +21,7 @@ export function CrmProfileCard({
   onViewProfile,
 }: CrmProfileCardProps) {
   return (
-    <div className="p-4 rounded-xl border border-border bg-card space-y-3 shadow-sm">
+    <div className="p-4 rounded-xl border border-border bg-white space-y-3 shadow-sm">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-sm">
           {initials}

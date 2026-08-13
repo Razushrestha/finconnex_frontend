@@ -116,7 +116,7 @@ export function EntitySelectionToolbar({
         <button
           type="button"
           onClick={onSendMail}
-          className="rounded-md bg-card/50 hover:bg-card border px-3 py-1"
+          className="rounded-md bg-white hover:bg-white border px-3 py-1"
         >
           Send Mail
         </button>
@@ -124,7 +124,7 @@ export function EntitySelectionToolbar({
           <button
             type="button"
             onClick={() => setIsTagsOpen((v) => !v)}
-            className="flex items-center gap-1 rounded-md border bg-card/50 hover:bg-card px-3 py-1"
+            className="flex items-center gap-1 rounded-md border bg-white hover:bg-white px-3 py-1"
           >
             Tags
             <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
@@ -203,7 +203,7 @@ export function EntitySelectionToolbar({
       <button
         type="button"
         onClick={onClick}
-        className="rounded-md bg-card/50 hover:bg-card border px-3 py-1"
+        className="rounded-md bg-white hover:bg-white border px-3 py-1"
       >
         Manage field
       </button>

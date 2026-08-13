@@ -347,11 +347,11 @@ export function CreateTaskForm({
           </button>
         </div>
       </div>
-      <div className="mx-auto grid w-full grid-cols-1 gap-6 px-6 py-2 lg:grid-cols-3">
+      <div className="mx-auto grid w-full max-w-[1920px] grid-cols-1 gap-4 px-4 py-3 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,400px)] lg:gap-6 2xl:px-8">
         {/* Left column */}
-        <div className="space-y-6 lg:col-span-2">
+        <div className="space-y-6">
           {/* Task info card */}
-          <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+          <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
             <div className="mb-1">
               <label className={labelClass}>
                 Task Subject <span className="text-red-500">*</span>
@@ -370,7 +370,7 @@ export function CreateTaskForm({
               )}
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <label className={labelClass}>
                   Task Type <span className="text-red-500">*</span>
@@ -493,7 +493,7 @@ export function CreateTaskForm({
           </div>
 
           {/* Action items card */}
-          <div className="rounded-md border border-border bg-card p-6 shadow-sm">
+          <div className="rounded-md border border-border bg-white p-6 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground/90">
                 <ListChecks className="h-4 w-4 text-foreground/70" />
@@ -508,7 +508,7 @@ export function CreateTaskForm({
               {form.actionItems.map((item) => (
                 <div
                   key={item.id}
-                  className="group flex items-center gap-2.5 rounded-md border border-gray-100 bg-card/70 px-3 py-2"
+                  className="group flex items-center gap-2.5 rounded-md border border-gray-100 bg-white px-3 py-2"
                 >
           <input
                     type="checkbox"
@@ -589,7 +589,7 @@ export function CreateTaskForm({
         {/* Right column */}
         <div className="space-y-6">
           {/* Status / scheduling card */}
-          <div className="space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="space-y-4 rounded-xl border border-border bg-white p-4 shadow-sm">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelClass}>
@@ -726,7 +726,7 @@ export function CreateTaskForm({
           </div>
 
           {/* Owner / collaborators card */}
-          <div className="space-y-4 rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="space-y-4 rounded-xl border border-border bg-white p-4 shadow-sm">
             <div>
               <label className={labelClass}>
                 Task Owner <span className="text-red-500">*</span>

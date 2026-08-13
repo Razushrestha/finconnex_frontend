@@ -10,7 +10,7 @@ const reduce = "motion-reduce:animate-none motion-reduce:transition-none";
  * Use on every kanban / board record card for a consistent shell.
  */
 export const entityCardShell =
-  "rounded-md border border-slate-100 bg-white p-3.5 shadow-sm";
+  "rounded-md border border-slate-100 !bg-white p-3.5 shadow-sm dark:border-zinc-800 dark:!bg-zinc-900";
 
 /** Drag affordance for board cards */
 export const entityCardInteractive =

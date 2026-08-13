@@ -159,7 +159,7 @@ export function KanbanViewControls({
         <button
           type="button"
           onClick={onSelectorClick}
-          className="flex items-center gap-1.5 rounded-sm bg-card/70 hover:bg-card px-3 py-1 text-sm font-medium text-foreground/70"
+          className="flex items-center gap-1.5 rounded-sm bg-white hover:bg-white px-3 py-1 text-sm font-medium text-foreground/70"
         >
           <span>{view.name}</span>
           <ChevronDown className="h-3.5 w-3.5 text-slate-400" />

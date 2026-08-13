@@ -6,6 +6,7 @@ import type { CallColumn } from "@/lib/calls/types";
 import { CallCard } from "./CallCard";
 import { cn } from "@/lib/utils";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
+import { KANBAN_HEADER, KANBAN_WELL } from "@/lib/layout";
 import { useRouter } from "next/navigation";
 import type { DropTargetPos } from "./CallsKanbanBoard";
 import type { Priority, TaskStatus } from "@/lib/tasks/types";
@@ -78,8 +79,8 @@ export function CallsKanbanColumn({
       <div className="mb-4 flex h-full w-10 shrink-0 flex-col rounded-sm">
         <div
           className={cn(
-            "flex h-full flex-col items-center gap-3 rounded-sm p-2 shadow-sm",
-            column.badgeColorClass,
+            "flex h-full flex-col items-center gap-3 p-2",
+            KANBAN_HEADER,
           )}
         >
           <button
@@ -109,10 +110,7 @@ export function CallsKanbanColumn({
     <div className="group mb-4 flex h-full w-72 shrink-0 flex-col">
       {/* Separate Header Box */}
       <div
-        className={cn(
-          "mb-3 shrink-0 rounded-sm p-2 shadow-sm",
-          column.badgeColorClass,
-        )}
+        className={cn("mb-2 shrink-0", KANBAN_HEADER)}
       >
         <div className="flex items-center justify-between gap-4">
           <button
@@ -151,7 +149,7 @@ export function CallsKanbanColumn({
         className={cn(
           "flex min-h-0 flex-1 flex-col rounded-sm border border-transparent p-2",
           dropTargetIdle,
-          isOver ? dropTargetActive : "bg-slate-200/70",
+          isOver ? dropTargetActive : KANBAN_WELL,
         )}
       >
         <div className="flex-1 space-y-3 overflow-y-auto pb-4 pr-1 [scrollbar-color:#94a3b8_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300">

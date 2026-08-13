@@ -40,7 +40,7 @@ export function MeetingParticipants({
           return (
             <div
               key={attendee.id}
-              className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card/40"
+              className="flex items-center gap-3 p-3 rounded-xl border border-border bg-white"
             >
               <div className="relative w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs shrink-0">
                 {initials}

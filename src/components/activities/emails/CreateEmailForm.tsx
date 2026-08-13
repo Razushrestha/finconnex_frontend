@@ -457,7 +457,7 @@ function formatBytes(bytes: number) {
 const inputClass =
   "w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring";
 const cardClass =
-  "rounded-2xl border border-border bg-card text-card-foreground shadow-sm";
+  "rounded-2xl border border-border bg-white text-card-foreground shadow-sm";
 const toolbarButtonClass =
   "rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground";
 const toolbarButtonActiveClass = "bg-accent text-accent-foreground";
@@ -588,7 +588,7 @@ export function CreateEmailForm({
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border bg-card px-6 py-3">
+      <div className="flex items-center justify-between border-b border-border bg-white px-6 py-3">
         <div className="flex items-center gap-4">
           <button
             type="button"
@@ -622,9 +622,9 @@ export function CreateEmailForm({
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-6 py-6 lg:grid-cols-3">
+      <div className="mx-auto grid w-full max-w-[1920px] grid-cols-1 gap-4 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,400px)] lg:gap-6 2xl:px-8">
         {/* Left column */}
-        <div className={`${cardClass} divide-y divide-border lg:col-span-2`}>
+        <div className={`${cardClass} divide-y divide-border`}>
           {/* To */}
           <div className="flex items-start justify-between gap-3 px-5 py-4">
             <div className="flex-1">
@@ -869,7 +869,7 @@ export function CreateEmailForm({
             <button
               type="button"
               title="Optimize for brevity — not yet wired up"
-              className="absolute bottom-3 right-5 flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-primary shadow-sm hover:bg-accent"
+              className="absolute bottom-3 right-5 flex items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-xs font-medium text-primary shadow-sm hover:bg-accent"
             >
               <Sparkles className="h-3 w-3" />
               Optimize for brevity

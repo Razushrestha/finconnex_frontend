@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Home, ArrowLeft, Route, Save } from "lucide-react";
+import { ArrowLeft, Save } from "lucide-react";
 import {
   EXIT_CONDITION_PRESETS,
   JOURNEY_OWNERS,
@@ -79,7 +79,7 @@ export default function CreateJourneyPage() {
 
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
-      <div className="relative mx-auto flex max-w-[1400px] flex-col p-2.5 sm:p-3 lg:p-4">
+      <div className="relative mx-auto flex max-w-[1920px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <button
@@ -89,27 +89,9 @@ export default function CreateJourneyPage() {
             >
               <ArrowLeft className="h-3.5 w-3.5" />
             </button>
-            <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-              <Link
-                href="/"
-                className="flex items-center gap-0.5 hover:text-slate-600"
-              >
-                <Home className="h-3 w-3" />
-                Home
-              </Link>
-              <span>/</span>
-              <Link href="/journeys" className="hover:text-slate-600">
-                Journeys
-              </Link>
-              <span>/</span>
-            </nav>
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Build journey
             </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
-              <Route className="h-2.5 w-2.5" />
-              Canvas
-            </span>
           </div>
           <button
             type="button"

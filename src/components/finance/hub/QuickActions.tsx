@@ -5,7 +5,7 @@ export const QuickActions: React.FC = () => {
   const router = useRouter();
 
   return (
-    <div className="bg-background text-card-foreground p-6 rounded-xl border border-border shadow-sm">
+    <div className="rounded-xl border border-slate-100 bg-white p-6 text-slate-900 shadow-sm">
       <h3 className="text-lg font-bold text-foreground mb-4">Quick Actions</h3>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <button

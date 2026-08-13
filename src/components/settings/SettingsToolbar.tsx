@@ -63,7 +63,7 @@ export function SettingsToolbar() {
 
   return (
     <div className="relative border-b border-slate-200/80 bg-white">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6">
+      <div className="mx-auto flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6 2xl:px-8">
         <p className="text-[10px] font-semibold tracking-wide text-violet-600 uppercase">
           §27 Settings · {SETTINGS_CATEGORIES.length} sections ·{" "}
           {paths.length} pages
@@ -133,7 +133,7 @@ export function SettingsToolbar() {
 
       {panel && (
         <div className="absolute inset-x-0 top-full z-40 border-b border-slate-200 bg-white shadow-lg">
-          <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6">
+          <div className="mx-auto w-full max-w-[1920px] px-4 py-3 sm:px-6 2xl:px-8">
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-[12px] font-bold text-slate-800">
                 {panel === "search" && "Search Settings"}

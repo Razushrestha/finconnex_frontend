@@ -234,7 +234,7 @@ export function EmailEditor({
         <button
           type="button"
           title="Optimize for brevity"
-          className="absolute bottom-3 right-5 flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-primary shadow-sm hover:bg-accent"
+          className="absolute bottom-3 right-5 flex items-center gap-1.5 rounded-full border border-border bg-white px-3 py-1.5 text-xs font-medium text-primary shadow-sm hover:bg-accent"
         >
           <Sparkles className="h-3 w-3" />
           Optimize for brevity

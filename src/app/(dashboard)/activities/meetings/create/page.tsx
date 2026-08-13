@@ -57,15 +57,15 @@ export default function ScheduleMeetingPage() {
   };
 
   return (
-    <div className="w-full mx-auto px-4 py-2 space-y-4 bg-background text-foreground min-h-screen">
+    <div className="mx-auto min-h-full w-full max-w-[1920px] space-y-4 bg-background px-4 py-3 text-foreground sm:px-6 2xl:px-8">
       <MeetingHeader
         onCancel={() => console.log("Cancelled scheduling")}
         onSendInvites={() => console.log("Invites sent")}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,400px)] lg:gap-6">
         {/* Left / Main Column */}
-        <div className="lg:col-span-2">
+        <div>
           <MeetingFormCard
             title={title}
             onTitleChange={setTitle}

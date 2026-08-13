@@ -4,14 +4,12 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Home,
-  Bell,
+    Bell,
   Plus,
   Clock,
   Link2,
   List,
   LayoutGrid,
-  Sparkles,
   Mail,
   Smartphone,
   Monitor,
@@ -34,6 +32,8 @@ import {
 } from "@/components/shared/CardInitialsAvatar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
+import { BOARD_PAGE, KANBAN_HEADER, KANBAN_WELL } from "@/lib/layout";
+import { dropTargetActive } from "@/lib/motion";
 
 type ViewMode = "kanban" | "list";
 
@@ -129,34 +129,15 @@ export default function RemindersPage() {
   }
 
   return (
-    <div className="relative min-h-full overflow-hidden bg-slate-50">
+    <div className={BOARD_PAGE}>
       <FocusHighlight />
 
-      <div className="relative mx-auto max-w-[1400px] p-2.5 sm:p-3 lg:p-4">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-              <Link
-                href="/"
-                className="flex items-center gap-0.5 transition-colors hover:text-slate-600"
-              >
-                <Home className="h-3 w-3" />
-                Home
-              </Link>
-              <span>/</span>
-              <span className="text-slate-500">Activities</span>
-              <span>/</span>
-            </nav>
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Reminders
             </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
-              <Sparkles className="h-2.5 w-2.5" />
-              On time
-            </span>
-            <span className="hidden text-[11px] text-slate-400 sm:inline">
-              · In-app, email, push &amp; SMS
-            </span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -187,8 +168,8 @@ export default function RemindersPage() {
         </div>
 
         {/* ONE surface: toolbar + content */}
-        <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 sm:px-4">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-0.5 rounded-lg bg-slate-50 p-0.5">
               <TabBtn
                 active={tab === "all"}
@@ -258,55 +239,42 @@ export default function RemindersPage() {
 
           <div className="min-h-0 flex-1 overflow-auto">
             {view === "kanban" ? (
-              <div
-                className={cn(
-                  "grid h-full min-h-[420px] divide-x divide-slate-100",
-                  tab === "pending"
-                    ? "grid-cols-1"
-                    : "grid-cols-1 md:grid-cols-2 xl:grid-cols-4",
-                )}
-              >
+              <div className="flex h-full min-h-[420px] items-stretch gap-3 overflow-x-auto p-1">
                 {visibleColumns.map((col) => {
-                  const meta = STATUS_META[col.title];
                   const isOver = overCol === col.id;
                   return (
                     <div
                       key={col.id}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        setOverCol(col.id);
-                      }}
-                      onDragLeave={() =>
-                        setOverCol((p) => (p === col.id ? null : p))
-                      }
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        handleDrop(col.title);
-                      }}
-                      className={cn(
-                        "flex min-h-[420px] flex-col transition-colors",
-                        isOver && "bg-violet-50/50",
-                      )}
+                      className="flex min-h-[420px] w-72 shrink-0 flex-col gap-2"
                     >
-                      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={cn(
-                              "rounded-full px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase",
-                              meta.soft,
-                              meta.text,
-                            )}
-                          >
+                      <div className={KANBAN_HEADER}>
+                        <div className="flex items-center justify-between px-1">
+                          <h3 className="text-xs font-semibold text-slate-800 xl:text-sm">
                             {col.title}
-                          </span>
-                          <span className="text-[10px] font-bold tabular-nums text-slate-400">
+                          </h3>
+                          <span className="rounded-full border border-slate-200/80 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500">
                             {col.count}
                           </span>
                         </div>
-                        <Bell className={cn("h-3.5 w-3.5", meta.text)} />
                       </div>
 
-                      <div className="flex flex-1 flex-col gap-2 p-2">
+                      <div
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setOverCol(col.id);
+                        }}
+                        onDragLeave={() =>
+                          setOverCol((p) => (p === col.id ? null : p))
+                        }
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          handleDrop(col.title);
+                        }}
+                        className={cn(
+                          "flex min-h-0 flex-1 flex-col gap-2 rounded-sm border p-2",
+                          isOver ? dropTargetActive : KANBAN_WELL,
+                        )}
+                      >
                         {col.reminders.map((r) => (
                           <ReminderCard
                             key={r.id}
@@ -514,7 +482,7 @@ function ReminderCard({
       data-focus-id={reminder.id}
       data-reminder-id={reminder.id}
       className={cn(
-        "group cursor-grab rounded-xl border border-slate-100 border-l-[3px] bg-white p-3.5 shadow-sm transition-all active:cursor-grabbing",
+        "group cursor-grab rounded-md border border-slate-100 border-l-[3px] !bg-white p-3.5 shadow-sm transition-all active:cursor-grabbing",
         meta.border,
         isDragging
           ? "opacity-40"

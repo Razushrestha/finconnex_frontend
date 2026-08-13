@@ -17,6 +17,7 @@ import {
 } from "@/components/activities/ActivityToolbar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
+import { BOARD_PAGE } from "@/lib/layout";
 import { moreMenuItems, printViewItems } from "../tasks/page";
 
 type TypeTab = "All" | NoteType;
@@ -119,7 +120,7 @@ export default function NotesPage() {
   const activeFilters = Number(pinnedOnly) + Number(privateOnly);
 
   return (
-    <div className="flex min-h-full w-full min-w-0 flex-col overflow-hidden bg-slate-50/50 p-3">
+    <div className={BOARD_PAGE}>
       <FocusHighlight />
       <div className="shrink-0">
         <ActivityToolbar
@@ -191,12 +192,7 @@ export default function NotesPage() {
               embedded
             />
           ) : (
-            <div
-              className={cn(
-                "flex h-full min-h-[420px] overflow-x-auto rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm",
-                typeTab === "All" ? "divide-x divide-slate-100" : "",
-              )}
-            >
+            <div className="flex h-full min-h-[420px] items-stretch gap-3 overflow-x-auto p-1">
               {visibleColumns.map((column) => {
                 const notes = column.notes.filter((n) => {
                   if (pinnedOnly && !n.isPinned) return false;

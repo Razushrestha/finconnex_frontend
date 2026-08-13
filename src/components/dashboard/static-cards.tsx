@@ -1,6 +1,4 @@
 import {
-  Home,
-  ChevronRight,
   MoreHorizontal,
   Plus,
   Clock,
@@ -11,11 +9,8 @@ import { Card, CardHeader } from "./card-primitives";
 
 export function DashboardBreadcrumb() {
   return (
-    <div className="flex items-center gap-2 text-sm text-gray-400">
-      <Home className="h-4 w-4" />
-      <span>Home</span>
-      <ChevronRight className="h-3.5 w-3.5" />
-      <span className="text-gray-600">Dashboard</span>
+    <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+      <span>Dashboard</span>
     </div>
   );
 }

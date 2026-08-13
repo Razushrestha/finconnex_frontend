@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Home,
-  ArrowLeft,
+    ArrowLeft,
   Play,
   Pause,
   Calendar,
@@ -247,17 +246,6 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
           >
             <ArrowLeft className="h-3.5 w-3.5" />
           </button>
-          <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-            <Link href="/" className="flex items-center gap-0.5 hover:text-slate-600">
-              <Home className="h-3 w-3" />
-              Home
-            </Link>
-            <span>/</span>
-            <Link href="/marketing/email" className="hover:text-slate-600">
-              Email Campaigns
-            </Link>
-            <span>/</span>
-          </nav>
           <h1 className="text-[15px] font-bold text-slate-900">
             {campaign.campaignId}
           </h1>
@@ -307,7 +295,7 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
                 {campaign.fromName} &lt;{campaign.fromEmail}&gt;
               </p>
             </div>
-            <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2">
+            <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2">
               <span
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-semibold",
@@ -366,7 +354,7 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
                 <Meta label="Created" value={campaign.createdAt} />
               </div>
 
-              <div className="mt-6 rounded-xl border border-slate-100 bg-slate-50/60 p-4">
+              <div className="mt-6 rounded-xl border border-slate-100 bg-white p-4">
                 <p className="mb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
                   Body preview
                 </p>
@@ -544,7 +532,7 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-2.5">
+    <div className="rounded-xl border border-slate-100 bg-white px-3 py-2.5">
       <p className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
         {label}
       </p>

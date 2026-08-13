@@ -66,7 +66,7 @@ export const TopMetricCards: React.FC<TopMetricCardsProps> = ({
         return (
           <div
             key={index}
-            className="bg-background text-card-foreground p-5 rounded-xl border border-border shadow-sm flex flex-col justify-between"
+            className="flex flex-col justify-between rounded-xl border border-slate-100 bg-white p-5 text-slate-900 shadow-sm"
           >
             <div className="flex justify-between items-start">
               <span className="text-xs font-bold text-muted-foreground tracking-wider">

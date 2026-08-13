@@ -287,7 +287,7 @@ export function DocumentRequestCard({
       data-request-id={request.id}
       data-column-id={columnId}
       className={cn(
-        "cursor-grab select-none rounded-xl border border-slate-100 border-l-[3px] bg-white p-3 shadow-sm transition-all active:cursor-grabbing",
+        "cursor-grab select-none rounded-md border border-slate-100 border-l-[3px] !bg-white p-3.5 shadow-sm transition-all active:cursor-grabbing",
         meta.border,
         isDragging ? "opacity-40" : "hover:border-slate-200 hover:shadow-md",
       )}

@@ -266,7 +266,7 @@ export function Navbar({
           <div
             role="menu"
             className={cn(
-              "absolute right-0 mt-2 w-60 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-card py-1 shadow-lg",
+              "absolute right-0 mt-2 w-60 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-xl border border-border bg-white py-1 shadow-lg",
               menuEnter,
             )}
           >

@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Home,
-  Bell,
+    Bell,
   Check,
   X,
   Upload,
@@ -188,20 +187,6 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
           >
             <ArrowLeft className="h-3.5 w-3.5" />
           </button>
-          <nav className="flex items-center gap-1 text-[10px] text-slate-400">
-            <Link
-              href="/"
-              className="flex items-center gap-0.5 hover:text-slate-600"
-            >
-              <Home className="h-3 w-3" />
-              Home
-            </Link>
-            <span>/</span>
-            <Link href="/documents/requests" className="hover:text-slate-600">
-              Requests
-            </Link>
-            <span>/</span>
-          </nav>
           <h1 className="text-[15px] font-bold text-slate-900">
             {request.requestId}
           </h1>
@@ -332,7 +317,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-2">
+                  <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2">
                     <span
                       className={cn(
                         "flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-semibold",

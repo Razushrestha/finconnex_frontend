@@ -8,7 +8,7 @@ interface TaskDescriptionCardProps {
 
 export function TaskDescriptionCard({ description }: TaskDescriptionCardProps) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+    <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
       <h2 className="mb-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         Description
       </h2>
