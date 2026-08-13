@@ -26,6 +26,7 @@ import {
   type LibraryDocument,
   type LibraryFolder,
 } from "@/lib/documents/library/types";
+import { downloadLibraryDocument } from "@/lib/documents/signed-artifacts";
 import {
   ACTIVITY_OWNERS,
   RELATED_ENTITY_KINDS,
@@ -142,7 +143,12 @@ export default function DocumentLibraryPage() {
   }
 
   function downloadDoc(doc: LibraryDocument) {
-    flash(`Download started: ${doc.fileName}`);
+    const ok = downloadLibraryDocument(doc);
+    flash(
+      ok
+        ? `Downloaded ${doc.fileName}`
+        : `No file bytes for ${doc.fileName} (demo stub)`,
+    );
     setMenuId(null);
   }
 

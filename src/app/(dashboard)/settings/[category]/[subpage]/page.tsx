@@ -9,6 +9,16 @@ import { RecycleBinSettingsClient } from "@/components/settings/RecycleBinSettin
 import { LeadCardSettingsClient } from "@/components/settings/LeadCardSettingsClient";
 import { CustomFieldsSettingsClient } from "@/components/settings/CustomFieldsSettingsClient";
 import { PipelineSlaSettingsClient } from "@/components/settings/PipelineSlaSettingsClient";
+import { TwoFactorSettingsClient } from "@/components/settings/TwoFactorSettingsClient";
+import { LoginHistorySettingsClient } from "@/components/settings/LoginHistorySettingsClient";
+import { BillingSettingsClient } from "@/components/settings/BillingSettingsClient";
+import { BackupRestoreSettingsClient } from "@/components/settings/BackupRestoreSettingsClient";
+import { FieldPermissionsSettingsClient } from "@/components/settings/FieldPermissionsSettingsClient";
+import { AutomationLogsSettingsClient } from "@/components/settings/AutomationLogsSettingsClient";
+import { SmtpSettingsClient } from "@/components/settings/SmtpSettingsClient";
+import { UsersSettingsClient } from "@/components/settings/UsersSettingsClient";
+import { IpRestrictionsSettingsClient } from "@/components/settings/IpRestrictionsSettingsClient";
+import { CustomObjectsSettingsClient } from "@/components/settings/CustomObjectsSettingsClient";
 import { cn } from "@/lib/utils";
 
 interface PageProps {
@@ -28,14 +38,41 @@ export default async function SettingsSubPage({ params }: PageProps) {
 
   const { category, item } = hit;
   const path = `/settings/${category.slug}/${item.slug}`;
-  const isRecycleBin =
-    category.slug === "data-management" && item.slug === "recycle-bin";
-  const isLeadCard =
-    category.slug === "crm-configuration" && item.slug === "lead-card";
-  const isCustomFields =
-    category.slug === "crm-configuration" && item.slug === "custom-fields";
-  const isPipelines =
-    category.slug === "crm-configuration" && item.slug === "pipelines";
+  const key = `${category.slug}/${item.slug}`;
+
+  const custom =
+    key === "data-management/recycle-bin" ? (
+      <RecycleBinSettingsClient />
+    ) : key === "crm-configuration/lead-card" ? (
+      <LeadCardSettingsClient />
+    ) : key === "crm-configuration/custom-fields" ? (
+      <CustomFieldsSettingsClient />
+    ) : key === "crm-configuration/pipelines" ? (
+      <PipelineSlaSettingsClient />
+    ) : key === "security/two-factor-authentication" ? (
+      <TwoFactorSettingsClient />
+    ) : key === "security/login-history" ? (
+      <LoginHistorySettingsClient />
+    ) : key === "subscription-and-billing/subscription-plan" ||
+      key === "subscription-and-billing/billing" ||
+      key === "subscription-and-billing/invoices" ? (
+      <BillingSettingsClient />
+    ) : key === "data-management/backup-and-restore" ||
+      key === "data-management/restore-points" ? (
+      <BackupRestoreSettingsClient />
+    ) : key === "users-and-access/permissions" ? (
+      <FieldPermissionsSettingsClient />
+    ) : key === "workflow-and-automation/automation-logs" ? (
+      <AutomationLogsSettingsClient />
+    ) : key === "communication/smtp" ? (
+      <SmtpSettingsClient />
+    ) : key === "users-and-access/users" ? (
+      <UsersSettingsClient />
+    ) : key === "security/ip-restrictions" ? (
+      <IpRestrictionsSettingsClient />
+    ) : key === "crm-configuration/custom-objects" ? (
+      <CustomObjectsSettingsClient />
+    ) : null;
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-4">
@@ -67,15 +104,7 @@ export default async function SettingsSubPage({ params }: PageProps) {
       </aside>
 
       <div className="lg:col-span-3">
-        {isRecycleBin ? (
-          <RecycleBinSettingsClient />
-        ) : isLeadCard ? (
-          <LeadCardSettingsClient />
-        ) : isCustomFields ? (
-          <CustomFieldsSettingsClient />
-        ) : isPipelines ? (
-          <PipelineSlaSettingsClient />
-        ) : (
+        {custom ?? (
           <SettingsFormClient
             categorySlug={category.slug}
             subpageSlug={item.slug}

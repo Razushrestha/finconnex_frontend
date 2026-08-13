@@ -537,7 +537,7 @@ export function TaskCard({
                                 strokeWidth={3}
                               />
                             )}
-                          </span>
+        </span>
                         </button>
                       );
                     },

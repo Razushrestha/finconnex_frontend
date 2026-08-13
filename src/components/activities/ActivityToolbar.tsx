@@ -18,7 +18,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export type ActivityView = "list" | "kanban";
+export type ActivityView = "list" | "kanban" | "calendar" | "timeline";
 
 export interface MoreMenuItem {
   key: string;
@@ -69,7 +69,7 @@ export interface ActivityToolbarProps {
   savedViews?: string[];
   defaultSavedView?: string;
 
-  extraViewIcons?: { key: string; icon: LucideIcon; label: string }[];
+  extraViewIcons?: { key: ActivityView; icon: LucideIcon; label: string }[];
 }
 
 const DEFAULT_LAYOUT_ID = "standard";
@@ -300,9 +300,14 @@ export function ActivityToolbar({
               <button
                 key={key}
                 type="button"
+                onClick={() => onViewChange(key)}
                 aria-label={label}
-                title={`${label} (coming soon)`}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50"
+                title={label}
+                className={`flex h-7 w-7 items-center justify-center rounded-md ${
+                  view === key
+                    ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200"
+                    : "text-slate-500 hover:bg-slate-50"
+                }`}
               >
                 <Icon className="h-3.5 w-3.5" />
               </button>

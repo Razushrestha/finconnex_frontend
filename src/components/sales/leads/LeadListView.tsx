@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { type KanbanColumn, type LeadStatus } from "@/lib/leads/types";
 import { listLeadColumns } from "@/lib/leads/store";
+import { onRulesChange } from "@/lib/rules";
 import { onLeadActivityChange } from "@/lib/leads/lead-extras-store";
 import {
   loadLeadCardSettings,
@@ -312,7 +313,7 @@ export function LeadListView({
   onPageSizeChange,
   onOpenListSettings,
 }: LeadListViewProps) {
-  const [columns] = useState<KanbanColumn[]>(
+  const [columns, setColumns] = useState<KanbanColumn[]>(
     () => columnsProp ?? listLeadColumns(),
   );
   const [cardSettings, setCardSettings] = useState<LeadCardSettings>(() =>
@@ -331,6 +332,17 @@ export function LeadListView({
   const setPageSize = onPageSizeChange ?? setInternalPageSize;
   const manageColumns = manageColumnsProp ?? internalManageColumns;
   const setManageColumns = onManageColumnsChange ?? setInternalManageColumns;
+
+  useEffect(() => {
+    if (columnsProp) setColumns(columnsProp);
+  }, [columnsProp]);
+
+  useEffect(() => {
+    return onRulesChange(() => {
+      if (!columnsProp) setColumns(listLeadColumns());
+      setRevision((n) => n + 1);
+    });
+  }, [columnsProp]);
 
   useEffect(() => {
     return onLeadActivityChange(() => setRevision((n) => n + 1));

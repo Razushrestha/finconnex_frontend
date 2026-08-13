@@ -10,6 +10,11 @@ import {
 } from "@/lib/deals/types";
 import { createBoardStore } from "@/lib/rules/module-store";
 import { formatRulesAt, newRulesId } from "@/lib/rules/storage";
+import {
+  findContactById,
+  linkDealToContact,
+  unlinkDealFromContact,
+} from "@/lib/contacts/store";
 
 const AVATAR_COLORS = [
   "bg-amber-50 text-amber-600",
@@ -140,4 +145,184 @@ export function deleteDeal(id: string): DealRecord | null {
   }
   if (found) saveDealPipelines(pipelines);
   return found;
+}
+
+export type DealLocation = {
+  deal: DealRecord;
+  stage: DealStage;
+  pipeline: DealPipeline;
+};
+
+export function findDealById(id: string): DealLocation | null {
+  const pipelines = listDealPipelines();
+  for (const pipe of Object.keys(pipelines) as DealPipeline[]) {
+    for (const stage of pipelines[pipe]) {
+      const deal = stage.deals.find((d) => d.id === id);
+      if (deal) return { deal, stage, pipeline: pipe };
+    }
+  }
+  return null;
+}
+
+function parseDealValue(value: string): number {
+  const n = Number(String(value).replace(/[^0-9.]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Σ(value × probability/100) for a stage. */
+export function stageWeightedForecast(stage: DealStage): number {
+  return stage.deals.reduce(
+    (sum, d) => sum + parseDealValue(d.value) * (d.probability / 100),
+    0,
+  );
+}
+
+export function updateDeal(
+  id: string,
+  patch: Partial<
+    Pick<
+      DealRecord,
+      | "name"
+      | "account"
+      | "contact"
+      | "contactId"
+      | "value"
+      | "currency"
+      | "probability"
+      | "owner"
+      | "closeDate"
+    >
+  > & { stageTitle?: string },
+): DealLocation | null {
+  const found = findDealById(id);
+  if (!found) return null;
+
+  const nextDeal: DealRecord = {
+    ...found.deal,
+    ...patch,
+    name: patch.name?.trim() || found.deal.name,
+    account: patch.account?.trim() || found.deal.account,
+    contact:
+      patch.contact !== undefined
+        ? patch.contact.trim() || undefined
+        : found.deal.contact,
+    value: patch.value
+      ? patch.value.trim().startsWith("$")
+        ? patch.value.trim()
+        : `$${patch.value.trim()}`
+      : found.deal.value,
+  };
+
+  const pipelines = listDealPipelines();
+  const stages = pipelines[found.pipeline];
+  const targetTitle = patch.stageTitle ?? found.stage.title;
+  const target =
+    stages.find((s) => s.title === targetTitle) ?? found.stage;
+
+  const without = stages.map((s) => ({
+    ...s,
+    deals: s.deals.filter((d) => d.id !== id),
+  }));
+
+  const moved: DealRecord = {
+    ...nextDeal,
+    accentColorClass: target.dotColorClass,
+    probability:
+      targetTitle === "Closed Won"
+        ? 100
+        : targetTitle === "Closed Lost"
+          ? 0
+          : nextDeal.probability,
+  };
+
+  pipelines[found.pipeline] = without.map((s) =>
+    s.id === target.id ? { ...s, deals: [moved, ...s.deals] } : s,
+  );
+  saveDealPipelines(pipelines);
+  return { deal: moved, stage: target, pipeline: found.pipeline };
+}
+
+export function markDealOutcome(
+  id: string,
+  outcome: "won" | "lost",
+): DealLocation | null {
+  const found = findDealById(id);
+  if (!found) return null;
+  const title = outcome === "won" ? "Closed Won" : "Closed Lost";
+  return updateDeal(id, {
+    stageTitle: title,
+    probability: outcome === "won" ? 100 : 0,
+    closeDate: formatRulesAt().split(",")[0] || found.deal.closeDate,
+  });
+}
+
+export function deleteDeals(ids: string[]): number {
+  let n = 0;
+  for (const id of ids) {
+    if (deleteDeal(id)) n += 1;
+  }
+  return n;
+}
+
+export function updateDealOwners(ids: string[], owner: string): number {
+  const nextOwner = owner.trim();
+  if (!nextOwner || !ids.length) return 0;
+  let n = 0;
+  for (const id of ids) {
+    if (updateDeal(id, { owner: nextOwner })) n += 1;
+  }
+  return n;
+}
+
+/** Link a contact record to a deal (and reverse). */
+export function linkContactToDeal(
+  dealId: string,
+  contactId: string,
+): DealLocation | null {
+  const contact = findContactById(contactId)?.contact;
+  if (!contact) return null;
+
+  const found = findDealById(dealId);
+  if (!found) return null;
+
+  if (found.deal.contactId && found.deal.contactId !== contactId) {
+    unlinkDealFromContact(found.deal.contactId, dealId);
+  }
+
+  linkDealToContact(contactId, dealId);
+
+  const pipelines = listDealPipelines();
+  pipelines[found.pipeline] = pipelines[found.pipeline].map((s) => ({
+    ...s,
+    deals: s.deals.map((d) =>
+      d.id === dealId
+        ? { ...d, contactId, contact: contact.name }
+        : d,
+    ),
+  }));
+  saveDealPipelines(pipelines);
+  return findDealById(dealId);
+}
+
+export function unlinkContactFromDeal(dealId: string): DealLocation | null {
+  const found = findDealById(dealId);
+  if (!found) return null;
+  if (found.deal.contactId) {
+    unlinkDealFromContact(found.deal.contactId, dealId);
+  }
+  const pipelines = listDealPipelines();
+  pipelines[found.pipeline] = pipelines[found.pipeline].map((s) => ({
+    ...s,
+    deals: s.deals.map((d) =>
+      d.id === dealId ? { ...d, contactId: undefined, contact: undefined } : d,
+    ),
+  }));
+  saveDealPipelines(pipelines);
+  return findDealById(dealId);
+}
+
+export function listAllDeals(): DealRecord[] {
+  return Object.values(listDealPipelines()).flatMap((stages) =>
+    stages.flatMap((s) => s.deals),
+  );
 }

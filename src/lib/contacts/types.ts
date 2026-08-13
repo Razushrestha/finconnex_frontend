@@ -38,6 +38,8 @@ export interface ContactCardData {
   createdDate: string;
   accentColorClass: string;
   avatarBgClass: string;
+  /** Linked deal record ids (SRS contact ↔ deal). */
+  dealIds?: string[];
 }
 
 export interface ContactGroup {

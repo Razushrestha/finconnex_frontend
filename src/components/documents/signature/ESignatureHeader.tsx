@@ -3,10 +3,10 @@ import { Download, Home, PenLine, Plus } from "lucide-react";
 
 export function ESignatureHeader({
   onExport,
-  onNew,
 }: {
   onExport: () => void;
-  onNew: () => void;
+  /** @deprecated use Link; kept for call-site compat */
+  onNew?: () => void;
 }) {
   return (
     <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
@@ -40,14 +40,13 @@ export function ESignatureHeader({
           <Download className="h-3.5 w-3.5" />
           Export log
         </button>
-        <button
-          type="button"
-          onClick={onNew}
+        <Link
+          href="/documents/signature/create?layoutid=standard&redirect=false"
           className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-md shadow-violet-600/20 hover:bg-violet-700"
         >
           <Plus className="h-3.5 w-3.5" />
           New signature
-        </button>
+        </Link>
       </div>
     </div>
   );

@@ -176,3 +176,50 @@ export function enableApiSendGateway(config: ApiSendGatewayConfig) {
   activeGateway = createApiSendGateway(config);
   return activeGateway;
 }
+
+/**
+ * In-app demo send when no live CRM API is configured.
+ * Avoids opening the OS mailto/sms composers for campaign/activity sends.
+ */
+export async function sendEmailDemoLive(input: {
+  email?: string;
+  subject?: string;
+  body?: string;
+}): Promise<SendResult> {
+  if (typeof window !== "undefined") {
+    try {
+      const { loadSmtpConfig } = await import("@/lib/comms/smtp");
+      const smtp = loadSmtpConfig();
+      if (!smtp.enabled) {
+        return {
+          ok: false,
+          message: "SMTP is disabled in Settings → Communication → SMTP",
+        };
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  const g = getSendGateway();
+  if (g.mode === "api") return g.sendEmail(input);
+  const mock = createApiSendGateway({
+    baseUrl: "mock://crm",
+    getAccessToken: () => null,
+    fetchImpl: createMockSendFetch(),
+  });
+  return mock.sendEmail(input);
+}
+
+export async function sendSmsDemoLive(input: {
+  phone?: string;
+  body?: string;
+}): Promise<SendResult> {
+  const g = getSendGateway();
+  if (g.mode === "api") return g.sendSms(input);
+  const mock = createApiSendGateway({
+    baseUrl: "mock://crm",
+    getAccessToken: () => null,
+    fetchImpl: createMockSendFetch(),
+  });
+  return mock.sendSms(input);
+}

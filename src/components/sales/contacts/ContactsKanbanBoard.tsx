@@ -1,8 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { CONTACT_GROUPS, type ContactGroup } from "@/lib/contacts/types";
+import { type ContactGroup } from "@/lib/contacts/types";
+import {
+  listContactGroups,
+  saveContactGroups,
+} from "@/lib/contacts/store";
+import { onRulesChange } from "@/lib/rules";
 import type { ContactFilters } from "./FilterContactsPanel";
 import {
   ContactRecordCard,
@@ -48,7 +53,9 @@ export function ContactsKanbanBoard({
 }: ContactsKanbanBoardProps) {
   const router = useRouter();
 
-  const [groups, setGroups] = useState<ContactGroup[]>(CONTACT_GROUPS);
+  const [groups, setGroups] = useState<ContactGroup[]>(() =>
+    listContactGroups(),
+  );
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const [dropTargetPos, setDropTargetPos] = useState<DropTargetPosition | null>(
     null,
@@ -60,9 +67,18 @@ export function ContactsKanbanBoard({
   const [panel, setPanel] = useState<ContactPanelState | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
+  useEffect(() => {
+    return onRulesChange(() => setGroups(listContactGroups()));
+  }, []);
+
   function flash(msg: string) {
     setToast(msg);
     window.setTimeout(() => setToast(null), 2400);
+  }
+
+  function persist(next: ContactGroup[]) {
+    setGroups(next);
+    saveContactGroups(next);
   }
 
   function toggleCollapsed(groupId: string) {
@@ -125,8 +141,8 @@ export function ContactsKanbanBoard({
     updatedContact: ContactRecord,
     targetIndex?: number,
   ) {
-    setGroups((prev) =>
-      prev.map((g) => {
+    persist(
+      groups.map((g) => {
         if (g.id === sourceGroup.id && g.id === targetGroup.id) {
           const filtered = g.contacts.filter((c) => c.id !== contact.id);
           const insertAt =

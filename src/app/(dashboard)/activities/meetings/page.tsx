@@ -20,6 +20,7 @@ import {
 } from "@/components/activities/ActivityToolbar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
+import { activityExportMenuItem } from "@/lib/activities/export";
 import { DropTargetPos } from "@/components/activities/meetings/MeetingsKanbanBoard";
 
 const TYPE_ICON: Record<MeetingType, React.ElementType> = {
@@ -147,6 +148,7 @@ export default function MeetingsPage() {
           onClearSort={() => setSortActive(false)}
           search={search}
           onSearchChange={setSearch}
+          moreMenuItems={[activityExportMenuItem("meetings")]}
         />
       </div>
 

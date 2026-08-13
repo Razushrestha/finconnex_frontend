@@ -40,6 +40,10 @@ import {
   type PortalModule,
   type PortalStatus,
 } from "@/lib/portals/types";
+import {
+  sendPortalInvite,
+  sendPortalPasswordReset,
+} from "@/lib/portals/auth";
 import { cn } from "@/lib/utils";
 import {
   InputShell,
@@ -134,34 +138,30 @@ export function PortalDetailClient({ id }: { id: string }) {
     save(next);
   }
 
-  function sendInvite() {
+  async function sendInvite() {
     if (!row) return;
     if (row.status !== "Active") {
       flash("Activate portal before inviting");
       return;
     }
-    let next = appendPortalAudit(
-      { ...row, inviteSentAt: formatPortalAt() },
-      "Invite sent",
-      row.createdBy,
-    );
-    next = appendPortalActivity(
-      next,
-      `Invite sent to ${row.primaryContactEmail}`,
-      row.createdBy,
-    );
-    save(next, `Invite sent to ${row.primaryContactEmail}`);
+    const result = await sendPortalInvite(row, row.createdBy);
+    if (!result.ok) {
+      flash(result.message);
+      return;
+    }
+    setRow(result.portal);
+    flash(`Invite emailed to ${row.primaryContactEmail}`);
   }
 
-  function resetPassword() {
+  async function resetPassword() {
     if (!row) return;
-    let next = appendPortalAudit(row, "Password reset sent", row.createdBy);
-    next = appendPortalActivity(
-      next,
-      `Password reset → ${row.primaryContactEmail}`,
-      row.createdBy,
-    );
-    save(next, "Password reset sent (mock)");
+    const result = await sendPortalPasswordReset(row, row.createdBy);
+    if (!result.ok) {
+      flash(result.message);
+      return;
+    }
+    setRow(result.portal);
+    flash(`Password reset emailed · temp: ${result.tempPassword}`);
   }
 
   function saveEdits() {
@@ -299,7 +299,7 @@ export function PortalDetailClient({ id }: { id: string }) {
           </button>
           <button
             type="button"
-            onClick={sendInvite}
+            onClick={() => void sendInvite()}
             className="inline-flex h-8 items-center gap-1 rounded-lg bg-violet-600 px-2.5 text-[11px] font-semibold text-white"
           >
             <Mail className="h-3.5 w-3.5" />
@@ -307,7 +307,7 @@ export function PortalDetailClient({ id }: { id: string }) {
           </button>
           <button
             type="button"
-            onClick={resetPassword}
+            onClick={() => void resetPassword()}
             className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600"
           >
             <KeyRound className="h-3.5 w-3.5" />

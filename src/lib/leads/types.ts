@@ -87,6 +87,12 @@ export interface LeadCardData {
   pipelineStartedAt?: string;
   /** Values keyed by Custom Field `key` (not `cf:` prefix). */
   custom?: Record<string, string>;
+  /** PDF §3.1 conversion metadata */
+  isConverted?: boolean;
+  convertedAt?: string;
+  convertedContactId?: string;
+  convertedDealId?: string;
+  convertedCompanyId?: string;
   accentColorClass: string;
   avatarBgClass: string;
 }

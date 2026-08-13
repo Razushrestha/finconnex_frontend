@@ -13,6 +13,7 @@ import {
   updateTaskPriority,
   updateTaskStatus,
 } from "@/lib/tasks/store";
+import { onRulesChange } from "@/lib/rules";
 import { KanbanColumn } from "./KanbanColumn";
 import type { Priority, TaskStatus } from "@/lib/tasks/types";
 
@@ -28,19 +29,35 @@ export interface DropTargetPos {
 
 interface KanbanBoardProps {
   filters?: TaskFilters;
+  selectedIds?: string[];
+  onSelectedIdsChange?: (ids: string[]) => void;
 }
 
-export function KanbanBoard({ filters }: KanbanBoardProps) {
+export function KanbanBoard({
+  filters,
+  selectedIds: controlledSelectedIds,
+  onSelectedIdsChange,
+}: KanbanBoardProps) {
   const [columns, setColumns] = useState<TaskColumn[]>(initialColumns);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const [dropTargetPos, setDropTargetPos] = useState<DropTargetPos | null>(
     null,
   );
 
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [localSelectedIds, setLocalSelectedIds] = useState<string[]>([]);
+  const selectedIds = controlledSelectedIds ?? localSelectedIds;
+
+  function setSelectedIds(ids: string[]) {
+    if (onSelectedIdsChange) onSelectedIdsChange(ids);
+    else setLocalSelectedIds(ids);
+  }
 
   useEffect(() => {
     setColumns(listTaskColumns());
+  }, []);
+
+  useEffect(() => {
+    return onRulesChange(() => setColumns(listTaskColumns()));
   }, []);
 
   function persist(next: TaskColumn[]) {
@@ -49,10 +66,10 @@ export function KanbanBoard({ filters }: KanbanBoardProps) {
   }
 
   function handleToggleSelect(taskId: string) {
-    setSelectedIds((prev) =>
-      prev.includes(taskId)
-        ? prev.filter((id) => id !== taskId)
-        : [...prev, taskId],
+    setSelectedIds(
+      selectedIds.includes(taskId)
+        ? selectedIds.filter((id) => id !== taskId)
+        : [...selectedIds, taskId],
     );
   }
 

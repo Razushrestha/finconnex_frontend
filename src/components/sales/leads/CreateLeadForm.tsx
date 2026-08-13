@@ -29,6 +29,7 @@ import {
   notifyOwnerAssigned,
   requireAction,
   requiredFieldErrors,
+  canField,
 } from "@/lib/rules";
 import {
   CreateEntityFormShell,
@@ -375,16 +376,24 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
           />
         </InputShell>
       </Field>
-      <Field label="Estimated Value">
-        <InputShell icon={DollarSign}>
-          <input
-            className={elevatedInputClass(true)}
-            value={form.estimatedValue}
-            onChange={(e) => update("estimatedValue", e.target.value)}
-            placeholder="$0.00"
-          />
-        </InputShell>
-      </Field>
+      {canField("sales.leads.estimatedValue") ? (
+        <Field label="Estimated Value">
+          <InputShell icon={DollarSign}>
+            <input
+              className={elevatedInputClass(true)}
+              value={form.estimatedValue}
+              onChange={(e) => update("estimatedValue", e.target.value)}
+              placeholder="$0.00"
+            />
+          </InputShell>
+        </Field>
+      ) : (
+        <Field label="Estimated Value">
+          <p className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-[12px] text-slate-500">
+            Hidden by field permissions for your role
+          </p>
+        </Field>
+      )}
       <Field label="Notes" className="col-span-full">
         <TextAreaShell>
           <textarea

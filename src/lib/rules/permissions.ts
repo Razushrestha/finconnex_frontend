@@ -104,6 +104,20 @@ export const PERMISSION_GRANTS: PermissionGrant[] = [
     role: "User",
     scope: "field",
     resource: "sales.leads.estimatedValue",
+    allowed: false,
+  },
+  {
+    id: "g4b",
+    role: "Read Only",
+    scope: "field",
+    resource: "sales.leads.estimatedValue",
+    allowed: false,
+  },
+  {
+    id: "g16",
+    role: "Org Admin",
+    scope: "action",
+    resource: "settings.backup.restore",
     allowed: true,
   },
   {
@@ -200,6 +214,20 @@ export const PERMISSION_GRANTS: PermissionGrant[] = [
     scope: "action",
     resource: "recycle-bin.purge",
     allowed: false,
+  },
+  {
+    id: "g16",
+    role: "Org Admin",
+    scope: "action",
+    resource: "settings.backup.restore",
+    allowed: true,
+  },
+  {
+    id: "g17",
+    role: "Manager",
+    scope: "action",
+    resource: "settings.backup.restore",
+    allowed: true,
   },
 ];
 

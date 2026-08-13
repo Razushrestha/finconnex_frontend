@@ -8,12 +8,17 @@ import {
   setPortalSession,
   type ClientPortal,
 } from "@/lib/portals/types";
+import {
+  getPortalDefaultPassword,
+  verifyPortalLogin,
+} from "@/lib/portals/auth";
 import { recordPortalLogin } from "@/components/portals/public/PortalShell";
 
 export function PortalLoginClient({ slug }: { slug: string }) {
   const router = useRouter();
   const [portal, setPortal] = useState<ClientPortal | null>(null);
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
 
@@ -29,19 +34,13 @@ export function PortalLoginClient({ slug }: { slug: string }) {
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!portal || portal.status !== "Active") return;
-    const trimmed = email.trim().toLowerCase();
-    if (!trimmed || !trimmed.includes("@")) {
-      setError("Enter a valid email");
+    const result = verifyPortalLogin(slug, email, password);
+    if (!result.ok) {
+      setError(result.message);
       return;
     }
-    if (trimmed !== portal.primaryContactEmail.toLowerCase()) {
-      setError(
-        `Use the invited email (${portal.primaryContactEmail}) for this mock login`,
-      );
-      return;
-    }
-    setPortalSession(slug, portal.primaryContactEmail);
-    recordPortalLogin(slug, portal.primaryContactEmail);
+    setPortalSession(slug, result.portal.primaryContactEmail);
+    recordPortalLogin(slug, result.portal.primaryContactEmail);
     router.push(`/p/${slug}`);
   }
 
@@ -91,7 +90,7 @@ export function PortalLoginClient({ slug }: { slug: string }) {
             {portal.name}
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            Sign in to view deals, documents, invoices, and support: for{" "}
+            Sign in to view deals, documents, invoices, and support for{" "}
             {portal.clientName}.
           </p>
         </div>
@@ -113,18 +112,31 @@ export function PortalLoginClient({ slug }: { slug: string }) {
             placeholder={portal.primaryContactEmail}
             className="h-11 w-full rounded-xl border border-slate-200 px-3.5 text-[13px] outline-none focus:border-violet-500 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.12)]"
           />
+          <label className="mb-1.5 mt-3 block text-[12px] font-semibold text-slate-700">
+            Password
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setError("");
+            }}
+            placeholder="••••••••"
+            className="h-11 w-full rounded-xl border border-slate-200 px-3.5 text-[13px] outline-none focus:border-violet-500 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.12)]"
+          />
           {error ? (
             <p className="mt-2 text-[11px] font-medium text-rose-500">{error}</p>
           ) : (
             <p className="mt-2 text-[11px] text-slate-400">
-              Mock login: use {portal.primaryContactEmail}
+              Demo: {portal.primaryContactEmail} / {getPortalDefaultPassword()}
             </p>
           )}
           <button
             type="submit"
             className="mt-4 h-11 w-full rounded-xl bg-violet-600 text-[13px] font-semibold text-white shadow-lg shadow-violet-600/25 hover:bg-violet-700"
           >
-            Continue
+            Sign in
           </button>
         </form>
       </div>

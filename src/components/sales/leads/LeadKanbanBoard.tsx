@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus, Trophy, XCircle } from "lucide-react";
 import { type KanbanColumn, type LeadPipelineStage } from "@/lib/leads/types";
 import { listLeadColumns, saveLeadColumns } from "@/lib/leads/store";
+import { onRulesChange } from "@/lib/rules";
 import {
   emitLeadActivityChange,
   onLeadActivityChange,
@@ -125,6 +126,12 @@ export function LeadKanbanBoard({
     updateBounds();
     window.addEventListener("resize", updateBounds);
     return () => window.removeEventListener("resize", updateBounds);
+  }, []);
+
+  useEffect(() => {
+    return onRulesChange(() => {
+      setColumns(listLeadColumns());
+    });
   }, []);
 
   // recompute right when a drag starts too, in case layout shifted (sidebar toggle, etc.)

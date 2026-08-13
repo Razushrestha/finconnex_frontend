@@ -14,6 +14,9 @@ import {
   upsertJourney,
   type LifecycleJourney,
 } from "@/lib/journeys/types";
+import { createLead } from "@/lib/leads/store";
+import { createContact } from "@/lib/contacts/store";
+import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 
 export type FormStatus = "Draft" | "Published" | "Paused" | "Archived";
 
@@ -496,13 +499,58 @@ export function processFormSubmission(
     createdRecordRef = ticket.ticketId;
     createdRecordHref = `/support/${ticket.id}`;
   } else if (form.destination === "Lead") {
-    const n = 8000 + (listFormSubmissions().length % 900);
-    createdRecordRef = `LD-${n}`;
-    createdRecordHref = "/sales/leads";
+    const parts = contactName.trim().split(/\s+/);
+    const firstName = parts[0] || "Form";
+    const lastName = parts.slice(1).join(" ") || "Lead";
+    const phone = findValue(values, form.fieldDefs, "phone", "mobile");
+    const company = findValue(
+      values,
+      form.fieldDefs,
+      "company",
+      "organization",
+      "business",
+    );
+    const lead = createLead({
+      firstName,
+      lastName,
+      email: contactEmail,
+      phone,
+      company,
+      source: "Website",
+      status: "New",
+      owner: ACTIVITY_OWNERS[0],
+    });
+    createdRecordRef = lead.id;
+    createdRecordHref = `/sales/leads`;
+  } else if (form.destination === "Contact") {
+    const parts = contactName.trim().split(/\s+/);
+    const firstName = parts[0] || "Form";
+    const lastName = parts.slice(1).join(" ") || "Contact";
+    const phone = findValue(values, form.fieldDefs, "phone");
+    const mobile = findValue(values, form.fieldDefs, "mobile");
+    const company = findValue(
+      values,
+      form.fieldDefs,
+      "company",
+      "organization",
+    );
+    const contact = createContact({
+      firstName,
+      lastName,
+      email: contactEmail,
+      phone,
+      mobile,
+      company,
+      source: "Website",
+      status: "Active",
+      owner: ACTIVITY_OWNERS[0],
+    });
+    createdRecordRef = contact.id;
+    createdRecordHref = `/sales/contacts`;
   } else {
     const n = 9000 + (listFormSubmissions().length % 900);
-    createdRecordRef = `CT-${n}`;
-    createdRecordHref = "/sales/contacts";
+    createdRecordRef = `REC-${n}`;
+    createdRecordHref = FORM_DESTINATION_HREF[form.destination];
   }
 
   let journeyEnrollmentId: string | undefined;

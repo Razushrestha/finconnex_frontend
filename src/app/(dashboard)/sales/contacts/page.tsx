@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   Download,
   Sparkles,
+  GitMerge,
 } from "lucide-react";
 import { ContactsKanbanBoard } from "@/components/sales/contacts/ContactsKanbanBoard";
 import { ContactsListView } from "@/components/sales/contacts/ContactsListView";
@@ -22,12 +23,28 @@ import {
   EMPTY_CONTACT_FILTERS,
   type ContactFilters,
 } from "@/components/sales/contacts/FilterContactsPanel";
-import { CONTACT_GROUPS } from "@/lib/contacts/types";
+import { CONTACT_GROUPS, CONTACT_SOURCES, CONTACT_STATUSES } from "@/lib/contacts/types";
+import { listContactGroups } from "@/lib/contacts/store";
+import {
+  applyContactImport,
+  CONTACT_IMPORT_FIELDS,
+  defaultContactImportSettings,
+  downloadContactImportErrorReport,
+  exportContactsCsv,
+  previewContactImport,
+  sampleContactCsvTemplate,
+  suggestContactMapping,
+} from "@/lib/contacts/import";
+import { EntityCsvImportModal } from "@/components/sales/import/EntityCsvImportModal";
+import { MergeRecordsModal } from "@/components/sales/merge/MergeRecordsModal";
+import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import { onRulesChange } from "@/lib/rules";
 import { viewEnter } from "@/lib/motion";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
 import { SORT_OPTIONS } from "../leads/page";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
+import type { ContactSource, ContactStatus } from "@/lib/contacts/types";
 
 const CONTACT_VIEW_MODE_KEY = "finconnex.contacts.view-mode";
 
@@ -78,10 +95,31 @@ export default function ContactsPage() {
   const [isMassUpdateOpen, setMassUpdateOpen] = useState(false);
   const [isManageTagsOpen, setManageTagsOpen] = useState(false);
   const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
+  const [isImportOpen, setImportOpen] = useState(false);
+  const [isMergeOpen, setMergeOpen] = useState(false);
+  const [totalContacts, setTotalContacts] = useState(0);
+  const [bulkFlash, setBulkFlash] = useState<string | null>(null);
+  const defaults = defaultContactImportSettings();
 
   useEffect(() => {
     setViewMode(loadContactViewMode());
   }, []);
+
+  useEffect(() => {
+    function refresh() {
+      setTotalContacts(
+        listContactGroups().reduce((n, g) => n + g.contacts.length, 0),
+      );
+    }
+    refresh();
+    return onRulesChange(refresh);
+  }, []);
+
+  useEffect(() => {
+    if (!bulkFlash) return;
+    const t = window.setTimeout(() => setBulkFlash(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [bulkFlash]);
 
   function handleViewChange(mode: ContactViewMode) {
     setViewMode(mode);
@@ -89,7 +127,14 @@ export default function ContactsPage() {
   }
 
   function exportTasks() {
-    console.log("export tasks clicked");
+    const n = exportContactsCsv();
+    setBulkFlash(`Exported ${n} contacts`);
+  }
+
+  function exportSelected() {
+    if (!selectedIds.length) return;
+    const n = exportContactsCsv({ ids: selectedIds });
+    setBulkFlash(`Exported ${n} selected contacts`);
   }
 
   function toggleFilterField(section: "source" | "status", field: string) {
@@ -123,11 +168,6 @@ export default function ContactsPage() {
 
   const visibleColumnIds = columns.filter((c) => c.visible).map((c) => c.id);
 
-  const totalContacts = CONTACT_GROUPS.reduce(
-    (sum, group) => sum + group.contacts.length,
-    0,
-  );
-
   const actionOptions: ActionOption[] = [
     {
       id: "mass-transfer",
@@ -160,8 +200,14 @@ export default function ContactsPage() {
       onClick: () => setAssignmentRulesOpen(true),
     },
     {
+      id: "merge-contacts",
+      label: "Merge Contacts",
+      icon: <GitMerge className="h-3.5 w-3.5 text-slate-400" />,
+      onClick: () => setMergeOpen(true),
+    },
+    {
       id: "export-tasks",
-      label: "Export Tasks",
+      label: "Export Contacts",
       icon: <Download className="h-3.5 w-3.5 text-slate-400" />,
       onClick: () => exportTasks(),
     },
@@ -192,12 +238,13 @@ export default function ContactsPage() {
             id: "import-contacts",
             label: "Import Contacts",
             badge: "New",
-            onClick: () => console.log("button clicked"),
+            onClick: () => setImportOpen(true),
           },
           {
             id: "import-notes",
             label: "Import Notes",
-            onClick: () => console.log("button clicked"),
+            onClick: () =>
+              setBulkFlash("Notes import comes later — use Import Contacts for CSV"),
           },
         ]}
         totalCount={totalContacts}
@@ -232,13 +279,15 @@ export default function ContactsPage() {
           onPrintMailingLabels={() =>
             console.log("print mailing labels clicked")
           }
-          onMailMerge={() => console.log("mail merge clicked")}
+          onMailMerge={() => setMergeOpen(true)}
           onMassConvert={() => console.log("mass convert clicked")}
           onDelete={() => console.log("delete clicked")}
-          onExportSelectedRecords={() =>
-            console.log("export selected records clicked")
-          }
+          onExportSelectedRecords={() => exportSelected()}
         />
+      ) : bulkFlash ? (
+        <div className="mt-2 text-xs text-emerald-700 dark:text-emerald-400">
+          {bulkFlash}
+        </div>
       ) : null}
 
       <div className="mt-3 flex items-start gap-4">
@@ -266,6 +315,68 @@ export default function ContactsPage() {
           )}
         </div>
       </div>
+
+      <EntityCsvImportModal
+        open={isImportOpen}
+        title="Import Contacts"
+        entityLabel="Contact"
+        fields={[...CONTACT_IMPORT_FIELDS]}
+        owners={ACTIVITY_OWNERS}
+        statuses={CONTACT_STATUSES}
+        sources={CONTACT_SOURCES}
+        defaultOwner={defaults.defaultOwner}
+        defaultStatus={defaults.defaultStatus}
+        defaultSource={defaults.defaultSource}
+        suggestMapping={suggestContactMapping}
+        preview={(rows, mapping, settings) =>
+          previewContactImport(rows, mapping, {
+            skipDuplicates: settings.skipDuplicates,
+            updateExisting: settings.updateExisting,
+            defaultOwner: settings.defaultOwner,
+            defaultStatus: settings.defaultStatus as ContactStatus,
+            defaultSource: settings.defaultSource as ContactSource,
+          })
+        }
+        apply={(rows, mapping, settings) =>
+          applyContactImport(rows, mapping, {
+            skipDuplicates: settings.skipDuplicates,
+            updateExisting: settings.updateExisting,
+            defaultOwner: settings.defaultOwner,
+            defaultStatus: settings.defaultStatus as ContactStatus,
+            defaultSource: settings.defaultSource as ContactSource,
+          })
+        }
+        downloadErrorReport={downloadContactImportErrorReport}
+        sampleTemplate={sampleContactCsvTemplate()}
+        sampleFilename="contacts-import-template.csv"
+        onClose={() => setImportOpen(false)}
+        onImported={(s) => {
+          setBulkFlash(
+            `Imported ${s.imported} · updated ${s.updated} · skipped ${s.skipped}`,
+          );
+          setTotalContacts(
+            listContactGroups().reduce((n, g) => n + g.contacts.length, 0),
+          );
+        }}
+      />
+
+      <MergeRecordsModal
+        open={isMergeOpen}
+        mode="contacts"
+        initialIds={
+          selectedIds.length === 2
+            ? [selectedIds[0]!, selectedIds[1]!]
+            : null
+        }
+        onClose={() => setMergeOpen(false)}
+        onMerged={(msg) => {
+          setBulkFlash(msg);
+          setSelectedIds([]);
+          setTotalContacts(
+            listContactGroups().reduce((n, g) => n + g.contacts.length, 0),
+          );
+        }}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Building2,
   Mail,
@@ -9,7 +10,6 @@ import {
   Send,
   StickyNote,
   Phone as PhoneIcon,
-  Award,
 } from "lucide-react";
 import {
   EntityDetailHeader,
@@ -23,7 +23,15 @@ import {
   RelatedContactsCard,
   type TimelineItemData,
 } from "@/components/sales/entity-detail";
-import { LeadCardData } from "@/lib/leads/types";
+import { LeadCardData, type LeadStatus } from "@/lib/leads/types";
+import { canField, logCreate, logEdit } from "@/lib/rules";
+import { emitRulesChange } from "@/lib/rules/storage";
+import { updateLead } from "@/lib/leads/store";
+import { createDeal } from "@/lib/deals/store";
+import { sendEmailDemoLive } from "@/lib/comms/send-gateway";
+import { createEmail } from "@/lib/emails/store";
+import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import { formatRulesAt } from "@/lib/rules/storage";
 import {
   ConvertToDealFormValues,
   ConvertToDealModal,
@@ -47,16 +55,48 @@ const DEAL_STAGES = [
   "Closed Lost",
 ];
 
-export function LeadDetailView({ card }: { card: LeadCardData }) {
+export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
+  const router = useRouter();
+  const [card, setCard] = useState(initial);
   const [activeTab, setActiveTab] = useState("timeline");
   const [isConvertOpen, setIsConvertOpen] = useState(false);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
+
+  function notify(msg: string) {
+    setFlash(msg);
+    window.setTimeout(() => setFlash(null), 2800);
+  }
 
   function handleConvert(values: ConvertToDealFormValues) {
-    console.log("convert lead to deal", card.id, values);
-    // TODO: call your create-deal API/mutation here, then close + redirect.
+    const deal = createDeal({
+      dealName: values.dealName,
+      account: card.company || card.name,
+      contact: card.name,
+      stage: values.dealStage,
+      dealValue: values.amount || card.estimatedValue || "$0",
+      currency: "AUD",
+      owner: card.owner || ACTIVITY_OWNERS[0],
+      closeDate: values.expectedCloseDate,
+    });
+    const updated = updateLead(card.id, {
+      status: "Converted",
+      isConverted: true,
+      convertedAt: new Date().toISOString(),
+      convertedDealId: deal.id,
+    });
+    if (updated) setCard(updated);
+    logCreate(
+      "sales.deals",
+      card.owner || ACTIVITY_OWNERS[0],
+      deal.id,
+      deal.name,
+    );
+    emitRulesChange("all");
     setIsConvertOpen(false);
+    notify(`Deal created · ${deal.name}`);
+    router.push(`/sales/deals/detail/${deal.id}`);
   }
 
   const allTimelineItems: TimelineItemData[] = [
@@ -92,9 +132,8 @@ export function LeadDetailView({ card }: { card: LeadCardData }) {
     },
   ];
 
-  // Filter items based on active tab
   const filteredItems = allTimelineItems.filter((item) => {
-    if (activeTab === "timeline") return true; // Timeline shows everything
+    if (activeTab === "timeline") return true;
     if (activeTab === "notes") return item.type === "note";
     if (activeTab === "emails") return item.type === "email";
     if (activeTab === "calls") return item.type === "call";
@@ -102,7 +141,13 @@ export function LeadDetailView({ card }: { card: LeadCardData }) {
   });
 
   return (
-    <div className="mx-auto w-full p-3">
+    <div className="relative mx-auto w-full p-3">
+      {flash ? (
+        <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-semibold text-white shadow-lg">
+          {flash}
+        </div>
+      ) : null}
+
       <EntityDetailHeader
         breadcrumb={[
           { label: "All Leads", href: "/sales/leads" },
@@ -127,11 +172,10 @@ export function LeadDetailView({ card }: { card: LeadCardData }) {
           { label: "Call", icon: Phone },
         ]}
         onEditDetails={() => setIsEditOpen(true)}
-        onMoreActions={() => console.log("More actions clicked")}
+        onMoreActions={() => notify("More actions…")}
       />
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr_280px]">
-        {/* Left column */}
         <div className="space-y-4">
           <ScoreGaugeCard
             title="Lead Score"
@@ -146,16 +190,23 @@ export function LeadDetailView({ card }: { card: LeadCardData }) {
           />
           <ContactInfoCard
             fields={[
-              { icon: Mail, label: "Email Address", value: card.email },
-              { icon: Phone, label: "Phone Number", value: card.phone },
+              {
+                icon: Mail,
+                label: "Email Address",
+                value: canField("sales.leads.email") ? card.email : "••••",
+              },
+              {
+                icon: Phone,
+                label: "Phone Number",
+                value: canField("sales.leads.phone") ? card.phone : "••••",
+              },
               { icon: ClockIcon, label: "Created", value: card.createdDate },
             ]}
           />
         </div>
 
-        {/* Center column */}
         <div className="space-y-3">
-          <ActivityComposer onSubmit={(text) => console.log("post", text)} />
+          <ActivityComposer onSubmit={(text) => notify(`Posted: ${text.slice(0, 40)}`)} />
           <ActivityTabs
             tabs={[
               { key: "timeline", label: "Timeline", icon: ClockIcon },
@@ -168,18 +219,17 @@ export function LeadDetailView({ card }: { card: LeadCardData }) {
           />
           <TimelineFeed
             items={filteredItems}
-            onLoadMore={() => console.log("load more")}
+            onLoadMore={() => notify("Load more…")}
           />
         </div>
 
-        {/* Right column */}
         <div className="space-y-4">
           <NextStepCard
             title="Follow up on proposal"
             dueLabel="Due Tomorrow"
             dueTime="10:00 AM"
-            onComplete={() => console.log("complete")}
-            onEdit={() => console.log("edit next step")}
+            onComplete={() => notify("Next step completed")}
+            onEdit={() => notify("Edit next step…")}
           />
           <OrgInfoCard
             name={card.company}
@@ -187,7 +237,9 @@ export function LeadDetailView({ card }: { card: LeadCardData }) {
               { label: "Source", value: card.source },
               {
                 label: "Est. Value",
-                value: card.estimatedValue ?? "",
+                value: canField("sales.leads.estimatedValue")
+                  ? (card.estimatedValue ?? "")
+                  : "••••",
               },
             ]}
           />
@@ -204,7 +256,7 @@ export function LeadDetailView({ card }: { card: LeadCardData }) {
           initials: card.initials,
         }}
         dealStages={DEAL_STAGES}
-        defaultDealName={`${card.company} - New Deal`}
+        defaultDealName={`${card.company || card.name} - New Deal`}
         onConvert={handleConvert}
       />
 
@@ -219,9 +271,28 @@ export function LeadDetailView({ card }: { card: LeadCardData }) {
         }}
         defaultGreeting={`Hi ${card.name.split(" ")[0]},`}
         onSend={(values) => {
-          console.log("send email", card.id, values);
-          // TODO: call your send-email API/mutation here.
-          setIsComposeOpen(false);
+          void (async () => {
+            const result = await sendEmailDemoLive({
+              email: card.email,
+              subject: values.subject,
+              body: values.body,
+            });
+            if (!result.ok) {
+              notify(result.message);
+              return;
+            }
+            createEmail({
+              subject: values.subject || "(no subject)",
+              body: values.body || "",
+              from: "noreply@finconnex.demo",
+              to: [card.email],
+              status: "Sent",
+              sentDate: formatRulesAt(),
+              relatedTo: `Lead: ${card.name}`,
+            });
+            setIsComposeOpen(false);
+            notify("Email sent via demo gateway");
+          })();
         }}
       />
 
@@ -240,10 +311,41 @@ export function LeadDetailView({ card }: { card: LeadCardData }) {
           website: "",
           status: card.pipelineStage ?? LEAD_STATUS_OPTIONS[0],
         }}
-        statusOptions={LEAD_STATUS_OPTIONS}
+        statusOptions={[...LEAD_STATUS_OPTIONS, card.pipelineStage ?? ""].filter(
+          Boolean,
+        )}
         onSave={(values) => {
-          console.log("save lead", card.id, values);
-          // TODO: call your update-lead API/mutation here.
+          const name = `${values.firstName} ${values.lastName}`.trim();
+          let statusOpt: LeadStatus | undefined;
+          if (
+            (LEAD_STATUS_OPTIONS as readonly string[]).includes(values.status)
+          ) {
+            statusOpt = values.status as LeadStatus;
+          }
+          const patch: Parameters<typeof updateLead>[1] = {
+            name,
+            email: values.email,
+            phone: values.phone ?? "",
+            company: values.companyName ?? "",
+          };
+          if (statusOpt) patch.status = statusOpt;
+          else if (values.status) patch.pipelineStage = values.status;
+          const updated = updateLead(card.id, patch);
+          if (updated) {
+            setCard(updated);
+            logEdit(
+              "sales.leads",
+              card.owner || ACTIVITY_OWNERS[0],
+              card.id,
+              name,
+              [
+                { field: "name", from: card.name, to: name },
+                { field: "email", from: card.email, to: values.email },
+              ],
+            );
+            emitRulesChange("all");
+            notify("Lead saved");
+          }
           setIsEditOpen(false);
         }}
       />

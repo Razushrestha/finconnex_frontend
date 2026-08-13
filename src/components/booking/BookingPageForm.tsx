@@ -114,15 +114,25 @@ function defaultAvailability(): AvailabilityRule[] {
   }));
 }
 
+/** Public URL slug: letters, numbers, single hyphens only (never "--"). */
+function normalizeBookingSlug(value: string, opts?: { trimEdges?: boolean }) {
+  let s = value.toLowerCase().trim();
+  s = s.replace(/^https?:\/\//, "");
+  const slash = s.indexOf("/");
+  if (slash >= 0 && s.slice(0, slash).includes(".")) {
+    s = s.slice(slash + 1); // drop domain from pasted full URL
+  }
+  s = s.replace(/^\/+/, "").replace(/^book\//, "");
+  s = s.replace(/[^a-z0-9-]/g, "");
+  s = s.replace(/-+/g, "-"); // collapse john--discovery → john-discovery
+  if (opts?.trimEdges !== false) {
+    s = s.replace(/^-|-$/g, "");
+  }
+  return s.slice(0, 48);
+}
+
 function slugify(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 48);
+  return normalizeBookingSlug(value);
 }
 
 export function BookingPageForm({
@@ -137,14 +147,14 @@ export function BookingPageForm({
 
   const [title, setTitle] = useState(initial?.title ?? "");
   const [slug, setSlug] = useState(() =>
-    initial?.slug ? slugify(initial.slug) : "",
+    initial?.slug ? normalizeBookingSlug(initial.slug) : "",
   );
   const [slugTouched, setSlugTouched] = useState(Boolean(initial?.slug));
   const [owner, setOwner] = useState<string>(initial?.owner ?? ACTIVITY_OWNERS[0]);
 
-  // Collapse any accidental "--" already in the URL field
+  // Keep Public URL free of "--" (and strip pasted /book/ prefixes)
   useEffect(() => {
-    setSlug((s) => (s.includes("--") ? slugify(s) : s));
+    setSlug((s) => normalizeBookingSlug(s));
   }, []);
   const [eventType, setEventType] = useState<BookingEventType>(
     initial?.eventType ?? "Call",
@@ -232,7 +242,7 @@ export function BookingPageForm({
     const live = getBookingPageById(pageIdProp);
     if (live) {
       setTitle(live.title);
-      setSlug(slugify(live.slug));
+      setSlug(normalizeBookingSlug(live.slug));
       setSlugTouched(true);
       setOwner(live.owner);
       setEventType(live.eventType);
@@ -426,7 +436,7 @@ export function BookingPageForm({
     return {
       id: pageId,
       title: title.trim(),
-      slug: slugify(slug.trim()),
+      slug: normalizeBookingSlug(slug),
       owner,
       eventType,
       durationMinutes,
@@ -632,15 +642,15 @@ export function BookingPageForm({
                             value={slug}
                             onChange={(e) => {
                               setSlugTouched(true);
+                              // Keep a single trailing "-" while typing; never allow "--"
                               setSlug(
-                                e.target.value
-                                  .toLowerCase()
-                                  .replace(/[^a-z0-9-]/g, "")
-                                  .replace(/-+/g, "-"),
+                                normalizeBookingSlug(e.target.value, {
+                                  trimEdges: false,
+                                }),
                               );
                             }}
                             onBlur={() =>
-                              setSlug((s) => s.replace(/^-+|-+$/g, ""))
+                              setSlug((s) => normalizeBookingSlug(s))
                             }
                             placeholder="john-discovery"
                             className="h-10 min-w-0 flex-1 bg-transparent pr-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400"

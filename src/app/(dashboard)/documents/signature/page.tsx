@@ -72,11 +72,6 @@ export default function ESignaturePage() {
       <div className="relative mx-auto flex max-w-[1400px] flex-col p-2.5 sm:p-3 lg:p-4">
         <ESignatureHeader
           onExport={() => ExportSignatureLogCsv(filtered)}
-          onNew={() =>
-            router.push(
-              "/documents/signature/create?layoutid=standard&redirect=false",
-            )
-          }
         />
 
         <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">

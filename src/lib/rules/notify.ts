@@ -111,6 +111,41 @@ export function notifyTaskDue(input: {
   });
 }
 
+export function notifyTaskAssigned(input: {
+  recipient: string;
+  taskTitle: string;
+  relatedTo: string;
+  relatedHref: string;
+  message?: string;
+}) {
+  return emit({
+    type: "Task Assigned",
+    title: "Task assigned",
+    message:
+      input.message ?? `You were assigned “${input.taskTitle}”`,
+    relatedTo: input.relatedTo,
+    relatedHref: input.relatedHref,
+    recipient: input.recipient,
+  });
+}
+
+export function notifyMention(input: {
+  recipient: string;
+  from: string;
+  preview: string;
+  relatedTo: string;
+  relatedHref: string;
+}) {
+  return emit({
+    type: "Mention",
+    title: `${input.from} mentioned you`,
+    message: input.preview.slice(0, 120),
+    relatedTo: input.relatedTo,
+    relatedHref: input.relatedHref,
+    recipient: input.recipient,
+  });
+}
+
 export function notifyTicketUpdated(input: {
   requester: string;
   ticketRef: string;

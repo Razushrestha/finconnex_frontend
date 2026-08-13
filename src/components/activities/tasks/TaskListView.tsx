@@ -612,12 +612,12 @@ export function TaskListView({
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="relative max-w-sm flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
+        <input
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(1);
+          }}
             placeholder="Search tasks…"
             className="h-9 w-full rounded-xl border border-slate-200 bg-white pr-3 pl-9 text-[12px] outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
           />
@@ -638,15 +638,15 @@ export function TaskListView({
                 return (
                   <th key={col.id} className="px-3 py-2.5 whitespace-nowrap">
                     {sortable ? (
-                      <button
+                  <button
                         type="button"
                         onClick={() => handleHeaderSort(col.id)}
                         className={cn(
                           "inline-flex items-center gap-1 hover:text-slate-700",
                           sortField === col.id && "text-violet-700",
                         )}
-                      >
-                        {col.label}
+                  >
+                    {col.label}
                         {sortField === col.id ? (
                           <span className="text-[10px] font-bold" aria-hidden>
                             {sortDirection === "asc" ? "↑" : "↓"}
@@ -674,7 +674,7 @@ export function TaskListView({
                   onManageColumns={() => setManageColumnsOpen(true)}
                   className="flex justify-end"
                 />
-              </th>
+                </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50 text-slate-700">
@@ -693,7 +693,7 @@ export function TaskListView({
                       className={renderer?.tdClassName ?? "px-3 py-2.5"}
                     >
                       {renderer ? renderer.td(task) : ""}
-                    </td>
+                </td>
                   );
                 })}
                 <td

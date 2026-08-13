@@ -251,3 +251,99 @@ export const PRIORITY_RANK: Record<Priority, number> = {
 export function compareTaskPriority(a: Priority, b: Priority): number {
   return PRIORITY_RANK[a] - PRIORITY_RANK[b];
 }
+
+export function listAllTasks(): Task[] {
+  return listTaskColumns().flatMap((c) => c.tasks);
+}
+
+function formatDueDate(d: Date): string {
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  return `${day}/${month}/${d.getFullYear()}`;
+}
+
+/** Duplicate a task into the same column with a new id. */
+export function cloneTask(taskId: string): Task | null {
+  const found = findTaskById(taskId);
+  if (!found) return null;
+  return createTask({
+    title: `${found.task.title} (copy)`,
+    taskType: found.task.taskType,
+    priority: found.task.priority,
+    status: found.task.status,
+    dueDate: found.task.dueDate,
+    assignedTo: found.task.assignedTo,
+    relatedTo: found.task.relatedTo,
+    description: found.task.description,
+    notes: found.task.notes,
+    collaborators: found.task.collaborators,
+    createdBy: found.task.createdBy ?? found.task.assignedTo,
+  });
+}
+
+export function reassignTask(
+  taskId: string,
+  assignedTo: string,
+): Task | null {
+  const found = findTaskById(taskId);
+  if (!found) return null;
+  let updated: Task | null = null;
+  saveTaskColumns(
+    listTaskColumns().map((col) => ({
+      ...col,
+      tasks: col.tasks.map((t) => {
+        if (t.taskId !== taskId) return t;
+        updated = {
+          ...t,
+          assignedTo,
+          assignee: {
+            initials: initials(assignedTo),
+            colorClass: avatarColor(assignedTo),
+          },
+        };
+        return updated;
+      }),
+    })),
+  );
+  return updated;
+}
+
+/** Push due date by N days and set reminderDate (SRS snooze). */
+export function snoozeTask(
+  taskId: string,
+  days: number,
+): Task | null {
+  const found = findTaskById(taskId);
+  if (!found) return null;
+
+  const raw = found.task.dueDate;
+  let base = new Date();
+  const m = raw.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) {
+    base = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  } else {
+    const parsed = Date.parse(raw);
+    if (!Number.isNaN(parsed)) base = new Date(parsed);
+  }
+  base.setDate(base.getDate() + days);
+  const nextDue = formatDueDate(base);
+  const reminder = formatDueDate(base);
+
+  let updated: Task | null = null;
+  saveTaskColumns(
+    listTaskColumns().map((col) => ({
+      ...col,
+      tasks: col.tasks.map((t) => {
+        if (t.taskId !== taskId) return t;
+        updated = {
+          ...t,
+          dueDate: nextDue,
+          reminderDate: reminder,
+          overdue: false,
+        };
+        return updated;
+      }),
+    })),
+  );
+  return updated;
+}

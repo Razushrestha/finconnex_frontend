@@ -49,6 +49,8 @@ export interface DealRecord {
   initials: string;
   account: string;
   contact?: string;
+  /** Stable link to ContactCardData.id when set. */
+  contactId?: string;
   value: string;
   currency: DealCurrency;
   probability: number;

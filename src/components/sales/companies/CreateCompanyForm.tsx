@@ -15,6 +15,7 @@ import {
   OWNERS,
   type CompanyStatus,
 } from "@/lib/companies/types";
+import { createCompany } from "@/lib/companies/store";
 import {
   CreateEntityFormShell,
   Field,
@@ -90,7 +91,16 @@ export function CreateCompanyForm({
   function handleSave(createAnother: boolean) {
     setSubmitted(true);
     if (!validate()) return;
-    console.log("Saving company", { layoutId, redirect, ...form });
+    createCompany({
+      name: form.companyName.trim(),
+      website: form.website.trim() || undefined,
+      industry: form.industry.trim() || undefined,
+      phone: form.phone.trim() || undefined,
+      city: form.city.trim() || undefined,
+      annualRevenue: form.annualRevenue.trim() || undefined,
+      status: form.status as CompanyStatus,
+      owner: form.owner,
+    });
     if (createAnother) {
       setForm({ ...initialState, owner: form.owner, status: "Prospect" });
       setErrors({});

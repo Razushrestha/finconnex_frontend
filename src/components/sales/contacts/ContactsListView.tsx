@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CONTACT_GROUPS, type ContactGroup } from "@/lib/contacts/types";
+import { type ContactGroup } from "@/lib/contacts/types";
+import { listContactGroups } from "@/lib/contacts/store";
+import { onRulesChange } from "@/lib/rules";
 import type { ContactFilters } from "./FilterContactsPanel";
 import { cn } from "@/lib/utils";
 import { TableDisplayOptionsMenu } from "@/components/common/TableDisplayOptionsMenu";
@@ -144,10 +146,13 @@ function buildColumnRenderers(
 }
 
 export function ContactsListView({
-  groups = CONTACT_GROUPS,
+  groups: groupsProp,
   filters,
   sortValue = "newest",
 }: ContactsListViewProps) {
+  const [groups, setGroups] = useState<ContactGroup[]>(
+    () => groupsProp ?? listContactGroups(),
+  );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pageSize, setPageSize] = useState<number>(10);
   const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
@@ -156,6 +161,16 @@ export function ContactsListView({
   );
   const [panel, setPanel] = useState<ContactPanelState | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (groupsProp) setGroups(groupsProp);
+  }, [groupsProp]);
+
+  useEffect(() => {
+    return onRulesChange(() => {
+      if (!groupsProp) setGroups(listContactGroups());
+    });
+  }, [groupsProp]);
 
   useEffect(() => {
     if (!toast) return;

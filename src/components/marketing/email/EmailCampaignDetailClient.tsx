@@ -28,6 +28,9 @@ import {
   type EmailCampaignStatus,
 } from "@/lib/marketing/email/types";
 import { assertCampaignStatusChange, logStatusChange, softDeleteRecord } from "@/lib/rules";
+import { sendEmailDemoLive } from "@/lib/comms/send-gateway";
+import { createEmail } from "@/lib/emails/store";
+import { formatRulesAt } from "@/lib/rules/storage";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
@@ -160,8 +163,30 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
     router.push(`/marketing/email/${copy.id}`);
   }
 
-  function testSend() {
-    flash(`Test send to ${campaign?.fromEmail}`);
+  async function testSend() {
+    if (!campaign) return;
+    const result = await sendEmailDemoLive({
+      email: campaign.fromEmail,
+      subject: `[TEST] ${campaign.subject}`,
+      body: `Test send for campaign ${campaign.name}`,
+    });
+    if (!result.ok) {
+      flash(result.message);
+      return;
+    }
+    createEmail({
+      subject: `[TEST] ${campaign.subject}`,
+      body: `Test send for campaign ${campaign.name}`,
+      from: campaign.fromEmail,
+      to: [campaign.fromEmail],
+      status: "Sent",
+      sentDate: formatRulesAt(),
+      relatedTo: `Campaign: ${campaign.name}`,
+    });
+    save(
+      appendAudit(campaign, "Test send"),
+      `Test send to ${campaign.fromEmail} via demo gateway`,
+    );
   }
 
   function remove() {
@@ -421,7 +446,7 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
                     tone="primary"
                   />
                 ) : null}
-                <ActionBtn onClick={testSend} icon={Send} label="Test send" />
+                <ActionBtn onClick={() => void testSend()} icon={Send} label="Test send" />
                 <ActionBtn onClick={duplicate} icon={Copy} label="Duplicate" />
                 {campaign.status !== "Completed" &&
                 campaign.status !== "Cancelled" ? (

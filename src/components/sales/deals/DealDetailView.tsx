@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Mail,
   Phone,
@@ -12,6 +12,7 @@ import {
   Calendar,
   User,
   Percent,
+  XCircle,
 } from "lucide-react";
 import {
   DEAL_CURRENCIES,
@@ -20,6 +21,15 @@ import {
   type DealRecord,
   type DealStage,
 } from "@/lib/deals/types";
+import {
+  findDealById,
+  linkContactToDeal,
+  markDealOutcome,
+  unlinkContactFromDeal,
+  updateDeal,
+} from "@/lib/deals/store";
+import { listAllContacts, findContactById } from "@/lib/contacts/store";
+import { useRouter } from "next/navigation";
 import {
   EntityDetailHeader,
   ScoreGaugeCard,
@@ -34,27 +44,52 @@ import {
 } from "@/components/sales/entity-detail";
 import { EditDealModal, type EditDealFormValues } from "./EditDealModal";
 import { ComposeEmailModal } from "../ComposeEmailModal";
+import { sendEmailDemoLive } from "@/lib/comms/send-gateway";
+import { createEmail } from "@/lib/emails/store";
+import { formatRulesAt, emitRulesChange } from "@/lib/rules/storage";
+import { logEdit, notifyDealClosed } from "@/lib/rules";
+import { listDealPipelines } from "@/lib/deals/store";
 
-/**
- * A deal's stage/pipeline aren't on DealRecord itself — they're implicit
- * in which DEAL_PIPELINE_STAGES bucket it's found in — so the page passes
- * all three in, same as findDealById's return shape.
- */
 export function DealDetailView({
-  deal,
-  stage,
-  pipeline,
-  pipelineStages,
+  deal: initialDeal,
+  stage: initialStage,
+  pipeline: initialPipeline,
+  pipelineStages: initialStages,
 }: {
   deal: DealRecord;
   stage: DealStage;
   pipeline: DealPipeline;
-  /** All stage titles for this deal's pipeline, for the edit-stage dropdown. */
   pipelineStages: DealStage[];
 }) {
+  const [deal, setDeal] = useState(initialDeal);
+  const [stage, setStage] = useState(initialStage);
+  const [pipeline, setPipeline] = useState(initialPipeline);
+  const [pipelineStages, setPipelineStages] = useState(initialStages);
   const [activeTab, setActiveTab] = useState("timeline");
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [linkContactId, setLinkContactId] = useState("");
+  const router = useRouter();
+
+  function refresh() {
+    const loc = findDealById(deal.id);
+    if (!loc) return;
+    setDeal(loc.deal);
+    setStage(loc.stage);
+    setPipeline(loc.pipeline);
+    setPipelineStages(listDealPipelines()[loc.pipeline] ?? []);
+  }
+
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deal.id]);
+
+  function notify(msg: string) {
+    setFlash(msg);
+    window.setTimeout(() => setFlash(null), 2800);
+  }
 
   const isClosed =
     stage.title === "Closed Won" || stage.title === "Closed Lost";
@@ -68,18 +103,72 @@ export function DealDetailView({
       icon: CheckCircle2,
       iconTone: "success",
       title: `Moved to ${stage.title}`,
-      timestampLabel: "2 hours ago",
+      timestampLabel: "Just now",
       body: `Stage changed by ${deal.owner}.`,
     },
   ];
 
   function handleEditSave(values: EditDealFormValues) {
-    console.log("save deal", deal.id, values);
+    const loc = updateDeal(deal.id, {
+      name: values.name,
+      account: values.account,
+      contact: values.contact,
+      value: values.value,
+      currency: values.currency,
+      probability: values.probability,
+      owner: values.owner,
+      closeDate: values.closeDate,
+      stageTitle: values.stageTitle,
+    });
+    if (loc) {
+      setDeal(loc.deal);
+      setStage(loc.stage);
+      setPipeline(loc.pipeline);
+      setPipelineStages(listDealPipelines()[loc.pipeline] ?? []);
+      logEdit(
+        "sales.deals",
+        values.owner,
+        deal.id,
+        values.name,
+        [
+          { field: "name", from: deal.name, to: values.name },
+          { field: "stage", from: stage.title, to: values.stageTitle },
+        ],
+      );
+      emitRulesChange("all");
+      notify("Deal saved");
+    }
     setIsEditOpen(false);
   }
 
+  function closeOutcome(outcome: "won" | "lost") {
+    const loc = markDealOutcome(deal.id, outcome);
+    if (!loc) {
+      notify(`No "${outcome === "won" ? "Closed Won" : "Closed Lost"}" stage`);
+      return;
+    }
+    setDeal(loc.deal);
+    setStage(loc.stage);
+    setPipeline(loc.pipeline);
+    notifyDealClosed({
+      owner: loc.deal.owner,
+      dealName: loc.deal.name,
+      stage: loc.stage.title,
+      relatedTo: loc.deal.name,
+      relatedHref: `/sales/deals/detail/${loc.deal.id}`,
+    });
+    emitRulesChange("all");
+    notify(outcome === "won" ? "Marked as Won" : "Marked as Lost");
+  }
+
   return (
-    <div className="mx-auto w-full p-3">
+    <div className="relative mx-auto w-full p-3">
+      {flash ? (
+        <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-semibold text-white shadow-lg">
+          {flash}
+        </div>
+      ) : null}
+
       <EntityDetailHeader
         breadcrumb={[
           { label: "All Deals", href: "/sales/deals" },
@@ -103,7 +192,7 @@ export function DealDetailView({
             ? {
                 label: "Mark as Won",
                 icon: CheckCircle2,
-                onClick: () => console.log("mark as won", deal.id),
+                onClick: () => closeOutcome("won"),
               }
             : undefined
         }
@@ -113,14 +202,22 @@ export function DealDetailView({
             icon: Mail,
             onClick: deal.contact ? () => setIsComposeOpen(true) : undefined,
           },
+          ...(!isClosed
+            ? [
+                {
+                  label: "Mark Lost",
+                  icon: XCircle,
+                  onClick: () => closeOutcome("lost"),
+                },
+              ]
+            : []),
           { label: "Call", icon: Phone },
         ]}
         onEditDetails={() => setIsEditOpen(true)}
-        onMoreActions={() => console.log("Clicked")}
+        onMoreActions={() => notify("More actions…")}
       />
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr_280px]">
-        {/* Left column */}
         <div className="space-y-4">
           <ScoreGaugeCard
             title="Win Probability"
@@ -151,9 +248,8 @@ export function DealDetailView({
           />
         </div>
 
-        {/* Center column */}
         <div className="space-y-3">
-          <ActivityComposer onSubmit={(text) => console.log("post", text)} />
+          <ActivityComposer onSubmit={(text) => notify(`Posted: ${text.slice(0, 40)}`)} />
           <ActivityTabs
             tabs={[
               { key: "timeline", label: "Timeline", icon: ClockIcon },
@@ -167,7 +263,6 @@ export function DealDetailView({
           <TimelineFeed items={timelineItems} />
         </div>
 
-        {/* Right column */}
         <div className="space-y-4">
           <NextStepCard
             title={isClosed ? "Deal closed" : `Advance past ${stage.title}`}
@@ -176,7 +271,9 @@ export function DealDetailView({
                 ? `Target close: ${deal.closeDate}`
                 : "No close date set"
             }
-            onComplete={() => console.log("complete next step", deal.id)}
+            onComplete={() =>
+              !isClosed ? closeOutcome("won") : notify("Already closed")
+            }
           />
           <OrgInfoCard
             name={deal.account}
@@ -191,7 +288,7 @@ export function DealDetailView({
               deal.contact
                 ? [
                     {
-                      id: `${deal.id}-contact`,
+                      id: deal.contactId ?? `${deal.id}-contact`,
                       name: deal.contact,
                       role: "Primary Contact",
                       initials: deal.contact
@@ -205,7 +302,71 @@ export function DealDetailView({
                 : []
             }
             totalCount={deal.contact ? 1 : 0}
+            onViewAll={() => {
+              if (deal.contactId) {
+                router.push(`/sales/contacts/detail/${deal.contactId}`);
+              }
+            }}
           />
+          <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+            <p className="mb-2 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+              Link contact
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={linkContactId}
+                onChange={(e) => setLinkContactId(e.target.value)}
+                className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 px-2 text-[11px]"
+              >
+                <option value="">Select contact…</option>
+                {listAllContacts().map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={!linkContactId}
+                onClick={() => {
+                  if (!linkContactId) return;
+                  linkContactToDeal(deal.id, linkContactId);
+                  emitRulesChange("all");
+                  setLinkContactId("");
+                  refresh();
+                  notify("Contact linked");
+                }}
+                className="h-8 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white disabled:opacity-40"
+              >
+                Link
+              </button>
+              {deal.contactId || deal.contact ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    unlinkContactFromDeal(deal.id);
+                    emitRulesChange("all");
+                    refresh();
+                    notify("Contact unlinked");
+                  }}
+                  className="h-8 rounded-lg border border-slate-200 px-3 text-[11px] font-semibold text-slate-700"
+                >
+                  Unlink
+                </button>
+              ) : null}
+            </div>
+            {deal.contactId && findContactById(deal.contactId) ? (
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(`/sales/contacts/detail/${deal.contactId}`)
+                }
+                className="mt-2 text-[11px] font-semibold text-violet-700 hover:underline"
+              >
+                Open contact record
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -236,16 +397,34 @@ export function DealDetailView({
           onClose={() => setIsComposeOpen(false)}
           recipient={{
             name: deal.contact,
-            // DealRecord has no email field — wire this up once deals
-            // link to a Contact/Lead record with a real email address.
-            email: "",
+            email: `${deal.contact.toLowerCase().replace(/\s+/g, ".")}@example.com`,
             initials: deal.initials,
           }}
           defaultGreeting={`Hi ${deal.contact.split(" ")[0]},`}
           onSend={(values) => {
-            console.log("send email", deal.id, values);
-            // TODO: call your send-email API/mutation here.
-            setIsComposeOpen(false);
+            void (async () => {
+              const email = `${deal.contact!.toLowerCase().replace(/\s+/g, ".")}@example.com`;
+              const result = await sendEmailDemoLive({
+                email,
+                subject: values.subject,
+                body: values.body,
+              });
+              if (!result.ok) {
+                notify(result.message);
+                return;
+              }
+              createEmail({
+                subject: values.subject || "(no subject)",
+                body: values.body || "",
+                from: "noreply@finconnex.demo",
+                to: [email],
+                status: "Sent",
+                sentDate: formatRulesAt(),
+                relatedTo: `Deal: ${deal.name}`,
+              });
+              setIsComposeOpen(false);
+              notify("Email sent via demo gateway");
+            })();
           }}
         />
       )}

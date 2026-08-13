@@ -20,6 +20,7 @@ import {
   upsertInvoice,
   type Invoice,
 } from "@/lib/finance/invoices/types";
+import { chargePaymentDemoLive } from "@/lib/finance/pay-gateway";
 import { FINANCE_OWNERS, formatAUD, formatFinanceDate } from "@/lib/finance/shared";
 import {
   CreateEntityFormShell,
@@ -47,6 +48,8 @@ export function CreatePaymentForm({ layoutId: _l, redirect: _r }: Props) {
   const [notes, setNotes] = useState("");
   const [recordedBy, setRecordedBy] = useState<string>(FINANCE_OWNERS[0]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [gatewayMsg, setGatewayMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const list = listInvoices().filter(
@@ -78,9 +81,44 @@ export function CreatePaymentForm({ layoutId: _l, redirect: _r }: Props) {
     return Object.keys(next).length === 0;
   }
 
-  function onSave(createAnother: boolean) {
+  async function onSave(createAnother: boolean) {
     if (!validate() || !invoice) return;
     const n = Number(amount);
+
+    if (method === "Stripe" && status === "Pending") {
+      setBusy(true);
+      setGatewayMsg(null);
+      const result = await chargePaymentDemoLive({
+        invoiceId: invoice.id,
+        amount: n,
+        method: "Stripe",
+        actor: recordedBy,
+      });
+      setBusy(false);
+      if (!result.ok) {
+        setGatewayMsg(result.message);
+        return;
+      }
+      setGatewayMsg(`Charged via demo gateway · ${result.providerId}`);
+      if (createAnother) {
+        setReference("");
+        setNotes("");
+        setErrors({});
+        const list = listInvoices().filter(
+          (i) =>
+            i.amountDue > 0 && !["Void", "Cancelled", "Draft"].includes(i.status),
+        );
+        setInvoices(list);
+        if (list[0]) {
+          setInvoiceId(list[0].id);
+          setAmount(String(list[0].amountDue));
+        }
+        return;
+      }
+      router.push(`/finance/payments/${result.payment.id}`);
+      return;
+    }
+
     const ids = nextPaymentIds();
     const created = upsertPayment(
       appendPaymentAudit(
@@ -138,15 +176,20 @@ export function CreatePaymentForm({ layoutId: _l, redirect: _r }: Props) {
       breadcrumbParent={{ label: "Payments", href: "/finance/payments" }}
       badge="§13.5"
       title="Record Payment"
-      subtitle="Record and track payments against invoices (gateway stub)."
-      tip="Invoice and amount are required. Completed payments update invoice balance."
+      subtitle="Record payments against invoices. Stripe + Pending uses the demo gateway."
+      tip="Invoice and amount are required. Stripe with Pending status charges via demo gateway."
       cardIcon={Banknote}
       cardTitle="Payment details"
       cardDescription="SRS §20.4: links to the open invoice balance"
       listHref="/finance/payments"
-      saveLabel="Save payment"
-      onSave={onSave}
+      saveLabel={busy ? "Charging…" : "Save payment"}
+      onSave={(again) => void onSave(again)}
     >
+      {gatewayMsg ? (
+        <p className="col-span-full mb-1 text-[12px] font-medium text-emerald-700">
+          {gatewayMsg}
+        </p>
+      ) : null}
       <Field label="Invoice" required error={errors.invoiceId} className="sm:col-span-2">
         <InputShell icon={FileText} error={!!errors.invoiceId}>
           <select
@@ -183,7 +226,11 @@ export function CreatePaymentForm({ layoutId: _l, redirect: _r }: Props) {
           <select
             className={elevatedSelectClass(false)}
             value={method}
-            onChange={(e) => setMethod(e.target.value as PaymentMethod)}
+            onChange={(e) => {
+              const m = e.target.value as PaymentMethod;
+              setMethod(m);
+              if (m === "Stripe") setStatus("Pending");
+            }}
           >
             {PAYMENT_METHODS.map((m) => (
               <option key={m} value={m}>
@@ -192,6 +239,11 @@ export function CreatePaymentForm({ layoutId: _l, redirect: _r }: Props) {
             ))}
           </select>
         </InputShell>
+        {method === "Stripe" ? (
+          <p className="mt-1 text-[10px] text-slate-400">
+            Use status Pending to run the Stripe demo charge.
+          </p>
+        ) : null}
       </Field>
       <Field label="Status" required>
         <InputShell>

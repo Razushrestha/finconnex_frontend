@@ -15,6 +15,7 @@ import {
 import type { EmailStatus } from "@/lib/emails/types";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
 import { createEmail } from "@/lib/emails/store";
+import { sendEmailDemoLive } from "@/lib/comms/send-gateway";
 import { formatRulesAt } from "@/lib/rules/storage";
 import { EmailEditor } from "./EmailEditor";
 import { EmailRecipients } from "./EmailRecipients";
@@ -124,6 +125,8 @@ export function CreateEmailForm({
   const [submitted, setSubmitted] = useState(false);
   const [showCcBcc, setShowCcBcc] = useState(false);
   const [recipientDraft, setRecipientDraft] = useState("");
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -163,9 +166,25 @@ export function CreateEmailForm({
     update("attachments", [...form.attachments, ...next]);
   }
 
-  function save(status: EmailStatus) {
+  async function save(status: EmailStatus) {
     setSubmitted(true);
+    setSendError(null);
     if (!validate()) return;
+
+    if (status === "Sent") {
+      setSending(true);
+      const result = await sendEmailDemoLive({
+        email: form.to[0],
+        subject: form.subject.trim(),
+        body: form.body.trim(),
+      });
+      setSending(false);
+      if (!result.ok) {
+        setSendError(result.message);
+        return;
+      }
+    }
+
     const relatedTo =
       form.relatedKind && form.relatedName
         ? `${form.relatedKind}: ${form.relatedName}`
@@ -210,21 +229,37 @@ export function CreateEmailForm({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => save("Draft")}
-            className="rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
+            disabled={sending}
+            onClick={() => void save("Draft")}
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
           >
             Save Draft
           </button>
           <button
             type="button"
-            onClick={() => save("Sent")}
-            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+            disabled={sending}
+            onClick={() => void save("Scheduled")}
+            className="rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"
           >
-            Send Email
+            Schedule
+          </button>
+          <button
+            type="button"
+            disabled={sending}
+            onClick={() => void save("Sent")}
+            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          >
+            {sending ? "Sending…" : "Send Email"}
             <Send className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
+
+      {sendError ? (
+        <div className="mx-6 mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+          {sendError}
+        </div>
+      ) : null}
 
       <div className="mx-auto grid w-full grid-cols-1 gap-6 px-6 py-4 lg:grid-cols-3">
         {/* Left column */}

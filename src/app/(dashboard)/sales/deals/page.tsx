@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Sparkles,
   ArrowLeftRight,
@@ -11,6 +11,7 @@ import {
   Download,
   Pencil,
   ChevronDown,
+  Copy,
 } from "lucide-react";
 import {
   EntityHeader,
@@ -23,11 +24,33 @@ import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolba
 import { DealsKanbanBoard } from "@/components/sales/deals/DealsKanbanBoard";
 import { DealsListView } from "@/components/sales/deals/DealsListView";
 import {
+  DEAL_CURRENCIES,
   DEAL_PIPELINES,
   DEAL_PIPELINE_STAGES,
+  DEAL_STAGES,
   type DealPipeline,
   type DealStage,
 } from "@/lib/deals/types";
+import {
+  listDealPipelines,
+  deleteDeals,
+  updateDealOwners,
+} from "@/lib/deals/store";
+import { emitRulesChange } from "@/lib/rules/storage";
+import {
+  applyDealImport,
+  cloneDeal,
+  DEAL_IMPORT_FIELDS,
+  defaultDealImportSettings,
+  downloadDealImportErrorReport,
+  exportDealsCsv,
+  previewDealImport,
+  sampleDealCsvTemplate,
+  suggestDealMapping,
+} from "@/lib/deals/import";
+import { EntityCsvImportModal } from "@/components/sales/import/EntityCsvImportModal";
+import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import { onRulesChange } from "@/lib/rules";
 import {
   FilterDealsPanel,
   EMPTY_DEAL_FILTERS,
@@ -94,7 +117,8 @@ export default function DealsPage() {
   const pipelineMenuRef = useRef<HTMLDivElement>(null);
 
   const [isImportDealsOpen, setIsImportDealsOpen] = useState(false);
-  const [isImportNotesOpen, setIsImportNotesOpen] = useState(false);
+  const [bulkFlash, setBulkFlash] = useState<string | null>(null);
+  const defaults = defaultDealImportSettings();
 
   // TODO: wire these up to the actual modals/handlers once they exist.
   const [isMassTransferOpen, setMassTransferOpen] = useState(false);
@@ -102,6 +126,20 @@ export default function DealsPage() {
   const [isMassUpdateOpen, setMassUpdateOpen] = useState(false);
   const [isManageTagsOpen, setManageTagsOpen] = useState(false);
   const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
+
+  useEffect(() => {
+    function refresh() {
+      setAllStages(listDealPipelines());
+    }
+    refresh();
+    return onRulesChange(refresh);
+  }, []);
+
+  useEffect(() => {
+    if (!bulkFlash) return;
+    const t = window.setTimeout(() => setBulkFlash(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [bulkFlash]);
 
   const [viewConfigs, setViewConfigs] = useState<
     Record<DealPipeline, KanbanViewConfig>
@@ -133,11 +171,50 @@ export default function DealsPage() {
   const activeViewConfig = viewConfigs[activePipeline];
 
   function exportTasks() {
-    console.log("export tasks clicked");
+    const n = exportDealsCsv({ pipeline: activePipeline });
+    setBulkFlash(`Exported ${n} deals`);
+  }
+
+  function exportSelected() {
+    if (!selectedIds.length) return;
+    const n = exportDealsCsv({ ids: selectedIds });
+    setBulkFlash(`Exported ${n} selected deals`);
+  }
+
+  function cloneSelected() {
+    if (selectedIds.length !== 1) {
+      setBulkFlash("Select exactly one deal to clone");
+      return;
+    }
+    const result = cloneDeal(selectedIds[0]!);
+    if (!result.ok) {
+      setBulkFlash(result.message);
+      return;
+    }
+    setBulkFlash(`Cloned as “${result.name}”`);
+    setSelectedIds([]);
+  }
+
+  function deleteSelected() {
+    if (!selectedIds.length) return;
+    if (!window.confirm(`Delete ${selectedIds.length} deal(s)?`)) return;
+    const n = deleteDeals(selectedIds);
+    emitRulesChange("all");
+    setSelectedIds([]);
+    setBulkFlash(`Deleted ${n} deal${n === 1 ? "" : "s"}`);
+  }
+
+  function changeOwnerSelected() {
+    const owner =
+      ACTIVITY_OWNERS.find((o) => o !== "John Smith") ?? ACTIVITY_OWNERS[0];
+    const n = updateDealOwners(selectedIds, owner);
+    emitRulesChange("all");
+    setSelectedIds([]);
+    setBulkFlash(`Reassigned ${n} deal${n === 1 ? "" : "s"} to ${owner}`);
   }
 
   function openPrintView() {
-    console.log("print view clicked");
+    window.print();
   }
 
   const currentPipelineStages = (allStages && allStages[activePipeline]) || [];
@@ -208,7 +285,8 @@ export default function DealsPage() {
     {
       id: "import-notes",
       label: "Import Notes",
-      onClick: () => setIsImportNotesOpen(true),
+      onClick: () =>
+        setBulkFlash("Notes import comes later — use Import Deals for CSV"),
     },
   ];
 
@@ -244,8 +322,14 @@ export default function DealsPage() {
       onClick: () => setAssignmentRulesOpen(true),
     },
     {
+      id: "clone-deal",
+      label: "Clone Deal",
+      icon: <Copy className="h-3.5 w-3.5 text-slate-400" />,
+      onClick: () => cloneSelected(),
+    },
+    {
       id: "export-tasks",
-      label: "Export Tasks",
+      label: "Export Deals",
       icon: <Download className="h-3.5 w-3.5 text-slate-400" />,
       onClick: () => exportTasks(),
     },
@@ -300,29 +384,21 @@ export default function DealsPage() {
         <EntitySelectionToolbar
           selectedCount={selectedIds.length}
           onClear={() => setSelectedIds([])}
-          onSendMail={() => console.log("send mail clicked")}
-          onAddTag={() => console.log("add tag clicked")}
-          onRemoveTag={() => console.log("remove tag clicked")}
-          onClick={() => console.log("Manage button clicked")}
-          onRunMacro={() => console.log("run macro clicked")}
-          onCreateTask={() => console.log("create task clicked")}
-          onSetReminder={() => console.log("set reminder clicked")}
-          onMassUpdate={() => console.log("mass update clicked")}
-          onChangeOwner={() => console.log("change owner clicked")}
-          onCadences={() => console.log("cadences clicked")}
-          onAddToCampaigns={() => console.log("add to campaigns clicked")}
-          onPrintMailingLabels={() =>
-            console.log("print mailing labels clicked")
+          onCreateTask={() =>
+            setBulkFlash("Create task from selection — open Activities → Tasks")
           }
-          onMailMerge={() => console.log("mail merge clicked")}
-          onMassConvert={() => console.log("mass convert clicked")}
-          onDelete={() => console.log("delete clicked")}
-          onExportSelectedRecords={() =>
-            console.log("export selected records clicked")
-          }
+          onChangeOwner={changeOwnerSelected}
+          onCloneSelected={cloneSelected}
+          onDelete={deleteSelected}
+          onExportSelectedRecords={exportSelected}
         />
       ) : (
         <div className="mt-3 flex w-fit items-center gap-2">
+          {bulkFlash ? (
+            <span className="rounded-md bg-emerald-500/10 px-2 py-1 text-xs text-emerald-700 dark:text-emerald-400">
+              {bulkFlash}
+            </span>
+          ) : null}
           <div className="relative" ref={pipelineMenuRef}>
             <button
               type="button"
@@ -420,6 +496,52 @@ export default function DealsPage() {
           )}
         </div>
       </div>
+
+      <EntityCsvImportModal
+        open={isImportDealsOpen}
+        title="Import Deals"
+        entityLabel="Deal"
+        fields={[...DEAL_IMPORT_FIELDS]}
+        owners={ACTIVITY_OWNERS}
+        statuses={DEAL_STAGES}
+        sources={DEAL_CURRENCIES}
+        defaultOwner={defaults.defaultOwner}
+        defaultStatus={defaults.defaultStatus}
+        defaultSource={defaults.defaultSource}
+        requiredHint="Required: Deal Name, Account"
+        identityColumnLabel="Account"
+        sourceFieldLabel="Default currency"
+        skipDuplicatesLabel="Skip rows whose Deal Name + Account already exist"
+        updateExistingLabel="Match by Deal Name + Account and overwrite mapped fields"
+        suggestMapping={suggestDealMapping}
+        preview={(rows, mapping, settings) =>
+          previewDealImport(rows, mapping, {
+            skipDuplicates: settings.skipDuplicates,
+            updateExisting: settings.updateExisting,
+            defaultOwner: settings.defaultOwner,
+            defaultStatus: settings.defaultStatus,
+            defaultSource: settings.defaultSource,
+          })
+        }
+        apply={(rows, mapping, settings) =>
+          applyDealImport(rows, mapping, {
+            skipDuplicates: settings.skipDuplicates,
+            updateExisting: settings.updateExisting,
+            defaultOwner: settings.defaultOwner,
+            defaultStatus: settings.defaultStatus,
+            defaultSource: settings.defaultSource,
+          })
+        }
+        downloadErrorReport={downloadDealImportErrorReport}
+        sampleTemplate={sampleDealCsvTemplate()}
+        sampleFilename="deals-import-template.csv"
+        onClose={() => setIsImportDealsOpen(false)}
+        onImported={(s) => {
+          setBulkFlash(
+            `Imported ${s.imported} · updated ${s.updated} · skipped ${s.skipped}`,
+          );
+        }}
+      />
     </div>
   );
 }

@@ -29,7 +29,11 @@ import {
   type SignatureStatus,
   type SignerStatus,
 } from "@/lib/documents/signature/types";
-import { pushLibraryDoc } from "@/lib/documents/library/types";
+import {
+  downloadArtifactBlob,
+  getSignedArtifact,
+  persistSignedPackage,
+} from "@/lib/documents/signed-artifacts";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { SignatureDocPreview } from "./SignatureDocPreview";
 import { cn } from "@/lib/utils";
@@ -152,31 +156,16 @@ export function SignatureDetailClient({ id }: { id: string }) {
 
   function downloadSigned() {
     if (!req) return;
-    flash(`Downloading signed: ${req.documentFile}`);
     if (req.status === "Signed") {
-      const today = new Date().toLocaleDateString("en-AU");
-      pushLibraryDoc({
-        id: `lib-signed-${req.id}`,
-        fileName: req.documentFile.replace(/\.pdf$/i, "") + "_Signed.pdf",
-        folder: "Signed",
-        owner: req.createdBy,
-        relatedTo: req.relatedTo,
-        version: 1,
-        tags: ["signed", "e-signature"],
-        uploadedAt: today,
-        accessLevel: "Team",
-        sizeLabel: "320 KB",
-        versions: [
-          {
-            version: 1,
-            uploadedAt: today,
-            uploadedBy: "System",
-            sizeLabel: "320 KB",
-            note: "From e-signature",
-          },
-        ],
-      });
+      const doc = persistSignedPackage(req);
+      const artifact = getSignedArtifact(doc.id);
+      if (artifact) {
+        downloadArtifactBlob(artifact);
+        flash(`Downloaded ${doc.fileName}`);
+        return;
+      }
     }
+    flash(`Document not fully signed yet: ${req.documentFile}`);
   }
 
   if (!req) {

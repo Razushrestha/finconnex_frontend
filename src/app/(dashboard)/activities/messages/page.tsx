@@ -8,7 +8,24 @@ import {
   type ActivityView,
 } from "@/components/activities/ActivityToolbar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
-import { moreMenuItems, printViewItems } from "../tasks/page";
+import { printViewItems } from "../tasks/page";
+import {
+  ArrowRightLeft,
+  Trash2,
+  RefreshCw,
+  Tags,
+  ShieldCheck,
+} from "lucide-react";
+import { activityExportMenuItem } from "@/lib/activities/export";
+
+const moreMenuItems = [
+  { key: "mass-transfer", icon: ArrowRightLeft, label: "Mass Transfer" },
+  { key: "mass-delete", icon: Trash2, label: "Mass Delete" },
+  { key: "mass-update", icon: RefreshCw, label: "Mass Update" },
+  { key: "manage-tags", icon: Tags, label: "Manage Tags" },
+  { key: "assignment-rules", icon: ShieldCheck, label: "Assignment Rules" },
+  activityExportMenuItem("messages"),
+];
 
 export default function MessagesPage() {
   const [view, setView] = useState<ActivityView>("kanban");

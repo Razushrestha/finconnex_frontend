@@ -8,10 +8,14 @@ import {
   Tags,
   ShieldCheck,
   Download,
+  CalendarDays,
+  GanttChart,
 } from "lucide-react";
 import { FilterPanel } from "@/components/activities/tasks/Filterpanel";
 import { KanbanBoard } from "@/components/activities/tasks/KanbanBoard";
 import { TaskListView } from "@/components/activities/tasks/TaskListView";
+import { TaskCalendarView } from "@/components/activities/tasks/TaskCalendarView";
+import { TaskTimelineView } from "@/components/activities/tasks/TaskTimelineView";
 import {
   ActivityToolbar,
   type ActivityView,
@@ -22,6 +26,15 @@ import {
   type TaskFilters,
   type TaskStatus,
 } from "@/lib/tasks/types";
+import {
+  cloneTask,
+  completeTask,
+  listAllTasks,
+  reassignTask,
+} from "@/lib/tasks/store";
+import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import { downloadCsv, toCsv } from "@/lib/import/csv";
+import { emitRulesChange } from "@/lib/rules/storage";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 
@@ -31,7 +44,14 @@ function loadTaskViewMode(): ActivityView {
   if (typeof window === "undefined") return "kanban";
   try {
     const raw = localStorage.getItem(TASK_VIEW_MODE_KEY);
-    if (raw === "list" || raw === "kanban") return raw;
+    if (
+      raw === "list" ||
+      raw === "kanban" ||
+      raw === "calendar" ||
+      raw === "timeline"
+    ) {
+      return raw;
+    }
   } catch {
     /* ignore */
   }
@@ -46,13 +66,47 @@ function persistTaskViewMode(mode: ActivityView) {
   }
 }
 
+function exportTasksCsv() {
+  const rows = listAllTasks();
+  downloadCsv(
+    `tasks-${Date.now()}.csv`,
+    toCsv(
+      [
+        "Task ID",
+        "Title",
+        "Type",
+        "Priority",
+        "Status",
+        "Due Date",
+        "Assigned To",
+        "Reminder",
+      ],
+      rows.map((t) => [
+        t.taskId,
+        t.title,
+        t.taskType,
+        t.priority,
+        t.status,
+        t.dueDate,
+        t.assignedTo,
+        t.reminderDate ?? "",
+      ]),
+    ),
+  );
+}
+
 export const moreMenuItems = [
   { key: "mass-transfer", icon: ArrowRightLeft, label: "Mass Transfer" },
   { key: "mass-delete", icon: Trash2, label: "Mass Delete" },
   { key: "mass-update", icon: RefreshCw, label: "Mass Update" },
   { key: "manage-tags", icon: Tags, label: "Manage Tags" },
   { key: "assignment-rules", icon: ShieldCheck, label: "Assignment Rules" },
-  { key: "export-tasks", icon: Download, label: "Export Tasks" },
+  {
+    key: "export-tasks",
+    icon: Download,
+    label: "Export Tasks",
+    onSelect: () => exportTasksCsv(),
+  },
 ];
 
 export const printViewItems = [
@@ -77,8 +131,7 @@ export default function TasksPage() {
   const [sortField, setSortField] = useState<string | undefined>();
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
-
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkFlash, setBulkFlash] = useState<string | null>(null);
 
   useEffect(() => {
     setView(loadTaskViewMode());
@@ -94,7 +147,6 @@ export default function TasksPage() {
     field: string,
   ) {
     setFilters((prev) => {
-      // Exclusive: pick one Priority or Status → table shows only that value.
       if (sectionId === "priority") {
         const selected = field as Priority;
         const already =
@@ -132,6 +184,43 @@ export default function TasksPage() {
     setSortField(undefined);
   }
 
+  function flash(msg: string) {
+    setBulkFlash(msg);
+    window.setTimeout(() => setBulkFlash(null), 2800);
+  }
+
+  function runBulkComplete() {
+    let n = 0;
+    for (const id of selectedTaskIds) {
+      if (completeTask(id)) n += 1;
+    }
+    emitRulesChange("all");
+    setSelectedTaskIds([]);
+    flash(`Completed ${n} task${n === 1 ? "" : "s"}`);
+  }
+
+  function runBulkClone() {
+    let n = 0;
+    for (const id of selectedTaskIds) {
+      if (cloneTask(id)) n += 1;
+    }
+    emitRulesChange("all");
+    setSelectedTaskIds([]);
+    flash(`Cloned ${n} task${n === 1 ? "" : "s"}`);
+  }
+
+  function runBulkReassign() {
+    const owner =
+      ACTIVITY_OWNERS.find((o) => o !== "John Smith") ?? ACTIVITY_OWNERS[0];
+    let n = 0;
+    for (const id of selectedTaskIds) {
+      if (reassignTask(id, owner)) n += 1;
+    }
+    emitRulesChange("all");
+    setSelectedTaskIds([]);
+    flash(`Reassigned ${n} to ${owner}`);
+  }
+
   return (
     <div className="flex min-h-full w-full min-w-0 flex-col overflow-hidden bg-slate-50/50 px-3 py-1">
       <FocusHighlight />
@@ -157,43 +246,30 @@ export default function TasksPage() {
             "Tasks by Assignee",
             "Tasks by Priority",
           ]}
+          extraViewIcons={[
+            { key: "calendar", icon: CalendarDays, label: "Calendar view" },
+            { key: "timeline", icon: GanttChart, label: "Timeline view" },
+          ]}
         />
-        {/* 
-        {selectedIds.length > 0 ? (
-        <EntitySelectionToolbar
-          selectedCount={selectedIds.length}
-          onClear={() => setSelectedIds([])}
-          onSendMail={() => console.log("send mail clicked")}
-          onAddTag={() => console.log("add tag clicked")}
-          onRemoveTag={() => console.log("remove tag clicked")}
-          onRunMacro={() => console.log("run macro clicked")}
-          onCreateTask={() => console.log("create task clicked")}
-          onSetReminder={() => console.log("set reminder clicked")}
-          onMassUpdate={() => console.log("mass update clicked")}
-          onChangeOwner={() => console.log("change owner clicked")}
-          onCadences={() => console.log("cadences clicked")}
-          onAddToCampaigns={() => console.log("add to campaigns clicked")}
-          onPrintMailingLabels={() =>
-            console.log("print mailing labels clicked")
-          }
-          onMailMerge={() => console.log("mail merge clicked")}
-          onMassConvert={() => console.log("mass convert clicked")}
-          onDelete={() => console.log("delete clicked")}
-          onExportSelectedRecords={() =>
-            console.log("export selected records clicked")
-          }
-        />
-      ) : null} */}
+
+        {bulkFlash ? (
+          <p className="mt-1 text-[12px] font-medium text-violet-700">
+            {bulkFlash}
+          </p>
+        ) : null}
 
         {selectedTaskIds.length > 0 && (
           <EntitySelectionToolbar
             selectedCount={selectedTaskIds.length}
             onClear={() => setSelectedTaskIds([])}
+            onCompleteSelected={runBulkComplete}
+            onCloneSelected={runBulkClone}
+            onChangeOwner={runBulkReassign}
           />
         )}
       </div>
 
-      <div className="flex min-h-0 flex-1 items-stretch gap-4 mt-2">
+      <div className="mt-2 flex min-h-0 flex-1 items-stretch gap-4">
         {filterOpen && (
           <FilterPanel
             filters={filters}
@@ -204,7 +280,15 @@ export default function TasksPage() {
 
         <div className="min-h-0 min-w-0 flex-1 overflow-auto [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100">
           {view === "kanban" ? (
-            <KanbanBoard filters={filters} />
+            <KanbanBoard
+              filters={filters}
+              selectedIds={selectedTaskIds}
+              onSelectedIdsChange={setSelectedTaskIds}
+            />
+          ) : view === "calendar" ? (
+            <TaskCalendarView filters={filters} />
+          ) : view === "timeline" ? (
+            <TaskTimelineView filters={filters} />
           ) : (
             <TaskListView
               filters={filters}

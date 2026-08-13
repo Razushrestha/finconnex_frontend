@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Home,
@@ -10,13 +10,25 @@ import {
   Plus,
   Sparkles,
   X,
+  RefreshCw,
+  Share2,
+  Download,
 } from "lucide-react";
 import {
-  calendarItems as seedCalendarItems,
   type CalendarItem,
   type CalendarItemType,
 } from "@/lib/calendar/types";
+import {
+  buildCalendarIcs,
+  createCalendarItem,
+  downloadCalendarIcs,
+  listCalendarItems,
+  saveCalendarItems,
+  syncExternalCalendarEvents,
+} from "@/lib/calendar/store";
+import { onRulesChange } from "@/lib/rules";
 import { cn } from "@/lib/utils";
+import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 
 type CalendarView = "Day" | "Week" | "Month" | "Agenda";
 
@@ -65,12 +77,14 @@ const TYPE_FILTERS: (CalendarItemType | "All")[] = [
 const TODAY = new Date(2026, 6, 22);
 
 export default function CalendarPage() {
-  const [calendarItems, setCalendarItems] =
-    useState<CalendarItem[]>(seedCalendarItems);
+  const [calendarItems, setCalendarItems] = useState<CalendarItem[]>(() =>
+    listCalendarItems(),
+  );
   const [view, setView] = useState<CalendarView>("Week");
   const [typeFilter, setTypeFilter] =
     useState<(typeof TYPE_FILTERS)[number]>("All");
   const [anchor, setAnchor] = useState(() => new Date(TODAY));
+  const [flash, setFlash] = useState<string | null>(null);
 
   // Modal State for adding events
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -78,6 +92,49 @@ export default function CalendarPage() {
   const [newType, setNewType] = useState<CalendarItemType>("Event");
   const [newDate, setNewDate] = useState(isoDate(TODAY));
   const [newTime, setNewTime] = useState("09:00");
+
+  useEffect(() => {
+    return onRulesChange(() => setCalendarItems(listCalendarItems()));
+  }, []);
+
+  useEffect(() => {
+    if (!flash) return;
+    const t = window.setTimeout(() => setFlash(null), 3200);
+    return () => window.clearTimeout(t);
+  }, [flash]);
+
+  function persist(next: CalendarItem[]) {
+    setCalendarItems(next);
+    saveCalendarItems(next);
+  }
+
+  function syncExternal() {
+    const added = syncExternalCalendarEvents();
+    setCalendarItems(listCalendarItems());
+    setFlash(
+      added.length
+        ? `Synced ${added.length} external event(s)`
+        : "Already up to date with Google/Outlook mock feeds",
+    );
+  }
+
+  async function shareCalendar() {
+    const url = window.location.href;
+    try {
+      await navigator.clipboard.writeText(url);
+      setFlash("Calendar link copied");
+    } catch {
+      setFlash(url);
+    }
+  }
+
+  function exportIcs() {
+    downloadCalendarIcs(
+      `finconnex-calendar-${Date.now()}.ics`,
+      buildCalendarIcs(calendarItems),
+    );
+    setFlash(`Exported ${calendarItems.length} events`);
+  }
 
   // Drag and drop state tracking
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
@@ -144,41 +201,37 @@ export default function CalendarPage() {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
-    const newItem: CalendarItem = {
-      id: `item-${Date.now()}`,
+    createCalendarItem({
       title: newTitle.trim(),
       type: newType,
-      start: `${newDate}T${newTime}:00`,
-      end: `${newDate}T${Number(newTime.slice(0, 2)) + 1}${newTime.slice(2)}:00`,
-      owner: "Current User",
+      start: `${newDate}T${newTime}`,
+      end: `${newDate}T${String(Number(newTime.slice(0, 2)) + 1).padStart(2, "0")}${newTime.slice(2)}`,
+      owner: ACTIVITY_OWNERS[0],
       relatedTo: "General",
-      colorClass: "bg-violet-500",
-    };
-
-    setCalendarItems((prev) => [newItem, ...prev]);
+    });
+    setCalendarItems(listCalendarItems());
     setNewTitle("");
     setIsAddOpen(false);
+    setFlash("Event added");
   }
 
   function handleDropOnDay(targetDateStr: string) {
     if (!draggedItemId) return;
-    setCalendarItems((prev) =>
-      prev.map((item) => {
-        if (item.id === draggedItemId) {
-          const timePart = item.start.includes("T")
-            ? item.start.split("T")[1]
-            : "09:00:00";
-          const endPart =
-            item.end && item.end.includes("T")
-              ? item.end.split("T")[1]
-              : "10:00:00";
-          return {
-            ...item,
-            start: `${targetDateStr}T${timePart}`,
-            end: `${targetDateStr}T${endPart}`,
-          };
-        }
-        return item;
+    persist(
+      calendarItems.map((item) => {
+        if (item.id !== draggedItemId) return item;
+        const timePart = item.start.includes("T")
+          ? item.start.split("T")[1]
+          : "09:00:00";
+        const endPart =
+          item.end && item.end.includes("T")
+            ? item.end.split("T")[1]
+            : "10:00:00";
+        return {
+          ...item,
+          start: `${targetDateStr}T${timePart}`,
+          end: `${targetDateStr}T${endPart}`,
+        };
       }),
     );
     setDraggedItemId(null);
@@ -213,6 +266,30 @@ export default function CalendarPage() {
 
           <button
             type="button"
+            onClick={syncExternal}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Sync
+          </button>
+          <button
+            type="button"
+            onClick={() => void shareCalendar()}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <Share2 className="h-3.5 w-3.5" />
+            Share
+          </button>
+          <button
+            type="button"
+            onClick={exportIcs}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Export
+          </button>
+          <button
+            type="button"
             onClick={() => setIsAddOpen(true)}
             className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-md shadow-violet-600/20 transition-all hover:bg-violet-700"
           >
@@ -220,6 +297,9 @@ export default function CalendarPage() {
             Add event
           </button>
         </div>
+        {flash ? (
+          <p className="mt-1 text-[11px] font-medium text-emerald-700">{flash}</p>
+        ) : null}
 
         {/* ONE surface: toolbar + grid */}
         <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col overflow-hidden rounded-md border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)]">

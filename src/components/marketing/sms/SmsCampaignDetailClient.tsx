@@ -31,6 +31,7 @@ import {
   logStatusChange,
   softDeleteRecord,
 } from "@/lib/rules";
+import { sendSmsDemoLive } from "@/lib/comms/send-gateway";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
@@ -128,6 +129,19 @@ export function SmsCampaignDetailClient({ id }: { id: string }) {
       ),
       `Scheduled for ${when}`,
     );
+  }
+
+  async function testSend() {
+    if (!campaign) return;
+    const result = await sendSmsDemoLive({
+      phone: "+61000000000",
+      body: campaign.message,
+    });
+    if (!result.ok) {
+      flash(result.message);
+      return;
+    }
+    save(appendAudit(campaign, "Test send"), "Test SMS sent via demo gateway");
   }
 
   function duplicate() {
@@ -348,7 +362,7 @@ export function SmsCampaignDetailClient({ id }: { id: string }) {
                   />
                 ) : null}
                 <ActionBtn
-                  onClick={() => flash("Test SMS sent (mock)")}
+                  onClick={() => void testSend()}
                   icon={Send}
                   label="Test send"
                 />

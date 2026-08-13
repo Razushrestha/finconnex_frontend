@@ -18,6 +18,7 @@ import {
   BellRing,
   AlarmClock,
   X,
+  Download,
 } from "lucide-react";
 import {
   reminderColumns as initialColumns,
@@ -26,6 +27,7 @@ import {
   type ReminderStatus,
   type NotificationMethod,
 } from "@/lib/reminders/types";
+import { exportRemindersCsv } from "@/lib/activities/export";
 import {
   CardInitialsAvatar,
   CardOwnerRow,
@@ -157,18 +159,31 @@ export default function RemindersPage() {
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={() =>
-              router.push(
-                "/activities/reminders/create?layoutid=standard&redirect=false",
-              )
-            }
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-md shadow-violet-600/20 transition-all hover:bg-violet-700"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Create Reminder
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const n = exportRemindersCsv();
+                void n;
+              }}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  "/activities/reminders/create?layoutid=standard&redirect=false",
+                )
+              }
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-md shadow-violet-600/20 transition-all hover:bg-violet-700"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Create Reminder
+            </button>
+          </div>
         </div>
 
         {/* ONE surface: toolbar + content */}

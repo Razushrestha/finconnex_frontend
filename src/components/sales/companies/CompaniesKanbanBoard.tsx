@@ -1,8 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { COMPANY_GROUPS, type CompanyGroup } from "@/lib/companies/types";
+import { type CompanyGroup } from "@/lib/companies/types";
+import {
+  listCompanyGroups,
+  saveCompanyGroups,
+} from "@/lib/companies/store";
+import { onRulesChange } from "@/lib/rules";
 import type { CompanyFilters } from "./FilterCompaniesPanel";
 import { CompanyCard } from "./CompanyCard";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
@@ -43,7 +48,9 @@ export function CompaniesKanbanBoard({
 }: CompaniesKanbanBoardProps) {
   const router = useRouter();
 
-  const [groups, setGroups] = useState<CompanyGroup[]>(COMPANY_GROUPS);
+  const [groups, setGroups] = useState<CompanyGroup[]>(() =>
+    listCompanyGroups(),
+  );
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const [dropTargetPos, setDropTargetPos] = useState<DropTargetPosition | null>(
     null,
@@ -56,6 +63,15 @@ export function CompaniesKanbanBoard({
   // Board-wide card customization settings
   const [cardSettings, setCardSettings] =
     useState<CompanyCardCustomizationSettings | null>(null);
+
+  useEffect(() => {
+    return onRulesChange(() => setGroups(listCompanyGroups()));
+  }, []);
+
+  function persist(next: CompanyGroup[]) {
+    setGroups(next);
+    saveCompanyGroups(next);
+  }
 
   function toggleCollapsed(groupId: string) {
     setCollapsedGroups((prev) => {
@@ -111,8 +127,8 @@ export function CompaniesKanbanBoard({
     updatedCompany: CompanyRecord,
     targetIndex?: number,
   ) {
-    setGroups((prev) =>
-      prev.map((g) => {
+    persist(
+      groups.map((g) => {
         if (g.id === sourceGroup.id && g.id === targetGroup.id) {
           // Reordering within the same group.
           const filtered = g.companies.filter((c) => c.id !== company.id);

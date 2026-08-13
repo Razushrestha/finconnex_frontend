@@ -52,6 +52,11 @@ import {
   type ChatPresence,
 } from "@/lib/chat/types";
 import { avatarColor, initials } from "@/lib/activities/shared";
+import { createTask } from "@/lib/tasks/store";
+import {
+  notifyMention,
+  notifyTaskAssigned,
+} from "@/lib/rules/notify";
 import { cn } from "@/lib/utils";
 
 const EMOJIS = ["😀", "👍", "🙏", "🔥", "✅", "🎉", "😂", "❤️"];
@@ -76,9 +81,15 @@ function flash(
   setToast: (v: string | null) => void,
   message: string,
   ms = 2600,
+  setToastHref?: (v: string | null) => void,
+  href?: string | null,
 ) {
   setToast(message);
-  window.setTimeout(() => setToast(null), ms);
+  setToastHref?.(href ?? null);
+  window.setTimeout(() => {
+    setToast(null);
+    setToastHref?.(null);
+  }, ms);
 }
 
 export default function TeamChatPage() {
@@ -92,6 +103,7 @@ export default function TeamChatPage() {
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("chat");
   const [threadSearch, setThreadSearch] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [toastHref, setToastHref] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
@@ -194,6 +206,25 @@ export default function TeamChatPage() {
     setDraft("");
     setReplyTo(null);
     setEmojiOpen(false);
+
+    // Mentions → in-app notification (demo: notify current user when @name appears)
+    const mention = text.match(/@([\w.-]+)/);
+    if (mention) {
+      notifyMention({
+        recipient: CURRENT_CHAT_USER.name,
+        from: CURRENT_CHAT_USER.name,
+        preview: text,
+        relatedTo: channelLabel(active),
+        relatedHref: "/activities/team-chat",
+      });
+      flash(
+        setToast,
+        `Mention sent · ${mention[1]} notified`,
+        2800,
+        setToastHref,
+        "/notifications",
+      );
+    }
   }
 
   function deleteMessage(id: string) {
@@ -215,8 +246,53 @@ export default function TeamChatPage() {
     flash(setToast, "Recording… tap Voice again to send", 4000);
   }
 
+  function createTaskFromChat(title: string, description?: string) {
+    const due = new Date();
+    due.setDate(due.getDate() + 2);
+    const dueDate = due.toLocaleDateString("en-AU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+    const task = createTask({
+      title: title.trim().slice(0, 120) || "Chat follow-up",
+      taskType: "Follow-up",
+      priority: "Medium",
+      status: "Not Started",
+      dueDate,
+      assignedTo: CURRENT_CHAT_USER.name,
+      description:
+        description ??
+        `Created from team chat in ${channelLabel(active)}`,
+      createdBy: CURRENT_CHAT_USER.name,
+    });
+    notifyTaskAssigned({
+      recipient: CURRENT_CHAT_USER.name,
+      taskTitle: task.title,
+      relatedTo: task.taskId,
+      relatedHref: "/activities/tasks",
+      message: `Task from chat: “${task.title}”`,
+    });
+    flash(
+      setToast,
+      `Task created · ${task.title.slice(0, 36)}${task.title.length > 36 ? "…" : ""}`,
+      3600,
+      setToastHref,
+      "/activities/tasks",
+    );
+    return task;
+  }
+
   function onPlusAction(label: string) {
     setPlusMenuOpen(false);
+    if (label === "Create task…") {
+      const title =
+        draft.trim() ||
+        `Follow up in ${channelLabel(active)}`;
+      createTaskFromChat(title, draft.trim() || undefined);
+      setDraft("");
+      return;
+    }
     flash(setToast, label);
   }
 
@@ -276,7 +352,15 @@ export default function TeamChatPage() {
                   type="button"
                   aria-label="Notifications"
                   title="Notifications"
-                  onClick={() => flash(setToast, "Chat notifications")}
+                  onClick={() => {
+                    flash(
+                      setToast,
+                      "Opening notifications",
+                      2200,
+                      setToastHref,
+                      "/notifications",
+                    );
+                  }}
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"
                 >
                   <Bell className="h-4 w-4" />
@@ -690,9 +774,9 @@ export default function TeamChatPage() {
                           return;
                         }
                         if (action === "task") {
-                          flash(
-                            setToast,
-                            `Task created from “${msg.body.slice(0, 40)}${msg.body.length > 40 ? "…" : ""}”`,
+                          createTaskFromChat(
+                            msg.body.slice(0, 80),
+                            `From ${msg.author}: ${msg.body}`,
                           );
                           return;
                         }
@@ -914,7 +998,15 @@ export default function TeamChatPage() {
       {toast ? (
         <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-[12px] font-medium text-emerald-800 shadow-lg">
           <CheckSquare className="h-3.5 w-3.5 text-emerald-600" />
-          {toast}
+          <span>{toast}</span>
+          {toastHref ? (
+            <Link
+              href={toastHref}
+              className="ml-1 font-semibold text-violet-700 underline-offset-2 hover:underline"
+            >
+              Open
+            </Link>
+          ) : null}
         </div>
       ) : null}
     </div>

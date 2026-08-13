@@ -18,6 +18,8 @@ import {
   ArrowRightLeft,
   Trash2,
   Download,
+  Copy,
+  CheckCircle2,
 } from "lucide-react";
 
 interface EntitySelectionToolbarProps {
@@ -39,6 +41,8 @@ interface EntitySelectionToolbarProps {
   onMassConvert?: () => void;
   onDelete?: () => void;
   onExportSelectedRecords?: () => void;
+  onCompleteSelected?: () => void;
+  onCloneSelected?: () => void;
 }
 
 export function EntitySelectionToolbar({
@@ -60,6 +64,8 @@ export function EntitySelectionToolbar({
   onMassConvert,
   onDelete,
   onExportSelectedRecords,
+  onCompleteSelected,
+  onCloneSelected,
 }: EntitySelectionToolbarProps) {
   const [isTagsOpen, setIsTagsOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
@@ -69,6 +75,8 @@ export function EntitySelectionToolbar({
     label: string;
     onClick?: () => void;
   }[] = [
+    { icon: CheckCircle2, label: "Mark Complete", onClick: onCompleteSelected },
+    { icon: Copy, label: "Clone", onClick: onCloneSelected },
     { icon: Zap, label: "Run Macro", onClick: onRunMacro },
     { icon: CheckSquare, label: "Create Task", onClick: onCreateTask },
     { icon: Bell, label: "Set Reminder", onClick: onSetReminder },
@@ -171,7 +179,9 @@ export function EntitySelectionToolbar({
                 onClick={() => setIsMoreOpen(false)}
               />
               <div className="absolute right-0 top-full z-30 mt-1 w-52 overflow-hidden rounded-md border border-slate-200 bg-white py-1 text-left shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
-                {moreMenuItems.map(({ icon: Icon, label, onClick }) => (
+    {moreMenuItems
+              .filter((item) => item.onClick)
+              .map(({ icon: Icon, label, onClick }) => (
                   <button
                     key={label}
                     type="button"

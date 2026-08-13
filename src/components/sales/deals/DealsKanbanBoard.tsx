@@ -3,7 +3,12 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, Plus, Trophy, XCircle } from "lucide-react";
 import { type DealPipeline, type DealStage } from "@/lib/deals/types";
-import { listDealPipelines, saveDealPipelines } from "@/lib/deals/store";
+import {
+  listDealPipelines,
+  saveDealPipelines,
+  stageWeightedForecast,
+} from "@/lib/deals/store";
+import { onRulesChange } from "@/lib/rules";
 import {
   assertDealStageChange,
   getOrgManager,
@@ -139,6 +144,10 @@ export function DealsKanbanBoard({
 
   useEffect(() => {
     setAllStages(listDealPipelines());
+  }, []);
+
+  useEffect(() => {
+    return onRulesChange(() => setAllStages(listDealPipelines()));
   }, []);
 
   function persist(next: Record<DealPipeline, DealStage[]>) {
@@ -549,10 +558,9 @@ export function DealsKanbanBoard({
                     </div>
                     <div className="px-1 text-xs font-medium text-slate-500">
                       {stage.deals.length > 0
-                        ? `avg ${Math.round(
-                            stage.deals.reduce((s, d) => s + d.probability, 0) /
-                              stage.deals.length,
-                          )}%`
+                        ? `$${Math.round(
+                            stageWeightedForecast(stage),
+                          ).toLocaleString()} wtd`
                         : "No deals"}
                     </div>
                   </div>
@@ -849,10 +857,7 @@ function CollapsedStage({
       >
         <span className="mb-3">{stage.title}</span>
         {stage.deals.length > 0
-          ? `avg ${Math.round(
-              stage.deals.reduce((s, d) => s + d.probability, 0) /
-                stage.deals.length,
-            )}%`
+          ? `$${Math.round(stageWeightedForecast(stage)).toLocaleString()} wtd`
           : "No deals"}
       </p>
 

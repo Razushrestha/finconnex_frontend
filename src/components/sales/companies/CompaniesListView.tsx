@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MoreVertical } from "lucide-react";
-import { COMPANY_GROUPS, type CompanyGroup } from "@/lib/companies/types";
+import { type CompanyGroup } from "@/lib/companies/types";
+import { listCompanyGroups } from "@/lib/companies/store";
+import { onRulesChange } from "@/lib/rules";
 import type { CompanyFilters } from "./FilterCompaniesPanel";
 import { cn } from "@/lib/utils";
 import { TableDisplayOptionsMenu } from "@/components/common/TableDisplayOptionsMenu";
@@ -114,15 +116,28 @@ const columnRenderers: Record<string, ColumnRenderer> = {
 };
 
 export function CompaniesListView({
-  groups = COMPANY_GROUPS,
+  groups: groupsProp,
   filters,
 }: CompaniesListViewProps) {
+  const [groups, setGroups] = useState<CompanyGroup[]>(
+    () => groupsProp ?? listCompanyGroups(),
+  );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pageSize, setPageSize] = useState<number>(10);
   const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
   const [manageColumns, setManageColumns] = useState<ManageColumn[]>(
     DEFAULT_COMPANY_COLUMNS,
   );
+
+  useEffect(() => {
+    if (groupsProp) setGroups(groupsProp);
+  }, [groupsProp]);
+
+  useEffect(() => {
+    return onRulesChange(() => {
+      if (!groupsProp) setGroups(listCompanyGroups());
+    });
+  }, [groupsProp]);
 
   const allCompanies = useMemo(() => {
     const hasStatusFilter = !!filters?.statuses.length;

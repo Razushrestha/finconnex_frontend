@@ -15,6 +15,7 @@ export * from "@/lib/rules/permissions";
 export * from "@/lib/rules/actor";
 export * from "@/lib/rules/restore";
 export * from "@/lib/rules/record";
+export * from "@/lib/rules/field-grants";
 
 export const RULES_SECTIONS = [
   {

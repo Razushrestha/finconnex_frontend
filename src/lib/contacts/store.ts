@@ -64,6 +64,77 @@ export function findContactById(id: string) {
   return null;
 }
 
+export function listAllContacts(): ContactCardData[] {
+  return listContactGroups().flatMap((g) => g.contacts);
+}
+
+export function findContactByName(name: string): ContactCardData | null {
+  const q = name.trim().toLowerCase();
+  if (!q) return null;
+  return listAllContacts().find((c) => c.name.trim().toLowerCase() === q) ?? null;
+}
+
+export function updateContact(
+  id: string,
+  patch: Partial<
+    Pick<
+      ContactCardData,
+      | "name"
+      | "email"
+      | "phone"
+      | "mobile"
+      | "company"
+      | "owner"
+      | "source"
+      | "dealIds"
+    >
+  >,
+): ContactCardData | null {
+  const found = findContactById(id);
+  if (!found) return null;
+  let updated: ContactCardData | null = null;
+  saveContactGroups(
+    listContactGroups().map((g) => ({
+      ...g,
+      contacts: g.contacts.map((c) => {
+        if (c.id !== id) return c;
+        updated = {
+          ...c,
+          ...patch,
+          name: patch.name?.trim() || c.name,
+          email: patch.email?.trim() || c.email,
+          dealIds: patch.dealIds ?? c.dealIds,
+        };
+        return updated;
+      }),
+    })),
+  );
+  return updated;
+}
+
+/** Bidirectional contact ↔ deal link. */
+export function linkDealToContact(
+  contactId: string,
+  dealId: string,
+): ContactCardData | null {
+  const found = findContactById(contactId);
+  if (!found) return null;
+  const dealIds = Array.from(
+    new Set([...(found.contact.dealIds ?? []), dealId]),
+  );
+  return updateContact(contactId, { dealIds });
+}
+
+export function unlinkDealFromContact(
+  contactId: string,
+  dealId: string,
+): ContactCardData | null {
+  const found = findContactById(contactId);
+  if (!found) return null;
+  const dealIds = (found.contact.dealIds ?? []).filter((id) => id !== dealId);
+  return updateContact(contactId, { dealIds });
+}
+
 export function createContact(input: {
   firstName: string;
   lastName: string;

@@ -13,10 +13,8 @@ import {
 } from "@/lib/portals/clientData";
 import {
   listInvoices,
-  applyPaymentToInvoice,
-  appendInvoiceAudit,
-  upsertInvoice,
 } from "@/lib/finance/invoices/types";
+import { chargePaymentDemoLive } from "@/lib/finance/pay-gateway";
 import { formatAUD } from "@/lib/finance/shared";
 import {
   listTickets,
@@ -169,6 +167,8 @@ export function PortalInvoicesPane({ slug }: { slug: string }) {
   const { portal, logActivity, refresh } = usePortalContext(slug);
   const [toast, setToast] = useState<string | null>(null);
 
+  const [payingId, setPayingId] = useState<string | null>(null);
+
   useEffect(() => {
     if (portal) logActivity("Viewed invoices");
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -182,18 +182,26 @@ export function PortalInvoicesPane({ slug }: { slug: string }) {
   );
   const canPay = canPayInPortal(portal);
 
-  function pay(invoiceId: string) {
+  async function pay(invoiceId: string) {
     const inv = listInvoices().find((i) => i.id === invoiceId);
     if (!inv || !canPay || inv.amountDue <= 0) return;
-    const amount = inv.amountDue;
-    const paid = applyPaymentToInvoice(inv, amount);
-    upsertInvoice(
-      appendInvoiceAudit(paid, `Portal payment ${formatAUD(amount)}`, portal!.primaryContactName),
-    );
-    logActivity(`Paid invoice ${inv.invoiceId}`);
+    setPayingId(invoiceId);
+    const result = await chargePaymentDemoLive({
+      invoiceId: inv.id,
+      amount: inv.amountDue,
+      method: "Stripe",
+      actor: portal!.primaryContactName,
+    });
+    setPayingId(null);
+    if (!result.ok) {
+      setToast(result.message);
+      window.setTimeout(() => setToast(null), 3200);
+      return;
+    }
+    logActivity(`Paid invoice ${inv.invoiceId} via gateway`);
     refresh();
-    setToast(`Paid ${formatAUD(amount)}`);
-    window.setTimeout(() => setToast(null), 2500);
+    setToast(`Paid ${formatAUD(result.payment.amount)} · ${result.providerId}`);
+    window.setTimeout(() => setToast(null), 2800);
   }
 
   return (
@@ -234,10 +242,11 @@ export function PortalInvoicesPane({ slug }: { slug: string }) {
                 {canPay && inv.amountDue > 0 ? (
                   <button
                     type="button"
-                    onClick={() => pay(inv.id)}
-                    className="h-8 rounded-lg bg-violet-600 px-2.5 text-[11px] font-semibold text-white"
+                    disabled={payingId === inv.id}
+                    onClick={() => void pay(inv.id)}
+                    className="h-8 rounded-lg bg-violet-600 px-2.5 text-[11px] font-semibold text-white disabled:opacity-60"
                   >
-                    Pay
+                    {payingId === inv.id ? "Paying…" : "Pay"}
                   </button>
                 ) : null}
               </div>

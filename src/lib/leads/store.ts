@@ -147,3 +147,114 @@ export function deleteLead(id: string): LeadCardData | null {
 export function upsertLeadColumns(cols: KanbanColumn[]) {
   saveLeadColumns(cols);
 }
+
+export function updateLeadOwner(ids: string[], owner: string): number {
+  if (!ids.length || !owner.trim()) return 0;
+  const idSet = new Set(ids);
+  let count = 0;
+  saveLeadColumns(
+    listLeadColumns().map((col) => ({
+      ...col,
+      cards: col.cards.map((card) => {
+        if (!idSet.has(card.id)) return card;
+        count += 1;
+        return { ...card, owner: owner.trim() };
+      }),
+    })),
+  );
+  return count;
+}
+
+export function deleteLeads(ids: string[]): number {
+  if (!ids.length) return 0;
+  const idSet = new Set(ids);
+  let count = 0;
+  saveLeadColumns(
+    listLeadColumns().map((col) => {
+      const kept = col.cards.filter((card) => {
+        if (!idSet.has(card.id)) return true;
+        count += 1;
+        return false;
+      });
+      return { ...col, cards: kept, leadCount: kept.length };
+    }),
+  );
+  return count;
+}
+
+export function updateLead(
+  id: string,
+  patch: Partial<
+    Pick<
+      LeadCardData,
+      | "name"
+      | "email"
+      | "phone"
+      | "company"
+      | "owner"
+      | "source"
+      | "estimatedValue"
+      | "isConverted"
+      | "convertedAt"
+      | "convertedContactId"
+      | "convertedDealId"
+      | "convertedCompanyId"
+    >
+  > & { status?: LeadStatus; pipelineStage?: string },
+): LeadCardData | null {
+  const found = findLeadById(id);
+  if (!found) return null;
+
+  const nextCard: LeadCardData = {
+    ...found.card,
+    ...patch,
+    name: patch.name?.trim() || found.card.name,
+    email: patch.email?.trim() || found.card.email,
+    phone: patch.phone !== undefined ? patch.phone.trim() : found.card.phone,
+    company:
+      patch.company !== undefined ? patch.company.trim() : found.card.company,
+  };
+
+  let cols = listLeadColumns().map((c) => ({
+    ...c,
+    cards: c.cards.map((card) => (card.id === id ? nextCard : card)),
+  }));
+
+  const targetStage =
+    patch.pipelineStage && isMortgagePipelineStage(patch.pipelineStage)
+      ? patch.pipelineStage
+      : patch.status
+        ? leadStatusToPipelineStage(patch.status)
+        : null;
+
+  if (targetStage) {
+    const without = cols.map((c) => ({
+      ...c,
+      cards: c.cards.filter((card) => card.id !== id),
+      leadCount: c.cards.filter((card) => card.id !== id).length,
+    }));
+    const target =
+      without.find((c) => c.title === targetStage) ?? without[0]!;
+    const moved: LeadCardData = {
+      ...nextCard,
+      pipelineStage: target.title,
+      stageEnteredAt: formatPipelineTimestamp(new Date()),
+      accentColorClass:
+        PIPELINE_STAGE_DOT[target.title] ?? target.dotColorClass,
+    };
+    cols = without.map((c) =>
+      c.id === target.id
+        ? {
+            ...c,
+            cards: [moved, ...c.cards],
+            leadCount: c.cards.length + 1,
+          }
+        : c,
+    );
+    saveLeadColumns(cols);
+    return moved;
+  }
+
+  saveLeadColumns(cols);
+  return nextCard;
+}

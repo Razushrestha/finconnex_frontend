@@ -13,7 +13,7 @@ import {
   type SignatureSigner,
 } from "@/lib/documents/signature/types";
 import { syncQuotationFromSignature } from "@/lib/finance/quotations/signatureBridge";
-import { pushLibraryDoc } from "@/lib/documents/library/types";
+import { persistSignedPackage } from "@/lib/documents/signed-artifacts";
 import { SignatureDocPreview } from "./SignatureDocPreview";
 import { CheckCircle2, Clock, Eraser, PenLine } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -128,28 +128,7 @@ export function PublicSignClient({ token }: { token: string }) {
       syncQuotationFromSignature(next);
     }
     if (next.status === "Signed") {
-      const today = new Date().toLocaleDateString("en-AU");
-      pushLibraryDoc({
-        id: `lib-signed-${next.id}`,
-        fileName: next.documentFile.replace(/\.pdf$/i, "") + "_Signed.pdf",
-        folder: "Signed",
-        owner: next.createdBy,
-        relatedTo: next.relatedTo,
-        version: 1,
-        tags: ["signed", "e-signature"],
-        uploadedAt: today,
-        accessLevel: "Team",
-        sizeLabel: "320 KB",
-        versions: [
-          {
-            version: 1,
-            uploadedAt: today,
-            uploadedBy: "System",
-            sizeLabel: "320 KB",
-            note: "From e-signature",
-          },
-        ],
-      });
+      persistSignedPackage(next);
     }
   }
 

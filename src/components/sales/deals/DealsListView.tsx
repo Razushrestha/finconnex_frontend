@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Building2,
   Calendar,
@@ -10,11 +10,9 @@ import {
   Layers,
   Globe,
 } from "lucide-react";
-import {
-  DEAL_PIPELINE_STAGES,
-  type DealPipeline,
-  type DealStage,
-} from "@/lib/deals/types";
+import { type DealPipeline, type DealStage } from "@/lib/deals/types";
+import { listDealPipelines } from "@/lib/deals/store";
+import { onRulesChange } from "@/lib/rules";
 import type { DealFilters } from "./FilterDealsPanel";
 import { cn } from "@/lib/utils";
 import { TableDisplayOptionsMenu } from "@/components/common/TableDisplayOptionsMenu";
@@ -162,15 +160,29 @@ const columnRenderers: Record<string, ColumnRenderer> = {
 
 export function DealsListView({
   pipeline,
-  stages = DEAL_PIPELINE_STAGES[pipeline],
+  stages: stagesProp,
   filters,
 }: DealsListViewProps) {
+  const [stages, setStages] = useState<DealStage[]>(
+    () => stagesProp ?? listDealPipelines()[pipeline] ?? [],
+  );
   const [pageSize, setPageSize] = useState<number>(10);
   const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
   const [manageColumns, setManageColumns] =
     useState<ManageColumn[]>(DEFAULT_DEAL_COLUMNS);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (stagesProp) setStages(stagesProp);
+    else setStages(listDealPipelines()[pipeline] ?? []);
+  }, [stagesProp, pipeline]);
+
+  useEffect(() => {
+    return onRulesChange(() => {
+      if (!stagesProp) setStages(listDealPipelines()[pipeline] ?? []);
+    });
+  }, [stagesProp, pipeline]);
 
   const allDeals = useMemo(() => {
     const hasStageFilter = !!filters?.stages.length;

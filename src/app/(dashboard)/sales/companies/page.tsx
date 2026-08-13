@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActionOption,
   EntityHeader,
@@ -13,24 +13,44 @@ import {
   EMPTY_COMPANY_FILTERS,
   type CompanyFilters,
 } from "@/components/sales/companies/FilterCompaniesPanel";
-import { COMPANY_GROUPS, type CompanyGroup } from "@/lib/companies/types";
+import {
+  COMPANY_GROUPS,
+  COMPANY_STATUSES,
+  type CompanyGroup,
+  type CompanyStatus,
+} from "@/lib/companies/types";
+import { listCompanyGroups } from "@/lib/companies/store";
+import {
+  applyCompanyImport,
+  COMPANY_IMPORT_FIELDS,
+  COMPANY_INDUSTRIES,
+  defaultCompanyImportSettings,
+  downloadCompanyImportErrorReport,
+  exportCompaniesCsv,
+  previewCompanyImport,
+  sampleCompanyCsvTemplate,
+  suggestCompanyMapping,
+} from "@/lib/companies/import";
+import { EntityCsvImportModal } from "@/components/sales/import/EntityCsvImportModal";
+import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import { onRulesChange } from "@/lib/rules";
 import { viewEnter } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeftRight,
   Download,
+  GitMerge,
   RefreshCw,
   ShieldCheck,
   Sparkles,
   Tag,
   Trash2,
-  ChevronDown,
-  Pencil,
 } from "lucide-react";
 import { SORT_OPTIONS } from "../leads/page";
 import type { CompanyQuickActionKind } from "@/components/sales/companies/CompanyCard";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
+import { MergeRecordsModal } from "@/components/sales/merge/MergeRecordsModal";
 
 type CompanyRecord = CompanyGroup["companies"][number];
 
@@ -51,6 +71,11 @@ export default function CompaniesPage() {
     useState<SortDirection>("asc");
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isImportOpen, setImportOpen] = useState(false);
+  const [isMergeOpen, setMergeOpen] = useState(false);
+  const [totalCompanies, setTotalCompanies] = useState(0);
+  const [bulkFlash, setBulkFlash] = useState<string | null>(null);
+  const defaults = defaultCompanyImportSettings();
 
   const [isMassTransferOpen, setMassTransferOpen] = useState(false);
   const [isMassDeleteOpen, setMassDeleteOpen] = useState(false);
@@ -58,12 +83,35 @@ export default function CompaniesPage() {
   const [isManageTagsOpen, setManageTagsOpen] = useState(false);
   const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
 
+  useEffect(() => {
+    function refresh() {
+      setTotalCompanies(
+        listCompanyGroups().reduce((n, g) => n + g.companies.length, 0),
+      );
+    }
+    refresh();
+    return onRulesChange(refresh);
+  }, []);
+
+  useEffect(() => {
+    if (!bulkFlash) return;
+    const t = window.setTimeout(() => setBulkFlash(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [bulkFlash]);
+
   function exportTasks() {
-    console.log("export tasks clicked");
+    const n = exportCompaniesCsv();
+    setBulkFlash(`Exported ${n} companies`);
+  }
+
+  function exportSelected() {
+    if (!selectedIds.length) return;
+    const n = exportCompaniesCsv({ ids: selectedIds });
+    setBulkFlash(`Exported ${n} selected companies`);
   }
 
   function openPrintView() {
-    console.log("print view clicked");
+    window.print();
   }
 
   function handleQuickAction(
@@ -90,24 +138,7 @@ export default function CompaniesPage() {
     });
   }
 
-  function reorderColumn(draggedId: string, targetId: string) {
-    setColumns((prev) => {
-      const next = [...prev];
-      const fromIndex = next.findIndex((c) => c.id === draggedId);
-      const toIndex = next.findIndex((c) => c.id === targetId);
-      if (fromIndex === -1 || toIndex === -1) return prev;
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next;
-    });
-  }
-
   const visibleColumnIds = columns.filter((c) => c.visible).map((c) => c.id);
-
-  const totalCompanies = COMPANY_GROUPS.reduce(
-    (sum, group) => sum + group.companies.length,
-    0,
-  );
 
   const actionOptions: ActionOption[] = [
     {
@@ -141,8 +172,14 @@ export default function CompaniesPage() {
       onClick: () => setAssignmentRulesOpen(true),
     },
     {
+      id: "merge-companies",
+      label: "Merge Companies",
+      icon: <GitMerge className="h-3.5 w-3.5 text-slate-400" />,
+      onClick: () => setMergeOpen(true),
+    },
+    {
       id: "export-tasks",
-      label: "Export Tasks",
+      label: "Export Companies",
       icon: <Download className="h-3.5 w-3.5 text-slate-400" />,
       onClick: () => exportTasks(),
     },
@@ -157,6 +194,15 @@ export default function CompaniesPage() {
     },
   ];
 
+  void isMassTransferOpen;
+  void isMassDeleteOpen;
+  void isMassUpdateOpen;
+  void isManageTagsOpen;
+  void isAssignmentRulesOpen;
+  void columns;
+  void setColumns;
+  void activeSortDirection;
+
   return (
     <div className="h-screen bg-slate-50 p-2 pr-3 dark:bg-zinc-950">
       <FocusHighlight />
@@ -169,12 +215,13 @@ export default function CompaniesPage() {
             id: "import-companies",
             label: "Import Companies",
             badge: "New",
-            onClick: () => console.log("button clicked"),
+            onClick: () => setImportOpen(true),
           },
           {
             id: "import-notes",
             label: "Import Notes",
-            onClick: () => console.log("button clicked"),
+            onClick: () =>
+              setBulkFlash("Notes import comes later — use Import Companies"),
           },
         ]}
         totalCount={totalCompanies}
@@ -210,13 +257,15 @@ export default function CompaniesPage() {
           onPrintMailingLabels={() =>
             console.log("print mailing labels clicked")
           }
-          onMailMerge={() => console.log("mail merge clicked")}
+          onMailMerge={() => setMergeOpen(true)}
           onMassConvert={() => console.log("mass convert clicked")}
           onDelete={() => console.log("delete clicked")}
-          onExportSelectedRecords={() =>
-            console.log("export selected records clicked")
-          }
+          onExportSelectedRecords={() => exportSelected()}
         />
+      ) : bulkFlash ? (
+        <div className="mt-2 text-xs text-emerald-700 dark:text-emerald-400">
+          {bulkFlash}
+        </div>
       ) : null}
 
       <div className="mt-3 flex items-start gap-4">
@@ -236,12 +285,81 @@ export default function CompaniesPage() {
               filters={filters}
               visibleColumnIds={visibleColumnIds}
               onQuickAction={handleQuickAction}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelected}
             />
           ) : (
             <CompaniesListView filters={filters} />
           )}
         </div>
       </div>
+
+      <EntityCsvImportModal
+        open={isImportOpen}
+        title="Import Companies"
+        entityLabel="Company"
+        fields={[...COMPANY_IMPORT_FIELDS]}
+        owners={ACTIVITY_OWNERS}
+        statuses={COMPANY_STATUSES}
+        sources={COMPANY_INDUSTRIES}
+        defaultOwner={defaults.defaultOwner}
+        defaultStatus={defaults.defaultStatus}
+        defaultSource={defaults.defaultSource}
+        requiredHint="Required: Company Name"
+        identityColumnLabel="Website"
+        sourceFieldLabel="Default industry"
+        skipDuplicatesLabel="Skip rows whose company name already exists"
+        updateExistingLabel="Match by company name and overwrite mapped fields"
+        suggestMapping={suggestCompanyMapping}
+        preview={(rows, mapping, settings) =>
+          previewCompanyImport(rows, mapping, {
+            skipDuplicates: settings.skipDuplicates,
+            updateExisting: settings.updateExisting,
+            defaultOwner: settings.defaultOwner,
+            defaultStatus: settings.defaultStatus as CompanyStatus,
+            defaultSource: settings.defaultSource,
+          })
+        }
+        apply={(rows, mapping, settings) =>
+          applyCompanyImport(rows, mapping, {
+            skipDuplicates: settings.skipDuplicates,
+            updateExisting: settings.updateExisting,
+            defaultOwner: settings.defaultOwner,
+            defaultStatus: settings.defaultStatus as CompanyStatus,
+            defaultSource: settings.defaultSource,
+          })
+        }
+        downloadErrorReport={downloadCompanyImportErrorReport}
+        sampleTemplate={sampleCompanyCsvTemplate()}
+        sampleFilename="companies-import-template.csv"
+        onClose={() => setImportOpen(false)}
+        onImported={(s) => {
+          setBulkFlash(
+            `Imported ${s.imported} · updated ${s.updated} · skipped ${s.skipped}`,
+          );
+          setTotalCompanies(
+            listCompanyGroups().reduce((n, g) => n + g.companies.length, 0),
+          );
+        }}
+      />
+
+      <MergeRecordsModal
+        open={isMergeOpen}
+        mode="companies"
+        initialIds={
+          selectedIds.length === 2
+            ? [selectedIds[0]!, selectedIds[1]!]
+            : null
+        }
+        onClose={() => setMergeOpen(false)}
+        onMerged={(msg) => {
+          setBulkFlash(msg);
+          setSelectedIds([]);
+          setTotalCompanies(
+            listCompanyGroups().reduce((n, g) => n + g.companies.length, 0),
+          );
+        }}
+      />
     </div>
   );
 }

@@ -1,5 +1,9 @@
 "use client";
 
+import { Suspense, useState, useEffect, useMemo, type DragEvent } from "react";
+import dynamic from "next/dynamic";
+import { useSearchParams, useRouter } from "next/navigation";
+import { ArrowLeft, Send } from "lucide-react";
 import { AdvancedOptionsSection } from "@/components/documents/signature/create/AdvancedOptionsSection";
 import { DocumentDetailsSection } from "@/components/documents/signature/create/DocumentDetailsSection";
 import { EmailMessageSection } from "@/components/documents/signature/create/EmailMessageSection";
@@ -8,13 +12,9 @@ import { SignersSection } from "@/components/documents/signature/create/SignersS
 import {
   makeSigner,
   nextSignatureIds,
-  SignatureSigner,
   upsertSignatureRequest,
+  type SignatureSigner,
 } from "@/lib/documents/signature/types";
-import React, { useState, useEffect, useMemo } from "react";
-import dynamic from "next/dynamic";
-import { useSearchParams, useRouter } from "next/navigation";
-import { ArrowLeft, Send } from "lucide-react";
 import type {
   PlacedField,
   DraggingFieldType,
@@ -34,12 +34,26 @@ const PdfFieldEditor = dynamic(
 );
 
 export default function CreateSignatureRequestPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[50vh] items-center justify-center text-[13px] text-slate-400">
+          Loading…
+        </div>
+      }
+    >
+      <CreateSignatureRequestForm />
+    </Suspense>
+  );
+}
+
+function CreateSignatureRequestForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const step = searchParams.get("step");
   const isPlacingFields = step === "place-fields";
 
-  const ids = nextSignatureIds();
+  const [ids] = useState(() => nextSignatureIds());
 
   const [documentName, setDocumentName] = useState(
     "Engagement Letter: Anderson",
@@ -60,7 +74,7 @@ export default function CreateSignatureRequestPage() {
     };
   }, [fileUrl]);
 
-  const [signers, setSigners] = useState<SignatureSigner[]>([
+  const [signers, setSigners] = useState<SignatureSigner[]>(() => [
     makeSigner({
       id: `sg-${ids.id}-1`,
       name: "",
@@ -182,7 +196,7 @@ export default function CreateSignatureRequestPage() {
   ];
 
   const handleSidebarDragStart = (
-    e: React.DragEvent<HTMLDivElement>,
+    e: DragEvent<HTMLDivElement>,
     field: (typeof standardFields)[number],
   ) => {
     e.dataTransfer.effectAllowed = "copy";

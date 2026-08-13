@@ -17,6 +17,8 @@ export type AuditAction =
   | "login"
   | "logout"
   | "login_failed"
+  | "2fa_success"
+  | "2fa_failed"
   | "permission_denied"
   | "purge";
 
@@ -162,10 +164,14 @@ export function logStatusChange(
 }
 
 export function logAuth(
-  action: "login" | "logout" | "login_failed",
+  action: "login" | "logout" | "login_failed" | "2fa_success" | "2fa_failed",
   actor: string,
   meta?: Record<string, string>,
 ) {
+  const ua =
+    typeof navigator !== "undefined"
+      ? navigator.userAgent.slice(0, 120)
+      : "server";
   return appendAuditEvent({
     action,
     module: "auth",
@@ -175,7 +181,15 @@ export function logAuth(
         ? "Login successful"
         : action === "logout"
           ? "Logout"
-          : "Failed login attempt",
-    meta,
+          : action === "2fa_success"
+            ? "2FA verified"
+            : action === "2fa_failed"
+              ? "2FA failed"
+              : "Failed login attempt",
+    meta: {
+      userAgent: ua,
+      ip: "demo-local",
+      ...meta,
+    },
   });
 }

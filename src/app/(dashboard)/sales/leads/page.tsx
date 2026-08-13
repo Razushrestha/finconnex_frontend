@@ -15,7 +15,13 @@ import {
   EMPTY_LEAD_FILTERS,
   type LeadFilters,
 } from "@/components/sales/leads/FilterLeadsPanel";
-import { listLeadColumns } from "@/lib/leads/store";
+import { listLeadColumns, deleteLeads, updateLeadOwner } from "@/lib/leads/store";
+import { exportLeadsCsv } from "@/lib/leads/import";
+import { ImportLeadsModal } from "@/components/sales/leads/ImportLeadsModal";
+import { AdsSyncModal } from "@/components/sales/leads/AdsSyncModal";
+import { SheetsImportModal } from "@/components/sales/leads/SheetsImportModal";
+import type { AdsPlatform } from "@/lib/leads/ads-sync";
+import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import { LEAD_PIPELINE_STAGES } from "@/lib/leads/types";
 import { stageColumnId } from "@/lib/pipeline-sla/board";
 import { onRulesChange } from "@/lib/rules";
@@ -237,6 +243,10 @@ export default function LeadsPage() {
   const [isMassUpdateOpen, setMassUpdateOpen] = useState(false);
   const [isManageTagsOpen, setManageTagsOpen] = useState(false);
   const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
+  const [isImportOpen, setImportOpen] = useState(false);
+  const [adsPlatform, setAdsPlatform] = useState<AdsPlatform | null>(null);
+  const [sheetsOpen, setSheetsOpen] = useState(false);
+  const [bulkFlash, setBulkFlash] = useState<string | null>(null);
 
   const [isKanbanSettingsOpen, setIsKanbanSettingsOpen] = useState(false);
   const [isListSettingsOpen, setIsListSettingsOpen] = useState(false);
@@ -262,7 +272,33 @@ export default function LeadsPage() {
   );
 
   function exportTasks() {
-    console.log("export tasks clicked");
+    const n = exportLeadsCsv();
+    setBulkFlash(`Exported ${n} leads`);
+  }
+
+  function exportSelected() {
+    if (!selectedIds.length) return;
+    const n = exportLeadsCsv({ ids: selectedIds });
+    setBulkFlash(`Exported ${n} selected leads`);
+  }
+
+  function deleteSelected() {
+    if (!selectedIds.length) return;
+    if (!window.confirm(`Delete ${selectedIds.length} selected lead(s)?`)) return;
+    const n = deleteLeads(selectedIds);
+    setSelectedIds([]);
+    setBulkFlash(`Deleted ${n} lead(s)`);
+  }
+
+  function changeOwnerSelected() {
+    if (!selectedIds.length) return;
+    const owner = window.prompt(
+      `Assign owner for ${selectedIds.length} lead(s).\nOptions: ${ACTIVITY_OWNERS.join(", ")}`,
+      ACTIVITY_OWNERS[0],
+    );
+    if (!owner?.trim()) return;
+    const n = updateLeadOwner(selectedIds, owner.trim());
+    setBulkFlash(`Updated owner on ${n} lead(s)`);
   }
 
   function openPrintView() {
@@ -276,6 +312,12 @@ export default function LeadsPage() {
     }
     setIsKanbanSettingsOpen(true);
   }
+
+  useEffect(() => {
+    if (!bulkFlash) return;
+    const t = window.setTimeout(() => setBulkFlash(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [bulkFlash]);
 
   useEffect(() => {
     setViewConfig(loadViewConfig());
@@ -350,27 +392,38 @@ export default function LeadsPage() {
       id: "import-leads",
       label: "Import Leads",
       badge: "New",
-      onClick: () => console.log("button clicked"),
+      onClick: () => setImportOpen(true),
     },
     {
       id: "import-notes",
       label: "Import Notes",
-      onClick: () => console.log("button clicked"),
+      onClick: () =>
+        setBulkFlash("Notes import comes next — use Import Leads for CSV now"),
     },
     {
       id: "facebook-ads-sync",
       label: "Facebook Ads Sync",
-      onClick: () => console.log("button clicked"),
+      onClick: () => setAdsPlatform("facebook"),
     },
     {
       id: "linkedin-ads-sync",
       label: "LinkedIn Ads Sync",
-      onClick: () => console.log("button clicked"),
+      onClick: () => setAdsPlatform("linkedin"),
     },
     {
       id: "tiktok-ads-sync",
       label: "Tiktok Ads Sync",
-      onClick: () => console.log("button clicked"),
+      onClick: () => setAdsPlatform("tiktok"),
+    },
+    {
+      id: "google-ads-sync",
+      label: "Google Ads Sync",
+      onClick: () => setAdsPlatform("google"),
+    },
+    {
+      id: "google-sheets-import",
+      label: "Google Sheets Import",
+      onClick: () => setSheetsOpen(true),
     },
   ];
 
@@ -407,7 +460,7 @@ export default function LeadsPage() {
     },
     {
       id: "export-tasks",
-      label: "Export Tasks",
+      label: "Export Leads",
       icon: <Download className="h-3.5 w-3.5 text-slate-400" />,
       onClick: () => exportTasks(),
     },
@@ -450,7 +503,13 @@ export default function LeadsPage() {
         />
 
         {selectedIds.length > 0 ? (
-          <EntitySelectionToolbar
+          <>
+            {bulkFlash ? (
+              <div className="mt-2 text-xs text-emerald-700 dark:text-emerald-400">
+                {bulkFlash}
+              </div>
+            ) : null}
+            <EntitySelectionToolbar
             selectedCount={selectedIds.length}
             onClear={() => setSelectedIds([])}
             onSendMail={() => console.log("send mail clicked")}
@@ -460,7 +519,7 @@ export default function LeadsPage() {
             onCreateTask={() => console.log("create task clicked")}
             onSetReminder={() => console.log("set reminder clicked")}
             onMassUpdate={() => console.log("mass update clicked")}
-            onChangeOwner={() => console.log("change owner clicked")}
+            onChangeOwner={() => changeOwnerSelected()}
             onCadences={() => console.log("cadences clicked")}
             onAddToCampaigns={() => console.log("add to campaigns clicked")}
             onPrintMailingLabels={() =>
@@ -468,13 +527,17 @@ export default function LeadsPage() {
             }
             onMailMerge={() => console.log("mail merge clicked")}
             onMassConvert={() => console.log("mass convert clicked")}
-            onDelete={() => console.log("delete clicked")}
-            onExportSelectedRecords={() =>
-              console.log("export selected records clicked")
-            }
+            onDelete={() => deleteSelected()}
+            onExportSelectedRecords={() => exportSelected()}
           />
+          </>
         ) : (
           <div className="mt-3 flex w-fit items-center gap-2">
+            {bulkFlash ? (
+              <span className="rounded-md bg-emerald-500/10 px-2 py-1 text-xs text-emerald-700 dark:text-emerald-400">
+                {bulkFlash}
+              </span>
+            ) : null}
             <button
               type="button"
               onClick={() => console.log("pipeline selector clicked")}
@@ -574,6 +637,57 @@ export default function LeadsPage() {
           onDelete={() => setIsListSettingsOpen(false)}
         />
       )}
+
+      <ImportLeadsModal
+        open={isImportOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={(s) => {
+          setBulkFlash(
+            `Imported ${s.imported} · updated ${s.updated} · skipped ${s.skipped}`,
+          );
+          setTotalLeads(
+            listLeadColumns().reduce((sum, column) => sum + column.cards.length, 0),
+          );
+        }}
+      />
+
+      {adsPlatform ? (
+        <AdsSyncModal
+          open
+          platform={adsPlatform}
+          onClose={() => setAdsPlatform(null)}
+          onSynced={(s) => {
+            setBulkFlash(
+              `Ad sync: imported ${s.imported}` +
+                (s.skipped ? ` · skipped ${s.skipped}` : ""),
+            );
+            setTotalLeads(
+              listLeadColumns().reduce(
+                (sum, column) => sum + column.cards.length,
+                0,
+              ),
+            );
+          }}
+        />
+      ) : null}
+
+      <SheetsImportModal
+        open={sheetsOpen}
+        onClose={() => setSheetsOpen(false)}
+        onImported={(s) => {
+          setBulkFlash(
+            `Sheets: imported ${s.imported}` +
+              (s.updated ? ` · updated ${s.updated}` : "") +
+              (s.skipped ? ` · skipped ${s.skipped}` : ""),
+          );
+          setTotalLeads(
+            listLeadColumns().reduce(
+              (sum, column) => sum + column.cards.length,
+              0,
+            ),
+          );
+        }}
+      />
     </div>
   );
 }

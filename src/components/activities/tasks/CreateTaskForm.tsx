@@ -321,7 +321,7 @@ export function CreateTaskForm({
           <div>
             <h1 className="text-base font-semibold text-foreground">
               Create New Task
-            </h1>
+          </h1>
             <p className="text-sm text-gray-500">
               Log an action item, assign responsibilities, and link to existing
               deals or contacts to maintain a comprehensive activity trail.
@@ -356,7 +356,7 @@ export function CreateTaskForm({
               <label className={labelClass}>
                 Task Subject <span className="text-red-500">*</span>
               </label>
-              <input
+            <input
                 className={
                   inputClass +
                   (submitted && errors.title ? " border-red-300" : "")
@@ -510,7 +510,7 @@ export function CreateTaskForm({
                   key={item.id}
                   className="group flex items-center gap-2.5 rounded-md border border-gray-100 bg-card/70 px-3 py-2"
                 >
-                  <input
+          <input
                     type="checkbox"
                     checked={item.done}
                     onChange={() => toggleActionItem(item.id)}
@@ -537,12 +537,12 @@ export function CreateTaskForm({
               ))}
 
               <div className="flex items-center gap-2.5 rounded-md border border-dashed border-gray-200 px-3 py-2">
-                <input
+          <input
                   type="checkbox"
                   disabled
                   className="h-4 w-4 rounded border-gray-300"
                 />
-                <input
+            <input
                   value={newActionItem}
                   onChange={(e) => setNewActionItem(e.target.value)}
                   onKeyDown={(e) => {
@@ -584,7 +584,7 @@ export function CreateTaskForm({
               onChange={(files) => update("attachments", files)}
             />
           </Field>
-        </div>
+          </div>
 
         {/* Right column */}
         <div className="space-y-6">
@@ -595,12 +595,12 @@ export function CreateTaskForm({
                 <label className={labelClass}>
                   Status <span className="text-red-500">*</span>
                 </label>
-                <select
+          <select
                   className={
                     selectClass +
                     (submitted && errors.status ? " border-red-300" : "")
                   }
-                  value={form.status}
+            value={form.status}
                   onChange={(e) =>
                     update("status", e.target.value as TaskStatus)
                   }
@@ -610,18 +610,18 @@ export function CreateTaskForm({
                       {s}
                     </option>
                   ))}
-                </select>
+          </select>
               </div>
               <div>
                 <label className={labelClass}>
                   Priority <span className="text-red-500">*</span>
                 </label>
-                <select
+          <select
                   className={
                     selectClass +
                     (submitted && errors.priority ? " border-red-300" : "")
                   }
-                  value={form.priority}
+            value={form.priority}
                   onChange={(e) =>
                     update("priority", e.target.value as Priority)
                   }
@@ -631,7 +631,7 @@ export function CreateTaskForm({
                       {p}
                     </option>
                   ))}
-                </select>
+          </select>
               </div>
             </div>
 
@@ -658,7 +658,7 @@ export function CreateTaskForm({
               <label className={labelClass}>Reminder Date</label>
               <div className="relative">
                 <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                <input
+          <input
                   type="datetime-local"
                   className={inputClass + " pl-9"}
                   value={form.reminderDate}
@@ -730,7 +730,7 @@ export function CreateTaskForm({
             <div>
               <label className={labelClass}>
                 Task Owner <span className="text-red-500">*</span>
-              </label>
+          </label>
               <div className="mt-1.5">
                 {form.assignedTo ? (
                   <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-2 text-sm text-gray-700">

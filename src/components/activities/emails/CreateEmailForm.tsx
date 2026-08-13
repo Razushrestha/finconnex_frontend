@@ -678,23 +678,23 @@ export function CreateEmailForm({
                 <label className="text-xs font-medium text-muted-foreground">
                   Cc
                 </label>
-                <input
+          <input
                   className={inputClass + " mt-1"}
-                  value={form.cc}
-                  onChange={(e) => update("cc", e.target.value)}
-                  placeholder="cc@company.com"
-                />
+            value={form.cc}
+            onChange={(e) => update("cc", e.target.value)}
+            placeholder="cc@company.com"
+          />
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground">
                   Bcc
                 </label>
-                <input
+          <input
                   className={inputClass + " mt-1"}
-                  value={form.bcc}
-                  onChange={(e) => update("bcc", e.target.value)}
-                  placeholder="bcc@company.com"
-                />
+            value={form.bcc}
+            onChange={(e) => update("bcc", e.target.value)}
+            placeholder="bcc@company.com"
+          />
               </div>
             </div>
           )}
@@ -715,18 +715,18 @@ export function CreateEmailForm({
             <div className="relative flex shrink-0 items-center gap-1 text-sm font-medium text-primary">
               <Sparkles className="h-3.5 w-3.5" />
               <span>{form.template || "Templates"}</span>
-              <select
-                value={form.template}
-                onChange={(e) => update("template", e.target.value)}
+          <select
+            value={form.template}
+            onChange={(e) => update("template", e.target.value)}
                 className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-              >
+          >
                 <option value="">Templates</option>
-                {EMAIL_TEMPLATES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+            {EMAIL_TEMPLATES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
             </div>
           </div>
           {submitted && errors.subject && (
@@ -737,7 +737,7 @@ export function CreateEmailForm({
 
           {/* Toolbar */}
           <div className="flex flex-wrap items-center gap-1 px-5 py-2">
-            <select
+          <select
               value={form.bodyFont}
               onChange={(e) => update("bodyFont", e.target.value as BodyFont)}
               className="mr-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus:outline-none"
@@ -745,9 +745,9 @@ export function CreateEmailForm({
               {FONT_OPTIONS.map((f) => (
                 <option key={f} value={f}>
                   {f}
-                </option>
-              ))}
-            </select>
+              </option>
+            ))}
+          </select>
             <span className="mx-1 h-4 w-px bg-border" />
             <button
               type="button"
@@ -850,7 +850,7 @@ export function CreateEmailForm({
 
           {/* Body */}
           <div className="relative px-5 py-4">
-            <textarea
+          <textarea
               ref={bodyRef}
               rows={10}
               style={{
@@ -858,10 +858,10 @@ export function CreateEmailForm({
                 textAlign: form.bodyAlign,
               }}
               className="w-full resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-              value={form.body}
-              onChange={(e) => update("body", e.target.value)}
-              placeholder="Write your email…"
-            />
+            value={form.body}
+            onChange={(e) => update("body", e.target.value)}
+            placeholder="Write your email…"
+          />
             {submitted && errors.body && (
               <p className="mt-1 text-xs text-destructive">{errors.body}</p>
             )}

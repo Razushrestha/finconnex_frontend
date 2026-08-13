@@ -35,6 +35,7 @@ import {
   type JourneyTrigger,
   type LifecycleJourney,
 } from "@/lib/journeys/types";
+import { runJourneyWorkflow } from "@/lib/workflows/runner";
 import {
   JourneyCanvas,
   JourneyStepInspector,
@@ -144,9 +145,16 @@ export function JourneyDetailClient({ id }: { id: string }) {
     router.push(`/journeys/${copy.id}`);
   }
 
-  function onTest() {
+  async function onTest() {
     if (!row) return;
-    persist(runTestJourney(row), "Test run completed (mock: no messages sent)");
+    const stamped = runTestJourney(row);
+    persist(stamped, "Running workflow…");
+    const { run } = await runJourneyWorkflow(stamped);
+    flash(
+      `Test run ${run.status.toLowerCase()} · ${run.stepsOk} ok` +
+        (run.stepsFailed ? ` · ${run.stepsFailed} failed` : "") +
+        " · see Settings → Automation Logs",
+    );
   }
 
   function onExitContact(enrollmentId: string) {
@@ -241,7 +249,7 @@ export function JourneyDetailClient({ id }: { id: string }) {
             </button>
             <button
               type="button"
-              onClick={onTest}
+              onClick={() => void onTest()}
               className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
             >
               <FlaskConical className="h-3.5 w-3.5" />
