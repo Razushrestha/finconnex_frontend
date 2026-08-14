@@ -11,6 +11,10 @@ import type {
   PlacedField,
   DraggingFieldType,
 } from "@/components/documents/signature/create/PdfFieldEditor";
+import {
+  SignatureSigner,
+  SIGNER_COLORS,
+} from "@/lib/documents/signature/types";
 
 const PdfFieldEditor = dynamic(
   () => import("@/components/documents/signature/create/PdfFieldEditor"),
@@ -33,6 +37,7 @@ interface PlaceFieldsViewProps {
   isConvertingDoc: boolean;
   placedFields: PlacedField[];
   draggingFieldType: DraggingFieldType | null;
+  recipients: SignatureSigner[];
   handleBackToForm: () => void;
   handleDropField: (page: number, xPct: number, yPct: number) => void;
   handleRepositionField: (
@@ -59,6 +64,7 @@ export function PlaceFieldsView({
   isConvertingDoc,
   placedFields,
   draggingFieldType,
+  recipients,
   handleBackToForm,
   handleDropField,
   handleRepositionField,
@@ -159,6 +165,7 @@ export function PlaceFieldsView({
                   onDropField={handleDropField}
                   onRepositionField={handleRepositionField}
                   onRemoveField={handleRemovePlacedField}
+                  onResizeField={handleResizeField}
                 />
               ) : (
                 <div
@@ -180,6 +187,10 @@ export function PlaceFieldsView({
                   {placedFields.map((field) => {
                     const width = field.width || 140;
                     const height = field.height || 36;
+                    const color =
+                      field.colorIndex != null
+                        ? SIGNER_COLORS[field.colorIndex]
+                        : SIGNER_COLORS[0];
 
                     return (
                       <div
@@ -199,8 +210,29 @@ export function PlaceFieldsView({
                         }}
                         className="absolute -translate-x-2 -translate-y-2 bg-indigo-50/90 border-2 border-dashed border-indigo-400 text-indigo-700 text-[11px] font-semibold px-2.5 py-1 rounded-md shadow-sm flex items-center justify-between cursor-grab active:cursor-grabbing z-10 group"
                       >
-                        <span className="truncate">{field.label}</span>
-
+                        {field.type === "checkbox" ? (
+                          <input
+                            type="checkbox"
+                            disabled
+                            className={`w-3.5 h-3.5 accent-current pointer-events-none shrink-0`}
+                          />
+                        ) : field.type === "date" ||
+                          field.type === "sign_date" ? (
+                          <input
+                            type="date"
+                            disabled
+                            className="w-full bg-transparent text-[11px] font-semibold pointer-events-none outline-none border-none"
+                          />
+                        ) : field.type === "dropdown" ? (
+                          <select
+                            disabled
+                            className="w-full bg-transparent text-[11px] font-semibold pointer-events-none outline-none border-none appearance-none truncate"
+                          >
+                            <option>{field.label}</option>
+                          </select>
+                        ) : (
+                          <span className="truncate">{field.label}</span>
+                        )}
                         <button
                           type="button"
                           onClick={(e) => {
@@ -250,6 +282,7 @@ export function PlaceFieldsView({
 
         {/* Standard Fields Sidebar */}
         <StandardFieldsSidebar
+          recipients={recipients}
           onDragStart={handleSidebarDragStart}
           onDragEnd={handleSidebarDragEnd}
         />

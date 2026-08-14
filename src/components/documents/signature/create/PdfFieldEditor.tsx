@@ -5,6 +5,7 @@ import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { X } from "lucide-react";
+import { SIGNER_COLORS } from "@/lib/documents/signature/types";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -17,11 +18,19 @@ export interface PlacedField {
   yPct: number; // % of that specific page's height
   width?: number;
   height?: number;
+  recipientId?: string;
+  colorIndex?: number;
 }
 
 export interface DraggingFieldType {
   type: string;
   label: string;
+  recipient?: {
+    id: string;
+    name: string;
+    email: string;
+    colorIndex: number;
+  };
 }
 
 interface PdfFieldEditorProps {
@@ -37,6 +46,7 @@ interface PdfFieldEditorProps {
     yPct: number,
   ) => void;
   onRemoveField: (id: string) => void;
+  onResizeField?: (id: string, width: number, height: number) => void;
 }
 
 export default function PdfFieldEditor({
@@ -47,6 +57,7 @@ export default function PdfFieldEditor({
   onDropField,
   onRepositionField,
   onRemoveField,
+  onResizeField,
 }: PdfFieldEditorProps) {
   const [numPages, setNumPages] = useState(0);
   const [loadError, setLoadError] = useState(false);
@@ -165,6 +176,14 @@ export default function PdfFieldEditor({
             .filter((f) => f.page === pageNum)
             .map((field) => {
               const isBeingDragged = repositioningId === field.id;
+              const color =
+                field.colorIndex != null
+                  ? SIGNER_COLORS[field.colorIndex]
+                  : null;
+
+              const width = field.width || 140;
+              const height = field.height || 36;
+
               return (
                 <div
                   key={field.id}
@@ -173,22 +192,82 @@ export default function PdfFieldEditor({
                     e.stopPropagation();
                     setRepositioningId(field.id);
                   }}
-                  style={{ left: `${field.xPct}%`, top: `${field.yPct}%` }}
-                  className={`group absolute -translate-x-1/2 -translate-y-1/2 flex items-center gap-1.5 bg-indigo-600 text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-md select-none z-10 ${
+                  style={{
+                    left: `${field.xPct}%`,
+                    top: `${field.yPct}%`,
+                    width: `${width}px`,
+                    height: `${height}px`,
+                  }}
+                  className={`group absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-between gap-1.5 ${
+                    color
+                      ? `${color.bg} ${color.text} border-2 border-dashed ${color.border}`
+                      : "bg-indigo-600 text-white border-2 border-dashed border-indigo-300"
+                  } text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-md select-none z-10 ${
                     isBeingDragged
                       ? "cursor-grabbing shadow-xl scale-105 z-20"
                       : "cursor-grab"
                   }`}
                 >
-                  <span>{field.label}</span>
+                  {field.type === "checkbox" ? (
+                    <input
+                      type="checkbox"
+                      disabled
+                      className="w-3.5 h-3.5 accent-current pointer-events-none shrink-0"
+                    />
+                  ) : field.type === "date" || field.type === "sign_date" ? (
+                    <input
+                      type="date"
+                      disabled
+                      className="w-full bg-transparent text-[11px] font-semibold pointer-events-none outline-none border-none"
+                    />
+                  ) : field.type === "dropdown" ? (
+                    <select
+                      disabled
+                      className="w-full bg-transparent text-[11px] font-semibold pointer-events-none outline-none border-none appearance-none truncate"
+                    >
+                      <option>{field.label}</option>
+                    </select>
+                  ) : (
+                    <span className="truncate">{field.label}</span>
+                  )}
                   <button
                     type="button"
                     onMouseDown={(e) => e.stopPropagation()}
                     onClick={() => onRemoveField(field.id)}
-                    className="ml-1 opacity-0 group-hover:opacity-100 hover:bg-indigo-700 rounded-full p-0.5 transition-opacity"
+                    className={`ml-1 opacity-0 group-hover:opacity-100 rounded-full p-0.5 transition-opacity ${
+                      color ? "hover:bg-black/10" : "hover:bg-indigo-700"
+                    }`}
                   >
                     <X className="w-3 h-3" />
                   </button>
+                  {onResizeField && (
+                    <div
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        const startX = e.clientX;
+                        const startY = e.clientY;
+                        const onMove = (moveEvent: MouseEvent) => {
+                          const newWidth = Math.max(
+                            80,
+                            width + (moveEvent.clientX - startX),
+                          );
+                          const newHeight = Math.max(
+                            30,
+                            height + (moveEvent.clientY - startY),
+                          );
+                          onResizeField(field.id, newWidth, newHeight);
+                        };
+                        const onUp = () => {
+                          window.removeEventListener("mousemove", onMove);
+                          window.removeEventListener("mouseup", onUp);
+                        };
+                        window.addEventListener("mousemove", onMove);
+                        window.addEventListener("mouseup", onUp);
+                      }}
+                      className="absolute -right-1 -bottom-1 w-3 h-3 bg-white border border-current rounded-full cursor-se-resize opacity-0 group-hover:opacity-100 z-30"
+                    />
+                  )}
                 </div>
               );
             })}
