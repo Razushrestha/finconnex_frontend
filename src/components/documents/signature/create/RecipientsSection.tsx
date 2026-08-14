@@ -1,11 +1,38 @@
 // import React, { useState } from "react";
-// import { Users, UserPlus, GripVertical, Trash2, Plus, X } from "lucide-react";
+// import {
+//   Users,
+//   UserPlus,
+//   GripVertical,
+//   Trash2,
+//   Plus,
+//   X,
+//   Building2,
+//   Briefcase,
+//   UserCheck,
+//   User,
+//   Mail,
+// } from "lucide-react";
 // import {
 //   SignatureSigner,
 //   SignerRole,
 //   SIGNER_COLORS,
 //   DeliveryMethod,
 // } from "@/lib/documents/signature/types";
+
+// export type CrmEntityType =
+//   | "email"
+//   | "contact"
+//   | "lead"
+//   | "deal"
+//   | "organization";
+
+// interface CrmEntityOption {
+//   id: string;
+//   name: string;
+//   email: string;
+//   type: CrmEntityType;
+//   subtitle?: string;
+// }
 
 // interface CcRecipient {
 //   id: string;
@@ -14,12 +41,16 @@
 
 // interface SignersSectionProps {
 //   signers: SignatureSigner[];
-//   onChange: (signers: SignatureSigner[]) => void;
+//   onChange: React.Dispatch<React.SetStateAction<SignatureSigner[]>>;
 //   signingOrder: "sequential" | "parallel";
 //   onToggleOrder: (order: "sequential" | "parallel") => void;
 //   currentUser?: { name: string; email: string };
 //   ccRecipients: CcRecipient[];
 //   setCcRecipients: (val: CcRecipient[]) => void;
+//   searchCrmEntities?: (
+//     type: CrmEntityType,
+//     query: string,
+//   ) => Promise<CrmEntityOption[]> | CrmEntityOption[];
 // }
 
 // export function RecipientsSection({
@@ -27,88 +58,172 @@
 //   onChange,
 //   signingOrder,
 //   onToggleOrder,
-//   currentUser = { name: "Harry", email: "harry@example.com" }, // TODO: replace with real session once auth is wired
+//   currentUser = { name: "Harry", email: "harry@example.com" },
 //   ccRecipients,
 //   setCcRecipients,
+//   searchCrmEntities,
 // }: SignersSectionProps) {
 //   const [draggedId, setDraggedId] = useState<string | null>(null);
 //   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
+//   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
+//   const [crmResults, setCrmResults] = useState<CrmEntityOption[]>([]);
+
 //   const handleAddSigner = () => {
-//     const newOrder = signers.length + 1;
-//     const newSigner: SignatureSigner = {
-//       id: `sg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-//       name: "",
-//       email: "",
-//       order: newOrder,
-//       role: "Signer",
-//       deliveryMethod: "email",
-//       status: "Pending",
-//       token: `sig-signer-${Date.now()}`,
-//       colorIndex: (newOrder - 1) % SIGNER_COLORS.length,
-//     };
-//     onChange([...signers, newSigner]);
+//     onChange((prev) => {
+//       const newOrder = prev.length + 1;
+//       const newSigner: SignatureSigner & { entityType?: CrmEntityType } = {
+//         id: `sg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+//         name: "",
+//         email: "",
+//         order: newOrder,
+//         role: "Signer",
+//         deliveryMethod: "email",
+//         status: "Pending",
+//         token: `sig-signer-${Date.now()}`,
+//         colorIndex: (newOrder - 1) % SIGNER_COLORS.length,
+//         entityType: "email",
+//       };
+//       return [...prev, newSigner];
+//     });
 //   };
 
 //   const handleRemoveSigner = (id: string) => {
-//     if (signers.length <= 1) return; // Keep at least one signer
-//     const updated = signers
-//       .filter((s) => s.id !== id)
-//       .map((s, idx) => ({
-//         ...s,
-//         order: idx + 1,
-//         colorIndex: idx % SIGNER_COLORS.length,
-//       }));
-//     onChange(updated);
+//     onChange((prev) => {
+//       if (prev.length <= 1) return prev;
+//       return prev
+//         .filter((s) => s.id !== id)
+//         .map((s, idx) => ({
+//           ...s,
+//           order: idx + 1,
+//           colorIndex: idx % SIGNER_COLORS.length,
+//         }));
+//     });
 //   };
 
 //   const handleUpdateSigner = (
 //     id: string,
-//     field: keyof SignatureSigner,
+//     field: keyof SignatureSigner | "entityType",
 //     value: any,
 //   ) => {
 //     const updated = signers.map((s) => {
 //       if (s.id !== id) return s;
+//       // If changing entity type, reset email/name fields
+//       if (field === "entityType") {
+//         return { ...s, entityType: value, email: "", name: "" };
+//       }
 //       return { ...s, [field]: value };
 //     });
 //     onChange(updated);
+//     setActiveDropdownId(null);
 //   };
 
-//   // --- Add me: autofill the current user into an empty row, or add one ---
-//   const handleAddMe = () => {
-//     if (!currentUser) return;
+//   const handleSearchCrm = async (signer: any, query: string) => {
+//     handleUpdateSigner(signer.id, "email", query);
 
-//     // avoid adding the same person twice
-//     const alreadyAdded = signers.some(
-//       (s) => s.email.toLowerCase() === currentUser.email.toLowerCase(),
-//     );
-//     if (alreadyAdded) return;
-
-//     const emptySigner = signers.find((s) => !s.email && !s.name);
-
-//     if (emptySigner) {
-//       const updated = signers.map((s) =>
-//         s.id === emptySigner.id
-//           ? { ...s, name: currentUser.name, email: currentUser.email }
-//           : s,
-//       );
-//       onChange(updated);
+//     if (!query.trim()) {
+//       setCrmResults([]);
+//       setActiveDropdownId(null);
 //       return;
 //     }
 
-//     const newOrder = signers.length + 1;
-//     const newSigner: SignatureSigner = {
-//       id: `sg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-//       name: currentUser.name,
-//       email: currentUser.email,
-//       order: newOrder,
-//       role: "Signer",
-//       deliveryMethod: "email",
-//       status: "Pending",
-//       token: `sig-signer-${Date.now()}`,
-//       colorIndex: (newOrder - 1) % SIGNER_COLORS.length,
-//     };
-//     onChange([...signers, newSigner]);
+//     if (searchCrmEntities) {
+//       const results = await searchCrmEntities(signer.entityType, query);
+//       setCrmResults(results);
+//     } else {
+//       // Mock data source filtered by selected entity type
+//       const mockDb: CrmEntityOption[] = [
+//         {
+//           id: "c1",
+//           name: "Sarah Connor",
+//           email: "sarah@cyberdyne.io",
+//           type: "contact",
+//           subtitle: "Tech Contact",
+//         },
+//         {
+//           id: "l1",
+//           name: "Michael Bluth",
+//           email: "mbluth@bluthcompany.com",
+//           type: "lead",
+//           subtitle: "Inbound Lead",
+//         },
+//         {
+//           id: "d1",
+//           name: "Acme Renewal",
+//           email: "billing@acmerenewal.com",
+//           type: "deal",
+//           subtitle: "Q4 Deal",
+//         },
+//         {
+//           id: "o1",
+//           name: "Stark Industries",
+//           email: "contracts@stark.com",
+//           type: "organization",
+//           subtitle: "Enterprise Account",
+//         },
+//       ];
+//       const filtered = mockDb.filter(
+//         (item) =>
+//           item.type === signer.entityType &&
+//           (item.name.toLowerCase().includes(query.toLowerCase()) ||
+//             item.email.toLowerCase().includes(query.toLowerCase())),
+//       );
+//       setCrmResults(filtered);
+//     }
+//     setActiveDropdownId(signer.id);
+//   };
+
+//   const handleSelectEntity = (signerId: string, entity: CrmEntityOption) => {
+//     const updated = signers.map((s) => {
+//       if (s.id !== signerId) return s;
+//       return {
+//         ...s,
+//         name: entity.name,
+//         email: entity.email,
+//       };
+//     });
+//     onChange(updated);
+//     setActiveDropdownId(null);
+//   };
+
+//   const handleAddMe = () => {
+//     if (!currentUser) return;
+
+//     onChange((prev) => {
+//       const alreadyAdded = prev.some(
+//         (s) => s.email.toLowerCase() === currentUser.email.toLowerCase(),
+//       );
+//       if (alreadyAdded) return prev;
+
+//       const emptySigner = prev.find((s) => !s.email && !s.name);
+//       if (emptySigner) {
+//         return prev.map((s) =>
+//           s.id === emptySigner.id
+//             ? {
+//                 ...s,
+//                 name: currentUser.name,
+//                 email: currentUser.email,
+//                 entityType: "email" as CrmEntityType,
+//               }
+//             : s,
+//         );
+//       }
+
+//       const newOrder = prev.length + 1;
+//       const newSigner: SignatureSigner & { entityType?: CrmEntityType } = {
+//         id: `sg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+//         name: currentUser.name,
+//         email: currentUser.email,
+//         order: newOrder,
+//         role: "Signer",
+//         deliveryMethod: "email",
+//         status: "Pending",
+//         token: `sig-signer-${Date.now()}`,
+//         colorIndex: (newOrder - 1) % SIGNER_COLORS.length,
+//         entityType: "email",
+//       };
+//       return [...prev, newSigner];
+//     });
 //   };
 
 //   // --- Drag to reorder ---
@@ -116,51 +231,41 @@
 //     setDraggedId(id);
 //     e.dataTransfer.effectAllowed = "move";
 //   };
-
 //   const handleDragOver = (e: React.DragEvent, id: string) => {
 //     e.preventDefault();
 //     e.dataTransfer.dropEffect = "move";
 //     if (id !== dragOverId) setDragOverId(id);
 //   };
-
 //   const handleDragLeave = () => setDragOverId(null);
-
 //   const handleDrop = (e: React.DragEvent, targetId: string) => {
 //     e.preventDefault();
 //     setDragOverId(null);
-
 //     if (!draggedId || draggedId === targetId) {
 //       setDraggedId(null);
 //       return;
 //     }
-
 //     const fromIndex = signers.findIndex((s) => s.id === draggedId);
 //     const toIndex = signers.findIndex((s) => s.id === targetId);
 //     if (fromIndex === -1 || toIndex === -1) {
 //       setDraggedId(null);
 //       return;
 //     }
-
 //     const reordered = [...signers];
 //     const [moved] = reordered.splice(fromIndex, 1);
 //     reordered.splice(toIndex, 0, moved);
-
 //     const updated = reordered.map((s, idx) => ({
 //       ...s,
 //       order: idx + 1,
 //       colorIndex: idx % SIGNER_COLORS.length,
 //     }));
-
 //     onChange(updated);
 //     setDraggedId(null);
 //   };
-
 //   const handleDragEnd = () => {
 //     setDraggedId(null);
 //     setDragOverId(null);
 //   };
 
-//   // --- CC recipients ---
 //   const handleAddCc = () => {
 //     setCcRecipients([
 //       ...ccRecipients,
@@ -170,13 +275,11 @@
 //       },
 //     ]);
 //   };
-
 //   const handleUpdateCc = (id: string, email: string) => {
 //     setCcRecipients(
 //       ccRecipients.map((cc) => (cc.id === id ? { ...cc, email } : cc)),
 //     );
 //   };
-
 //   const handleRemoveCc = (id: string) => {
 //     setCcRecipients(ccRecipients.filter((cc) => cc.id !== id));
 //   };
@@ -238,12 +341,14 @@
 
 //       {/* Recipient Rows */}
 //       <div className="space-y-3">
-//         {signers.map((signer, index) => {
+//         {signers.map((signer: any, index) => {
 //           const color =
 //             SIGNER_COLORS[signer.colorIndex ?? index % SIGNER_COLORS.length];
 //           const isDragging = draggedId === signer.id;
 //           const isDragOver =
 //             dragOverId === signer.id && draggedId !== signer.id;
+//           const currentEntityType = signer.entityType || "email";
+
 //           return (
 //             <div
 //               key={signer.id}
@@ -253,7 +358,7 @@
 //               onDragLeave={handleDragLeave}
 //               onDrop={(e) => handleDrop(e, signer.id)}
 //               onDragEnd={handleDragEnd}
-//               className={`flex items-center space-x-3 bg-slate-50/70 border rounded-xl p-3.5 transition-all ${
+//               className={`flex items-center space-x-3 bg-slate-50/70 border rounded-xl p-3.5 transition-all relative ${
 //                 isDragOver
 //                   ? "border-violet-400 ring-2 ring-violet-200"
 //                   : "border-slate-200/80 hover:border-slate-300"
@@ -269,20 +374,87 @@
 //                 </span>
 //               </div>
 
-//               {/* Email Address Field */}
-//               <div className="flex-1 space-y-1">
+//               {/* Entity Selector Dropdown */}
+//               <div className="w-32 space-y-1">
 //                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
-//                   Email Address
+//                   Recipient Source
 //                 </label>
-//                 <input
-//                   type="email"
-//                   value={signer.email}
+//                 <select
+//                   value={currentEntityType}
 //                   onChange={(e) =>
-//                     handleUpdateSigner(signer.id, "email", e.target.value)
+//                     handleUpdateSigner(
+//                       signer.id,
+//                       "entityType",
+//                       e.target.value as CrmEntityType,
+//                     )
 //                   }
-//                   placeholder="Enter the email address"
+//                   className="w-full bg-white border border-gray-200 rounded-lg px-2.5 py-2 text-xs font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
+//                 >
+//                   <option value="email">Direct Email</option>
+//                   <option value="contact">Contact</option>
+//                   <option value="lead">Lead</option>
+//                   <option value="deal">Deal</option>
+//                   <option value="organization">Organization</option>
+//                 </select>
+//               </div>
+
+//               {/* Conditional Field: Search Bar for CRM entities OR Standard input for Direct Email */}
+//               <div className="flex-1 space-y-1 relative">
+//                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
+//                   {currentEntityType === "email"
+//                     ? "Email Address"
+//                     : `Search ${currentEntityType}`}
+//                 </label>
+
+//                 <input
+//                   type={currentEntityType === "email" ? "email" : "text"}
+//                   value={signer.email}
+//                   onChange={(e) => {
+//                     if (currentEntityType === "email") {
+//                       handleUpdateSigner(signer.id, "email", e.target.value);
+//                     } else {
+//                       handleSearchCrm(signer, e.target.value);
+//                     }
+//                   }}
+//                   placeholder={
+//                     currentEntityType === "email"
+//                       ? "Enter the email address"
+//                       : `Search ${currentEntityType} by name or email...`
+//                   }
 //                   className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
 //                 />
+
+//                 {/* CRM Search Results Popup */}
+//                 {activeDropdownId === signer.id &&
+//                   crmResults.length > 0 &&
+//                   currentEntityType !== "email" && (
+//                     <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-52 overflow-y-auto divide-y divide-gray-50">
+//                       <div className="p-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 bg-gray-50">
+//                         Matching {currentEntityType}s
+//                       </div>
+//                       {crmResults.map((result) => (
+//                         <div
+//                           key={result.id}
+//                           onClick={() => handleSelectEntity(signer.id, result)}
+//                           className="flex items-center justify-between px-3 py-2 hover:bg-violet-50 cursor-pointer transition-colors"
+//                         >
+//                           <div>
+//                             <div className="text-xs font-semibold text-gray-800">
+//                               {result.name}
+//                             </div>
+//                             <div className="text-[11px] text-gray-500">
+//                               {result.email}
+//                             </div>
+//                           </div>
+//                           {result.subtitle && (
+//                             <div className="text-[10px] text-gray-400">
+//                               {result.subtitle}
+//                             </div>
+//                           )}
+//                         </div>
+//                       ))}
+//                     </div>
+//                   )}
 //               </div>
 
 //               {/* Name Field */}
@@ -302,7 +474,7 @@
 //               </div>
 
 //               {/* Role Selector */}
-//               <div className="w-44 space-y-1">
+//               <div className="w-36 space-y-1">
 //                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
 //                   Role
 //                 </label>
@@ -323,7 +495,8 @@
 //                 </select>
 //               </div>
 
-//               <div className="w-44 space-y-1">
+//               {/* Delivery Method */}
+//               <div className="w-36 space-y-1">
 //                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
 //                   Deliver via
 //                 </label>
@@ -338,8 +511,8 @@
 //                   }
 //                   className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
 //                 >
-//                   <option value="Signer">Email</option>
-//                   <option value="Approver">Email + SMS</option>
+//                   <option value="email">Email</option>
+//                   <option value="sms">Email + SMS</option>
 //                 </select>
 //               </div>
 
@@ -419,20 +592,10 @@
 //   );
 // }
 
+"use client";
+
 import React, { useState } from "react";
-import {
-  Users,
-  UserPlus,
-  GripVertical,
-  Trash2,
-  Plus,
-  X,
-  Building2,
-  Briefcase,
-  UserCheck,
-  User,
-  Mail,
-} from "lucide-react";
+import { Users, UserPlus, GripVertical, Trash2, Plus, X } from "lucide-react";
 import {
   SignatureSigner,
   SignerRole,
@@ -462,7 +625,7 @@ interface CcRecipient {
 
 interface SignersSectionProps {
   signers: SignatureSigner[];
-  onChange: (signers: SignatureSigner[]) => void;
+  onChange: React.Dispatch<React.SetStateAction<SignatureSigner[]>>;
   signingOrder: "sequential" | "parallel";
   onToggleOrder: (order: "sequential" | "parallel") => void;
   currentUser?: { name: string; email: string };
@@ -491,32 +654,38 @@ export function RecipientsSection({
   const [crmResults, setCrmResults] = useState<CrmEntityOption[]>([]);
 
   const handleAddSigner = () => {
-    const newOrder = signers.length + 1;
-    const newSigner: SignatureSigner & { entityType?: CrmEntityType } = {
-      id: `sg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      name: "",
-      email: "",
-      order: newOrder,
-      role: "Signer",
-      deliveryMethod: "email",
-      status: "Pending",
-      token: `sig-signer-${Date.now()}`,
-      colorIndex: (newOrder - 1) % SIGNER_COLORS.length,
-      entityType: "email", // default to direct email input
-    };
-    onChange([...signers, newSigner]);
-  };
-
-  const handleRemoveSigner = (id: string) => {
-    if (signers.length <= 1) return;
-    const updated = signers
-      .filter((s) => s.id !== id)
-      .map((s, idx) => ({
+    onChange((prev) => {
+      const newSigner: SignatureSigner & { entityType?: CrmEntityType } = {
+        id: `sg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: "",
+        email: "",
+        order: prev.length + 1,
+        role: "Signer",
+        deliveryMethod: "email",
+        status: "Pending",
+        token: `sig-signer-${Date.now()}`,
+        colorIndex: 0, // placeholder — recomputed for everyone below
+        entityType: "email",
+      };
+      return [...prev, newSigner].map((s, idx) => ({
         ...s,
         order: idx + 1,
         colorIndex: idx % SIGNER_COLORS.length,
       }));
-    onChange(updated);
+    });
+  };
+
+  const handleRemoveSigner = (id: string) => {
+    onChange((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev
+        .filter((s) => s.id !== id)
+        .map((s, idx) => ({
+          ...s,
+          order: idx + 1,
+          colorIndex: idx % SIGNER_COLORS.length,
+        }));
+    });
   };
 
   const handleUpdateSigner = (
@@ -524,15 +693,15 @@ export function RecipientsSection({
     field: keyof SignatureSigner | "entityType",
     value: any,
   ) => {
-    const updated = signers.map((s) => {
-      if (s.id !== id) return s;
-      // If changing entity type, reset email/name fields
-      if (field === "entityType") {
-        return { ...s, entityType: value, email: "", name: "" };
-      }
-      return { ...s, [field]: value };
-    });
-    onChange(updated);
+    onChange((prev) =>
+      prev.map((s) => {
+        if (s.id !== id) return s;
+        if (field === "entityType") {
+          return { ...s, entityType: value, email: "", name: "" };
+        }
+        return { ...s, [field]: value };
+      }),
+    );
     setActiveDropdownId(null);
   };
 
@@ -549,7 +718,6 @@ export function RecipientsSection({
       const results = await searchCrmEntities(signer.entityType, query);
       setCrmResults(results);
     } else {
-      // Mock data source filtered by selected entity type
       const mockDb: CrmEntityOption[] = [
         {
           id: "c1",
@@ -592,55 +760,57 @@ export function RecipientsSection({
   };
 
   const handleSelectEntity = (signerId: string, entity: CrmEntityOption) => {
-    const updated = signers.map((s) => {
-      if (s.id !== signerId) return s;
-      return {
-        ...s,
-        name: entity.name,
-        email: entity.email,
-      };
-    });
-    onChange(updated);
+    onChange((prev) =>
+      prev.map((s) =>
+        s.id === signerId
+          ? { ...s, name: entity.name, email: entity.email }
+          : s,
+      ),
+    );
     setActiveDropdownId(null);
   };
 
   const handleAddMe = () => {
     if (!currentUser) return;
-    const alreadyAdded = signers.some(
-      (s) => s.email.toLowerCase() === currentUser.email.toLowerCase(),
-    );
-    if (alreadyAdded) return;
 
-    const emptySigner = signers.find((s) => !s.email && !s.name);
-    if (emptySigner) {
-      const updated = signers.map((s) =>
-        s.id === emptySigner.id
-          ? {
-              ...s,
-              name: currentUser.name,
-              email: currentUser.email,
-              entityType: "email" as CrmEntityType,
-            }
-          : s,
+    onChange((prev) => {
+      const alreadyAdded = prev.some(
+        (s) => s.email.toLowerCase() === currentUser.email.toLowerCase(),
       );
-      onChange(updated);
-      return;
-    }
+      if (alreadyAdded) return prev;
 
-    const newOrder = signers.length + 1;
-    const newSigner: SignatureSigner & { entityType?: CrmEntityType } = {
-      id: `sg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      name: currentUser.name,
-      email: currentUser.email,
-      order: newOrder,
-      role: "Signer",
-      deliveryMethod: "email",
-      status: "Pending",
-      token: `sig-signer-${Date.now()}`,
-      colorIndex: (newOrder - 1) % SIGNER_COLORS.length,
-      entityType: "email",
-    };
-    onChange([...signers, newSigner]);
+      const emptySigner = prev.find((s) => !s.email && !s.name);
+      if (emptySigner) {
+        return prev.map((s) =>
+          s.id === emptySigner.id
+            ? {
+                ...s,
+                name: currentUser.name,
+                email: currentUser.email,
+                entityType: "email" as CrmEntityType,
+              }
+            : s,
+        );
+      }
+
+      const newSigner: SignatureSigner & { entityType?: CrmEntityType } = {
+        id: `sg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: currentUser.name,
+        email: currentUser.email,
+        order: prev.length + 1,
+        role: "Signer",
+        deliveryMethod: "email",
+        status: "Pending",
+        token: `sig-signer-${Date.now()}`,
+        colorIndex: 0,
+        entityType: "email",
+      };
+      return [...prev, newSigner].map((s, idx) => ({
+        ...s,
+        order: idx + 1,
+        colorIndex: idx % SIGNER_COLORS.length,
+      }));
+    });
   };
 
   // --- Drag to reorder ---
@@ -661,21 +831,21 @@ export function RecipientsSection({
       setDraggedId(null);
       return;
     }
-    const fromIndex = signers.findIndex((s) => s.id === draggedId);
-    const toIndex = signers.findIndex((s) => s.id === targetId);
-    if (fromIndex === -1 || toIndex === -1) {
-      setDraggedId(null);
-      return;
-    }
-    const reordered = [...signers];
-    const [moved] = reordered.splice(fromIndex, 1);
-    reordered.splice(toIndex, 0, moved);
-    const updated = reordered.map((s, idx) => ({
-      ...s,
-      order: idx + 1,
-      colorIndex: idx % SIGNER_COLORS.length,
-    }));
-    onChange(updated);
+    onChange((prev) => {
+      const fromIndex = prev.findIndex((s) => s.id === draggedId);
+      const toIndex = prev.findIndex((s) => s.id === targetId);
+      if (fromIndex === -1 || toIndex === -1) return prev;
+
+      const reordered = [...prev];
+      const [moved] = reordered.splice(fromIndex, 1);
+      reordered.splice(toIndex, 0, moved);
+
+      return reordered.map((s, idx) => ({
+        ...s,
+        order: idx + 1,
+        colorIndex: idx % SIGNER_COLORS.length,
+      }));
+    });
     setDraggedId(null);
   };
   const handleDragEnd = () => {
@@ -759,8 +929,7 @@ export function RecipientsSection({
       {/* Recipient Rows */}
       <div className="space-y-3">
         {signers.map((signer: any, index) => {
-          const color =
-            SIGNER_COLORS[signer.colorIndex ?? index % SIGNER_COLORS.length];
+          const color = SIGNER_COLORS[index % SIGNER_COLORS.length];
           const isDragging = draggedId === signer.id;
           const isDragOver =
             dragOverId === signer.id && draggedId !== signer.id;
@@ -781,7 +950,6 @@ export function RecipientsSection({
                   : "border-slate-200/80 hover:border-slate-300"
               } ${isDragging ? "opacity-40" : ""}`}
             >
-              {/* Drag Handle & Order Badge */}
               <div className="flex items-center space-x-2 text-gray-400">
                 <GripVertical className="w-4 h-4 cursor-grab active:cursor-grabbing" />
                 <span
@@ -791,7 +959,6 @@ export function RecipientsSection({
                 </span>
               </div>
 
-              {/* Entity Selector Dropdown */}
               <div className="w-32 space-y-1">
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
                   Recipient Source
@@ -815,7 +982,6 @@ export function RecipientsSection({
                 </select>
               </div>
 
-              {/* Conditional Field: Search Bar for CRM entities OR Standard input for Direct Email */}
               <div className="flex-1 space-y-1 relative">
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
                   {currentEntityType === "email"
@@ -841,7 +1007,6 @@ export function RecipientsSection({
                   className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
                 />
 
-                {/* CRM Search Results Popup */}
                 {activeDropdownId === signer.id &&
                   crmResults.length > 0 &&
                   currentEntityType !== "email" && (
@@ -874,7 +1039,6 @@ export function RecipientsSection({
                   )}
               </div>
 
-              {/* Name Field */}
               <div className="flex-1 space-y-1">
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
                   Name
@@ -890,7 +1054,6 @@ export function RecipientsSection({
                 />
               </div>
 
-              {/* Role Selector */}
               <div className="w-36 space-y-1">
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
                   Role
@@ -912,7 +1075,6 @@ export function RecipientsSection({
                 </select>
               </div>
 
-              {/* Delivery Method */}
               <div className="w-36 space-y-1">
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
                   Deliver via
@@ -933,7 +1095,6 @@ export function RecipientsSection({
                 </select>
               </div>
 
-              {/* Delete / Remove Action */}
               <div className="pt-5">
                 <button
                   type="button"
@@ -954,7 +1115,6 @@ export function RecipientsSection({
         })}
       </div>
 
-      {/* Add Another Recipient Button */}
       <div>
         <button
           type="button"

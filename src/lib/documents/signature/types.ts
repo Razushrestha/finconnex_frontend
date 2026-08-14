@@ -115,10 +115,10 @@ export const SIGNER_COLORS = [
     hex: "#7C3AED",
   },
   {
-    bg: "bg-sky-100",
-    text: "text-sky-800",
-    border: "border-sky-400",
-    hex: "#0284C7",
+    bg: "bg-yellow-100",
+    text: "text-yellow-800",
+    border: "border-yellow-400",
+    hex: "#CA8A04",
   },
   {
     bg: "bg-amber-100",
