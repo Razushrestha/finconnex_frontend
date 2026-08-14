@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-    ArrowLeft,
+  ArrowLeft,
   Send,
   X,
   Download,
@@ -118,7 +118,8 @@ export function SignatureDetailClient({ id }: { id: string }) {
   function resend() {
     if (!req) return;
     const pending = req.signers.filter(
-      (s) => s.role !== "CC" && s.status !== "Signed" && s.status !== "Declined",
+      (s) =>
+        s.role !== "CC" && s.status !== "Signed" && s.status !== "Declined",
     );
     save(
       {
@@ -199,7 +200,7 @@ export function SignatureDetailClient({ id }: { id: string }) {
             <ArrowLeft className="h-3.5 w-3.5" />
           </button>
           <h1 className="text-[15px] font-bold text-slate-900">
-            {req.signatureRequestId}
+            {req.documentName}
           </h1>
           <span
             className={cn(
@@ -209,15 +210,7 @@ export function SignatureDetailClient({ id }: { id: string }) {
           >
             {req.status}
           </span>
-          {total > 1 ? (
-            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
-              {done}/{total} signed
-            </span>
-          ) : null}
-          <span className="hidden text-[11px] text-slate-400 sm:inline">·</span>
-          <p className="hidden min-w-0 truncate text-[12px] font-medium text-slate-600 sm:block">
-            {req.documentName}
-          </p>
+
           <div className="ml-auto flex flex-wrap items-center gap-1.5">
             <button
               type="button"
@@ -453,7 +446,11 @@ export function SignatureDetailClient({ id }: { id: string }) {
                   </>
                 ) : null}
                 {openForSigner ? (
-                  <ActionBtn onClick={resend} icon={Send} label="Resend reminders" />
+                  <ActionBtn
+                    onClick={resend}
+                    icon={Send}
+                    label="Resend reminders"
+                  />
                 ) : null}
                 {req.status === "Signed" ? (
                   <ActionBtn
@@ -479,10 +476,7 @@ export function SignatureDetailClient({ id }: { id: string }) {
                 <Row label="Sent" value={req.sentDate ?? ""} />
                 <Row label="Completed" value={req.signedDate ?? ""} />
                 <Row label="IP address" value={req.ipAddress ?? ""} />
-                <Row
-                  label="Fields"
-                  value={String(req.fields.length)}
-                />
+                <Row label="Fields" value={String(req.fields.length)} />
               </dl>
 
               <p className="mt-5 mb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
@@ -490,7 +484,10 @@ export function SignatureDetailClient({ id }: { id: string }) {
               </p>
               <ol className="min-h-0 flex-1 space-y-0 overflow-auto">
                 {req.audit.map((a, i) => (
-                  <li key={a.id} className="relative flex gap-3 pb-3.5 last:pb-0">
+                  <li
+                    key={a.id}
+                    className="relative flex gap-3 pb-3.5 last:pb-0"
+                  >
                     {i < req.audit.length - 1 ? (
                       <span
                         aria-hidden

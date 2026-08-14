@@ -12,6 +12,7 @@ import {
 import { SearchInput } from "@/components/ui/search-input";
 import { PaginationBar } from "@/components/ui/pagination-bar";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 // Full mock data list matching the templates style
 const initialTemplates = [
@@ -122,12 +123,13 @@ const initialTemplates = [
 ];
 
 export default function SignatureTemplatesPage() {
+  const router = useRouter();
   const [templates, setTemplates] = useState(initialTemplates);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const pageSize = 10; // Changed to show 10 items per page
+  const pageSize = 10;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -150,12 +152,10 @@ export default function SignatureTemplatesPage() {
     page * pageSize,
   );
 
-  // Calculate how many empty rows are needed to fill up to 10 rows
   const emptyRowsCount = Math.max(0, pageSize - paginatedTemplates.length);
 
   const handleEdit = (id: string) => {
     setOpenMenuId(null);
-    // Add your edit logic here
     console.log("Edit template:", id);
   };
 
@@ -165,31 +165,30 @@ export default function SignatureTemplatesPage() {
   };
 
   return (
-    <div className="relative mx-auto flex w-full flex-col p-4 space-y-6">
-      {/* Header */}
+    <div className="relative mx-auto flex w-full flex-col p-4 space-y-4">
+      {/* Header & Controls Section Combined */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
-            Signature Templates
-          </h1>
+        <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
+          Signature Templates
+        </h1>
+
+        <div className="flex items-center gap-3">
+          <SearchInput
+            value={search}
+            onChange={(val) => {
+              setSearch(val);
+              setPage(1);
+            }}
+            placeholder="Search templates..."
+          />
+          <button className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-primary/90">
+            <Plus className="h-4 w-4" />
+            New Template
+          </button>
         </div>
-        <button className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-primary/90">
-          <Plus className="h-4 w-4" />
-          New Template
-        </button>
       </div>
 
-      {/* Search Input Filter */}
-      <div className="flex justify-end">
-        <SearchInput
-          value={search}
-          onChange={(val) => {
-            setSearch(val);
-            setPage(1);
-          }}
-          placeholder="Search templates..."
-        />
-      </div>
+      <hr className="border-border" />
 
       {/* Content Table / Empty State Container */}
       <div className="flex flex-col rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)] dark:border-zinc-800 dark:bg-zinc-950 overflow-hidden">
@@ -210,7 +209,7 @@ export default function SignatureTemplatesPage() {
                   {paginatedTemplates.map((tpl) => (
                     <tr
                       key={tpl.id}
-                      className="h-[53px] hover:bg-slate-50/60 dark:hover:bg-zinc-900/40 transition-colors"
+                      className="h-[53px] hover:bg-slate-50/60 dark:hover:bg-zinc-900/40 transition-colors cursor-pointer"
                     >
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
@@ -219,7 +218,7 @@ export default function SignatureTemplatesPage() {
                           </div>
                           <div>
                             <Link
-                              href={`/documents/signature/templates/${tpl.id}`}
+                              href={`/signature/templates/${tpl.id}`}
                               className="font-semibold text-slate-900 hover:text-violet-600 dark:text-white dark:hover:text-violet-400 transition-colors"
                             >
                               {tpl.name}
@@ -289,7 +288,6 @@ export default function SignatureTemplatesPage() {
                     </tr>
                   ))}
 
-                  {/* Empty filler rows to maintain a consistent height for up to 10 entries */}
                   {Array.from({ length: emptyRowsCount }).map((_, index) => (
                     <tr key={`empty-${index}`} className="h-[53px]">
                       <td colSpan={5} className="px-4 py-3.5">

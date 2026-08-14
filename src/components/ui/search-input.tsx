@@ -46,7 +46,7 @@ export function SearchInput({
         onChange={(e) => setLocalValue(e.target.value)}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        className="h-8 w-52 rounded-md border border-slate-200/90 bg-background pr-2.5 pl-8 text-[12px] outline-none focus:border-violet-500 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.12)]"
+        className="h-8 w-52 rounded-md border border-border bg-background pr-2.5 pl-8 text-[12px] outline-none focus:border-violet-500 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.12)]"
       />
     </div>
   );
