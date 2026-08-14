@@ -13,7 +13,9 @@ export interface PlacedField {
   id: string;
   type: string;
   label: string;
-  page: number; // 1-indexed
+  /** Which document this field belongs to — "primary" or an AdditionalDocument id. */
+  documentId: string;
+  page: number; // 1-indexed, scoped to `documentId`
   xPct: number; // % of that specific page's width
   yPct: number; // % of that specific page's height
   width?: number;
@@ -34,22 +36,33 @@ export interface DraggingFieldType {
 }
 
 interface PdfFieldEditorProps {
+  /** Identifies which document this editor instance is rendering — used to scope placedFields. */
+  documentId: string;
   fileUrl: string;
   placedFields: PlacedField[];
   draggingFieldType: DraggingFieldType | null;
   pageWidth?: number;
-  onDropField: (page: number, xPct: number, yPct: number) => void;
+  onDropField: (
+    documentId: string,
+    page: number,
+    xPct: number,
+    yPct: number,
+  ) => void;
   onRepositionField: (
     id: string,
+    documentId: string,
     page: number,
     xPct: number,
     yPct: number,
   ) => void;
   onRemoveField: (id: string) => void;
   onResizeField?: (id: string, width: number, height: number) => void;
+  /** Called once this document's page count is known, so the caller can show continuous numbering across documents. */
+  onNumPagesResolved?: (documentId: string, numPages: number) => void;
 }
 
 export default function PdfFieldEditor({
+  documentId,
   fileUrl,
   placedFields,
   draggingFieldType,
@@ -58,6 +71,7 @@ export default function PdfFieldEditor({
   onRepositionField,
   onRemoveField,
   onResizeField,
+  onNumPagesResolved,
 }: PdfFieldEditorProps) {
   const [numPages, setNumPages] = useState(0);
   const [loadError, setLoadError] = useState(false);
@@ -70,8 +84,10 @@ export default function PdfFieldEditor({
     else pageRefs.current.delete(page);
   }, []);
 
-  // Pointer-based repositioning — works across page boundaries too,
-  // since each page div is checked for cursor containment on every move.
+  // Pointer-based repositioning — works across page boundaries too, since
+  // each page div (within THIS document) is checked for cursor containment
+  // on every move. Repositioning does not cross document boundaries — each
+  // PdfFieldEditor instance only tracks its own pages.
   useEffect(() => {
     if (!repositioningId) return;
 
@@ -88,6 +104,7 @@ export default function PdfFieldEditor({
           const yPct = ((e.clientY - rect.top) / rect.height) * 100;
           onRepositionField(
             repositioningId,
+            documentId,
             page,
             Math.min(Math.max(xPct, 0), 100),
             Math.min(Math.max(yPct, 0), 100),
@@ -105,7 +122,7 @@ export default function PdfFieldEditor({
       window.removeEventListener("mousemove", handleMove);
       window.removeEventListener("mouseup", handleUp);
     };
-  }, [repositioningId, onRepositionField]);
+  }, [repositioningId, onRepositionField, documentId]);
 
   const handleDragOverPage = (page: number) => (e: React.DragEvent) => {
     e.preventDefault();
@@ -124,6 +141,7 @@ export default function PdfFieldEditor({
     const xPct = ((e.clientX - rect.left) / rect.width) * 100;
     const yPct = ((e.clientY - rect.top) / rect.height) * 100;
     onDropField(
+      documentId,
       page,
       Math.min(Math.max(xPct, 0), 100),
       Math.min(Math.max(yPct, 0), 100),
@@ -138,10 +156,17 @@ export default function PdfFieldEditor({
     );
   }
 
+  const fieldsForThisDocument = placedFields.filter(
+    (f) => f.documentId === documentId,
+  );
+
   return (
     <Document
       file={fileUrl}
-      onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+      onLoadSuccess={({ numPages }) => {
+        setNumPages(numPages);
+        onNumPagesResolved?.(documentId, numPages);
+      }}
       onLoadError={() => setLoadError(true)}
       loading={
         <div className="flex items-center justify-center py-16 text-xs text-slate-400">
@@ -172,7 +197,7 @@ export default function PdfFieldEditor({
             renderTextLayer={false}
           />
 
-          {placedFields
+          {fieldsForThisDocument
             .filter((f) => f.page === pageNum)
             .map((field) => {
               const isBeingDragged = repositioningId === field.id;

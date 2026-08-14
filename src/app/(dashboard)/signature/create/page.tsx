@@ -1,13 +1,29 @@
 "use client";
 
-import { Suspense, useState, useEffect, useMemo, type DragEvent } from "react";
+import {
+  Suspense,
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  type DragEvent,
+} from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import mammoth from "mammoth";
 import { AdvancedOptionsSection } from "@/components/documents/signature/create/AdvancedOptionsSection";
-import { DocumentDetailsSection } from "@/components/documents/signature/create/DocumentDetailsSection";
+import {
+  DocumentDetailsSection,
+  type AdditionalDocument,
+} from "@/components/documents/signature/create/DocumentDetailsSection";
 import { EmailMessageSection } from "@/components/documents/signature/create/EmailMessageSection";
-import { RecipientsSection } from "@/components/documents/signature/create/RecipientsSection";
-import { PlaceFieldsView } from "@/components/documents/signature/create/PlaceFieldsView";
+import {
+  CcRecipient,
+  RecipientsSection,
+} from "@/components/documents/signature/create/RecipientsSection";
+import {
+  PlaceFieldsView,
+  type SignatureDocumentPreview,
+} from "@/components/documents/signature/create/PlaceFieldsView";
 import type { StandardFieldType } from "@/components/documents/signature/create/StandardFieldsSidebar";
 import {
   nextSignatureIds,
@@ -33,6 +49,15 @@ export default function CreateSignatureRequestPage() {
   );
 }
 
+interface AdditionalDocPreview {
+  fileUrl: string;
+  docHtmlContent: string;
+  isConvertingDoc: boolean;
+}
+
+const isDocxFile = (file: File) =>
+  file.name.endsWith(".docx") || file.name.endsWith(".doc");
+
 function CreateSignatureRequestForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -49,42 +74,171 @@ function CreateSignatureRequestForm() {
     return URL.createObjectURL(documentFile);
   }, [documentFile]);
 
-  const fileName = documentFile?.name || "Engagement Letter";
-
   useEffect(() => {
     return () => {
       if (fileUrl) URL.revokeObjectURL(fileUrl);
     };
   }, [fileUrl]);
 
-  // Word Document conversion state
+  // Word Document conversion state (primary document)
   const [docHtmlContent, setDocHtmlContent] = useState<string>("");
   const [isConvertingDoc, setIsConvertingDoc] = useState(false);
 
   useEffect(() => {
     async function convertDocx() {
-      if (!documentFile) return;
-      const isDocx =
-        documentFile.name.endsWith(".docx") ||
-        documentFile.name.endsWith(".doc");
+      if (!documentFile) {
+        setDocHtmlContent("");
+        return;
+      }
+      if (!isDocxFile(documentFile)) {
+        setDocHtmlContent("");
+        return;
+      }
 
-      if (isDocx) {
-        setIsConvertingDoc(true);
-        try {
-          const arrayBuffer = await documentFile.arrayBuffer();
-          const result = await mammoth.convertToHtml({ arrayBuffer });
-          setDocHtmlContent(result.value);
-        } catch (error) {
-          console.error("Error converting docx:", error);
-          setDocHtmlContent("<p>Error loading document preview.</p>");
-        } finally {
-          setIsConvertingDoc(false);
-        }
+      setIsConvertingDoc(true);
+      try {
+        const arrayBuffer = await documentFile.arrayBuffer();
+        const result = await mammoth.convertToHtml({ arrayBuffer });
+        setDocHtmlContent(result.value);
+      } catch (error) {
+        console.error("Error converting docx:", error);
+        setDocHtmlContent("<p>Error loading document preview.</p>");
+      } finally {
+        setIsConvertingDoc(false);
       }
     }
 
     convertDocx();
   }, [documentFile]);
+
+  // --- Additional documents: each needs its own object URL + (if docx) its
+  // own mammoth conversion. Keyed by AdditionalDocument.id.
+  const [additionalFiles, setAdditionalFiles] = useState<AdditionalDocument[]>(
+    [],
+  );
+  const [additionalPreviews, setAdditionalPreviews] = useState<
+    Record<string, AdditionalDocPreview>
+  >({});
+  const processedAdditionalIds = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const currentIds = new Set(additionalFiles.map((doc) => doc.id));
+
+    // Drop + revoke previews for files that were removed.
+    setAdditionalPreviews((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const id of Object.keys(next)) {
+        if (!currentIds.has(id)) {
+          URL.revokeObjectURL(next[id].fileUrl);
+          delete next[id];
+          processedAdditionalIds.current.delete(id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+
+    // Set up previews for newly added files only (avoids re-creating object
+    // URLs / re-running mammoth on every render).
+    additionalFiles.forEach((doc) => {
+      if (processedAdditionalIds.current.has(doc.id)) return;
+      processedAdditionalIds.current.add(doc.id);
+
+      const docFileUrl = URL.createObjectURL(doc.file);
+      const isDocx = isDocxFile(doc.file);
+
+      setAdditionalPreviews((prev) => ({
+        ...prev,
+        [doc.id]: {
+          fileUrl: docFileUrl,
+          docHtmlContent: "",
+          isConvertingDoc: isDocx,
+        },
+      }));
+
+      if (isDocx) {
+        doc.file
+          .arrayBuffer()
+          .then((arrayBuffer) => mammoth.convertToHtml({ arrayBuffer }))
+          .then((result) => {
+            setAdditionalPreviews((prev) =>
+              prev[doc.id]
+                ? {
+                    ...prev,
+                    [doc.id]: {
+                      ...prev[doc.id],
+                      docHtmlContent: result.value,
+                      isConvertingDoc: false,
+                    },
+                  }
+                : prev,
+            );
+          })
+          .catch((error) => {
+            console.error("Error converting docx:", error);
+            setAdditionalPreviews((prev) =>
+              prev[doc.id]
+                ? {
+                    ...prev,
+                    [doc.id]: {
+                      ...prev[doc.id],
+                      docHtmlContent: "<p>Error loading document preview.</p>",
+                      isConvertingDoc: false,
+                    },
+                  }
+                : prev,
+            );
+          });
+      }
+    });
+  }, [additionalFiles]);
+
+  // Revoke any remaining additional-document object URLs on unmount.
+  useEffect(() => {
+    return () => {
+      Object.values(additionalPreviews).forEach((preview) =>
+        URL.revokeObjectURL(preview.fileUrl),
+      );
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Ordered list of every document to preview/sign — primary first, then
+  // additional documents in the order they were attached.
+  const documents: SignatureDocumentPreview[] = useMemo(() => {
+    const list: SignatureDocumentPreview[] = [];
+    if (documentFile) {
+      list.push({
+        id: "primary",
+        name: documentName || documentFile.name,
+        file: documentFile,
+        fileUrl,
+        docHtmlContent,
+        isConvertingDoc,
+      });
+    }
+    additionalFiles.forEach((doc) => {
+      const preview = additionalPreviews[doc.id];
+      list.push({
+        id: doc.id,
+        name: doc.name,
+        file: doc.file,
+        fileUrl: preview?.fileUrl ?? "",
+        docHtmlContent: preview?.docHtmlContent ?? "",
+        isConvertingDoc: preview?.isConvertingDoc ?? false,
+      });
+    });
+    return list;
+  }, [
+    documentFile,
+    documentName,
+    fileUrl,
+    docHtmlContent,
+    isConvertingDoc,
+    additionalFiles,
+    additionalPreviews,
+  ]);
 
   const [recipients, setRecipients] = useState<SignatureSigner[]>([]);
   const [signingOrder, setSigningOrder] = useState<"sequential" | "parallel">(
@@ -95,9 +249,7 @@ function CreateSignatureRequestForm() {
   const [enableExpiry, setEnableExpiry] = useState(false);
   const [expiryDate, setExpiryDate] = useState("");
   const [expiryTime, setExpiryTime] = useState("");
-  const [ccRecipients, setCcRecipients] = useState<
-    { id: string; email: string }[]
-  >([]);
+  const [ccRecipients, setCcRecipients] = useState<CcRecipient[]>([]);
 
   const [emailTitle, setEmailTitle] = useState(`Please sign: ${documentName}`);
   const [emailMessage, setEmailMessage] = useState("");
@@ -178,11 +330,11 @@ function CreateSignatureRequestForm() {
       ],
     });
 
-    router.push("/documents/signature/create?step=place-fields");
+    router.push("/signature/create?step=place-fields");
   };
 
   const handleBackToForm = () => {
-    router.push("/documents/signature/create");
+    router.push("/signature/create");
   };
 
   const handleSidebarDragStart = (
@@ -199,7 +351,12 @@ function CreateSignatureRequestForm() {
     setDraggingFieldType(null);
   };
 
-  const handleDropField = (page: number, xPct: number, yPct: number) => {
+  const handleDropField = (
+    documentId: string,
+    page: number,
+    xPct: number,
+    yPct: number,
+  ) => {
     if (!draggingFieldType) return;
     setPlacedFields((prev) => [
       ...prev,
@@ -207,6 +364,7 @@ function CreateSignatureRequestForm() {
         id: `field-${Date.now()}-${prev.length}`,
         type: draggingFieldType.type,
         label: draggingFieldType.label,
+        documentId,
         page,
         xPct,
         yPct,
@@ -219,12 +377,15 @@ function CreateSignatureRequestForm() {
 
   const handleRepositionField = (
     id: string,
+    documentId: string,
     page: number,
     xPct: number,
     yPct: number,
   ) => {
     setPlacedFields((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, page, xPct, yPct } : f)),
+      prev.map((f) =>
+        f.id === id ? { ...f, documentId, page, xPct, yPct } : f,
+      ),
     );
   };
 
@@ -239,11 +400,7 @@ function CreateSignatureRequestForm() {
     return (
       <PlaceFieldsView
         documentName={documentName}
-        fileName={fileName}
-        fileUrl={fileUrl}
-        documentFile={documentFile}
-        docHtmlContent={docHtmlContent}
-        isConvertingDoc={isConvertingDoc}
+        documents={documents}
         placedFields={placedFields}
         draggingFieldType={draggingFieldType}
         recipients={recipients}
@@ -280,6 +437,8 @@ function CreateSignatureRequestForm() {
           onChangeName={setDocumentName}
           onChangeFile={handleFileChange}
           error={fileError}
+          additionalFiles={additionalFiles}
+          onChangeAdditionalFiles={setAdditionalFiles}
         />
 
         <RecipientsSection

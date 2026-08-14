@@ -87,7 +87,15 @@ const dashboardItems: NavItem[] = [
     children: [
       { label: "Library", href: "/documents/library" },
       { label: "Document Requests", href: "/documents/requests" },
-      { label: "E-Signature", href: "/documents/signature" },
+    ],
+  },
+  {
+    label: "E-Signature",
+    icon: Folder,
+    children: [
+      { label: "Overview", href: "/signature" },
+      { label: "Documents", href: "/signature/documents" },
+      { label: "Templates", href: "/signature/templates" },
     ],
   },
   {

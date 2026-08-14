@@ -123,7 +123,7 @@ export default function DocumentsList() {
   return (
     <div className="relative mx-auto flex w-full flex-col px-4 py-2">
       {/* Header section */}
-      <div className="mb-4 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+      <div className="mb-2 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
             Signature Documents
@@ -137,6 +137,8 @@ export default function DocumentsList() {
           New Request
         </button>
       </div>
+
+      <hr className="mb-2 border-border" />
 
       {/* Filters and Search Bar */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -185,7 +187,8 @@ export default function DocumentsList() {
       {/* Table Container */}
       <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)] dark:border-zinc-800 dark:bg-zinc-950">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          {/* Added a fixed minimum height to the table (approx. 10 rows * row height) */}
+          <table className="w-full text-left border-collapse min-h-[560px]">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/75 text-xs font-semibold text-slate-500 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-400">
                 <th className="py-3.5 px-4 sm:px-6">Document Name</th>
@@ -203,7 +206,7 @@ export default function DocumentsList() {
                 <tr>
                   <td
                     colSpan={8}
-                    className="py-12 text-center text-slate-500 dark:text-zinc-400"
+                    className="py-24 text-center text-slate-500 dark:text-zinc-400"
                   >
                     <FileSignature className="mx-auto h-10 w-10 text-slate-300 dark:text-zinc-700 mb-2" />
                     <p className="font-medium text-slate-900 dark:text-white">
@@ -215,122 +218,136 @@ export default function DocumentsList() {
                   </td>
                 </tr>
               ) : (
-                paginatedRequests.map((req) => {
-                  const overallStatus = computeOverallStatus(req);
-                  return (
-                    <tr
-                      key={req.id}
-                      className="transition-colors hover:bg-slate-50/50 dark:hover:bg-zinc-900/50"
-                    >
-                      {/* Document Name */}
-                      <td className="py-2 px-4 sm:px-6">
-                        <div className="flex items-start gap-3">
-                          <div className="mt-0.5 rounded-lg bg-violet-50 p-2 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400">
-                            <FileText className="h-4 w-4" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="group/doc-name relative block max-w-[24ch]">
-                              <span className="block truncate font-medium text-slate-900 dark:text-white">
-                                {req.documentName}
-                              </span>
-                              <div className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden max-w-xs whitespace-normal rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-normal text-white shadow-lg group-hover/doc-name:block dark:bg-zinc-800">
-                                {req.documentName}
-                              </div>
+                <>
+                  {paginatedRequests.map((req) => {
+                    const overallStatus = computeOverallStatus(req);
+                    return (
+                      <tr
+                        key={req.id}
+                        onClick={() => router.push(`/signature/${req.id}`)}
+                        className="transition-colors hover:bg-slate-50/50 dark:hover:bg-zinc-900/50 h-[56px] cursor-pointer"
+                      >
+                        {/* Document Name */}
+                        <td className="py-2 px-4 sm:px-6">
+                          <div className="flex items-start gap-3">
+                            <div className="mt-0.5 rounded-lg bg-violet-50 p-2 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400">
+                              <FileText className="h-4 w-4" />
                             </div>
-                            <span className="text-xs text-slate-500 dark:text-zinc-400">
-                              {req.signatureRequestId}
+                            <div className="min-w-0">
+                              <div className="group/doc-name relative block max-w-[24ch]">
+                                <span className="block truncate font-medium text-slate-900 dark:text-white">
+                                  {req.documentName}
+                                </span>
+                                <div className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden max-w-xs whitespace-normal rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-normal text-white shadow-lg group-hover/doc-name:block dark:bg-zinc-800">
+                                  {req.documentName}
+                                </div>
+                              </div>
+                              <span className="text-xs text-slate-500 dark:text-zinc-400">
+                                {req.signatureRequestId}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Applicants / Recipients */}
+                        <td className="py-2 px-4">
+                          <div className="flex flex-col gap-1.5">
+                            <div className="flex items-center gap-1.5">
+                              {req.signers.slice(0, 2).map((signer) => {
+                                const color =
+                                  SIGNER_COLORS[
+                                    signer.colorIndex % SIGNER_COLORS.length
+                                  ];
+                                return (
+                                  <div
+                                    key={signer.id}
+                                    className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${color.bg} ${color.text} border ${color.border}`}
+                                    title={`${signer.name} (${signer.email})`}
+                                  >
+                                    {getInitials(signer.name)}
+                                  </div>
+                                );
+                              })}
+                              {req.signers.length > 2 && (
+                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs font-medium text-slate-600 border border-slate-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700">
+                                  +{req.signers.length - 2}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-zinc-400 truncate max-w-[180px]">
+                              {req.signers.map((s) => s.email).join(", ")}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Owner */}
+                        <td className="py-2 px-4">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-slate-700 text-xs font-medium dark:bg-zinc-800 dark:text-zinc-300">
+                              {req.createdBy ? req.createdBy[0] : "F"}
+                            </div>
+                            <span className="text-xs font-medium text-slate-700 dark:text-zinc-300">
+                              {req.createdBy || "Finconnex"}
                             </span>
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Applicants / Recipients */}
-                      <td className="py-2 px-4">
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center gap-1.5">
-                            {req.signers.slice(0, 2).map((signer) => {
-                              const color =
-                                SIGNER_COLORS[
-                                  signer.colorIndex % SIGNER_COLORS.length
-                                ];
-                              return (
-                                <div
-                                  key={signer.id}
-                                  className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${color.bg} ${color.text} border ${color.border}`}
-                                  title={`${signer.name} (${signer.email})`}
-                                >
-                                  {getInitials(signer.name)}
-                                </div>
-                              );
-                            })}
-                            {req.signers.length > 2 && (
-                              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs font-medium text-slate-600 border border-slate-200 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700">
-                                +{req.signers.length - 2}
-                              </div>
-                            )}
-                          </div>
-                          <div className="text-xs text-slate-500 dark:text-zinc-400">
-                            {req.signers.map((s) => s.email).join(", ")}
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Owner */}
-                      <td className="py-2 px-4">
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-slate-700 text-xs font-medium dark:bg-zinc-800 dark:text-zinc-300">
-                            {req.createdBy ? req.createdBy[0] : "F"}
-                          </div>
-                          <span className="text-xs font-medium text-slate-700 dark:text-zinc-300">
-                            {req.createdBy || "Finconnex"}
+                        {/* Related To */}
+                        <td className="py-2 px-4">
+                          <span className="text-xs text-slate-600 dark:text-zinc-400">
+                            {req.relatedTo || "—"}
                           </span>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Related To */}
-                      <td className="py-2 px-4">
-                        <span className="text-xs text-slate-600 dark:text-zinc-400">
-                          {req.relatedTo || "—"}
-                        </span>
-                      </td>
+                        {/* Status */}
+                        <td className="py-2 px-4">
+                          {getStatusBadge(overallStatus)}
+                        </td>
 
-                      {/* Status */}
-                      <td className="py-2 px-4">
-                        {getStatusBadge(overallStatus)}
-                      </td>
+                        {/* Sent Date */}
+                        <td className="py-2 px-4 text-xs text-slate-600 dark:text-zinc-400 whitespace-nowrap">
+                          {req.sentDate || "—"}
+                        </td>
 
-                      {/* Sent Date */}
-                      <td className="py-2 px-4 text-xs text-slate-600 dark:text-zinc-400 whitespace-nowrap">
-                        {req.sentDate || "—"}
-                      </td>
+                        {/* Last Activity */}
+                        <td className="py-2 px-4 text-xs text-slate-500 dark:text-zinc-400 whitespace-nowrap">
+                          {req.audit && req.audit.length > 0
+                            ? req.audit[req.audit.length - 1].at
+                            : "Recently"}
+                        </td>
 
-                      {/* Last Activity */}
-                      <td className="py-2 px-4 text-xs text-slate-500 dark:text-zinc-400 whitespace-nowrap">
-                        {req.audit && req.audit.length > 0
-                          ? req.audit[req.audit.length - 1].at
-                          : "Recently"}
-                      </td>
+                        {/* Action */}
+                        <td className="py-2 px-4 sm:px-6 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() =>
+                                router.push(`/signature/${req.id}`)
+                              }
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              View
+                            </button>
+                            {/* <button className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-200">
+                              <MoreVertical className="h-4 w-4" />
+                            </button> */}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
 
-                      {/* Action */}
-                      <td className="py-2 px-4 sm:px-6 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() =>
-                              router.push(`/documents/signature/${req.id}`)
-                            }
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            View
-                          </button>
-                          <button className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-200">
-                            <MoreVertical className="h-4 w-4" />
-                          </button>
-                        </div>
+                  {/* Spacer rows with transparent borders to preserve height without visual lines */}
+                  {Array.from({
+                    length: Math.max(0, 10 - paginatedRequests.length),
+                  }).map((_, index) => (
+                    <tr key={`empty-${index}`} className="h-[56px] border-b-0">
+                      <td colSpan={8} className="py-2 px-4 sm:px-6 border-b-0">
+                        &nbsp;
                       </td>
                     </tr>
-                  );
-                })
+                  ))}
+                </>
               )}
             </tbody>
           </table>

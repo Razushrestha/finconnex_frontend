@@ -100,7 +100,7 @@ export function SignatureStatsGrid() {
             className={`group flex h-full flex-col justify-between rounded-md border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04),0_10px_25px_rgba(15,23,42,0.04)] transition-all duration-300 dark:border-zinc-800 dark:bg-zinc-950 ${
               stat.href
                 ? "hover:-translate-y-1 hover:border-blue-500/50 hover:shadow-[0_4px_20px_rgba(59,130,246,0.15)] dark:hover:border-blue-500/50 dark:hover:shadow-[0_4px_20px_rgba(59,130,246,0.25)]"
-                : ""
+                : "hover:-translate-y-1 hover:border-blue-500/50 hover:shadow-[0_4px_20px_rgba(59,130,246,0.15)] dark:hover:border-blue-500/50 dark:hover:shadow-[0_4px_20px_rgba(59,130,246,0.25)]"
             }`}
           >
             <div className="flex items-center gap-4">
