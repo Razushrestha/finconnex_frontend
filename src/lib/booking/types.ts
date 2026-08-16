@@ -585,6 +585,11 @@ export function listConsultationPages(): BookingPage[] {
     });
 }
 
+export function deleteBookingPage(id: string) {
+  const list = listBookingPages().filter((p) => p.id !== id);
+  writeStore(list);
+}
+
 export function upsertBookingPage(page: BookingPage) {
   const normalized = applyMeetingViaToLegacy(page);
   const list = listBookingPages();

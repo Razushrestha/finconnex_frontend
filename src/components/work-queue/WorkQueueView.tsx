@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { WorkQueueSidebar } from "@/components/work-queue/WorkQueueSidebar";
 import {
   WorkQueueTable,
@@ -274,7 +274,7 @@ export function WorkQueueView() {
         </div>
 
         <div className="relative ml-auto w-full max-w-[280px] sm:w-[280px]">
-          <Search className="pointer-events-none absolute top-1/2 left-0 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
           <input
             value={query}
             onChange={(e) => {
@@ -282,8 +282,21 @@ export function WorkQueueView() {
               setPage(1);
             }}
             placeholder="Search this queue…"
-            className="h-8 w-full border-0 border-b border-transparent bg-transparent pr-2 pl-6 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-slate-300"
+            className="h-9 w-full rounded-lg border border-[#E2E8F0] bg-white pr-8 pl-8 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
           />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setPage(1);
+              }}
+              className="absolute top-1/2 right-1.5 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              aria-label="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
         </div>
       </header>
 

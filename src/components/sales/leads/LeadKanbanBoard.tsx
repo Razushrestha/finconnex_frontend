@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, Plus, Trophy, XCircle } from "lucide-react";
+import { ChevronRight, FoldHorizontal, Plus, Trophy, XCircle } from "lucide-react";
 import { type KanbanColumn, type LeadPipelineStage } from "@/lib/leads/types";
 import { listLeadColumns, saveLeadColumns } from "@/lib/leads/store";
 import { onRulesChange } from "@/lib/rules";
@@ -450,23 +450,24 @@ export function LeadKanbanBoard({
                         className={cn("rounded-xs p-1", surface.className)}
                         style={surface.style}
                       >
-                        <div className="mb-1 flex items-center justify-between px-1">
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => toggleCollapsed(column.id)}
-                              title="Collapse"
-                              aria-label={`Collapse ${column.title}`}
-                              className="flex items-center gap-1.5 rounded-sm hover:opacity-70"
-                            >
-                              <h2 className="max-w-[15rem] text-xs font-semibold leading-snug text-foreground xl:text-sm">
-                                {column.title}
-                              </h2>
-                            </button>
+                        <div className="mb-1 flex items-center justify-between gap-1 px-1">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <h2 className="max-w-[12rem] truncate text-xs font-semibold leading-snug text-foreground xl:text-sm">
+                              {column.title}
+                            </h2>
                             <span className="rounded-full border border-slate-200/80 bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
                               {column.cards.length}
                             </span>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleCollapsed(column.id)}
+                            title="Collapse column"
+                            aria-label={`Collapse ${column.title}`}
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200/80 bg-white text-slate-700 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:bg-slate-50 focus-visible:opacity-100"
+                          >
+                            <FoldHorizontal className="h-3.5 w-3.5" strokeWidth={2} />
+                          </button>
                         </div>
                         <div className="px-1 text-xs font-medium text-foreground/70">
                           {column.totalAmount} total
