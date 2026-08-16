@@ -48,7 +48,7 @@ function buildStats(requests: SignatureRequest[]): StatCard[] {
       value: requests.length,
       label: "All Documents",
       link: "View all documents",
-      href: "/documents/signature/documents",
+      href: "/signature/documents",
     },
     {
       icon: PenLine,
@@ -57,7 +57,7 @@ function buildStats(requests: SignatureRequest[]): StatCard[] {
       value: draft,
       label: "Draft",
       link: "View draft documents",
-      href: "/documents/signature/documents?status=draft",
+      href: "/signature/documents?status=draft",
     },
     {
       icon: Clock,
