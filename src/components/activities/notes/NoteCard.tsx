@@ -70,7 +70,7 @@ export function NoteCard({
       )}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <h4 className="text-[13px] font-semibold leading-snug text-slate-900">
+        <h4 className="min-w-0 truncate text-[13px] font-semibold leading-snug text-slate-900">
           {note.title || "Untitled note"}
         </h4>
         <div className="flex shrink-0 items-center gap-1">

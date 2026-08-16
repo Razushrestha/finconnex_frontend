@@ -49,6 +49,7 @@ import {
 } from "@/components/sales/QuickActionsBar";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion, entityCardShell } from "@/lib/motion";
+import { KANBAN_CARD } from "@/lib/layout";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 
 interface LeadCardProps {
@@ -205,6 +206,7 @@ export function LeadCard({
         className={cn(
           "group w-full shrink-0 cursor-pointer",
           entityCardShell,
+          KANBAN_CARD,
           cardMotion,
           isDragging && cardDragging,
         )}
@@ -345,7 +347,7 @@ export function LeadCard({
           actions={quickActionItems}
           onAction={onQuickAction}
           ariaLabel={`Quick actions for ${vm.name}`}
-          className="border-t border-slate-100 pt-1.5"
+          className="mt-auto border-t border-slate-100 pt-1.5"
         />
       </article>
 

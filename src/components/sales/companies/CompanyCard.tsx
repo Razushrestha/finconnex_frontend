@@ -216,7 +216,7 @@ export function CompanyCard({
           )}
         </div>
 
-        <div className="my-3 border-t border-slate-100" />
+        <div className="mt-auto border-t border-slate-100 pt-3" />
 
         <div className="flex items-center justify-between gap-1">
           {company.industry ? (

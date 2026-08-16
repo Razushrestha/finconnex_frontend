@@ -207,7 +207,7 @@ export function TaskCard({
       data-task-id={task.taskId}
       data-column-id={columnId}
         className={cn(
-          "group/card cursor-grab flex h-[220px] w-full flex-col p-3 sm:h-[230px] sm:p-3.5 relative",
+          "group/card relative cursor-grab",
           entityCardBox,
           cardMotion,
           isDragging && cardDragging,

@@ -13,6 +13,7 @@ import { CompanyCard } from "./CompanyCard";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
+  KANBAN_CARD_SLOT,
   KANBAN_COL,
   KANBAN_COL_COLLAPSED,
   KANBAN_HEADER,
@@ -294,7 +295,7 @@ export function CompaniesKanbanBoard({
                             rendered.push(
                               <div
                                 key={`placeholder-${company.id}`}
-                                className="h-[168px] rounded-md border-2 border-dashed border-indigo-300 bg-indigo-50/60 transition-all duration-150 ease-out"
+                                className={cn(KANBAN_CARD_SLOT, "rounded-md border-2 border-dashed border-indigo-300 bg-indigo-50/60 transition-all duration-150 ease-out")}
                               />,
                             );
                           }
@@ -347,7 +348,7 @@ export function CompaniesKanbanBoard({
                           rendered.push(
                             <div
                               key="placeholder-end"
-                              className="h-[168px] rounded-md border-2 border-dashed border-indigo-300 bg-indigo-50/60 transition-all duration-150 ease-out"
+                              className={cn(KANBAN_CARD_SLOT, "rounded-md border-2 border-dashed border-indigo-300 bg-indigo-50/60 transition-all duration-150 ease-out")}
                             />,
                           );
                         }

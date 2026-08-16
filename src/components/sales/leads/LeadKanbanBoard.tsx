@@ -31,6 +31,7 @@ import {
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
+  KANBAN_CARD_SLOT,
   KANBAN_COL,
   KANBAN_COL_COLLAPSED,
   KANBAN_HEADER_TITLE,
@@ -543,7 +544,7 @@ export function LeadKanbanBoard({
                             rendered.push(
                               <div
                                 key={`placeholder-${card.id}`}
-                                className="h-[180px] shrink-0 rounded-md border-2 border-dashed border-violet-300 bg-violet-50/50 transition-all duration-150 ease-out"
+                                className={cn(KANBAN_CARD_SLOT, "shrink-0 rounded-md border-2 border-dashed border-violet-300 bg-violet-50/50 transition-all duration-150 ease-out")}
                               />,
                             );
                           }
@@ -620,7 +621,7 @@ export function LeadKanbanBoard({
                           rendered.push(
                             <div
                               key="placeholder-end"
-                              className="h-[180px] shrink-0 rounded-md border-2 border-dashed border-violet-300 bg-violet-50/50 transition-all duration-150 ease-out"
+                              className={cn(KANBAN_CARD_SLOT, "shrink-0 rounded-md border-2 border-dashed border-violet-300 bg-violet-50/50 transition-all duration-150 ease-out")}
                             />,
                           );
                         }

@@ -56,5 +56,12 @@ export const KANBAN_COL_COLLAPSED =
 export const KANBAN_HEADER_TITLE =
   "min-w-0 flex-1 truncate text-xs font-semibold leading-5 text-foreground xl:text-sm";
 
+/** Record card on every kanban board — same size as Leads. */
+export const KANBAN_CARD =
+  "flex h-[252px] w-full min-w-0 max-w-full flex-col overflow-hidden";
+
+/** Drop ghost matching kanban card height. */
+export const KANBAN_CARD_SLOT = "h-[252px]";
+
 /** Page canvas behind cards. */
 export const PAGE_CANVAS = "bg-slate-50";
