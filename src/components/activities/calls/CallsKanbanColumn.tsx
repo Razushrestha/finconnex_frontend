@@ -6,7 +6,7 @@ import type { CallColumn } from "@/lib/calls/types";
 import { CallCard } from "./CallCard";
 import { cn } from "@/lib/utils";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
-import { KANBAN_HEADER, KANBAN_WELL } from "@/lib/layout";
+import { KANBAN_COL, KANBAN_HEADER, KANBAN_HEADER_RAIL, KANBAN_WELL } from "@/lib/layout";
 import { useRouter } from "next/navigation";
 import type { DropTargetPos } from "./CallsKanbanBoard";
 import type { Priority, TaskStatus } from "@/lib/tasks/types";
@@ -80,7 +80,7 @@ export function CallsKanbanColumn({
         <div
           className={cn(
             "flex h-full flex-col items-center gap-3 p-2",
-            KANBAN_HEADER,
+            KANBAN_HEADER_RAIL,
           )}
         >
           <button
@@ -107,7 +107,7 @@ export function CallsKanbanColumn({
   }
 
   return (
-    <div className="group mb-4 flex h-full w-72 shrink-0 flex-col">
+    <div className={cn("group mb-4 flex h-full flex-col", KANBAN_COL)}>
       {/* Separate Header Box */}
       <div
         className={cn("mb-2 shrink-0", KANBAN_HEADER)}

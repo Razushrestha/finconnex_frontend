@@ -26,7 +26,7 @@ import {
   DocumentRequestCard,
 } from "@/components/documents/requests/DocumentRequestsList";
 import { cn } from "@/lib/utils";
-import { BOARD_PAGE, KANBAN_HEADER, KANBAN_WELL } from "@/lib/layout";
+import { BOARD_PAGE, KANBAN_COL, KANBAN_HEADER, KANBAN_WELL } from "@/lib/layout";
 import { dropTargetActive } from "@/lib/motion";
 
 type ViewMode = "list" | "kanban";
@@ -270,7 +270,7 @@ export default function DocumentRequestsPage() {
                   return (
                     <div
                       key={column.id}
-                      className="flex min-h-[420px] w-72 shrink-0 flex-col gap-2"
+                      className={cn("flex min-h-[420px] flex-col gap-2", KANBAN_COL)}
                     >
                       <div className={KANBAN_HEADER}>
                         <div className="flex items-center justify-between px-1">

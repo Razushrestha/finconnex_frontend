@@ -38,7 +38,23 @@ export const KANBAN_WELL = "border-slate-200/60 bg-slate-100/60";
 
 /** Kanban column header — same as Leads / Contacts. */
 export const KANBAN_HEADER =
-  "rounded-xs border border-slate-200/60 bg-primary/10 p-1";
+  "flex h-14 w-full shrink-0 flex-col justify-center overflow-hidden rounded-xs border border-slate-200/60 bg-primary/10 p-1.5";
+
+/** Collapsed kanban rail tint (no fixed height). */
+export const KANBAN_HEADER_RAIL =
+  "rounded-xs border border-slate-200/60 bg-primary/10";
+
+/** Expanded kanban column — identical size on every board. */
+export const KANBAN_COL =
+  "w-[272px] min-w-[272px] max-w-[272px] flex-shrink-0";
+
+/** Collapsed kanban rail. */
+export const KANBAN_COL_COLLAPSED =
+  "w-14 min-w-[3.5rem] max-w-[3.5rem] flex-shrink-0";
+
+/** Title row inside a kanban header. */
+export const KANBAN_HEADER_TITLE =
+  "min-w-0 flex-1 truncate text-xs font-semibold leading-5 text-foreground xl:text-sm";
 
 /** Page canvas behind cards. */
 export const PAGE_CANVAS = "bg-slate-50";

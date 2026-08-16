@@ -25,6 +25,12 @@ import {
 } from "./DealCardPanelHost";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import {
+  KANBAN_COL,
+  KANBAN_COL_COLLAPSED,
+  KANBAN_HEADER,
+  KANBAN_HEADER_TITLE,
+} from "@/lib/layout";
 import { useRouter } from "next/navigation";
 
 interface DragInfo {
@@ -523,9 +529,7 @@ export function DealsKanbanBoard({
               className={cn(
                 "group relative flex flex-col gap-2 transition-all duration-200",
                 BOARD_HEIGHT,
-                isCollapsed
-                  ? "w-12 min-w-[3.5rem] flex-shrink-0"
-                  : "w-[272px] flex-shrink-0",
+                isCollapsed ? KANBAN_COL_COLLAPSED : KANBAN_COL,
               )}
             >
               {isCollapsed ? (
@@ -545,10 +549,10 @@ export function DealsKanbanBoard({
                 </div>
               ) : (
                 <>
-                  <div className="rounded-xs border border-slate-200/60 bg-primary/10 p-1">
-                    <div className="flex items-center justify-between px-1">
-                      <div className="flex items-center gap-2">
-                        <h2 className="max-w-[15rem] text-xs font-semibold leading-snug text-slate-800 xl:text-sm">
+                  <div className={KANBAN_HEADER}>
+                    <div className="flex h-6 items-center justify-between gap-1">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <h2 className={KANBAN_HEADER_TITLE} title={stage.title}>
                           {stage.title}
                         </h2>
                         <span className="rounded-full border border-slate-200/80 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500">
@@ -556,7 +560,7 @@ export function DealsKanbanBoard({
                         </span>
                       </div>
                     </div>
-                    <div className="px-1 text-xs font-medium text-slate-500">
+                    <div className="truncate text-xs font-medium leading-5 text-slate-500">
                       {stage.deals.length > 0
                         ? `$${Math.round(
                             stageWeightedForecast(stage),

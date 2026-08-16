@@ -30,6 +30,11 @@ import {
 } from "./panels/LeadCardPanelHost";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import {
+  KANBAN_COL,
+  KANBAN_COL_COLLAPSED,
+  KANBAN_HEADER_TITLE,
+} from "@/lib/layout";
 import { useRouter } from "next/navigation";
 import {
   kanbanHeaderSurfaceStyle,
@@ -414,9 +419,7 @@ export function LeadKanbanBoard({
               className={cn(
                 "group relative flex h-full min-h-0 flex-col gap-2 transition-all duration-200",
                 BOARD_HEIGHT,
-                isCollapsed
-                  ? "w-12 min-w-[3.5rem] flex-shrink-0"
-                  : "w-[272px] flex-shrink-0",
+                isCollapsed ? KANBAN_COL_COLLAPSED : KANBAN_COL,
               )}
             >
               {isCollapsed ? (
@@ -447,12 +450,15 @@ export function LeadKanbanBoard({
                     const surface = kanbanHeaderSurfaceStyle(hex);
                     return (
                       <div
-                        className={cn("rounded-xs p-1", surface.className)}
+                        className={cn(
+                          "flex h-14 w-full shrink-0 flex-col justify-center overflow-hidden rounded-xs p-1.5",
+                          surface.className,
+                        )}
                         style={surface.style}
                       >
-                        <div className="mb-1 flex items-center justify-between gap-1 px-1">
+                        <div className="flex h-6 items-center justify-between gap-1">
                           <div className="flex min-w-0 items-center gap-2">
-                            <h2 className="max-w-[12rem] truncate text-xs font-semibold leading-snug text-foreground xl:text-sm">
+                            <h2 className={KANBAN_HEADER_TITLE} title={column.title}>
                               {column.title}
                             </h2>
                             <span className="rounded-full border border-slate-200/80 bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
@@ -469,7 +475,7 @@ export function LeadKanbanBoard({
                             <FoldHorizontal className="h-3.5 w-3.5" strokeWidth={2} />
                           </button>
                         </div>
-                        <div className="px-1 text-xs font-medium text-foreground/70">
+                        <div className="truncate text-xs font-medium leading-5 text-foreground/70">
                           {column.totalAmount} total
                         </div>
                       </div>

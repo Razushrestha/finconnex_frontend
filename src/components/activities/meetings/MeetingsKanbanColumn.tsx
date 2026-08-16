@@ -6,7 +6,7 @@ import type { MeetingColumn } from "@/lib/meetings/types";
 import { MeetingCard } from "./MeetingCard";
 import { cn } from "@/lib/utils";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
-import { KANBAN_HEADER, KANBAN_WELL } from "@/lib/layout";
+import { KANBAN_COL, KANBAN_HEADER, KANBAN_HEADER_RAIL, KANBAN_WELL } from "@/lib/layout";
 import { useRouter } from "next/navigation";
 import type { DropTargetPos } from "./MeetingsKanbanBoard";
 
@@ -69,7 +69,7 @@ export function MeetingsKanbanColumn({
         <div
           className={cn(
             "flex h-full flex-col items-center gap-3 p-2",
-            KANBAN_HEADER,
+            KANBAN_HEADER_RAIL,
           )}
         >
           <button
@@ -99,7 +99,7 @@ export function MeetingsKanbanColumn({
     <div
       className={cn(
         "group mb-4 flex h-full min-w-[220px] flex-1 flex-col",
-        !embedded && "w-72 shrink-0",
+        !embedded && KANBAN_COL,
       )}
     >
       {/* Separate Header Box */}
