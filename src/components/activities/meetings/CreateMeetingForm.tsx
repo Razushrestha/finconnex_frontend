@@ -144,7 +144,7 @@ export function CreateMeetingForm({
     }
     void layoutId;
     void redirect;
-    router.push(`/activities/meetings?focus=${created.id}`);
+    router.push(`/activities/meetings/detail/${created.id}`);
   }
 
   return (

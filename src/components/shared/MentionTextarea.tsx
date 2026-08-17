@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  forwardRef,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -20,6 +21,7 @@ interface MentionTextareaProps
   onChange: (value: string) => void;
   onMentionSelect?: (person: MentionPerson) => void;
   people?: MentionPerson[];
+  menuTitle?: string;
 }
 
 function findActiveMention(text: string, cursor: number) {
@@ -31,15 +33,22 @@ function findActiveMention(text: string, cursor: number) {
   return { query, start };
 }
 
-export function MentionTextarea({
-  value,
-  onChange,
-  onMentionSelect,
-  people,
-  className,
-  onKeyDown,
-  ...props
-}: MentionTextareaProps) {
+export const MentionTextarea = forwardRef<
+  HTMLTextAreaElement,
+  MentionTextareaProps
+>(function MentionTextarea(
+  {
+    value,
+    onChange,
+    onMentionSelect,
+    people,
+    menuTitle = "Assign to",
+    className,
+    onKeyDown,
+    ...props
+  },
+  ref,
+) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -64,11 +73,14 @@ export function MentionTextarea({
     const textarea = textareaRef.current;
     if (!textarea) return;
     const rect = textarea.getBoundingClientRect();
-    setMenuPos({
-      top: rect.bottom + 4,
-      left: rect.left,
-      width: Math.max(rect.width, 240),
-    });
+    const width = Math.max(rect.width, 240);
+    const menuHeight = 248;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const top =
+      spaceBelow < menuHeight + 12
+        ? Math.max(8, rect.top - menuHeight - 4)
+        : rect.bottom + 4;
+    setMenuPos({ top, left: rect.left, width });
   }, []);
 
   const syncMention = useCallback(
@@ -173,7 +185,11 @@ export function MentionTextarea({
   return (
     <>
       <textarea
-        ref={textareaRef}
+        ref={(el) => {
+          textareaRef.current = el;
+          if (typeof ref === "function") ref(el);
+          else if (ref) ref.current = el;
+        }}
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
@@ -200,7 +216,7 @@ export function MentionTextarea({
               className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl"
             >
               <div className="border-b border-violet-100 bg-violet-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-violet-800">
-                Assign to
+                {menuTitle}
               </div>
               <ul className="max-h-56 overflow-y-auto py-1">
                 {filtered.map((person, index) => (
@@ -237,4 +253,4 @@ export function MentionTextarea({
         : null}
     </>
   );
-}
+});

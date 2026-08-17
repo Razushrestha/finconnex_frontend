@@ -32,6 +32,17 @@ export const QUICK_REPLIES = [
   "Please upload the requested docs in the portal when you can.",
 ] as const;
 
+export interface InboxAttachment {
+  id: string;
+  name: string;
+  sizeLabel: string;
+  mimeType: string;
+  /** data URL for images; empty for files/voice mock */
+  url?: string;
+  kind: "image" | "file" | "voice";
+  durationSec?: number;
+}
+
 export interface InboxMessage {
   id: string;
   body: string;
@@ -39,6 +50,11 @@ export interface InboxMessage {
   /** true = outbound from CRM agent */
   outbound: boolean;
   author: string;
+  replyToId?: string;
+  replyToPreview?: string;
+  kind?: "text" | "voice";
+  voiceDurationSec?: number;
+  attachments?: InboxAttachment[];
 }
 
 export interface InboxConversation {
@@ -52,6 +68,8 @@ export interface InboxConversation {
   status: InboxStatus;
   lastMessage: string;
   unreadCount: number;
+  /** Contact is currently online on the channel */
+  online?: boolean;
   timestamp: string;
   tags: string[];
   notes: string;
@@ -66,7 +84,7 @@ export interface InboxChannelConnection {
   via: string;
 }
 
-const STORE_KEY = "marketing:inbox:v1";
+const STORE_KEY = "marketing:inbox:v2";
 const CONNECTIONS_KEY = "marketing:inbox:connections";
 
 export const inboxChannelConnections: InboxChannelConnection[] = [
@@ -108,6 +126,7 @@ export const inboxConversations: InboxConversation[] = [
     status: "Open",
     lastMessage: "Can we lock the rate this week?",
     unreadCount: 2,
+    online: true,
     timestamp: "20/07/2026 16:42",
     tags: ["hot"],
     notes: "Pre-approval in progress. Wants rate lock before Friday.",
@@ -146,6 +165,7 @@ export const inboxConversations: InboxConversation[] = [
     status: "Pending",
     lastMessage: "Thanks: reviewing the proposal tonight.",
     unreadCount: 0,
+    online: true,
     timestamp: "20/07/2026 14:10",
     tags: ["proposal"],
     notes: "",
@@ -176,6 +196,7 @@ export const inboxConversations: InboxConversation[] = [
     status: "Open",
     lastMessage: "Do you cover first-home buyers?",
     unreadCount: 1,
+    online: false,
     timestamp: "20/07/2026 11:05",
     tags: [],
     notes: "",
@@ -206,6 +227,7 @@ export const inboxConversations: InboxConversation[] = [
     status: "Resolved",
     lastMessage: "Docs uploaded: thanks!",
     unreadCount: 0,
+    online: false,
     timestamp: "19/07/2026 18:20",
     tags: ["docs"],
     notes: "Vendor agreement received.",
@@ -236,6 +258,7 @@ export const inboxConversations: InboxConversation[] = [
     status: "Open",
     lastMessage: "Can someone call about commercial lending?",
     unreadCount: 3,
+    online: true,
     timestamp: "20/07/2026 15:01",
     tags: ["commercial"],
     notes: "",
@@ -258,6 +281,7 @@ export const inboxConversations: InboxConversation[] = [
     status: "Pending",
     lastMessage: "Is anyone available for a chat?",
     unreadCount: 1,
+    online: false,
     timestamp: "20/07/2026 17:12",
     tags: ["new"],
     notes: "",

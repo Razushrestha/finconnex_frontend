@@ -300,6 +300,8 @@ function emailOwnedBy(e: Email, scope: WorkQueueScope) {
 }
 
 function hrefFor(module: keyof typeof HREF, id: string, q?: string) {
+  if (module === "notes") return `/activities/notes/detail/${id}`;
+  if (module === "meetings") return `/activities/meetings/detail/${id}`;
   const base = HREF[module];
   const params = new URLSearchParams();
   params.set("focus", id);

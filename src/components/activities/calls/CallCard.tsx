@@ -6,7 +6,6 @@ import {
   Clock,
   Flag,
   UserPlus,
-  Reply,
   Check,
   RotateCcw,
   MessageCircle,
@@ -19,6 +18,7 @@ import { TASK_PRIORITIES, TASK_STATUSES } from "@/lib/tasks/types";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
+import { RelatedToLink } from "@/components/activities/RelatedToLink";
 import { useRouter } from "next/navigation";
 
 interface CallCardProps {
@@ -131,11 +131,11 @@ export function CallCard({
   const submitComment = () => {
     const trimmed = commentText.trim();
     if (!trimmed) {
-      toast.error("Comment can't be empty");
+      toast.error("Note can't be empty");
       return;
     }
     onAddComment?.(call.id, trimmed);
-    toast.success("Comment added");
+    toast.success("Note added");
     setCommentText("");
     setShowCommentModal(false);
   };
@@ -144,18 +144,41 @@ export function CallCard({
     (call as any).commentsCount || (call as any).attachmentsCount,
   );
 
+  function goToCall() {
+    if (wasDragging.current) return;
+    router.push(`/activities/calls/detail/${call.id}`);
+  }
+
   return (
     <>
       <div
         draggable
+        role="link"
+        tabIndex={0}
         onDragStart={handleCardDragStart}
         onDragEnd={handleCardDragEnd}
+        onClick={(e) => {
+          if (wasDragging.current) return;
+          if (
+            footerRef.current &&
+            footerRef.current.contains(e.target as Node)
+          ) {
+            return;
+          }
+          goToCall();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            goToCall();
+          }
+        }}
         data-focus-id={call.id}
         data-call-id={call.id}
         data-column-id={columnId}
         className={cn(
           entityCardBox,
-          "group/card relative flex flex-col justify-between",
+          "group/card relative flex cursor-pointer flex-col justify-between",
           cardMotion,
           isDragging && cardDragging,
           isSelected
@@ -203,13 +226,18 @@ export function CallCard({
           </div>
 
           <h4
-            onClick={() => router.push(`/activities/calls/detail/${call.id}`)}
-            className="mb-1 truncate text-[13px] font-semibold text-slate-900 cursor-pointer"
+            className="mb-1 truncate text-[13px] font-semibold text-slate-900"
+            title={call.subject}
           >
             {call.subject}
           </h4>
           <p className="mb-3 truncate text-[11px] text-slate-500">
-            {call.relatedTo || call.contact || ""}
+            <RelatedToLink
+              relatedTo={
+                call.relatedTo ||
+                (call.contact ? `Contact: ${call.contact}` : undefined)
+              }
+            />
           </p>
 
           <div className="space-y-1.5 text-[11px] text-slate-500">
@@ -344,14 +372,14 @@ export function CallCard({
             <UserPlus className="h-3.5 w-3.5" />
           </button>
 
-          {/* Add Comment Button */}
+          {/* Add note — same icon as Task */}
           <button
             type="button"
             onClick={() => setShowCommentModal(true)}
-            title="Add comment"
+            title="Add note"
             className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-600"
           >
-            <Reply className="h-3.5 w-3.5" />
+            <MessageCircle className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -391,16 +419,22 @@ export function CallCard({
         </div>
       )}
 
-      {/* Add Comment Modal */}
+      {/* Add note modal */}
       {showCommentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowCommentModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl"
+          >
             <h3 className="mb-3 text-sm font-semibold text-slate-900">
-              Add Comment
+              Add note
             </h3>
             <textarea
               rows={3}
-              placeholder="Type your comment here..."
+              placeholder="Write a note…"
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
               className="mb-4 w-full rounded-lg border border-slate-200 p-2.5 text-xs focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
@@ -419,7 +453,7 @@ export function CallCard({
                 onClick={submitComment}
                 className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
               >
-                Add Comment
+                Add note
               </button>
             </div>
           </div>

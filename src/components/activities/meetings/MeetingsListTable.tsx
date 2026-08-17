@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Search,
   Video,
@@ -15,7 +15,8 @@ import {
 import type { Meeting, MeetingStatus, MeetingType } from "@/lib/meetings/types";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { RelatedToLink } from "@/components/activities/RelatedToLink";
 
 const STATUS_META: Record<MeetingStatus, { soft: string; text: string }> = {
   Scheduled: { soft: "bg-sky-50", text: "text-sky-700" },
@@ -48,6 +49,7 @@ export function MeetingsListTable({
   statusLabel = "All Meetings",
   embedded = false,
 }: MeetingsListTableProps) {
+  const router = useRouter();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const pageSize = 8;
@@ -159,6 +161,9 @@ export function MeetingsListTable({
                   data-focus-id={meeting.id}
                   data-meeting-id={meeting.id}
                   className="group cursor-pointer transition-colors hover:bg-violet-50/40"
+                  onClick={() =>
+                    router.push(`/activities/meetings/detail/${meeting.id}`)
+                  }
                 >
                   <td className="px-4 py-3">
                     <input
@@ -171,22 +176,20 @@ export function MeetingsListTable({
                     />
                   </td>
                   <td className="max-w-[240px] px-4 py-3">
-                    <Link
-                      href={`/activities/meetings/detail/${meeting.id}`}
-                      className="group block cursor-pointer"
-                    >
-                      <p className="truncate font-semibold text-slate-900 dark:text-slate-100 group-hover:text-primary transition-colors">
-                        {meeting.title}
-                      </p>
-                    </Link>
+                    <p className="truncate font-semibold text-slate-900 dark:text-slate-100">
+                      {meeting.title}
+                    </p>
                     {meeting.agenda ? (
                       <p className="mt-0.5 line-clamp-1 text-[11px] text-slate-400">
                         {meeting.agenda}
                       </p>
                     ) : null}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
-                    {meeting.relatedTo ?? ""}
+                  <td
+                    className="px-4 py-3 text-slate-600"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <RelatedToLink relatedTo={meeting.relatedTo} />
                   </td>
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-1.5 text-slate-600">

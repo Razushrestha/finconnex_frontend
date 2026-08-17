@@ -52,6 +52,11 @@ export default function MeetingsPage() {
     setColumns(listMeetingColumns());
   }, []);
 
+  useEffect(() => {
+    const focus = new URLSearchParams(window.location.search).get("focus");
+    if (focus) router.replace(`/activities/meetings/detail/${focus}`);
+  }, [router]);
+
   const allMeetings = useMemo(
     () =>
       columns.flatMap((c) =>

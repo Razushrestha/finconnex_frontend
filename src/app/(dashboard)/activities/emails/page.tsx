@@ -2,12 +2,8 @@
 
 import { useState } from "react";
 import { EmailListTable } from "@/components/activities/emails/EmailListTable";
-import {
-  ActivityToolbar,
-  type ActivityView,
-} from "@/components/activities/ActivityToolbar";
+import { ActivityToolbar } from "@/components/activities/ActivityToolbar";
 import { EmailsFilterPanel } from "@/components/activities/emails/EmailsFilterPanel";
-import { EmailsKanbanBoard } from "@/components/activities/emails/EmailsKanbanBoard";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { printViewItems } from "../tasks/page";
 import {
@@ -30,9 +26,7 @@ const moreMenuItems = [
 ];
 
 export default function EmailsPage() {
-  const [view, setView] = useState<ActivityView>("kanban");
   const [filterOpen, setFilterOpen] = useState(false);
-  const [sortActive, setSortActive] = useState(true);
 
   return (
     <div className={BOARD_PAGE}>
@@ -42,11 +36,11 @@ export default function EmailsPage() {
           entityLabel="Email"
           createRoute="/activities/emails/create"
           tabs={["All Emails"]}
-          view={view}
-          onViewChange={setView}
+          view="list"
+          onViewChange={() => {}}
+          showViewSwitcher={false}
           filterOpen={filterOpen}
           onToggleFilter={() => setFilterOpen((v) => !v)}
-          onClearSort={() => setSortActive(false)}
           moreMenuItems={moreMenuItems}
           printViewItems={printViewItems}
         />
@@ -58,7 +52,7 @@ export default function EmailsPage() {
         )}
 
         <div className="min-h-0 min-w-0 flex-1 overflow-auto rounded-sm [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100">
-          {view === "list" ? <EmailListTable /> : <EmailsKanbanBoard />}
+          <EmailListTable />
         </div>
       </div>
     </div>

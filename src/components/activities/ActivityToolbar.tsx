@@ -47,6 +47,8 @@ export interface ActivityToolbarProps {
 
   view: ActivityView;
   onViewChange: (view: ActivityView) => void;
+  /** When false, list/kanban switcher is hidden (page is list-only). */
+  showViewSwitcher?: boolean;
 
   filterOpen: boolean;
   onToggleFilter: () => void;
@@ -84,6 +86,7 @@ export function ActivityToolbar({
   tabCounts,
   view,
   onViewChange,
+  showViewSwitcher = true,
   filterOpen,
   onToggleFilter,
   sortOptions,
@@ -272,53 +275,76 @@ export function ActivityToolbar({
             )}
           </div>
 
-          <span className="mx-0.5 hidden h-4 w-px bg-slate-200 sm:block" />
+          {showViewSwitcher ? (
+            <>
+              <span className="mx-0.5 hidden h-4 w-px bg-slate-200 sm:block" />
 
-          <div className="flex items-center gap-0.5">
-            <button
-              type="button"
-              onClick={() => onViewChange("list")}
-              aria-label="List view"
-              title="List view"
-              className={`flex h-7 w-7 items-center justify-center rounded-md ${
-                view === "list"
-                  ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200"
-                  : "text-slate-500 hover:bg-slate-50"
-              }`}
-            >
-              <List className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onViewChange("kanban")}
-              aria-label="Kanban view"
-              title="Kanban view"
-              className={`flex h-7 w-7 items-center justify-center rounded-md ${
-                view === "kanban"
-                  ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200"
-                  : "text-slate-500 hover:bg-slate-50"
-              }`}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-            </button>
+              <div className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => onViewChange("list")}
+                  aria-label="List view"
+                  title="List view"
+                  className={`flex h-7 w-7 items-center justify-center rounded-md ${
+                    view === "list"
+                      ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200"
+                      : "text-slate-500 hover:bg-slate-50"
+                  }`}
+                >
+                  <List className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onViewChange("kanban")}
+                  aria-label="Kanban view"
+                  title="Kanban view"
+                  className={`flex h-7 w-7 items-center justify-center rounded-md ${
+                    view === "kanban"
+                      ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200"
+                      : "text-slate-500 hover:bg-slate-50"
+                  }`}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                </button>
 
-            {extraViewIcons.map(({ key, icon: Icon, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => onViewChange(key)}
-                aria-label={label}
-                title={label}
-                className={`flex h-7 w-7 items-center justify-center rounded-md ${
-                  view === key
-                    ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200"
-                    : "text-slate-500 hover:bg-slate-50"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-              </button>
-            ))}
-          </div>
+                {extraViewIcons.map(({ key, icon: Icon, label }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => onViewChange(key)}
+                    aria-label={label}
+                    title={label}
+                    className={`flex h-7 w-7 items-center justify-center rounded-md ${
+                      view === key
+                        ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200"
+                        : "text-slate-500 hover:bg-slate-50"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : extraViewIcons.length > 0 ? (
+            <div className="flex items-center gap-0.5">
+              {extraViewIcons.map(({ key, icon: Icon, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => onViewChange(key)}
+                  aria-label={label}
+                  title={label}
+                  className={`flex h-7 w-7 items-center justify-center rounded-md ${
+                    view === key
+                      ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200"
+                      : "text-slate-500 hover:bg-slate-50"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           {showRefresh && (
             <button

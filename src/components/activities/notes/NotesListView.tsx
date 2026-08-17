@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Search,
   Pin,
@@ -14,7 +15,7 @@ import { type Note, type NoteType } from "@/lib/notes/types";
 import { listNotes } from "@/lib/notes/store";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
-import { RecordDetailModal } from "@/components/shared/RecordDetailModal";
+import { RelatedToLink } from "@/components/activities/RelatedToLink";
 
 const TYPE_META: Record<NoteType, { soft: string; text: string }> = {
   General: { soft: "bg-slate-100", text: "text-slate-600" },
@@ -45,17 +46,10 @@ export function NotesListView({
   const [page, setPage] = useState(1);
   const pageSize = 8;
 
+  const router = useRouter();
   const search = controlledSearch ?? localSearch;
   const setSearch = onSearchChange ?? setLocalSearch;
-  const [detail, setDetail] = useState<Note | null>(null);
   const allNotes = notesOverride ?? listNotes();
-
-  useEffect(() => {
-    const focus = new URLSearchParams(window.location.search).get("focus");
-    if (!focus) return;
-    const hit = allNotes.find((n) => n.id === focus);
-    if (hit) setDetail(hit);
-  }, [allNotes]);
 
   const filtered = useMemo(() => {
     if (notesOverride) {
@@ -142,7 +136,9 @@ export function NotesListView({
                   data-focus-id={note.id}
                   data-note-id={note.id}
                   className="group cursor-pointer transition-colors hover:bg-violet-50/40"
-                  onClick={() => setDetail(note)}
+                  onClick={() =>
+                    router.push(`/activities/notes/detail/${note.id}`)
+                  }
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
@@ -164,7 +160,12 @@ export function NotesListView({
                       {note.body}
                     </p>
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{note.relatedTo}</td>
+                  <td
+                    className="px-4 py-3 text-slate-600"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <RelatedToLink relatedTo={note.relatedTo} />
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={cn(
@@ -242,32 +243,6 @@ export function NotesListView({
         </div>
       </div>
 
-      <RecordDetailModal
-        open={!!detail}
-        onClose={() => setDetail(null)}
-        title={detail?.title || "Note"}
-        subtitle={detail?.noteType}
-        fields={
-          detail
-            ? [
-                { label: "Related to", value: detail.relatedTo },
-                { label: "Type", value: detail.noteType },
-                { label: "Created by", value: detail.createdBy },
-                { label: "Created at", value: detail.createdAt },
-                {
-                  label: "Flags",
-                  value: [
-                    detail.isPinned ? "Pinned" : null,
-                    detail.isPrivate ? "Private" : null,
-                  ]
-                    .filter(Boolean)
-                    .join(", "),
-                },
-              ]
-            : []
-        }
-        body={detail?.body}
-      />
     </div>
   );
 }

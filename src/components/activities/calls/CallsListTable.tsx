@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Phone, ChevronLeft, ChevronRight } from "lucide-react";
 import { listCalls } from "@/lib/calls/store";
-import type { Call } from "@/lib/calls/types";
-import { RecordDetailModal } from "@/components/shared/RecordDetailModal";
+import { RelatedToLink } from "@/components/activities/RelatedToLink";
 import { useRouter } from "next/navigation";
 
 interface CallsListTableProps {
@@ -117,8 +116,16 @@ export function CallsListTable({
                     {call.subject}
                   </div>
                 </td>
-                <td className="px-3 py-2 text-slate-600">
-                  {call.relatedTo || ""}
+                <td
+                  className="px-3 py-2 text-slate-600"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <RelatedToLink
+                    relatedTo={
+                      call.relatedTo ||
+                      (call.contact ? `Contact: ${call.contact}` : undefined)
+                    }
+                  />
                 </td>
                 <td className="px-3 py-2 text-slate-600">
                   {call.contact || ""}
@@ -161,27 +168,6 @@ export function CallsListTable({
           </button>
         </div>
       </div>
-
-      {/* <RecordDetailModal
-        open={!!detail}
-        onClose={() => setDetail(null)}
-        title={detail?.subject ?? "Call"}
-        subtitle={detail?.status}
-        fields={
-          detail
-            ? [
-                { label: "Related to", value: detail.relatedTo ?? "" },
-                { label: "Contact", value: detail.contact ?? "" },
-                { label: "Type", value: detail.callType },
-                { label: "Status", value: detail.status },
-                { label: "Date", value: detail.date },
-                { label: "Duration", value: detail.duration ?? "" },
-                { label: "Assigned to", value: detail.assignedTo },
-              ]
-            : []
-        }
-        body={detail?.notes}
-      /> */}
     </div>
   );
 }

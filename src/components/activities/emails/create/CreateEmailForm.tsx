@@ -37,9 +37,6 @@ const EMAIL_TEMPLATES = [
   "Proposal Follow-up",
 ];
 
-type BodyFont = "Sans Serif" | "Serif" | "Monospace";
-type BodyAlign = "left" | "center" | "right";
-
 interface Attachment {
   id: string;
   name: string;
@@ -51,14 +48,12 @@ interface FormState {
   body: string;
   from: string;
   to: string[];
-  cc: string;
-  bcc: string;
+  cc: string[];
+  bcc: string[];
   relatedKind: RelatedEntityKind | "";
   relatedName: string;
   template: string;
   attachments: Attachment[];
-  bodyFont: BodyFont;
-  bodyAlign: BodyAlign;
 }
 
 const initialState: FormState = {
@@ -66,14 +61,12 @@ const initialState: FormState = {
   body: "",
   from: "bishnu@nepatronix.com",
   to: [],
-  cc: "",
-  bcc: "",
+  cc: [],
+  bcc: [],
   relatedKind: "",
   relatedName: "",
   template: "",
   attachments: [],
-  bodyFont: "Sans Serif",
-  bodyAlign: "left",
 };
 
 const MOCK_CONTACT = {
@@ -123,8 +116,11 @@ export function CreateEmailForm({
     Partial<Record<keyof FormState, string>>
   >({});
   const [submitted, setSubmitted] = useState(false);
-  const [showCcBcc, setShowCcBcc] = useState(false);
+  const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
   const [recipientDraft, setRecipientDraft] = useState("");
+  const [ccDraft, setCcDraft] = useState("");
+  const [bccDraft, setBccDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -133,26 +129,54 @@ export function CreateEmailForm({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function validate() {
-    const next: Partial<Record<keyof FormState, string>> = {};
-    if (!form.subject.trim()) next.subject = "Subject is required";
-    if (!form.body.trim()) next.body = "Body is required";
-    if (form.to.length === 0) next.to = "At least one recipient is required";
-    setErrors(next);
-    return Object.keys(next).length === 0;
+  function parseAddresses(raw: string) {
+    return raw
+      .split(/[,;]+/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+  }
+
+  function addToList(
+    key: "to" | "cc" | "bcc",
+    raw: string,
+    clearDraft: () => void,
+  ) {
+    const next = parseAddresses(raw);
+    if (next.length === 0) return;
+    update(key, [...new Set([...form[key], ...next])]);
+    clearDraft();
   }
 
   function addRecipient() {
-    const value = recipientDraft.trim();
-    if (!value || form.to.includes(value)) return;
-    update("to", [...form.to, value]);
-    setRecipientDraft("");
+    addToList("to", recipientDraft, () => setRecipientDraft(""));
   }
 
   function removeRecipient(value: string) {
     update(
       "to",
       form.to.filter((r) => r !== value),
+    );
+  }
+
+  function addCc() {
+    addToList("cc", ccDraft, () => setCcDraft(""));
+  }
+
+  function removeCc(value: string) {
+    update(
+      "cc",
+      form.cc.filter((r) => r !== value),
+    );
+  }
+
+  function addBcc() {
+    addToList("bcc", bccDraft, () => setBccDraft(""));
+  }
+
+  function removeBcc(value: string) {
+    update(
+      "bcc",
+      form.bcc.filter((r) => r !== value),
     );
   }
 
@@ -166,15 +190,32 @@ export function CreateEmailForm({
     update("attachments", [...form.attachments, ...next]);
   }
 
+  function mergeList(list: string[], draft: string) {
+    return [...new Set([...list, ...parseAddresses(draft)])];
+  }
+
   async function save(status: EmailStatus) {
     setSubmitted(true);
     setSendError(null);
-    if (!validate()) return;
+    const to = mergeList(form.to, recipientDraft);
+    const cc = mergeList(form.cc, ccDraft);
+    const bcc = mergeList(form.bcc, bccDraft);
+    setForm((prev) => ({ ...prev, to, cc, bcc }));
+    setRecipientDraft("");
+    setCcDraft("");
+    setBccDraft("");
+
+    const next: Partial<Record<keyof FormState, string>> = {};
+    if (!form.subject.trim()) next.subject = "Subject is required";
+    if (!form.body.trim()) next.body = "Body is required";
+    if (to.length === 0) next.to = "At least one recipient is required";
+    setErrors(next);
+    if (Object.keys(next).length > 0) return;
 
     if (status === "Sent") {
       setSending(true);
       const result = await sendEmailDemoLive({
-        email: form.to[0],
+        email: to[0],
         subject: form.subject.trim(),
         body: form.body.trim(),
       });
@@ -193,7 +234,9 @@ export function CreateEmailForm({
       subject: form.subject.trim(),
       body: form.body.trim(),
       from: form.from.trim(),
-      to: form.to,
+      to,
+      cc,
+      bcc,
       relatedTo,
       status,
       sentDate: status === "Draft" ? undefined : formatRulesAt(new Date()),
@@ -270,12 +313,20 @@ export function CreateEmailForm({
             onDraftChange={setRecipientDraft}
             onAddRecipient={addRecipient}
             onRemoveRecipient={removeRecipient}
-            showCcBcc={showCcBcc}
-            onToggleCcBcc={() => setShowCcBcc((v) => !v)}
+            showCc={showCc}
+            showBcc={showBcc}
+            onToggleCc={() => setShowCc((v) => !v)}
+            onToggleBcc={() => setShowBcc((v) => !v)}
             cc={form.cc}
+            ccDraft={ccDraft}
+            onCcDraftChange={setCcDraft}
+            onAddCc={addCc}
+            onRemoveCc={removeCc}
             bcc={form.bcc}
-            onCcChange={(val) => update("cc", val)}
-            onBccChange={(val) => update("bcc", val)}
+            bccDraft={bccDraft}
+            onBccDraftChange={setBccDraft}
+            onAddBcc={addBcc}
+            onRemoveBcc={removeBcc}
             error={errors.to}
             submitted={submitted}
           />
@@ -318,11 +369,8 @@ export function CreateEmailForm({
           <EmailEditor
             body={form.body}
             onChange={(val) => update("body", val)}
-            bodyFont={form.bodyFont}
-            onFontChange={(font) => update("bodyFont", font)}
-            bodyAlign={form.bodyAlign}
-            onAlignChange={(align) => update("bodyAlign", align)}
-            onAttachImage={() => fileInputRef.current?.click()}
+            recipientName={form.relatedName || form.to[0]}
+            subject={form.subject}
             error={errors.body}
             submitted={submitted}
           />

@@ -111,7 +111,7 @@ export function CreateNoteForm({
     }
     void layoutId;
     void redirect;
-    router.push(`/activities/notes?focus=${created.id}`);
+    router.push(`/activities/notes/detail/${created.id}`);
   }
 
   return (

@@ -1,3 +1,7 @@
+"use client";
+
+import { useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   Calendar,
   Clock,
@@ -7,19 +11,11 @@ import {
   Users,
   Link2,
 } from "lucide-react";
-import type { Meeting, MeetingStatus, MeetingType } from "@/lib/meetings/types";
+import type { Meeting, MeetingType } from "@/lib/meetings/types";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
-import Link from "next/link";
-
-const STATUS_BORDER: Record<MeetingStatus, string> = {
-  Scheduled: "border-l-sky-500",
-  "In Progress": "border-l-amber-500",
-  Completed: "border-l-emerald-500",
-  Cancelled: "border-l-slate-400",
-  Rescheduled: "border-l-violet-500",
-};
+import { RelatedToLink } from "@/components/activities/RelatedToLink";
 
 const TYPE_ICON: Record<MeetingType, React.ElementType> = {
   "Video Call": Video,
@@ -50,35 +46,62 @@ export function MeetingCard({
   onDragEnd,
   isDragging,
 }: MeetingCardProps) {
+  const router = useRouter();
+  const wasDragging = useRef(false);
   const TypeIcon = TYPE_ICON[meeting.type];
+  const href = `/activities/meetings/detail/${meeting.id}`;
+
+  function goToMeeting() {
+    if (wasDragging.current) return;
+    router.push(href);
+  }
 
   return (
     <div
       draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      role="link"
+      tabIndex={0}
+      onDragStart={(e) => {
+        wasDragging.current = true;
+        onDragStart(e);
+      }}
+      onDragEnd={() => {
+        onDragEnd();
+        setTimeout(() => {
+          wasDragging.current = false;
+        }, 0);
+      }}
+      onClick={goToMeeting}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          goToMeeting();
+        }
+      }}
       data-focus-id={meeting.id}
       data-meeting-id={meeting.id}
       data-column-id={columnId}
-      className={cn(entityCardBox, cardMotion, isDragging && cardDragging)}
+      className={cn(
+        entityCardBox,
+        "cursor-pointer",
+        cardMotion,
+        isDragging && cardDragging,
+      )}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <Link
-          href={`/activities/meetings/detail/${meeting.id}`}
-          className="group cursor-pointer"
-        >
-          <h4 className="text-[13px] font-semibold leading-snug text-slate-900 dark:text-slate-100 group-hover:text-primary transition-colors">
-            {meeting.title}
-          </h4>
-        </Link>
+        <h4 className="text-[13px] font-semibold leading-snug text-slate-900 dark:text-slate-100">
+          {meeting.title}
+        </h4>
         <TypeIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
       </div>
 
       <div className="mb-2.5 flex items-center gap-1.5 text-[11px] text-slate-500">
         <Link2 className="h-3 w-3 shrink-0 text-slate-400" />
-        <span className="truncate">
-          {meeting.relatedTo ?? "General Meeting"}
-        </span>
+        {meeting.relatedTo ? (
+          <RelatedToLink relatedTo={meeting.relatedTo} />
+        ) : (
+          <span className="truncate">General Meeting</span>
+        )}
       </div>
 
       <div className="space-y-1.5 text-[11px] text-slate-500">

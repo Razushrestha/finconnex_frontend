@@ -56,7 +56,8 @@ export function ComposeEmailModal({
   onDiscard,
 }: ComposeEmailModalProps) {
   const [isMinimized, setIsMinimized] = useState(false);
-  const [showCcBcc, setShowCcBcc] = useState(false);
+  const [showCc, setShowCc] = useState(false);
+  const [showBcc, setShowBcc] = useState(false);
   const [subject, setSubject] = useState(defaultSubject);
   const [cc, setCc] = useState("");
   const [bcc, setBcc] = useState("");
@@ -153,32 +154,52 @@ export function ComposeEmailModal({
                 {recipient.email}
               </span>
             </div>
-            {!showCcBcc && (
+            <div className="flex shrink-0 items-center gap-2">
               <button
-                onClick={() => setShowCcBcc(true)}
-                className="shrink-0 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                type="button"
+                onClick={() => setShowCc((v) => !v)}
+                className={`text-xs font-medium transition-colors ${
+                  showCc
+                    ? "text-violet-700"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
               >
-                Cc Bcc
+                Cc
               </button>
-            )}
+              <button
+                type="button"
+                onClick={() => setShowBcc((v) => !v)}
+                className={`text-xs font-medium transition-colors ${
+                  showBcc
+                    ? "text-violet-700"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Bcc
+              </button>
+            </div>
           </div>
 
-          {showCcBcc && (
+          {showCc || showBcc ? (
             <div className="space-y-2 border-b border-border px-4 py-2.5 bg-muted/20">
-              <input
-                value={cc}
-                onChange={(e) => setCc(e.target.value)}
-                placeholder="Cc"
-                className="w-full border-none bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
-              />
-              <input
-                value={bcc}
-                onChange={(e) => setBcc(e.target.value)}
-                placeholder="Bcc"
-                className="w-full border-none bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
-              />
+              {showCc ? (
+                <input
+                  value={cc}
+                  onChange={(e) => setCc(e.target.value)}
+                  placeholder="Cc"
+                  className="w-full border-none bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
+                />
+              ) : null}
+              {showBcc ? (
+                <input
+                  value={bcc}
+                  onChange={(e) => setBcc(e.target.value)}
+                  placeholder="Bcc"
+                  className="w-full border-none bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
+                />
+              ) : null}
             </div>
-          )}
+          ) : null}
 
           {/* Subject */}
           <div className="border-b border-border px-4 py-2.5">

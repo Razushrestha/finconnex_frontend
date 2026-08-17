@@ -1,45 +1,50 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { ExternalLink, CheckSquare, Square, Mail, Plus } from "lucide-react";
+import { hrefForRelatedTo } from "@/lib/activities/related-href";
 
 interface MeetingSidebarCardProps {
   relatedTo?: string;
 }
 
 export function MeetingSidebarCard({ relatedTo }: MeetingSidebarCardProps) {
+  const relatedHref = hrefForRelatedTo(relatedTo);
+
   return (
     <div className="space-y-6">
-      {/* Related Deal Widget */}
+      {/* Related record */}
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-          Related Deal
+        <h3 className="mb-3 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+          Related record
         </h3>
-        <div className="p-4 rounded-xl border border-border bg-white space-y-3 shadow-xs">
-          <div className="flex items-start justify-between">
-            <div>
-              <h4 className="text-sm font-semibold text-card-foreground">
-                Acme Corp - Enterprise Expansion
-              </h4>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {relatedTo || "Deal ID: #10294"}
-              </p>
+        <div className="space-y-3 rounded-xl border border-border bg-white p-4 shadow-xs">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              {relatedHref ? (
+                <Link
+                  href={relatedHref}
+                  className="truncate text-sm font-semibold text-card-foreground hover:text-primary hover:underline"
+                >
+                  {relatedTo}
+                </Link>
+              ) : (
+                <h4 className="truncate text-sm font-semibold text-card-foreground">
+                  {relatedTo || "No related record"}
+                </h4>
+              )}
             </div>
-            <button className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-card-foreground transition-colors cursor-pointer">
-              <ExternalLink className="w-3.5 h-3.5" />
-            </button>
+            {relatedHref ? (
+              <Link
+                href={relatedHref}
+                className="rounded p-1 text-muted-foreground transition-colors hover:bg-secondary hover:text-card-foreground"
+                aria-label="Open related record"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Link>
+            ) : null}
           </div>
-          <div className="flex items-baseline justify-between pt-2 border-t border-border">
-            <span className="text-lg font-bold text-card-foreground">
-              $120,000
-            </span>
-            <span className="px-2 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
-              Proposal
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Expected Close: Nov 15
-          </p>
         </div>
       </div>
 

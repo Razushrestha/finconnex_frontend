@@ -171,11 +171,11 @@ export function TaskCard({
   const submitComment = () => {
     const trimmed = commentText.trim();
     if (!trimmed) {
-      toast.error("Comment can't be empty");
+      toast.error("Note can't be empty");
       return;
     }
     onAddComment?.(task.taskId, trimmed);
-    toast.success("Comment added");
+    toast.success("Note added");
     setCommentText("");
     setShowCommentModal(false);
   };
@@ -431,7 +431,7 @@ export function TaskCard({
           <button
             type="button"
             onClick={() => setShowCommentModal(true)}
-            title="Add comment"
+            title="Add note"
             className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-600"
           >
             <MessageCircle className="h-3.5 w-3.5" />
@@ -553,7 +553,7 @@ export function TaskCard({
         </div>
       ) : null}
 
-      {/* Add comment modal */}
+      {/* Add note modal */}
       {showCommentModal ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
@@ -565,7 +565,7 @@ export function TaskCard({
           >
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-900">
-                Add comment
+                Add note
               </h3>
               <button
                 type="button"
@@ -579,7 +579,7 @@ export function TaskCard({
               autoFocus
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
-              placeholder="Write a comment…"
+              placeholder="Write a note…"
               rows={4}
               className="mb-3 w-full resize-none rounded-md border border-slate-200 p-2 text-[13px] text-slate-700 outline-none focus:border-sky-400"
             />
@@ -596,7 +596,7 @@ export function TaskCard({
                 onClick={submitComment}
                 className="rounded-md bg-sky-600 px-3 py-1.5 text-[12px] font-medium text-white hover:bg-sky-700"
               >
-                Comment
+                Add note
               </button>
             </div>
       </div>

@@ -8,61 +8,57 @@ export function TaskSidebarTimeline() {
   const [comment, setComment] = useState("");
 
   return (
-    <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
-      <h2 className="mb-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+    <section className="py-6">
+      <h2 className="mb-4 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
         Timeline
       </h2>
 
-      <div className="space-y-4 relative before:absolute before:bottom-2 before:top-2 before:left-3.5 before:w-px before:bg-border">
-        <div className="flex gap-3 relative">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary z-10">
+      <div className="relative space-y-5 before:absolute before:top-2 before:bottom-2 before:left-3.5 before:w-px before:bg-slate-100">
+        <div className="relative flex gap-3">
+          <span className="z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#F3ECFB] text-[10px] font-bold text-[#5A32A3]">
             AS
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-medium text-foreground">
+            <p className="text-[11px] font-medium text-slate-800">
               Alex Sterling{" "}
-              <span className="text-[10px] font-normal text-muted-foreground">
+              <span className="text-[10px] font-normal text-slate-400">
                 2h ago
               </span>
             </p>
-            <div className="mt-1 rounded-xl border border-border bg-muted/30 p-2.5 text-xs text-foreground">
+            <p className="mt-1 text-xs leading-relaxed text-slate-600">
               I&apos;ve attached the initial draft of the metrics. Still waiting
               on the APAC numbers from Sarah.
-            </div>
+            </p>
           </div>
         </div>
 
-        <div className="flex gap-3 relative">
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] text-secondary-foreground z-10">
+        <div className="relative flex gap-3">
+          <span className="z-10 flex h-7 w-7 shrink-0 items-center justify-center bg-slate-100 text-[10px] text-slate-500">
             <Clock className="h-3 w-3" />
           </span>
           <div className="min-w-0 flex-1 pt-1">
-            <p className="text-[11px] text-muted-foreground">
-              <span className="font-medium text-foreground">
-                Status changed
-              </span>{" "}
+            <p className="text-[11px] text-slate-500">
+              <span className="font-medium text-slate-800">Status changed</span>{" "}
               to In Progress
             </p>
           </div>
         </div>
       </div>
 
-      <div className="mt-4 pt-3 border-t border-border">
-        <div className="relative">
-          <MentionInput
-            value={comment}
-            onChange={setComment}
-            placeholder="Type @ to mention..."
-            className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring pr-8"
-          />
-          <button
-            type="button"
-            className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
-          >
-            <Send className="h-3 w-3" />
-          </button>
-        </div>
+      <div className="relative mt-5 pt-4">
+        <MentionInput
+          value={comment}
+          onChange={setComment}
+          placeholder="Type @ to mention..."
+          className="w-full border-0 border-b border-slate-200 bg-transparent py-1.5 pr-7 text-xs text-slate-800 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-0"
+        />
+        <button
+          type="button"
+          className="absolute top-6 right-0 text-slate-400 hover:text-slate-700"
+        >
+          <Send className="h-3 w-3" />
+        </button>
       </div>
-    </div>
+    </section>
   );
 }

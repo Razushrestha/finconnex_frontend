@@ -26,32 +26,32 @@ export function TaskDetailsView({
   onAddNote,
 }: TaskDetailsViewProps) {
   return (
-    <div className="min-h-screen bg-background px-4 py-2">
-      <TaskHeader task={task} onBack={onBack} onUpdateStatus={onUpdateStatus} />
+    <div className="min-h-screen bg-white">
+      <div className="px-6 lg:px-10">
+        <TaskHeader
+          task={task}
+          onBack={onBack}
+          onUpdateStatus={onUpdateStatus}
+        />
+      </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="px-6 lg:border-r lg:border-slate-100 lg:px-10">
           <TaskMetadataCard task={task} onUpdateStatus={onUpdateStatus} />
           <TaskDescriptionCard
             description={task.description}
             editable
             onSave={onUpdateDescription}
           />
-          <TaskChecklistCard
-            taskId={task.taskId}
-            items={task.actionItems}
-          />
-          <TaskActivityTabs
-            notes={task.activityNotes}
-            onAddNote={onAddNote}
-          />
+          <TaskChecklistCard taskId={task.taskId} items={task.actionItems} />
+          <TaskActivityTabs notes={task.activityNotes} onAddNote={onAddNote} />
         </div>
 
-        <div className="space-y-6">
+        <aside className="px-6 py-6 lg:px-8">
           <TaskSidebarContext />
           <TaskSidebarParticipants />
           <TaskSidebarTimeline />
-        </div>
+        </aside>
       </div>
     </div>
   );

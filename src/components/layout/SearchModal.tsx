@@ -45,7 +45,7 @@ const DESTINATIONS: SearchItem[] = [
   { label: "Team Chat", href: "/activities/team-chat", icon: MessageSquareText, keywords: ["chat", "dm"] },
   { label: "Messages", href: "/activities/messages", icon: MessageSquareText },
   { label: "Emails", href: "/activities/emails", icon: Mail },
-  { label: "Unified Inbox", href: "/marketing/inbox", icon: Inbox, keywords: ["omni", "sms", "whatsapp"] },
+  { label: "Inbox", href: "/marketing/inbox", icon: Inbox, keywords: ["omni", "sms", "whatsapp", "unified"] },
   { label: "Email Campaigns", href: "/marketing/email", icon: Mail },
   { label: "Support", href: "/support", icon: LifeBuoy, keywords: ["ticket"] },
   { label: "Notifications", href: "/notifications", icon: Bell },

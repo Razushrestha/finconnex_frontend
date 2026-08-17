@@ -65,14 +65,14 @@ export function TaskChecklistCard({
 
   if (checklist.length === 0 && !draft) {
     return (
-      <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
-        <h2 className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      <section className="border-b border-slate-100 py-7">
+        <h2 className="mb-2 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
           Action Items
         </h2>
-        <p className="mb-4 text-sm text-muted-foreground">
+        <p className="mb-4 text-sm text-slate-500">
           No action items on this task yet.
         </p>
-        <div className="flex items-center gap-2 rounded-lg border border-dashed border-border px-3 py-2 focus-within:border-violet-300 focus-within:ring-2 focus-within:ring-violet-100">
+        <div className="flex items-center gap-2 border-b border-slate-200 py-1.5 focus-within:border-violet-400">
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -89,27 +89,27 @@ export function TaskChecklistCard({
             type="button"
             onClick={addItem}
             disabled={!draft.trim()}
-            className="text-xs font-medium text-violet-700 disabled:text-muted-foreground"
+            className="text-xs font-medium text-violet-700 disabled:text-slate-400"
           >
             Add
           </button>
         </div>
-      </div>
+      </section>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
+    <section className="border-b border-slate-100 py-7">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <h2 className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
           Action Items [{completedCount}/{checklist.length}]
         </h2>
       </div>
 
       {checklist.length > 0 && (
-        <div className="mb-4 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+        <div className="mb-4 h-px w-full bg-slate-100">
           <div
-            className="h-full bg-primary transition-all duration-300"
+            className="h-px bg-[#5A32A3] transition-all duration-300"
             style={{
               width: `${(completedCount / checklist.length) * 100}%`,
             }}
@@ -121,16 +121,16 @@ export function TaskChecklistCard({
         {checklist.map((item) => (
           <label
             key={item.id}
-            className="flex cursor-pointer items-center gap-3 py-1.5"
+            className="flex cursor-pointer items-center gap-3 py-0.5"
           >
             <input
               type="checkbox"
               checked={item.done}
               onChange={() => toggleItem(item.id)}
-              className="h-4 w-4 rounded border-border text-primary focus:ring-ring"
+              className="h-4 w-4 rounded border-slate-300 text-[#5A32A3] focus:ring-[#5A32A3]"
             />
             <span
-              className={`text-sm ${item.done ? "text-muted-foreground line-through" : "text-foreground"}`}
+              className={`text-sm ${item.done ? "text-slate-400 line-through" : "text-slate-800"}`}
             >
               {item.text}
             </span>
@@ -138,7 +138,7 @@ export function TaskChecklistCard({
         ))}
       </div>
 
-      <div className="mt-4 flex items-center gap-2">
+      <div className="mt-4 flex items-center gap-2 border-b border-slate-200 py-1.5 focus-within:border-violet-400">
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -149,18 +149,18 @@ export function TaskChecklistCard({
             }
           }}
           placeholder="Add new action item…"
-          className="min-w-0 flex-1 rounded-lg border border-border px-3 py-2 text-sm focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100"
+          className="min-w-0 flex-1 bg-transparent text-sm focus:outline-none"
         />
         <button
           type="button"
           onClick={addItem}
           disabled={!draft.trim()}
-          className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-primary transition-opacity hover:opacity-80 disabled:opacity-40"
+          className="inline-flex items-center gap-1 text-xs font-medium text-[#5A32A3] hover:opacity-80 disabled:opacity-40"
         >
           <Plus className="h-3.5 w-3.5" />
           Add Item
         </button>
       </div>
-    </div>
+    </section>
   );
 }

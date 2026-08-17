@@ -429,6 +429,12 @@ export function listLeadActivityCandidates(
 /** Deep-link into the matching activity module (Work Queue style). */
 export function hrefForLeadActivity(c: LeadActivityCandidate): string | null {
   if (!c.sourceModule) return null;
+  if (c.sourceModule === "notes") {
+    return `/activities/notes/detail/${c.id}`;
+  }
+  if (c.sourceModule === "meetings") {
+    return `/activities/meetings/detail/${c.id}`;
+  }
   const base: Record<string, string> = {
     tasks: "/activities/tasks",
     calls: "/activities/calls",
@@ -436,7 +442,6 @@ export function hrefForLeadActivity(c: LeadActivityCandidate): string | null {
     emails: "/activities/emails",
     messages: "/activities/messages",
     reminders: "/activities/reminders",
-    notes: "/activities/notes",
     attachments: "/activities/attachments",
     documents: "/documents/requests",
     leads: "/sales/leads",

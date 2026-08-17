@@ -1,52 +1,95 @@
-import React from "react";
+"use client";
+
+import { use, useEffect, useState } from "react";
 import { Calendar, Clock, Edit3, Video, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { Meeting, meetings } from "@/lib/meetings/types";
+import { useRouter } from "next/navigation";
+import type { Meeting } from "@/lib/meetings/types";
+import { findMeetingById } from "@/lib/meetings/store";
 import { MeetingInfoCard } from "@/components/activities/meetings/detail/MeetingInfoCard";
 import { MeetingAgenda } from "@/components/activities/meetings/detail/MeetingAgenda";
 import { MeetingParticipants } from "@/components/activities/meetings/detail/MeetingParticipants";
 import { MeetingNotes } from "@/components/activities/meetings/detail/MeetingNotes";
 import { MeetingSidebarCard } from "@/components/activities/meetings/detail/MeetingSidebarCard";
+import { onRulesChange } from "@/lib/rules";
 
-export default async function MeetingDetailsPage({
+export default function MeetingDetailsPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-  const meeting: Meeting = meetings.find((m) => m.id === id) || meetings[0];
+  const { id } = use(params);
+  const router = useRouter();
+  const [meeting, setMeeting] = useState<Meeting | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    function load() {
+      setMeeting(findMeetingById(id)?.meeting ?? null);
+      setReady(true);
+    }
+    load();
+    return onRulesChange(load);
+  }, [id]);
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-[320px] items-center justify-center px-4">
+        <p className="text-sm text-slate-500">Loading meeting…</p>
+      </div>
+    );
+  }
+
+  if (!meeting) {
+    return (
+      <div className="flex min-h-[320px] items-center justify-center px-4">
+        <div className="text-center">
+          <p className="text-sm font-medium text-slate-700">Meeting not found</p>
+          <button
+            type="button"
+            onClick={() => router.push("/activities/meetings")}
+            className="mt-3 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+          >
+            Back to Meetings
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const startParts = meeting.startDateTime.split(" ");
+  const endParts = meeting.endDateTime.split(" ");
 
   return (
-    <div className="flex h-screen bg-background text-foreground overflow-hidden">
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col border-r border-border overflow-y-auto">
-        {/* Top Header / Actions Bar */}
-        <div className="sticky top-0 z-10 flex items-center justify-between px-8 py-4 border-b border-border bg-white backdrop-blur-md">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+      <div className="flex flex-1 flex-col overflow-y-auto border-r border-border">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white px-8 py-4 backdrop-blur-md">
           <Link
             href="/activities/meetings"
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="w-4 h-4" /> Back to Meetings
           </Link>
           <div className="flex items-center gap-3">
-            <button className="px-4 py-2 text-sm font-medium bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg flex items-center gap-2 transition-colors cursor-pointer">
+            <button
+              type="button"
+              className="flex cursor-pointer items-center gap-2 rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+            >
               <Edit3 className="w-4 h-4" /> Edit Details
             </button>
-            <button className="px-4 py-2 text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg flex items-center gap-2 shadow-sm transition-all cursor-pointer">
+            <button
+              type="button"
+              className="flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90"
+            >
               <Video className="w-4 h-4" /> Join Meeting
             </button>
           </div>
         </div>
 
-        {/* Meeting Header Metadata */}
-        <div className="px-8 py-6 space-y-4 border-b border-border bg-white">
+        <div className="space-y-4 border-b border-border bg-white px-8 py-6">
           <div className="flex items-center gap-3">
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary uppercase tracking-wider">
+            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold tracking-wider text-primary uppercase">
               {meeting.status}
-            </span>
-            <span className="flex items-center gap-1 text-xs text-emerald-500 font-medium">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />{" "}
-              Starts in 2h 15m
             </span>
           </div>
 
@@ -56,23 +99,19 @@ export default async function MeetingDetailsPage({
 
           <div className="flex flex-wrap items-center gap-6 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-primary" />
-              <span>{meeting.startDateTime.split(" ")[0]}</span>
+              <Calendar className="h-4 w-4 text-primary" />
+              <span>{startParts[0]}</span>
             </div>
             <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-primary" />
+              <Clock className="h-4 w-4 text-primary" />
               <span>
-                {meeting.startDateTime.split(" ")[1]}{" "}
-                {meeting.startDateTime.split(" ")[2]} -{" "}
-                {meeting.endDateTime.split(" ")[1]}{" "}
-                {meeting.endDateTime.split(" ")[2]}
+                {startParts[1]} {startParts[2]} - {endParts[1]} {endParts[2]}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Scrollable Body Content */}
-        <div className="p-8 space-y-8 flex-1">
+        <div className="flex-1 space-y-8 p-8">
           <MeetingInfoCard
             type={meeting.type}
             location={meeting.location}
@@ -90,8 +129,7 @@ export default async function MeetingDetailsPage({
         </div>
       </div>
 
-      {/* Right CRM Sidebar */}
-      <div className="w-96 bg-white p-6 overflow-y-auto border-l border-border hidden xl:block">
+      <div className="hidden w-96 overflow-y-auto border-l border-border bg-white p-6 xl:block">
         <MeetingSidebarCard relatedTo={meeting.relatedTo} />
       </div>
     </div>

@@ -44,6 +44,7 @@ import {
   type AvailabilityRule,
   type BookingQuestion,
   type ConsultationMode,
+  type ConsultantPriority,
   type MeetingMode,
   type MeetingVia,
 } from "@/lib/booking/types";
@@ -80,6 +81,7 @@ const DURATION_PRESETS = [15, 30, 45, 60, 90];
 const BUFFER_PRESETS = [0, 5, 10, 15, 30];
 const NOTICE_PRESETS = [0, 1, 2, 4, 12, 24];
 const ADVANCE_PRESETS = [7, 14, 30, 60, 90];
+const BRAND = "#5A32A3";
 
 const EVENT_META: Record<
   BookingEventType,
@@ -207,6 +209,9 @@ export function BookingPageForm({
     initial?.consultants ??
       (initial?.owner ? [initial.owner] : []),
   );
+  const [consultantPriorities, setConsultantPriorities] = useState<
+    Record<string, ConsultantPriority>
+  >(initial?.consultantPriorities ?? {});
   const [durationMinutes, setDurationMinutes] = useState(
     initial?.durationMinutes ?? defaultDurationMinutes ?? 30,
   );
@@ -283,6 +288,7 @@ export function BookingPageForm({
             ? [live.owner]
             : [],
       );
+      setConsultantPriorities(live.consultantPriorities ?? {});
       setDurationMinutes(live.durationMinutes);
       setBufferMinutes(live.bufferMinutes);
       setMinNoticeHours(live.minNoticeHours ?? 2);
@@ -322,6 +328,7 @@ export function BookingPageForm({
     meetingViaDetail,
     maxAttendees,
     consultants,
+    consultantPriorities,
   };
 
   useEffect(() => {
@@ -365,6 +372,8 @@ export function BookingPageForm({
     if (patch.maxAttendees !== undefined)
       setMaxAttendees(patch.maxAttendees);
     if (patch.consultants !== undefined) setConsultants(patch.consultants);
+    if (patch.consultantPriorities !== undefined)
+      setConsultantPriorities(patch.consultantPriorities);
   }
 
   function updateAvail(day: string, patch: Partial<AvailabilityRule>) {
@@ -506,6 +515,7 @@ export function BookingPageForm({
           ? maxAttendees
           : undefined,
       consultants: isConsultation ? consultants : undefined,
+      consultantPriorities: isConsultation ? consultantPriorities : undefined,
     };
   }
 
@@ -531,6 +541,7 @@ export function BookingPageForm({
       setMeetingVia("video");
       setMeetingViaDetail("");
       setConsultants([]);
+      setConsultantPriorities({});
       setErrors({});
       return;
     }
@@ -632,7 +643,6 @@ export function BookingPageForm({
                       label="Public URL"
                       required
                       error={errors.slug}
-                      className="sm:col-span-2"
                     >
                       <InputShell icon={Link2} error={!!errors.slug}>
                         <div className="flex w-full min-w-0 items-center">
@@ -657,6 +667,24 @@ export function BookingPageForm({
                             className="h-10 min-w-0 flex-1 bg-transparent pr-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400"
                           />
                         </div>
+                      </InputShell>
+                    </Field>
+
+                    <Field label="Event type">
+                      <InputShell icon={EVENT_META[eventType].icon}>
+                        <select
+                          value={eventType}
+                          onChange={(e) =>
+                            selectEventType(e.target.value as BookingEventType)
+                          }
+                          className={elevatedSelectClass(true)}
+                        >
+                          {BOOKING_EVENT_TYPES.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
                       </InputShell>
                     </Field>
 
@@ -698,142 +726,94 @@ export function BookingPageForm({
                     </Field>
                   </div>
 
-                  <div className="mt-2.5">
-                    <p className="mb-1.5 text-[11px] font-semibold text-slate-700">
-                      Event type
-                    </p>
-                    <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-4">
-                      {BOOKING_EVENT_TYPES.map((t) => {
-                        const meta = EVENT_META[t];
-                        const Icon = meta.icon;
-                        const active = eventType === t;
-                        return (
-                          <button
-                            key={t}
-                            type="button"
-                            onClick={() => selectEventType(t)}
-                            className={cn(
-                              "flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-all",
-                              active
-                                ? "border-violet-300 bg-violet-50 shadow-[0_0_0_2px_rgba(139,92,246,0.12)]"
-                                : "border-slate-200 bg-white hover:border-violet-200",
-                            )}
+                  {isConsultation ? (
+                    <ConsultationSetup
+                      value={consultationValue}
+                      errors={errors}
+                      onChange={patchConsultation}
+                      onTitleChange={applyTitle}
+                    />
+                  ) : null}
+
+                  <div
+                    className={cn(
+                      "mt-2.5 grid gap-2.5 sm:grid-cols-2",
+                      isConsultation ? "lg:grid-cols-3" : "lg:grid-cols-4",
+                    )}
+                  >
+                    {!isConsultation ? (
+                      <Field label="Duration" error={errors.duration}>
+                        <InputShell icon={Clock} error={!!errors.duration}>
+                          <select
+                            value={durationMinutes}
+                            onChange={(e) =>
+                              setDurationMinutes(Number(e.target.value))
+                            }
+                            className={elevatedSelectClass(true)}
                           >
-                            <span
-                              className={cn(
-                                "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
-                                meta.soft,
-                                meta.text,
-                              )}
-                            >
-                              <Icon className="h-3.5 w-3.5" />
-                            </span>
-                            <span className="min-w-0">
-                              <span className="block truncate text-[11px] font-semibold text-slate-900">
-                                {t}
-                              </span>
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {isConsultation ? (
-                      <ConsultationSetup
-                        value={consultationValue}
-                        errors={errors}
-                        onChange={patchConsultation}
-                        onTitleChange={applyTitle}
-                      />
+                            {DURATION_PRESETS.map((m) => (
+                              <option key={m} value={m}>
+                                {m} minutes
+                              </option>
+                            ))}
+                          </select>
+                        </InputShell>
+                      </Field>
                     ) : null}
-                  </div>
 
-                  {!isConsultation ? (
-                  <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
-                    <div>
-                      <p className="mb-1.5 text-[11px] font-semibold text-slate-700">
-                        Duration
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {DURATION_PRESETS.map((m) => (
-                          <Chip
-                            key={m}
-                            active={durationMinutes === m}
-                            onClick={() => setDurationMinutes(m)}
-                            label={`${m}m`}
-                          />
-                        ))}
-                      </div>
-                      {errors.duration ? (
-                        <p className="mt-1 text-[11px] font-medium text-rose-500">
-                          {errors.duration}
-                        </p>
-                      ) : null}
-                    </div>
-                    <div>
-                      <p className="mb-1.5 text-[11px] font-semibold text-slate-700">
-                        Buffer
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {BUFFER_PRESETS.map((m) => (
-                          <Chip
-                            key={m}
-                            active={bufferMinutes === m}
-                            onClick={() => setBufferMinutes(m)}
-                            label={m === 0 ? "None" : `${m}m`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  ) : (
-                  <div className="mt-2.5">
-                    <p className="mb-1.5 text-[11px] font-semibold text-slate-700">
-                      Buffer
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {BUFFER_PRESETS.map((m) => (
-                        <Chip
-                          key={m}
-                          active={bufferMinutes === m}
-                          onClick={() => setBufferMinutes(m)}
-                          label={m === 0 ? "None" : `${m}m`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  )}
+                    <Field label="Buffer">
+                      <InputShell icon={Clock}>
+                        <select
+                          value={bufferMinutes}
+                          onChange={(e) =>
+                            setBufferMinutes(Number(e.target.value))
+                          }
+                          className={elevatedSelectClass(true)}
+                        >
+                          {BUFFER_PRESETS.map((m) => (
+                            <option key={m} value={m}>
+                              {m === 0 ? "None" : `${m} minutes`}
+                            </option>
+                          ))}
+                        </select>
+                      </InputShell>
+                    </Field>
 
-                  <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
-                    <div>
-                      <p className="mb-1.5 text-[11px] font-semibold text-slate-700">
-                        Min notice
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {NOTICE_PRESETS.map((h) => (
-                          <Chip
-                            key={h}
-                            active={minNoticeHours === h}
-                            onClick={() => setMinNoticeHours(h)}
-                            label={h === 0 ? "None" : `${h}h`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="mb-1.5 text-[11px] font-semibold text-slate-700">
-                        Book ahead
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {ADVANCE_PRESETS.map((d) => (
-                          <Chip
-                            key={d}
-                            active={maxAdvanceDays === d}
-                            onClick={() => setMaxAdvanceDays(d)}
-                            label={`${d}d`}
-                          />
-                        ))}
-                      </div>
-                    </div>
+                    <Field label="Min notice">
+                      <InputShell icon={Bell}>
+                        <select
+                          value={minNoticeHours}
+                          onChange={(e) =>
+                            setMinNoticeHours(Number(e.target.value))
+                          }
+                          className={elevatedSelectClass(true)}
+                        >
+                          {NOTICE_PRESETS.map((h) => (
+                            <option key={h} value={h}>
+                              {h === 0 ? "None" : `${h} hour${h === 1 ? "" : "s"}`}
+                            </option>
+                          ))}
+                        </select>
+                      </InputShell>
+                    </Field>
+
+                    <Field label="Book ahead">
+                      <InputShell icon={CalendarClock}>
+                        <select
+                          value={maxAdvanceDays}
+                          onChange={(e) =>
+                            setMaxAdvanceDays(Number(e.target.value))
+                          }
+                          className={elevatedSelectClass(true)}
+                        >
+                          {ADVANCE_PRESETS.map((d) => (
+                            <option key={d} value={d}>
+                              {d} days
+                            </option>
+                          ))}
+                        </select>
+                      </InputShell>
+                    </Field>
                   </div>
 
                   <div className="mt-2.5">
@@ -894,9 +874,9 @@ export function BookingPageForm({
                           className={cn(
                             "relative flex flex-col items-center rounded-lg border px-1 py-1.5 transition-all",
                             selected
-                              ? "border-violet-400 bg-violet-50 shadow-[0_0_0_2px_rgba(139,92,246,0.15)]"
+                              ? "border-[#5A32A3] bg-[#F3ECFB] shadow-[0_0_0_2px_rgba(90,50,163,0.12)]"
                               : r.enabled
-                                ? "border-violet-200 bg-white hover:border-violet-300"
+                                ? "border-[#5A32A3]/25 bg-white hover:border-[#5A32A3]/45"
                                 : "border-slate-200 bg-slate-50/80 text-slate-400 hover:border-slate-300",
                           )}
                         >
@@ -911,7 +891,10 @@ export function BookingPageForm({
                             {short}
                           </span>
                           {r.enabled ? (
-                            <span className="mt-0.5 h-1 w-1 rounded-full bg-violet-500" />
+                            <span
+                              className="mt-0.5 h-1 w-1 rounded-full"
+                              style={{ backgroundColor: BRAND }}
+                            />
                           ) : (
                             <span className="mt-0.5 h-1 w-1 rounded-full bg-transparent" />
                           )}
@@ -937,9 +920,14 @@ export function BookingPageForm({
                           className={cn(
                             "inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-[11px] font-semibold transition-all",
                             selected.enabled
-                              ? "border-violet-300 bg-violet-600 text-white"
+                              ? "border-[#5A32A3] text-white"
                               : "border-slate-200 bg-white text-slate-500",
                           )}
+                          style={
+                            selected.enabled
+                              ? { backgroundColor: BRAND }
+                              : undefined
+                          }
                         >
                           <span
                             className={cn(
@@ -1212,7 +1200,8 @@ export function BookingPageForm({
                         type="button"
                         onClick={copyLink}
                         disabled={!slug}
-                        className="inline-flex h-8 items-center gap-1 rounded-md bg-violet-600 px-2.5 text-[11px] font-semibold text-white disabled:opacity-40"
+                        className="inline-flex h-8 items-center gap-1 rounded-md px-2.5 text-[11px] font-semibold text-white disabled:opacity-40"
+                        style={{ backgroundColor: BRAND }}
                       >
                         <Copy className="h-3 w-3" />
                         {copied ? "Copied" : "Copy"}
@@ -1378,6 +1367,11 @@ export function BookingPageForm({
                               {initials(name)}
                             </span>
                             {name}
+                            {consultantPriorities[name] ? (
+                              <span className="text-[8px] text-[#5A32A3]">
+                                · {consultantPriorities[name]}
+                              </span>
+                            ) : null}
                           </li>
                         ))}
                       </ul>
@@ -1406,7 +1400,10 @@ export function BookingPageForm({
                       </ul>
                     </div>
                   ) : null}
-                  <div className="mt-2.5 h-7 rounded-md bg-violet-600 text-center text-[10px] leading-7 font-semibold text-white">
+                  <div
+                    className="mt-2.5 h-8 rounded-md text-center text-[11px] leading-8 font-semibold text-white"
+                    style={{ backgroundColor: BRAND }}
+                  >
                     Continue
                   </div>
                 </div>
@@ -1437,14 +1434,15 @@ export function BookingPageForm({
             <button
               type="button"
               onClick={() => onSave(true)}
-              className="h-9 rounded-lg border border-violet-200 bg-violet-50 px-3.5 text-[12px] font-semibold text-violet-700 hover:bg-violet-100"
+              className="h-9 rounded-lg border border-[#5A32A3]/30 bg-[#F3ECFB] px-3.5 text-[12px] font-semibold text-[#5A32A3] hover:bg-[#EDE0F8]"
             >
               Save &amp; New
             </button>
             <button
               type="button"
               onClick={() => onSave(false)}
-              className="h-9 rounded-lg bg-violet-600 px-4 text-[12px] font-semibold text-white shadow-md shadow-violet-600/20 hover:bg-violet-700"
+              className="h-9 rounded-lg px-4 text-[12px] font-semibold text-white shadow-md hover:brightness-110"
+              style={{ backgroundColor: BRAND }}
             >
               {isEdit ? "Save changes" : "Save page"}
             </button>
@@ -1466,7 +1464,10 @@ function SectionHead({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-violet-600 text-[10px] font-bold text-white">
+      <span
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[10px] font-bold text-white"
+        style={{ backgroundColor: BRAND }}
+      >
         {step}
       </span>
       <div className="min-w-0">
@@ -1476,31 +1477,6 @@ function SectionHead({
         </h2>
       </div>
     </div>
-  );
-}
-
-function Chip({
-  active,
-  onClick,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all",
-        active
-          ? "bg-violet-600 text-white shadow-sm shadow-violet-600/25"
-          : "border border-slate-200 bg-white text-slate-600 hover:border-violet-200",
-      )}
-    >
-      {label}
-    </button>
   );
 }
 

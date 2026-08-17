@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Pin, Lock, StickyNote } from "lucide-react";
 import {
   NOTE_TYPES,
@@ -23,6 +24,7 @@ import { moreMenuItems, printViewItems } from "../tasks/page";
 type TypeTab = "All" | NoteType;
 
 export default function NotesPage() {
+  const router = useRouter();
   const [view, setView] = useState<ActivityView>("kanban");
   const [typeTab, setTypeTab] = useState<TypeTab>("All");
   const [search, setSearch] = useState("");
@@ -39,6 +41,11 @@ export default function NotesPage() {
   useEffect(() => {
     setColumns(listNoteColumns());
   }, []);
+
+  useEffect(() => {
+    const focus = new URLSearchParams(window.location.search).get("focus");
+    if (focus) router.replace(`/activities/notes/detail/${focus}`);
+  }, [router]);
 
   const allNotes = useMemo(
     () =>

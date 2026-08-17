@@ -78,27 +78,27 @@ export function TaskDescriptionCard({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
+    <section className="border-b border-slate-100 py-7">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <h2 className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
           Description
         </h2>
         {editable && !isEditing ? (
           <button
             type="button"
             onClick={startEditing}
-            className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-violet-700"
           >
             <Pencil className="h-3 w-3" />
             Edit
           </button>
         ) : null}
         {editable && isEditing ? (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={cancelEditing}
-              className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-slate-800"
             >
               <X className="h-3 w-3" />
               Cancel
@@ -106,7 +106,7 @@ export function TaskDescriptionCard({
             <button
               type="button"
               onClick={saveEditing}
-              className="inline-flex items-center gap-1 rounded-md bg-violet-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-violet-700"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-violet-700 hover:text-violet-800"
             >
               <Check className="h-3 w-3" />
               Save
@@ -119,30 +119,27 @@ export function TaskDescriptionCard({
         <TaskDescriptionEditor value={draft} onChange={setDraft} />
       ) : description && looksLikeHtml(description) ? (
         <div
-          className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground [&_.mention-tag]:rounded [&_.mention-tag]:bg-violet-100 [&_.mention-tag]:px-1 [&_.mention-tag]:py-0.5 [&_.mention-tag]:font-medium [&_.mention-tag]:text-violet-800 [&_a]:text-violet-700 [&_a]:underline"
+          className="prose prose-sm max-w-none text-sm leading-relaxed text-slate-700 [&_.mention-tag]:rounded [&_.mention-tag]:bg-violet-100 [&_.mention-tag]:px-1 [&_.mention-tag]:py-0.5 [&_.mention-tag]:font-medium [&_.mention-tag]:text-violet-800 [&_a]:text-violet-700 [&_a]:underline"
           dangerouslySetInnerHTML={{
             __html: sanitizeTaskDescriptionHtml(description),
           }}
         />
       ) : (
-        <p className="text-sm leading-relaxed text-foreground">
+        <p className="text-sm leading-relaxed text-slate-700">
           {description
             ? renderPlainDescriptionWithMentions(description)
             : renderPlainDescriptionWithMentions(fallback)}
         </p>
       )}
 
-      <div className="mt-4 overflow-hidden rounded-xl border border-border bg-muted/40 p-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-primary" />
-            <span className="text-xs font-medium text-foreground">
-              Financial_Model_Q3.xlsx
-            </span>
-          </div>
-          <span className="text-[11px] text-muted-foreground">2.4 MB</span>
-        </div>
+      <div className="mt-5 flex items-center gap-2 text-sm">
+        <FileText className="h-4 w-4 text-slate-400" />
+        <span className="font-medium text-slate-800">
+          Financial_Model_Q3.xlsx
+        </span>
+        <span className="text-slate-400">·</span>
+        <span className="text-xs text-slate-400">2.4 MB</span>
       </div>
-    </div>
+    </section>
   );
 }

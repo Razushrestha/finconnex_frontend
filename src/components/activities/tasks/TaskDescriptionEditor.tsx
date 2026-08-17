@@ -65,6 +65,7 @@ interface TaskDescriptionEditorProps {
   onChange: (value: string) => void;
   placeholder?: string;
   onMentionSelect?: (person: import("@/lib/mentions/people").MentionPerson) => void;
+  editorClassName?: string;
 }
 
 function preventFocusLoss(event: React.MouseEvent) {
@@ -540,6 +541,7 @@ export function TaskDescriptionEditor({
   onChange,
   placeholder = "Provide detailed context or instructions… Type @ to assign someone.",
   onMentionSelect,
+  editorClassName,
 }: TaskDescriptionEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const lastHtmlRef = useRef(value);
@@ -1011,6 +1013,7 @@ export function TaskDescriptionEditor({
           "empty:before:pointer-events-none empty:before:text-foreground/50 empty:before:content-[attr(data-placeholder)]",
           "[&_.mention-tag]:rounded [&_.mention-tag]:bg-violet-100 [&_.mention-tag]:px-1 [&_.mention-tag]:py-0.5 [&_.mention-tag]:font-medium [&_.mention-tag]:text-violet-800",
           showMarks && "[&_p]:relative [&_p]:border-b [&_p]:border-dashed [&_p]:border-slate-200 [&_p]:pb-1",
+          editorClassName,
         )}
       />
       <MentionPickerMenu

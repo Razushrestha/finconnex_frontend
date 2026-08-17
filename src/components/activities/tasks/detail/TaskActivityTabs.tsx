@@ -64,71 +64,68 @@ export function TaskActivityTabs({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-white p-6 shadow-sm">
-      <div className="flex items-center gap-6 border-b border-border pb-3">
+    <section className="py-7">
+      <div className="flex items-center gap-6 border-b border-slate-100 pb-3">
         <button
           type="button"
           onClick={() => setActiveTab("notes")}
-          className={`text-xs font-medium pb-1 relative transition-colors ${activeTab === "notes" ? "text-primary font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+          className={`relative pb-1 text-xs font-medium transition-colors ${activeTab === "notes" ? "font-semibold text-[#5A32A3]" : "text-slate-400 hover:text-slate-700"}`}
         >
           Notes ({notes.length})
           {activeTab === "notes" && (
-            <span className="absolute bottom-[-13px] left-0 right-0 h-0.5 bg-primary" />
+            <span className="absolute right-0 bottom-[-13px] left-0 h-0.5 bg-[#5A32A3]" />
           )}
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("attachments")}
-          className={`text-xs font-medium pb-1 relative transition-colors ${activeTab === "attachments" ? "text-primary font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+          className={`relative pb-1 text-xs font-medium transition-colors ${activeTab === "attachments" ? "font-semibold text-[#5A32A3]" : "text-slate-400 hover:text-slate-700"}`}
         >
           Attachments (2)
           {activeTab === "attachments" && (
-            <span className="absolute bottom-[-13px] left-0 right-0 h-0.5 bg-primary" />
+            <span className="absolute right-0 bottom-[-13px] left-0 h-0.5 bg-[#5A32A3]" />
           )}
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("emails")}
-          className={`text-xs font-medium pb-1 relative transition-colors ${activeTab === "emails" ? "text-primary font-semibold" : "text-muted-foreground hover:text-foreground"}`}
+          className={`relative pb-1 text-xs font-medium transition-colors ${activeTab === "emails" ? "font-semibold text-[#5A32A3]" : "text-slate-400 hover:text-slate-700"}`}
         >
           Emails
           {activeTab === "emails" && (
-            <span className="absolute bottom-[-13px] left-0 right-0 h-0.5 bg-primary" />
+            <span className="absolute right-0 bottom-[-13px] left-0 h-0.5 bg-[#5A32A3]" />
           )}
         </button>
       </div>
 
       {activeTab === "notes" && (
-        <div className="mt-4 space-y-4">
+        <div className="mt-5 space-y-5">
           {notes.length === 0 ? (
-            <p className="py-2 text-center text-xs text-muted-foreground">
+            <p className="py-2 text-xs text-slate-400">
               No notes yet. Add the first note below.
             </p>
           ) : (
             notes.map((note) => (
-              <div
-                key={note.id}
-                className="rounded-xl border border-border bg-muted/30 p-3"
-              >
-                <div className="mb-2 flex items-center justify-between gap-2">
+              <div key={note.id}>
+                <div className="mb-1.5 flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
                     <span
                       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${avatarColor(note.author)}`}
                     >
                       {initials(note.author)}
                     </span>
-                    <span className="truncate text-xs font-medium text-foreground">
+                    <span className="truncate text-xs font-medium text-slate-800">
                       {note.author}
                     </span>
                   </div>
                   <time
                     dateTime={note.createdAt}
-                    className="shrink-0 text-[10px] text-muted-foreground"
+                    className="shrink-0 text-[10px] text-slate-400"
                   >
                     {note.createdAt}
                   </time>
                 </div>
-                <p className="whitespace-pre-wrap text-xs text-foreground">
+                <p className="whitespace-pre-wrap pl-8 text-xs leading-relaxed text-slate-700">
                   {renderNoteBodyWithMentions(note.body)}
                 </p>
               </div>
@@ -140,14 +137,14 @@ export function TaskActivityTabs({
               value={newNote}
               onChange={setNewNote}
               placeholder="Add a note... Type @ to assign someone."
-              className="w-full rounded-xl border border-border bg-background p-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full border-0 border-b border-slate-200 bg-transparent p-0 pb-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-0"
             />
             <div className="flex justify-end">
               <button
                 type="button"
                 onClick={handleSaveNote}
                 disabled={!newNote.trim()}
-                className="rounded-xl bg-primary px-4 py-2 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="bg-[#5A32A3] px-4 py-1.5 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Save Note
               </button>
@@ -157,26 +154,26 @@ export function TaskActivityTabs({
       )}
 
       {activeTab === "attachments" && (
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3">
-            <FileText className="h-5 w-5 text-primary" />
+        <div className="mt-5 space-y-3">
+          <div className="flex items-center gap-3 py-1">
+            <FileText className="h-4 w-4 text-slate-400" />
             <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-foreground">
+              <p className="truncate text-xs font-medium text-slate-800">
                 Financial_Model_Q3.xlsx
               </p>
-              <p className="text-[10px] text-muted-foreground">
-                2.4 MB • Uploaded Today
+              <p className="text-[10px] text-slate-400">
+                2.4 MB · Uploaded Today
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 p-3">
-            <FileText className="h-5 w-5 text-primary" />
+          <div className="flex items-center gap-3 py-1">
+            <FileText className="h-4 w-4 text-slate-400" />
             <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-foreground">
+              <p className="truncate text-xs font-medium text-slate-800">
                 Strategy_Deck.pdf
               </p>
-              <p className="text-[10px] text-muted-foreground">
-                5.1 MB • Uploaded Yesterday
+              <p className="text-[10px] text-slate-400">
+                5.1 MB · Uploaded Yesterday
               </p>
             </div>
           </div>
@@ -184,10 +181,10 @@ export function TaskActivityTabs({
       )}
 
       {activeTab === "emails" && (
-        <div className="mt-4 text-center py-6 text-xs text-muted-foreground">
+        <div className="mt-5 py-4 text-xs text-slate-400">
           No emails linked to this task yet.
         </div>
       )}
-    </div>
+    </section>
   );
 }

@@ -76,6 +76,8 @@ export function createEmail(input: {
   body: string;
   from: string;
   to: string[];
+  cc?: string[];
+  bcc?: string[];
   relatedTo?: string;
   status: EmailStatus;
   sentDate?: string;
@@ -87,6 +89,8 @@ export function createEmail(input: {
     body: input.body,
     from: input.from,
     to: input.to,
+    cc: input.cc?.length ? [...input.cc] : undefined,
+    bcc: input.bcc?.length ? [...input.bcc] : undefined,
     relatedTo: input.relatedTo,
     status: input.status,
     sentDate: input.sentDate ?? formatRulesAt(new Date()),

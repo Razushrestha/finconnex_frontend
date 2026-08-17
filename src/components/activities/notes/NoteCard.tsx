@@ -1,10 +1,13 @@
 "use client";
 
+import { useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Pin, Lock, Link2, Clock } from "lucide-react";
 import type { Note, NoteType } from "@/lib/notes/types";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
+import { RelatedToLink } from "@/components/activities/RelatedToLink";
 
 const TYPE_META: Record<
   NoteType,
@@ -52,18 +55,44 @@ export function NoteCard({
   onDragEnd,
   isDragging,
 }: NoteCardProps) {
+  const router = useRouter();
+  const wasDragging = useRef(false);
   const meta = TYPE_META[note.noteType];
+  const href = `/activities/notes/detail/${note.id}`;
+
+  function goToNote() {
+    if (wasDragging.current) return;
+    router.push(href);
+  }
 
   return (
     <div
       draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      role="link"
+      tabIndex={0}
+      onDragStart={(e) => {
+        wasDragging.current = true;
+        onDragStart(e);
+      }}
+      onDragEnd={() => {
+        onDragEnd();
+        setTimeout(() => {
+          wasDragging.current = false;
+        }, 0);
+      }}
+      onClick={goToNote}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          goToNote();
+        }
+      }}
+      data-focus-id={note.id}
       data-note-id={note.id}
       data-column-id={columnId}
       className={cn(
         entityCardBox,
-        "border-l-[3px]",
+        "cursor-pointer border-l-[3px]",
         meta.border,
         cardMotion,
         isDragging && cardDragging,
@@ -90,7 +119,7 @@ export function NoteCard({
       <div className="space-y-1.5 text-[11px] text-slate-500">
         <div className="flex items-center gap-1.5">
           <Link2 className="h-3 w-3 shrink-0 text-slate-400" />
-          <span className="truncate">{note.relatedTo}</span>
+          <RelatedToLink relatedTo={note.relatedTo} />
         </div>
         <div className="flex items-center gap-1.5">
           <Clock className="h-3 w-3 shrink-0 text-slate-400" />
