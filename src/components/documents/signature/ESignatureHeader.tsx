@@ -9,14 +9,7 @@ export function ESignatureHeader({
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-          Good afternoon {name} 👋
-        </h1>
-        <p className="text-sm text-slate-500">
-          Manage your documents and signatures in one place.
-        </p>
-      </div>
+      <div></div>
       <div className="flex items-center gap-2">
         <Link
           href="/signature/create?layoutid=standard&redirect=false&type=send"

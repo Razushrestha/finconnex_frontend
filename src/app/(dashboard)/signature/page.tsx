@@ -18,6 +18,7 @@ import {
   FileCode2,
 } from "lucide-react";
 import { PaginationBar } from "@/components/ui/pagination-bar";
+import { ESignatureHeader } from "@/components/documents/signature/ESignatureHeader";
 
 // Mock templates data matching the screenshot style
 const mockTemplates = [
@@ -100,6 +101,8 @@ export default function ESignatureOverviewPage() {
 
   return (
     <div className="relative mx-auto flex w-full flex-col p-4 space-y-6">
+      <ESignatureHeader />
+
       <SignatureStatsGrid />
 
       {/* Main Content Table Section */}
