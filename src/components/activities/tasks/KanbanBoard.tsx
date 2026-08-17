@@ -6,12 +6,15 @@ import {
   type TaskColumn,
   type TaskFilters,
   type Task,
+  type TaskGroupBy,
+  groupTaskColumns,
 } from "@/lib/tasks/types";
 import {
   listTaskColumns,
   saveTaskColumns,
   updateTaskPriority,
   updateTaskStatus,
+  reassignTask,
 } from "@/lib/tasks/store";
 import { onRulesChange } from "@/lib/rules";
 import { KanbanColumn } from "./KanbanColumn";
@@ -29,12 +32,14 @@ export interface DropTargetPos {
 
 interface KanbanBoardProps {
   filters?: TaskFilters;
+  groupBy?: TaskGroupBy;
   selectedIds?: string[];
   onSelectedIdsChange?: (ids: string[]) => void;
 }
 
 export function KanbanBoard({
   filters,
+  groupBy = "status",
   selectedIds: controlledSelectedIds,
   onSelectedIdsChange,
 }: KanbanBoardProps) {
@@ -77,23 +82,27 @@ export function KanbanBoard({
     const hasStatusFilter = !!filters?.statuses.length;
     const hasPriorityFilter = !!filters?.priorities.length;
     const hasTypeFilter = !!filters?.types.length;
-    if (!hasStatusFilter && !hasPriorityFilter && !hasTypeFilter)
-      return columns;
 
-    return columns
-      .filter(
-        (col) => !hasStatusFilter || filters!.statuses.includes(col.title),
-      )
-      .map((col) => ({
-        ...col,
-        tasks: col.tasks.filter(
-          (task) =>
-            (!hasPriorityFilter ||
-              filters!.priorities.includes(task.priority)) &&
-            (!hasTypeFilter || filters!.types.includes(task.taskType)),
-        ),
-      }));
-  }, [columns, filters]);
+    let sourceColumns = columns;
+    if (hasStatusFilter || hasPriorityFilter || hasTypeFilter) {
+      sourceColumns = columns
+        .filter(
+          (col) => !hasStatusFilter || filters!.statuses.includes(col.title),
+        )
+        .map((col) => ({
+          ...col,
+          tasks: col.tasks.filter(
+            (task) =>
+              (!hasPriorityFilter ||
+                filters!.priorities.includes(task.priority)) &&
+              (!hasTypeFilter || filters!.types.includes(task.taskType)),
+          ),
+        }));
+    }
+
+    const grouped = groupTaskColumns(sourceColumns, groupBy);
+    return grouped.map((col) => ({ ...col, count: col.tasks.length }));
+  }, [columns, filters, groupBy]);
 
   function handleDragStartTask(
     e: React.DragEvent<HTMLDivElement>,
@@ -113,16 +122,35 @@ export function KanbanBoard({
     if (!dragInfo) return;
     const { taskId, sourceColumnId } = dragInfo;
 
-    const sourceColumn = columns.find((c) => c.id === sourceColumnId);
-    const targetColumn = columns.find((c) => c.id === targetColumnId);
-    const task = sourceColumn?.tasks.find((t) => t.taskId === taskId);
-
-    if (!task || !targetColumn) {
+    const targetColumn = visibleColumns.find((c) => c.id === targetColumnId);
+    if (!targetColumn) {
       handleDragEndTask();
       return;
     }
 
-    const moved = { ...task, status: targetColumn.title };
+    if (groupBy === "assignee") {
+      reassignTask(taskId, targetColumn.title);
+      setColumns(listTaskColumns());
+      handleDragEndTask();
+      return;
+    }
+
+    if (groupBy === "priority") {
+      updateTaskPriority(taskId, targetColumn.title as Priority);
+      setColumns(listTaskColumns());
+      handleDragEndTask();
+      return;
+    }
+
+    const sourceColumn = columns.find((c) => c.id === sourceColumnId);
+    const task = sourceColumn?.tasks.find((t) => t.taskId === taskId);
+
+    if (!task) {
+      handleDragEndTask();
+      return;
+    }
+
+    const moved = { ...task, status: targetColumn.title as TaskStatus };
 
     persist(
       columns.map((col) => {

@@ -46,7 +46,7 @@ const initialState: FormState = {
   dateTime: "",
   type: "Follow-up",
   status: "Pending",
-  notificationMethod: "In-app",
+  notificationMethod: "Web Push",
 };
 
 export function CreateReminderForm({

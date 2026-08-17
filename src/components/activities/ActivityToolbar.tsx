@@ -12,7 +12,6 @@ import {
   ChevronDown,
   ChevronRight,
   MoreHorizontal,
-  Pencil,
   Sparkles,
   Search,
   type LucideIcon,
@@ -68,6 +67,8 @@ export interface ActivityToolbarProps {
 
   savedViews?: string[];
   defaultSavedView?: string;
+  savedView?: string;
+  onSavedViewChange?: (view: string) => void;
 
   extraViewIcons?: { key: ActivityView; icon: LucideIcon; label: string }[];
 }
@@ -97,6 +98,8 @@ export function ActivityToolbar({
   printViewItems,
   savedViews,
   defaultSavedView,
+  savedView: controlledSavedView,
+  onSavedViewChange,
   extraViewIcons = [],
 }: ActivityToolbarProps) {
   const router = useRouter();
@@ -104,9 +107,19 @@ export function ActivityToolbar({
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [savedViewMenuOpen, setSavedViewMenuOpen] = useState(false);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
-  const [savedView, setSavedView] = useState(
+  const [internalSavedView, setInternalSavedView] = useState(
     defaultSavedView ?? savedViews?.[0],
   );
+
+  const savedView = controlledSavedView ?? internalSavedView;
+
+  function handleSavedViewSelect(view: string) {
+    if (controlledSavedView === undefined) {
+      setInternalSavedView(view);
+    }
+    onSavedViewChange?.(view);
+    setSavedViewMenuOpen(false);
+  }
 
   const activeTab = externalActiveTab ?? internalActiveTab;
 
@@ -158,13 +171,6 @@ export function ActivityToolbar({
               </button>
             );
           })}
-          <button
-            type="button"
-            aria-label="More tabs"
-            className="shrink-0 rounded-md p-1 text-slate-400 hover:text-slate-600"
-          >
-            <MoreHorizontal className="h-3.5 w-3.5" />
-          </button>
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-1">
@@ -425,35 +431,30 @@ export function ActivityToolbar({
             </button>
 
             {savedViewMenuOpen && (
-              <div className="absolute left-0 z-10 mt-1 w-44 rounded-lg border border-slate-100 bg-white py-1 shadow-md">
-                {savedViews.map((opt) => (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => {
-                      setSavedView(opt);
-                      setSavedViewMenuOpen(false);
-                    }}
-                    className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-slate-50 ${
-                      opt === savedView
-                        ? "font-medium text-violet-700"
-                        : "text-slate-600"
-                    }`}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setSavedViewMenuOpen(false)}
+                />
+                <div className="absolute left-0 z-20 mt-1 w-44 rounded-lg border border-slate-100 bg-white py-1 shadow-md">
+                  {savedViews.map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => handleSavedViewSelect(opt)}
+                      className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-slate-50 ${
+                        opt === savedView
+                          ? "font-medium text-violet-700"
+                          : "text-slate-600"
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </div>
-
-          <button
-            type="button"
-            aria-label="Edit view"
-            className="rounded p-1 text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
         </div>
       )}
     </div>

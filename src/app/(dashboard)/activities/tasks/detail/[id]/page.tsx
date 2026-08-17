@@ -1,9 +1,11 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { taskColumns, type TaskStatus } from "@/lib/tasks/types";
+import type { Task, TaskStatus } from "@/lib/tasks/types";
+import { findTaskById, updateTaskStatus } from "@/lib/tasks/store";
 import { TaskDetailsView } from "@/components/activities/tasks/detail/TaskDetailsView";
+import { onRulesChange } from "@/lib/rules";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -12,23 +14,43 @@ interface PageProps {
 export default function TaskDetailPage({ params }: PageProps) {
   const { id } = use(params);
   const router = useRouter();
+  const [task, setTask] = useState<Task | null>(null);
 
-  const allTasks = taskColumns.flatMap((col) => col.tasks);
-  const initialTask = allTasks.find((t) => t.taskId === id) || allTasks[0];
+  useEffect(() => {
+    function loadTask() {
+      const found = findTaskById(id);
+      setTask(found?.task ?? null);
+    }
+    loadTask();
+    return onRulesChange(loadTask);
+  }, [id]);
 
-  const [currentTask, setCurrentTask] = useState(initialTask);
+  function handleUpdateStatus(newStatus: TaskStatus) {
+    const updated = updateTaskStatus(id, newStatus);
+    if (updated) setTask(updated);
+  }
 
-  const handleUpdateStatus = (newStatus: TaskStatus) => {
-    setCurrentTask((prev) => ({
-      ...prev,
-      status: newStatus,
-    }));
-  };
+  if (!task) {
+    return (
+      <div className="flex min-h-[320px] items-center justify-center px-4">
+        <div className="text-center">
+          <p className="text-sm font-medium text-slate-700">Task not found</p>
+          <button
+            type="button"
+            onClick={() => router.push("/activities/tasks")}
+            className="mt-3 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
+          >
+            Back to Tasks
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <TaskDetailsView
-      task={currentTask}
-      onBack={() => router.back()}
+      task={task}
+      onBack={() => router.push("/activities/tasks")}
       onUpdateStatus={handleUpdateStatus}
     />
   );

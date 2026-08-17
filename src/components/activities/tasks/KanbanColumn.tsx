@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import type { Priority, TaskColumn, TaskStatus } from "@/lib/tasks/types";
+import type { Priority, TaskBoardColumn, TaskStatus } from "@/lib/tasks/types";
 import { TaskCard } from "./TaskCard";
 import { cn } from "@/lib/utils";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import type { DropTargetPos } from "./KanbanBoard";
 
 interface KanbanColumnProps {
-  column: TaskColumn;
+  column: TaskBoardColumn;
   draggingTaskId: string | null;
   dropTargetPos: DropTargetPos | null;
   setDropTargetPos: React.Dispatch<React.SetStateAction<DropTargetPos | null>>;

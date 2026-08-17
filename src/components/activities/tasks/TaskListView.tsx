@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import {
   Search,
   ArrowUpDown,
@@ -45,10 +46,6 @@ interface FlatTask extends Task {
 
 interface TaskListViewProps {
   filters?: TaskFilters;
-  onToggleField?: (
-    sectionId: "status" | "priority" | "type",
-    field: string,
-  ) => void;
   sortField?: string;
   sortDirection?: "asc" | "desc";
   onSortChange?: (field: string, direction: "asc" | "desc") => void;
@@ -103,7 +100,10 @@ function TaskPriorityCell({ task }: { task: FlatTask }) {
     <div ref={ref} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Priority ${task.priority}. Change priority`}
@@ -129,7 +129,8 @@ function TaskPriorityCell({ task }: { task: FlatTask }) {
                 type="button"
                 role="option"
                 aria-selected={priority === task.priority}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (priority !== task.priority) {
                     updateTaskPriority(task.taskId, priority);
                     toast.success(`Priority changed to "${priority}"`);
@@ -174,7 +175,10 @@ function TaskStatusCell({ task }: { task: FlatTask }) {
     <div ref={ref} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Status ${task.status}. Change status`}
@@ -200,7 +204,8 @@ function TaskStatusCell({ task }: { task: FlatTask }) {
                 type="button"
                 role="option"
                 aria-selected={status === task.status}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (status !== task.status) {
                     updateTaskStatus(task.taskId, status);
                     toast.success(`Status changed to "${status}"`);
@@ -293,6 +298,21 @@ function buildColumnRenderers(): Record<string, ColumnRenderer> {
       tdClassName: "px-3 py-2.5 text-slate-600",
       td: (task) => task.createdBy || "",
     },
+    createdOn: {
+      label: "Created On",
+      tdClassName: "px-3 py-2.5 whitespace-nowrap text-slate-600",
+      td: (task) => task.createdOn || "",
+    },
+    modifiedBy: {
+      label: "Modified By",
+      tdClassName: "px-3 py-2.5 text-slate-600",
+      td: (task) => task.modifiedBy || "",
+    },
+    modifiedOn: {
+      label: "Modified On",
+      tdClassName: "px-3 py-2.5 whitespace-nowrap text-slate-600",
+      td: (task) => task.modifiedOn || "",
+    },
     reminderDate: {
       label: "Reminder Date",
       tdClassName: "px-3 py-2.5 text-slate-600",
@@ -380,12 +400,12 @@ function buildColumnRenderers(): Record<string, ColumnRenderer> {
 
 export function TaskListView({
   filters,
-  onToggleField,
   sortField,
   sortDirection,
   onSortChange,
   onClearSort,
 }: TaskListViewProps) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
@@ -407,10 +427,19 @@ export function TaskListView({
     setPage(1);
   }, [filters?.priorities, filters?.statuses, filters?.types, pageSize]);
 
-  const activePriority =
-    filters?.priorities.length === 1 ? filters.priorities[0] : null;
-  const activeStatus =
-    filters?.statuses.length === 1 ? filters.statuses[0] : null;
+  const filterHint = useMemo(() => {
+    const parts: string[] = [];
+    if ((filters?.priorities.length ?? 0) > 0) {
+      parts.push(`${filters!.priorities.length} priority`);
+    }
+    if ((filters?.statuses.length ?? 0) > 0) {
+      parts.push(`${filters!.statuses.length} status`);
+    }
+    if ((filters?.types.length ?? 0) > 0) {
+      parts.push(`${filters!.types.length} type`);
+    }
+    return parts.length ? ` · ${parts.join(" · ")}` : "";
+  }, [filters?.priorities.length, filters?.statuses.length, filters?.types.length]);
 
   const allTasks = useMemo(() => {
     void revision;
@@ -536,79 +565,6 @@ export function TaskListView({
 
   return (
     <div className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
-      {onToggleField ? (
-        <div className="mb-3 flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-              Priority
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                if (activePriority) onToggleField("priority", activePriority);
-              }}
-              className={cn(
-                "rounded-md px-2 py-1 text-[11px] font-semibold",
-                !activePriority
-                  ? "bg-violet-600 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200",
-              )}
-            >
-              All
-            </button>
-            {TASK_PRIORITIES.map((priority) => (
-              <button
-                key={priority}
-                type="button"
-                onClick={() => onToggleField("priority", priority)}
-                className={cn(
-                  "rounded-md px-2 py-1 text-[11px] font-semibold",
-                  activePriority === priority
-                    ? "bg-violet-600 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200",
-                )}
-              >
-                {priority}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-              Status
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                if (activeStatus) onToggleField("status", activeStatus);
-              }}
-              className={cn(
-                "rounded-md px-2 py-1 text-[11px] font-semibold",
-                !activeStatus
-                  ? "bg-violet-600 text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200",
-              )}
-            >
-              All
-            </button>
-            {TASK_STATUSES.map((status) => (
-              <button
-                key={status}
-                type="button"
-                onClick={() => onToggleField("status", status)}
-                className={cn(
-                  "rounded-md px-2 py-1 text-[11px] font-semibold",
-                  activeStatus === status
-                    ? "bg-violet-600 text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200",
-                )}
-              >
-                {status}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="relative max-w-sm flex-1">
           <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -623,9 +579,7 @@ export function TaskListView({
           />
         </div>
         <p className="text-[11px] text-slate-400">
-          {processedData.length} tasks
-          {activePriority ? ` · ${activePriority} only` : ""}
-          {activeStatus ? ` · ${activeStatus} only` : ""}
+          {processedData.length} tasks{filterHint}
         </p>
       </div>
 
@@ -683,7 +637,10 @@ export function TaskListView({
                 key={`${task.taskId}-${task.status}`}
                 data-focus-id={task.taskId}
                 data-task-id={task.taskId}
-                className="transition-colors hover:bg-slate-50/80"
+                onClick={() =>
+                  router.push(`/activities/tasks/detail/${task.taskId}`)
+                }
+                className="cursor-pointer transition-colors hover:bg-violet-50/40"
               >
                 {orderedVisibleColumns.map((col) => {
                   const renderer = columnRenderers[col.id];

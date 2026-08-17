@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { listAllTasks } from "@/lib/tasks/store";
+import {
+  findTaskById,
+  listAllTasks,
+  updateTaskDueDate,
+} from "@/lib/tasks/store";
 import { parseTaskDueDate } from "@/lib/dashboard/layout";
 import type { Task, TaskFilters } from "@/lib/tasks/types";
 import { onRulesChange } from "@/lib/rules";
@@ -42,6 +46,8 @@ function sameDay(a: Date, b: Date) {
 export function TaskCalendarView({ filters }: { filters: TaskFilters }) {
   const [tasks, setTasks] = useState(() => listAllTasks());
   const [cursor, setCursor] = useState(() => new Date(2026, 6, 1));
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
+  const [dropTargetKey, setDropTargetKey] = useState<string | null>(null);
 
   useEffect(() => {
     return onRulesChange(() => setTasks(listAllTasks()));
@@ -85,6 +91,28 @@ export function TaskCalendarView({ filters }: { filters: TaskFilters }) {
     month: "long",
     year: "numeric",
   });
+
+  function handleDropOnDay(day: Date) {
+    if (!draggedTaskId) return;
+
+    const found = findTaskById(draggedTaskId);
+    if (!found) {
+      setDraggedTaskId(null);
+      setDropTargetKey(null);
+      return;
+    }
+
+    const currentDue = parseTaskDueDate(found.task.dueDate);
+    if (currentDue && sameDay(currentDue, day)) {
+      setDraggedTaskId(null);
+      setDropTargetKey(null);
+      return;
+    }
+
+    updateTaskDueDate(draggedTaskId, day);
+    setDraggedTaskId(null);
+    setDropTargetKey(null);
+  }
 
   return (
     <div className="rounded-xl border border-border bg-white p-3">
@@ -131,13 +159,31 @@ export function TaskCalendarView({ filters }: { filters: TaskFilters }) {
           if (!day) {
             return <div key={`pad-${idx}`} className="min-h-24 rounded-md" />;
           }
-          const items = byDay.get(day.toDateString()) ?? [];
+          const dayKey = day.toDateString();
+          const items = byDay.get(dayKey) ?? [];
+          const isDropTarget = dropTargetKey === dayKey && draggedTaskId !== null;
+
           return (
             <div
               key={day.toISOString()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                setDropTargetKey(dayKey);
+              }}
+              onDragLeave={() => {
+                setDropTargetKey((current) =>
+                  current === dayKey ? null : current,
+                );
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                handleDropOnDay(day);
+              }}
               className={cn(
-                "min-h-24 rounded-md border border-border bg-background p-1.5 text-left",
+                "min-h-24 rounded-md border border-border bg-background p-1.5 text-left transition-colors",
                 sameDay(day, today) && "ring-1 ring-violet-300",
+                isDropTarget && "border-violet-400 bg-violet-50/70 ring-1 ring-violet-300",
               )}
             >
               <div className="text-[11px] font-semibold text-foreground">
@@ -147,13 +193,23 @@ export function TaskCalendarView({ filters }: { filters: TaskFilters }) {
                 {items.slice(0, 3).map((t) => (
                   <li
                     key={t.taskId}
+                    draggable
+                    onDragStart={(e) => {
+                      setDraggedTaskId(t.taskId);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragEnd={() => {
+                      setDraggedTaskId(null);
+                      setDropTargetKey(null);
+                    }}
                     className={cn(
-                      "truncate rounded px-1 py-0.5 text-[10px]",
+                      "truncate rounded px-1 py-0.5 text-[10px] cursor-grab active:cursor-grabbing",
+                      draggedTaskId === t.taskId && "opacity-50",
                       t.overdue
                         ? "bg-rose-50 text-rose-800"
                         : "bg-violet-50 text-violet-800",
                     )}
-                    title={t.title}
+                    title={`${t.title} — drag to reschedule`}
                   >
                     {t.title}
                   </li>

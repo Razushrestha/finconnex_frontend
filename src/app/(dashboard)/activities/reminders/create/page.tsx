@@ -1,25 +1,15 @@
-// import { CreateReminderForm } from "@/components/activities/reminders/CreateReminderForm";
-
-// interface CreateReminderPageProps {
-//   searchParams: Promise<{ layoutid?: string; redirect?: string }>;
-// }
-
-// export default async function CreateReminderPage({
-//   searchParams,
-// }: CreateReminderPageProps) {
-//   const params = await searchParams;
-//   const layoutId = params.layoutid ?? "standard";
-//   const redirect = params.redirect === "true";
-
-//   return <CreateReminderForm layoutId={layoutId} redirect={redirect} />;
-// }
-
 "use client";
 
 import React, { useState } from "react";
-import { NotificationMethod } from "@/lib/reminders/types";
+import { useRouter } from "next/navigation";
+import {
+  createReminderScheduleEntry,
+  type NotificationMethod,
+  type ReminderScheduleEntry,
+} from "@/lib/reminders/types";
 import { ReminderHeader } from "@/components/activities/reminders/create/RemainderHeader";
 import { ReminderDetailsCard } from "@/components/activities/reminders/create/RemainderDetailsCard";
+import { ReminderSchedulesCard } from "@/components/activities/reminders/create/ReminderSchedulesCard";
 import { ContextualLinkingCard } from "@/components/activities/reminders/create/ContextualLinkingCard";
 import { ReminderSettingsSidebar } from "@/components/activities/reminders/create/RemainderSettingsSidebar";
 
@@ -29,10 +19,12 @@ interface Assignee {
 }
 
 export default function CreateReminderPage() {
+  const router = useRouter();
   const [subject, setSubject] = useState("");
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
   const [notes, setNotes] = useState("");
+  const [scheduleEntries, setScheduleEntries] = useState<ReminderScheduleEntry[]>(
+    [createReminderScheduleEntry("Web Push")],
+  );
 
   const [selectedEntity, setSelectedEntity] = useState<
     "Lead" | "Contact" | "Company" | "Deal"
@@ -40,7 +32,7 @@ export default function CreateReminderPage() {
   const [searchRecord, setSearchRecord] = useState("");
 
   const [notificationMethod, setNotificationMethod] =
-    useState<NotificationMethod>("In-app");
+    useState<NotificationMethod>("Web Push");
   const [frequency, setFrequency] = useState("Does not repeat");
   const [leadTime, setLeadTime] = useState("15 minutes before");
 
@@ -48,34 +40,63 @@ export default function CreateReminderPage() {
     { id: "u1", name: "Alex Sterling" },
   ]);
 
-  const handleRemoveAssignee = (id: string) => {
-    setAssignees(assignees.filter((a) => a.id !== id));
-  };
+  function handleRemoveAssignee(id: string) {
+    setAssignees((prev) => prev.filter((a) => a.id !== id));
+  }
 
-  const handleAddAssignee = (assignee: Assignee) => {
-    if (assignees.some((a) => a.id === assignee.id)) return;
-    setAssignees([...assignees, assignee]);
-  };
+  function handleAddAssignee(assignee: Assignee) {
+    setAssignees((prev) =>
+      prev.some((a) => a.id === assignee.id) ? prev : [...prev, assignee],
+    );
+  }
+
+  function handleNotificationMethodChange(method: NotificationMethod) {
+    setNotificationMethod(method);
+    setScheduleEntries((prev) =>
+      prev.map((entry) => ({ ...entry, notificationMethod: method })),
+    );
+  }
+
+  function handleSave() {
+    if (!subject.trim()) return;
+    const validEntries = scheduleEntries.filter(
+      (entry) => entry.date && entry.time,
+    );
+    if (validEntries.length === 0) return;
+
+    console.log("Saving reminders", {
+      subject,
+      notes,
+      selectedEntity,
+      searchRecord,
+      frequency,
+      leadTime,
+      assignees,
+      scheduleEntries: validEntries,
+    });
+    router.push("/activities/reminders");
+  }
 
   return (
     <div className="mx-auto min-h-full w-full max-w-[1920px] space-y-4 bg-background px-4 py-3 text-foreground sm:px-6 2xl:px-8">
       <ReminderHeader
-        onCancel={() => console.log("Cancelled reminder creation")}
-        onSave={() => console.log("Reminder saved")}
+        onCancel={() => router.push("/activities/reminders")}
+        onSave={handleSave}
       />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,400px)] lg:gap-6">
-        {/* Main Column */}
         <div className="space-y-4">
           <ReminderDetailsCard
             subject={subject}
             onSubjectChange={setSubject}
-            date={date}
-            onDateChange={setDate}
-            time={time}
-            onTimeChange={setTime}
             notes={notes}
             onNotesChange={setNotes}
+          />
+
+          <ReminderSchedulesCard
+            entries={scheduleEntries}
+            onChange={setScheduleEntries}
+            defaultNotificationMethod={notificationMethod}
           />
 
           <ContextualLinkingCard
@@ -86,11 +107,10 @@ export default function CreateReminderPage() {
           />
         </div>
 
-        {/* Sidebar Column */}
         <div>
           <ReminderSettingsSidebar
             notificationMethod={notificationMethod}
-            onNotificationMethodChange={setNotificationMethod}
+            onNotificationMethodChange={handleNotificationMethodChange}
             frequency={frequency}
             onFrequencyChange={setFrequency}
             leadTime={leadTime}

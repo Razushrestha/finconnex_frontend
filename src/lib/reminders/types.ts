@@ -21,10 +21,38 @@ export type ReminderStatus = (typeof REMINDER_STATUSES)[number];
 export const NOTIFICATION_METHODS = [
   "In-app",
   "Email",
-  "Push",
+  "Web Push",
   "SMS",
 ] as const;
 export type NotificationMethod = (typeof NOTIFICATION_METHODS)[number];
+
+export const REMINDER_LEAD_TIMES = [
+  "15 minutes before",
+  "30 minutes before",
+  "1 hour before",
+  "1 day before",
+] as const;
+export type ReminderLeadTime = (typeof REMINDER_LEAD_TIMES)[number];
+
+export interface ReminderScheduleEntry {
+  id: string;
+  date: string;
+  time: string;
+  leadTime: ReminderLeadTime;
+  notificationMethod: NotificationMethod;
+}
+
+export function createReminderScheduleEntry(
+  notificationMethod: NotificationMethod = "Web Push",
+): ReminderScheduleEntry {
+  return {
+    id: `rs-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    date: "",
+    time: "",
+    leadTime: REMINDER_LEAD_TIMES[0],
+    notificationMethod,
+  };
+}
 
 export interface Reminder {
   id: string;
@@ -57,7 +85,7 @@ export const reminders: Reminder[] = [
     dateTime: "22/07/2026 01:45 PM",
     type: "Meeting Start",
     status: "Pending",
-    notificationMethod: "Push",
+    notificationMethod: "Web Push",
     owner: "John Smith",
   },
   {

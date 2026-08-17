@@ -194,6 +194,8 @@ export function TaskCard({
       draggable
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        role="button"
+        tabIndex={0}
         onClick={(e) => {
           if (wasDragging.current) return;
           if (
@@ -202,26 +204,30 @@ export function TaskCard({
           ) {
             return;
           }
+          router.push(`/activities/tasks/detail/${task.taskId}`);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            router.push(`/activities/tasks/detail/${task.taskId}`);
+          }
         }}
         data-focus-id={task.taskId}
       data-task-id={task.taskId}
       data-column-id={columnId}
         className={cn(
-          "group/card relative cursor-grab",
+          "group/card relative cursor-pointer",
           entityCardBox,
           cardMotion,
           isDragging && cardDragging,
           isSelected
             ? "border-indigo-500 ring-1 ring-indigo-500"
-            : "border-slate-200/80 hover:border-slate-300",
+            : "border-slate-200/80 hover:border-slate-300 hover:bg-violet-50/40",
         )}
       >
         <div className="mb-3 flex items-center justify-between gap-2.5">
           <h4
-            onClick={() =>
-              router.push(`/activities/tasks/detail/${task.taskId}`)
-            }
-            className="mb-2 truncate text-[13px] font-semibold text-primary cursor-pointer"
+            className="mb-2 truncate text-[13px] font-semibold text-primary"
             title={task.title}
           >
         {task.title}

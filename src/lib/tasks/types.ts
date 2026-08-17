@@ -52,6 +52,9 @@ export interface Task {
   relatedTo?: RelatedTo;
   reminderDate?: string;
   createdBy?: string;
+  createdOn?: string;
+  modifiedBy?: string;
+  modifiedOn?: string;
   description?: string;
   completedDate?: string;
   notes?: string;
@@ -65,6 +68,17 @@ export interface Task {
   overdue?: boolean;
 }
 
+export function formatTaskTimestamp(date = new Date()): string {
+  return date.toLocaleString("en-AU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 export interface TaskColumn {
   id: string;
   title: TaskStatus;
@@ -76,8 +90,16 @@ export interface TaskColumn {
 function task(
   partial: Omit<Task, "assignee"> & { assignee?: Task["assignee"] },
 ): Task {
+  const createdBy = partial.createdBy ?? partial.assignedTo;
+  const createdOn = partial.createdOn ?? "17/08/2026 09:00 AM";
+  const modifiedBy = partial.modifiedBy ?? createdBy;
+  const modifiedOn = partial.modifiedOn ?? createdOn;
   return {
     ...partial,
+    createdBy,
+    createdOn,
+    modifiedBy,
+    modifiedOn,
     assignee: partial.assignee ?? {
       initials: initials(partial.assignedTo),
       colorClass: avatarColor(partial.assignedTo),
@@ -323,3 +345,74 @@ export const taskColumns: TaskColumn[] = [
 ];
 
 export const TASK_OWNERS = ACTIVITY_OWNERS;
+
+export type TaskGroupBy = "status" | "assignee" | "priority";
+
+export const TASK_SAVED_VIEWS = [
+  { label: "Tasks by Status", groupBy: "status" as TaskGroupBy },
+  { label: "Tasks by Assignee", groupBy: "assignee" as TaskGroupBy },
+  { label: "Tasks by Priority", groupBy: "priority" as TaskGroupBy },
+] as const;
+
+export interface TaskBoardColumn {
+  id: string;
+  title: string;
+  count: number;
+  badgeColorClass: string;
+  tasks: Task[];
+}
+
+const PRIORITY_COLUMN_BADGE: Record<Priority, string> = {
+  Critical: "bg-red-500 text-white",
+  High: "bg-rose-500 text-white",
+  Medium: "bg-amber-500 text-white",
+  Low: "bg-slate-400 text-white",
+};
+
+export function groupTaskColumns(
+  statusColumns: TaskColumn[],
+  groupBy: TaskGroupBy,
+): TaskBoardColumn[] {
+  const allTasks = statusColumns.flatMap((col) => col.tasks);
+
+  if (groupBy === "status") {
+    return statusColumns.map((col) => ({
+      id: col.id,
+      title: col.title,
+      count: col.tasks.length,
+      badgeColorClass: col.badgeColorClass,
+      tasks: col.tasks,
+    }));
+  }
+
+  if (groupBy === "priority") {
+    return TASK_PRIORITIES.map((priority) => {
+      const tasks = allTasks.filter((task) => task.priority === priority);
+      return {
+        id: `priority-${priority.toLowerCase()}`,
+        title: priority,
+        count: tasks.length,
+        badgeColorClass: PRIORITY_COLUMN_BADGE[priority],
+        tasks,
+      };
+    });
+  }
+
+  const assignees = [
+    ...new Set([
+      ...TASK_OWNERS,
+      ...allTasks.map((task) => task.assignedTo),
+    ]),
+  ];
+
+  return assignees.map((name) => {
+    const tasks = allTasks.filter((task) => task.assignedTo === name);
+    return {
+      id: `assignee-${name.toLowerCase().replace(/\s+/g, "-")}`,
+      title: name,
+      count: tasks.length,
+      badgeColorClass: "bg-violet-500 text-white",
+      tasks,
+    };
+  });
+}

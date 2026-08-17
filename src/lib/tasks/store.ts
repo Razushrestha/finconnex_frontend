@@ -2,6 +2,7 @@
 
 import {
   taskColumns as SEED_COLUMNS,
+  formatTaskTimestamp,
   type Priority,
   type Task,
   type TaskColumn,
@@ -15,6 +16,16 @@ import {
 } from "@/lib/activities/shared";
 import { createBoardStore } from "@/lib/rules/module-store";
 import { newRulesId } from "@/lib/rules/storage";
+import { getRulesActor } from "@/lib/rules/actor";
+
+function touchModified(task: Task): Task {
+  const actor = getRulesActor().name || task.modifiedBy || task.createdBy || task.assignedTo;
+  return {
+    ...task,
+    modifiedBy: actor,
+    modifiedOn: formatTaskTimestamp(new Date()),
+  };
+}
 
 function cloneSeed(): TaskColumn[] {
   return SEED_COLUMNS.map((col) => ({
@@ -68,6 +79,8 @@ export function createTask(input: {
     cols.find((c) => c.title === input.status) ??
     cols.find((c) => c.title === "Not Started") ??
     cols[0];
+  const now = formatTaskTimestamp(new Date());
+  const creator = input.createdBy ?? getRulesActor().name ?? input.assignedTo;
   const task: Task = {
     taskId: newRulesId("task"),
     title: input.title.trim(),
@@ -80,7 +93,10 @@ export function createTask(input: {
     description: input.description,
     notes: input.notes,
     collaborators: input.collaborators,
-    createdBy: input.createdBy ?? input.assignedTo,
+    createdBy: creator,
+    createdOn: now,
+    modifiedBy: creator,
+    modifiedOn: now,
     assignee: {
       initials: initials(input.assignedTo),
       colorClass: avatarColor(input.assignedTo),
@@ -124,12 +140,12 @@ export function completeTask(taskId: string): Task | null {
     cols.find((c) => c.title === "Completed") ??
     cols.find((c) => c.id === "completed");
 
-  const updated: Task = {
+  const updated: Task = touchModified({
     ...found.task,
     status: "Completed",
     completedDate: new Date().toISOString().slice(0, 10),
     overdue: false,
-  };
+  });
 
   const without = cols.map((c) => ({
     ...c,
@@ -176,7 +192,7 @@ export function updateTaskPriority(
       // Only update the first match — IDs must be unique.
       if (matched || t.taskId !== taskId) return t;
       matched = true;
-      updated = { ...t, priority };
+      updated = touchModified({ ...t, priority });
       return updated;
     }),
   }));
@@ -200,7 +216,7 @@ export function updateTaskStatus(
     cols.find((c) => c.title === status) ??
     cols.find((c) => c.id === status.toLowerCase().replace(/\s+/g, "-"));
 
-  const updated: Task = {
+  const updated: Task = touchModified({
     ...found.task,
     status,
     completedDate:
@@ -208,7 +224,7 @@ export function updateTaskStatus(
         ? new Date().toISOString().slice(0, 10)
         : found.task.completedDate,
     overdue: status === "Completed" ? false : found.task.overdue,
-  };
+  });
 
   const without = cols.map((c) => ({
     ...c,
@@ -260,6 +276,39 @@ function formatDueDate(d: Date): string {
   const day = String(d.getDate()).padStart(2, "0");
   const month = String(d.getMonth() + 1).padStart(2, "0");
   return `${day}/${month}/${d.getFullYear()}`;
+}
+
+function isDueDateOverdue(dueDate: string): boolean {
+  const m = dueDate.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return false;
+  const due = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  due.setHours(0, 0, 0, 0);
+  return due < today;
+}
+
+export function updateTaskDueDate(taskId: string, date: Date): Task | null {
+  const found = findTaskById(taskId);
+  if (!found) return null;
+
+  const nextDue = formatDueDate(date);
+  let updated: Task | null = null;
+  saveTaskColumns(
+    listTaskColumns().map((col) => ({
+      ...col,
+      tasks: col.tasks.map((t) => {
+        if (t.taskId !== taskId) return t;
+        updated = touchModified({
+          ...t,
+          dueDate: nextDue,
+          overdue: isDueDateOverdue(nextDue),
+        });
+        return updated;
+      }),
+    })),
+  );
+  return updated;
 }
 
 /** Duplicate a task into the same column with a new id. */

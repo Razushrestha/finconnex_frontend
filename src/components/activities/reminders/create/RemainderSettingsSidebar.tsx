@@ -105,7 +105,7 @@ export const ReminderSettingsSidebar: React.FC<
                     {method === "In-app" && "Standard dashboard alert"}
                     {method === "Email" && "Sent to assigned user"}
                     {method === "SMS" && "Requires mobile number"}
-                    {method === "Push" && "Instant mobile device ping"}
+                    {method === "Web Push" && "Browser push notification"}
                   </p>
                 </div>
               </label>

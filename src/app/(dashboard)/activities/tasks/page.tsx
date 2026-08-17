@@ -22,8 +22,10 @@ import {
 } from "@/components/activities/ActivityToolbar";
 import {
   EMPTY_TASK_FILTERS,
+  TASK_SAVED_VIEWS,
   type Priority,
   type TaskFilters,
+  type TaskGroupBy,
   type TaskStatus,
 } from "@/lib/tasks/types";
 import {
@@ -40,6 +42,34 @@ import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolba
 import { BOARD_PAGE } from "@/lib/layout";
 
 const TASK_VIEW_MODE_KEY = "finconnex.tasks.view-mode";
+const TASK_SAVED_VIEW_KEY = "finconnex.tasks.saved-view";
+
+function loadTaskSavedView(): string {
+  if (typeof window === "undefined") return TASK_SAVED_VIEWS[0].label;
+  try {
+    const raw = localStorage.getItem(TASK_SAVED_VIEW_KEY);
+    if (raw && TASK_SAVED_VIEWS.some((view) => view.label === raw)) {
+      return raw;
+    }
+  } catch {
+    /* ignore */
+  }
+  return TASK_SAVED_VIEWS[0].label;
+}
+
+function savedViewToGroupBy(view: string): TaskGroupBy {
+  return (
+    TASK_SAVED_VIEWS.find((item) => item.label === view)?.groupBy ?? "status"
+  );
+}
+
+function persistTaskSavedView(view: string) {
+  try {
+    localStorage.setItem(TASK_SAVED_VIEW_KEY, view);
+  } catch {
+    /* ignore */
+  }
+}
 
 function loadTaskViewMode(): ActivityView {
   if (typeof window === "undefined") return "kanban";
@@ -127,6 +157,7 @@ const taskSortOptions = [
 
 export default function TasksPage() {
   const [view, setView] = useState<ActivityView>("kanban");
+  const [savedView, setSavedView] = useState<string>(TASK_SAVED_VIEWS[0].label);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState<TaskFilters>(EMPTY_TASK_FILTERS);
   const [sortField, setSortField] = useState<string | undefined>();
@@ -136,12 +167,20 @@ export default function TasksPage() {
 
   useEffect(() => {
     setView(loadTaskViewMode());
+    setSavedView(loadTaskSavedView());
   }, []);
 
   function handleViewChange(mode: ActivityView) {
     setView(mode);
     persistTaskViewMode(mode);
   }
+
+  function handleSavedViewChange(nextView: string) {
+    setSavedView(nextView);
+    persistTaskSavedView(nextView);
+  }
+
+  const groupBy = savedViewToGroupBy(savedView);
 
   function toggleField(
     sectionId: "status" | "priority" | "type",
@@ -150,22 +189,18 @@ export default function TasksPage() {
     setFilters((prev) => {
       if (sectionId === "priority") {
         const selected = field as Priority;
-        const already =
-          prev.priorities.length === 1 && prev.priorities[0] === selected;
-        return {
-          ...prev,
-          priorities: already ? [] : [selected],
-        };
+        const next = prev.priorities.includes(selected)
+          ? prev.priorities.filter((value) => value !== selected)
+          : [...prev.priorities, selected];
+        return { ...prev, priorities: next };
       }
 
       if (sectionId === "status") {
         const selected = field as TaskStatus;
-        const already =
-          prev.statuses.length === 1 && prev.statuses[0] === selected;
-        return {
-          ...prev,
-          statuses: already ? [] : [selected],
-        };
+        const next = prev.statuses.includes(selected)
+          ? prev.statuses.filter((value) => value !== selected)
+          : [...prev.statuses, selected];
+        return { ...prev, statuses: next };
       }
 
       const current = prev.types;
@@ -242,11 +277,9 @@ export default function TasksPage() {
           showRefresh
           moreMenuItems={moreMenuItems}
           printViewItems={printViewItems}
-          savedViews={[
-            "Tasks by Status",
-            "Tasks by Assignee",
-            "Tasks by Priority",
-          ]}
+          savedViews={TASK_SAVED_VIEWS.map((item) => item.label)}
+          savedView={savedView}
+          onSavedViewChange={handleSavedViewChange}
           extraViewIcons={[
             { key: "calendar", icon: CalendarDays, label: "Calendar view" },
             { key: "timeline", icon: GanttChart, label: "Timeline view" },
@@ -283,6 +316,7 @@ export default function TasksPage() {
           {view === "kanban" ? (
             <KanbanBoard
               filters={filters}
+              groupBy={groupBy}
               selectedIds={selectedTaskIds}
               onSelectedIdsChange={setSelectedTaskIds}
             />
@@ -293,7 +327,6 @@ export default function TasksPage() {
           ) : (
             <TaskListView
               filters={filters}
-              onToggleField={toggleField}
               sortField={sortField}
               sortDirection={sortDirection}
               onSortChange={handleSortChange}

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import { ChevronDown, HelpCircle, Pencil, Search, X } from "lucide-react";
+import { ColorWheelPicker } from "@/components/common/ColorWheelPicker";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -230,33 +231,7 @@ function ColorSwatchRow({
   label?: string;
 }) {
   return (
-    <div className="space-y-1.5">
-      {label ? (
-        <p className="truncate text-[12px] font-medium text-slate-600 dark:text-zinc-300">
-          {label}
-        </p>
-      ) : null}
-      <div className="flex flex-wrap gap-1.5">
-        {KANBAN_HEADER_PALETTE.map((hex) => {
-          const selected = value.toLowerCase() === hex.toLowerCase();
-          return (
-            <button
-              key={hex}
-              type="button"
-              aria-label={`Color ${hex}`}
-              title={hex}
-              onClick={() => onChange(hex)}
-              className={`h-6 w-6 rounded-full border-2 transition-transform ${
-                selected
-                  ? "scale-110 border-slate-800 dark:border-white"
-                  : "border-transparent hover:scale-105"
-              }`}
-              style={{ backgroundColor: hex }}
-            />
-          );
-        })}
-      </div>
-    </div>
+    <ColorWheelPicker value={value} onChange={onChange} label={label} />
   );
 }
 

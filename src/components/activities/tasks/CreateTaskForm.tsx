@@ -41,8 +41,11 @@ import {
   requireAction,
   requiredFieldErrors,
 } from "@/lib/rules";
+import { getRulesActor } from "@/lib/rules/actor";
+import { formatTaskTimestamp } from "@/lib/tasks/types";
 import RelatedRecordCombobox from "./RelatedRecordComboBox";
 import RepeatModal, { defaultRepeatConfig, RepeatConfig } from "./RepeatModal";
+import { TaskAuditCard } from "@/components/activities/tasks/TaskAuditCard";
 import {
   elevatedTextareaClass,
   Field,
@@ -155,6 +158,9 @@ export function CreateTaskForm({
   const relatedOptions = form.relatedKind
     ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === form.relatedKind)
     : RELATED_RECORD_OPTIONS;
+
+  const actor = getRulesActor().name || form.assignedTo || "Admin";
+  const auditPreviewOn = formatTaskTimestamp(new Date());
 
   const canEnableRepeat = Boolean(form.taskType) && Boolean(form.dueDate);
 
@@ -275,7 +281,7 @@ export function CreateTaskForm({
       relatedTo: related,
       description: form.description || undefined,
       collaborators: form.collaborators.length ? form.collaborators : undefined,
-      createdBy: form.assignedTo,
+      createdBy: actor,
       // actionItems: form.actionItems — wire this up once api.tasks.create
       // accepts a checklist payload; kept as local state for now.
     });
@@ -826,6 +832,13 @@ export function CreateTaskForm({
               </div>
             </div>
           </div>
+
+          <TaskAuditCard
+            createdBy={actor}
+            createdOn={auditPreviewOn}
+            modifiedBy={actor}
+            modifiedOn={auditPreviewOn}
+          />
         </div>
       </div>
     </div>
