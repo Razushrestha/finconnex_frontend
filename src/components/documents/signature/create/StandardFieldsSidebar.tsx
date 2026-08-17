@@ -45,8 +45,6 @@ export const standardFields = [
 
 export type StandardFieldType = (typeof standardFields)[number];
 
-// Minimal shape a dropped field needs to know about its assigned recipient.
-// Passed through onDragStart so the canvas/drop handler can tag & tint the field.
 export interface FieldRecipient {
   id: string;
   name: string;
@@ -73,7 +71,6 @@ export function StandardFieldsSidebar({
   activeRecipientId,
   onSelectRecipient,
 }: StandardFieldsSidebarProps) {
-  // Fall back to internal state if the parent isn't controlling selection
   const [internalActiveId, setInternalActiveId] = useState<string | null>(
     recipients[0]?.id ?? null,
   );
@@ -105,8 +102,6 @@ export function StandardFieldsSidebar({
         }
       : undefined;
 
-    // Stash it on the transfer too, so a drop handler that only has
-    // access to the DataTransfer (not React state) can still read it.
     if (recipient) {
       e.dataTransfer.setData(
         "application/x-field-recipient",
@@ -224,7 +219,6 @@ export function StandardFieldsSidebar({
                       : "border-slate-200 hover:border-indigo-300"
                   }`}
                 >
-                  {/* Recipient color tick so it's obvious who a dragged field belongs to */}
                   {fieldColor && (
                     <span
                       className={`w-1.5 h-6 rounded-full shrink-0 ${fieldColor.bg} border ${fieldColor.border}`}
