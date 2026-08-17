@@ -260,9 +260,7 @@ export default function ESignatureOverviewPage() {
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() =>
-                              router.push(`/documents/signature/${doc.id}`)
-                            }
+                            onClick={() => router.push(`/signature/${doc.id}`)}
                             className="h-7 px-3 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-900"
                           >
                             View

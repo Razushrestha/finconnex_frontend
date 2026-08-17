@@ -243,6 +243,7 @@ export function SignatureDetailClient({ id }: { id: string }) {
                 </button>
               </>
             ) : null}
+
             {openForSigner && req.signers[0] ? (
               <button
                 type="button"
