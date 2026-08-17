@@ -248,6 +248,7 @@ export function BookingFormStep({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
   const [addFieldOpen, setAddFieldOpen] = useState(false);
+  const [editingButtons, setEditingButtons] = useState(false);
 
   function move(from: number, to: number) {
     if (to < 0 || to >= fields.length) return;
@@ -441,31 +442,47 @@ export function BookingFormStep({
           </div>
         </div>
 
-        <h2 className="mt-7 mb-3 text-[14px] font-bold text-slate-800">
-          Booking Confirmation Button
-        </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className="mb-1.5 block text-[12px] font-semibold text-slate-600">
-              Free Appointments<span className="text-rose-500">*</span>
-            </span>
-            <input
-              value={freeButton}
-              onChange={(e) => setFreeButton(e.target.value)}
-              className="h-11 w-full rounded-lg border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/40"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-[12px] font-semibold text-slate-600">
-              Paid Appointments<span className="text-rose-500">*</span>
-            </span>
-            <input
-              value={paidButton}
-              onChange={(e) => setPaidButton(e.target.value)}
-              className="h-11 w-full rounded-lg border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/40"
-            />
-          </label>
+        <div className="mt-7 flex items-center justify-between gap-3">
+          <h2 className="text-[14px] font-bold text-slate-800">
+            Booking Confirmation Button
+          </h2>
+          <button
+            type="button"
+            onClick={() => setEditingButtons((v) => !v)}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-[#5A32A3]"
+            aria-label={
+              editingButtons
+                ? "Hide confirmation button labels"
+                : "Edit confirmation button labels"
+            }
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
         </div>
+        {editingButtons ? (
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-1.5 block text-[12px] font-semibold text-slate-600">
+                Free Appointments<span className="text-rose-500">*</span>
+              </span>
+              <input
+                value={freeButton}
+                onChange={(e) => setFreeButton(e.target.value)}
+                className="h-11 w-full rounded-lg border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/40"
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-[12px] font-semibold text-slate-600">
+                Paid Appointments<span className="text-rose-500">*</span>
+              </span>
+              <input
+                value={paidButton}
+                onChange={(e) => setPaidButton(e.target.value)}
+                className="h-11 w-full rounded-lg border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/40"
+              />
+            </label>
+          </div>
+        ) : null}
 
         <div className="mt-7 flex justify-end gap-2">
           <button

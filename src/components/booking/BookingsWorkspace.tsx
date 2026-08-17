@@ -39,7 +39,6 @@ import {
   formatApptTime,
   type AppointmentChannel,
   type AppointmentStatus,
-  type AppointmentType,
   type DashboardAppointment,
   type RelatedKind,
 } from "@/lib/booking/dashboard";
@@ -56,12 +55,6 @@ const STATUS_STYLE: Record<AppointmentStatus, string> = {
   Confirmed: "bg-[#D1FAE5] text-[#059669]",
   Pending: "bg-[#FEF3C7] text-[#D97706]",
   Scheduled: "bg-[#DBEAFE] text-[#2563EB]",
-};
-
-const TYPE_STYLE: Record<AppointmentType, string> = {
-  Consultation: "bg-[#F3ECFB] text-[#5A32A3]",
-  "Strategy Call": "bg-[#DBEAFE] text-[#2563EB]",
-  Review: "bg-[#CCFBF1] text-[#0F766E]",
 };
 
 const RELATED_ICON: Record<RelatedKind, typeof User> = {
@@ -282,14 +275,13 @@ function HomeView({
           </div>
 
           <div className="hidden min-w-0 overflow-x-auto lg:block">
-            <table className="w-full min-w-[980px] text-left">
+            <table className="w-full min-w-[860px] text-left">
               <thead>
                 <tr className="border-b border-[#E5E7EB] text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
                   <th className="px-5 py-3">Appointment</th>
                   <th className="px-3 py-3">Related To</th>
                   <th className="px-3 py-3">Consultant</th>
                   <th className="px-3 py-3 whitespace-nowrap">Date & Time</th>
-                  <th className="px-3 py-3">Type</th>
                   <th className="px-3 py-3">Status</th>
                   <th className="px-3 py-3">Channel</th>
                   <th className="px-4 py-3 text-right">Actions</th>
@@ -493,14 +485,6 @@ function AppointmentCard({
             <span
               className={cn(
                 "inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
-                TYPE_STYLE[row.type],
-              )}
-            >
-              {row.type}
-            </span>
-            <span
-              className={cn(
-                "inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
                 STATUS_STYLE[row.status],
               )}
             >
@@ -583,16 +567,6 @@ function AppointmentRow({
             {formatApptTime(row.start)}
           </span>
         </div>
-      </td>
-      <td className="px-3 py-3.5">
-        <span
-          className={cn(
-            "inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
-            TYPE_STYLE[row.type],
-          )}
-        >
-          {row.type}
-        </span>
       </td>
       <td className="px-3 py-3.5">
         <span
@@ -738,10 +712,21 @@ function AppointmentDrawer({
 }) {
   const consultant = consultantById(row.consultantId);
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/20 backdrop-blur-[1px]">
-      <div className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex justify-end bg-slate-900/20 backdrop-blur-[1px]"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-labelledby="appointment-detail-title"
+        className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h3 className="text-[15px] font-bold text-slate-900">
+          <h3
+            id="appointment-detail-title"
+            className="text-[15px] font-bold text-slate-900"
+          >
             Appointment detail
           </h3>
           <button
@@ -775,7 +760,6 @@ function AppointmentDrawer({
             <Row label="Role" value={consultant?.role ?? ""} />
             <Row label="Date" value={formatApptDate(row.start)} />
             <Row label="Time" value={formatApptTime(row.start)} />
-            <Row label="Type" value={row.type} />
             <Row label="Status" value={row.status} />
             <Row label="Channel" value={row.channel} />
           </dl>

@@ -58,6 +58,7 @@ import {
   upsertBookingPage,
   WEEKDAYS,
   type BookingPage,
+  type ConsultantPriority,
 } from "@/lib/booking/types";
 
 const BRAND = "#5A32A3";
@@ -67,6 +68,7 @@ type ViewMode = "grid" | "list";
 const SECTION_FILTERS = [
   "All Consultations",
   "Active Consultations",
+  "Non active Consultations",
   "My Consultations",
 ] as const;
 
@@ -84,6 +86,8 @@ function matchesSection(
       return true;
     case "Active Consultations":
       return page.status === "Live";
+    case "Non active Consultations":
+      return page.status !== "Live";
     case "My Consultations":
       return mine;
     default:
@@ -110,6 +114,9 @@ export function ConsultationsBoard() {
     useState<ConsultationDetailsValues | null>(null);
   const [assignStep, setAssignStep] = useState(false);
   const [assignedConsultants, setAssignedConsultants] = useState<string[]>([]);
+  const [assignedPriorities, setAssignedPriorities] = useState<
+    Record<string, ConsultantPriority>
+  >({});
   const [rulesStep, setRulesStep] = useState(false);
   const [rulesValues, setRulesValues] = useState<BookingRulesValues | null>(
     null,
@@ -129,6 +136,7 @@ export function ConsultationsBoard() {
     setRulesStep(false);
     setAssignStep(false);
     setAssignedConsultants([]);
+    setAssignedPriorities({});
     setRulesValues(null);
     setFormValues(null);
     setNotifyValues(null);
@@ -171,6 +179,7 @@ export function ConsultationsBoard() {
             ? detailsValues.locationDetail || undefined
             : detailsValues.phoneDetail || undefined,
       consultants: assignedConsultants,
+      consultantPriorities: assignedPriorities,
       price: detailsValues.price,
       coverImageUrl: detailsValues.coverImageUrl,
       currency: "AUD",
@@ -282,8 +291,9 @@ export function ConsultationsBoard() {
         choice={detailsChoice}
         consultationName={detailsValues.name}
         onBack={() => setAssignStep(false)}
-        onCreate={(consultants) => {
+        onCreate={(consultants, priorities) => {
           setAssignedConsultants(consultants);
+          setAssignedPriorities(priorities);
           setRulesStep(true);
         }}
       />

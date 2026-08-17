@@ -1,9 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Aperture, Search } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { BOOKING_CONSULTANTS } from "@/lib/booking/types";
+import { Camera, Info, Search } from "lucide-react";
+import {
+  BOOKING_CONSULTANTS,
+  CONSULTANT_PRIORITIES,
+  type ConsultantPriority,
+} from "@/lib/booking/types";
 import {
   modeSubtitle,
   type CalendarTypeChoice,
@@ -25,6 +28,10 @@ const ALL_NAMES = [
   ),
 ];
 
+function priorityLabel(priority: ConsultantPriority) {
+  return `${priority} priority`;
+}
+
 export function AssignConsultantsStep({
   choice,
   consultationName,
@@ -34,10 +41,16 @@ export function AssignConsultantsStep({
   choice: CalendarTypeChoice;
   consultationName: string;
   onBack: () => void;
-  onCreate: (consultants: string[]) => void;
+  onCreate: (
+    consultants: string[],
+    priorities: Record<string, ConsultantPriority>,
+  ) => void;
 }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
+  const [priorities, setPriorities] = useState<
+    Record<string, ConsultantPriority>
+  >({});
   const [error, setError] = useState("");
 
   const names = useMemo(() => {
@@ -48,6 +61,14 @@ export function AssignConsultantsStep({
 
   const allVisibleSelected =
     names.length > 0 && names.every((n) => selected.includes(n));
+
+  function priorityOf(name: string): ConsultantPriority {
+    return priorities[name] ?? "Low";
+  }
+
+  function setPriority(name: string, priority: ConsultantPriority) {
+    setPriorities((prev) => ({ ...prev, [name]: priority }));
+  }
 
   function toggle(name: string) {
     setError("");
@@ -72,7 +93,7 @@ export function AssignConsultantsStep({
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-white"
           style={{ backgroundColor: BRAND }}
         >
-          <Aperture className="h-5 w-5" />
+          <Camera className="h-5 w-5" strokeWidth={2} />
         </span>
         <div className="min-w-0">
           <p className="truncate text-[15px] font-bold uppercase text-slate-800">
@@ -120,19 +141,44 @@ export function AssignConsultantsStep({
           {names.map((name) => {
             const checked = selected.includes(name);
             return (
-              <li key={name}>
-                <label className="flex cursor-pointer items-center gap-3 px-5 py-3.5 sm:px-7">
+              <li key={name} className="px-5 py-3.5 sm:px-7">
+                <div className="flex items-center gap-3">
                   <span className="h-9 w-9 shrink-0 rounded-full bg-slate-200/80" />
                   <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-slate-800">
                     {name}
                   </span>
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggle(name)}
-                    className="h-4 w-4 rounded border-slate-300 accent-[#5A32A3]"
-                  />
-                </label>
+                  <div className="flex shrink-0 items-center gap-2.5">
+                    <label className="sr-only">
+                      Priority for {name}
+                    </label>
+                    <span
+                      className="hidden text-slate-400 sm:inline-flex"
+                      title="Rank this consultant when assigning bookings. High priority consultants are offered first."
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </span>
+                    <select
+                      value={priorityOf(name)}
+                      onChange={(e) =>
+                        setPriority(name, e.target.value as ConsultantPriority)
+                      }
+                      className="h-9 w-[148px] rounded-lg border border-[#E5E7EB] bg-white px-2.5 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/40"
+                    >
+                      {CONSULTANT_PRIORITIES.map((priority) => (
+                        <option key={priority} value={priority}>
+                          {priorityLabel(priority)}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggle(name)}
+                      className="h-4 w-4 rounded border-slate-300 accent-[#5A32A3]"
+                      aria-label={`Assign ${name}`}
+                    />
+                  </div>
+                </div>
               </li>
             );
           })}
@@ -148,7 +194,9 @@ export function AssignConsultantsStep({
             Consultants Assigned:
             {selected.length ? (
               <span className="ml-1.5 font-medium text-[#5A32A3]">
-                {selected.join(", ")}
+                {selected
+                  .map((name) => `${name} (${priorityOf(name)})`)
+                  .join(", ")}
               </span>
             ) : (
               <span className="ml-1.5 font-normal text-slate-400">None</span>
@@ -178,7 +226,9 @@ export function AssignConsultantsStep({
               setError("Select at least one consultant");
               return;
             }
-            onCreate(selected);
+            const next: Record<string, ConsultantPriority> = {};
+            for (const name of selected) next[name] = priorityOf(name);
+            onCreate(selected, next);
           }}
           className="h-10 rounded-lg px-5 text-[13px] font-semibold text-white hover:brightness-110"
           style={{ backgroundColor: BRAND }}

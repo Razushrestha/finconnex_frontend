@@ -38,8 +38,9 @@ export function ShareConsultationModal({
   const [tab, setTab] = useState<ShareTab>("shorten");
   const [shortCode, setShortCode] = useState<string | null>(null);
   const [oneTime, setOneTime] = useState<string | null>(null);
-  const [embedCopied, setEmbedCopied] = useState(false);
+  const [embedCopied, setEmbedCopied] = useState<string | null>(null);
   const [slotsCopied, setSlotsCopied] = useState(false);
+  const [shortCopied, setShortCopied] = useState(false);
 
   const origin =
     typeof window !== "undefined" ? window.location.origin : "";
@@ -98,7 +99,7 @@ export function ShareConsultationModal({
       <div
         role="dialog"
         aria-labelledby="share-consultation-title"
-        className="w-full max-w-[600px] overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-2xl"
+        className="flex max-h-[90vh] w-full max-w-[600px] flex-col overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative px-5 pt-5 pb-1 sm:px-6 sm:pt-6">
@@ -118,7 +119,7 @@ export function ShareConsultationModal({
           </h2>
         </div>
 
-        <div className="space-y-4 px-5 py-4 sm:px-6">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
           <div className="flex items-center gap-2">
             <div className="group/url flex min-w-0 flex-1 items-center gap-1.5 rounded-lg bg-[#F3ECFB] py-1.5 pr-1.5 pl-3">
               {editing ? (
@@ -233,18 +234,43 @@ export function ShareConsultationModal({
           </div>
 
           {tab === "shorten" ? (
-            <div className="flex justify-center pt-1 pb-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setOneTime(null);
-                  setShortCode(randomCode());
-                }}
-                className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
-                style={{ borderColor: BRAND }}
-              >
-                Generate Shortened URL
-              </button>
+            <div className="space-y-3 pt-1 pb-2">
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOneTime(null);
+                    setShortCopied(false);
+                    setShortCode(randomCode());
+                  }}
+                  className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
+                  style={{ borderColor: BRAND }}
+                >
+                  Generate Shortened URL
+                </button>
+              </div>
+              {shortCode ? (
+                <div className="rounded-xl border border-[#E5E7EB] bg-slate-50 px-4 py-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
+                      Shortened URL
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copyText(`${origin}/s/${shortCode}`, setShortCopied)
+                      }
+                      className="h-7 rounded-md px-2.5 text-[11px] font-semibold text-white"
+                      style={{ backgroundColor: BRAND }}
+                    >
+                      {shortCopied ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                  <p className="overflow-auto rounded-lg border border-[#E5E7EB] bg-white p-3 text-[12px] font-medium break-all text-[#5A32A3]">
+                    {origin}/s/{shortCode}
+                  </p>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -291,22 +317,44 @@ export function ShareConsultationModal({
                   },
                 ] as const
               ).map((option) => (
-                <button
+                <div
                   key={option.id}
-                  type="button"
-                  onClick={() => copyText(option.snippet, setEmbedCopied)}
-                  className="flex w-full items-center gap-5 rounded-xl border border-[#E5E7EB] bg-white px-5 py-4 text-left hover:border-[#5A32A3]/30"
+                  className="overflow-hidden rounded-xl border border-[#E5E7EB] bg-white"
                 >
-                  {option.preview}
-                  <span className="min-w-0">
-                    <span className="block text-[15px] font-bold text-slate-800">
-                      {option.title}
-                    </span>
-                    <span className="mt-1 block text-[13px] leading-relaxed text-slate-500">
-                      {option.body}
-                    </span>
-                  </span>
-                </button>
+                  <div className="flex items-center gap-5 px-5 py-4">
+                    {option.preview}
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-bold text-slate-800">
+                        {option.title}
+                      </p>
+                      <p className="mt-1 text-[13px] leading-relaxed text-slate-500">
+                        {option.body}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="border-t border-[#E5E7EB] bg-slate-50 px-4 py-3">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
+                        Embed code
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          copyText(option.snippet, (v) =>
+                            setEmbedCopied(v ? option.id : null),
+                          )
+                        }
+                        className="h-7 rounded-md px-2.5 text-[11px] font-semibold text-white"
+                        style={{ backgroundColor: BRAND }}
+                      >
+                        {embedCopied === option.id ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                    <pre className="max-h-36 overflow-auto rounded-lg border border-[#E5E7EB] bg-white p-3 text-[11px] leading-relaxed break-all whitespace-pre-wrap text-slate-700">
+                      {option.snippet}
+                    </pre>
+                  </div>
+                </div>
               ))}
             </div>
           ) : null}

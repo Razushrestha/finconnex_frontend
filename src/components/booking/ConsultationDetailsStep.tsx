@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Aperture, ChevronDown, Search } from "lucide-react";
+import { Camera, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConsultationMode } from "@/lib/booking/types";
 
@@ -157,22 +157,23 @@ export function ConsultationDetailsStep({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="group relative flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg text-white transition hover:brightness-110"
-          style={{ backgroundColor: coverImageUrl ? undefined : BRAND }}
-          aria-label="Upload consultation image"
+          className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-white transition hover:brightness-110"
+          style={{ backgroundColor: BRAND }}
+          title={
+            coverImageUrl
+              ? "Change consultation image"
+              : "Upload consultation image"
+          }
+          aria-label={
+            coverImageUrl
+              ? "Change consultation image"
+              : "Upload consultation image"
+          }
         >
+          <Camera className="h-5 w-5" strokeWidth={2} />
           {coverImageUrl ? (
-            <img
-              src={coverImageUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <Aperture className="h-5 w-5" />
-          )}
-          <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 text-[10px] font-semibold text-white opacity-0 transition group-hover:bg-black/35 group-hover:opacity-100">
-            Upload
-          </span>
+            <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
+          ) : null}
         </button>
         <div className="min-w-0">
           <p className="truncate text-[15px] font-bold text-slate-800">

@@ -8,6 +8,13 @@ export type BookingEventType =
 
 export type BookingPageStatus = "Draft" | "Live";
 
+export const CONSULTANT_PRIORITIES = [
+  "Low",
+  "Medium",
+  "High",
+] as const;
+export type ConsultantPriority = (typeof CONSULTANT_PRIORITIES)[number];
+
 export type BookingStatus =
   | "Confirmed"
   | "Rescheduled"
@@ -113,6 +120,8 @@ export interface BookingPage {
   maxAttendees?: number;
   /** Assigned consultant name(s). One for most modes; many for collective. */
   consultants?: string[];
+  /** Priority per assigned consultant name. */
+  consultantPriorities?: Record<string, ConsultantPriority>;
 }
 
 export interface Booking {
