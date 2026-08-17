@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import Link from "next/link";
 import {
     Inbox,
@@ -622,10 +623,10 @@ export function UnifiedInboxClient() {
                 </p>
               </div>
               <div className="flex flex-1 flex-col p-3">
-                <textarea
+                <MentionTextarea
                   value={notesDraft}
-                  onChange={(e) => setNotesDraft(e.target.value)}
-                  placeholder="Conversation-level notes…"
+                  onChange={setNotesDraft}
+                  placeholder="Conversation-level notes… Type @ to assign someone."
                   className="min-h-[120px] flex-1 resize-none rounded-xl border border-slate-200 bg-white p-2.5 text-[12px] outline-none focus:border-violet-500"
                 />
                 <button

@@ -1,5 +1,6 @@
 "use client";
 
+import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import { useRef, useState } from "react";
 import { Paperclip, X } from "lucide-react";
 import { createAttachment } from "@/lib/attachments/store";
@@ -206,11 +207,11 @@ function AttachmentForm({
           <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
             Notes (optional)
           </label>
-          <textarea
+          <MentionTextarea
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={setNotes}
             rows={3}
-            placeholder={`Notes about this file for ${panel.dealName}...`}
+            placeholder={`Notes about this file for ${panel.dealName}... Type @ to assign someone.`}
             className="w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
           />
         </div>
@@ -376,12 +377,12 @@ function QuickActionForm({
         <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
           {config.label}
         </label>
-        <textarea
+        <MentionTextarea
           autoFocus
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={setValue}
           rows={6}
-          placeholder={config.placeholder(panel)}
+          placeholder={`${config.placeholder(panel)} Type @ to assign someone.`}
           className="w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
         />
         {error && (

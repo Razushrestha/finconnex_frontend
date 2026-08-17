@@ -41,6 +41,19 @@ export const EMPTY_TASK_FILTERS: TaskFilters = {
   types: [],
 };
 
+export interface TaskActionItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+export interface TaskActivityNote {
+  id: string;
+  body: string;
+  author: string;
+  createdAt: string;
+}
+
 export interface Task {
   taskId: string;
   title: string;
@@ -58,6 +71,8 @@ export interface Task {
   description?: string;
   completedDate?: string;
   notes?: string;
+  activityNotes?: TaskActivityNote[];
+  actionItems?: TaskActionItem[];
   collaborators?: string[];
   commentsCount?: number;
   attachmentsCount?: number;
@@ -207,6 +222,14 @@ export const taskColumns: TaskColumn[] = [
         ],
         createdBy: "John Smith",
         overdue: true,
+        activityNotes: [
+          {
+            id: "note-t005-1",
+            body: "Client confirmed the Q3 targets during the morning sync. Need to ensure the churn metrics account for the recent platform update.",
+            author: "Alex Sterling",
+            createdAt: "17/08/2026 09:30 AM",
+          },
+        ],
       }),
       task({
         taskId: "T-006",

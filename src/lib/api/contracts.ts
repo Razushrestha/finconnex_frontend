@@ -27,6 +27,7 @@ import type {
 import type {
   Priority,
   Task,
+  TaskActionItem,
   TaskColumn,
   TaskStatus,
   TaskType,
@@ -175,7 +176,10 @@ export interface TaskCreateInput {
   relatedTo?: RelatedTo;
   description?: string;
   notes?: string;
+  reminderDate?: string;
+  actionItems?: TaskActionItem[];
   collaborators?: string[];
+  attachmentsCount?: number;
   createdBy?: string;
 }
 

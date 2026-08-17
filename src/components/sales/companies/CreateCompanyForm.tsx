@@ -15,6 +15,7 @@ import {
   OWNERS,
   type CompanyStatus,
 } from "@/lib/companies/types";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { createCompany } from "@/lib/companies/store";
 import {
   CreateEntityFormShell,
@@ -273,14 +274,11 @@ export function CreateCompanyForm({
         </InputShell>
       </Field>
       <Field label="Notes" className="col-span-full">
-        <TextAreaShell>
-          <textarea
-            className={elevatedTextareaClass}
-            value={form.notes}
-            onChange={(e) => update("notes", e.target.value)}
-            placeholder="Account context, relationship notes…"
-          />
-        </TextAreaShell>
+        <MentionNotesTextarea
+          value={form.notes}
+          onChange={(notes) => update("notes", notes)}
+          placeholder="Account context, relationship notes… Type @ to assign someone."
+        />
       </Field>
     </CreateEntityFormShell>
   );

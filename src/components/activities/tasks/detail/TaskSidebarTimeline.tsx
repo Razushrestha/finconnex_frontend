@@ -1,8 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { Clock, Send } from "lucide-react";
+import { MentionInput } from "@/components/shared/MentionInput";
 
 export function TaskSidebarTimeline() {
+  const [comment, setComment] = useState("");
+
   return (
     <div className="rounded-2xl border border-border bg-white p-4 shadow-sm">
       <h2 className="mb-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
@@ -45,8 +49,9 @@ export function TaskSidebarTimeline() {
 
       <div className="mt-4 pt-3 border-t border-border">
         <div className="relative">
-          <input
-            type="text"
+          <MentionInput
+            value={comment}
+            onChange={setComment}
             placeholder="Type @ to mention..."
             className="w-full rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring pr-8"
           />

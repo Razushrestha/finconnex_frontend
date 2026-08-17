@@ -43,6 +43,32 @@ type NavItem = {
   children?: NavChildItem[];
 };
 
+function isNavActive(pathname: string, href: string): boolean {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function isChildNavActive(
+  pathname: string,
+  href: string,
+  siblings: NavChildItem[],
+): boolean {
+  if (!isNavActive(pathname, href)) return false;
+  const matches = siblings.filter((item) => isNavActive(pathname, item.href));
+  if (matches.length === 0) return false;
+  const bestMatch = matches.reduce((longest, item) =>
+    item.href.length > longest.href.length ? item : longest,
+  );
+  return bestMatch.href === href;
+}
+
+const childNavClass = (active: boolean) =>
+  cn(
+    "rounded-lg px-2.5 py-2 text-sm transition-colors md:py-1.5",
+    active
+      ? "bg-violet-50 font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+  );
+
 const dashboardItems: NavItem[] = [
   { label: "Dashboard", href: "/", icon: Package },
   { label: "Work Queue", href: "/work-queue", icon: Rows4 },
@@ -153,12 +179,24 @@ export function Sidebar({
   const [expanded, setExpanded] = React.useState<Set<string>>(() => {
     const initial = new Set<string>();
     dashboardItems.forEach((item) => {
-      if (item.children?.some((c) => pathname.startsWith(c.href))) {
+      if (item.children?.some((c) => isNavActive(pathname, c.href))) {
         initial.add(item.label);
       }
     });
     return initial;
   });
+
+  React.useEffect(() => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      dashboardItems.forEach((item) => {
+        if (item.children?.some((c) => isNavActive(pathname, c.href))) {
+          next.add(item.label);
+        }
+      });
+      return next;
+    });
+  }, [pathname]);
 
   const [internalMobileOpen, setInternalMobileOpen] = React.useState(false);
   const mobileOpen = mobileOpenProp ?? internalMobileOpen;
@@ -285,9 +323,9 @@ export function Sidebar({
             {dashboardItems.map((item) => {
               const hasChildren = !!item.children?.length;
               const isActive =
-                (item.href && pathname === item.href) ||
+                (item.href && isNavActive(pathname, item.href)) ||
                 (hasChildren &&
-                  item.children!.some((c) => pathname.startsWith(c.href)));
+                  item.children!.some((c) => isNavActive(pathname, c.href)));
               const isOpen = expanded.has(item.label);
               const Icon = item.icon!;
 
@@ -359,17 +397,16 @@ export function Sidebar({
                       )}
                     >
                       {item.children!.map((child) => {
-                        const childActive = pathname === child.href;
+                        const childActive = isChildNavActive(
+                          pathname,
+                          child.href,
+                          item.children!,
+                        );
                         return (
                           <Link
                             key={child.href}
                             href={child.href}
-                            className={cn(
-                              "rounded-lg px-2.5 py-2 text-sm transition-colors md:py-1.5",
-                              childActive
-                                ? "text-violet-600 dark:text-violet-400 font-medium"
-                                : "text-muted-foreground hover:bg-accent",
-                            )}
+                            className={childNavClass(childActive)}
                           >
                             {child.label}
                           </Link>

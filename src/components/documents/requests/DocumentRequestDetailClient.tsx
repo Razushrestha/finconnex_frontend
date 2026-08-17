@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -412,12 +413,12 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
                     Notes
                   </p>
                   <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50/40 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] focus-within:border-violet-400 focus-within:bg-white focus-within:shadow-[0_0_0_3px_rgba(139,92,246,0.12)]">
-                    <textarea
+                    <MentionTextarea
                       value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
+                      onChange={setNotes}
                       onBlur={() => save({ ...request, notes })}
                       className="min-h-[140px] flex-1 resize-none bg-transparent px-3.5 py-3 text-[13px] leading-relaxed text-slate-800 outline-none placeholder:text-slate-400"
-                      placeholder="Internal notes for the team…"
+                      placeholder="Internal notes for the team… Type @ to assign someone."
                     />
                   </div>
                 </section>

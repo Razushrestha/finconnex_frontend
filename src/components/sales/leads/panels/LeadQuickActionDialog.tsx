@@ -1,5 +1,6 @@
 "use client";
 
+import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import { useState } from "react";
 import {
   Dialog,
@@ -403,21 +404,31 @@ export function LeadQuickActionDialog({
                 : kind === "attachment"
                   ? "Notes (optional)"
                   : "Message"}
-              <textarea
-                value={draft.body}
-                onChange={(e) => update("body", e.target.value)}
-                rows={3}
-                className="mt-1 w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
-                placeholder={
-                  kind === "sms"
-                    ? "Write a text…"
-                    : kind === "email"
-                      ? "Email body…"
-                      : kind === "attachment"
-                        ? "What was uploaded…"
-                        : "Add a note…"
-                }
-              />
+              {kind === "note" || kind === "attachment" ? (
+                <MentionTextarea
+                  value={draft.body}
+                  onChange={(body) => update("body", body)}
+                  rows={3}
+                  className="mt-1 w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
+                  placeholder={
+                    kind === "attachment"
+                      ? "What was uploaded… Type @ to assign someone."
+                      : "Add a note… Type @ to assign someone."
+                  }
+                />
+              ) : (
+                <textarea
+                  value={draft.body}
+                  onChange={(e) => update("body", e.target.value)}
+                  rows={3}
+                  className="mt-1 w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
+                  placeholder={
+                    kind === "sms"
+                      ? "Write a text…"
+                      : "Email body…"
+                  }
+                />
+              )}
             </label>
           )}
 

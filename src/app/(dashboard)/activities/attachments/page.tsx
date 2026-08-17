@@ -10,6 +10,7 @@ import {
   Search,
   X,
 } from "lucide-react";
+import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import Link from "next/link";
 import {
   ATTACHMENT_KINDS,
@@ -448,10 +449,11 @@ export default function AttachmentsPage() {
             </label>
             <label className="mb-4 block text-xs font-medium text-slate-600">
               Notes
-              <textarea
+              <MentionTextarea
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={setNotes}
                 rows={2}
+                placeholder="Attachment notes… Type @ to assign someone."
                 className="mt-1 w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-300"
               />
             </label>

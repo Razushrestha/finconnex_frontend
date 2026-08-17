@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Task, TaskStatus } from "@/lib/tasks/types";
-import { findTaskById, updateTaskStatus } from "@/lib/tasks/store";
+import { findTaskById, addTaskActivityNote, updateTaskDescription, updateTaskStatus } from "@/lib/tasks/store";
 import { TaskDetailsView } from "@/components/activities/tasks/detail/TaskDetailsView";
 import { onRulesChange } from "@/lib/rules";
 
@@ -30,6 +30,16 @@ export default function TaskDetailPage({ params }: PageProps) {
     if (updated) setTask(updated);
   }
 
+  function handleUpdateDescription(description: string) {
+    const updated = updateTaskDescription(id, description);
+    if (updated) setTask(updated);
+  }
+
+  function handleAddNote(body: string) {
+    const updated = addTaskActivityNote(id, body);
+    if (updated) setTask(updated);
+  }
+
   if (!task) {
     return (
       <div className="flex min-h-[320px] items-center justify-center px-4">
@@ -52,6 +62,8 @@ export default function TaskDetailPage({ params }: PageProps) {
       task={task}
       onBack={() => router.push("/activities/tasks")}
       onUpdateStatus={handleUpdateStatus}
+      onUpdateDescription={handleUpdateDescription}
+      onAddNote={handleAddNote}
     />
   );
 }

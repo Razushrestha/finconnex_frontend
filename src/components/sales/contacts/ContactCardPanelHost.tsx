@@ -1,5 +1,6 @@
 "use client";
 
+import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import { useState } from "react";
 import { X } from "lucide-react";
 import type { ContactQuickActionKind } from "@/components/sales/contacts/ContactRecordCard";
@@ -134,12 +135,12 @@ function QuickActionForm({
         <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
           {config.label}
         </label>
-        <textarea
+        <MentionTextarea
           autoFocus
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={setValue}
           rows={6}
-          placeholder={config.placeholder(panel)}
+          placeholder={`${config.placeholder(panel)} Type @ to assign someone.`}
           className="w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
         />
       </div>

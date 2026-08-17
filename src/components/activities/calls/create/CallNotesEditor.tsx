@@ -1,4 +1,4 @@
-import React from "react";
+import { MentionTextarea } from "@/components/shared/MentionTextarea";
 
 interface CallNotesEditorProps {
   notes: string;
@@ -46,11 +46,11 @@ export const CallNotesEditor: React.FC<CallNotesEditorProps> = ({
       </div>
 
       {/* Textarea */}
-      <textarea
+      <MentionTextarea
         rows={6}
         value={notes}
-        onChange={(e) => onNotesChange(e.target.value)}
-        placeholder="Enter notes or let AI summarize automatically..."
+        onChange={onNotesChange}
+        placeholder="Enter notes or let AI summarize automatically... Type @ to assign someone."
         className="w-full text-sm text-slate-700 focus:outline-none resize-none leading-relaxed"
       />
     </div>

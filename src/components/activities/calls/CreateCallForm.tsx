@@ -17,6 +17,7 @@ import {
   type CallStatus,
   type CallType,
 } from "@/lib/calls/types";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { createCall } from "@/lib/calls/store";
 import {
   RELATED_ENTITY_KINDS,
@@ -312,14 +313,11 @@ export function CreateCallForm({
       </Field>
 
       <Field label="Notes" className="col-span-full">
-        <TextAreaShell>
-          <textarea
-            className={elevatedTextareaClass}
-            value={form.notes}
-            onChange={(e) => update("notes", e.target.value)}
-            placeholder="Call summary, next steps…"
-          />
-        </TextAreaShell>
+        <MentionNotesTextarea
+          value={form.notes}
+          onChange={(notes) => update("notes", notes)}
+          placeholder="Call summary, next steps… Type @ to assign someone."
+        />
       </Field>
     </CreateEntityFormShell>
   );

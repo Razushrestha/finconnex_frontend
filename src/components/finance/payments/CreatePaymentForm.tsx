@@ -22,6 +22,7 @@ import {
 } from "@/lib/finance/invoices/types";
 import { chargePaymentDemoLive } from "@/lib/finance/pay-gateway";
 import { FINANCE_OWNERS, formatAUD, formatFinanceDate } from "@/lib/finance/shared";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import {
   CreateEntityFormShell,
   Field,
@@ -286,14 +287,12 @@ export function CreatePaymentForm({ layoutId: _l, redirect: _r }: Props) {
         </InputShell>
       </Field>
       <Field label="Notes" className="col-span-full">
-        <TextAreaShell>
-          <textarea
-            className={elevatedTextareaClass}
-            rows={3}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </TextAreaShell>
+        <MentionNotesTextarea
+          rows={3}
+          value={notes}
+          onChange={setNotes}
+          placeholder="Internal notes… Type @ to assign someone."
+        />
       </Field>
     </CreateEntityFormShell>
   );

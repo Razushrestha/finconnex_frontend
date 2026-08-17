@@ -5,6 +5,8 @@ import {
   formatTaskTimestamp,
   type Priority,
   type Task,
+  type TaskActionItem,
+  type TaskActivityNote,
   type TaskColumn,
   type TaskStatus,
   type TaskType,
@@ -35,6 +37,7 @@ function cloneSeed(): TaskColumn[] {
       assignee: { ...t.assignee },
       relatedTo: t.relatedTo ? { ...t.relatedTo } : undefined,
       collaborators: t.collaborators ? [...t.collaborators] : undefined,
+      activityNotes: t.activityNotes?.map((note) => ({ ...note })),
     })),
   }));
 }
@@ -71,7 +74,10 @@ export function createTask(input: {
   relatedTo?: RelatedTo;
   description?: string;
   notes?: string;
+  reminderDate?: string;
+  actionItems?: TaskActionItem[];
   collaborators?: string[];
+  attachmentsCount?: number;
   createdBy?: string;
 }): Task {
   const cols = listTaskColumns();
@@ -92,7 +98,12 @@ export function createTask(input: {
     relatedTo: input.relatedTo,
     description: input.description,
     notes: input.notes,
+    reminderDate: input.reminderDate,
+    actionItems: input.actionItems?.length
+      ? input.actionItems.map((item) => ({ ...item }))
+      : undefined,
     collaborators: input.collaborators,
+    attachmentsCount: input.attachmentsCount,
     createdBy: creator,
     createdOn: now,
     modifiedBy: creator,
@@ -303,6 +314,80 @@ export function updateTaskDueDate(taskId: string, date: Date): Task | null {
           ...t,
           dueDate: nextDue,
           overdue: isDueDateOverdue(nextDue),
+        });
+        return updated;
+      }),
+    })),
+  );
+  return updated;
+}
+
+export function updateTaskActionItems(
+  taskId: string,
+  actionItems: TaskActionItem[],
+): Task | null {
+  let updated: Task | null = null;
+  saveTaskColumns(
+    listTaskColumns().map((col) => ({
+      ...col,
+      tasks: col.tasks.map((t) => {
+        if (t.taskId !== taskId) return t;
+        updated = touchModified({
+          ...t,
+          actionItems: actionItems.map((item) => ({ ...item })),
+        });
+        return updated;
+      }),
+    })),
+  );
+  return updated;
+}
+
+export function updateTaskDescription(
+  taskId: string,
+  description: string,
+): Task | null {
+  let updated: Task | null = null;
+  saveTaskColumns(
+    listTaskColumns().map((col) => ({
+      ...col,
+      tasks: col.tasks.map((t) => {
+        if (t.taskId !== taskId) return t;
+        updated = touchModified({
+          ...t,
+          description: description || undefined,
+        });
+        return updated;
+      }),
+    })),
+  );
+  return updated;
+}
+
+export function addTaskActivityNote(
+  taskId: string,
+  body: string,
+): Task | null {
+  const trimmed = body.trim();
+  if (!trimmed) return null;
+
+  const author = getRulesActor().name || "John Smith";
+  const note: TaskActivityNote = {
+    id: newRulesId("task-note"),
+    body: trimmed,
+    author,
+    createdAt: formatTaskTimestamp(new Date()),
+  };
+
+  let updated: Task | null = null;
+  saveTaskColumns(
+    listTaskColumns().map((col) => ({
+      ...col,
+      tasks: col.tasks.map((t) => {
+        if (t.taskId !== taskId) return t;
+        updated = touchModified({
+          ...t,
+          activityNotes: [note, ...(t.activityNotes ?? [])],
         });
         return updated;
       }),

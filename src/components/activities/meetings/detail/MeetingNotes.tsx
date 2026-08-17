@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
+import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import { FileText, Bold, Italic, List, Paperclip } from "lucide-react";
 
 interface MeetingNotesProps {
@@ -38,10 +39,10 @@ export function MeetingNotes({ initialNotes = "", onSave }: MeetingNotesProps) {
         </div>
 
         {/* Text Area */}
-        <textarea
+        <MentionTextarea
           value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Start typing collaborative notes here..."
+          onChange={setNotes}
+          placeholder="Start typing collaborative notes here... Type @ to assign someone."
           className="w-full h-32 p-4 text-sm bg-transparent text-card-foreground focus:outline-none resize-none"
         />
       </div>

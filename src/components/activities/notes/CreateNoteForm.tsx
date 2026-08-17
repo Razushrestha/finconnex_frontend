@@ -20,6 +20,7 @@ import {
   elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
 
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { createNote } from "@/lib/notes/store";
 
 interface CreateNoteFormProps {
@@ -230,14 +231,13 @@ export function CreateNoteForm({
         error={submitted ? errors.body : undefined}
         className="col-span-full"
       >
-        <TextAreaShell error={!!(submitted && errors.body)}>
-          <textarea
-            className={`${elevatedTextareaClass} min-h-[140px]`}
-            value={form.body}
-            onChange={(e) => update("body", e.target.value)}
-            placeholder="Write your note…"
-          />
-        </TextAreaShell>
+        <MentionNotesTextarea
+          error={!!(submitted && errors.body)}
+          className={`${elevatedTextareaClass} min-h-[140px]`}
+          value={form.body}
+          onChange={(body) => update("body", body)}
+          placeholder="Write your note… Type @ to assign someone."
+        />
       </Field>
     </CreateEntityFormShell>
   );

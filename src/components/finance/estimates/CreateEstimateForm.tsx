@@ -19,6 +19,7 @@ import {
   type FinanceLineItem,
 } from "@/lib/finance/shared";
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import {
   CreateEntityFormShell,
   Field,
@@ -204,15 +205,12 @@ export function CreateEstimateForm({ layoutId: _l, redirect: _r }: Props) {
       </Field>
 
       <Field label="Notes" className="col-span-full">
-        <TextAreaShell>
-          <textarea
-            className={elevatedTextareaClass}
-            rows={3}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Internal notes for this estimate"
-          />
-        </TextAreaShell>
+        <MentionNotesTextarea
+          rows={3}
+          value={notes}
+          onChange={setNotes}
+          placeholder="Internal notes for this estimate. Type @ to assign someone."
+        />
       </Field>
 
       <div className="col-span-full">

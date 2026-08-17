@@ -47,6 +47,7 @@ import {
   softDeleteRecord,
 } from "@/lib/rules";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
+import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import { cn } from "@/lib/utils";
 import {
   elevatedInputClass,
@@ -721,14 +722,14 @@ export function TicketDetailClient({ id }: { id: string }) {
                   Public reply
                 </button>
               </div>
-              <textarea
+              <MentionTextarea
                 className={cn(elevatedTextareaClass, "min-h-[80px] border border-slate-200 px-3 py-2")}
                 value={noteBody}
-                onChange={(e) => setNoteBody(e.target.value)}
+                onChange={setNoteBody}
                 placeholder={
                   noteKind === "internal"
-                    ? "Internal note (agents only)…"
-                    : "Public reply to requester…"
+                    ? "Internal note (agents only)… Type @ to assign someone."
+                    : "Public reply to requester… Type @ to assign someone."
                 }
               />
               <button

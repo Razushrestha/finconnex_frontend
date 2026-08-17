@@ -20,6 +20,7 @@ import {
   type LeadSource,
 } from "@/lib/leads/types";
 import { api } from "@/lib/api";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import {
   isMortgagePipelineStage,
   pipelineStageToLeadStatus,
@@ -395,14 +396,11 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
         </Field>
       )}
       <Field label="Notes" className="col-span-full">
-        <TextAreaShell>
-          <textarea
-            className={elevatedTextareaClass}
-            value={form.notes}
-            onChange={(e) => update("notes", e.target.value)}
-            placeholder="Context, next steps, or how they found you…"
-          />
-        </TextAreaShell>
+        <MentionNotesTextarea
+          value={form.notes}
+          onChange={(notes) => update("notes", notes)}
+          placeholder="Context, next steps, or how they found you… Type @ to assign someone."
+        />
       </Field>
     </CreateEntityFormShell>
   );

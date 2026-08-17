@@ -1,5 +1,6 @@
 "use client";
 
+import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
@@ -726,11 +727,11 @@ function NotesSection({
             placeholder="Subject (optional)"
             className="h-9 w-full border-b border-slate-200 bg-transparent px-0 text-[13px] outline-none focus:border-violet-500"
           />
-          <textarea
+          <MentionTextarea
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={setBody}
             rows={3}
-            placeholder="Add a note…"
+            placeholder="Add a note… Type @ to assign someone."
             className="w-full resize-none border-b border-slate-200 bg-transparent px-0 py-2 text-[13px] outline-none focus:border-violet-500"
           />
           <div className="flex justify-end gap-2 pt-1">

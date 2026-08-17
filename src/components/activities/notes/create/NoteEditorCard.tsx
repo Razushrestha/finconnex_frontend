@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import { NOTE_TYPES, type NoteType } from "@/lib/notes/types";
 import {
   RELATED_ENTITY_KINDS,
@@ -248,11 +248,11 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
         <label className="block text-[11px] font-medium text-muted-foreground">
           Body <span className="text-destructive">*</span>
         </label>
-        <textarea
+        <MentionTextarea
           rows={8}
           value={body}
-          onChange={(e) => onBodyChange(e.target.value)}
-          placeholder="Start typing your notes here... Use markdown for quick formatting."
+          onChange={onBodyChange}
+          placeholder="Start typing your notes here... Type @ to assign someone."
           className={`w-full text-sm text-foreground bg-transparent focus:outline-none resize-none leading-relaxed placeholder:text-muted-foreground/50 ${
             submitted && errors.body ? "border-destructive" : ""
           }`}

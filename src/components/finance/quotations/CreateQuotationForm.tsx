@@ -19,6 +19,7 @@ import {
   type FinanceLineItem,
 } from "@/lib/finance/shared";
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import {
   CreateEntityFormShell,
   Field,
@@ -196,14 +197,12 @@ export function CreateQuotationForm({ layoutId: _l, redirect: _r }: Props) {
         </InputShell>
       </Field>
       <Field label="Notes" className="col-span-full">
-        <TextAreaShell>
-          <textarea
-            className={elevatedTextareaClass}
-            rows={3}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </TextAreaShell>
+        <MentionNotesTextarea
+          rows={3}
+          value={notes}
+          onChange={setNotes}
+          placeholder="Internal notes… Type @ to assign someone."
+        />
       </Field>
       <div className="col-span-full">
         <h3 className="mb-3 text-[12px] font-bold tracking-wide text-slate-700 uppercase">

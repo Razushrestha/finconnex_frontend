@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -82,11 +83,11 @@ export function RelatedListCard({
 
         {isField && composing && (
           <div className="rounded-md border border-indigo-200 focus-within:ring-2 focus-within:ring-indigo-100">
-            <textarea
+            <MentionTextarea
               autoFocus
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={action.label}
+              onChange={setDraft}
+              placeholder={`${action.label} — type @ to assign someone`}
               rows={3}
               className="w-full resize-none rounded-t-md px-3 py-2 text-[13px] text-slate-800 outline-none placeholder:text-slate-400"
             />

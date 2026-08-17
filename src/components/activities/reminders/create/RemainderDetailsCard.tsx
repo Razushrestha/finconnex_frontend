@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import { MentionTextarea } from "@/components/shared/MentionTextarea";
 
 interface ReminderDetailsCardProps {
   subject: string;
@@ -38,11 +38,11 @@ export const ReminderDetailsCard: React.FC<ReminderDetailsCardProps> = ({
         <label className="block text-xs font-semibold text-muted-foreground">
           Notes
         </label>
-        <textarea
+        <MentionTextarea
           rows={4}
           value={notes}
-          onChange={(e) => onNotesChange(e.target.value)}
-          placeholder="Additional context for this reminder..."
+          onChange={onNotesChange}
+          placeholder="Additional context for this reminder... Type @ to assign someone."
           className="w-full bg-input/50 border border-border rounded-lg p-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none resize-none"
         />
       </div>

@@ -23,6 +23,8 @@ import {
   RELATED_RECORD_OPTIONS,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
+import { createMeeting } from "@/lib/meetings/store";
 import {
   CreateEntityFormShell,
   Field,
@@ -32,8 +34,6 @@ import {
   elevatedSelectClass,
   elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
-
-import { createMeeting } from "@/lib/meetings/store";
 
 interface CreateMeetingFormProps {
   layoutId: string;
@@ -354,14 +354,11 @@ export function CreateMeetingForm({
         </TextAreaShell>
       </Field>
       <Field label="Notes" className="col-span-full">
-        <TextAreaShell>
-          <textarea
-            className={elevatedTextareaClass}
-            value={form.notes}
-            onChange={(e) => update("notes", e.target.value)}
-            placeholder="Internal notes…"
-          />
-        </TextAreaShell>
+        <MentionNotesTextarea
+          value={form.notes}
+          onChange={(notes) => update("notes", notes)}
+          placeholder="Internal notes… Type @ to assign someone."
+        />
       </Field>
     </CreateEntityFormShell>
   );

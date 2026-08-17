@@ -75,7 +75,9 @@ function parseDueDate(dateStr: string): number {
 }
 
 function truncateText(value: string | undefined, max = 48): string {
-  const text = value?.trim() || "";
+  const raw = value?.trim() || "";
+  if (!raw) return "";
+  const text = raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   if (!text) return "";
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }

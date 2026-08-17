@@ -17,6 +17,7 @@ import {
   RELATED_RECORD_OPTIONS,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import {
   CreateEntityFormShell,
   Field,
@@ -251,15 +252,12 @@ export function CreateDocumentRequestForm({
       </Field>
 
       <Field label="Notes" className="col-span-full">
-        <TextAreaShell>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="What exactly do you need from them?"
-            className={elevatedTextareaClass}
-            rows={3}
-          />
-        </TextAreaShell>
+        <MentionNotesTextarea
+          value={notes}
+          onChange={setNotes}
+          placeholder="What exactly do you need from them? Type @ to assign someone."
+          rows={3}
+        />
       </Field>
     </CreateEntityFormShell>
   );

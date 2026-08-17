@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import { useRouter } from "next/navigation";
 import { Plus, Search, X } from "lucide-react";
 import { WorkQueueSidebar } from "@/components/work-queue/WorkQueueSidebar";
@@ -430,12 +431,12 @@ export function WorkQueueView() {
             <p className="mt-1 truncate text-[12.5px] text-slate-500">
               {noteRow.subject}
             </p>
-            <textarea
+            <MentionTextarea
               autoFocus
               value={noteBody}
-              onChange={(e) => setNoteBody(e.target.value)}
+              onChange={setNoteBody}
               rows={4}
-              placeholder="Write a short note…"
+              placeholder="Write a short note… Type @ to assign someone."
               className="mt-4 w-full resize-none border-b border-slate-200 bg-transparent px-0 py-2 text-[13px] text-slate-800 outline-none focus:border-[var(--wq-accent)]"
             />
             <div className="mt-5 flex justify-end gap-3">

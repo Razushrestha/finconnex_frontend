@@ -3,20 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Bold,
   Calendar,
-  CheckSquare,
   ChevronLeft,
-  Italic,
-  Link2,
-  List,
   ListChecks,
-  ListOrdered,
   Plus,
   Repeat,
-  Underline,
+  Search,
   User,
-  Users,
   X,
 } from "lucide-react";
 import {
@@ -25,6 +18,7 @@ import {
   TASK_STATUSES,
   TASK_TYPES,
   type Priority,
+  type TaskActionItem,
   type TaskStatus,
   type TaskType,
 } from "@/lib/tasks/types";
@@ -51,7 +45,10 @@ import {
   Field,
   TextAreaShell,
 } from "@/components/sales/CreateEntityForm";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import AttachmentUpload from "./AttachmentUpload";
+import { TaskDescriptionEditor } from "./TaskDescriptionEditor";
+import { getUploadAdapter } from "@/lib/attachments/upload";
 
 interface CreateTaskFormProps {
   layoutId: string;
@@ -60,12 +57,6 @@ interface CreateTaskFormProps {
     relatedKind?: RelatedEntityKind;
     relatedName?: string;
   };
-}
-
-interface ActionItem {
-  id: string;
-  text: string;
-  done: boolean;
 }
 
 interface FormState {
@@ -81,7 +72,7 @@ interface FormState {
   description: string;
   attachments: File[];
   collaborators: string[];
-  actionItems: ActionItem[];
+  actionItems: TaskActionItem[];
   repeatEnabled: boolean;
   repeat: RepeatConfig;
   notes: string;
@@ -131,6 +122,72 @@ const selectClass = inputClass + " appearance-none";
 const labelClass =
   "text-[11px] font-medium uppercase tracking-wide text-gray-500";
 
+function parseDatetimeLocal(value: string): Date | null {
+  if (!value.trim()) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function toDatetimeLocalValue(date: Date): string {
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function startOfMinute(date: Date): Date {
+  const next = new Date(date);
+  next.setSeconds(0, 0);
+  return next;
+}
+
+function formatStoredTaskDateTime(value: string): string {
+  const parsed = parseDatetimeLocal(value);
+  if (!parsed) return value.trim();
+  return parsed.toLocaleString("en-AU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function validateTaskDates(
+  dueDate: string,
+  reminderDate: string,
+): Partial<Record<"dueDate" | "reminderDate", string>> {
+  const errors: Partial<Record<"dueDate" | "reminderDate", string>> = {};
+  const now = startOfMinute(new Date());
+  const due = parseDatetimeLocal(dueDate);
+
+  if (dueDate.trim()) {
+    if (!due) {
+      errors.dueDate = "Enter a valid due date and time";
+    } else if (due.getTime() < now.getTime()) {
+      errors.dueDate = "Due date cannot be before the current date and time";
+    }
+  }
+
+  if (reminderDate.trim()) {
+    const reminder = parseDatetimeLocal(reminderDate);
+    if (!reminder) {
+      errors.reminderDate = "Enter a valid reminder date and time";
+    } else if (reminder.getTime() <= now.getTime()) {
+      errors.reminderDate =
+        "Reminder must be after the current date and time";
+    }
+  }
+
+  return errors;
+}
+
+function newActionItemId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `ai-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
 export function CreateTaskForm({
   layoutId,
   redirect,
@@ -149,11 +206,44 @@ export function CreateTaskForm({
   const [repeatModalOpen, setRepeatModalOpen] = useState(false);
   const [newActionItem, setNewActionItem] = useState("");
   const [addingCollaborator, setAddingCollaborator] = useState(false);
-  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const [collaboratorSearch, setCollaboratorSearch] = useState("");
+  const newActionItemRef = useRef<HTMLInputElement>(null);
+  const collaboratorPickerRef = useRef<HTMLDivElement>(null);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
+
+  function syncDateErrors(nextDueDate: string, nextReminderDate: string) {
+    const dateErrors = validateTaskDates(nextDueDate, nextReminderDate);
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (dateErrors.dueDate) {
+        next.dueDate = dateErrors.dueDate;
+      } else if (nextDueDate.trim()) {
+        delete next.dueDate;
+      }
+      if (dateErrors.reminderDate) {
+        next.reminderDate = dateErrors.reminderDate;
+      } else {
+        delete next.reminderDate;
+      }
+      return next;
+    });
+  }
+
+  function handleDueDateChange(value: string) {
+    update("dueDate", value);
+    syncDateErrors(value, form.reminderDate);
+  }
+
+  function handleReminderDateChange(value: string) {
+    update("reminderDate", value);
+    syncDateErrors(form.dueDate, value);
+  }
+
+  const minDueDate = toDatetimeLocalValue(startOfMinute(new Date()));
+  const minReminderDate = minDueDate;
 
   const relatedOptions = form.relatedKind
     ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === form.relatedKind)
@@ -170,80 +260,97 @@ export function CreateTaskForm({
     }
   }, [canEnableRepeat, form.repeatEnabled]);
 
+  useEffect(() => {
+    if (!addingCollaborator) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        collaboratorPickerRef.current &&
+        !collaboratorPickerRef.current.contains(event.target as Node)
+      ) {
+        setAddingCollaborator(false);
+        setCollaboratorSearch("");
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [addingCollaborator]);
+
+  const availableCollaborators = TASK_OWNERS.filter(
+    (owner) =>
+      owner !== form.assignedTo && !form.collaborators.includes(owner),
+  );
+  const filteredCollaborators = availableCollaborators.filter((owner) =>
+    owner.toLowerCase().includes(collaboratorSearch.trim().toLowerCase()),
+  );
+
   function validate() {
     const next: Partial<Record<keyof FormState, string>> = {
       ...requiredFieldErrors(
         form as unknown as Record<string, unknown>,
         REQUIRED_FIELDS as unknown as string[],
       ),
+      ...validateTaskDates(form.dueDate, form.reminderDate),
     };
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
-  // Wraps the current textarea selection with markdown-style markers so the
-  // toolbar buttons do something useful without pulling in a rich text lib.
-  function wrapDescriptionSelection(before: string, after = before) {
-    const el = descriptionRef.current;
-    if (!el) return;
-    const { selectionStart, selectionEnd, value } = el;
-    const selected = value.slice(selectionStart, selectionEnd);
-    const next =
-      value.slice(0, selectionStart) +
-      before +
-      selected +
-      after +
-      value.slice(selectionEnd);
-    update("description", next);
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(
-        selectionStart + before.length,
-        selectionStart + before.length + selected.length,
-      );
-    });
-  }
-
-  function insertLinePrefix(prefix: string) {
-    const el = descriptionRef.current;
-    if (!el) return;
-    const { selectionStart, value } = el;
-    const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
-    const next = value.slice(0, lineStart) + prefix + value.slice(lineStart);
-    update("description", next);
-    requestAnimationFrame(() => el.focus());
-  }
-
   function addActionItem() {
     const text = newActionItem.trim();
-    if (!text) return;
-    update("actionItems", [
-      ...form.actionItems,
-      { id: crypto.randomUUID(), text, done: false },
-    ]);
+    if (!text) {
+      newActionItemRef.current?.focus();
+      return;
+    }
+    setForm((prev) => ({
+      ...prev,
+      actionItems: [
+        ...prev.actionItems,
+        { id: newActionItemId(), text, done: false },
+      ],
+    }));
     setNewActionItem("");
+    requestAnimationFrame(() => newActionItemRef.current?.focus());
   }
 
   function toggleActionItem(id: string) {
-    update(
-      "actionItems",
-      form.actionItems.map((item) =>
+    setForm((prev) => ({
+      ...prev,
+      actionItems: prev.actionItems.map((item) =>
         item.id === id ? { ...item, done: !item.done } : item,
       ),
-    );
+    }));
+  }
+
+  function updateActionItemText(id: string, text: string) {
+    setForm((prev) => ({
+      ...prev,
+      actionItems: prev.actionItems.map((item) =>
+        item.id === id ? { ...item, text } : item,
+      ),
+    }));
+  }
+
+  function finalizeActionItemText(id: string) {
+    setForm((prev) => ({
+      ...prev,
+      actionItems: prev.actionItems.filter(
+        (item) => item.id !== id || item.text.trim().length > 0,
+      ),
+    }));
   }
 
   function removeActionItem(id: string) {
-    update(
-      "actionItems",
-      form.actionItems.filter((item) => item.id !== id),
-    );
+    setForm((prev) => ({
+      ...prev,
+      actionItems: prev.actionItems.filter((item) => item.id !== id),
+    }));
   }
 
   function addCollaborator(name: string) {
     if (!name || form.collaborators.includes(name) || name === form.assignedTo)
       return;
     update("collaborators", [...form.collaborators, name]);
+    setCollaboratorSearch("");
     setAddingCollaborator(false);
   }
 
@@ -271,19 +378,42 @@ export function CreateTaskForm({
             name: form.relatedName,
           }
         : undefined;
+
+    let attachmentsCount = 0;
+    if (form.attachments.length > 0) {
+      const adapter = getUploadAdapter();
+      for (const file of form.attachments) {
+        const result = await adapter.upload({
+          fileName: file.name,
+          data: await file.arrayBuffer(),
+          contentType: file.type || "application/octet-stream",
+          relatedTo: form.title.trim() || "Task",
+        });
+        if (!result.ok) {
+          window.alert(`Failed to upload "${file.name}": ${result.message}`);
+          return;
+        }
+        attachmentsCount += 1;
+      }
+    }
+
     const result = await api.tasks.create({
       title: form.title.trim(),
       taskType: form.taskType as TaskType,
       priority: form.priority as Priority,
       status: form.status as TaskStatus,
-      dueDate: form.dueDate,
+      dueDate: formatStoredTaskDateTime(form.dueDate),
+      reminderDate: form.reminderDate.trim()
+        ? formatStoredTaskDateTime(form.reminderDate)
+        : undefined,
       assignedTo: form.assignedTo,
       relatedTo: related,
       description: form.description || undefined,
+      notes: form.notes.trim() || undefined,
       collaborators: form.collaborators.length ? form.collaborators : undefined,
+      actionItems: form.actionItems.length ? form.actionItems : undefined,
+      attachmentsCount: attachmentsCount || undefined,
       createdBy: actor,
-      // actionItems: form.actionItems — wire this up once api.tasks.create
-      // accepts a checklist payload; kept as local state for now.
     });
     if (!result.ok) {
       window.alert(result.error.message);
@@ -320,20 +450,9 @@ export function CreateTaskForm({
     <div className="min-h-screen w-full bg-background flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-            <CheckSquare className="h-4 w-4" />
-          </span>
-          <div>
-            <h1 className="text-base font-semibold text-foreground">
-              Create New Task
-          </h1>
-            <p className="text-sm text-gray-500">
-              Log an action item, assign responsibilities, and link to existing
-              deals or contacts to maintain a comprehensive activity trail.
-            </p>
-          </div>
-        </div>
+        <h1 className="text-base font-semibold text-foreground">
+          Create New Task
+        </h1>
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
@@ -430,69 +549,12 @@ export function CreateTaskForm({
               </div>
             </div>
 
-            <div className="mt-5">
+            <div className="mt-5 w-full">
               <label className={labelClass}>Task Description</label>
-              <div className="mt-1 overflow-hidden rounded-md border border-border bg-background">
-                <div className="flex items-center gap-1 border-b border-border px-2 py-1.5">
-                  <button
-                    type="button"
-                    title="Bold"
-                    onClick={() => wrapDescriptionSelection("**")}
-                    className="rounded p-1 text-gray-500 hover:bg-white hover:text-gray-800"
-                  >
-                    <Bold className="h-3.5 w-3.5" />
-                  </button>
-
-                  <button
-                    type="button"
-                    title="Italic"
-                    onClick={() => wrapDescriptionSelection("_")}
-                    className="rounded p-1 text-gray-500 hover:bg-white hover:text-gray-800"
-                  >
-                    <Italic className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    title="Underline"
-                    onClick={() => wrapDescriptionSelection("<u>", "</u>")}
-                    className="rounded p-1 text-gray-500 hover:bg-white hover:text-gray-800"
-                  >
-                    <Underline className="h-3.5 w-3.5" />
-                  </button>
-                  <span className="mx-1 h-4 w-px bg-blue-100" />
-                  <button
-                    type="button"
-                    title="Bullet list"
-                    onClick={() => insertLinePrefix("- ")}
-                    className="rounded p-1 text-gray-500 hover:bg-white hover:text-gray-800"
-                  >
-                    <List className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    title="Numbered list"
-                    onClick={() => insertLinePrefix("1. ")}
-                    className="rounded p-1 text-gray-500 hover:bg-white hover:text-gray-800"
-                  >
-                    <ListOrdered className="h-3.5 w-3.5" />
-                  </button>
-                  <span className="mx-1 h-4 w-px bg-blue-100" />
-                  <button
-                    type="button"
-                    title="Link"
-                    onClick={() => wrapDescriptionSelection("[", "](url)")}
-                    className="rounded p-1 text-gray-500 hover:bg-white hover:text-gray-800"
-                  >
-                    <Link2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                <textarea
-                  ref={descriptionRef}
-                  rows={5}
-                  className="w-full resize-none bg-transparent px-3 py-2 text-sm text-foreground/90 placeholder:text-foreground/50 focus:outline-none"
+              <div className="mt-1 w-full">
+                <TaskDescriptionEditor
                   value={form.description}
-                  onChange={(e) => update("description", e.target.value)}
-                  placeholder="Provide detailed context or instructions…"
+                  onChange={(description) => update("description", description)}
                 />
               </div>
             </div>
@@ -510,45 +572,69 @@ export function CreateTaskForm({
               </span>
             </div>
 
-            <div className="space-y-1.5">
-              {form.actionItems.map((item) => (
+            {form.actionItems.length > 0 && (
+              <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                 <div
-                  key={item.id}
-                  className="group flex items-center gap-2.5 rounded-md border border-gray-100 bg-white px-3 py-2"
-                >
-          <input
-                    type="checkbox"
-                    checked={item.done}
-                    onChange={() => toggleActionItem(item.id)}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-400"
-                  />
-                  <span
-                    className={
-                      "flex-1 text-sm " +
-                      (item.done
-                        ? "text-foreground/50 line-through"
-                        : "text-foreground/70")
-                    }
-                  >
-                    {item.text}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeActionItem(item.id)}
-                    className="text-gray-300 opacity-0 hover:text-gray-500 group-hover:opacity-100"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-
-              <div className="flex items-center gap-2.5 rounded-md border border-dashed border-gray-200 px-3 py-2">
-          <input
-                  type="checkbox"
-                  disabled
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="h-full rounded-full bg-violet-600 transition-all duration-300"
+                  style={{
+                    width: `${
+                      form.actionItems.length
+                        ? (completedCount / form.actionItems.length) * 100
+                        : 0
+                    }%`,
+                  }}
                 />
-            <input
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              {form.actionItems.length === 0 ? (
+                <p className="rounded-md border border-dashed border-gray-200 px-3 py-4 text-center text-sm text-gray-400">
+                  No action items yet. Add your first step below.
+                </p>
+              ) : (
+                form.actionItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="group flex items-center gap-2.5 rounded-md border border-gray-100 bg-white px-3 py-2"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={item.done}
+                      onChange={() => toggleActionItem(item.id)}
+                      className="h-4 w-4 shrink-0 rounded border-gray-300 text-violet-600 focus:ring-violet-400"
+                      aria-label={`Mark "${item.text}" complete`}
+                    />
+                    <input
+                      type="text"
+                      value={item.text}
+                      onChange={(e) =>
+                        updateActionItemText(item.id, e.target.value)
+                      }
+                      onBlur={() => finalizeActionItemText(item.id)}
+                      className={
+                        "min-w-0 flex-1 bg-transparent text-sm focus:outline-none " +
+                        (item.done
+                          ? "text-foreground/50 line-through"
+                          : "text-foreground/80")
+                      }
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeActionItem(item.id)}
+                      className="shrink-0 text-gray-400 opacity-100 transition-opacity hover:text-gray-600 md:opacity-0 md:group-hover:opacity-100"
+                      aria-label={`Remove "${item.text}"`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
+
+              <div className="flex items-center gap-2.5 rounded-md border border-dashed border-gray-200 px-3 py-2 focus-within:border-violet-300 focus-within:ring-2 focus-within:ring-violet-100">
+                <Plus className="h-4 w-4 shrink-0 text-gray-400" />
+                <input
+                  ref={newActionItemRef}
                   value={newActionItem}
                   onChange={(e) => setNewActionItem(e.target.value)}
                   onKeyDown={(e) => {
@@ -558,7 +644,7 @@ export function CreateTaskForm({
                     }
                   }}
                   placeholder="Add new action item…"
-                  className="flex-1 bg-transparent text-sm text-gray-600 placeholder:text-gray-400 focus:outline-none"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-gray-700 placeholder:text-gray-400 focus:outline-none"
                 />
               </div>
             </div>
@@ -566,7 +652,8 @@ export function CreateTaskForm({
             <button
               type="button"
               onClick={addActionItem}
-              className="mt-3 flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:text-blue-800"
+              disabled={!newActionItem.trim()}
+              className="mt-3 flex items-center gap-1.5 text-sm font-medium text-violet-700 transition-colors hover:text-violet-800 disabled:cursor-not-allowed disabled:text-gray-300"
             >
               <Plus className="h-3.5 w-3.5" />
               Add Item
@@ -574,14 +661,11 @@ export function CreateTaskForm({
           </div>
 
           <Field label="Notes" className="col-span-full">
-            <TextAreaShell>
-              <textarea
-                className={elevatedTextareaClass}
-                value={form.notes}
-                onChange={(e) => update("notes", e.target.value)}
-                placeholder="Internal notes…"
-              />
-            </TextAreaShell>
+            <MentionNotesTextarea
+              value={form.notes}
+              onChange={(notes) => update("notes", notes)}
+              placeholder="Internal notes… Type @ to assign someone."
+            />
           </Field>
 
           <Field label="Attachments" className="col-span-full">
@@ -649,28 +733,44 @@ export function CreateTaskForm({
                 <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
                   type="datetime-local"
+                  min={minDueDate}
                   className={
                     inputClass +
                     " pl-9" +
                     (submitted && errors.dueDate ? " border-red-300" : "")
                   }
                   value={form.dueDate}
-                  onChange={(e) => update("dueDate", e.target.value)}
+                  onChange={(e) => handleDueDateChange(e.target.value)}
                 />
               </div>
+              {(submitted || form.dueDate) && errors.dueDate ? (
+                <p className="mt-1 text-xs text-red-600">{errors.dueDate}</p>
+              ) : null}
             </div>
 
             <div>
               <label className={labelClass}>Reminder Date</label>
               <div className="relative">
                 <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
+                <input
                   type="datetime-local"
-                  className={inputClass + " pl-9"}
+                  min={minReminderDate}
+                  className={
+                    inputClass +
+                    " pl-9" +
+                    (submitted && errors.reminderDate ? " border-red-300" : "")
+                  }
                   value={form.reminderDate}
-                  onChange={(e) => update("reminderDate", e.target.value)}
+                  onChange={(e) => handleReminderDateChange(e.target.value)}
                 />
               </div>
+              {(submitted || form.reminderDate) && errors.reminderDate ? (
+                <p className="mt-1 text-xs text-red-600">{errors.reminderDate}</p>
+              ) : (
+                <p className="mt-1 text-xs text-gray-500">
+                  Any date and time after the current moment can be selected.
+                </p>
+              )}
             </div>
 
             <div>
@@ -736,24 +836,112 @@ export function CreateTaskForm({
             <div>
               <label className={labelClass}>
                 Task Owner <span className="text-red-500">*</span>
-          </label>
-              <div className="mt-1.5">
+              </label>
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 {form.assignedTo ? (
-                  <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-2 text-sm text-gray-700">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-[11px] font-semibold text-blue-700">
-                      {initials(form.assignedTo)}
+                  <>
+                    <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-2 text-sm text-gray-700">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-[11px] font-semibold text-blue-700">
+                        {initials(form.assignedTo)}
+                      </span>
+                      {form.assignedTo}
+                      <button
+                        type="button"
+                        onClick={() => update("assignedTo", "")}
+                        className="text-gray-400 hover:text-gray-600"
+                        aria-label={`Remove ${form.assignedTo}`}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
                     </span>
-                    {form.assignedTo}
-                    <button
-                      type="button"
-                      onClick={() => update("assignedTo", "")}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </span>
+
+                    {form.collaborators.map((name) => (
+                      <span
+                        key={name}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-gray-900 py-1 pl-1 pr-2 text-sm text-white"
+                      >
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[10px] font-semibold">
+                          {initials(name)}
+                        </span>
+                        {name}
+                        <button
+                          type="button"
+                          onClick={() => removeCollaborator(name)}
+                          className="text-white/70 hover:text-white"
+                          aria-label={`Remove collaborator ${name}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+
+                    <div ref={collaboratorPickerRef} className="relative">
+                      {availableCollaborators.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAddingCollaborator((open) => !open);
+                            if (addingCollaborator) setCollaboratorSearch("");
+                          }}
+                          className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-dashed transition-colors ${
+                            addingCollaborator
+                              ? "border-violet-300 bg-violet-50 text-violet-700"
+                              : "border-gray-300 text-gray-500 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+                          }`}
+                          aria-label="Add collaborator"
+                          title="Add collaborator"
+                          aria-expanded={addingCollaborator}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      )}
+                      {addingCollaborator && (
+                        <div className="absolute left-0 top-full z-30 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg">
+                          <div className="border-b border-gray-100 p-2">
+                            <div className="relative">
+                              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                              <input
+                                autoFocus
+                                type="text"
+                                value={collaboratorSearch}
+                                onChange={(e) =>
+                                  setCollaboratorSearch(e.target.value)
+                                }
+                                placeholder="Search collaborators…"
+                                className="w-full rounded-md border border-gray-200 py-1.5 pl-8 pr-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100"
+                              />
+                            </div>
+                          </div>
+                          <ul className="max-h-44 overflow-y-auto py-1">
+                            {filteredCollaborators.length > 0 ? (
+                              filteredCollaborators.map((owner) => (
+                                <li key={owner}>
+                                  <button
+                                    type="button"
+                                    onClick={() => addCollaborator(owner)}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-violet-50 hover:text-violet-700"
+                                  >
+                                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-semibold text-blue-700">
+                                      {initials(owner)}
+                                    </span>
+                                    {owner}
+                                  </button>
+                                </li>
+                              ))
+                            ) : (
+                              <li className="px-3 py-2 text-sm text-gray-400">
+                                {collaboratorSearch.trim()
+                                  ? "No collaborators match your search"
+                                  : "No collaborators available"}
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </>
                 ) : (
-                  <div className="relative">
+                  <div className="relative w-full">
                     <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                     <select
                       className={inputClass + " pl-9"}
@@ -775,61 +963,6 @@ export function CreateTaskForm({
               {submitted && errors.assignedTo && (
                 <p className="mt-1 text-xs text-red-500">{errors.assignedTo}</p>
               )}
-            </div>
-
-            <div>
-              <div className="mb-1.5 flex items-center justify-between">
-                <label className={labelClass}>Collaborators</label>
-                <button
-                  type="button"
-                  onClick={() => setAddingCollaborator((v) => !v)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <Users className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {form.collaborators.map((name) => (
-                  <span
-                    key={name}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-gray-900 py-1 pl-1 pr-2 text-sm text-white"
-                  >
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[10px] font-semibold">
-                      {initials(name)}
-                    </span>
-                    {name}
-                    <button
-                      type="button"
-                      onClick={() => removeCollaborator(name)}
-                      className="text-white/70 hover:text-white"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-                {addingCollaborator && (
-                  <select
-                    autoFocus
-                    className="rounded-full border border-gray-200 bg-white px-2 py-1 text-sm text-gray-600 focus:outline-none"
-                    value=""
-                    onChange={(e) => addCollaborator(e.target.value)}
-                    onBlur={() => setAddingCollaborator(false)}
-                  >
-                    <option value="" disabled>
-                      Add collaborator…
-                    </option>
-                    {TASK_OWNERS.filter(
-                      (o) =>
-                        o !== form.assignedTo &&
-                        !form.collaborators.includes(o),
-                    ).map((o) => (
-                      <option key={o} value={o}>
-                        {o}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
             </div>
           </div>
 
