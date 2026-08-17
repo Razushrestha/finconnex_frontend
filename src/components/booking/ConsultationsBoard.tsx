@@ -1,20 +1,26 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarDays,
   ChevronDown,
   ChevronRight,
+  Copy,
+  ExternalLink,
   Filter,
+  FolderInput,
   LayoutGrid,
   List,
+  MoreHorizontal,
   MoreVertical,
+  Pencil,
   Plus,
   Presentation,
   RefreshCw,
   Search,
   Share2,
+  Trash2,
   User,
   Users,
   UsersRound,
@@ -41,10 +47,13 @@ import {
   type CalendarTypeChoice,
   type ConsultationDetailsValues,
 } from "@/components/booking/ConsultationDetailsStep";
+import { ShareConsultationModal } from "@/components/booking/ShareConsultationModal";
+import { getRulesActor } from "@/lib/rules/actor";
 import { cn } from "@/lib/utils";
 import { initials } from "@/lib/activities/shared";
 import {
   consultationModeLabel,
+  deleteBookingPage,
   listConsultationPages,
   nextBookingPageId,
   publicBookUrl,
@@ -57,6 +66,33 @@ const BRAND = "#5A32A3";
 
 type ViewMode = "grid" | "list";
 
+const SECTION_FILTERS = [
+  "All Consultations",
+  "Active Consultations",
+  "My Consultations",
+] as const;
+
+type SectionFilter = (typeof SECTION_FILTERS)[number];
+
+function matchesSection(
+  page: BookingPage,
+  filter: SectionFilter,
+  myName: string,
+) {
+  const mine =
+    page.owner === myName || (page.consultants ?? []).includes(myName);
+  switch (filter) {
+    case "All Consultations":
+      return true;
+    case "Active Consultations":
+      return page.status === "Live";
+    case "My Consultations":
+      return mine;
+    default:
+      return true;
+  }
+}
+
 export function ConsultationsBoard() {
   const router = useRouter();
   const [pages, setPages] = useState<BookingPage[]>(() =>
@@ -64,7 +100,10 @@ export function ConsultationsBoard() {
   );
   const [query, setQuery] = useState("");
   const [view, setView] = useState<ViewMode>("grid");
-  const [open, setOpen] = useState(true);
+  const [sectionOpen, setSectionOpen] = useState(false);
+  const [sectionFilter, setSectionFilter] =
+    useState<SectionFilter>("Active Consultations");
+  const sectionRef = useRef<HTMLDivElement>(null);
   const [chooseType, setChooseType] = useState(false);
   const [detailsChoice, setDetailsChoice] = useState<CalendarTypeChoice | null>(
     null,
@@ -121,10 +160,18 @@ export function ConsultationsBoard() {
       maxAdvanceDays: mapped.maxAdvanceDays,
       maxAttendees: mapped.maxAttendees,
       timezone: "Australia/Sydney",
-      meetingVia: detailsValues.online ? "video" : "in_person",
-      meetingViaDetail: detailsValues.online
-        ? detailsValues.platform
-        : undefined,
+      meetingVia:
+        detailsValues.meetingPlace === "online"
+          ? "video"
+          : detailsValues.meetingPlace === "offline"
+            ? "in_person"
+            : "phone",
+      meetingViaDetail:
+        detailsValues.meetingPlace === "online"
+          ? detailsValues.platform
+          : detailsValues.meetingPlace === "offline"
+            ? detailsValues.locationDetail || undefined
+            : detailsValues.phoneDetail || undefined,
       consultants: assignedConsultants,
       price: detailsValues.price,
       currency: "AUD",
@@ -156,10 +203,22 @@ export function ConsultationsBoard() {
     resetWizard();
   }
 
+  useEffect(() => {
+    if (!sectionOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (sectionRef.current && !sectionRef.current.contains(e.target as Node)) {
+        setSectionOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [sectionOpen]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return pages;
     return pages.filter((p) => {
+      if (!matchesSection(p, sectionFilter, getRulesActor().name)) return false;
+      if (!q) return true;
       const people = (p.consultants ?? [p.owner]).join(" ").toLowerCase();
       return (
         p.title.toLowerCase().includes(q) ||
@@ -167,7 +226,7 @@ export function ConsultationsBoard() {
         consultationModeLabel(p.consultationMode).toLowerCase().includes(q)
       );
     });
-  }, [pages, query]);
+  }, [pages, query, sectionFilter]);
 
   if (detailsChoice && settingsStep && detailsValues) {
     return (
@@ -252,16 +311,7 @@ export function ConsultationsBoard() {
 
   return (
     <div className="min-w-0">
-      <div className="mb-5 flex flex-col gap-4 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
-            Consultations
-          </h1>
-          <p className="mt-0.5 text-[12px] text-slate-500">
-            Manage and track all consultations in one place
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="mb-5 flex flex-wrap items-center justify-end gap-2 sm:mb-6">
           <button
             type="button"
             onClick={() => setChooseType(true)}
@@ -280,35 +330,69 @@ export function ConsultationsBoard() {
           <IconBtn label="More">
             <MoreVertical className="h-4 w-4" />
           </IconBtn>
-        </div>
       </div>
 
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="inline-flex items-center gap-2 self-start text-[15px] font-semibold text-slate-800"
-        >
-          Active Consultations
-          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-slate-100 px-1.5 text-[11px] font-bold text-slate-600">
-            {filtered.length}
-          </span>
-          <ChevronDown
-            className={cn(
-              "h-4 w-4 text-slate-400 transition-transform",
-              !open && "-rotate-90",
-            )}
-          />
-        </button>
+        <div className="relative self-start" ref={sectionRef}>
+          <button
+            type="button"
+            onClick={() => setSectionOpen((v) => !v)}
+            className="inline-flex items-center gap-2 text-[15px] font-semibold text-slate-800"
+            aria-expanded={sectionOpen}
+          >
+            {sectionFilter}
+            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-md bg-[#F3ECFB] px-1.5 text-[11px] font-bold text-[#5A32A3]">
+              {filtered.length}
+            </span>
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 text-slate-400 transition-transform",
+                sectionOpen && "rotate-180",
+              )}
+            />
+          </button>
+          {sectionOpen ? (
+            <div className="absolute top-9 left-0 z-30 w-56 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white py-1 shadow-[0_8px_24px_rgba(15,23,42,0.12)]">
+              {SECTION_FILTERS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => {
+                    setSectionFilter(option);
+                    setSectionOpen(false);
+                  }}
+                  className={cn(
+                    "flex w-full px-3 py-2.5 text-left text-[13px] font-medium",
+                    option === sectionFilter
+                      ? "bg-[#F3ECFB] text-[#5A32A3]"
+                      : "text-slate-800 hover:bg-slate-50",
+                  )}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-          <label className="relative min-w-0 flex-1 lg:w-72 lg:flex-none">
+          <label className="relative min-w-0 flex-1 lg:w-80 lg:flex-none">
             <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search Consultations"
-              className="h-10 w-full rounded-lg border border-[#E5E7EB] bg-white pr-3 pl-9 text-[13px] text-slate-700 outline-none placeholder:text-slate-400 focus:border-[#5A32A3]/40"
+              placeholder="Search consultations…"
+              className="h-10 w-full rounded-lg border border-[#E5E7EB] bg-white pr-9 pl-9 text-[13px] text-slate-800 shadow-[inset_0_0_0_0_transparent] outline-none placeholder:text-slate-400 focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/15"
             />
+            {query ? (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="absolute top-1/2 right-2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                aria-label="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
           </label>
           <div className="inline-flex self-end overflow-hidden rounded-lg border border-[#E5E7EB] bg-white sm:self-auto">
             <button
@@ -341,35 +425,33 @@ export function ConsultationsBoard() {
         </div>
       </div>
 
-      {open ? (
-        view === "grid" ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {filtered.map((page) => (
-              <ConsultationCard
-                key={page.id}
-                page={page}
-                onOpen={() => router.push(`/booking/${page.id}`)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-xl border border-[#E5E7EB] bg-white">
-            {filtered.map((page) => (
-              <ConsultationRow
-                key={page.id}
-                page={page}
-                onOpen={() => router.push(`/booking/${page.id}`)}
-              />
-            ))}
-          </div>
-        )
-      ) : null}
-
-      {open && filtered.length === 0 ? (
+      {filtered.length === 0 ? (
         <p className="rounded-xl border border-dashed border-[#E5E7EB] bg-white py-16 text-center text-[13px] text-slate-400">
-          No consultations match your search.
+          No consultations in this view.
         </p>
-      ) : null}
+      ) : view === "grid" ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((page) => (
+            <ConsultationCard
+              key={page.id}
+              page={page}
+              onOpen={() => router.push(`/booking/${page.id}`)}
+              onRefresh={() => setPages(listConsultationPages())}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-[#E5E7EB] bg-white">
+          {filtered.map((page) => (
+            <ConsultationRow
+              key={page.id}
+              page={page}
+              onOpen={() => router.push(`/booking/${page.id}`)}
+              onRefresh={() => setPages(listConsultationPages())}
+            />
+          ))}
+        </div>
+      )}
 
       {chooseType ? (
         <ChooseCalendarTypeModal
@@ -537,33 +619,38 @@ function IconBtn({
 function ConsultationCard({
   page,
   onOpen,
+  onRefresh,
 }: {
   page: BookingPage;
   onOpen: () => void;
+  onRefresh: () => void;
 }) {
   const people = page.consultants?.length ? page.consultants : [page.owner];
   const mode = consultationModeLabel(page.consultationMode) || "One-to-One";
 
   return (
-    <article className="flex min-w-0 flex-col rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex min-w-0 items-start gap-3 text-left"
-      >
-        <BrandMark page={page} />
-        <div className="min-w-0 pt-0.5">
-          <h3 className="truncate text-[16px] font-bold text-slate-900">
-            {page.title}
-          </h3>
-          <p className="mt-0.5 text-[12px] text-slate-500">
-            {page.durationMinutes} mins | {mode}
-          </p>
-        </div>
-      </button>
+    <article className="relative flex min-w-0 flex-col rounded-xl border border-[#5A32A3]/25 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+      <div className="flex items-start gap-3">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex min-w-0 flex-1 items-start gap-3 text-left"
+        >
+          <BrandMark page={page} />
+          <div className="min-w-0 pt-0.5">
+            <h3 className="truncate text-[16px] font-bold text-slate-900">
+              {page.title}
+            </h3>
+            <p className="mt-0.5 text-[12px] text-slate-500">
+              {page.durationMinutes} mins | {mode}
+            </p>
+          </div>
+        </button>
+        <CardMenu page={page} onRefresh={onRefresh} />
+      </div>
       <div className="mt-8 flex items-center justify-between gap-3">
         <PeopleSlot people={people} />
-        <ShareButton slug={page.slug} />
+        <ShareButton slug={page.slug} title={page.title} />
       </div>
     </article>
   );
@@ -572,9 +659,11 @@ function ConsultationCard({
 function ConsultationRow({
   page,
   onOpen,
+  onRefresh,
 }: {
   page: BookingPage;
   onOpen: () => void;
+  onRefresh: () => void;
 }) {
   const people = page.consultants?.length ? page.consultants : [page.owner];
   const mode = consultationModeLabel(page.consultationMode) || "One-to-One";
@@ -598,9 +687,146 @@ function ConsultationRow({
       </button>
       <div className="flex items-center justify-between gap-3 sm:justify-end">
         <PeopleSlot people={people} />
-        <ShareButton slug={page.slug} />
+        <ShareButton slug={page.slug} title={page.title} />
+        <CardMenu page={page} onRefresh={onRefresh} />
       </div>
     </div>
+  );
+}
+
+function CardMenu({
+  page,
+  onRefresh,
+}: {
+  page: BookingPage;
+  onRefresh: () => void;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  function copyPage() {
+    const slugBase = `${page.slug}-copy`.slice(0, 48);
+    upsertBookingPage({
+      ...page,
+      id: nextBookingPageId(),
+      title: `${page.title} (copy)`,
+      slug: slugBase,
+      views: 0,
+      bookingsCount: 0,
+      createdAt: new Date().toLocaleDateString("en-GB"),
+    });
+    onRefresh();
+  }
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        aria-label="More actions"
+        aria-expanded={open}
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </button>
+      {open ? (
+        <div className="absolute top-9 right-0 z-30 w-44 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white py-1 shadow-[0_8px_24px_rgba(15,23,42,0.12)]">
+          <MenuRow
+            icon={Pencil}
+            label="Edit"
+            onClick={() => {
+              setOpen(false);
+              router.push(`/booking/${page.id}`);
+            }}
+          />
+          <MenuRow
+            icon={ExternalLink}
+            label="Booking page"
+            onClick={() => {
+              setOpen(false);
+              window.open(publicBookUrl(page.slug), "_blank", "noopener");
+            }}
+          />
+          <MenuRow
+            icon={Copy}
+            label="Make a copy"
+            onClick={() => {
+              setOpen(false);
+              copyPage();
+            }}
+          />
+          <MenuRow
+            icon={FolderInput}
+            label="Move"
+            onClick={() => {
+              const next =
+                page.status === "Live"
+                  ? window.confirm("Move this consultation to Draft?")
+                    ? "Draft"
+                    : null
+                  : window.confirm("Move this consultation to Active?")
+                    ? "Live"
+                    : null;
+              if (!next) return;
+              upsertBookingPage({ ...page, status: next });
+              setOpen(false);
+              onRefresh();
+            }}
+          />
+          <MenuRow
+            icon={Trash2}
+            label="Delete"
+            danger
+            onClick={() => {
+              if (!window.confirm(`Delete “${page.title}”?`)) return;
+              deleteBookingPage(page.id);
+              setOpen(false);
+              onRefresh();
+            }}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MenuRow({
+  icon: Icon,
+  label,
+  onClick,
+  danger,
+}: {
+  icon: typeof Pencil;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium",
+        danger
+          ? "text-rose-600 hover:bg-rose-50"
+          : "text-slate-800 hover:bg-slate-50",
+      )}
+    >
+      <Icon className="h-4 w-4 shrink-0" />
+      {label}
+    </button>
   );
 }
 
@@ -636,6 +862,34 @@ function BrandMark({ page }: { page: BookingPage }) {
   );
 }
 
+function ShareButton({ slug, title }: { slug: string; title: string }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-semibold hover:bg-[#F3ECFB]"
+        style={{ borderColor: `${BRAND}55`, color: BRAND }}
+      >
+        <Share2 className="h-3.5 w-3.5" />
+        Share
+      </button>
+      {open ? (
+        <ShareConsultationModal
+          title={title}
+          slug={slug}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
 function PeopleSlot({ people }: { people: string[] }) {
   if (people.length > 1) {
     return (
@@ -663,28 +917,3 @@ function PeopleSlot({ people }: { people: string[] }) {
   );
 }
 
-function ShareButton({ slug }: { slug: string }) {
-  const [copied, setCopied] = useState(false);
-
-  return (
-    <button
-      type="button"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(
-            `${window.location.origin}${publicBookUrl(slug)}`,
-          );
-          setCopied(true);
-          window.setTimeout(() => setCopied(false), 1500);
-        } catch {
-          /* ignore */
-        }
-      }}
-      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-semibold hover:bg-[#F3ECFB]"
-      style={{ borderColor: `${BRAND}55`, color: BRAND }}
-    >
-      <Share2 className="h-3.5 w-3.5" />
-      {copied ? "Copied" : "Share"}
-    </button>
-  );
-}

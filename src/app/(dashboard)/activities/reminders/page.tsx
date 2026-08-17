@@ -32,7 +32,7 @@ import {
 } from "@/components/shared/CardInitialsAvatar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
-import { BOARD_PAGE, KANBAN_HEADER, KANBAN_WELL } from "@/lib/layout";
+import { BOARD_PAGE, KANBAN_CARD, KANBAN_COL, KANBAN_HEADER, KANBAN_WELL } from "@/lib/layout";
 import { dropTargetActive } from "@/lib/motion";
 
 type ViewMode = "kanban" | "list";
@@ -245,7 +245,7 @@ export default function RemindersPage() {
                   return (
                     <div
                       key={col.id}
-                      className="flex min-h-[420px] w-72 shrink-0 flex-col gap-2"
+                      className={cn("flex min-h-[420px] flex-col gap-2", KANBAN_COL)}
                     >
                       <div className={KANBAN_HEADER}>
                         <div className="flex items-center justify-between px-1">
@@ -483,6 +483,7 @@ function ReminderCard({
       data-reminder-id={reminder.id}
       className={cn(
         "group cursor-grab rounded-md border border-slate-100 border-l-[3px] !bg-white p-3.5 shadow-sm transition-all active:cursor-grabbing",
+        KANBAN_CARD,
         meta.border,
         isDragging
           ? "opacity-40"

@@ -3,6 +3,8 @@
  * Cut: decorative entrance cascades / bounce / violet hover lift.
  */
 
+import { KANBAN_CARD } from "@/lib/layout";
+
 const reduce = "motion-reduce:animate-none motion-reduce:transition-none";
 
 /**
@@ -17,7 +19,7 @@ export const entityCardInteractive =
   "cursor-grab select-none active:cursor-grabbing";
 
 /** Full CallCard-equivalent shell (shell + interactive). Pair with cardMotion. */
-export const entityCardBox = `${entityCardShell} ${entityCardInteractive}`;
+export const entityCardBox = `${entityCardShell} ${entityCardInteractive} ${KANBAN_CARD}`;
 
 /** Kanban / draggable record cards — quiet hover, no lift cascade */
 export const cardMotion = [

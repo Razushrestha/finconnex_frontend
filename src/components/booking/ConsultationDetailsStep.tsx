@@ -21,13 +21,18 @@ export type CalendarTypeChoice = {
   title: string;
 };
 
+export type MeetingPlace = "online" | "offline" | "phone";
+
 export type ConsultationDetailsValues = {
   name: string;
   durationMinutes: number;
   isFree: boolean;
   price: number;
   online: boolean;
+  meetingPlace: MeetingPlace;
   platform: string;
+  locationDetail: string;
+  phoneDetail: string;
 };
 
 export function modeSubtitle(choice: CalendarTypeChoice) {
@@ -57,10 +62,16 @@ export function ConsultationDetailsStep({
   );
   const [isFree, setIsFree] = useState(initial?.isFree ?? true);
   const [price, setPrice] = useState(initial?.price ?? 0);
-  const [online, setOnline] = useState(initial?.online ?? true);
+  const [meetingPlace, setMeetingPlace] = useState<MeetingPlace>(
+    initial?.meetingPlace ?? (initial?.online === false ? "offline" : "online"),
+  );
   const [platform, setPlatform] = useState<(typeof PLATFORMS)[number]>(
     (initial?.platform as (typeof PLATFORMS)[number]) ?? "Zoho Meeting",
   );
+  const [locationDetail, setLocationDetail] = useState(
+    initial?.locationDetail ?? "",
+  );
+  const [phoneDetail, setPhoneDetail] = useState(initial?.phoneDetail ?? "");
   const [platformOpen, setPlatformOpen] = useState(false);
   const [platformQuery, setPlatformQuery] = useState("");
   const [error, setError] = useState("");
@@ -88,13 +99,20 @@ export function ConsultationDetailsStep({
       setError("Enter a price for paid consultations");
       return;
     }
+    if (meetingPlace === "phone" && !phoneDetail.trim()) {
+      setError("Enter a phone number");
+      return;
+    }
     onNext({
       name: name.trim(),
       durationMinutes,
       isFree,
       price: isFree ? 0 : price,
-      online,
+      online: meetingPlace === "online",
+      meetingPlace,
       platform,
+      locationDetail: locationDetail.trim(),
+      phoneDetail: phoneDetail.trim(),
     });
   }
 
@@ -241,36 +259,35 @@ export function ConsultationDetailsStep({
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
               <div className="inline-flex overflow-hidden rounded-lg border border-[#E5E7EB] bg-white">
-                <button
-                  type="button"
-                  onClick={() => setOnline(true)}
-                  className={cn(
-                    "h-11 min-w-[88px] px-5 text-[13px] font-semibold",
-                    online
-                      ? "bg-[#F3ECFB] text-[#5A32A3]"
-                      : "text-slate-500 hover:bg-slate-50",
-                  )}
-                >
-                  Online
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOnline(false);
-                    setPlatformOpen(false);
-                  }}
-                  className={cn(
-                    "h-11 min-w-[88px] border-l border-[#E5E7EB] px-5 text-[13px] font-semibold",
-                    !online
-                      ? "bg-[#F3ECFB] text-[#5A32A3]"
-                      : "text-slate-500 hover:bg-slate-50",
-                  )}
-                >
-                  Offline
-                </button>
+                {(
+                  [
+                    ["online", "Online"],
+                    ["offline", "Offline"],
+                    ["phone", "Phone"],
+                  ] as const
+                ).map(([value, label], i) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setMeetingPlace(value);
+                      setPlatformOpen(false);
+                      if (error) setError("");
+                    }}
+                    className={cn(
+                      "h-11 min-w-[88px] px-5 text-[13px] font-semibold",
+                      i > 0 && "border-l border-[#E5E7EB]",
+                      meetingPlace === value
+                        ? "bg-[#F3ECFB] text-[#5A32A3]"
+                        : "text-slate-500 hover:bg-slate-50",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
 
-              {online ? (
+              {meetingPlace === "online" ? (
                 <div className="relative min-w-0 flex-1">
                   <button
                     type="button"
@@ -327,10 +344,28 @@ export function ConsultationDetailsStep({
                     </div>
                   ) : null}
                 </div>
-              ) : (
+              ) : meetingPlace === "offline" ? (
                 <input
+                  value={locationDetail}
+                  onChange={(e) => setLocationDetail(e.target.value)}
                   placeholder="Office address or room"
                   className="h-11 min-w-0 flex-1 rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/45"
+                />
+              ) : (
+                <input
+                  type="tel"
+                  value={phoneDetail}
+                  onChange={(e) => {
+                    setPhoneDetail(e.target.value);
+                    if (error) setError("");
+                  }}
+                  placeholder="Phone number"
+                  className={cn(
+                    "h-11 min-w-0 flex-1 rounded-lg border bg-white px-3 text-[13px] text-slate-700 outline-none",
+                    error && !phoneDetail.trim()
+                      ? "border-rose-300"
+                      : "border-[#E5E7EB] focus:border-[#5A32A3]/45",
+                  )}
                 />
               )}
             </div>

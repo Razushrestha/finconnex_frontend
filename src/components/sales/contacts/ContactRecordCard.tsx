@@ -140,7 +140,7 @@ export function ContactRecordCard({
           </div>
         </div>
 
-        <div className="my-3 border-t border-slate-100" />
+        <div className="mt-auto border-t border-slate-100 pt-3" />
 
         <div className="flex items-center justify-between gap-1">
           <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700">

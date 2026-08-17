@@ -599,11 +599,18 @@ export function WorkQueueTable({
                   }}
                   style={gridStyle}
                   className={cn(
-                    "group grid w-full cursor-pointer items-center gap-x-3 border-b border-slate-100 px-5 py-2 text-left transition-colors last:border-b-0 hover:bg-slate-50/80 sm:px-6",
+                    "group/row grid w-full cursor-pointer items-center gap-x-3 border-b border-slate-100 px-5 py-2 text-left transition-colors last:border-b-0 hover:bg-slate-50/80 sm:px-6",
                     overdue && "bg-red-50/40 hover:bg-red-50/70",
                   )}
                 >
-                  <div className="flex items-center gap-1">
+                  <div
+                    className={cn(
+                      "flex items-center gap-0.5 transition-opacity",
+                      isMenuOpen
+                        ? "opacity-100"
+                        : "pointer-events-none opacity-0 group-hover/row:pointer-events-auto group-hover/row:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100",
+                    )}
+                  >
                     <div
                       className="relative inline-block text-left"
                       ref={isMenuOpen ? menuRef : undefined}
@@ -676,9 +683,11 @@ export function WorkQueueTable({
                         e.stopPropagation();
                         onCompleteRow?.(row);
                       }}
-                      className="flex h-8 w-8 items-center justify-center rounded-md text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700"
+                      className="flex h-8 w-8 items-center justify-center"
                     >
-                      <Check className="h-4 w-4" strokeWidth={2.5} />
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white transition-colors hover:bg-emerald-600">
+                        <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                      </span>
                     </button>
                   </div>
 

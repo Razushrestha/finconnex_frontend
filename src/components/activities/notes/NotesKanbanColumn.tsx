@@ -5,7 +5,7 @@ import type { NoteColumn } from "@/lib/notes/types";
 import { NoteCard } from "./NoteCard";
 import { cn } from "@/lib/utils";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
-import { KANBAN_HEADER, KANBAN_WELL } from "@/lib/layout";
+import { KANBAN_COL, KANBAN_HEADER, KANBAN_WELL } from "@/lib/layout";
 
 interface NotesKanbanColumnProps {
   column: NoteColumn;
@@ -33,8 +33,8 @@ export function NotesKanbanColumn({
   return (
     <div
       className={cn(
-        "flex h-full min-w-[220px] flex-col gap-2",
-        embedded ? "flex-1" : "w-72 shrink-0",
+        "flex h-full flex-col gap-2",
+        embedded ? "min-w-[220px] flex-1" : KANBAN_COL,
       )}
     >
       <div className={KANBAN_HEADER}>

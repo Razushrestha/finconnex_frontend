@@ -17,6 +17,7 @@ import type {
 } from "@/lib/documents/requests/types";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
+import { KANBAN_CARD } from "@/lib/layout";
 import Link from "next/link";
 
 const STATUS_META: Record<
@@ -288,6 +289,7 @@ export function DocumentRequestCard({
       data-column-id={columnId}
       className={cn(
         "cursor-grab select-none rounded-md border border-slate-100 border-l-[3px] !bg-white p-3.5 shadow-sm transition-all active:cursor-grabbing",
+        KANBAN_CARD,
         meta.border,
         isDragging ? "opacity-40" : "hover:border-slate-200 hover:shadow-md",
       )}

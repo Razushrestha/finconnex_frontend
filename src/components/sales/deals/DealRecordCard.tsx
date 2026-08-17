@@ -160,7 +160,7 @@ export function DealRecordCard({
       </div>
 
       <div
-        className="mt-3 flex items-center justify-between gap-0.5 border-t border-slate-100 pt-2.5"
+        className="mt-auto flex items-center justify-between gap-0.5 border-t border-slate-100 pt-2.5"
         role="toolbar"
         aria-label={`Quick actions for ${deal.name}`}
       >
