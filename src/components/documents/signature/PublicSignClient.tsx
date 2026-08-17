@@ -121,8 +121,7 @@ export function PublicSignClient({ token }: { token: string }) {
 
   function afterPersist(next: SignatureRequest) {
     setReq(next);
-    const nextSigner =
-      next.signers.find((s) => s.id === signer?.id) ?? signer;
+    const nextSigner = next.signers.find((s) => s.id === signer?.id) ?? signer;
     setSigner(nextSigner);
     if (next.status === "Signed" || next.status === "Declined") {
       syncQuotationFromSignature(next);
@@ -210,10 +209,7 @@ export function PublicSignClient({ token }: { token: string }) {
     const waitingOthers =
       req.status !== "Signed" &&
       req.signers.some(
-        (s) =>
-          s.role !== "CC" &&
-          s.id !== signer.id &&
-          s.status !== "Signed",
+        (s) => s.role !== "CC" && s.id !== signer.id && s.status !== "Signed",
       );
     return (
       <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-4 text-center">
@@ -287,6 +283,7 @@ export function PublicSignClient({ token }: { token: string }) {
       <div className="mb-5">
         <SignatureDocPreview
           fileName={req.documentFile}
+          fileUrl={req.documentFileUrl}
           fields={req.fields}
           signers={req.signers}
           highlightSignerId={signer.id}

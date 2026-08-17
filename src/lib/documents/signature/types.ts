@@ -82,6 +82,7 @@ export interface SignatureRequest {
   signatureRequestId: string;
   documentName: string;
   documentFile: string;
+  documentFileUrl?: string;
   /** @deprecated use signers[0] — kept for table/bridge compat */
   signer: string;
   /** @deprecated use signers[0] */
@@ -523,14 +524,14 @@ export const signatureRequests: SignatureRequest[] = [
 function readStore(): SignatureRequest[] | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(STORE_KEY);
+    const raw = localStorage.getItem(STORE_KEY);
     if (raw) return JSON.parse(raw) as SignatureRequest[];
 
-    const legacy = sessionStorage.getItem(LEGACY_STORE_KEY);
+    const legacy = localStorage.getItem(LEGACY_STORE_KEY);
     if (legacy) {
       const parsed = JSON.parse(legacy) as SignatureRequest[];
       const migrated = parsed.map((r) => normalizeSignatureRequest(r));
-      sessionStorage.setItem(STORE_KEY, JSON.stringify(migrated));
+      localStorage.setItem(STORE_KEY, JSON.stringify(migrated));
       return migrated;
     }
     return null;
@@ -541,7 +542,7 @@ function readStore(): SignatureRequest[] | null {
 
 function writeStore(list: SignatureRequest[]) {
   if (typeof window === "undefined") return;
-  sessionStorage.setItem(STORE_KEY, JSON.stringify(list));
+  localStorage.setItem(STORE_KEY, JSON.stringify(list));
 }
 
 export function listSignatureRequests(): SignatureRequest[] {
@@ -856,4 +857,10 @@ export function fieldKindLabel(kind: SignatureFieldKind): string {
     case "text":
       return "Text";
   }
+}
+
+export function deleteSignatureRequest(id: string): SignatureRequest[] {
+  const list = listSignatureRequests().filter((r) => r.id !== id);
+  writeStore(list);
+  return list;
 }

@@ -34,6 +34,7 @@
 //   PlacedField,
 //   DraggingFieldType,
 // } from "@/components/documents/signature/create/PdfFieldEditor";
+// import { toast } from "sonner";
 
 // export default function CreateSignatureRequestPage() {
 //   return (
@@ -297,7 +298,7 @@
 //         },
 //       ],
 //     });
-//     alert("Draft saved successfully!");
+//     toast.success("Draft saved successfully!");
 //   };
 
 //   const handleContinue = () => {
@@ -473,7 +474,7 @@
 //         </div>
 //       </div>
 
-//       <div className="sticky bottom-0 bg-white/80 backdrop-blur-md border-t border-slate-200 w-full p-2 flex items-center justify-between rounded-xl shadow-lg">
+//       <div className="sticky bottom-0 bg-white/85 backdrop-blur-md border-t border-slate-200 w-full p-2 flex items-center justify-between rounded-xl shadow-lg">
 //         <button
 //           type="button"
 //           onClick={() => window.history.back()}
@@ -533,6 +534,8 @@ import type { StandardFieldType } from "@/components/documents/signature/create/
 import {
   nextSignatureIds,
   upsertSignatureRequest,
+  markRequestSent,
+  type SignatureField,
   type SignatureSigner,
 } from "@/lib/documents/signature/types";
 import type {
@@ -540,6 +543,8 @@ import type {
   DraggingFieldType,
 } from "@/components/documents/signature/create/PdfFieldEditor";
 import { toast } from "sonner";
+import { getNewlyNotifiedSigners } from "@/lib/documents/signature/mock-send";
+import { notifySigners } from "@/components/documents/signature/create/Notify";
 
 export default function CreateSignatureRequestPage() {
   return (
@@ -563,6 +568,27 @@ interface AdditionalDocPreview {
 
 const isDocxFile = (file: File) =>
   file.name.endsWith(".docx") || file.name.endsWith(".doc");
+
+// Converts the field-placement editor's PlacedField[] into the store's
+// SignatureField[] shape.
+// TODO: confirm PlacedField's actual width/height field names — guessed
+// here since PdfFieldEditor's type definition wasn't shared.
+function toSignatureFields(placed: PlacedField[]): SignatureField[] {
+  return placed
+    .filter((f) => f.recipientId) // a field with no assigned recipient can't be saved
+    .map((f) => ({
+      id: f.id,
+      kind: f.type as SignatureField["kind"],
+      label: f.label,
+      x: f.xPct,
+      y: f.yPct,
+      w: (f as any).width ?? 20,
+      h: (f as any).height ?? 6,
+      page: f.page,
+      signerId: f.recipientId!,
+      required: true,
+    }));
+}
 
 function CreateSignatureRequestForm() {
   const router = useRouter();
@@ -899,6 +925,44 @@ function CreateSignatureRequestForm() {
     setPlacedFields((prev) => prev.filter((f) => f.id !== id));
   };
 
+  // Called by PlaceFieldsView's "Send Request" button. Persists the request
+  // with the actual placed fields, marks it Sent, fires the (mock)
+  // notifications, and resolves with whoever was just notified so the test
+  // links modal can be shown before navigating away.
+  const handleSendForSignature = async (): Promise<SignatureSigner[]> => {
+    const fields = toSignatureFields(placedFields);
+
+    const draft = upsertSignatureRequest({
+      id: ids.id,
+      signatureRequestId: ids.signatureRequestId,
+      documentName,
+      documentFile: documentFile?.name || "",
+      signer: recipients[0]?.name || "",
+      signerEmail: recipients[0]?.email || "",
+      signers: recipients,
+      fields,
+      signingOrder,
+      status: "Draft",
+      expiryDate: expiryDate || "31/10/2026",
+      createdBy: "Current User",
+      manageToken: ids.manageToken,
+      audit: [
+        {
+          id: `a-${Date.now()}`,
+          at: new Date().toLocaleString(),
+          action: "Fields placed, ready to send",
+          actor: "Current User",
+        },
+      ],
+    });
+
+    const sent = markRequestSent(draft, "Current User");
+    const notified = getNewlyNotifiedSigners(draft, sent);
+    await notifySigners(sent, notified); // mock for now — logs the payload
+
+    return notified;
+  };
+
   // ==========================================
   // STEP 2: PLACE FIELDS VIEW (?step=place-fields)
   // ==========================================
@@ -917,6 +981,7 @@ function CreateSignatureRequestForm() {
         handleSidebarDragStart={handleSidebarDragStart}
         handleSidebarDragEnd={handleSidebarDragEnd}
         handleResizeField={handleResizeField}
+        onSend={handleSendForSignature}
       />
     );
   }
