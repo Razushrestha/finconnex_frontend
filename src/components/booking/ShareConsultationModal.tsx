@@ -1,13 +1,15 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { Check, Download, Pencil, RefreshCw, X } from "lucide-react";
+import { Check, ChevronDown, Download, Pencil, RefreshCw, X } from "lucide-react";
 import { publicBookUrl } from "@/lib/booking/types";
+import { saveOnceLink, saveShortLink } from "@/lib/booking/short-links";
 import { cn } from "@/lib/utils";
 
 const BRAND = "#5A32A3";
 
 type ShareTab = "shorten" | "onetime" | "embed" | "slots";
+type EmbedId = "inline" | "button" | "link";
 
 const TABS: { id: ShareTab; label: string }[] = [
   { id: "shorten", label: "Shorten Link" },
@@ -21,6 +23,43 @@ function randomCode(len = 7) {
   return Array.from({ length: len }, () =>
     chars[Math.floor(Math.random() * chars.length)],
   ).join("");
+}
+
+function CopyBlock({
+  label,
+  value,
+  copied,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <div className="rounded-xl border border-[#E5E7EB] bg-slate-50 px-4 py-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
+          {label}
+        </p>
+        <button
+          type="button"
+          onClick={onCopy}
+          className="h-7 shrink-0 rounded-md px-2.5 text-[11px] font-semibold text-white"
+          style={{ backgroundColor: BRAND }}
+        >
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <textarea
+        readOnly
+        value={value}
+        rows={Math.min(6, Math.max(2, Math.ceil(value.length / 52)))}
+        className="w-full resize-none rounded-lg border border-[#E5E7EB] bg-white p-3 font-mono text-[11px] leading-relaxed break-all text-slate-700 outline-none"
+        onFocus={(e) => e.currentTarget.select()}
+      />
+    </div>
+  );
 }
 
 export function ShareConsultationModal({
@@ -38,26 +77,60 @@ export function ShareConsultationModal({
   const [tab, setTab] = useState<ShareTab>("shorten");
   const [shortCode, setShortCode] = useState<string | null>(null);
   const [oneTime, setOneTime] = useState<string | null>(null);
+  const [openEmbed, setOpenEmbed] = useState<EmbedId | null>(null);
   const [embedCopied, setEmbedCopied] = useState<string | null>(null);
   const [slotsCopied, setSlotsCopied] = useState(false);
   const [shortCopied, setShortCopied] = useState(false);
+  const [onceCopied, setOnceCopied] = useState(false);
 
   const origin =
     typeof window !== "undefined" ? window.location.origin : "";
   const bookPath = publicBookUrl(path.trim() || slug);
-  const fullUrl = shortCode
-    ? `${origin}/s/${shortCode}`
-    : oneTime && tab === "onetime"
-      ? `${origin}${bookPath}?once=${oneTime}`
-      : `${origin}${bookPath}`;
+  const bookUrl = `${origin}${bookPath}`;
+  const shortUrl = shortCode ? `${origin}/s/${shortCode}` : null;
+  const onceUrl = oneTime ? `${origin}/s/${oneTime}` : null;
+  const displayUrl =
+    tab === "shorten" && shortUrl
+      ? shortUrl
+      : tab === "onetime" && onceUrl
+        ? onceUrl
+        : bookUrl;
 
   const qrSrc = useMemo(
     () =>
-      `https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=8&data=${encodeURIComponent(fullUrl)}`,
-    [fullUrl],
+      `https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=8&data=${encodeURIComponent(displayUrl)}`,
+    [displayUrl],
   );
 
-  const embedSnippet = `<iframe src="${origin}${bookPath}?embed=1" width="100%" height="720" frameborder="0" title="${title}"></iframe>`;
+  const embedOptions: {
+    id: EmbedId;
+    title: string;
+    body: string;
+    preview: ReactNode;
+    snippet: string;
+  }[] = [
+    {
+      id: "inline",
+      title: "Inline Embed",
+      body: "Displays the booking page directly within your website.",
+      preview: <InlineEmbedPreview />,
+      snippet: `<iframe src="${bookUrl}?embed=1" width="100%" height="720" frameborder="0" title="${title}"></iframe>`,
+    },
+    {
+      id: "button",
+      title: "Embed as Button",
+      body: "Opens the booking page in a pop-up on button click.",
+      preview: <ButtonEmbedPreview />,
+      snippet: `<button onclick="window.open('${bookUrl}','booking','width=480,height=720')" style="background:#5A32A3;color:#fff;padding:10px 16px;border:0;border-radius:8px;font-weight:600;">Book Now</button>`,
+    },
+    {
+      id: "link",
+      title: "Embed as Link",
+      body: "Opens the booking page in a pop-up through a clickable link.",
+      preview: <LinkEmbedPreview />,
+      snippet: `<a href="${bookUrl}" onclick="window.open(this.href,'booking','width=480,height=720');return false;">${title}</a>`,
+    },
+  ];
 
   const slots = [
     "Mon 18 Aug · 09:00 – 09:30",
@@ -74,6 +147,22 @@ export function ShareConsultationModal({
     } catch {
       /* ignore */
     }
+  }
+
+  function generateShort() {
+    const code = randomCode();
+    saveShortLink(code, bookPath);
+    setOneTime(null);
+    setShortCopied(false);
+    setShortCode(code);
+  }
+
+  function generateOnce() {
+    const code = randomCode(10);
+    saveOnceLink(code, bookPath);
+    setShortCode(null);
+    setOnceCopied(false);
+    setOneTime(code);
   }
 
   async function downloadQr() {
@@ -93,13 +182,13 @@ export function ShareConsultationModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-3 backdrop-blur-[1px] sm:items-center sm:p-6"
+      className="fixed inset-0 z-[80] flex items-end justify-center overflow-y-auto bg-slate-900/40 p-3 backdrop-blur-[1px] sm:items-center sm:p-6"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-labelledby="share-consultation-title"
-        className="flex max-h-[90vh] w-full max-w-[600px] flex-col overflow-hidden rounded-2xl border border-[#E5E7EB] bg-white shadow-2xl"
+        className="my-auto max-h-[90vh] w-full max-w-[600px] overflow-y-auto rounded-2xl border border-[#E5E7EB] bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative px-5 pt-5 pb-1 sm:px-6 sm:pt-6">
@@ -119,7 +208,7 @@ export function ShareConsultationModal({
           </h2>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6">
+        <div className="space-y-4 px-5 py-4 sm:px-6">
           <div className="flex items-center gap-2">
             <div className="group/url flex min-w-0 flex-1 items-center gap-1.5 rounded-lg bg-[#F3ECFB] py-1.5 pr-1.5 pl-3">
               {editing ? (
@@ -138,7 +227,7 @@ export function ShareConsultationModal({
                 />
               ) : (
                 <p className="min-w-0 flex-1 truncate text-[12px] font-medium text-[#5A32A3]">
-                  {fullUrl}
+                  {displayUrl}
                 </p>
               )}
               <button
@@ -166,7 +255,7 @@ export function ShareConsultationModal({
               </button>
               <button
                 type="button"
-                onClick={() => copyText(fullUrl, setCopied)}
+                onClick={() => copyText(displayUrl, setCopied)}
                 className="h-8 shrink-0 rounded-md px-3.5 text-[12px] font-semibold text-white"
                 style={{ backgroundColor: BRAND }}
               >
@@ -238,124 +327,111 @@ export function ShareConsultationModal({
               <div className="flex justify-center">
                 <button
                   type="button"
-                  onClick={() => {
-                    setOneTime(null);
-                    setShortCopied(false);
-                    setShortCode(randomCode());
-                  }}
+                  onClick={generateShort}
                   className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
                   style={{ borderColor: BRAND }}
                 >
                   Generate Shortened URL
                 </button>
               </div>
-              {shortCode ? (
-                <div className="rounded-xl border border-[#E5E7EB] bg-slate-50 px-4 py-3">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
-                      Shortened URL
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        copyText(`${origin}/s/${shortCode}`, setShortCopied)
-                      }
-                      className="h-7 rounded-md px-2.5 text-[11px] font-semibold text-white"
-                      style={{ backgroundColor: BRAND }}
-                    >
-                      {shortCopied ? "Copied" : "Copy"}
-                    </button>
-                  </div>
-                  <p className="overflow-auto rounded-lg border border-[#E5E7EB] bg-white p-3 text-[12px] font-medium break-all text-[#5A32A3]">
-                    {origin}/s/{shortCode}
-                  </p>
-                </div>
-              ) : null}
+              {shortUrl ? (
+                <CopyBlock
+                  label="Shortened URL"
+                  value={shortUrl}
+                  copied={shortCopied}
+                  onCopy={() => copyText(shortUrl, setShortCopied)}
+                />
+              ) : (
+                <p className="text-center text-[12px] text-slate-400">
+                  Click Generate Shortened URL to create a shareable short link.
+                </p>
+              )}
             </div>
           ) : null}
 
           {tab === "onetime" ? (
-            <div className="flex justify-center pt-1 pb-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShortCode(null);
-                  setOneTime(randomCode(10));
-                }}
-                className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
-                style={{ borderColor: BRAND }}
-              >
-                Generate One Time Link
-              </button>
+            <div className="space-y-3 pt-1 pb-2">
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={generateOnce}
+                  className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
+                  style={{ borderColor: BRAND }}
+                >
+                  Generate One Time Link
+                </button>
+              </div>
+              {onceUrl ? (
+                <CopyBlock
+                  label="One time link"
+                  value={onceUrl}
+                  copied={onceCopied}
+                  onCopy={() => copyText(onceUrl, setOnceCopied)}
+                />
+              ) : (
+                <p className="text-center text-[12px] text-slate-400">
+                  Click Generate One Time Link to create a single-use URL.
+                </p>
+              )}
             </div>
           ) : null}
 
           {tab === "embed" ? (
             <div className="space-y-3 pb-2">
-              {(
-                [
-                  {
-                    id: "inline",
-                    title: "Inline Embed",
-                    body: "Displays the booking page directly within your website.",
-                    preview: <InlineEmbedPreview />,
-                    snippet: embedSnippet,
-                  },
-                  {
-                    id: "button",
-                    title: "Embed as Button",
-                    body: "Opens the booking page in a pop-up on button click.",
-                    preview: <ButtonEmbedPreview />,
-                    snippet: `<button onclick="window.open('${fullUrl}','booking','width=480,height=720')" style="background:#5A32A3;color:#fff;padding:10px 16px;border:0;border-radius:8px;font-weight:600;">Book Now</button>`,
-                  },
-                  {
-                    id: "link",
-                    title: "Embed as Link",
-                    body: "Opens the booking page in a pop-up through a clickable link.",
-                    preview: <LinkEmbedPreview />,
-                    snippet: `<a href="${fullUrl}" onclick="window.open(this.href,'booking','width=480,height=720');return false;">${title}</a>`,
-                  },
-                ] as const
-              ).map((option) => (
-                <div
-                  key={option.id}
-                  className="overflow-hidden rounded-xl border border-[#E5E7EB] bg-white"
-                >
-                  <div className="flex items-center gap-5 px-5 py-4">
-                    {option.preview}
-                    <div className="min-w-0">
-                      <p className="text-[15px] font-bold text-slate-800">
-                        {option.title}
-                      </p>
-                      <p className="mt-1 text-[13px] leading-relaxed text-slate-500">
-                        {option.body}
-                      </p>
-                    </div>
+              {embedOptions.map((option) => {
+                const open = openEmbed === option.id;
+                return (
+                  <div
+                    key={option.id}
+                    className={cn(
+                      "rounded-xl border bg-white",
+                      open
+                        ? "border-[#5A32A3]/50"
+                        : "border-[#E5E7EB] hover:border-[#5A32A3]/30",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setOpenEmbed((prev) =>
+                          prev === option.id ? null : option.id,
+                        )
+                      }
+                      className="flex w-full items-center gap-5 px-5 py-4 text-left"
+                    >
+                      {option.preview}
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[15px] font-bold text-slate-800">
+                          {option.title}
+                        </span>
+                        <span className="mt-1 block text-[13px] leading-relaxed text-slate-500">
+                          {option.body}
+                        </span>
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 shrink-0 text-slate-400 transition-transform",
+                          open && "rotate-180 text-[#5A32A3]",
+                        )}
+                      />
+                    </button>
+                    {open ? (
+                      <div className="px-4 pb-4">
+                        <CopyBlock
+                          label="Embed code"
+                          value={option.snippet}
+                          copied={embedCopied === option.id}
+                          onCopy={() =>
+                            copyText(option.snippet, (v) =>
+                              setEmbedCopied(v ? option.id : null),
+                            )
+                          }
+                        />
+                      </div>
+                    ) : null}
                   </div>
-                  <div className="border-t border-[#E5E7EB] bg-slate-50 px-4 py-3">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
-                        Embed code
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          copyText(option.snippet, (v) =>
-                            setEmbedCopied(v ? option.id : null),
-                          )
-                        }
-                        className="h-7 rounded-md px-2.5 text-[11px] font-semibold text-white"
-                        style={{ backgroundColor: BRAND }}
-                      >
-                        {embedCopied === option.id ? "Copied" : "Copy"}
-                      </button>
-                    </div>
-                    <pre className="max-h-36 overflow-auto rounded-lg border border-[#E5E7EB] bg-white p-3 text-[11px] leading-relaxed break-all whitespace-pre-wrap text-slate-700">
-                      {option.snippet}
-                    </pre>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : null}
 
