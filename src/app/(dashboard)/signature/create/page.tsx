@@ -582,8 +582,8 @@ function toSignatureFields(placed: PlacedField[]): SignatureField[] {
       label: f.label,
       x: f.xPct,
       y: f.yPct,
-      w: (f as any).width ?? 20,
-      h: (f as any).height ?? 6,
+      w: typeof f.width === "number" && f.width <= 100 ? f.width : 20,
+      h: typeof f.height === "number" && f.height <= 20 ? f.height : 5,
       page: f.page,
       signerId: f.recipientId!,
       required: true,
@@ -600,10 +600,24 @@ function CreateSignatureRequestForm() {
 
   const [documentName, setDocumentName] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [persistentFileUrl, setPersistentFileUrl] = useState<string>("");
 
   const fileUrl = useMemo(() => {
     if (!documentFile || !(documentFile instanceof File)) return "";
     return URL.createObjectURL(documentFile);
+  }, [documentFile]);
+
+  useEffect(() => {
+    if (!documentFile || !(documentFile instanceof File)) {
+      setPersistentFileUrl("");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      if (result) setPersistentFileUrl(result);
+    };
+    reader.readAsDataURL(documentFile);
   }, [documentFile]);
 
   useEffect(() => {
@@ -811,6 +825,7 @@ function CreateSignatureRequestForm() {
       signatureRequestId: ids.signatureRequestId,
       documentName,
       documentFile: documentFile?.name || "",
+      documentFileUrl: persistentFileUrl || fileUrl,
       signer: recipients[0]?.name || "",
       signerEmail: recipients[0]?.email || "",
       signers: recipients,
@@ -843,6 +858,7 @@ function CreateSignatureRequestForm() {
       signatureRequestId: ids.signatureRequestId,
       documentName,
       documentFile: documentFile?.name || "",
+      documentFileUrl: persistentFileUrl || fileUrl,
       signer: recipients[0]?.name || "",
       signerEmail: recipients[0]?.email || "",
       signers: recipients,
@@ -937,6 +953,7 @@ function CreateSignatureRequestForm() {
       signatureRequestId: ids.signatureRequestId,
       documentName,
       documentFile: documentFile?.name || "",
+      documentFileUrl: persistentFileUrl || fileUrl,
       signer: recipients[0]?.name || "",
       signerEmail: recipients[0]?.email || "",
       signers: recipients,

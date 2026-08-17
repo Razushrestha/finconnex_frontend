@@ -82,6 +82,7 @@ function mapRequestToView(req: SignatureRequest): MockSignatureDocument {
         actionable.length > 0
           ? Math.round((signed / actionable.length) * 100)
           : 0,
+      documentFileUrl: req.documentFileUrl || "",
     },
     recipients: req.signers.map((s) => ({
       id: s.id,

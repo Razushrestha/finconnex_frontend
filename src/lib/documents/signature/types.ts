@@ -723,14 +723,23 @@ export function applySignerSignature(
 
   const fields = n.fields.map((f) => {
     if (f.signerId !== signerId) return f;
-    if (f.kind === "signature" || f.kind === "initials")
-      return { ...f, value: signatureData };
+    const isDate =
+      f.kind === "date" ||
+      (f as any).kind === "sign_date" ||
+      f.label?.toLowerCase().includes("date");
+    const isSig =
+      f.kind === "signature" ||
+      f.kind === "initials" ||
+      (f as any).kind === "sign" ||
+      f.label?.toLowerCase().includes("signature");
+
+    if (isSig) return { ...f, value: signatureData };
     if (f.kind === "name")
       return {
         ...f,
         value: signers.find((s) => s.id === signerId)?.name,
       };
-    if (f.kind === "date") return { ...f, value: today };
+    if (isDate) return { ...f, value: today };
     return f;
   });
 
