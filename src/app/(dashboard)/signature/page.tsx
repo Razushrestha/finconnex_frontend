@@ -7,7 +7,6 @@ import {
   listSignatureRequests,
   type SignatureRequest,
 } from "@/lib/documents/signature/types";
-import { ESignatureHeader } from "@/components/documents/signature/ESignatureHeader";
 import { RecentTabsHeader } from "@/components/documents/signature/overview/RecentTabsHeader";
 import SignatureStatsGrid from "@/components/documents/signature/overview/SignatureStatsGrid";
 import {
@@ -18,7 +17,6 @@ import {
   CalendarX2,
   FileCode2,
 } from "lucide-react";
-import { SearchInput } from "@/components/ui/search-input";
 import { PaginationBar } from "@/components/ui/pagination-bar";
 
 // Mock templates data matching the screenshot style
@@ -70,7 +68,6 @@ const mockTemplates = [
 export default function ESignatureOverviewPage() {
   const router = useRouter();
   const [requests, setRequests] = useState<SignatureRequest[]>(seed);
-  const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"documents" | "templates">(
     "documents",
   );
@@ -81,38 +78,9 @@ export default function ESignatureOverviewPage() {
     setRequests(listSignatureRequests());
   }, []);
 
-  const filteredDocuments = useMemo(() => {
-    let data = requests;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      data = data.filter(
-        (r) =>
-          r.documentName.toLowerCase().includes(q) ||
-          r.signatureRequestId.toLowerCase().includes(q) ||
-          r.signer.toLowerCase().includes(q) ||
-          r.signers?.some(
-            (s) =>
-              s.name.toLowerCase().includes(q) ||
-              s.email.toLowerCase().includes(q),
-          ) ||
-          (r.relatedTo?.toLowerCase().includes(q) ?? false),
-      );
-    }
-    return data;
-  }, [requests, search]);
+  const filteredDocuments = useMemo(() => requests, [requests]);
 
-  const filteredTemplates = useMemo(() => {
-    let data = mockTemplates;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      data = data.filter(
-        (t) =>
-          t.name.toLowerCase().includes(q) ||
-          t.description.toLowerCase().includes(q),
-      );
-    }
-    return data;
-  }, [search]);
+  const filteredTemplates = useMemo(() => mockTemplates, []);
 
   // Pagination slice
   const paginatedDocuments = useMemo(() => {
@@ -132,25 +100,7 @@ export default function ESignatureOverviewPage() {
 
   return (
     <div className="relative mx-auto flex w-full flex-col p-4 space-y-6">
-      <ESignatureHeader />
-
       <SignatureStatsGrid />
-
-      {/* Search Bar aligned to the right, below stats card and above recent table */}
-      <div className="flex justify-end">
-        <SearchInput
-          value={search}
-          onChange={(val) => {
-            setSearch(val);
-            setCurrentPage(1);
-          }}
-          placeholder={
-            activeTab === "documents"
-              ? "Search documents..."
-              : "Search templates..."
-          }
-        />
-      </div>
 
       {/* Main Content Table Section */}
       <div className="flex flex-col rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)] dark:border-zinc-800 dark:bg-zinc-950 overflow-hidden">
@@ -158,7 +108,6 @@ export default function ESignatureOverviewPage() {
           onTabChange={(tab) => {
             setActiveTab(tab);
             setCurrentPage(1);
-            setSearch("");
           }}
         />
 

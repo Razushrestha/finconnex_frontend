@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Aperture, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConsultationMode } from "@/lib/booking/types";
@@ -33,6 +33,7 @@ export type ConsultationDetailsValues = {
   platform: string;
   locationDetail: string;
   phoneDetail: string;
+  coverImageUrl?: string;
 };
 
 export function modeSubtitle(choice: CalendarTypeChoice) {
@@ -72,9 +73,13 @@ export function ConsultationDetailsStep({
     initial?.locationDetail ?? "",
   );
   const [phoneDetail, setPhoneDetail] = useState(initial?.phoneDetail ?? "");
+  const [coverImageUrl, setCoverImageUrl] = useState(
+    initial?.coverImageUrl ?? "",
+  );
   const [platformOpen, setPlatformOpen] = useState(false);
   const [platformQuery, setPlatformQuery] = useState("");
   const [error, setError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const platforms = useMemo(() => {
     const q = platformQuery.trim().toLowerCase();
@@ -84,6 +89,28 @@ export function ConsultationDetailsStep({
 
   const heading = name.trim() || "Consultation title";
   const subtitle = modeSubtitle(choice);
+
+  function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Image must be under 2 MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setCoverImageUrl(reader.result);
+        if (error) setError("");
+      }
+    };
+    reader.readAsDataURL(file);
+  }
 
   function submit() {
     if (!name.trim()) {
@@ -113,18 +140,40 @@ export function ConsultationDetailsStep({
       platform,
       locationDetail: locationDetail.trim(),
       phoneDetail: phoneDetail.trim(),
+      coverImageUrl: coverImageUrl || undefined,
     });
   }
 
   return (
     <div className="mx-auto w-full max-w-[720px] pb-8">
       <div className="mb-4 flex items-center gap-3 rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-        <span
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-white"
-          style={{ backgroundColor: BRAND }}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImagePick}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="group relative flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-lg text-white transition hover:brightness-110"
+          style={{ backgroundColor: coverImageUrl ? undefined : BRAND }}
+          aria-label="Upload consultation image"
         >
-          <Aperture className="h-5 w-5" />
-        </span>
+          {coverImageUrl ? (
+            <img
+              src={coverImageUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <Aperture className="h-5 w-5" />
+          )}
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 text-[10px] font-semibold text-white opacity-0 transition group-hover:bg-black/35 group-hover:opacity-100">
+            Upload
+          </span>
+        </button>
         <div className="min-w-0">
           <p className="truncate text-[15px] font-bold text-slate-800">
             {heading}

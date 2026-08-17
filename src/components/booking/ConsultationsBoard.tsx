@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarDays,
@@ -8,12 +8,10 @@ import {
   ChevronRight,
   Copy,
   ExternalLink,
-  Filter,
   FolderInput,
   LayoutGrid,
   List,
   MoreHorizontal,
-  MoreVertical,
   Pencil,
   Plus,
   Presentation,
@@ -174,6 +172,7 @@ export function ConsultationsBoard() {
             : detailsValues.phoneDetail || undefined,
       consultants: assignedConsultants,
       price: detailsValues.price,
+      coverImageUrl: detailsValues.coverImageUrl,
       currency: "AUD",
       description: "",
       availability: WEEKDAYS.map((day) => ({
@@ -312,27 +311,65 @@ export function ConsultationsBoard() {
   return (
     <div className="min-w-0">
       <div className="mb-5 flex flex-wrap items-center justify-end gap-2 sm:mb-6">
+        <label className="relative min-w-0 w-full sm:w-72 lg:w-80">
+          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search consultations…"
+            className="h-10 w-full rounded-lg border border-[#E5E7EB] bg-white pr-9 pl-9 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/15"
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="absolute top-1/2 right-2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              aria-label="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </label>
+        <div className="inline-flex overflow-hidden rounded-lg border border-[#E5E7EB] bg-white">
           <button
             type="button"
-            onClick={() => setChooseType(true)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-lg px-3.5 text-[13px] font-semibold text-white shadow-sm hover:brightness-110 sm:px-4"
-            style={{ backgroundColor: BRAND }}
+            onClick={() => setView("grid")}
+            className={cn(
+              "flex h-10 w-10 items-center justify-center",
+              view === "grid"
+                ? "bg-[#F3ECFB] text-[#5A32A3]"
+                : "text-slate-400 hover:bg-slate-50",
+            )}
+            aria-label="Grid view"
           >
-            <Plus className="h-4 w-4" />
-            New Consultation
+            <LayoutGrid className="h-4 w-4" />
           </button>
-          <IconBtn label="Calendar">
-            <CalendarDays className="h-4 w-4" />
-          </IconBtn>
-          <IconBtn label="Filter">
-            <Filter className="h-4 w-4" />
-          </IconBtn>
-          <IconBtn label="More">
-            <MoreVertical className="h-4 w-4" />
-          </IconBtn>
+          <button
+            type="button"
+            onClick={() => setView("list")}
+            className={cn(
+              "flex h-10 w-10 items-center justify-center border-l border-[#E5E7EB]",
+              view === "list"
+                ? "bg-[#F3ECFB] text-[#5A32A3]"
+                : "text-slate-400 hover:bg-slate-50",
+            )}
+            aria-label="List view"
+          >
+            <List className="h-4 w-4" />
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => setChooseType(true)}
+          className="inline-flex h-10 items-center gap-1.5 rounded-lg px-3.5 text-[13px] font-semibold text-white shadow-sm hover:brightness-110 sm:px-4"
+          style={{ backgroundColor: BRAND }}
+        >
+          <Plus className="h-4 w-4" />
+          New Consultation
+        </button>
       </div>
 
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mb-4">
         <div className="relative self-start" ref={sectionRef}>
           <button
             type="button"
@@ -373,55 +410,6 @@ export function ConsultationsBoard() {
               ))}
             </div>
           ) : null}
-        </div>
-        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-          <label className="relative min-w-0 flex-1 lg:w-80 lg:flex-none">
-            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search consultations…"
-              className="h-10 w-full rounded-lg border border-[#E5E7EB] bg-white pr-9 pl-9 text-[13px] text-slate-800 shadow-[inset_0_0_0_0_transparent] outline-none placeholder:text-slate-400 focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/15"
-            />
-            {query ? (
-              <button
-                type="button"
-                onClick={() => setQuery("")}
-                className="absolute top-1/2 right-2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                aria-label="Clear search"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            ) : null}
-          </label>
-          <div className="inline-flex self-end overflow-hidden rounded-lg border border-[#E5E7EB] bg-white sm:self-auto">
-            <button
-              type="button"
-              onClick={() => setView("grid")}
-              className={cn(
-                "flex h-10 w-10 items-center justify-center",
-                view === "grid"
-                  ? "bg-[#F3ECFB] text-[#5A32A3]"
-                  : "text-slate-400 hover:bg-slate-50",
-              )}
-              aria-label="Grid view"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setView("list")}
-              className={cn(
-                "flex h-10 w-10 items-center justify-center border-l border-[#E5E7EB]",
-                view === "list"
-                  ? "bg-[#F3ECFB] text-[#5A32A3]"
-                  : "text-slate-400 hover:bg-slate-50",
-              )}
-              aria-label="List view"
-            >
-              <List className="h-4 w-4" />
-            </button>
-          </div>
         </div>
       </div>
 
@@ -598,24 +586,6 @@ function ChooseCalendarTypeModal({
   );
 }
 
-function IconBtn({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-slate-500 hover:bg-slate-50"
-    >
-      {children}
-    </button>
-  );
-}
-
 function ConsultationCard({
   page,
   onOpen,
@@ -629,13 +599,20 @@ function ConsultationCard({
   const mode = consultationModeLabel(page.consultationMode) || "One-to-One";
 
   return (
-    <article className="relative flex min-w-0 flex-col rounded-xl border border-[#5A32A3]/25 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+    <article
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className="relative flex min-w-0 cursor-pointer flex-col rounded-xl border border-[#5A32A3]/25 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition-colors hover:bg-[#F3ECFB]"
+    >
       <div className="flex items-start gap-3">
-        <button
-          type="button"
-          onClick={onOpen}
-          className="flex min-w-0 flex-1 items-start gap-3 text-left"
-        >
+        <div className="flex min-w-0 flex-1 items-start gap-3 text-left">
           <BrandMark page={page} />
           <div className="min-w-0 pt-0.5">
             <h3 className="truncate text-[16px] font-bold text-slate-900">
@@ -645,12 +622,16 @@ function ConsultationCard({
               {page.durationMinutes} mins | {mode}
             </p>
           </div>
-        </button>
-        <CardMenu page={page} onRefresh={onRefresh} />
+        </div>
+        <div onClick={(e) => e.stopPropagation()}>
+          <CardMenu page={page} onRefresh={onRefresh} />
+        </div>
       </div>
       <div className="mt-8 flex items-center justify-between gap-3">
         <PeopleSlot people={people} />
-        <ShareButton slug={page.slug} title={page.title} />
+        <div onClick={(e) => e.stopPropagation()}>
+          <ShareButton slug={page.slug} title={page.title} />
+        </div>
       </div>
     </article>
   );
@@ -669,12 +650,19 @@ function ConsultationRow({
   const mode = consultationModeLabel(page.consultationMode) || "One-to-One";
 
   return (
-    <div className="flex flex-col gap-3 border-b border-[#F3F4F6] px-4 py-3.5 last:border-0 sm:flex-row sm:items-center sm:justify-between">
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex min-w-0 items-center gap-3 text-left"
-      >
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className="flex cursor-pointer flex-col gap-3 border-b border-[#F3F4F6] px-4 py-3.5 transition-colors last:border-0 hover:bg-[#F3ECFB] sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div className="flex min-w-0 items-center gap-3 text-left">
         <BrandMark page={page} />
         <div className="min-w-0">
           <p className="truncate text-[14px] font-bold text-slate-900">
@@ -684,8 +672,11 @@ function ConsultationRow({
             {page.durationMinutes} mins | {mode}
           </p>
         </div>
-      </button>
-      <div className="flex items-center justify-between gap-3 sm:justify-end">
+      </div>
+      <div
+        className="flex items-center justify-between gap-3 sm:justify-end"
+        onClick={(e) => e.stopPropagation()}
+      >
         <PeopleSlot people={people} />
         <ShareButton slug={page.slug} title={page.title} />
         <CardMenu page={page} onRefresh={onRefresh} />
@@ -831,6 +822,17 @@ function MenuRow({
 }
 
 function BrandMark({ page }: { page: BookingPage }) {
+  if (page.coverImageUrl) {
+    return (
+      <span className="flex h-12 w-12 shrink-0 overflow-hidden rounded-xl">
+        <img
+          src={page.coverImageUrl}
+          alt=""
+          className="h-full w-full object-cover"
+        />
+      </span>
+    );
+  }
   if (page.id === "bp5" || page.slug === "rate-review") {
     return (
       <span

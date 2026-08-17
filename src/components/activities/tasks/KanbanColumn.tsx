@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { Priority, TaskColumn, TaskStatus } from "@/lib/tasks/types";
 import { TaskCard } from "./TaskCard";
 import { cn } from "@/lib/utils";
@@ -101,7 +102,7 @@ export function KanbanColumn({
   }
 
   return (
-    <div className={cn("mb-4 flex h-full flex-col", KANBAN_COL)}>
+    <div className={cn("group mb-4 flex h-full flex-col", KANBAN_COL)}>
       {/* Header Box */}
       <div
         className={cn("mb-2 shrink-0", KANBAN_HEADER)}
@@ -195,17 +196,12 @@ export function KanbanColumn({
           )}
         </div>
 
-        {/* Create Task Button */}
-        <div className="mt-2 flex w-full shrink-0 justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-          <button
-            type="button"
-            onClick={() => router.push("/activities/tasks/create")}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-white hover:text-slate-900"
-          >
-            <Plus className="h-4 w-4" />
-            Create task
-          </button>
-        </div>
+        <KanbanColumnFooter
+          createLabel="Create task"
+          onCreate={() => router.push("/activities/tasks/create")}
+          onCollapse={() => setIsCollapsed(true)}
+          collapseLabel={`Collapse ${column.title}`}
+        />
       </div>
     </div>
   );

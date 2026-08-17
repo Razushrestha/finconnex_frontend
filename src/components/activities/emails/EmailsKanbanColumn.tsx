@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import type { EmailColumn } from "@/lib/emails/types";
 import { EmailCard } from "./EmailCard";
+import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
 import { cn } from "@/lib/utils";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { KANBAN_COL, KANBAN_HEADER, KANBAN_HEADER_RAIL, KANBAN_WELL } from "@/lib/layout";
@@ -184,17 +185,12 @@ export function EmailsKanbanColumn({
           )}
         </div>
 
-        {/* Centered Create Email Button (Visible on Column Hover) */}
-        <div className="mt-2 flex w-full shrink-0 justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-          <button
-            type="button"
-            onClick={() => router.push("/activities/emails/create")}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-white hover:text-slate-900"
-          >
-            <Plus className="h-4 w-4" />
-            Create email
-          </button>
-        </div>
+        <KanbanColumnFooter
+          createLabel="Create email"
+          onCreate={() => router.push("/activities/emails/create")}
+          onCollapse={() => setIsCollapsed(true)}
+          collapseLabel={`Collapse ${column.title}`}
+        />
       </div>
     </div>
   );

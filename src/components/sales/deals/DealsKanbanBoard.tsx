@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from "react";
-import { ChevronLeft, ChevronRight, Plus, Trophy, XCircle } from "lucide-react";
+import { ChevronRight, Trophy, XCircle } from "lucide-react";
 import { type DealPipeline, type DealStage } from "@/lib/deals/types";
 import {
   listDealPipelines,
@@ -23,6 +23,7 @@ import {
   DealCardPanelHost,
   type DealPanelState,
 } from "./DealCardPanelHost";
+import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
@@ -706,25 +707,12 @@ export function DealsKanbanBoard({
                       })()}
                     </div>
 
-                    <div className="mt-2 flex shrink-0 items-center justify-between gap-2 px-2 pb-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                      <button
-                        type="button"
-                        onClick={() => router.push("/sales/deals/create")}
-                        className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-slate-600 transition-colors hover:bg-white hover:text-slate-900"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        Create Deal
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => toggleCollapsed(stage.id)}
-                        aria-label={`Collapse ${stage.title}`}
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50"
-                      >
-                        <ChevronLeft className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                    <KanbanColumnFooter
+                      createLabel="Create Deal"
+                      onCreate={() => router.push("/sales/deals/create")}
+                      onCollapse={() => toggleCollapsed(stage.id)}
+                      collapseLabel={`Collapse ${stage.title}`}
+                    />
                   </div>
                 </>
               )}

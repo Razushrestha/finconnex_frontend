@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, FoldHorizontal, Plus, Trophy, XCircle } from "lucide-react";
+import { ChevronRight, Trophy, XCircle } from "lucide-react";
 import { type KanbanColumn, type LeadPipelineStage } from "@/lib/leads/types";
 import { listLeadColumns, saveLeadColumns } from "@/lib/leads/store";
 import { onRulesChange } from "@/lib/rules";
@@ -29,6 +29,7 @@ import {
   type LeadPanelState,
 } from "./panels/LeadCardPanelHost";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
+import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
 import { cn } from "@/lib/utils";
 import {
   KANBAN_CARD_SLOT,
@@ -466,15 +467,6 @@ export function LeadKanbanBoard({
                               {column.cards.length}
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => toggleCollapsed(column.id)}
-                            title="Collapse column"
-                            aria-label={`Collapse ${column.title}`}
-                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-slate-200/80 bg-white text-slate-700 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:bg-slate-50 focus-visible:opacity-100"
-                          >
-                            <FoldHorizontal className="h-3.5 w-3.5" strokeWidth={2} />
-                          </button>
                         </div>
                         <div className="truncate text-xs font-medium leading-5 text-foreground/70">
                           {column.totalAmount} total
@@ -639,23 +631,19 @@ export function LeadKanbanBoard({
                       })()}
                     </div>
 
-                    <div className="mt-2 flex w-full shrink-0 justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onAddLead
-                            ? onAddLead(column.id)
-                            : router.push(
-                                `/sales/leads/create?stage=${encodeURIComponent(column.title)}`,
-                              )
-                        }
-                        aria-label={`Create lead in ${column.title}`}
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-white/80 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-white hover:text-slate-900"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Create lead
-                      </button>
-                    </div>
+                    <KanbanColumnFooter
+                      createLabel="Create lead"
+                      createAriaLabel={`Create lead in ${column.title}`}
+                      onCreate={() =>
+                        onAddLead
+                          ? onAddLead(column.id)
+                          : router.push(
+                              `/sales/leads/create?stage=${encodeURIComponent(column.title)}`,
+                            )
+                      }
+                      onCollapse={() => toggleCollapsed(column.id)}
+                      collapseLabel={`Collapse ${column.title}`}
+                    />
                   </div>
                 </>
               )}

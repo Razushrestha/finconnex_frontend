@@ -1,17 +1,39 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  AlignLeft,
+  Calendar,
+  CheckSquare,
+  ChevronDown,
+  CircleDot,
   Eye,
   EyeOff,
+  FormInput,
   GripVertical,
+  Hash,
   HelpCircle,
+  Mail,
+  MapPin,
   Pencil,
   Plus,
+  Trash2,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const BRAND = "#5A32A3";
+
+export type BookingFormFieldType =
+  | "single_line"
+  | "multiline"
+  | "email"
+  | "checkbox"
+  | "radio"
+  | "dropdown"
+  | "date"
+  | "address"
+  | "number";
 
 export type BookingFormField = {
   id: string;
@@ -19,6 +41,7 @@ export type BookingFormField = {
   required: boolean;
   hidden: boolean;
   badge?: string;
+  type?: BookingFormFieldType;
 };
 
 export type BookingFormValues = {
@@ -50,6 +73,22 @@ export const DEFAULT_BOOKING_FORM: BookingFormValues = {
   paidButton: "Pay and Schedule an Appointment",
 };
 
+const FIELD_TYPES: {
+  id: BookingFormFieldType;
+  label: string;
+  icon: typeof FormInput;
+}[] = [
+  { id: "single_line", label: "Single Line", icon: FormInput },
+  { id: "multiline", label: "MultiLine", icon: AlignLeft },
+  { id: "email", label: "Email", icon: Mail },
+  { id: "checkbox", label: "Checkbox", icon: CheckSquare },
+  { id: "radio", label: "Radio Button", icon: CircleDot },
+  { id: "dropdown", label: "Drop-down", icon: ChevronDown },
+  { id: "date", label: "Date", icon: Calendar },
+  { id: "address", label: "Address", icon: MapPin },
+  { id: "number", label: "Number", icon: Hash },
+];
+
 function Toggle({
   on,
   onChange,
@@ -78,6 +117,111 @@ function Toggle({
   );
 }
 
+function AddFieldDrawer({
+  open,
+  onClose,
+  onSelect,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSelect: (type: BookingFormFieldType, label: string) => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      const frame = requestAnimationFrame(() => {
+        requestAnimationFrame(() => setVisible(true));
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+    setVisible(false);
+    const timer = window.setTimeout(() => setMounted(false), 300);
+    return () => window.clearTimeout(timer);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+
+  if (!mounted) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <button
+        type="button"
+        aria-label="Close add field panel"
+        onClick={onClose}
+        className={cn(
+          "absolute inset-0 bg-slate-900/30 transition-opacity duration-300",
+          visible ? "opacity-100" : "opacity-0",
+        )}
+      />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-field-title"
+        className={cn(
+          "relative flex h-full w-full max-w-[380px] flex-col bg-white shadow-2xl transition-transform duration-300 ease-out",
+          visible ? "translate-x-0" : "translate-x-full",
+        )}
+      >
+        <div className="flex items-center justify-between border-b border-[#E5E7EB] px-5 py-4">
+          <h2
+            id="add-field-title"
+            className="text-[15px] font-bold text-slate-900"
+          >
+            Add New Field
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+          <h3 className="mb-4 text-[13px] font-bold text-slate-800">
+            Field Types
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            {FIELD_TYPES.map((fieldType) => {
+              const Icon = fieldType.icon;
+              return (
+                <button
+                  key={fieldType.id}
+                  type="button"
+                  onClick={() => onSelect(fieldType.id, fieldType.label)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-lg border border-[#E5E7EB] bg-white px-3 py-5 text-center transition hover:border-[#5A32A3]/35 hover:bg-[#F3ECFB]"
+                >
+                  <Icon className="h-5 w-5 text-slate-500" strokeWidth={1.75} />
+                  <span className="text-[12px] font-medium text-slate-700">
+                    {fieldType.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
 export function BookingFormStep({
   initial,
   onBack,
@@ -103,6 +247,7 @@ export function BookingFormStep({
   const [activeId, setActiveId] = useState("guests");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
+  const [addFieldOpen, setAddFieldOpen] = useState(false);
 
   function move(from: number, to: number) {
     if (to < 0 || to >= fields.length) return;
@@ -114,15 +259,24 @@ export function BookingFormStep({
     });
   }
 
-  function addField() {
+  function addFieldOfType(type: BookingFormFieldType, label: string) {
     const id = `field-${Date.now()}`;
     setFields((prev) => [
       ...prev,
-      { id, label: "New field", required: false, hidden: false },
+      { id, label, required: false, hidden: false, type },
     ]);
     setActiveId(id);
     setEditingId(id);
-    setEditLabel("New field");
+    setEditLabel(label);
+    setAddFieldOpen(false);
+  }
+
+  function deleteField(id: string) {
+    if (fields.length <= 1) return;
+    const next = fields.filter((f) => f.id !== id);
+    setFields(next);
+    if (activeId === id) setActiveId(next[0]?.id ?? "");
+    if (editingId === id) setEditingId(null);
   }
 
   return (
@@ -133,7 +287,7 @@ export function BookingFormStep({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={addField}
+              onClick={() => setAddFieldOpen(true)}
               className="inline-flex h-9 items-center gap-1 rounded-lg border border-[#5A32A3]/30 px-3 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -158,7 +312,7 @@ export function BookingFormStep({
                 key={field.id}
                 onClick={() => setActiveId(field.id)}
                 className={cn(
-                  "flex items-center gap-2 border-b border-[#F3F4F6] px-3 py-3 last:border-0",
+                  "group flex items-center gap-2 border-b border-[#F3F4F6] px-3 py-3 last:border-0 hover:bg-[#F3ECFB]",
                   active && "bg-[#F3ECFB]",
                   field.hidden && "opacity-50",
                 )}
@@ -208,41 +362,56 @@ export function BookingFormStep({
                     </p>
                   )}
                 </div>
-                {active ? (
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingId(field.id);
-                        setEditLabel(field.label);
-                      }}
-                      className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-white hover:text-[#5A32A3]"
-                      aria-label="Edit"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFields((prev) =>
-                          prev.map((f) =>
-                            f.id === field.id ? { ...f, hidden: !f.hidden } : f,
-                          ),
-                        );
-                      }}
-                      className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-white hover:text-[#5A32A3]"
-                      aria-label={field.hidden ? "Show" : "Hide"}
-                    >
-                      {field.hidden ? (
-                        <Eye className="h-3.5 w-3.5" />
-                      ) : (
-                        <EyeOff className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                  </div>
-                ) : null}
+                <div
+                  className={cn(
+                    "flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100",
+                    active && "opacity-100",
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingId(field.id);
+                      setEditLabel(field.label);
+                    }}
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-white hover:text-[#5A32A3]"
+                    aria-label="Edit"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setFields((prev) =>
+                        prev.map((f) =>
+                          f.id === field.id ? { ...f, hidden: !f.hidden } : f,
+                        ),
+                      );
+                    }}
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-white hover:text-[#5A32A3]"
+                    aria-label={field.hidden ? "Show" : "Hide"}
+                  >
+                    {field.hidden ? (
+                      <Eye className="h-3.5 w-3.5" />
+                    ) : (
+                      <EyeOff className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteField(field.id);
+                    }}
+                    disabled={fields.length <= 1}
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-white hover:text-rose-600 disabled:pointer-events-none disabled:opacity-30"
+                    aria-label="Delete field"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -324,6 +493,12 @@ export function BookingFormStep({
           </button>
         </div>
       </div>
+
+      <AddFieldDrawer
+        open={addFieldOpen}
+        onClose={() => setAddFieldOpen(false)}
+        onSelect={addFieldOfType}
+      />
     </div>
   );
 }

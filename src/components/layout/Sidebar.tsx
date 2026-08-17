@@ -12,7 +12,6 @@ import {
   UserCog,
   Notebook,
   ChevronDown,
-  FoldHorizontal,
   Rows4,
   Folder,
   Megaphone,
@@ -33,8 +32,6 @@ import {
 type NavChildItem = {
   label: string;
   href: string;
-  createHref?: string;
-  createLabel?: string;
 };
 
 type NavItem = {
@@ -53,12 +50,7 @@ const dashboardItems: NavItem[] = [
     label: "Sales",
     icon: BadgePercent,
     children: [
-      {
-        label: "Leads",
-        href: "/sales/leads",
-        createHref: "/sales/leads/create",
-        createLabel: "Create Lead",
-      },
+      { label: "Leads", href: "/sales/leads" },
       { label: "Contacts", href: "/sales/contacts" },
       { label: "Companies", href: "/sales/companies" },
       { label: "Deals", href: "/sales/deals" },
@@ -147,7 +139,6 @@ interface SidebarProps {
   tenantName?: string;
   mobileOpen?: boolean;
   onMobileOpenChange?: (open: boolean) => void;
-  onCollapse?: () => void;
 }
 
 export function Sidebar({
@@ -155,11 +146,8 @@ export function Sidebar({
   tenantName,
   mobileOpen: mobileOpenProp,
   onMobileOpenChange,
-  onCollapse,
 }: SidebarProps) {
   const pathname = usePathname();
-  const [hoveredCreate, setHoveredCreate] =
-    React.useState<NavChildItem | null>(null);
   const chatRef = React.useRef<HTMLInputElement>(null);
 
   const [expanded, setExpanded] = React.useState<Set<string>>(() => {
@@ -240,7 +228,6 @@ export function Sidebar({
       )}
 
       <aside
-        onMouseLeave={() => setHoveredCreate(null)}
         className={cn(
           "fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[85vw] shrink-0 flex-col overflow-hidden rounded-tr-[18px] rounded-br-[18px] bg-white px-5 py-6 transition-transform duration-200 ease-in-out dark:bg-zinc-950",
           // Elevated rail: stronger depth + right edge
@@ -374,12 +361,18 @@ export function Sidebar({
                       {item.children!.map((child) => {
                         const childActive = pathname === child.href;
                         return (
-                          <NavChildRow
+                          <Link
                             key={child.href}
-                            child={child}
-                            active={childActive}
-                            onHoverCreate={setHoveredCreate}
-                          />
+                            href={child.href}
+                            className={cn(
+                              "rounded-lg px-2.5 py-2 text-sm transition-colors md:py-1.5",
+                              childActive
+                                ? "text-violet-600 dark:text-violet-400 font-medium"
+                                : "text-muted-foreground hover:bg-accent",
+                            )}
+                          >
+                            {child.label}
+                          </Link>
                         );
                       })}
                     </div>
@@ -398,25 +391,6 @@ export function Sidebar({
             collapsed && "md:hidden",
           )}
         >
-          {hoveredCreate?.createHref ? (
-            <div className="flex overflow-hidden border-b border-slate-200">
-              <Link
-                href={hoveredCreate.createHref}
-                className="flex-1 px-3 py-2 text-[13px] font-medium text-sky-600 hover:bg-sky-50"
-              >
-                {hoveredCreate.createLabel}
-              </Link>
-              <button
-                type="button"
-                onClick={() => onCollapse?.()}
-                className="flex w-9 items-center justify-center border-l border-slate-200 text-slate-800 hover:bg-slate-50"
-                aria-label="Collapse sidebar"
-                title="Collapse"
-              >
-                <FoldHorizontal className="h-3.5 w-3.5" strokeWidth={2} />
-              </button>
-            </div>
-          ) : null}
           <input
             ref={chatRef}
             type="text"
@@ -426,34 +400,6 @@ export function Sidebar({
         </div>
       </aside>
     </>
-  );
-}
-
-function NavChildRow({
-  child,
-  active,
-  onHoverCreate,
-}: {
-  child: NavChildItem;
-  active: boolean;
-  onHoverCreate: (item: NavChildItem | null) => void;
-}) {
-  return (
-    <div
-      onMouseEnter={() => onHoverCreate(child.createHref ? child : null)}
-    >
-      <Link
-        href={child.href}
-        className={cn(
-          "block rounded-lg px-2.5 py-2 text-sm transition-colors md:py-1.5",
-          active
-            ? "text-violet-600 dark:text-violet-400 font-medium"
-            : "text-muted-foreground hover:bg-accent",
-        )}
-      >
-        {child.label}
-      </Link>
-    </div>
   );
 }
 

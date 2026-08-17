@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarDays,
-  Plus,
   ChevronLeft,
   ChevronRight,
   Filter,
@@ -150,29 +149,17 @@ export function BookingsWorkspace({
       <div className="min-h-0 min-w-0 flex-1 overflow-auto">
         <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-5 sm:py-5 lg:px-7">
           {section === "home" ? (
-            <div className="mb-4 flex flex-wrap items-start justify-end gap-3 sm:mb-5">
-              <button
-                type="button"
-                onClick={() =>
-                  router.push("/booking/create?layoutid=standard&redirect=false")
-                }
-                className="inline-flex h-10 items-center gap-1.5 rounded-lg px-4 text-[13px] font-semibold text-white shadow-sm hover:brightness-110"
-                style={{ backgroundColor: BRAND }}
-              >
-                <Plus className="h-4 w-4" />
-                New Booking
-              </button>
-            </div>
-          ) : null}
-
-          {section === "home" ? (
             <HomeView
               onViewConsultants={() => router.push("/booking/consultants")}
             />
           ) : null}
           {section === "consultations" ? <ConsultationsBoard /> : null}
           {section === "schedules" ? (
-            <PagesPanel title="Schedules" pages={pages} />
+            <PagesPanel
+              title="Schedules"
+              pages={pages}
+              onOpenPage={(id) => router.push(`/booking/${id}`)}
+            />
           ) : null}
           {section === "consultants" ? <ConsultantsPanel /> : null}
         </div>
@@ -807,7 +794,15 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PagesPanel({ title, pages }: { title: string; pages: BookingPage[] }) {
+function PagesPanel({
+  title,
+  pages,
+  onOpenPage,
+}: {
+  title: string;
+  pages: BookingPage[];
+  onOpenPage: (id: string) => void;
+}) {
   return (
     <section className="min-w-0 overflow-hidden rounded-xl border border-slate-200/70 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="border-b border-slate-100 px-4 py-3.5 sm:px-5">
@@ -826,11 +821,16 @@ function PagesPanel({ title, pages }: { title: string; pages: BookingPage[] }) {
         </thead>
         <tbody>
           {pages.map((p) => (
-            <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50/80">
+            <tr
+              key={p.id}
+              onClick={() => onOpenPage(p.id)}
+              className="cursor-pointer border-b border-slate-50 transition-colors hover:bg-[#F3ECFB]"
+            >
               <td className="px-5 py-3">
                 <p className="font-semibold text-slate-900">{p.title}</p>
                 <a
                   href={publicBookUrl(p.slug)}
+                  onClick={(e) => e.stopPropagation()}
                   className="text-[11px] hover:underline"
                   style={{ color: BRAND }}
                 >
