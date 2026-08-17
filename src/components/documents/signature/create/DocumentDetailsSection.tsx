@@ -6,6 +6,7 @@ import { DocumentUploadCard } from "./DocumentUploadCard";
 export interface AdditionalDocument {
   id: string;
   file: File;
+  fileUrl: string;
   name: string;
   extension: string;
 }
@@ -13,8 +14,9 @@ export interface AdditionalDocument {
 interface DocumentDetailsSectionProps {
   documentName: string;
   documentFile: File | null;
+  documentFileUrl?: string;
   onChangeName: (name: string) => void;
-  onChangeFile: (file: File | null) => void;
+  onChangeFile: (file: File | null, url?: string) => void;
   error?: string;
   additionalFiles?: AdditionalDocument[];
   onChangeAdditionalFiles?: (files: AdditionalDocument[]) => void;
@@ -63,7 +65,10 @@ export const DocumentDetailsSection: React.FC<DocumentDetailsSectionProps> = ({
     const { base, ext } = splitFileName(file.name);
     setFileExtension(ext);
     onChangeName(base);
-    onChangeFile(file);
+
+    const fileUrl = URL.createObjectURL(file);
+    onChangeFile(file, fileUrl);
+
     setSelectedDocId("primary");
   };
 
@@ -71,7 +76,13 @@ export const DocumentDetailsSection: React.FC<DocumentDetailsSectionProps> = ({
     if (files.length === 0) return;
     const newEntries: AdditionalDocument[] = files.map((file) => {
       const { base, ext } = splitFileName(file.name);
-      return { id: nextAdditionalDocId(), file, name: base, extension: ext };
+      return {
+        id: nextAdditionalDocId(),
+        file,
+        fileUrl: URL.createObjectURL(file),
+        name: base,
+        extension: ext,
+      };
     });
     setAdditionalFiles([...additionalFiles, ...newEntries]);
   };

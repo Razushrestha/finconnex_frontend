@@ -4,6 +4,13 @@ import { DocumentSummaryData } from "@/components/documents/signature/documents/
 import { ExtendExpiryModal } from "@/components/documents/signature/documents/detail/ExtendExpiryModal";
 import { RecipientStatusData } from "@/components/documents/signature/documents/detail/RecipientStatusRow";
 import { SignatureDocumentDetailView } from "@/components/documents/signature/documents/detail/SignatureDocumentDetailView";
+import {
+  listSignatureRequests,
+  signedCount,
+  type SignatureAuditEvent,
+  type SignatureRequest,
+  type SignatureSigner,
+} from "@/lib/documents/signature/types";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -16,43 +23,81 @@ interface MockSignatureDocument {
 const USE_MOCK_DATA = true;
 const API_BASE_URL = "http://182.93.94.220:8010";
 
-// Always returns the realistic engagement letter details as default mock data
-function getMockSignatureDocument(id: string): MockSignatureDocument {
-  return {
-    document: {
-      name:
-        id === "ES-2001"
-          ? "Engagement Letter: Anderson"
-          : `Engagement Letter (${id})`,
-      ownerName: "William Anderson",
-      description: "Professional services engagement agreement.",
-      submittedAtLabel: "18/07/2026 09:05",
-      lastUpdatedAtLabel: "18/07/2026 09:05",
-      completionPercent: 50,
-    },
-    recipients: [
-      {
-        id: `${id}-r1`,
-        order: 1,
-        name: "John Smith",
-        email: "william@example.com",
-        accessInfo: "Accessed using Web at 18/07/2026 09:05",
-        mailed: true,
-        viewed: true,
-        signed: false,
-      },
-    ],
-  };
+/**
+ * The route param can be either the internal record id ("sr1") or the
+ * human-facing signatureRequestId ("ES-2001") — the old mock matched on
+ * the latter, so we check both here.
+ */
+function findSignatureRequest(
+  documentId: string,
+): SignatureRequest | undefined {
+  return listSignatureRequests().find(
+    (r) => r.id === documentId || r.signatureRequestId === documentId,
+  );
 }
 
-function formatExpiryLabel(isoDate: string): string {
-  const date = new Date(`${isoDate}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return isoDate;
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "2-digit",
-    year: "numeric",
-  }).format(date);
+function toIsoDate(ddmmyyyy?: string): string | null {
+  if (!ddmmyyyy) return null;
+  const [day, month, year] = ddmmyyyy.split("/");
+  if (!day || !month || !year) return null;
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function describeAccess(
+  signer: SignatureSigner,
+  audit: SignatureAuditEvent[],
+): string {
+  if (signer.status === "Signed" && signer.signedAt) {
+    return `Signed at ${signer.signedAt}`;
+  }
+  const viewedEvent = audit.find(
+    (a) => a.actor === signer.name && a.action.toLowerCase().includes("viewed"),
+  );
+  if (viewedEvent) return `Accessed using Web at ${viewedEvent.at}`;
+  if (signer.status === "Declined") return "Declined to sign";
+  if (signer.status === "Sent") return "Waiting for signer to open";
+  return "Not yet sent";
+}
+
+// Builds the view-model the detail page renders, from a real SignatureRequest
+// record instead of a fixed hardcoded object.
+function mapRequestToView(req: SignatureRequest): MockSignatureDocument {
+  const actionable = req.signers.filter((s) => s.role !== "CC");
+  const signed = signedCount(req);
+  const sentEvent = req.audit.find((a) =>
+    a.action.toLowerCase().includes("sent for signature"),
+  );
+  const lastEvent = req.audit[req.audit.length - 1];
+
+  return {
+    document: {
+      name: req.documentName,
+      ownerName: req.createdBy,
+      description: req.relatedTo
+        ? `Related to ${req.relatedTo}`
+        : "Signature request document.",
+      submittedAtLabel: sentEvent?.at ?? req.sentDate ?? "Not sent yet",
+      lastUpdatedAtLabel: lastEvent?.at ?? req.sentDate ?? "N/A",
+      completionPercent:
+        actionable.length > 0
+          ? Math.round((signed / actionable.length) * 100)
+          : 0,
+      documentFileUrl: req.documentFileUrl || "",
+    },
+    recipients: req.signers.map((s) => ({
+      id: s.id,
+      order: s.order,
+      name: s.name,
+      email: s.email,
+      accessInfo: describeAccess(s, req.audit),
+      mailed: s.status !== "Pending",
+      viewed:
+        s.status === "Viewed" ||
+        s.status === "Signed" ||
+        s.status === "Declined",
+      signed: s.status === "Signed",
+    })),
+  };
 }
 
 export default function SignatureDocumentDetailPage() {
@@ -75,7 +120,10 @@ export default function SignatureDocumentDetailPage() {
 
       if (USE_MOCK_DATA) {
         setTimeout(() => {
-          setDocumentData(getMockSignatureDocument(documentId));
+          const req = findSignatureRequest(documentId);
+          setDocumentData(req ? mapRequestToView(req) : null);
+          const iso = toIsoDate(req?.expiryDate);
+          if (iso) setExpiryDateIso(iso);
           setIsLoading(false);
         }, 200);
         return;
@@ -114,11 +162,17 @@ export default function SignatureDocumentDetailPage() {
             setExpiryDateIso(data.expiryDate);
           }
         } else {
-          setDocumentData(getMockSignatureDocument(documentId));
+          const req = findSignatureRequest(documentId);
+          setDocumentData(req ? mapRequestToView(req) : null);
+          const iso = toIsoDate(req?.expiryDate);
+          if (iso) setExpiryDateIso(iso);
         }
       } catch (error) {
         console.warn("Backend offline, using local mock data.");
-        setDocumentData(getMockSignatureDocument(documentId));
+        const req = findSignatureRequest(documentId);
+        setDocumentData(req ? mapRequestToView(req) : null);
+        const iso = toIsoDate(req?.expiryDate);
+        if (iso) setExpiryDateIso(iso);
       } finally {
         setIsLoading(false);
       }
@@ -255,4 +309,14 @@ export default function SignatureDocumentDetailPage() {
       />
     </>
   );
+}
+
+function formatExpiryLabel(isoDate: string): string {
+  const date = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return isoDate;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  }).format(date);
 }

@@ -76,6 +76,7 @@
 import React, { useState } from "react";
 import { FileText, Eye } from "lucide-react";
 import { CircularProgress } from "./CircularProgress";
+import { SignatureDocPreview } from "@/components/documents/signature/SignatureDocPreview";
 
 export interface DocumentSummaryData {
   name: string;
@@ -107,7 +108,7 @@ export const DocumentSummaryCard: React.FC<DocumentSummaryData> = ({
   const handleViewClick = () => {
     if (onViewThumbnail) {
       onViewThumbnail();
-    } else if (documentFileUrl) {
+    } else {
       setIsPreviewOpen(true);
     }
   };
@@ -132,9 +133,9 @@ export const DocumentSummaryCard: React.FC<DocumentSummaryData> = ({
             <button
               type="button"
               onClick={handleViewClick}
-              className="absolute bottom-0 left-0 right-0 py-1 text-[11px] font-semibold text-white bg-emerald-500/90 flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute bottom-0 left-0 right-0 py-1.5 text-[11px] font-semibold text-white bg-emerald-500 hover:bg-emerald-600 flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
             >
-              <Eye className="w-3 h-3" />
+              <Eye className="w-3.5 h-3.5" />
               <span>View</span>
             </button>
           </div>
@@ -161,13 +162,13 @@ export const DocumentSummaryCard: React.FC<DocumentSummaryData> = ({
         <CircularProgress percent={completionPercent} />
       </div>
 
-      {/* Optional Document Modal Previewer if documentFileUrl is passed */}
-      {isPreviewOpen && documentFileUrl && (
+      {/* Document Modal Previewer */}
+      {isPreviewOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="relative w-full max-w-4xl h-[85vh] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-zinc-800">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-                {name} - Preview
+                {name} - Document Preview
               </h3>
               <button
                 onClick={() => setIsPreviewOpen(false)}
@@ -177,10 +178,12 @@ export const DocumentSummaryCard: React.FC<DocumentSummaryData> = ({
               </button>
             </div>
             <div className="flex-1 bg-slate-50 dark:bg-zinc-900 p-4 overflow-auto flex items-center justify-center">
-              <iframe
-                src={documentFileUrl}
-                className="w-full h-full rounded-lg border border-slate-200 dark:border-zinc-800 bg-white"
-                title={name}
+              <SignatureDocPreview
+                fileName={name}
+                fileUrl={documentFileUrl}
+                fields={[]}
+                signers={[]}
+                className="w-full h-full max-w-2xl max-h-none"
               />
             </div>
           </div>
