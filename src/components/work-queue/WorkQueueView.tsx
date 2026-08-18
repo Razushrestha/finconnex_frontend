@@ -3,7 +3,7 @@
 import * as React from "react";
 import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import { useRouter } from "next/navigation";
-import { Plus, Search, X } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { WorkQueueSidebar } from "@/components/work-queue/WorkQueueSidebar";
 import {
   WorkQueueTable,
@@ -13,6 +13,7 @@ import { ManageQueueModal } from "@/components/work-queue/ManageQueueModal";
 import {
   CATEGORIES_DEFAULT,
   QUEUE_STORAGE_KEY,
+  USER_TAB_COLORS,
   cloneCategories,
   getActivityTitle,
   isActivityNav,
@@ -25,9 +26,15 @@ import {
   getUserTabs,
   getWorkqueueSidebar,
   listQueueRows,
+  sortQueueRows,
   type QueueRow,
+  type QueueSortDirection,
+  type QueueSortField,
   type WorkQueueTimeFilter,
+  type WorkQueueUserTab,
 } from "@/lib/work-queue/live";
+import { listMentionPeople } from "@/lib/mentions/people";
+import { initials } from "@/lib/activities/shared";
 import { onLeadActivityChange } from "@/lib/leads/lead-extras-store";
 import { onPipelineSlaChange } from "@/lib/pipeline-sla/settings";
 import { onRulesChange } from "@/lib/rules";
@@ -68,17 +75,20 @@ export function WorkQueueView() {
   const [page, setPage] = React.useState(1);
   const [tick, setTick] = React.useState(0);
   const [spinning, setSpinning] = React.useState(false);
-  const [query, setQuery] = React.useState("");
   const [filters, setFilters] =
     React.useState<QueueTableFilters>(DEFAULT_FILTERS);
+  const [sortField, setSortField] = React.useState<QueueSortField | undefined>();
+  const [sortDirection, setSortDirection] =
+    React.useState<QueueSortDirection>("asc");
   const [categories, setCategories] =
     React.useState<WorkqueueCategoryDef[]>(CATEGORIES_DEFAULT);
   const [manageOpen, setManageOpen] = React.useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
 
   const [isAddUserOpen, setIsAddUserOpen] = React.useState(false);
-  const [newUserName, setNewUserName] = React.useState("");
-  const [newUserRole, setNewUserRole] = React.useState("");
+  const [userQuery, setUserQuery] = React.useState("");
+  const userSearchRef = React.useRef<HTMLDivElement>(null);
+  const userSearchInputRef = React.useRef<HTMLInputElement>(null);
 
   const [noteRow, setNoteRow] = React.useState<QueueRow | null>(null);
   const [noteBody, setNoteBody] = React.useState("");
@@ -87,9 +97,14 @@ export function WorkQueueView() {
   React.useEffect(() => {
     setCategories(readStoredCategories());
     const nextTabs = getUserTabs();
-    setTabs(nextTabs);
+    setTabs((prev) => {
+      const ids = new Set(nextTabs.map((t) => t.id));
+      return [...nextTabs, ...prev.filter((t) => !ids.has(t.id))];
+    });
     setScope((prev) =>
-      nextTabs.some((t) => t.id === prev) ? prev : (nextTabs[0]?.id ?? ""),
+      nextTabs.some((t) => t.id === prev) || prev
+        ? prev
+        : (nextTabs[0]?.id ?? ""),
     );
   }, []);
 
@@ -97,7 +112,10 @@ export function WorkQueueView() {
     return onRulesChange(() => {
       setTick((n) => n + 1);
       const nextTabs = getUserTabs();
-      setTabs(nextTabs);
+      setTabs((prev) => {
+        const ids = new Set(nextTabs.map((t) => t.id));
+        return [...nextTabs, ...prev.filter((t) => !ids.has(t.id))];
+      });
     });
   }, []);
 
@@ -129,12 +147,16 @@ export function WorkQueueView() {
   const filteredRows = React.useMemo(
     () =>
       filterQueueRows(rawRows, {
-        query,
         priority: filters.priority,
         status: filters.status,
         due: filters.due,
       }),
-    [rawRows, query, filters],
+    [rawRows, filters],
+  );
+
+  const sortedRows = React.useMemo(
+    () => sortQueueRows(filteredRows, sortField, sortDirection),
+    [filteredRows, sortField, sortDirection],
   );
 
   const statusOptions = React.useMemo(() => {
@@ -142,27 +164,110 @@ export function WorkQueueView() {
     return Array.from(set).sort();
   }, [rawRows]);
 
-  const total = filteredRows.length;
+  const total = sortedRows.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   React.useEffect(() => {
     if (page > totalPages) setPage(1);
   }, [page, totalPages]);
 
+  React.useEffect(() => {
+    setSortField(undefined);
+    setSortDirection("asc");
+    setPage(1);
+  }, [activeNav, scope]);
+
   const pageRows = React.useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return filteredRows.slice(start, start + PAGE_SIZE);
-  }, [filteredRows, page]);
+    return sortedRows.slice(start, start + PAGE_SIZE);
+  }, [sortedRows, page]);
 
-  const handleAddUser = () => {
-    if (!newUserName.trim()) return;
-    setNewUserName("");
-    setNewUserRole("");
+  const searchableUsers = React.useMemo(() => {
+    const people = listMentionPeople();
+    const seen = new Set<string>();
+    const out: { id: string; name: string; role: string; email?: string }[] =
+      [];
+    for (const person of people) {
+      const key = person.name.trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        id: person.name,
+        name: person.name,
+        role: person.role || "User",
+        email: person.email,
+      });
+    }
+    for (const tab of tabs) {
+      const key = tab.name.trim().toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        id: tab.id,
+        name: tab.name,
+        role: tab.role,
+      });
+    }
+    return out;
+  }, [tabs, tick]);
+
+  const matchedUsers = React.useMemo(() => {
+    const q = userQuery.trim().toLowerCase();
+    if (!q) return searchableUsers;
+    return searchableUsers.filter(
+      (u) =>
+        u.name.toLowerCase().includes(q) ||
+        u.role.toLowerCase().includes(q) ||
+        (u.email?.toLowerCase().includes(q) ?? false),
+    );
+  }, [searchableUsers, userQuery]);
+
+  React.useEffect(() => {
+    if (!isAddUserOpen) return;
+    window.setTimeout(() => userSearchInputRef.current?.focus(), 0);
+    function onDoc(e: MouseEvent) {
+      if (
+        userSearchRef.current &&
+        !userSearchRef.current.contains(e.target as Node)
+      ) {
+        setIsAddUserOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setIsAddUserOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [isAddUserOpen]);
+
+  function selectSearchedUser(user: {
+    id: string;
+    name: string;
+    role: string;
+  }) {
+    const existing = tabs.find((t) => t.id === user.id || t.name === user.name);
+    if (!existing) {
+      const tab: WorkQueueUserTab = {
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        initials: initials(user.name),
+        color: USER_TAB_COLORS[tabs.length % USER_TAB_COLORS.length],
+      };
+      setTabs((prev) => [...prev, tab]);
+    }
+    setScope(existing?.id ?? user.id);
+    setPage(1);
+    resetLocalFilters();
+    setUserQuery("");
     setIsAddUserOpen(false);
-  };
+  }
 
   const title = getActivityTitle(activeNav);
-  const activeUser = tabs.find((t) => t.id === scope);
 
   function refresh() {
     setSpinning(true);
@@ -240,7 +345,6 @@ export function WorkQueueView() {
   }
 
   function resetLocalFilters() {
-    setQuery("");
     setFilters(DEFAULT_FILTERS);
     setPage(1);
   }
@@ -266,38 +370,6 @@ export function WorkQueueView() {
           <h1 className="text-[15px] font-semibold tracking-tight text-slate-900">
             Work Queue
           </h1>
-          {activeUser ? (
-            <p className="mt-0.5 truncate text-[12px] text-slate-500">
-              Viewing work for{" "}
-              <span className="font-medium text-slate-700">{activeUser.name}</span>
-            </p>
-          ) : null}
-        </div>
-
-        <div className="relative ml-auto w-full max-w-[280px] sm:w-[280px]">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-          <input
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Search this queue…"
-            className="h-9 w-full rounded-lg border border-[#E2E8F0] bg-white pr-8 pl-8 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-          />
-          {query ? (
-            <button
-              type="button"
-              onClick={() => {
-                setQuery("");
-                setPage(1);
-              }}
-              className="absolute top-1/2 right-1.5 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              aria-label="Clear search"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          ) : null}
         </div>
       </header>
 
@@ -350,15 +422,66 @@ export function WorkQueueView() {
             </button>
           );
         })}
-        <button
-          type="button"
-          aria-label="Add person"
-          title="Add person"
-          onClick={() => setIsAddUserOpen(true)}
-          className="mb-1.5 ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
-        >
-          <Plus className="h-3.5 w-3.5" strokeWidth={2} />
-        </button>
+        <div className="relative mb-1.5 ml-1 shrink-0" ref={userSearchRef}>
+          <button
+            type="button"
+            aria-label="Search users"
+            title="Search users"
+            aria-expanded={isAddUserOpen}
+            onClick={() => {
+              setIsAddUserOpen((v) => !v);
+              setUserQuery("");
+            }}
+            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          >
+            <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+          </button>
+          {isAddUserOpen ? (
+            <div className="absolute top-9 right-0 z-40 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+              <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2">
+                <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                <input
+                  ref={userSearchInputRef}
+                  value={userQuery}
+                  onChange={(e) => setUserQuery(e.target.value)}
+                  placeholder="Search users…"
+                  className="w-full bg-transparent text-[13px] text-slate-800 outline-none placeholder:text-slate-400"
+                />
+              </div>
+              <div className="max-h-56 overflow-y-auto py-1">
+                {matchedUsers.length === 0 ? (
+                  <p className="px-3 py-3 text-center text-[12px] text-slate-400">
+                    {userQuery.trim()
+                      ? `No users match “${userQuery.trim()}”`
+                      : "No users found"}
+                  </p>
+                ) : (
+                  matchedUsers.map((u) => (
+                    <button
+                      key={u.id}
+                      type="button"
+                      onClick={() => selectSearchedUser(u)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-violet-50"
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-semibold text-slate-700">
+                        {initials(u.name)}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] font-medium text-slate-800">
+                          {u.name}
+                        </span>
+                        <span className="block truncate text-[11px] text-slate-400">
+                          {u.role}
+                          {u.email ? ` · ${u.email}` : ""}
+                        </span>
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
@@ -398,6 +521,13 @@ export function WorkQueueView() {
             filters={filters}
             onFiltersChange={(f) => {
               setFilters(f);
+              setPage(1);
+            }}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSortChange={(field, direction) => {
+              setSortField(field);
+              setSortDirection(direction);
               setPage(1);
             }}
             statusOptions={statusOptions}
@@ -463,68 +593,6 @@ export function WorkQueueView() {
       {toast ? (
         <div className="fixed right-4 bottom-4 z-[60] rounded-lg bg-slate-900 px-3.5 py-2 text-[13px] font-medium text-white shadow-lg">
           {toast}
-        </div>
-      ) : null}
-
-      {isAddUserOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/35 px-4 backdrop-blur-[1px]"
-          onClick={() => setIsAddUserOpen(false)}
-        >
-          <div
-            className="w-full max-w-sm bg-white p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-[15px] font-semibold text-slate-900">
-              Add person
-            </h2>
-            <p className="mt-1 text-[12.5px] text-slate-500">
-              They’ll appear in the Work Queue person switcher.
-            </p>
-
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="mb-1 block text-[11px] font-medium tracking-wide text-slate-500 uppercase">
-                  Name
-                </label>
-                <input
-                  autoFocus
-                  value={newUserName}
-                  onChange={(e) => setNewUserName(e.target.value)}
-                  className="w-full border-b border-slate-200 bg-transparent px-0 py-2 text-[13px] outline-none focus:border-[var(--wq-accent)]"
-                  placeholder="e.g. Priya Shrestha"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-[11px] font-medium tracking-wide text-slate-500 uppercase">
-                  Role
-                </label>
-                <input
-                  value={newUserRole}
-                  onChange={(e) => setNewUserRole(e.target.value)}
-                  className="w-full border-b border-slate-200 bg-transparent px-0 py-2 text-[13px] outline-none focus:border-[var(--wq-accent)]"
-                  placeholder="e.g. Sales Rep"
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setIsAddUserOpen(false)}
-                className="px-2 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-800"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleAddUser}
-                className="bg-[var(--wq-accent)] px-3.5 py-1.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
-              >
-                Add
-              </button>
-            </div>
-          </div>
         </div>
       ) : null}
     </div>

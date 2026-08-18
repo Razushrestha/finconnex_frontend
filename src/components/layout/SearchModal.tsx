@@ -36,22 +36,22 @@ interface SearchItem {
 
 /** Real app routes: kept in sync with Sidebar destinations. */
 const DESTINATIONS: SearchItem[] = [
-  { label: "Dashboard", href: "/", icon: LayoutGrid, keywords: ["home"] },
-  { label: "Leads", href: "/sales/leads", icon: Users, keywords: ["sales", "prospect"] },
-  { label: "Contacts", href: "/sales/contacts", icon: Users },
-  { label: "Deals", href: "/sales/deals", icon: Handshake, keywords: ["pipeline"] },
-  { label: "Tasks", href: "/activities/tasks", icon: CheckSquare },
-  { label: "Calendar", href: "/activities/calendar", icon: Calendar },
-  { label: "Team Chat", href: "/activities/team-chat", icon: MessageSquareText, keywords: ["chat", "dm"] },
-  { label: "Messages", href: "/activities/messages", icon: MessageSquareText },
-  { label: "Emails", href: "/activities/emails", icon: Mail },
-  { label: "Inbox", href: "/marketing/inbox", icon: Inbox, keywords: ["omni", "sms", "whatsapp", "unified"] },
-  { label: "Email Campaigns", href: "/marketing/email", icon: Mail },
-  { label: "Support", href: "/support", icon: LifeBuoy, keywords: ["ticket"] },
-  { label: "Notifications", href: "/notifications", icon: Bell },
-  { label: "Rules", href: "/rules", icon: Scale },
-  { label: "Settings", href: "/settings", icon: Settings },
-  { label: "My Preferences", href: "/settings/my-preferences", icon: Settings },
+  { label: "Dashboard", href: "/", icon: LayoutGrid, keywords: ["dashboard", "home"] },
+  { label: "Leads", href: "/sales/leads", icon: Users, keywords: ["leads", "sales", "prospect"] },
+  { label: "Contacts", href: "/sales/contacts", icon: Users, keywords: ["contacts"] },
+  { label: "Deals", href: "/sales/deals", icon: Handshake, keywords: ["deals", "pipeline"] },
+  { label: "Tasks", href: "/activities/tasks", icon: CheckSquare, keywords: ["tasks"] },
+  { label: "Calendar", href: "/activities/calendar", icon: Calendar, keywords: ["calendar"] },
+  { label: "Team Chat", href: "/activities/team-chat", icon: MessageSquareText, keywords: ["team chat", "chat", "dm"] },
+  { label: "Messages", href: "/marketing/inbox", icon: MessageSquareText, keywords: ["messages", "chat", "whatsapp", "sms"] },
+  { label: "Emails", href: "/activities/emails", icon: Mail, keywords: ["emails"] },
+  { label: "Inbox", href: "/marketing/inbox", icon: Inbox, keywords: ["inbox", "omni", "sms", "whatsapp", "unified"] },
+  { label: "Email Campaigns", href: "/marketing/email", icon: Mail, keywords: ["email campaigns", "campaigns"] },
+  { label: "Support", href: "/support", icon: LifeBuoy, keywords: ["support", "ticket"] },
+  { label: "Notifications", href: "/notifications", icon: Bell, keywords: ["notifications"] },
+  { label: "Rules", href: "/rules", icon: Scale, keywords: ["rules"] },
+  { label: "Settings", href: "/settings", icon: Settings, keywords: ["settings"] },
+  { label: "My Preferences", href: "/settings/my-preferences", icon: Settings, keywords: ["preferences", "theme"] },
 ];
 
 const RECENT_KEY = "finconnex:search-recent:v1";
@@ -89,9 +89,7 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     return DESTINATIONS.filter((d) => {
-      const hay = [d.label, d.href, ...(d.keywords ?? [])]
-        .join(" ")
-        .toLowerCase();
+      const hay = (d.keywords ?? []).join(" ").toLowerCase();
       return hay.includes(q);
     }).slice(0, 10);
   }, [query]);
@@ -139,9 +137,9 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Search anything's"
+            placeholder="Search keywords"
             className="w-full bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-none"
-            aria-label="Search navigation"
+            aria-label="Search keywords"
           />
           <kbd className="hidden rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline">
             Esc

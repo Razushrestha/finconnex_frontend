@@ -13,6 +13,7 @@ import {
   saveSettingsValues,
   type SettingsValues,
 } from "@/lib/settings/settings-store";
+import { ThemeModeToggle } from "@/components/layout/ThemeModeToggle";
 import { cn } from "@/lib/utils";
 
 export function SettingsFormClient({
@@ -222,6 +223,19 @@ function FieldRenderer({
   }
 
   if (field.type === "select") {
+    if (field.id === "theme") {
+      return (
+        <div className="space-y-1.5">
+          <p className="text-[12px] font-semibold text-slate-700">
+            {field.label}
+          </p>
+          <ThemeModeToggle onChange={(mode) => onChange(mode)} />
+          <p className="text-[11px] text-slate-400">
+            Light or dark appearance for your account.
+          </p>
+        </div>
+      );
+    }
     return (
       <label className="block space-y-1.5">
         <span className="text-[12px] font-semibold text-slate-700">

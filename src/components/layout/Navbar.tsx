@@ -3,14 +3,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTheme } from "next-themes";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   ChevronsLeft,
   Menu,
   Search,
-  Sun,
-  Moon,
   MessageSquare,
   Calendar,
   ChevronDown,
@@ -60,15 +57,11 @@ export function Navbar({
 }: NavbarProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { theme, setTheme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [inboxUnread, setInboxUnread] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -104,7 +97,6 @@ export function Navbar({
     }
   }
 
-  const activeTheme = mounted ? (resolvedTheme ?? theme ?? "light") : "light";
   const tenantLabel = user.tenantName ?? "FinConnex HQ";
   const isInbox = pathname.startsWith("/marketing/inbox");
   const isCalendar = pathname.startsWith("/activities/calendar");
@@ -137,12 +129,12 @@ export function Navbar({
       <button
         type="button"
         onClick={() => setSearchOpen(true)}
-        aria-label="Search (Ctrl+K)"
+        aria-label="Search keywords (Ctrl+K)"
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted transition-colors hover:bg-muted/80 sm:w-auto sm:max-w-xs sm:flex-1 sm:justify-start sm:gap-2 sm:px-4"
       >
         <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="hidden w-full truncate text-left text-sm text-muted-foreground sm:inline">
-          Search anything&apos;s
+          Search keywords
         </span>
         <kbd className="ml-auto hidden rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline">
           ⌘K
@@ -152,41 +144,6 @@ export function Navbar({
       <SearchModal open={searchOpen} onOpenChange={setSearchOpen} />
 
       <div className="flex-1" />
-
-      <div
-        className="hidden h-10 shrink-0 items-center gap-1 rounded-full bg-muted p-1 sm:flex"
-        role="group"
-        aria-label="Theme"
-      >
-        <button
-          type="button"
-          onClick={() => setTheme("light")}
-          aria-label="Light mode"
-          aria-pressed={activeTheme === "light"}
-          className={cn(
-            "flex h-8 w-8 items-center justify-center rounded-full transition-colors",
-            activeTheme === "light"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <Sun className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          onClick={() => setTheme("dark")}
-          aria-label="Dark mode"
-          aria-pressed={activeTheme === "dark"}
-          className={cn(
-            "flex h-8 w-8 items-center justify-center rounded-full transition-colors",
-            activeTheme === "dark"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <Moon className="h-4 w-4" />
-        </button>
-      </div>
 
       <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
         <Link

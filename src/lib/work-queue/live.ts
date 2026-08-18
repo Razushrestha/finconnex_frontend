@@ -195,10 +195,11 @@ export function dueColorForLabel(label: string): string {
 
 function priorityRank(p?: string) {
   const v = (p ?? "").toLowerCase();
-  if (v === "high") return 0;
-  if (v === "medium") return 1;
-  if (v === "low") return 2;
-  return 3;
+  if (v === "critical") return 0;
+  if (v === "high") return 1;
+  if (v === "medium") return 2;
+  if (v === "low") return 3;
+  return 4;
 }
 
 function buildSortKey(due: Date | null, priority: string, now = new Date()) {
@@ -924,6 +925,84 @@ export function filterQueueRows(
       }
     }
     return true;
+  });
+}
+
+export const QUEUE_SORT_OPTIONS = [
+  { id: "dueDate", label: "Due Date" },
+  { id: "priority", label: "Priority" },
+  { id: "status", label: "Status" },
+  { id: "subject", label: "Subject" },
+  { id: "relatedTo", label: "Related To" },
+  { id: "contactName", label: "Contact Name" },
+  { id: "taskOwner", label: "Task Owner" },
+  { id: "createdTime", label: "Created Time" },
+  { id: "modifiedTime", label: "Modified Time" },
+] as const;
+
+export type QueueSortField = (typeof QUEUE_SORT_OPTIONS)[number]["id"];
+export type QueueSortDirection = "asc" | "desc";
+
+function sortFieldText(row: QueueRow, field: QueueSortField): string {
+  switch (field) {
+    case "dueDate":
+      return row.dueLabel;
+    case "relatedTo":
+      return row.related;
+    case "contactName":
+      return row.contactName ?? "";
+    case "taskOwner":
+      return row.taskOwner ?? "";
+    case "createdTime":
+      return row.createdTime ?? "";
+    case "modifiedTime":
+      return row.modifiedTime ?? "";
+    case "priority":
+      return row.priority;
+    case "status":
+      return row.status;
+    case "subject":
+    default:
+      return row.subject;
+  }
+}
+
+function dueSortValue(label: string): number {
+  if (!label) return Number.MAX_SAFE_INTEGER;
+  if (label.includes("overdue")) {
+    const days = parseInt(label, 10);
+    return Number.isFinite(days) ? -days : -2;
+  }
+  if (label === "Yesterday") return -1;
+  if (label === "Today") return 0;
+  if (label === "Tomorrow") return 1;
+  const parsed = Date.parse(label);
+  if (!Number.isNaN(parsed)) return parsed;
+  return 2;
+}
+
+export function sortQueueRows(
+  rows: QueueRow[],
+  field: QueueSortField | undefined,
+  direction: QueueSortDirection = "asc",
+): QueueRow[] {
+  if (!field) return rows;
+  const mul = direction === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    let cmp = 0;
+    if (field === "dueDate") {
+      cmp = dueSortValue(a.dueLabel) - dueSortValue(b.dueLabel);
+    } else if (field === "priority") {
+      cmp = priorityRank(a.priority) - priorityRank(b.priority);
+    } else {
+      cmp = sortFieldText(a, field).localeCompare(sortFieldText(b, field), undefined, {
+        sensitivity: "base",
+        numeric: true,
+      });
+    }
+    if (cmp === 0) cmp = a.sortKey - b.sortKey;
+    if (cmp === 0) cmp = a.subject.localeCompare(b.subject);
+    return cmp * mul;
   });
 }
 

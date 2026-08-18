@@ -16,12 +16,14 @@ import {
   Link2,
   ChevronDown,
   Smile,
-  AtSign,
   Reply,
   X,
   ImageIcon,
   Paperclip,
   Mic,
+  Plus,
+  Calendar,
+  ListTodo,
 } from "lucide-react";
 import {
   INBOX_AGENTS,
@@ -38,8 +40,6 @@ import {
   type InboxStatus,
 } from "@/lib/marketing/inbox/types";
 import { avatarColor, initials } from "@/lib/activities/shared";
-import { listMentionPeople } from "@/lib/mentions/people";
-import { notifyMention } from "@/lib/rules/notify";
 import { cn } from "@/lib/utils";
 
 const CHANNEL_DOT: Record<InboxChannel, string> = {
@@ -146,12 +146,14 @@ export function UnifiedInboxClient() {
   const [showArchived, setShowArchived] = useState(false);
   const [replyTo, setReplyTo] = useState<InboxMessage | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
   const [emojiCategory, setEmojiCategory] = useState(EMOJI_CATEGORIES[0].id);
   const [pendingFiles, setPendingFiles] = useState<InboxAttachment[]>([]);
   const [recording, setRecording] = useState(false);
   const feedRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const emojiRef = useRef<HTMLDivElement>(null);
+  const attachRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -182,6 +184,7 @@ export function UnifiedInboxClient() {
     setReplyTo(null);
     setDraft("");
     setEmojiOpen(false);
+    setAttachOpen(false);
     setPendingFiles([]);
     setRecording(false);
   }, [activeId]);
@@ -197,32 +200,16 @@ export function UnifiedInboxClient() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [emojiOpen]);
 
-  const mentionPeople = useMemo(() => {
-    const merged = [...listMentionPeople()];
-    const seen = new Set(merged.map((p) => p.name.toLowerCase()));
-    const extras = [
-      ...INBOX_AGENTS.filter((name) => name !== "Unassigned").map((name) => ({
-        id: `agent-${name}`,
-        name,
-        role: "Agent",
-      })),
-      ...(active?.contactName
-        ? [
-            {
-              id: `contact-${active.id}`,
-              name: active.contactName,
-              role: "Contact",
-            },
-          ]
-        : []),
-    ];
-    for (const person of extras) {
-      if (seen.has(person.name.toLowerCase())) continue;
-      seen.add(person.name.toLowerCase());
-      merged.push(person);
+  useEffect(() => {
+    if (!attachOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (attachRef.current && !attachRef.current.contains(e.target as Node)) {
+        setAttachOpen(false);
+      }
     }
-    return merged;
-  }, [active?.id, active?.contactName]);
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [attachOpen]);
 
   const channelCounts = useMemo(() => {
     const map = Object.fromEntries(INBOX_CHANNELS.map((c) => [c, 0])) as Record<
@@ -317,30 +304,12 @@ export function UnifiedInboxClient() {
       timestamp: msg.at,
       unreadCount: 0,
     });
-    const mentioned = mentionPeople
-      .filter((p) =>
-        body.toLowerCase().includes(`@${p.name.toLowerCase()}`),
-      )
-      .map((p) => p.name);
-    for (const name of mentioned) {
-      notifyMention({
-        recipient: name,
-        from: author,
-        preview: body,
-        relatedTo: active.contactName,
-        relatedHref: "/marketing/inbox",
-      });
-    }
     setDraft("");
     setPendingFiles([]);
     setReplyTo(null);
     setEmojiOpen(false);
     setRecording(false);
-    flash(
-      mentioned.length
-        ? `Reply sent · mentioned ${mentioned.join(", ")}`
-        : `Reply sent via ${active.channel}`,
-    );
+    flash(`Reply sent via ${active.channel}`);
   }
 
   function formatBytes(n: number) {
@@ -420,14 +389,6 @@ export function UnifiedInboxClient() {
       el.focus();
       el.setSelectionRange(cursor, cursor);
     });
-  }
-
-  function startMention() {
-    const el = composerRef.current;
-    const needsSpace =
-      draft.length > 0 && !/\s$/.test(draft.slice(0, el?.selectionStart ?? draft.length));
-    insertComposerText(needsSpace ? " @" : "@");
-    setEmojiOpen(false);
   }
 
   function insertQuickReply(text: string) {
@@ -853,11 +814,7 @@ export function UnifiedInboxClient() {
                               m.body === "Photo" ||
                               m.attachments.some((a) => a.name === m.body))
                           ) ? (
-                            <InboxMessageText
-                              text={m.body}
-                              outbound={m.outbound}
-                              names={mentionPeople.map((p) => p.name)}
-                            />
+                            <InboxMessageText text={m.body} />
                           ) : null}
                           <div
                             className={cn(
@@ -963,12 +920,10 @@ export function UnifiedInboxClient() {
                     </div>
                   ) : null}
                   <div className="rounded-xl border border-slate-200 bg-slate-50/50 focus-within:border-violet-500 focus-within:bg-white focus-within:shadow-[0_0_0_3px_rgba(139,92,246,0.12)]">
-                    <MentionTextarea
+                    <textarea
                       ref={composerRef}
                       value={draft}
-                      onChange={setDraft}
-                      people={mentionPeople}
-                      menuTitle="Mention"
+                      onChange={(e) => setDraft(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
@@ -977,14 +932,14 @@ export function UnifiedInboxClient() {
                       }}
                       placeholder={
                         replyTo
-                          ? `Reply to ${replyTo.author} on ${active.channel}… Type @ to mention`
-                          : `Reply on ${active.channel}… Type @ to mention`
+                          ? `Reply to ${replyTo.author} on ${active.channel}…`
+                          : `Reply on ${active.channel}…`
                       }
                       rows={2}
                       className="max-h-28 min-h-[40px] w-full resize-none bg-transparent px-3 py-2.5 text-[13px] outline-none placeholder:text-slate-400"
                     />
                     <div className="flex items-center justify-between gap-2 px-2 pb-2">
-                      <div className="relative flex items-center gap-0.5" ref={emojiRef}>
+                      <div className="flex items-center gap-0.5">
                         <input
                           ref={imageInputRef}
                           type="file"
@@ -1006,45 +961,92 @@ export function UnifiedInboxClient() {
                             e.target.value = "";
                           }}
                         />
-                        <button
-                          type="button"
-                          title="Emoji"
-                          aria-label="Insert emoji"
-                          onClick={() => setEmojiOpen((v) => !v)}
-                          className={cn(
-                            "flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-violet-50 hover:text-violet-700",
-                            emojiOpen && "bg-violet-50 text-violet-700",
-                          )}
-                        >
-                          <Smile className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          title="Mention someone"
-                          aria-label="Mention someone"
-                          onClick={startMention}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-violet-50 hover:text-violet-700"
-                        >
-                          <AtSign className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          title="Attach image"
-                          aria-label="Attach image"
-                          onClick={() => imageInputRef.current?.click()}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-violet-50 hover:text-violet-700"
-                        >
-                          <ImageIcon className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          title="Attach file"
-                          aria-label="Attach file"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-violet-50 hover:text-violet-700"
-                        >
-                          <Paperclip className="h-4 w-4" />
-                        </button>
+                        <div className="relative" ref={emojiRef}>
+                          <button
+                            type="button"
+                            title="Emoji"
+                            aria-label="Insert emoji"
+                            onClick={() => {
+                              setAttachOpen(false);
+                              setEmojiOpen((v) => !v);
+                            }}
+                            className={cn(
+                              "flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-violet-50 hover:text-violet-700",
+                              emojiOpen && "bg-violet-50 text-violet-700",
+                            )}
+                          >
+                            <Smile className="h-4 w-4" />
+                          </button>
+                          {emojiOpen ? (
+                            <InboxEmojiPicker
+                              category={emojiCategory}
+                              onCategory={setEmojiCategory}
+                              onPick={(emoji) => {
+                                insertComposerText(emoji);
+                                composerRef.current?.focus();
+                              }}
+                            />
+                          ) : null}
+                        </div>
+                        <div className="relative" ref={attachRef}>
+                          <button
+                            type="button"
+                            title="Add"
+                            aria-label="Add image, file, meeting, or task"
+                            onClick={() => {
+                              setEmojiOpen(false);
+                              setAttachOpen((v) => !v);
+                            }}
+                            className={cn(
+                              "flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-violet-50 hover:text-violet-700",
+                              attachOpen && "bg-violet-50 text-violet-700",
+                            )}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
+                          {attachOpen ? (
+                            <div className="absolute bottom-10 left-0 z-40 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAttachOpen(false);
+                                  imageInputRef.current?.click();
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-violet-50 hover:text-violet-700"
+                              >
+                                <ImageIcon className="h-3.5 w-3.5 text-slate-400" />
+                                Image
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAttachOpen(false);
+                                  fileInputRef.current?.click();
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-violet-50 hover:text-violet-700"
+                              >
+                                <Paperclip className="h-3.5 w-3.5 text-slate-400" />
+                                Files
+                              </button>
+                              <Link
+                                href="/activities/meetings"
+                                onClick={() => setAttachOpen(false)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-medium text-slate-700 hover:bg-violet-50 hover:text-violet-700"
+                              >
+                                <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                                Meeting
+                              </Link>
+                              <Link
+                                href="/activities/tasks"
+                                onClick={() => setAttachOpen(false)}
+                                className="flex w-full items-center gap-2 text-left text-[12px] font-medium text-slate-700 hover:bg-violet-50 hover:text-violet-700 px-3 py-2"
+                              >
+                                <ListTodo className="h-3.5 w-3.5 text-slate-400" />
+                                Task
+                              </Link>
+                            </div>
+                          ) : null}
+                        </div>
                         <button
                           type="button"
                           title={recording ? "Stop and attach voice note" : "Voice note"}
@@ -1059,16 +1061,6 @@ export function UnifiedInboxClient() {
                         >
                           <Mic className="h-4 w-4" />
                         </button>
-                        {emojiOpen ? (
-                          <InboxEmojiPicker
-                            category={emojiCategory}
-                            onCategory={setEmojiCategory}
-                            onPick={(emoji) => {
-                              insertComposerText(emoji);
-                              composerRef.current?.focus();
-                            }}
-                          />
-                        ) : null}
                       </div>
                       <button
                         type="button"
@@ -1200,42 +1192,9 @@ function InboxMessageMedia({
   );
 }
 
-function InboxMessageText({
-  text,
-  outbound,
-  names,
-}: {
-  text: string;
-  outbound: boolean;
-  names: string[];
-}) {
-  const sorted = [...names].sort((a, b) => b.length - a.length);
-  const pattern =
-    sorted.length > 0
-      ? new RegExp(
-          `(@(?:${sorted.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")}))`,
-          "gi",
-        )
-      : null;
-  const parts = pattern ? text.split(pattern) : [text];
+function InboxMessageText({ text }: { text: string }) {
   return (
-    <p className="text-[13px] leading-relaxed whitespace-pre-wrap">
-      {parts.map((part, i) =>
-        part.startsWith("@") ? (
-          <span
-            key={`${part}-${i}`}
-            className={cn(
-              "rounded px-0.5 font-semibold",
-              outbound ? "bg-white/20 text-white" : "bg-violet-50 text-violet-700",
-            )}
-          >
-            {part}
-          </span>
-        ) : (
-          <span key={`${part}-${i}`}>{part}</span>
-        ),
-      )}
-    </p>
+    <p className="text-[13px] leading-relaxed whitespace-pre-wrap">{text}</p>
   );
 }
 

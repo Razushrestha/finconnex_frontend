@@ -2,21 +2,51 @@
 
 import { useState, type ComponentType } from "react";
 import {
+  AlarmClock,
+  BadgeCheck,
   Bell,
+  CalendarCheck,
+  CalendarClock,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  CircleAlert,
+  ClipboardList,
+  Clock,
+  Contact,
+  FileQuestion,
+  Flag,
+  Flame,
+  FolderOpen,
+  Gauge,
+  Handshake,
+  Hourglass,
+  List,
   Mail,
   MessageSquare,
+  PauseCircle,
   Phone,
+  PhoneForwarded,
   Plus,
   Settings2,
+  ShieldAlert,
+  Tag,
+  Timer,
+  TriangleAlert,
+  TrendingUp,
+  User,
+  UserPlus,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
-import type { ActivityIconId, WorkQueueNavId } from "@/lib/work-queue/config";
+import type {
+  ActivityIconId,
+  WorkQueueNavId,
+  WorkqueueItemId,
+} from "@/lib/work-queue/config";
 import type {
   ActivityNavItem,
   WorkQueueTimeFilter,
@@ -35,6 +65,57 @@ const iconMap: Record<
   message: MessageSquare,
   bell: Bell,
 };
+
+type SidebarIcon = ComponentType<{ className?: string; strokeWidth?: number }>;
+
+const queueIconMap: Record<WorkqueueItemId, SidebarIcon> = {
+  "my-leads": User,
+  "new-leads": UserPlus,
+  "pending-tags": Tag,
+  "stale-leads": Clock,
+  "my-contacts": Contact,
+  "contacts-3h": Timer,
+  followup: PhoneForwarded,
+  "my-deals": Handshake,
+  "closing-soon": CalendarClock,
+  stalled: PauseCircle,
+  "pending-review": ClipboardList,
+  "missing-info": FileQuestion,
+  "awaiting-action": Hourglass,
+  "waiting-approval": BadgeCheck,
+  overdue: TriangleAlert,
+  "high-priority": Flame,
+  escalated: TrendingUp,
+  "sla-attention": ShieldAlert,
+  "sla-overdue": AlarmClock,
+  "sla-milestone-overdue": Flag,
+  "sla-due-today": CalendarCheck,
+  "sla-at-risk": CircleAlert,
+};
+
+const categoryIconMap: Record<string, SidebarIcon> = {
+  leads: User,
+  contacts: Users,
+  deals: Handshake,
+  records: FolderOpen,
+  attention: TriangleAlert,
+  "pipeline-sla": Gauge,
+};
+
+function queueItemIcon(id: string, label?: string): SidebarIcon {
+  if (id in queueIconMap) return queueIconMap[id as WorkqueueItemId];
+  const key = (label ?? id).trim().toLowerCase();
+  if (key.includes("lead")) return User;
+  if (key.includes("contact")) return Contact;
+  if (key.includes("deal")) return Handshake;
+  if (key.includes("overdue") || key.includes("attention")) return TriangleAlert;
+  if (key.includes("priority")) return Flame;
+  if (key.includes("review")) return ClipboardList;
+  if (key.includes("risk")) return CircleAlert;
+  if (key.includes("today")) return CalendarCheck;
+  if (key.includes("milestone")) return Flag;
+  return List;
+}
 
 interface WorkQueueSidebarProps {
   collapsed: boolean;
@@ -104,17 +185,17 @@ export function WorkQueueSidebar({
 
   if (collapsed) {
     return (
-      <aside className="flex w-11 shrink-0 flex-col items-center border-b border-[var(--wq-line)] bg-white py-3 lg:border-r lg:border-b-0">
+      <aside className="flex w-11 shrink-0 flex-col items-center overflow-y-auto border-b border-[var(--wq-line)] bg-white py-3 [scrollbar-width:none] lg:border-r lg:border-b-0 [&::-webkit-scrollbar]:hidden">
         <button
           type="button"
           onClick={onToggleCollapse}
           aria-label="Expand sidebar"
           title="Expand sidebar"
-          className="flex h-8 w-8 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
+          className="flex h-8 w-8 shrink-0 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
         >
-          <ChevronRight className="h-4 w-4" />
+          <ChevronsRight className="h-4 w-4" strokeWidth={2.75} />
         </button>
-        <div className="mt-4 flex flex-col items-center gap-1">
+        <div className="mt-3 flex flex-col items-center gap-0.5">
           {activityItems.map((item) => {
             const active = activeItem === item.id;
             const Icon = iconMap[item.icon];
@@ -140,6 +221,49 @@ export function WorkQueueSidebar({
             );
           })}
         </div>
+        <div
+          className="my-2 h-px w-6 shrink-0 bg-[var(--wq-line)]"
+          aria-hidden
+        />
+        <div className="flex flex-col items-center gap-0.5 pb-2">
+          {sidebarCategories.flatMap((cat) =>
+            cat.items.map((item) => {
+              const active = activeItem === item.id;
+              const Icon = queueItemIcon(item.id, item.label);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  title={`${item.label} (${item.count})`}
+                  aria-label={item.label}
+                  onClick={() => onActiveItemChange(item.id)}
+                  className={cn(
+                    "relative flex h-8 w-8 items-center justify-center transition-colors",
+                    active
+                      ? item.danger
+                        ? "text-[var(--wq-danger)]"
+                        : "text-[var(--wq-accent)]"
+                      : item.danger
+                        ? "text-red-400 hover:text-red-500"
+                        : "text-slate-400 hover:text-slate-700",
+                  )}
+                >
+                  <Icon strokeWidth={1.75} className="h-4 w-4" />
+                  {item.count > 0 ? (
+                    <span
+                      className={cn(
+                        "absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full",
+                        item.danger
+                          ? "bg-[var(--wq-danger)]"
+                          : "bg-[var(--wq-accent)]",
+                      )}
+                    />
+                  ) : null}
+                </button>
+              );
+            }),
+          )}
+        </div>
       </aside>
     );
   }
@@ -147,7 +271,7 @@ export function WorkQueueSidebar({
   return (
     <div className="relative flex">
       <aside className="w-full shrink-0 overflow-y-auto border-b border-[var(--wq-line)] bg-white px-3 py-3 sm:px-4 lg:w-[248px] lg:border-r lg:border-b-0">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between border-b border-[var(--wq-line)] pb-2">
           <h2 className="text-[11px] font-semibold tracking-[0.08em] text-slate-400 uppercase">
             Open activity
           </h2>
@@ -158,7 +282,7 @@ export function WorkQueueSidebar({
             title="Minimize sidebar"
             className="flex h-7 w-7 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronsLeft className="h-4 w-4" strokeWidth={2.75} />
           </button>
         </div>
 
@@ -233,7 +357,7 @@ export function WorkQueueSidebar({
           })}
         </nav>
 
-        <div className="mb-2.5 flex items-center justify-between">
+        <div className="mb-2.5 flex items-center justify-between border-b border-[var(--wq-line)] pb-2">
           <h2 className="text-[11px] font-semibold tracking-[0.08em] text-slate-400 uppercase">
             My queues
           </h2>
@@ -260,25 +384,42 @@ export function WorkQueueSidebar({
         </div>
 
         <div className="flex flex-col gap-4">
-          {sidebarCategories.map((cat) => (
+          {sidebarCategories.map((cat) => {
+            const CatIcon = categoryIconMap[cat.id] ?? List;
+            return (
             <div key={cat.id} className="flex flex-col">
-              <div className="mb-1 px-0.5 text-[11px] font-medium text-slate-400">
+              <div className="mb-1 flex items-center gap-2 px-0.5 text-[11px] font-medium text-slate-400">
+                <CatIcon className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
                 {cat.label}
               </div>
               {cat.items.map((item) => {
                 const active = activeItem === item.id;
+                const Icon = queueItemIcon(item.id, item.label);
                 return (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => onActiveItemChange(item.id)}
                     className={cn(
-                      "flex h-8 items-center gap-2 border-l-2 pl-2.5 text-left transition-colors",
+                      "group flex h-8 items-center gap-2.5 border-l-2 pl-2.5 text-left transition-colors",
                       active
                         ? "border-[var(--wq-accent)] text-[var(--wq-accent)]"
                         : "border-transparent text-slate-600 hover:text-slate-900",
                     )}
                   >
+                    <Icon
+                      strokeWidth={2}
+                      className={cn(
+                        "h-4 w-4 shrink-0",
+                        active
+                          ? item.danger
+                            ? "text-[var(--wq-danger)]"
+                            : "text-[var(--wq-accent)]"
+                          : item.danger
+                            ? "text-red-400 group-hover:text-red-500"
+                            : "text-slate-500 group-hover:text-slate-700",
+                      )}
+                    />
                     <span
                       className={cn(
                         "min-w-0 flex-1 truncate text-[13px] leading-none",
@@ -292,7 +433,8 @@ export function WorkQueueSidebar({
                 );
               })}
             </div>
-          ))}
+            );
+          })}
         </div>
       </aside>
 

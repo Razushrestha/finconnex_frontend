@@ -31,5 +31,5 @@
     "**/*.mts",
     "src/components/activities/notes/NotesListView.tsx"
   ],
-  "exclude": ["node_modules", "multi-crm-backend-main"]
+  "exclude": ["node_modules", "multi-crm-backend-main", ".next/dev"]
 }

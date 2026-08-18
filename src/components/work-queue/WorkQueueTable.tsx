@@ -22,7 +22,12 @@ import {
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-import type { QueueRow } from "@/lib/work-queue/live";
+import type {
+  QueueRow,
+  QueueSortDirection,
+  QueueSortField,
+} from "@/lib/work-queue/live";
+import { QUEUE_SORT_OPTIONS } from "@/lib/work-queue/live";
 import {
   DEFAULT_MANAGE_COLUMNS,
   ManageColumnsModal,
@@ -48,6 +53,9 @@ interface WorkQueueTableProps {
   emptyLabel?: string;
   filters: QueueTableFilters;
   onFiltersChange: (f: QueueTableFilters) => void;
+  sortField?: QueueSortField;
+  sortDirection?: QueueSortDirection;
+  onSortChange?: (field: QueueSortField | undefined, direction: QueueSortDirection) => void;
   statusOptions: string[];
   onManageColumns?: () => void;
   onPageSizeChange?: (size: number) => void;
@@ -216,6 +224,9 @@ export function WorkQueueTable({
   emptyLabel = "No records in this queue.",
   filters,
   onFiltersChange,
+  sortField,
+  sortDirection = "asc",
+  onSortChange,
   statusOptions,
   onManageColumns,
   onPageSizeChange,
@@ -226,6 +237,8 @@ export function WorkQueueTable({
 }: WorkQueueTableProps) {
   const router = useRouter();
   const [filterOpen, setFilterOpen] = React.useState(false);
+  const [sortOpen, setSortOpen] = React.useState(false);
+  const sortRef = React.useRef<HTMLDivElement>(null);
   const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
@@ -303,6 +316,48 @@ export function WorkQueueTable({
     };
   }, [optionsMenuOpen]);
 
+  React.useEffect(() => {
+    if (!sortOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
+        setSortOpen(false);
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setSortOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [sortOpen]);
+
+  function applySort(field: QueueSortField) {
+    if (!onSortChange) return;
+    if (sortField === field) {
+      onSortChange(field, sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      onSortChange(field, "asc");
+    }
+  }
+
+  function clearSort() {
+    onSortChange?.(undefined, "asc");
+    setSortOpen(false);
+  }
+
+  function sortDirectionHint(id: QueueSortField): string {
+    if (id === "dueDate") return sortDirection === "asc" ? "Soonest" : "Latest";
+    if (id === "priority") return sortDirection === "asc" ? "High first" : "Low first";
+    return sortDirection === "asc" ? "A → Z" : "Z → A";
+  }
+
+  const activeSortLabel =
+    QUEUE_SORT_OPTIONS.find((opt) => opt.id === sortField)?.label ?? "Sort";
+  const sortableIds = new Set<string>(QUEUE_SORT_OPTIONS.map((opt) => opt.id));
+
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
   const activeFilterCount = [
@@ -313,7 +368,7 @@ export function WorkQueueTable({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-white">
-      <div className="flex shrink-0 items-center justify-between gap-3 px-5 pt-4 pb-3 sm:px-6">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--wq-line)] px-5 pt-4 pb-3 sm:px-6">
         <div className="flex min-w-0 items-baseline gap-2.5">
           <h2 className="truncate text-[18px] leading-6 font-semibold tracking-tight text-slate-900">
             {title}
@@ -354,18 +409,89 @@ export function WorkQueueTable({
             ) : null}
           </button>
 
-          <button
-            type="button"
-            className="inline-flex h-8 items-center gap-1.5 px-2.5 text-[13px] font-medium text-slate-600 transition-colors hover:text-slate-900"
-          >
-            <ArrowUpDown className="h-3.5 w-3.5" />
-            Sort
-          </button>
+          <div className="relative flex items-center" ref={sortRef}>
+            <button
+              type="button"
+              onClick={() => setSortOpen((v) => !v)}
+              aria-label="Sort options"
+              aria-haspopup="menu"
+              aria-expanded={sortOpen}
+              className={cn(
+                "inline-flex h-8 items-center gap-1.5 px-2.5 text-[13px] font-medium transition-colors",
+                sortOpen || sortField
+                  ? "text-[var(--wq-accent)]"
+                  : "text-slate-600 hover:text-slate-900",
+              )}
+            >
+              <ArrowUpDown className="h-3.5 w-3.5" />
+              {activeSortLabel}
+              {sortField ? (
+                <span className="text-[11px] font-semibold tabular-nums">
+                  {sortDirection === "asc" ? "↑" : "↓"}
+                </span>
+              ) : null}
+            </button>
+            {sortField ? (
+              <button
+                type="button"
+                aria-label="Clear sort"
+                title="Clear sort"
+                onClick={clearSort}
+                className="-ml-1 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+            {sortOpen ? (
+              <div className="absolute top-full right-0 z-40 mt-1 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                <p className="px-3 py-1.5 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+                  Sort by
+                </p>
+                {QUEUE_SORT_OPTIONS.map((opt) => {
+                  const active = sortField === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => applySort(opt.id)}
+                      className={cn(
+                        "flex w-full items-center justify-between px-3 py-2 text-left text-[13px] hover:bg-violet-50",
+                        active
+                          ? "font-semibold text-[var(--wq-accent)]"
+                          : "text-slate-700",
+                      )}
+                    >
+                      <span>{opt.label}</span>
+                      {active ? (
+                        <span className="text-[11px] font-medium text-slate-400">
+                          {sortDirectionHint(opt.id)}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+                {sortField ? (
+                  <>
+                    <div className="my-1 border-t border-slate-100" />
+                    <button
+                      type="button"
+                      onClick={clearSort}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Default order
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
       {filterOpen ? (
-        <div className="flex flex-wrap items-end gap-x-5 gap-y-3 border-y border-[var(--wq-line)] bg-[var(--wq-surface)]/60 px-5 py-3 sm:px-6">
+        <div className="flex flex-wrap items-end gap-x-5 gap-y-3 border-b border-[var(--wq-line)] bg-[var(--wq-surface)]/60 px-5 py-3 sm:px-6">
           <label className="flex min-w-[120px] flex-col gap-1">
             <span className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
               Priority
@@ -449,14 +575,36 @@ export function WorkQueueTable({
             className="sticky top-0 z-10 grid gap-x-3 border-b border-[var(--wq-line)] bg-white px-5 py-2 sm:px-6"
           >
             <span aria-hidden />
-            {visibleCols.map((col) => (
-              <span
-                key={col.id}
-                className="truncate text-[11px] font-semibold tracking-[0.04em] text-slate-400 uppercase"
-              >
-                {col.label}
-              </span>
-            ))}
+            {visibleCols.map((col) => {
+              const sortable = sortableIds.has(col.id);
+              const active = sortField === col.id;
+              return (
+                <button
+                  key={col.id}
+                  type="button"
+                  disabled={!sortable}
+                  onClick={() => {
+                    if (!sortable) return;
+                    applySort(col.id as QueueSortField);
+                  }}
+                  className={cn(
+                    "flex min-w-0 items-center gap-1 truncate text-left text-[11px] font-semibold tracking-[0.04em] uppercase",
+                    sortable
+                      ? active
+                        ? "text-[var(--wq-accent)]"
+                        : "text-slate-400 hover:text-slate-700"
+                      : "cursor-default text-slate-400",
+                  )}
+                >
+                  <span className="truncate">{col.label}</span>
+                  {active ? (
+                    <span className="shrink-0 text-[10px] font-bold">
+                      {sortDirection === "asc" ? "↑" : "↓"}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
 
             <div
               className={cn(
