@@ -51,9 +51,7 @@ export function TaskActivityTabs({
   notes = [],
   onAddNote,
 }: TaskActivityTabsProps) {
-  const [activeTab, setActiveTab] = useState<
-    "notes" | "attachments" | "emails"
-  >("notes");
+  const [activeTab, setActiveTab] = useState<"notes" | "attachments">("notes");
   const [newNote, setNewNote] = useState("");
 
   function handleSaveNote() {
@@ -83,16 +81,6 @@ export function TaskActivityTabs({
         >
           Attachments (2)
           {activeTab === "attachments" && (
-            <span className="absolute right-0 bottom-[-13px] left-0 h-0.5 bg-[#5A32A3]" />
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("emails")}
-          className={`relative pb-1 text-xs font-medium transition-colors ${activeTab === "emails" ? "font-semibold text-[#5A32A3]" : "text-slate-400 hover:text-slate-700"}`}
-        >
-          Emails
-          {activeTab === "emails" && (
             <span className="absolute right-0 bottom-[-13px] left-0 h-0.5 bg-[#5A32A3]" />
           )}
         </button>
@@ -138,6 +126,7 @@ export function TaskActivityTabs({
               onChange={setNewNote}
               placeholder="Add a note... Type @ to assign someone."
               className="w-full border-0 border-b border-slate-200 bg-transparent p-0 pb-2 text-xs text-slate-800 placeholder:text-slate-400 focus:border-violet-400 focus:outline-none focus:ring-0"
+              data-task-note-input
             />
             <div className="flex justify-end">
               <button
@@ -177,12 +166,6 @@ export function TaskActivityTabs({
               </p>
             </div>
           </div>
-        </div>
-      )}
-
-      {activeTab === "emails" && (
-        <div className="mt-5 py-4 text-xs text-slate-400">
-          No emails linked to this task yet.
         </div>
       )}
     </section>

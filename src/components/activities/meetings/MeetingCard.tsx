@@ -37,6 +37,10 @@ interface MeetingCardProps {
   onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
   isDragging: boolean;
+  isSelected?: boolean;
+  onSelect?: (
+    e: React.MouseEvent | React.ChangeEvent<HTMLInputElement>,
+  ) => void;
 }
 
 export function MeetingCard({
@@ -45,6 +49,8 @@ export function MeetingCard({
   onDragStart,
   onDragEnd,
   isDragging,
+  isSelected = false,
+  onSelect,
 }: MeetingCardProps) {
   const router = useRouter();
   const wasDragging = useRef(false);
@@ -83,16 +89,40 @@ export function MeetingCard({
       data-column-id={columnId}
       className={cn(
         entityCardBox,
-        "cursor-pointer",
+        "group/card cursor-pointer",
         cardMotion,
         isDragging && cardDragging,
+        isSelected
+          ? "border-indigo-500 ring-1 ring-indigo-500"
+          : "hover:border-slate-300",
       )}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
         <h4 className="text-[13px] font-semibold leading-snug text-slate-900 dark:text-slate-100">
           {meeting.title}
         </h4>
-        <TypeIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        <div className="flex shrink-0 items-center gap-1.5">
+          <TypeIcon className="h-3.5 w-3.5 text-slate-400" />
+          {onSelect ? (
+            <div
+              className={cn(
+                "shrink-0 transition-opacity",
+                isSelected
+                  ? "opacity-100"
+                  : "opacity-0 group-hover/card:opacity-100",
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={onSelect}
+                onClick={(e) => e.stopPropagation()}
+                aria-label={`Select meeting ${meeting.title}`}
+                className="h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="mb-2.5 flex items-center gap-1.5 text-[11px] text-slate-500">

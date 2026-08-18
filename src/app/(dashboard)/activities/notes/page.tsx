@@ -9,13 +9,14 @@ import {
   type NoteColumn,
   type NoteType,
 } from "@/lib/notes/types";
-import { listNoteColumns, saveNotes } from "@/lib/notes/store";
+import { listNoteColumns, saveNotes, deleteNote } from "@/lib/notes/store";
 import { NotesListView } from "@/components/activities/notes/NotesListView";
 import { NotesKanbanColumn } from "@/components/activities/notes/NotesKanbanColumn";
 import {
   ActivityToolbar,
   type ActivityView,
 } from "@/components/activities/ActivityToolbar";
+import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
@@ -37,6 +38,8 @@ export default function NotesPage() {
     noteId: string;
     sourceColumnId: string;
   } | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkFlash, setBulkFlash] = useState<string | null>(null);
 
   useEffect(() => {
     setColumns(listNoteColumns());
@@ -124,6 +127,32 @@ export default function NotesPage() {
     setDragInfo(null);
   }
 
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id],
+    );
+  }
+
+  function runBulkDelete() {
+    if (!selectedIds.length) return;
+    const count = selectedIds.length;
+    if (
+      !window.confirm(
+        `Delete ${count} note${count === 1 ? "" : "s"}? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    let n = 0;
+    for (const id of selectedIds) {
+      if (deleteNote(id)) n += 1;
+    }
+    setColumns(listNoteColumns());
+    setSelectedIds([]);
+    setBulkFlash(`Deleted ${n} note${n === 1 ? "" : "s"}`);
+    window.setTimeout(() => setBulkFlash(null), 2800);
+  }
+
   const activeFilters = Number(pinnedOnly) + Number(privateOnly);
 
   return (
@@ -150,6 +179,20 @@ export default function NotesPage() {
           moreMenuItems={moreMenuItems}
           printViewItems={printViewItems}
         />
+
+        {bulkFlash ? (
+          <p className="mt-1 text-[12px] font-medium text-violet-700">
+            {bulkFlash}
+          </p>
+        ) : null}
+
+        {selectedIds.length > 0 ? (
+          <EntitySelectionToolbar
+            selectedCount={selectedIds.length}
+            onClear={() => setSelectedIds([])}
+            onDelete={runBulkDelete}
+          />
+        ) : null}
       </div>
 
       <div className="flex min-h-0 flex-1 items-stretch gap-4 overflow-hidden pt-3">
@@ -197,6 +240,8 @@ export default function NotesPage() {
               onSearchChange={setSearch}
               notesOverride={filteredNotes}
               embedded
+              selectedIds={selectedIds}
+              onSelectedIdsChange={setSelectedIds}
             />
           ) : (
             <div className="flex h-full min-h-[420px] items-stretch gap-3 overflow-x-auto p-1">
@@ -222,6 +267,8 @@ export default function NotesPage() {
                     onDragEndNote={() => setDragInfo(null)}
                     onDropNote={handleDropNote}
                     embedded
+                    selectedIds={selectedIds}
+                    onToggleSelect={toggleSelected}
                   />
                 );
               })}

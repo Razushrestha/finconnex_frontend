@@ -1,142 +1,150 @@
-// "use client";
-
-// import { ArrowLeft } from "lucide-react";
-// import type { Call } from "@/lib/calls/types";
-// import { CallHeaderSection } from "./CallHeaderSection";
-// import { CallAudioPlayerSection } from "./CallAudioPlayerSection";
-// import { CallTranscriptSection } from "./CallTranscriptSection";
-// import { ContactSidebarCard } from "./ContactSidebarCard";
-// import { RelatedEntitySidebarCard } from "./RelatedEntitySidebarCard";
-// import { NextStepsSidebarCard } from "./NextStepSidebarCard";
-
-// interface CallDetailsLayoutProps {
-//   call: Call;
-//   onBack: () => void;
-// }
-
-// export function CallDetailsLayout({ call, onBack }: CallDetailsLayoutProps) {
-//   return (
-//     <div className="mx-auto w-full p-3">
-//       <div className="mb-4 border-b border-border pb-3">
-//         <button
-//           type="button"
-//           onClick={onBack}
-//           className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
-//         >
-//           <ArrowLeft className="h-4 w-4" />
-//           Back to Calls
-//         </button>
-//       </div>
-
-//       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-//         <div className="flex flex-col gap-6 lg:col-span-2">
-//           <div className="flex flex-col gap-6 rounded-2xl border border-border bg-white p-6 shadow-sm">
-//             <CallHeaderSection call={call} onBack={onBack} />
-//             <CallAudioPlayerSection />
-//           </div>
-//           <CallTranscriptSection
-//             notes={call.notes}
-//             assignedTo={call.assignedTo}
-//           />
-//         </div>
-
-//         <div className="flex flex-col gap-6">
-//           <ContactSidebarCard contactName={call.contact} />
-//           <RelatedEntitySidebarCard relatedTo={call.relatedTo} />
-//           <NextStepsSidebarCard />
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
 "use client";
 
-import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
-import type { Call } from "@/lib/calls/types";
+import { toast } from "sonner";
+import type { Call, CallFollowUp, CallStatus, CallType } from "@/lib/calls/types";
+import type { TaskReminder } from "@/lib/tasks/types";
+import { deleteCall, parseCallDurationSeconds, updateCall } from "@/lib/calls/store";
 import { CallHeaderSection } from "./CallHeaderSection";
 import { CallAudioPlayerSection } from "./CallAudioPlayerSection";
 import { CallTranscriptSection } from "./CallTranscriptSection";
 import { ContactSidebarCard } from "./ContactSidebarCard";
 import { RelatedEntitySidebarCard } from "./RelatedEntitySidebarCard";
 import { NextStepsSidebarCard, type NextStepItem } from "./NextStepSidebarCard";
+import { CallRemindersCard } from "./CallRemindersCard";
+import { PAGE_FRAME } from "@/lib/layout";
 
 interface CallDetailsLayoutProps {
   call: Call;
   onBack: () => void;
+  onChange: (next: Call) => void;
 }
 
-export function CallDetailsLayout({ call, onBack }: CallDetailsLayoutProps) {
-  // Initialize sample next steps state
-  const [steps, setSteps] = useState<NextStepItem[]>([
-    {
-      id: "1",
-      text: "Send follow-up email with revised proposal",
-      dueDate: "Overdue (Yesterday)",
-      isOverdue: true,
-      completed: true,
-    },
-    {
-      id: "2",
-      text: "Schedule touchpoint call if no reply",
-      dueDate: "Due Oct 27",
-      isOverdue: false,
-      completed: false,
-    },
-  ]);
+function toUiSteps(steps: CallFollowUp[] = []): NextStepItem[] {
+  return steps.map((step) => ({
+    id: step.id,
+    text: step.title,
+    dueDate: step.dueDate,
+    completed: step.completed,
+    isOverdue: step.dueDate.toLowerCase().includes("overdue"),
+  }));
+}
 
-  const handleToggleStep = (id: string) => {
-    setSteps((prev) =>
-      prev.map((step) =>
-        step.id === id ? { ...step, completed: !step.completed } : step,
-      ),
-    );
-  };
+export function CallDetailsLayout({
+  call,
+  onBack,
+  onChange,
+}: CallDetailsLayoutProps) {
+  const durationSeconds = parseCallDurationSeconds(call);
+  const hasRecording = Boolean(call.recording?.durationSeconds || durationSeconds);
 
-  const handleAddStep = (text: string, dueDate: string) => {
-    const newStep: NextStepItem = {
-      id: Date.now().toString(),
-      text,
-      dueDate,
-      isOverdue: dueDate.toLowerCase().includes("overdue"),
-      completed: false,
-    };
-    setSteps((prev) => [...prev, newStep]);
-  };
+  function persist(patch: Partial<Call>) {
+    const next = updateCall(call.id, patch);
+    if (next) onChange(next);
+    return Boolean(next);
+  }
+
+  function handleDelete() {
+    if (!window.confirm("Delete this call? This cannot be undone.")) return;
+    if (deleteCall(call.id)) {
+      toast.success("Call deleted");
+      onBack();
+    }
+  }
 
   return (
-    <div className="mx-auto w-full p-3">
-      <div className="mb-4 border-b border-border pb-3">
+    <div className={`${PAGE_FRAME} bg-slate-50 min-h-full`}>
+      <div className="mb-4 flex items-center justify-between border-b border-slate-200/80 pb-3">
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#5A32A3]"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Calls
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="flex flex-col gap-6 lg:col-span-2">
-          <div className="flex flex-col gap-6 rounded-2xl border border-border bg-white p-6 shadow-sm">
-            <CallHeaderSection call={call} onBack={onBack} />
-            <CallAudioPlayerSection />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-5 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
+            <CallHeaderSection
+              call={call}
+              onStatusChange={(status: CallStatus) => persist({ status })}
+              onSaveDetails={(next: {
+                subject: string;
+                fromNumber: string;
+                callType: CallType;
+                assignedTo: string;
+              }) => {
+                persist({
+                  subject: next.subject,
+                  fromNumber: next.fromNumber || undefined,
+                  callType: next.callType,
+                  assignedTo: next.assignedTo,
+                });
+                toast.success("Call details saved");
+              }}
+              onDelete={handleDelete}
+            />
+            <CallAudioPlayerSection
+              durationSeconds={durationSeconds}
+              hasRecording={hasRecording}
+            />
           </div>
           <CallTranscriptSection
             notes={call.notes}
+            agenda={call.agenda}
+            purpose={call.purpose}
             assignedTo={call.assignedTo}
+            contactName={call.contact || call.callFor}
+            onSaveNotes={(notes) => {
+              const ok = persist({ notes });
+              if (ok) toast.success("Notes saved");
+              else toast.error("Could not save notes");
+              return ok;
+            }}
           />
         </div>
 
-        <div className="flex flex-col gap-6">
-          <ContactSidebarCard contactName={call.contact} />
+        <div className="flex flex-col gap-5">
+          <ContactSidebarCard
+            contactName={call.contact || call.callFor}
+            relatedTo={call.relatedTo}
+          />
           <RelatedEntitySidebarCard relatedTo={call.relatedTo} />
+          <CallRemindersCard
+            reminders={call.reminders ?? []}
+            dueDate={call.date}
+            onChange={(reminders: TaskReminder[]) => {
+              persist({ reminders });
+              toast.success("Reminder updated");
+            }}
+          />
           <NextStepsSidebarCard
-            steps={steps}
-            onToggleStep={handleToggleStep}
-            onAddStep={handleAddStep}
+            steps={toUiSteps(call.nextSteps)}
+            onToggleStep={(id) => {
+              persist({
+                nextSteps: (call.nextSteps ?? []).map((step) =>
+                  step.id === id
+                    ? { ...step, completed: !step.completed }
+                    : step,
+                ),
+              });
+            }}
+            onAddStep={(text, dueDate) => {
+              persist({
+                nextSteps: [
+                  ...(call.nextSteps ?? []),
+                  {
+                    id: `ns-${Date.now()}`,
+                    title: text,
+                    dueDate,
+                    completed: false,
+                  },
+                ],
+              });
+            }}
           />
         </div>
       </div>

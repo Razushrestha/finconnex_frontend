@@ -1,6 +1,7 @@
 /** SRS §7.2 Calls */
 
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import type { TaskReminder } from "@/lib/tasks/types";
 
 export const CALL_TYPES = [
   "Inbound",
@@ -29,6 +30,13 @@ export interface NextStepTask {
   assignee: string;
 }
 
+export interface CallFollowUp {
+  id: string;
+  title: string;
+  dueDate: string;
+  completed: boolean;
+}
+
 export interface CallRecording {
   durationSeconds: number;
   audioUrl?: string;
@@ -39,14 +47,20 @@ export interface Call {
   subject: string;
   relatedTo?: string;
   contact?: string;
+  callFor?: string;
+  fromNumber?: string;
   callType: CallType;
   status: CallStatus;
   date: string;
   duration?: string;
   notes?: string;
+  agenda?: string;
+  purpose?: string;
   assignedTo: string;
   recording?: CallRecording;
   nextStep?: NextStepTask;
+  nextSteps?: CallFollowUp[];
+  reminders?: TaskReminder[];
   outcome?: string;
 }
 
@@ -74,10 +88,46 @@ export const callColumns: CallColumn[] = [
           "Follow up on refinancing application before rate lock expires",
         relatedTo: "Lead: William Anderson",
         contact: "William Anderson",
+        callFor: "William Anderson",
+        fromNumber: "+1 (415) 555-0142",
         callType: "Outbound",
         status: "Scheduled",
         date: "22/07/2026 10:00 AM",
+        duration: "3:42",
         assignedTo: "John Smith",
+        agenda: "Confirm remaining documents, rate-lock deadline, and next drawdown date.",
+        purpose: "Keep the refinance on track before the current rate lock expires.",
+        recording: { durationSeconds: 222 },
+        reminders: [
+          {
+            id: "cr-c1-1",
+            type: "Follow-up",
+            date: "2026-07-22",
+            time: "09:45",
+            leadTime: "15 minutes before",
+            notificationMethod: "Email",
+            scheduleMode: "onDate",
+            relativeCount: 1,
+            relativeWhen: "Before",
+            relativeOf: "Due Date",
+            repeatType: "None",
+            notify: "Both",
+          },
+        ],
+        nextSteps: [
+          {
+            id: "ns-c1-1",
+            title: "Send follow-up email with revised proposal",
+            dueDate: "Overdue (Yesterday)",
+            completed: true,
+          },
+          {
+            id: "ns-c1-2",
+            title: "Schedule touchpoint call if no reply",
+            dueDate: "Due Oct 27",
+            completed: false,
+          },
+        ],
       },
       {
         id: "c2",
@@ -87,6 +137,7 @@ export const callColumns: CallColumn[] = [
         callType: "Outbound",
         status: "Scheduled",
         date: "23/07/2026 02:00 PM",
+        fromNumber: "+1 (415) 555-0198",
         assignedTo: "Shiva Kadhka",
       },
       {
@@ -98,6 +149,7 @@ export const callColumns: CallColumn[] = [
         callType: "Outbound",
         status: "Scheduled",
         date: "23/07/2026 05:00 PM",
+        fromNumber: "+1 (415) 555-0100",
         assignedTo: "John Smith",
       },
     ],
@@ -117,8 +169,10 @@ export const callColumns: CallColumn[] = [
         status: "Completed",
         date: "20/07/2026 11:30 AM",
         duration: "18 min",
+        fromNumber: "+1 (628) 555-0177",
         notes: "Resolved billing question.",
         assignedTo: "Tejas Gokhe",
+        recording: { durationSeconds: 1080 },
       },
       {
         id: "c4",
@@ -128,7 +182,9 @@ export const callColumns: CallColumn[] = [
         status: "Completed",
         date: "19/07/2026 04:00 PM",
         duration: "32 min",
+        fromNumber: "+1 (415) 555-0142",
         assignedTo: "Roshna Abraham",
+        recording: { durationSeconds: 1920 },
       },
       {
         // Empty-summary + last-activity seed (Lead: Katherina Brooks)
@@ -140,8 +196,10 @@ export const callColumns: CallColumn[] = [
         status: "Completed",
         date: "22/07/2026 03:00 PM",
         duration: "22 min",
+        fromNumber: "+1 (415) 555-0142",
         notes: "Interested; follow up next week.",
         assignedTo: "Roshna Abraham",
+        recording: { durationSeconds: 1320 },
       },
     ],
   },
@@ -158,6 +216,7 @@ export const callColumns: CallColumn[] = [
         callType: "Outbound",
         status: "No Answer",
         date: "21/07/2026 09:15 AM",
+        fromNumber: "+1 (415) 555-0142",
         assignedTo: "John Smith",
       },
     ],
@@ -177,7 +236,9 @@ export const callColumns: CallColumn[] = [
         status: "Voicemail Left",
         date: "20/07/2026 03:45 PM",
         duration: "0:42",
+        fromNumber: "+1 (415) 555-0142",
         assignedTo: "Shiva Kadhka",
+        recording: { durationSeconds: 42 },
       },
     ],
   },
@@ -194,6 +255,7 @@ export const callColumns: CallColumn[] = [
         callType: "Outbound",
         status: "Cancelled",
         date: "18/07/2026 01:00 PM",
+        fromNumber: "+1 (415) 555-0100",
         assignedTo: "Tejas Gokhe",
       },
     ],

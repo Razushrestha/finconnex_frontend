@@ -1,15 +1,17 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, Sparkles } from "lucide-react";
-import type { Task, TaskStatus } from "@/lib/tasks/types";
+import { ArrowLeft, Check, CheckCircle2, Pencil, X } from "lucide-react";
+import type { TaskStatus } from "@/lib/tasks/types";
+import { useTaskPageEditing } from "./TaskEditContext";
 
 interface TaskHeaderProps {
-  task: Task;
   onBack: () => void;
   onUpdateStatus: (status: TaskStatus) => void;
 }
 
-export function TaskHeader({ task, onBack, onUpdateStatus }: TaskHeaderProps) {
+export function TaskHeader({ onBack, onUpdateStatus }: TaskHeaderProps) {
+  const { editing, beginEdit, saveAll, cancelAll } = useTaskPageEditing();
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 py-4">
       <div className="flex items-center gap-3">
@@ -21,20 +23,37 @@ export function TaskHeader({ task, onBack, onUpdateStatus }: TaskHeaderProps) {
           <ArrowLeft className="h-4 w-4" />
           Back to Tasks
         </button>
-        <span className="h-4 w-px bg-slate-200" />
-        <span className="text-xs font-mono text-slate-400">{task.taskId}</span>
-        <span className="text-xs font-medium text-slate-500">
-          {task.taskType}
-        </span>
       </div>
       <div className="flex items-center gap-3">
-        <button
-          type="button"
-          className="flex items-center gap-1.5 text-xs font-medium text-slate-600 transition-colors hover:text-violet-700"
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          Convert to Project
-        </button>
+        {editing ? (
+          <>
+            <button
+              type="button"
+              onClick={cancelAll}
+              className="inline-flex items-center gap-1.5 border border-slate-200 px-3.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-900"
+            >
+              <X className="h-3.5 w-3.5" />
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={saveAll}
+              className="inline-flex items-center gap-1.5 border border-violet-200 bg-violet-50 px-3.5 py-1.5 text-xs font-medium text-violet-700 transition-colors hover:bg-violet-100"
+            >
+              <Check className="h-3.5 w-3.5" />
+              Save
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={beginEdit}
+            className="inline-flex items-center gap-1.5 border border-slate-200 px-3.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-violet-300 hover:text-violet-700"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </button>
+        )}
         <button
           type="button"
           onClick={() => onUpdateStatus("Completed")}

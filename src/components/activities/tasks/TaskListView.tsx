@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Search,
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
@@ -31,6 +30,7 @@ import {
   saveTaskListColumns,
 } from "@/lib/tasks/list-columns";
 import { formatRelatedTo, initials } from "@/lib/activities/shared";
+import { taskMatchesSearch } from "@/lib/tasks/search";
 import { onRulesChange } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 import {
@@ -46,10 +46,13 @@ interface FlatTask extends Task {
 
 interface TaskListViewProps {
   filters?: TaskFilters;
+  search?: string;
   sortField?: string;
   sortDirection?: "asc" | "desc";
   onSortChange?: (field: string, direction: "asc" | "desc") => void;
   onClearSort?: () => void;
+  selectedIds?: string[];
+  onSelectedIdsChange?: (ids: string[]) => void;
 }
 
 const PRIORITY_STYLE: Record<Priority, { className: string }> = {
@@ -402,16 +405,25 @@ function buildColumnRenderers(): Record<string, ColumnRenderer> {
 
 export function TaskListView({
   filters,
+  search = "",
   sortField,
   sortDirection,
   onSortChange,
   onClearSort,
+  selectedIds: controlledSelectedIds,
+  onSelectedIdsChange,
 }: TaskListViewProps) {
   const router = useRouter();
-  const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
   const [revision, setRevision] = useState(0);
+  const [localSelectedIds, setLocalSelectedIds] = useState<string[]>([]);
+  const selectedIds = controlledSelectedIds ?? localSelectedIds;
+
+  function setSelectedIds(ids: string[]) {
+    if (onSelectedIdsChange) onSelectedIdsChange(ids);
+    else setLocalSelectedIds(ids);
+  }
   const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
   const [manageColumns, setManageColumns] = useState<ManageColumn[]>(() =>
     loadTaskListColumns(),
@@ -427,21 +439,7 @@ export function TaskListView({
 
   useEffect(() => {
     setPage(1);
-  }, [filters?.priorities, filters?.statuses, filters?.types, pageSize]);
-
-  const filterHint = useMemo(() => {
-    const parts: string[] = [];
-    if ((filters?.priorities.length ?? 0) > 0) {
-      parts.push(`${filters!.priorities.length} priority`);
-    }
-    if ((filters?.statuses.length ?? 0) > 0) {
-      parts.push(`${filters!.statuses.length} status`);
-    }
-    if ((filters?.types.length ?? 0) > 0) {
-      parts.push(`${filters!.types.length} type`);
-    }
-    return parts.length ? ` · ${parts.join(" · ")}` : "";
-  }, [filters?.priorities.length, filters?.statuses.length, filters?.types.length]);
+  }, [filters?.priorities, filters?.statuses, filters?.types, pageSize, search]);
 
   const allTasks = useMemo(() => {
     void revision;
@@ -474,16 +472,7 @@ export function TaskListView({
     }
 
     if (search) {
-      const q = search.toLowerCase();
-      data = data.filter(
-        (t) =>
-          t.title.toLowerCase().includes(q) ||
-          t.taskId.toLowerCase().includes(q) ||
-          t.assignedTo.toLowerCase().includes(q) ||
-          formatRelatedTo(t.relatedTo).toLowerCase().includes(q) ||
-          (t.createdBy?.toLowerCase().includes(q) ?? false) ||
-          (t.description?.toLowerCase().includes(q) ?? false),
-      );
+      data = data.filter((t) => taskMatchesSearch(t, search));
     }
 
     if (sortField) {
@@ -540,6 +529,28 @@ export function TaskListView({
     safePage * pageSize,
   );
 
+  const pageIds = paginatedData.map((task) => task.taskId);
+  const allPageSelected =
+    pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
+  const somePageSelected =
+    pageIds.some((id) => selectedIds.includes(id)) && !allPageSelected;
+
+  function toggleTaskSelected(taskId: string) {
+    setSelectedIds(
+      selectedIds.includes(taskId)
+        ? selectedIds.filter((id) => id !== taskId)
+        : [...selectedIds, taskId],
+    );
+  }
+
+  function togglePageSelected() {
+    if (allPageSelected) {
+      setSelectedIds(selectedIds.filter((id) => !pageIds.includes(id)));
+      return;
+    }
+    setSelectedIds([...new Set([...selectedIds, ...pageIds])]);
+  }
+
   const columnRenderers = useMemo(() => buildColumnRenderers(), []);
   const orderedVisibleColumns = useMemo(
     () => manageColumns.filter((c) => c.checked),
@@ -567,32 +578,29 @@ export function TaskListView({
 
   return (
     <div className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="relative max-w-sm flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-            placeholder="Search tasks…"
-            className="h-9 w-full rounded-xl border border-slate-200 bg-white pr-3 pl-9 text-[12px] outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
-          />
-        </div>
-        <p className="text-[11px] text-slate-400">
-          {processedData.length} tasks{filterHint}
-        </p>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[900px] text-left text-[12px]">
+      <div className="min-h-0 min-w-0 flex-1 overflow-x-scroll overflow-y-auto overscroll-x-contain [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100">
+        <table className="w-max min-w-full text-left text-[12px]">
           <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/90 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
             <tr>
+              <th className="sticky left-0 z-20 w-10 bg-slate-50/90 px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={allPageSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = somePageSelected;
+                  }}
+                  onChange={togglePageSelected}
+                  aria-label="Select all tasks on this page"
+                  className="h-4 w-4 cursor-pointer rounded border-slate-300 text-[#5A32A3] focus:ring-[#5A32A3]"
+                />
+              </th>
               {orderedVisibleColumns.map((col) => {
                 const sortable = isTaskColumnSortable(col.id);
                 return (
-                  <th key={col.id} className="px-3 py-2.5 whitespace-nowrap">
+                  <th
+                    key={col.id}
+                    className="px-3 py-2.5 whitespace-nowrap"
+                  >
                     {sortable ? (
                   <button
                         type="button"
@@ -642,14 +650,37 @@ export function TaskListView({
                 onClick={() =>
                   router.push(`/activities/tasks/detail/${task.taskId}`)
                 }
-                className="cursor-pointer transition-colors hover:bg-violet-50/40"
+                className={cn(
+                  "cursor-pointer transition-colors hover:bg-violet-50/40",
+                  selectedIds.includes(task.taskId) && "bg-violet-50/70",
+                )}
               >
+                <td
+                  className={cn(
+                    "sticky left-0 z-10 px-3 py-2.5",
+                    selectedIds.includes(task.taskId)
+                      ? "bg-violet-50"
+                      : "bg-white",
+                  )}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(task.taskId)}
+                    onChange={() => toggleTaskSelected(task.taskId)}
+                    aria-label={`Select ${task.title}`}
+                    className="h-4 w-4 cursor-pointer rounded border-slate-300 text-[#5A32A3] focus:ring-[#5A32A3]"
+                  />
+                </td>
                 {orderedVisibleColumns.map((col) => {
                   const renderer = columnRenderers[col.id];
                   return (
                     <td
                       key={col.id}
-                      className={renderer?.tdClassName ?? "px-3 py-2.5"}
+                      className={cn(
+                        "whitespace-nowrap",
+                        renderer?.tdClassName ?? "px-3 py-2.5",
+                      )}
                     >
                       {renderer ? renderer.td(task) : ""}
                 </td>
@@ -667,7 +698,7 @@ export function TaskListView({
             {paginatedData.length === 0 && (
               <tr>
                 <td
-                  colSpan={orderedVisibleColumns.length + 1}
+                  colSpan={orderedVisibleColumns.length + 2}
                   className="px-3 py-12 text-center text-sm text-slate-400"
                 >
                   No tasks match the current filters.

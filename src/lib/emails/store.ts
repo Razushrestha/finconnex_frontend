@@ -20,7 +20,7 @@ function cloneSeed(): Email[] {
 }
 
 const store = createBoardStore({
-  key: "activities:emails:list:v1",
+  key: "activities:emails:list:v2",
   seed: cloneSeed,
 });
 
@@ -104,4 +104,26 @@ export function createEmail(input: {
 export function findEmailById(id: string) {
   const email = listEmails().find((e) => e.id === id);
   return email ? { email } : null;
+}
+
+export function updateEmail(id: string, patch: Partial<Email>): Email | null {
+  let updated: Email | null = null;
+  saveEmails(
+    listEmails().map((email) => {
+      if (email.id !== id) return email;
+      updated = { ...email, ...patch, id };
+      return updated;
+    }),
+  );
+  if (updated) emitLeadActivityChange();
+  return updated;
+}
+
+export function deleteEmail(id: string): Email | null {
+  const items = listEmails();
+  const found = items.find((email) => email.id === id) ?? null;
+  if (!found) return null;
+  saveEmails(items.filter((email) => email.id !== id));
+  emitLeadActivityChange();
+  return found;
 }

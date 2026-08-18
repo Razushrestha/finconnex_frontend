@@ -831,7 +831,7 @@ export function CreateTaskForm({
             />
           </div>
 
-          {/* Owner / collaborators card */}
+          {/* Owner + collaborators — same card, separate sections */}
           <div className="space-y-4 rounded-xl border border-border bg-white p-4 shadow-sm">
             <div>
               <label className={labelClass}>
@@ -839,107 +839,20 @@ export function CreateTaskForm({
               </label>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 {form.assignedTo ? (
-                  <>
-                    <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-2 text-sm text-gray-700">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-[11px] font-semibold text-blue-700">
-                        {initials(form.assignedTo)}
-                      </span>
-                      {form.assignedTo}
-                      <button
-                        type="button"
-                        onClick={() => update("assignedTo", "")}
-                        className="text-gray-400 hover:text-gray-600"
-                        aria-label={`Remove ${form.assignedTo}`}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-2 text-sm text-gray-700">
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-[11px] font-semibold text-blue-700">
+                      {initials(form.assignedTo)}
                     </span>
-
-                    {form.collaborators.map((name) => (
-                      <span
-                        key={name}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-gray-900 py-1 pl-1 pr-2 text-sm text-white"
-                      >
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[10px] font-semibold">
-                          {initials(name)}
-                        </span>
-                        {name}
-                        <button
-                          type="button"
-                          onClick={() => removeCollaborator(name)}
-                          className="text-white/70 hover:text-white"
-                          aria-label={`Remove collaborator ${name}`}
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
-
-                    <div ref={collaboratorPickerRef} className="relative">
-                      {availableCollaborators.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAddingCollaborator((open) => !open);
-                            if (addingCollaborator) setCollaboratorSearch("");
-                          }}
-                          className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-dashed transition-colors ${
-                            addingCollaborator
-                              ? "border-violet-300 bg-violet-50 text-violet-700"
-                              : "border-gray-300 text-gray-500 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
-                          }`}
-                          aria-label="Add collaborator"
-                          title="Add collaborator"
-                          aria-expanded={addingCollaborator}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                      )}
-                      {addingCollaborator && (
-                        <div className="absolute left-0 top-full z-30 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg">
-                          <div className="border-b border-gray-100 p-2">
-                            <div className="relative">
-                              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-                              <input
-                                autoFocus
-                                type="text"
-                                value={collaboratorSearch}
-                                onChange={(e) =>
-                                  setCollaboratorSearch(e.target.value)
-                                }
-                                placeholder="Search collaborators…"
-                                className="w-full rounded-md border border-gray-200 py-1.5 pl-8 pr-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100"
-                              />
-                            </div>
-                          </div>
-                          <ul className="max-h-44 overflow-y-auto py-1">
-                            {filteredCollaborators.length > 0 ? (
-                              filteredCollaborators.map((owner) => (
-                                <li key={owner}>
-                                  <button
-                                    type="button"
-                                    onClick={() => addCollaborator(owner)}
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-violet-50 hover:text-violet-700"
-                                  >
-                                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-semibold text-blue-700">
-                                      {initials(owner)}
-                                    </span>
-                                    {owner}
-                                  </button>
-                                </li>
-                              ))
-                            ) : (
-                              <li className="px-3 py-2 text-sm text-gray-400">
-                                {collaboratorSearch.trim()
-                                  ? "No collaborators match your search"
-                                  : "No collaborators available"}
-                              </li>
-                            )}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </>
+                    {form.assignedTo}
+                    <button
+                      type="button"
+                      onClick={() => update("assignedTo", "")}
+                      className="text-gray-400 hover:text-gray-600"
+                      aria-label={`Remove ${form.assignedTo}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
                 ) : (
                   <div className="relative w-full">
                     <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -963,6 +876,94 @@ export function CreateTaskForm({
               {submitted && errors.assignedTo && (
                 <p className="mt-1 text-xs text-red-500">{errors.assignedTo}</p>
               )}
+            </div>
+
+            <div className="border-t border-border pt-4">
+              <label className={labelClass}>Collaborators</label>
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {form.collaborators.map((name) => (
+                  <span
+                    key={name}
+                    className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-2 text-sm text-gray-700"
+                  >
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-[11px] font-semibold text-violet-700">
+                      {initials(name)}
+                    </span>
+                    {name}
+                    <button
+                      type="button"
+                      onClick={() => removeCollaborator(name)}
+                      className="text-gray-400 hover:text-gray-600"
+                      aria-label={`Remove collaborator ${name}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </span>
+                ))}
+
+                <div ref={collaboratorPickerRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAddingCollaborator((open) => !open);
+                      if (addingCollaborator) setCollaboratorSearch("");
+                    }}
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-dashed transition-colors ${
+                      addingCollaborator
+                        ? "border-violet-300 bg-violet-50 text-violet-700"
+                        : "border-gray-300 text-gray-500 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+                    }`}
+                    aria-label="Add collaborator"
+                    title="Add collaborator"
+                    aria-expanded={addingCollaborator}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                  {addingCollaborator && (
+                    <div className="absolute left-0 top-full z-30 mt-1 w-56 rounded-lg border border-gray-200 bg-white shadow-lg">
+                      <div className="border-b border-gray-100 p-2">
+                        <div className="relative">
+                          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                          <input
+                            autoFocus
+                            type="text"
+                            value={collaboratorSearch}
+                            onChange={(e) =>
+                              setCollaboratorSearch(e.target.value)
+                            }
+                            placeholder="Search collaborators…"
+                            className="w-full rounded-md border border-gray-200 py-1.5 pl-8 pr-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-100"
+                          />
+                        </div>
+                      </div>
+                      <ul className="max-h-44 overflow-y-auto py-1">
+                        {filteredCollaborators.length > 0 ? (
+                          filteredCollaborators.map((owner) => (
+                            <li key={owner}>
+                              <button
+                                type="button"
+                                onClick={() => addCollaborator(owner)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-violet-50 hover:text-violet-700"
+                              >
+                                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-semibold text-blue-700">
+                                  {initials(owner)}
+                                </span>
+                                {owner}
+                              </button>
+                            </li>
+                          ))
+                        ) : (
+                          <li className="px-3 py-2 text-sm text-gray-400">
+                            {collaboratorSearch.trim()
+                              ? "No collaborators match your search"
+                              : "No collaborators available"}
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 

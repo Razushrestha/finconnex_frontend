@@ -5,7 +5,7 @@ import type { NoteColumn } from "@/lib/notes/types";
 import { NoteCard } from "./NoteCard";
 import { cn } from "@/lib/utils";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
-import { KANBAN_COL, KANBAN_HEADER, KANBAN_WELL } from "@/lib/layout";
+import { KANBAN_COL, KANBAN_HEADER, KANBAN_HEADER_COUNT, KANBAN_WELL } from "@/lib/layout";
 
 interface NotesKanbanColumnProps {
   column: NoteColumn;
@@ -18,6 +18,8 @@ interface NotesKanbanColumnProps {
   onDragEndNote: () => void;
   onDropNote: (targetColumnId: string) => void;
   embedded?: boolean;
+  selectedIds?: string[];
+  onToggleSelect?: (noteId: string) => void;
 }
 
 export function NotesKanbanColumn({
@@ -27,6 +29,8 @@ export function NotesKanbanColumn({
   onDragEndNote,
   onDropNote,
   embedded = false,
+  selectedIds = [],
+  onToggleSelect,
 }: NotesKanbanColumnProps) {
   const [isOver, setIsOver] = useState(false);
 
@@ -42,7 +46,7 @@ export function NotesKanbanColumn({
           <h3 className="text-xs font-semibold text-slate-800 xl:text-sm">
             {column.title}
           </h3>
-          <span className="rounded-full border border-slate-200/80 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500">
+          <span className={KANBAN_HEADER_COUNT}>
             {column.notes.length}
           </span>
         </div>
@@ -74,6 +78,10 @@ export function NotesKanbanColumn({
               isDragging={draggingNoteId === note.id}
               onDragStart={(e) => onDragStartNote(e, note.id, column.id)}
               onDragEnd={onDragEndNote}
+              isSelected={selectedIds.includes(note.id)}
+              onSelect={
+                onToggleSelect ? () => onToggleSelect(note.id) : undefined
+              }
             />
           ))}
 

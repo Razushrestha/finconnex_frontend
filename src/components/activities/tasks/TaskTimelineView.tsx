@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { Clock } from "lucide-react";
 import { listAllTasks, snoozeTask } from "@/lib/tasks/store";
 import { parseTaskDueDate } from "@/lib/dashboard/layout";
+import { taskMatchesSearch } from "@/lib/tasks/search";
 import type { Task, TaskFilters } from "@/lib/tasks/types";
 import { onRulesChange } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 
-function filterTasks(tasks: Task[], filters: TaskFilters) {
+function filterTasks(tasks: Task[], filters: TaskFilters, search = "") {
   return tasks.filter((t) => {
     if (filters.statuses.length && !filters.statuses.includes(t.status)) {
       return false;
@@ -19,7 +20,7 @@ function filterTasks(tasks: Task[], filters: TaskFilters) {
     if (filters.types.length && !filters.types.includes(t.taskType)) {
       return false;
     }
-    return true;
+    return taskMatchesSearch(t, search);
   });
 }
 
@@ -29,7 +30,13 @@ const SNOOZE_OPTIONS = [
   { days: 7, label: "1 week" },
 ];
 
-export function TaskTimelineView({ filters }: { filters: TaskFilters }) {
+export function TaskTimelineView({
+  filters,
+  search = "",
+}: {
+  filters: TaskFilters;
+  search?: string;
+}) {
   const [tasks, setTasks] = useState(() => listAllTasks());
   const [flash, setFlash] = useState<string | null>(null);
 
@@ -44,7 +51,7 @@ export function TaskTimelineView({ filters }: { filters: TaskFilters }) {
   }, [flash]);
 
   const rows = useMemo(() => {
-    return filterTasks(tasks, filters)
+    return filterTasks(tasks, filters, search)
       .map((t) => ({ task: t, due: parseTaskDueDate(t.dueDate) }))
       .sort((a, b) => {
         if (!a.due && !b.due) return 0;
@@ -52,7 +59,7 @@ export function TaskTimelineView({ filters }: { filters: TaskFilters }) {
         if (!b.due) return -1;
         return a.due.getTime() - b.due.getTime();
       });
-  }, [tasks, filters]);
+  }, [tasks, filters, search]);
 
   const minTime = rows.find((r) => r.due)?.due?.getTime() ?? Date.now();
   const maxTime =
@@ -77,7 +84,10 @@ export function TaskTimelineView({ filters }: { filters: TaskFilters }) {
       <ul className="space-y-3">
         {rows.map(({ task, due }) => {
           const left = due
-            ? Math.min(92, Math.max(0, ((due.getTime() - minTime) / span) * 100))
+            ? Math.min(
+                92,
+                Math.max(0, ((due.getTime() - minTime) / span) * 100),
+              )
             : 0;
           return (
             <li
@@ -119,7 +129,7 @@ export function TaskTimelineView({ filters }: { filters: TaskFilters }) {
                 <div
                   className={cn(
                     "absolute top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full",
-                    task.overdue ? "bg-rose-500" : "bg-violet-600",
+                    task.overdue ? "bg-rose-500" : "bg-[#5A32A3]",
                   )}
                   style={{ left: `${left}%` }}
                   title={due ? due.toDateString() : "No due date"}

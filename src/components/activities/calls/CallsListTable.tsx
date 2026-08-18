@@ -3,27 +3,42 @@
 import { useEffect, useMemo, useState } from "react";
 import { Phone, ChevronLeft, ChevronRight } from "lucide-react";
 import { listCalls } from "@/lib/calls/store";
+import { onRulesChange } from "@/lib/rules/storage";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
 import { useRouter } from "next/navigation";
 
 interface CallsListTableProps {
   sortActive: boolean;
   filterOpen?: boolean;
+  selectedIds?: string[];
+  onSelectedIdsChange?: (ids: string[]) => void;
 }
 
 export function CallsListTable({
   sortActive,
   filterOpen = false,
+  selectedIds: controlledSelectedIds,
+  onSelectedIdsChange,
 }: CallsListTableProps) {
   const router = useRouter();
 
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [localSelected, setLocalSelected] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [tick, setTick] = useState(0);
   const pageSize = 10;
+  const selected = controlledSelectedIds ?? localSelected;
+
+  function setSelected(ids: string[]) {
+    if (onSelectedIdsChange) onSelectedIdsChange(ids);
+    else setLocalSelected(ids);
+  }
 
   useEffect(() => {
     setTick((n) => n + 1);
+  }, []);
+
+  useEffect(() => {
+    return onRulesChange(() => setTick((n) => n + 1));
   }, []);
 
   const sorted = useMemo(() => {
@@ -50,18 +65,23 @@ export function CallsListTable({
   );
 
   const allSelected =
-    selected.size === paginated.length && paginated.length > 0;
+    paginated.length > 0 && paginated.every((c) => selected.includes(c.id));
 
   function toggleAll() {
-    setSelected(allSelected ? new Set() : new Set(paginated.map((c) => c.id)));
+    const pageIds = paginated.map((c) => c.id);
+    if (allSelected) {
+      setSelected(selected.filter((id) => !pageIds.includes(id)));
+    } else {
+      setSelected([...new Set([...selected, ...pageIds])]);
+    }
   }
 
   function toggleRow(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+    setSelected(
+      selected.includes(id)
+        ? selected.filter((value) => value !== id)
+        : [...selected, id],
+    );
   }
 
   return (
@@ -105,7 +125,7 @@ export function CallsListTable({
                 <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
-                    checked={selected.has(call.id)}
+                    checked={selected.includes(call.id)}
                     onChange={() => toggleRow(call.id)}
                     className="h-3.5 w-3.5 rounded border-slate-300 text-violet-500"
                   />

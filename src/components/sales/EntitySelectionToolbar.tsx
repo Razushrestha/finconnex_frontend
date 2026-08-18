@@ -163,6 +163,16 @@ export function EntitySelectionToolbar({
             </>
           )}
         </div>
+        {onDelete ? (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-white px-3 py-1 text-rose-600 hover:bg-rose-50"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
+        ) : null}
         <div className="relative">
           <button
             type="button"

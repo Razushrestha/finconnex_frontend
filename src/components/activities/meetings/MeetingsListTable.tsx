@@ -40,6 +40,8 @@ interface MeetingsListTableProps {
   statusLabel?: string;
   /** Sit inside a parent surface: no nested card chrome. */
   embedded?: boolean;
+  selectedIds?: string[];
+  onSelectedIdsChange?: (ids: string[]) => void;
 }
 
 export function MeetingsListTable({
@@ -48,11 +50,19 @@ export function MeetingsListTable({
   onSearchChange,
   statusLabel = "All Meetings",
   embedded = false,
+  selectedIds: controlledSelectedIds,
+  onSelectedIdsChange,
 }: MeetingsListTableProps) {
   const router = useRouter();
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [localSelectedIds, setLocalSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const pageSize = 8;
+  const selectedIds = controlledSelectedIds ?? localSelectedIds;
+
+  function setSelectedIds(ids: string[]) {
+    if (onSelectedIdsChange) onSelectedIdsChange(ids);
+    else setLocalSelectedIds(ids);
+  }
 
   const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -62,26 +72,23 @@ export function MeetingsListTable({
   );
 
   const isAllSelected =
-    paginated.length > 0 && paginated.every((m) => selectedIds.has(m.id));
+    paginated.length > 0 && paginated.every((m) => selectedIds.includes(m.id));
 
   function toggleAll() {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (isAllSelected) {
-        paginated.forEach((m) => next.delete(m.id));
-      } else {
-        paginated.forEach((m) => next.add(m.id));
-      }
-      return next;
-    });
+    const pageIds = paginated.map((m) => m.id);
+    if (isAllSelected) {
+      setSelectedIds(selectedIds.filter((id) => !pageIds.includes(id)));
+    } else {
+      setSelectedIds([...new Set([...selectedIds, ...pageIds])]);
+    }
   }
 
   function toggleRow(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+    setSelectedIds(
+      selectedIds.includes(id)
+        ? selectedIds.filter((value) => value !== id)
+        : [...selectedIds, id],
+    );
   }
 
   function organizerName(email: string) {
@@ -109,7 +116,7 @@ export function MeetingsListTable({
             </h3>
             <p className="text-[11px] text-slate-400">
               {data.length} meeting{data.length === 1 ? "" : "s"}
-              {selectedIds.size > 0 ? ` · ${selectedIds.size} selected` : ""}
+              {selectedIds.length > 0 ? ` · ${selectedIds.length} selected` : ""}
             </p>
           </div>
           {onSearchChange ? (
@@ -169,7 +176,7 @@ export function MeetingsListTable({
                     <input
                       type="checkbox"
                       className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
-                      checked={selectedIds.has(meeting.id)}
+                      checked={selectedIds.includes(meeting.id)}
                       onChange={() => toggleRow(meeting.id)}
                       onClick={(e) => e.stopPropagation()}
                       aria-label={`Select ${meeting.title}`}

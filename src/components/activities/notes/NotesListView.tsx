@@ -33,6 +33,8 @@ interface NotesListViewProps {
   notesOverride?: Note[];
   /** Sit inside a parent surface: no nested card chrome. */
   embedded?: boolean;
+  selectedIds?: string[];
+  onSelectedIdsChange?: (ids: string[]) => void;
 }
 
 export function NotesListView({
@@ -41,10 +43,19 @@ export function NotesListView({
   onSearchChange,
   notesOverride,
   embedded = false,
+  selectedIds: controlledSelectedIds,
+  onSelectedIdsChange,
 }: NotesListViewProps) {
   const [localSearch, setLocalSearch] = useState("");
+  const [localSelectedIds, setLocalSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const pageSize = 8;
+  const selectedIds = controlledSelectedIds ?? localSelectedIds;
+
+  function setSelectedIds(ids: string[]) {
+    if (onSelectedIdsChange) onSelectedIdsChange(ids);
+    else setLocalSelectedIds(ids);
+  }
 
   const router = useRouter();
   const search = controlledSearch ?? localSearch;
@@ -80,6 +91,26 @@ export function NotesListView({
     (safePage - 1) * pageSize,
     safePage * pageSize,
   );
+
+  const isAllSelected =
+    paginated.length > 0 && paginated.every((n) => selectedIds.includes(n.id));
+
+  function toggleAll() {
+    const pageIds = paginated.map((n) => n.id);
+    if (isAllSelected) {
+      setSelectedIds(selectedIds.filter((id) => !pageIds.includes(id)));
+    } else {
+      setSelectedIds([...new Set([...selectedIds, ...pageIds])]);
+    }
+  }
+
+  function toggleRow(id: string) {
+    setSelectedIds(
+      selectedIds.includes(id)
+        ? selectedIds.filter((value) => value !== id)
+        : [...selectedIds, id],
+    );
+  }
 
   return (
     <div
@@ -119,6 +150,15 @@ export function NotesListView({
         <table className="w-full min-w-[920px] text-left text-[12px]">
           <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
             <tr>
+              <th className="w-10 px-4 py-2.5">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                  checked={isAllSelected}
+                  onChange={toggleAll}
+                  aria-label="Select all"
+                />
+              </th>
               <th className="w-12 px-4 py-2.5" />
               <th className="px-4 py-2.5">Title</th>
               <th className="px-4 py-2.5">Related To</th>
@@ -140,6 +180,18 @@ export function NotesListView({
                     router.push(`/activities/notes/detail/${note.id}`)
                   }
                 >
+                  <td
+                    className="px-4 py-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                      checked={selectedIds.includes(note.id)}
+                      onChange={() => toggleRow(note.id)}
+                      aria-label={`Select ${note.title || "Untitled note"}`}
+                    />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       {note.isPinned ? (
@@ -199,7 +251,7 @@ export function NotesListView({
             {paginated.length === 0 ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-4 py-16 text-center text-sm text-slate-400"
                 >
                   No notes match your filters.

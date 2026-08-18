@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { FileText, Pencil, X, Check } from "lucide-react";
+import { FileText } from "lucide-react";
 import {
   TaskDescriptionEditor,
   sanitizeTaskDescriptionHtml,
 } from "../TaskDescriptionEditor";
 import { listMentionPeople } from "@/lib/mentions/people";
+import { useTaskSectionEdit } from "./TaskEditContext";
 
 interface TaskDescriptionCardProps {
   description?: string;
@@ -56,26 +57,23 @@ export function TaskDescriptionCard({
   editable = false,
   onSave,
 }: TaskDescriptionCardProps) {
-  const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(description ?? "");
 
   const fallback =
     "Review and analyze the financial performance metrics across all regional enterprise accounts. This includes aggregating revenue data, identifying churn risk patterns, and comparing actuals against projected forecasts outlined in the strategy deck.";
 
-  function startEditing() {
-    setDraft(description ?? "");
-    setIsEditing(true);
-  }
-
-  function cancelEditing() {
-    setDraft(description ?? "");
-    setIsEditing(false);
-  }
-
-  function saveEditing() {
-    onSave?.(draft);
-    setIsEditing(false);
-  }
+  const editing = useTaskSectionEdit({
+    start() {
+      setDraft(description ?? "");
+    },
+    save() {
+      if (editable) onSave?.(draft);
+    },
+    cancel() {
+      setDraft(description ?? "");
+    },
+  });
+  const isEditing = editable && editing;
 
   return (
     <section className="border-b border-slate-100 py-7">
@@ -83,36 +81,6 @@ export function TaskDescriptionCard({
         <h2 className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
           Description
         </h2>
-        {editable && !isEditing ? (
-          <button
-            type="button"
-            onClick={startEditing}
-            className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-violet-700"
-          >
-            <Pencil className="h-3 w-3" />
-            Edit
-          </button>
-        ) : null}
-        {editable && isEditing ? (
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={cancelEditing}
-              className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-slate-800"
-            >
-              <X className="h-3 w-3" />
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={saveEditing}
-              className="inline-flex items-center gap-1 text-[11px] font-medium text-violet-700 hover:text-violet-800"
-            >
-              <Check className="h-3 w-3" />
-              Save
-            </button>
-          </div>
-        ) : null}
       </div>
 
       {isEditing ? (

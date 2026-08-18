@@ -64,8 +64,8 @@ export function NextStepsSidebarCard({
                   className={cn(
                     "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
                     step.completed
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border hover:border-muted-foreground bg-background",
+                      ? "border-[#5A32A3] bg-[#5A32A3] text-white"
+                      : "border-border hover:border-[#5A32A3]/50 bg-background",
                   )}
                 >
                   {step.completed && (
@@ -164,7 +164,7 @@ export function NextStepsSidebarCard({
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+                  className="rounded-xl bg-[#5A32A3] px-4 py-2 text-xs font-medium text-white hover:opacity-90 transition-opacity"
                 >
                   Add Step
                 </button>

@@ -2,41 +2,25 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Phone,
-  User,
-  Calendar,
-  Clock,
-  Link2,
-  Users,
-} from "lucide-react";
+import { Phone, X } from "lucide-react";
 import {
   CALL_OWNERS,
-  CALL_STATUSES,
   CALL_TYPES,
-  type CallStatus,
   type CallType,
 } from "@/lib/calls/types";
-import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { createCall } from "@/lib/calls/store";
 import {
   RELATED_ENTITY_KINDS,
   RELATED_RECORD_OPTIONS,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
-import {
-  CreateEntityFormShell,
-  Field,
-  InputShell,
-  TextAreaShell,
-  elevatedInputClass,
-  elevatedSelectClass,
-  elevatedTextareaClass,
-} from "@/components/sales/CreateEntityForm";
+import RelatedRecordCombobox from "@/components/activities/tasks/RelatedRecordComboBox";
+import { ScheduleCallForm } from "@/components/activities/calls/ScheduleCallForm";
 
 interface CreateCallFormProps {
   layoutId: string;
   redirect: boolean;
+  mode?: "schedule" | "log";
   defaults?: {
     relatedKind?: RelatedEntityKind;
     relatedName?: string;
@@ -45,42 +29,62 @@ interface CreateCallFormProps {
 }
 
 interface FormState {
-  subject: string;
+  callFor: string;
   relatedKind: RelatedEntityKind | "";
   relatedName: string;
-  contact: string;
+  fromNumber: string;
   callType: CallType | "";
-  status: CallStatus | "";
-  date: string;
+  startTime: string;
   duration: string;
-  notes: string;
   assignedTo: string;
+  subject: string;
+  agenda: string;
+  purpose: string;
 }
 
+const CALL_FOR_OPTIONS = RELATED_RECORD_OPTIONS.filter(
+  (r) => r.kind === "Lead" || r.kind === "Contact",
+);
+
+const inputClass =
+  "w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground/90 placeholder:text-foreground/50 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100";
+const selectClass = inputClass + " appearance-none";
+const labelClass =
+  "text-[11px] font-medium uppercase tracking-wide text-gray-500";
+
 const initialState: FormState = {
-  subject: "",
+  callFor: "",
   relatedKind: "",
   relatedName: "",
-  contact: "",
+  fromNumber: "",
   callType: "Outbound",
-  status: "Scheduled",
-  date: "",
+  startTime: "",
   duration: "",
-  notes: "",
   assignedTo: "John Smith",
+  subject: "",
+  agenda: "",
+  purpose: "",
 };
 
-export function CreateCallForm({
+export function CreateCallForm(props: CreateCallFormProps) {
+  if (props.mode !== "log") {
+    return <ScheduleCallForm {...props} />;
+  }
+  return <LogCallForm {...props} />;
+}
+
+function LogCallForm({
   layoutId,
   redirect,
   defaults,
 }: CreateCallFormProps) {
+  const isLog = true;
   const router = useRouter();
   const [form, setForm] = useState<FormState>({
     ...initialState,
     relatedKind: defaults?.relatedKind ?? "",
     relatedName: defaults?.relatedName ?? "",
-    contact: defaults?.contact ?? defaults?.relatedName ?? "",
+    callFor: defaults?.contact ?? "",
   });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
@@ -110,16 +114,16 @@ export function CreateCallForm({
 
   function validate() {
     const next: Partial<Record<keyof FormState, string>> = {};
-    if (!form.subject.trim()) next.subject = "Subject is required";
+    if (!form.callFor.trim()) next.callFor = "Call for is required";
     if (!form.callType) next.callType = "Call type is required";
-    if (!form.status) next.status = "Status is required";
-    if (!form.date) next.date = "Date is required";
-    if (!form.assignedTo.trim()) next.assignedTo = "Assigned to is required";
+    if (!form.startTime) next.startTime = "Call start time is required";
+    if (!form.assignedTo.trim()) next.assignedTo = "Call owner is required";
+    if (!form.subject.trim()) next.subject = "Subject is required";
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
-  function handleSave(createAnother: boolean) {
+  function handleSave() {
     setSubmitted(true);
     if (!validate()) return;
     const relatedTo =
@@ -129,196 +133,249 @@ export function CreateCallForm({
     const created = createCall({
       subject: form.subject.trim(),
       relatedTo,
-      contact: form.contact.trim() || undefined,
+      contact: form.callFor.trim() || undefined,
+      callFor: form.callFor.trim() || undefined,
+      fromNumber: form.fromNumber.trim() || undefined,
       callType: form.callType as CallType,
-      status: form.status as CallStatus,
-      date: form.date,
-      duration: form.duration.trim() || undefined,
-      notes: form.notes.trim() || undefined,
+      status: isLog ? "Completed" : "Scheduled",
+      date: form.startTime,
+      duration: isLog ? form.duration.trim() || undefined : undefined,
       assignedTo: form.assignedTo.trim(),
+      agenda: form.agenda.trim() || undefined,
+      purpose: form.purpose.trim() || undefined,
+      notes: [form.agenda.trim(), form.purpose.trim()]
+        .filter(Boolean)
+        .join("\n\n") || undefined,
     });
-    if (createAnother) {
-      setForm({
-        ...initialState,
-        assignedTo: form.assignedTo,
-        relatedKind: form.relatedKind,
-        relatedName: form.relatedName,
-      });
-      setErrors({});
-      setSubmitted(false);
-      return;
-    }
     void layoutId;
     void redirect;
     router.push(`/activities/calls?focus=${created.id}`);
   }
 
   return (
-    <CreateEntityFormShell
-      breadcrumbParent={{ label: "Calls", href: "/activities/calls" }}
-      badge="New call"
-      title="Create Call"
-      subtitle="Log an inbound or outbound conversation: capture type, timing, and outcome."
-      tip="Tip: Subject, call type, status, date & assignee are required."
-      cardIcon={Phone}
-      cardTitle="Call Information"
-      cardDescription="Fields marked required are needed to save (SRS §7.2)"
-      listHref="/activities/calls"
-      saveLabel="Save Call"
-      onSave={handleSave}
-    >
-      <Field
-        label="Subject"
-        required
-        error={submitted ? errors.subject : undefined}
-        className="col-span-full"
-      >
-        <InputShell icon={Phone} error={!!(submitted && errors.subject)}>
-          <input
-            className={elevatedInputClass(true)}
-            value={form.subject}
-            onChange={(e) => update("subject", e.target.value)}
-            placeholder="e.g. Discovery call: Anderson Finance"
-          />
-        </InputShell>
-      </Field>
+    <div className="flex min-h-screen w-full flex-col bg-background">
+      <div className="flex items-center justify-between px-4 py-2">
+        <h1 className="text-base font-semibold text-foreground">
+          {isLog ? "Log a Call" : "Schedule a Call"}
+        </h1>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/activities/calls")}
+            className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
+          >
+            <X className="h-4 w-4" />
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            className="flex items-center gap-1.5 rounded-md bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800"
+          >
+            <Phone className="h-4 w-4" />
+            {isLog ? "Log Call" : "Schedule Call"}
+          </button>
+        </div>
+      </div>
 
-      <Field label="Related Entity">
-        <InputShell icon={Link2}>
-          <select
-            className={elevatedSelectClass(true)}
-            value={form.relatedKind}
-            onChange={(e) => {
-              update("relatedKind", e.target.value as RelatedEntityKind | "");
-              update("relatedName", "");
-            }}
-          >
-            <option value="">None</option>
-            {RELATED_ENTITY_KINDS.map((k) => (
-              <option key={k} value={k}>
-                {k}
-              </option>
-            ))}
-          </select>
-        </InputShell>
-      </Field>
-      <Field label="Related To">
-        <InputShell>
-          <select
-            className={elevatedSelectClass(false)}
-            value={form.relatedName}
-            onChange={(e) => update("relatedName", e.target.value)}
-            disabled={!form.relatedKind}
-          >
-            <option value="">Select record</option>
-            {relatedOptions.map((r) => (
-              <option key={`${r.kind}-${r.name}`} value={r.name}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </InputShell>
-      </Field>
-      <Field label="Contact">
-        <InputShell icon={User}>
-          <input
-            className={elevatedInputClass(true)}
-            value={form.contact}
-            onChange={(e) => update("contact", e.target.value)}
-            placeholder="Who did you speak with?"
-          />
-        </InputShell>
-      </Field>
+      <div className="mx-auto w-full max-w-4xl space-y-4 px-4 py-3 sm:px-6 2xl:px-8">
+        <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-[11px] font-semibold tracking-[0.08em] text-slate-400 uppercase">
+            Calls
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelClass}>
+                Call For <span className="text-red-500">*</span>
+              </label>
+              <RelatedRecordCombobox
+                value={form.callFor}
+                onChange={(v) => update("callFor", v)}
+                options={CALL_FOR_OPTIONS}
+                placeholder="Select lead or contact…"
+              />
+              {submitted && errors.callFor ? (
+                <p className="mt-1 text-xs text-red-500">{errors.callFor}</p>
+              ) : null}
+            </div>
 
-      <Field
-        label="Call Type"
-        required
-        error={submitted ? errors.callType : undefined}
-      >
-        <InputShell error={!!(submitted && errors.callType)}>
-          <select
-            className={elevatedSelectClass(false)}
-            value={form.callType}
-            onChange={(e) => update("callType", e.target.value as CallType)}
-          >
-            {CALL_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </InputShell>
-      </Field>
-      <Field
-        label="Status"
-        required
-        error={submitted ? errors.status : undefined}
-      >
-        <InputShell error={!!(submitted && errors.status)}>
-          <select
-            className={elevatedSelectClass(false)}
-            value={form.status}
-            onChange={(e) => update("status", e.target.value as CallStatus)}
-          >
-            {CALL_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </InputShell>
-      </Field>
-      <Field
-        label="Date"
-        required
-        error={submitted ? errors.date : undefined}
-      >
-        <InputShell icon={Calendar} error={!!(submitted && errors.date)}>
-          <input
-            type="datetime-local"
-            className={elevatedInputClass(true)}
-            value={form.date}
-            onChange={(e) => update("date", e.target.value)}
-          />
-        </InputShell>
-      </Field>
-      <Field label="Duration">
-        <InputShell icon={Clock}>
-          <input
-            className={elevatedInputClass(true)}
-            value={form.duration}
-            onChange={(e) => update("duration", e.target.value)}
-            placeholder="e.g. 18 min"
-          />
-        </InputShell>
-      </Field>
-      <Field
-        label="Assigned To"
-        required
-        error={submitted ? errors.assignedTo : undefined}
-      >
-        <InputShell icon={Users} error={!!(submitted && errors.assignedTo)}>
-          <select
-            className={elevatedSelectClass(true)}
-            value={form.assignedTo}
-            onChange={(e) => update("assignedTo", e.target.value)}
-          >
-            {CALL_OWNERS.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
-        </InputShell>
-      </Field>
+            <div>
+              <label className={labelClass}>Related To</label>
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  className={selectClass}
+                  value={form.relatedKind}
+                  onChange={(e) => {
+                    update(
+                      "relatedKind",
+                      e.target.value as RelatedEntityKind | "",
+                    );
+                    update("relatedName", "");
+                  }}
+                >
+                  <option value="">Type</option>
+                  {RELATED_ENTITY_KINDS.map((k) => (
+                    <option key={k} value={k}>
+                      {k}
+                    </option>
+                  ))}
+                </select>
+                <RelatedRecordCombobox
+                  value={form.relatedName}
+                  onChange={(v) => update("relatedName", v)}
+                  options={relatedOptions}
+                  disabled={!form.relatedKind}
+                  placeholder="Select record…"
+                />
+              </div>
+            </div>
 
-      <Field label="Notes" className="col-span-full">
-        <MentionNotesTextarea
-          value={form.notes}
-          onChange={(notes) => update("notes", notes)}
-          placeholder="Call summary, next steps… Type @ to assign someone."
-        />
-      </Field>
-    </CreateEntityFormShell>
+            <div>
+              <label className={labelClass}>From Number</label>
+              <input
+                type="tel"
+                className={inputClass}
+                value={form.fromNumber}
+                onChange={(e) => update("fromNumber", e.target.value)}
+                placeholder="e.g. +1 415 555 0198"
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>
+                Call Type <span className="text-red-500">*</span>
+              </label>
+              <select
+                className={
+                  selectClass +
+                  (submitted && errors.callType ? " border-red-300" : "")
+                }
+                value={form.callType}
+                onChange={(e) =>
+                  update("callType", e.target.value as CallType)
+                }
+              >
+                {CALL_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              {submitted && errors.callType ? (
+                <p className="mt-1 text-xs text-red-500">{errors.callType}</p>
+              ) : null}
+            </div>
+
+            <div>
+              <label className={labelClass}>
+                {isLog ? "Call Time" : "Call Start Time"}{" "}
+                <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="datetime-local"
+                className={
+                  inputClass +
+                  (submitted && errors.startTime ? " border-red-300" : "")
+                }
+                value={form.startTime}
+                onChange={(e) => update("startTime", e.target.value)}
+              />
+              {submitted && errors.startTime ? (
+                <p className="mt-1 text-xs text-red-500">{errors.startTime}</p>
+              ) : null}
+            </div>
+
+            {isLog ? (
+              <div>
+                <label className={labelClass}>Duration</label>
+                <input
+                  className={inputClass}
+                  value={form.duration}
+                  onChange={(e) => update("duration", e.target.value)}
+                  placeholder="e.g. 12 min"
+                />
+              </div>
+            ) : null}
+
+            <div>
+              <label className={labelClass}>
+                Call Owner <span className="text-red-500">*</span>
+              </label>
+              <select
+                className={
+                  selectClass +
+                  (submitted && errors.assignedTo ? " border-red-300" : "")
+                }
+                value={form.assignedTo}
+                onChange={(e) => update("assignedTo", e.target.value)}
+              >
+                {CALL_OWNERS.map((o) => (
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
+                ))}
+              </select>
+              {submitted && errors.assignedTo ? (
+                <p className="mt-1 text-xs text-red-500">{errors.assignedTo}</p>
+              ) : null}
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className={labelClass}>
+                Subject <span className="text-red-500">*</span>
+              </label>
+              <input
+                className={
+                  inputClass +
+                  (submitted && errors.subject ? " border-red-300" : "")
+                }
+                value={form.subject}
+                onChange={(e) => update("subject", e.target.value)}
+                placeholder="e.g. Discovery call: Anderson Finance"
+              />
+              {submitted && errors.subject ? (
+                <p className="mt-1 text-xs text-red-500">{errors.subject}</p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
+          <h2 className="mb-4 text-[11px] font-semibold tracking-[0.08em] text-slate-400 uppercase">
+            {isLog ? "Notes" : "Reminder"}
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label className={labelClass}>Agenda</label>
+              <textarea
+                rows={3}
+                className={inputClass + " resize-none"}
+                value={form.agenda}
+                onChange={(e) => update("agenda", e.target.value)}
+                placeholder={
+                  isLog
+                    ? "What was discussed on this call?"
+                    : "What should be covered on this call?"
+                }
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className={labelClass}>Purpose</label>
+              <textarea
+                rows={3}
+                className={inputClass + " resize-none"}
+                value={form.purpose}
+                onChange={(e) => update("purpose", e.target.value)}
+                placeholder={
+                  isLog
+                    ? "Outcome, objections, or follow-up needed"
+                    : "Why are you making this call?"
+                }
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

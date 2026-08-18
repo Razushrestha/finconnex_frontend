@@ -1,132 +1,366 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Archive,
+  Clock,
+  Mail,
+  MailOpen,
+  Paperclip,
+  Star,
+  Trash2,
+} from "lucide-react";
 import type { Email, EmailStatus } from "@/lib/emails/types";
-import { listEmails } from "@/lib/emails/store";
-import { Paperclip } from "lucide-react";
-import Link from "next/link";
+import { deleteEmail, listEmails, updateEmail } from "@/lib/emails/store";
+import { onRulesChange } from "@/lib/rules";
+import { cn } from "@/lib/utils";
 
-const statusStyles: Record<EmailStatus, string> = {
-  Draft: "bg-slate-100 text-slate-600",
-  Scheduled: "bg-amber-50 text-amber-600",
-  Sent: "bg-blue-50 text-blue-600",
-  Delivered: "bg-indigo-50 text-indigo-600",
-  Opened: "bg-emerald-50 text-emerald-600",
-  Bounced: "bg-orange-50 text-orange-600",
-  Failed: "bg-rose-50 text-rose-600",
-};
+const STARRED_KEY = "finconnex.emails.starred";
 
-const columns = [
-  { key: "subject", label: "Subject" },
-  { key: "from", label: "From" },
-  { key: "to", label: "To" },
-  { key: "relatedTo", label: "Related To" },
-  { key: "templateUsed", label: "Template Used" },
-  { key: "sentDate", label: "Sent Date" },
-  { key: "openedDate", label: "Opened Date" },
-  { key: "status", label: "Status" },
-] as const;
+function loadStarred(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = localStorage.getItem(STARRED_KEY);
+    const ids = raw ? (JSON.parse(raw) as string[]) : [];
+    return new Set(Array.isArray(ids) ? ids : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistStarred(ids: Set<string>) {
+  try {
+    localStorage.setItem(STARRED_KEY, JSON.stringify([...ids]));
+  } catch {
+    /* ignore */
+  }
+}
+
+function displayName(email: Email): string {
+  if (email.relatedTo) {
+    return email.relatedTo.replace(/^(Lead|Contact|Deal|Company):\s*/i, "");
+  }
+  const source = email.from || email.to[0] || "Unknown";
+  if (!source.includes("@")) return source;
+  const local = source.split("@")[0] ?? source;
+  return local
+    .replace(/[._-]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function snippetOf(email: Email): string {
+  return email.body.replace(/\s+/g, " ").trim();
+}
+
+function isUnread(status: EmailStatus): boolean {
+  return status !== "Opened";
+}
+
+function inboxDate(sentDate?: string): string {
+  if (!sentDate) return "";
+  const match = sentDate.trim().match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})\s*(AM|PM))?/i,
+  );
+  if (!match) return sentDate;
+  const day = Number(match[1]);
+  const month = Number(match[2]) - 1;
+  const year = Number(match[3]);
+  const parsed = new Date(year, month, day);
+  const now = new Date();
+  const sameDay =
+    parsed.getFullYear() === now.getFullYear() &&
+    parsed.getMonth() === now.getMonth() &&
+    parsed.getDate() === now.getDate();
+  if (sameDay && match[4] && match[6]) {
+    return `${Number(match[4])}:${match[5]} ${match[6].toUpperCase()}`;
+  }
+  if (parsed.getFullYear() === now.getFullYear()) {
+    return parsed.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+  }
+  return parsed.toLocaleDateString("en-AU", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 interface EmailListTableProps {
   data?: Email[];
 }
 
 export function EmailListTable({ data }: EmailListTableProps) {
-  const rows = useMemo(() => data ?? listEmails(), [data]);
+  const router = useRouter();
+  const [emails, setEmails] = useState(() => data ?? listEmails());
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [starred, setStarred] = useState<Set<string>>(loadStarred);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (data) {
+      setEmails(data);
+      return;
+    }
+    return onRulesChange(() => setEmails(listEmails()));
+  }, [data]);
+
+  const allSelected =
+    emails.length > 0 && selectedIds.length === emails.length;
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds(allSelected ? [] : emails.map((e) => e.id));
+  }
+
+  function toggleStar(id: string) {
+    setStarred((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      persistStarred(next);
+      return next;
+    });
+  }
+
+  function openEmail(id: string) {
+    const email = emails.find((e) => e.id === id);
+    if (email && isUnread(email.status)) {
+      updateEmail(id, { status: "Opened" });
+      setEmails(listEmails());
+    }
+    router.push(`/activities/emails/detail/${id}`);
+  }
+
+  function markReadState(ids: string[], read: boolean) {
+    for (const id of ids) {
+      updateEmail(id, { status: read ? "Opened" : "Delivered" });
+    }
+    setEmails(listEmails());
+  }
+
+  function removeEmails(ids: string[]) {
+    for (const id of ids) deleteEmail(id);
+    setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+    setEmails(listEmails());
+  }
+
+  const rows = useMemo(() => emails, [emails]);
 
   return (
-    <div className="flex h-full w-full min-w-0 flex-col rounded-2xl border border-slate-100 bg-white">
-      {/* Internal scroll wrapper: owns its own scroll, independent of parent */}
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-auto [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100">
-        <table className="w-full min-w-[1200px] border-collapse text-left text-sm">
-          <thead className="sticky top-0 z-20 bg-white">
-            <tr className="border-b border-slate-100 text-slate-500">
-              <th className="sticky left-0 z-30 w-10 bg-white px-4 py-2.5">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-slate-100 px-2">
+        <label className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-slate-100">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={toggleSelectAll}
+            aria-label="Select all emails"
+            className="h-4 w-4 rounded border-slate-300 text-[#5A32A3] accent-[#5A32A3] focus:ring-[#5A32A3]/30"
+          />
+        </label>
+        {selectedIds.length > 0 ? (
+          <>
+            <span className="mr-1 text-[12px] text-slate-500">
+              {selectedIds.length} selected
+            </span>
+            <button
+              type="button"
+              title="Mark as read"
+              onClick={() => markReadState(selectedIds, true)}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-[#5A32A3]"
+            >
+              <MailOpen className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              title="Mark as unread"
+              onClick={() => markReadState(selectedIds, false)}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-[#5A32A3]"
+            >
+              <Mail className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              title="Delete"
+              onClick={() => removeEmails(selectedIds)}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-rose-50 hover:text-rose-600"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </>
+        ) : (
+          <span className="text-[12px] text-slate-400">Inbox</span>
+        )}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-color:#c4c7c5_transparent] [scrollbar-width:thin]">
+        {rows.map((email) => {
+          const unread = isUnread(email.status);
+          const selected = selectedIds.includes(email.id);
+          const starredRow = starred.has(email.id);
+          const hovering = hoveredId === email.id;
+          const who = displayName(email);
+
+          return (
+            <div
+              key={email.id}
+              data-focus-id={email.id}
+              data-email-id={email.id}
+              onMouseEnter={() => setHoveredId(email.id)}
+              onMouseLeave={() => setHoveredId((id) => (id === email.id ? null : id))}
+              onClick={() => openEmail(email.id)}
+              className={cn(
+                "group grid cursor-pointer grid-cols-[32px_32px_minmax(140px,180px)_minmax(0,1fr)_auto] items-center gap-1 border-b border-slate-100 px-2 py-[7px] transition-colors",
+                selected
+                  ? "bg-[#F3ECFB]"
+                  : unread
+                    ? "bg-white hover:shadow-[inset_1px_0_0_#dadce0,inset_-1px_0_0_#dadce0,0_1px_2px_0_rgba(60,64,67,.15)]"
+                    : "bg-[#f8f9fa] hover:shadow-[inset_1px_0_0_#dadce0,inset_-1px_0_0_#dadce0,0_1px_2px_0_rgba(60,64,67,.15)]",
+              )}
+            >
+              <button
+                type="button"
+                aria-label={selected ? "Deselect" : "Select"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleSelect(email.id);
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"
+              >
                 <input
                   type="checkbox"
-                  className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-500 focus:ring-indigo-300"
+                  readOnly
+                  checked={selected}
+                  className="pointer-events-none h-4 w-4 rounded border-slate-300 text-[#5A32A3] accent-[#5A32A3]"
                 />
-              </th>
-              {columns.map((col) => (
-                <th key={col.key} className="px-4 py-2.5 font-medium">
-                  {col.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
+              </button>
 
-          <tbody>
-            {rows.map((email) => (
-              <tr
-                key={email.id}
-                data-focus-id={email.id}
-                data-email-id={email.id}
-                className="group cursor-pointer border-b border-slate-50 last:border-b-0 hover:bg-slate-50/60"
+              <button
+                type="button"
+                aria-label={starredRow ? "Unstar" : "Star"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleStar(email.id);
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"
               >
-                <td className="sticky left-0 z-10 bg-white px-4 py-3 group-hover:bg-slate-50/60">
-                  <input
-                    type="checkbox"
-                    className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-500 focus:ring-indigo-300"
-                  />
-                </td>
-                <td className="max-w-[260px] px-4 py-3">
-                  <Link
-                    href={`/activities/emails/detail/${email.id}`}
-                    className="flex items-center gap-1.5 truncate font-medium text-slate-800 hover:text-primary transition-colors cursor-pointer"
-                  >
-                    {email.subject}
-                  </Link>
-                  <p className="mt-0.5 max-w-[240px] truncate text-xs text-slate-400">
-                    {email.body}
-                  </p>
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                  {email.from}
-                </td>
-                <td className="max-w-[220px] truncate px-4 py-3 text-slate-600">
-                  {email.to.join(", ")}
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                  {email.relatedTo ?? ""}
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-500">
-                  {email.templateUsed ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-600">
-                      <Paperclip className="h-3 w-3" />
-                      {email.templateUsed}
-                    </span>
-                  ) : (
-                    ""
+                <Star
+                  className={cn(
+                    "h-4 w-4",
+                    starredRow
+                      ? "fill-[#f4b400] text-[#f4b400]"
+                      : "text-slate-300 group-hover:text-slate-400",
                   )}
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-500">
-                  {email.sentDate ?? ""}
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-slate-500">
-                  {email.openedDate ?? ""}
-                </td>
-                <td className="px-4 py-3">
-                  <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${statusStyles[email.status]}`}
-                  >
-                    {email.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
+                />
+              </button>
 
-            {rows.length === 0 && (
-              <tr>
-                <td
-                  colSpan={9}
-                  className="px-4 py-10 text-center text-sm text-slate-400"
-                >
-                  No emails found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              <p
+                className={cn(
+                  "min-w-0 truncate pr-2 text-[13.5px] tracking-tight",
+                  unread ? "font-bold text-slate-900" : "font-medium text-slate-700",
+                )}
+                title={who}
+              >
+                {who}
+              </p>
+
+              <div className="flex min-w-0 items-baseline gap-2">
+                <p className="min-w-0 truncate text-[13.5px]">
+                  {email.status === "Draft" ? (
+                    <>
+                      <span className="font-bold text-rose-600">Draft</span>
+                      <span className="text-slate-400">
+                        {" "}
+                        {email.subject || "(no subject)"}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span
+                        className={cn(
+                          unread ? "font-bold text-slate-900" : "font-medium text-slate-800",
+                        )}
+                      >
+                        {email.subject}
+                      </span>
+                      <span className="text-slate-400">
+                        {" "}
+                        – {snippetOf(email)}
+                      </span>
+                    </>
+                  )}
+                </p>
+                {email.templateUsed ? (
+                  <Paperclip className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                ) : null}
+              </div>
+
+              <div className="flex h-8 min-w-[7.5rem] items-center justify-end pl-2">
+                {hovering ? (
+                  <div
+                    className="flex items-center"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      title="Archive"
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-[#5A32A3]"
+                    >
+                      <Archive className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Delete"
+                      onClick={() => removeEmails([email.id])}
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-rose-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      title={unread ? "Mark as read" : "Mark as unread"}
+                      onClick={() => markReadState([email.id], unread)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-[#5A32A3]"
+                    >
+                      {unread ? (
+                        <MailOpen className="h-4 w-4" />
+                      ) : (
+                        <Mail className="h-4 w-4" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      title="Snooze"
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-[#5A32A3]"
+                    >
+                      <Clock className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <span
+                    className={cn(
+                      "whitespace-nowrap pr-2 text-[12px] tabular-nums",
+                      unread ? "font-bold text-slate-800" : "text-slate-500",
+                    )}
+                  >
+                    {inboxDate(email.sentDate)}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {rows.length === 0 ? (
+          <p className="px-4 py-16 text-center text-sm text-slate-400">
+            No emails in this inbox
+          </p>
+        ) : null}
       </div>
     </div>
   );

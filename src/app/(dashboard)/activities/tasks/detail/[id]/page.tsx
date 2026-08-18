@@ -2,8 +2,8 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Task, TaskStatus } from "@/lib/tasks/types";
-import { findTaskById, addTaskActivityNote, updateTaskDescription, updateTaskStatus } from "@/lib/tasks/store";
+import type { Priority, Task, TaskStatus } from "@/lib/tasks/types";
+import { findTaskById, addTaskActivityNote, patchTask, updateTaskDescription, updateTaskStatus } from "@/lib/tasks/store";
 import { TaskDetailsView } from "@/components/activities/tasks/detail/TaskDetailsView";
 import { onRulesChange } from "@/lib/rules";
 
@@ -40,6 +40,16 @@ export default function TaskDetailPage({ params }: PageProps) {
     if (updated) setTask(updated);
   }
 
+  function handleSaveDetails(next: {
+    title: string;
+    dueDate: string;
+    assignedTo: string;
+    priority: Priority;
+  }) {
+    const updated = patchTask(id, next);
+    if (updated) setTask(updated);
+  }
+
   if (!task) {
     return (
       <div className="flex min-h-[320px] items-center justify-center px-4">
@@ -64,6 +74,7 @@ export default function TaskDetailPage({ params }: PageProps) {
       onUpdateStatus={handleUpdateStatus}
       onUpdateDescription={handleUpdateDescription}
       onAddNote={handleAddNote}
+      onSaveDetails={handleSaveDetails}
     />
   );
 }

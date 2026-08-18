@@ -99,6 +99,15 @@ export function findMeetingById(id: string) {
   return meeting ? { meeting } : null;
 }
 
+export function deleteMeeting(id: string): Meeting | null {
+  const items = listMeetings();
+  const found = items.find((m) => m.id === id) ?? null;
+  if (!found) return null;
+  saveMeetings(items.filter((m) => m.id !== id));
+  emitLeadActivityChange();
+  return found;
+}
+
 export function formatMeetingDateTime(d: Date): string {
   return formatRulesAt(d);
 }

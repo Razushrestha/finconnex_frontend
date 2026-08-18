@@ -32,8 +32,9 @@ import {
 } from "@/components/shared/CardInitialsAvatar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
-import { BOARD_PAGE, KANBAN_CARD, KANBAN_COL, KANBAN_HEADER, KANBAN_WELL } from "@/lib/layout";
+import { BOARD_PAGE, KANBAN_CARD, KANBAN_COL, KANBAN_HEADER, KANBAN_HEADER_COUNT, KANBAN_WELL } from "@/lib/layout";
 import { dropTargetActive } from "@/lib/motion";
+import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 
 type ViewMode = "kanban" | "list";
 
@@ -81,6 +82,8 @@ export default function RemindersPage() {
   const [tab, setTab] = useState<"all" | "pending">("all");
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkFlash, setBulkFlash] = useState<string | null>(null);
 
   const visibleColumns = useMemo(() => {
     if (tab === "pending") {
@@ -96,6 +99,18 @@ export default function RemindersPage() {
       ),
     [columns],
   );
+
+  const visibleReminders = useMemo(
+    () =>
+      tab === "pending"
+        ? allReminders.filter((r) => r.status === "Pending")
+        : allReminders,
+    [allReminders, tab],
+  );
+
+  const allVisibleSelected =
+    visibleReminders.length > 0 &&
+    visibleReminders.every((r) => selectedIds.includes(r.id));
 
   const pendingCount = columns.find((c) => c.title === "Pending")?.count ?? 0;
 
@@ -126,6 +141,34 @@ export default function RemindersPage() {
     moveReminder(dragId, targetStatus);
     setDragId(null);
     setOverCol(null);
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id],
+    );
+  }
+
+  function runBulkDelete() {
+    if (!selectedIds.length) return;
+    const count = selectedIds.length;
+    if (
+      !window.confirm(
+        `Delete ${count} reminder${count === 1 ? "" : "s"}? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    const remove = new Set(selectedIds);
+    setColumns((prev) =>
+      prev.map((col) => {
+        const reminders = col.reminders.filter((r) => !remove.has(r.id));
+        return { ...col, reminders, count: reminders.length };
+      }),
+    );
+    setSelectedIds([]);
+    setBulkFlash(`Deleted ${count} reminder${count === 1 ? "" : "s"}`);
+    window.setTimeout(() => setBulkFlash(null), 2800);
   }
 
   return (
@@ -237,6 +280,20 @@ export default function RemindersPage() {
             </div>
           </div>
 
+          {bulkFlash ? (
+            <p className="mb-2 text-[12px] font-medium text-violet-700">
+              {bulkFlash}
+            </p>
+          ) : null}
+
+          {selectedIds.length > 0 ? (
+            <EntitySelectionToolbar
+              selectedCount={selectedIds.length}
+              onClear={() => setSelectedIds([])}
+              onDelete={runBulkDelete}
+            />
+          ) : null}
+
           <div className="min-h-0 flex-1 overflow-auto">
             {view === "kanban" ? (
               <div className="flex h-full min-h-[420px] items-stretch gap-3 overflow-x-auto p-1">
@@ -252,7 +309,7 @@ export default function RemindersPage() {
                           <h3 className="text-xs font-semibold text-slate-800 xl:text-sm">
                             {col.title}
                           </h3>
-                          <span className="rounded-full border border-slate-200/80 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500">
+                          <span className={KANBAN_HEADER_COUNT}>
                             {col.count}
                           </span>
                         </div>
@@ -281,6 +338,8 @@ export default function RemindersPage() {
                             reminder={r}
                             status={col.title}
                             isDragging={dragId === r.id}
+                            isSelected={selectedIds.includes(r.id)}
+                            onSelect={() => toggleSelected(r.id)}
                             onDragStart={() => setDragId(r.id)}
                             onDragEnd={() => {
                               setDragId(null);
@@ -307,6 +366,22 @@ export default function RemindersPage() {
               <table className="w-full min-w-[960px] text-left text-[12px]">
                 <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
                   <tr>
+                    <th className="w-10 px-4 py-2.5">
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                        checked={allVisibleSelected}
+                        onChange={() => {
+                          const ids = visibleReminders.map((r) => r.id);
+                          setSelectedIds(
+                            allVisibleSelected
+                              ? selectedIds.filter((id) => !ids.includes(id))
+                              : [...new Set([...selectedIds, ...ids])],
+                          );
+                        }}
+                        aria-label="Select all"
+                      />
+                    </th>
                     <th className="px-4 py-2.5">Reminder</th>
                     <th className="px-4 py-2.5">Type</th>
                     <th className="px-4 py-2.5">When</th>
@@ -318,10 +393,7 @@ export default function RemindersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {(tab === "pending"
-                    ? allReminders.filter((r) => r.status === "Pending")
-                    : allReminders
-                  ).map((r) => {
+                  {visibleReminders.map((r) => {
                     const meta = STATUS_META[r.status];
                     const MethodIcon = METHOD_ICON[r.notificationMethod];
                     return (
@@ -331,6 +403,15 @@ export default function RemindersPage() {
                         data-reminder-id={r.id}
                         className="transition-colors hover:bg-violet-50/40"
                       >
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                            checked={selectedIds.includes(r.id)}
+                            onChange={() => toggleSelected(r.id)}
+                            aria-label={`Select ${r.title}`}
+                          />
+                        </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
                             <span
@@ -452,6 +533,8 @@ function ReminderCard({
   reminder,
   status,
   isDragging,
+  isSelected = false,
+  onSelect,
   onDragStart,
   onDragEnd,
   onSnooze,
@@ -461,6 +544,8 @@ function ReminderCard({
   reminder: Reminder;
   status: ReminderStatus;
   isDragging: boolean;
+  isSelected?: boolean;
+  onSelect?: () => void;
   onDragStart: () => void;
   onDragEnd: () => void;
   onSnooze: () => void;
@@ -482,12 +567,14 @@ function ReminderCard({
       data-focus-id={reminder.id}
       data-reminder-id={reminder.id}
       className={cn(
-        "group cursor-grab rounded-md border border-slate-100 border-l-[3px] !bg-white p-3.5 shadow-sm transition-all active:cursor-grabbing",
+        "group/card cursor-grab rounded-md border border-slate-100 border-l-[3px] !bg-white p-3.5 shadow-sm transition-all active:cursor-grabbing",
         KANBAN_CARD,
         meta.border,
         isDragging
           ? "opacity-40"
-          : "hover:border-slate-200 hover:shadow-md",
+          : isSelected
+            ? "border-indigo-500 ring-1 ring-indigo-500"
+            : "hover:border-slate-200 hover:shadow-md",
       )}
     >
       <div className="mb-2.5 flex items-start gap-2.5">
@@ -514,6 +601,25 @@ function ReminderCard({
             </span>
           </div>
         </div>
+        {onSelect ? (
+          <div
+            className={cn(
+              "shrink-0 transition-opacity",
+              isSelected
+                ? "opacity-100"
+                : "opacity-0 group-hover/card:opacity-100",
+            )}
+          >
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={onSelect}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Select reminder ${reminder.title}`}
+              className="h-4 w-4 cursor-pointer rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            />
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-1.5 text-[11px] text-slate-500">

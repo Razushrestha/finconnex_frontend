@@ -32,6 +32,13 @@ export interface PrintViewItem {
   premium?: boolean;
 }
 
+export interface CreateMenuItem {
+  key: string;
+  label: string;
+  href?: string;
+  onSelect?: () => void;
+}
+
 export interface SortOption {
   key: string;
   label: string;
@@ -61,6 +68,7 @@ export interface ActivityToolbarProps {
 
   search?: string;
   onSearchChange?: (search: string) => void;
+  searchPlaceholder?: string;
 
   showRefresh?: boolean;
 
@@ -73,6 +81,7 @@ export interface ActivityToolbarProps {
   onSavedViewChange?: (view: string) => void;
 
   extraViewIcons?: { key: ActivityView; icon: LucideIcon; label: string }[];
+  createMenuItems?: CreateMenuItem[];
 }
 
 const DEFAULT_LAYOUT_ID = "standard";
@@ -96,6 +105,7 @@ export function ActivityToolbar({
   onClearSort,
   search,
   onSearchChange,
+  searchPlaceholder,
   showRefresh = false,
   moreMenuItems,
   printViewItems,
@@ -104,10 +114,12 @@ export function ActivityToolbar({
   savedView: controlledSavedView,
   onSavedViewChange,
   extraViewIcons = [],
+  createMenuItems = [],
 }: ActivityToolbarProps) {
   const router = useRouter();
   const [internalActiveTab, setInternalActiveTab] = useState(tabs[0]);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [savedViewMenuOpen, setSavedViewMenuOpen] = useState(false);
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [internalSavedView, setInternalSavedView] = useState(
@@ -125,6 +137,33 @@ export function ActivityToolbar({
   }
 
   const activeTab = externalActiveTab ?? internalActiveTab;
+  const hasCreateMenu = createMenuItems.length > 0;
+
+  function createHref(extra?: Record<string, string>) {
+    const params = new URLSearchParams({
+      layoutid: DEFAULT_LAYOUT_ID,
+      redirect: "false",
+      ...extra,
+    });
+    return `${createRoute}?${params.toString()}`;
+  }
+
+  function goToCreate() {
+    if (hasCreateMenu) {
+      setMoreMenuOpen(false);
+      setCreateMenuOpen((open) => !open);
+      return;
+    }
+    router.push(createHref());
+  }
+
+  function selectCreateItem(item: CreateMenuItem) {
+    setCreateMenuOpen(false);
+    item.onSelect?.();
+    if (item.href) {
+      router.push(item.href);
+    }
+  }
 
   function handleTabClick(tab: string) {
     setInternalActiveTab(tab);
@@ -176,19 +215,22 @@ export function ActivityToolbar({
           })}
         </div>
 
+        {onSearchChange ? (
+          <div className="relative mx-1 min-w-[160px] max-w-xs flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              placeholder={
+                searchPlaceholder ?? `Search ${entityLabel.toLowerCase()}s...`
+              }
+              value={search ?? ""}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="h-8 w-full rounded-full border border-slate-200 bg-white pr-3 pl-9 text-[12px] text-slate-800 placeholder:text-slate-400 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-500/15"
+            />
+          </div>
+        ) : null}
+
         <div className="ml-auto flex flex-wrap items-center gap-1">
-          {onSearchChange && (
-            <div className="relative flex items-center">
-              <Search className="absolute left-2.5 h-3.5 w-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder={`Search ${entityLabel.toLowerCase()}s...`}
-                value={search ?? ""}
-                onChange={(e) => onSearchChange(e.target.value)}
-                className="h-7 w-40 rounded-md border border-slate-200 bg-white pl-8 pr-2 text-[12px] text-slate-800 placeholder-slate-400 focus:border-violet-500 focus:outline-none sm:w-52"
-              />
-            </div>
-          )}
 
           <button
             type="button"
@@ -356,31 +398,63 @@ export function ActivityToolbar({
             </button>
           )}
 
-          <div className="flex h-7 overflow-hidden rounded-md bg-violet-600 text-[12px]">
-            <button
-              type="button"
-              onClick={() =>
-                router.push(
-                  `${createRoute}?layoutid=${DEFAULT_LAYOUT_ID}&redirect=false`,
-                )
-              }
-              className="px-2.5 font-semibold text-white hover:bg-violet-700 whitespace-nowrap sm:px-3"
-            >
-              Create <span className="hidden md:inline">{entityLabel}</span>
-            </button>
-            <button
-              type="button"
-              aria-label="More create options"
-              className="flex items-center border-l border-violet-500 px-1.5 text-white hover:bg-violet-700"
-            >
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
+          <div className="relative">
+            <div className="flex h-7 overflow-hidden rounded-md bg-[#5A32A3] text-[12px]">
+              <button
+                type="button"
+                onClick={goToCreate}
+                aria-expanded={hasCreateMenu ? createMenuOpen : undefined}
+                aria-haspopup={hasCreateMenu ? "menu" : undefined}
+                className="px-2.5 font-semibold text-white hover:bg-[#4A2888] whitespace-nowrap sm:px-3"
+              >
+                Create <span className="hidden md:inline">{entityLabel}</span>
+              </button>
+              <button
+                type="button"
+                aria-label="More create options"
+                aria-expanded={hasCreateMenu ? createMenuOpen : undefined}
+                aria-haspopup={hasCreateMenu ? "menu" : undefined}
+                onClick={goToCreate}
+                className="flex items-center border-l border-white/25 px-1.5 text-white hover:bg-[#4A2888]"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {hasCreateMenu && createMenuOpen ? (
+              <>
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setCreateMenuOpen(false)}
+                />
+                <div
+                  role="menu"
+                  className="absolute right-0 z-20 mt-1 min-w-[176px] rounded-lg border border-slate-100 bg-white py-1 shadow-lg"
+                >
+                  {createMenuItems.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => selectCreateItem(item)}
+                      className="w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3]"
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : null}
           </div>
 
           <div className="relative">
             <button
               type="button"
-              onClick={() => moreMenuItems && setMoreMenuOpen((v) => !v)}
+              onClick={() => {
+                if (!moreMenuItems) return;
+                setCreateMenuOpen(false);
+                setMoreMenuOpen((v) => !v);
+              }}
               aria-label="More options"
               className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50"
             >

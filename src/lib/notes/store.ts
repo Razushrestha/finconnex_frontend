@@ -79,3 +79,12 @@ export function findNoteById(id: string) {
   const note = listNotes().find((n) => n.id === id);
   return note ? { note } : null;
 }
+
+export function deleteNote(id: string): Note | null {
+  const items = listNotes();
+  const found = items.find((n) => n.id === id) ?? null;
+  if (!found) return null;
+  saveNotes(items.filter((n) => n.id !== id));
+  emitLeadActivityChange();
+  return found;
+}

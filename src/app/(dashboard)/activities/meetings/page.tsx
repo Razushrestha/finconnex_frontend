@@ -11,13 +11,14 @@ import {
   type MeetingStatus,
   type MeetingType,
 } from "@/lib/meetings/types";
-import { listMeetingColumns, saveMeetingColumns } from "@/lib/meetings/store";
+import { listMeetingColumns, saveMeetingColumns, deleteMeeting } from "@/lib/meetings/store";
 import { MeetingsListTable } from "@/components/activities/meetings/MeetingsListTable";
 import { MeetingsKanbanColumn } from "@/components/activities/meetings/MeetingsKanbanColumn";
 import {
   ActivityToolbar,
   type ActivityView,
 } from "@/components/activities/ActivityToolbar";
+import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
@@ -47,6 +48,8 @@ export default function MeetingsPage() {
   const [dropTargetPos, setDropTargetPos] = useState<DropTargetPos | null>(
     null,
   );
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkFlash, setBulkFlash] = useState<string | null>(null);
 
   useEffect(() => {
     setColumns(listMeetingColumns());
@@ -133,6 +136,32 @@ export default function MeetingsPage() {
     setDragInfo(null);
   }
 
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((value) => value !== id) : [...prev, id],
+    );
+  }
+
+  function runBulkDelete() {
+    if (!selectedIds.length) return;
+    const count = selectedIds.length;
+    if (
+      !window.confirm(
+        `Delete ${count} meeting${count === 1 ? "" : "s"}? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    let n = 0;
+    for (const id of selectedIds) {
+      if (deleteMeeting(id)) n += 1;
+    }
+    setColumns(listMeetingColumns());
+    setSelectedIds([]);
+    setBulkFlash(`Deleted ${n} meeting${n === 1 ? "" : "s"}`);
+    window.setTimeout(() => setBulkFlash(null), 2800);
+  }
+
   return (
     <div className={BOARD_PAGE}>
       <FocusHighlight />
@@ -156,6 +185,20 @@ export default function MeetingsPage() {
           onSearchChange={setSearch}
           moreMenuItems={[activityExportMenuItem("meetings")]}
         />
+
+        {bulkFlash ? (
+          <p className="mt-1 text-[12px] font-medium text-violet-700">
+            {bulkFlash}
+          </p>
+        ) : null}
+
+        {selectedIds.length > 0 ? (
+          <EntitySelectionToolbar
+            selectedCount={selectedIds.length}
+            onClear={() => setSelectedIds([])}
+            onDelete={runBulkDelete}
+          />
+        ) : null}
       </div>
 
       <div className="relative flex min-h-0 flex-1 items-stretch gap-4 overflow-hidden pt-3">
@@ -198,6 +241,8 @@ export default function MeetingsPage() {
               data={filteredMeetings}
               statusLabel={statusTab === "All" ? "All Meetings" : statusTab}
               embedded
+              selectedIds={selectedIds}
+              onSelectedIdsChange={setSelectedIds}
             />
           ) : (
             <div className="flex h-full min-h-[420px] items-stretch gap-3 overflow-x-auto p-1">
@@ -228,6 +273,8 @@ export default function MeetingsPage() {
                     }}
                     onDropMeeting={handleDropMeeting}
                     embedded
+                    selectedIds={selectedIds}
+                    onToggleSelect={toggleSelected}
                   />
                 );
               })}

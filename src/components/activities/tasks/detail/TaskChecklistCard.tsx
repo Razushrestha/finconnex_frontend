@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import type { TaskActionItem } from "@/lib/tasks/types";
 import { findTaskById, updateTaskActionItems } from "@/lib/tasks/store";
 import { onRulesChange } from "@/lib/rules";
+import { useTaskSectionEdit } from "./TaskEditContext";
 
 const EMPTY_ACTION_ITEMS: TaskActionItem[] = [];
 
@@ -21,6 +22,7 @@ export function TaskChecklistCard({
     () => items ?? EMPTY_ACTION_ITEMS,
   );
   const [draft, setDraft] = useState("");
+  const [editItems, setEditItems] = useState<TaskActionItem[]>([]);
 
   useEffect(() => {
     const found = findTaskById(taskId);
@@ -63,12 +65,30 @@ export function TaskChecklistCard({
     setDraft("");
   }
 
-  if (checklist.length === 0 && !draft) {
+  const editing = useTaskSectionEdit({
+    start() {
+      setEditItems(checklist.map((item) => ({ ...item })));
+    },
+    save() {
+      persist(
+        editItems
+          .map((item) => ({ ...item, text: item.text.trim() }))
+          .filter((item) => item.text.length > 0),
+      );
+    },
+    cancel() {
+      setEditItems([]);
+    },
+  });
+
+  if (checklist.length === 0 && !draft && !editing) {
     return (
       <section className="border-b border-slate-100 py-7">
-        <h2 className="mb-2 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
-          Action Items
-        </h2>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+            Action Items
+          </h2>
+        </div>
         <p className="mb-4 text-sm text-slate-500">
           No action items on this task yet.
         </p>
@@ -118,7 +138,7 @@ export function TaskChecklistCard({
       )}
 
       <div className="space-y-3">
-        {checklist.map((item) => (
+        {(editing ? editItems : checklist).map((item) => (
           <label
             key={item.id}
             className="flex cursor-pointer items-center gap-3 py-0.5"
@@ -126,14 +146,54 @@ export function TaskChecklistCard({
             <input
               type="checkbox"
               checked={item.done}
-              onChange={() => toggleItem(item.id)}
+              onChange={() => {
+                if (editing) {
+                  setEditItems((prev) =>
+                    prev.map((row) =>
+                      row.id === item.id ? { ...row, done: !row.done } : row,
+                    ),
+                  );
+                  return;
+                }
+                toggleItem(item.id);
+              }}
               className="h-4 w-4 rounded border-slate-300 text-[#5A32A3] focus:ring-[#5A32A3]"
             />
-            <span
-              className={`text-sm ${item.done ? "text-slate-400 line-through" : "text-slate-800"}`}
-            >
-              {item.text}
-            </span>
+            {editing ? (
+              <>
+                <input
+                  value={item.text}
+                  onChange={(e) =>
+                    setEditItems((prev) =>
+                      prev.map((row) =>
+                        row.id === item.id
+                          ? { ...row, text: e.target.value }
+                          : row,
+                      ),
+                    )
+                  }
+                  className="min-w-0 flex-1 border-b border-slate-200 bg-transparent text-sm text-slate-800 outline-none focus:border-violet-400"
+                />
+                <button
+                  type="button"
+                  aria-label={`Remove ${item.text}`}
+                  onClick={() =>
+                    setEditItems((prev) =>
+                      prev.filter((row) => row.id !== item.id),
+                    )
+                  }
+                  className="text-slate-400 hover:text-rose-600"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </>
+            ) : (
+              <span
+                className={`text-sm ${item.done ? "text-slate-400 line-through" : "text-slate-800"}`}
+              >
+                {item.text}
+              </span>
+            )}
           </label>
         ))}
       </div>

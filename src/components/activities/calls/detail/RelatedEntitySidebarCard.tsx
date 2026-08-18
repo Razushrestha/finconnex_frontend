@@ -15,7 +15,7 @@ export function RelatedEntitySidebarCard({ relatedTo }: RelatedEntityProps) {
 
   const inner = (
     <>
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#F3ECFB] text-[#5A32A3]">
         <Building2 className="h-5 w-5" />
       </div>
       <div className="min-w-0 flex-1">
@@ -34,7 +34,7 @@ export function RelatedEntitySidebarCard({ relatedTo }: RelatedEntityProps) {
       {href ? (
         <Link
           href={href}
-          className="flex items-center gap-3 rounded-xl border border-border bg-accent/50 p-3.5 transition-colors hover:border-violet-200 hover:bg-violet-50/60"
+          className="flex items-center gap-3 rounded-xl border border-[#5A32A3]/15 bg-[#F3ECFB]/40 p-3.5 transition-colors hover:border-[#5A32A3]/35 hover:bg-[#F3ECFB]"
         >
           {inner}
         </Link>

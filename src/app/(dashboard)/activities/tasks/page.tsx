@@ -22,15 +22,14 @@ import {
 } from "@/components/activities/ActivityToolbar";
 import {
   EMPTY_TASK_FILTERS,
-  TASK_SAVED_VIEWS,
   type Priority,
   type TaskFilters,
-  type TaskGroupBy,
   type TaskStatus,
 } from "@/lib/tasks/types";
 import {
   cloneTask,
   completeTask,
+  deleteTask,
   listAllTasks,
   reassignTask,
 } from "@/lib/tasks/store";
@@ -42,34 +41,6 @@ import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolba
 import { BOARD_PAGE } from "@/lib/layout";
 
 const TASK_VIEW_MODE_KEY = "finconnex.tasks.view-mode";
-const TASK_SAVED_VIEW_KEY = "finconnex.tasks.saved-view";
-
-function loadTaskSavedView(): string {
-  if (typeof window === "undefined") return TASK_SAVED_VIEWS[0].label;
-  try {
-    const raw = localStorage.getItem(TASK_SAVED_VIEW_KEY);
-    if (raw && TASK_SAVED_VIEWS.some((view) => view.label === raw)) {
-      return raw;
-    }
-  } catch {
-    /* ignore */
-  }
-  return TASK_SAVED_VIEWS[0].label;
-}
-
-function savedViewToGroupBy(view: string): TaskGroupBy {
-  return (
-    TASK_SAVED_VIEWS.find((item) => item.label === view)?.groupBy ?? "status"
-  );
-}
-
-function persistTaskSavedView(view: string) {
-  try {
-    localStorage.setItem(TASK_SAVED_VIEW_KEY, view);
-  } catch {
-    /* ignore */
-  }
-}
 
 function loadTaskViewMode(): ActivityView {
   if (typeof window === "undefined") return "kanban";
@@ -157,30 +128,22 @@ const taskSortOptions = [
 
 export default function TasksPage() {
   const [view, setView] = useState<ActivityView>("kanban");
-  const [savedView, setSavedView] = useState<string>(TASK_SAVED_VIEWS[0].label);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState<TaskFilters>(EMPTY_TASK_FILTERS);
   const [sortField, setSortField] = useState<string | undefined>();
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [search, setSearch] = useState("");
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
 
   useEffect(() => {
     setView(loadTaskViewMode());
-    setSavedView(loadTaskSavedView());
   }, []);
 
   function handleViewChange(mode: ActivityView) {
     setView(mode);
     persistTaskViewMode(mode);
   }
-
-  function handleSavedViewChange(nextView: string) {
-    setSavedView(nextView);
-    persistTaskSavedView(nextView);
-  }
-
-  const groupBy = savedViewToGroupBy(savedView);
 
   function toggleField(
     sectionId: "status" | "priority" | "type",
@@ -257,6 +220,25 @@ export default function TasksPage() {
     flash(`Reassigned ${n} to ${owner}`);
   }
 
+  function runBulkDelete() {
+    if (!selectedTaskIds.length) return;
+    const count = selectedTaskIds.length;
+    if (
+      !window.confirm(
+        `Delete ${count} task${count === 1 ? "" : "s"}? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    let n = 0;
+    for (const id of selectedTaskIds) {
+      if (deleteTask(id)) n += 1;
+    }
+    emitRulesChange("all");
+    setSelectedTaskIds([]);
+    flash(`Deleted ${n} task${n === 1 ? "" : "s"}`);
+  }
+
   return (
     <div className={BOARD_PAGE}>
       <FocusHighlight />
@@ -274,12 +256,12 @@ export default function TasksPage() {
           sortDirection={sortDirection}
           onSortChange={handleSortChange}
           onClearSort={handleClearSort}
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search tasks..."
           showRefresh
           moreMenuItems={moreMenuItems}
           printViewItems={printViewItems}
-          savedViews={TASK_SAVED_VIEWS.map((item) => item.label)}
-          savedView={savedView}
-          onSavedViewChange={handleSavedViewChange}
           extraViewIcons={[
             { key: "calendar", icon: CalendarDays, label: "Calendar view" },
             { key: "timeline", icon: GanttChart, label: "Timeline view" },
@@ -299,6 +281,7 @@ export default function TasksPage() {
             onCompleteSelected={runBulkComplete}
             onCloneSelected={runBulkClone}
             onChangeOwner={runBulkReassign}
+            onDelete={runBulkDelete}
           />
         )}
       </div>
@@ -312,25 +295,34 @@ export default function TasksPage() {
           />
         )}
 
-        <div className="min-h-0 min-w-0 flex-1 overflow-auto [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100">
+        <div
+          className={`min-h-0 min-w-0 flex-1 ${
+            view === "list" || view === "kanban"
+              ? "overflow-hidden"
+              : "overflow-auto [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin]"
+          }`}
+        >
           {view === "kanban" ? (
             <KanbanBoard
               filters={filters}
-              groupBy={groupBy}
+              search={search}
               selectedIds={selectedTaskIds}
               onSelectedIdsChange={setSelectedTaskIds}
             />
           ) : view === "calendar" ? (
-            <TaskCalendarView filters={filters} />
+            <TaskCalendarView filters={filters} search={search} />
           ) : view === "timeline" ? (
-            <TaskTimelineView filters={filters} />
+            <TaskTimelineView filters={filters} search={search} />
           ) : (
             <TaskListView
               filters={filters}
+              search={search}
               sortField={sortField}
               sortDirection={sortDirection}
               onSortChange={handleSortChange}
               onClearSort={handleClearSort}
+              selectedIds={selectedTaskIds}
+              onSelectedIdsChange={setSelectedTaskIds}
             />
           )}
         </div>

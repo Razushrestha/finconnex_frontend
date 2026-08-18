@@ -51,7 +51,7 @@ export default function EmailsPage() {
           <EmailsFilterPanel onClose={() => setFilterOpen(false)} />
         )}
 
-        <div className="min-h-0 min-w-0 flex-1 overflow-auto rounded-sm [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100">
+        <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
           <EmailListTable />
         </div>
       </div>

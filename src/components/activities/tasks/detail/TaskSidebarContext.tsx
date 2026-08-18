@@ -1,17 +1,42 @@
 "use client";
 
+import { useState } from "react";
 import { ExternalLink, Sparkles } from "lucide-react";
+import { useTaskSectionEdit } from "./TaskEditContext";
 
 export function TaskSidebarContext() {
+  const [context, setContext] = useState("Acme Corp - Q4 Renewal");
+  const [draft, setDraft] = useState(context);
+
+  const editing = useTaskSectionEdit({
+    start() {
+      setDraft(context);
+    },
+    save() {
+      setContext(draft.trim() || context);
+    },
+    cancel() {
+      setDraft(context);
+    },
+  });
+
   return (
     <section className="border-b border-slate-100 pb-6">
-      <h2 className="mb-3 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
-        Context
-      </h2>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
+          Context
+        </h2>
+      </div>
       <div className="mb-4 flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-slate-800">
-          Acme Corp - Q4 Renewal
-        </span>
+        {editing ? (
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            className="min-w-0 flex-1 border-b border-slate-200 bg-transparent text-sm font-medium text-slate-800 outline-none focus:border-violet-400"
+          />
+        ) : (
+          <span className="text-sm font-medium text-slate-800">{context}</span>
+        )}
         <ExternalLink className="h-3.5 w-3.5 shrink-0 text-slate-400" />
       </div>
 

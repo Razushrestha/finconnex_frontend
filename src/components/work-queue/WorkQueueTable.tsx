@@ -727,14 +727,15 @@ export function WorkQueueTable({
               </p>
             </div>
           ) : (
-            rows.map((row) => {
+            <ul className="m-0 list-none p-0" aria-label={title}>
+              {rows.map((row) => {
               const overdue =
                 row.dueLabel === "Yesterday" ||
                 row.dueLabel.includes("overdue");
               const isMenuOpen = activeMenuId === row.id;
 
               return (
-                <div
+                <li
                   key={row.id}
                   role="button"
                   tabIndex={0}
@@ -883,11 +884,11 @@ export function WorkQueueTable({
                     );
                   })}
 
-                  {/* Spacer cell aligned with sticky settings column */}
                   <span aria-hidden />
-                </div>
+                </li>
               );
-            })
+            })}
+            </ul>
           )}
         </div>
       </div>

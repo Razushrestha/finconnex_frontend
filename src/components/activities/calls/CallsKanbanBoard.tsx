@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { type CallColumn } from "@/lib/calls/types";
 import { listCallColumns, saveCallColumns } from "@/lib/calls/store";
+import { onRulesChange } from "@/lib/rules/storage";
 import { CallsKanbanColumn } from "./CallsKanbanColumn";
 import type { Priority, TaskStatus } from "@/lib/tasks/types";
 
@@ -16,16 +17,32 @@ export interface DropTargetPos {
   targetIndex: number;
 }
 
-export function CallsKanbanBoard() {
+export function CallsKanbanBoard({
+  selectedIds,
+  onSelectedIdsChange,
+}: {
+  selectedIds?: string[];
+  onSelectedIdsChange?: (ids: string[]) => void;
+}) {
   const [columns, setColumns] = useState<CallColumn[]>([]);
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const [dropTargetPos, setDropTargetPos] = useState<DropTargetPos | null>(
     null,
   );
-  const [selectedCallIds, setSelectedCallIds] = useState<string[]>([]);
+  const [localSelectedIds, setLocalSelectedIds] = useState<string[]>([]);
+  const selectedCallIds = selectedIds ?? localSelectedIds;
+
+  function setSelectedCallIds(ids: string[]) {
+    if (onSelectedIdsChange) onSelectedIdsChange(ids);
+    else setLocalSelectedIds(ids);
+  }
 
   useEffect(() => {
     setColumns(listCallColumns());
+  }, []);
+
+  useEffect(() => {
+    return onRulesChange(() => setColumns(listCallColumns()));
   }, []);
 
   function handleDragStartCall(
@@ -43,10 +60,10 @@ export function CallsKanbanBoard() {
   }
 
   function handleToggleSelect(callId: string) {
-    setSelectedCallIds((prev) =>
-      prev.includes(callId)
-        ? prev.filter((id) => id !== callId)
-        : [...prev, callId],
+    setSelectedCallIds(
+      selectedCallIds.includes(callId)
+        ? selectedCallIds.filter((id) => id !== callId)
+        : [...selectedCallIds, callId],
     );
   }
 

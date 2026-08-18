@@ -8,11 +8,12 @@ import {
   updateTaskDueDate,
 } from "@/lib/tasks/store";
 import { parseTaskDueDate } from "@/lib/dashboard/layout";
+import { taskMatchesSearch } from "@/lib/tasks/search";
 import type { Task, TaskFilters } from "@/lib/tasks/types";
 import { onRulesChange } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 
-function filterTasks(tasks: Task[], filters: TaskFilters) {
+function filterTasks(tasks: Task[], filters: TaskFilters, search = "") {
   return tasks.filter((t) => {
     if (filters.statuses.length && !filters.statuses.includes(t.status)) {
       return false;
@@ -23,7 +24,7 @@ function filterTasks(tasks: Task[], filters: TaskFilters) {
     if (filters.types.length && !filters.types.includes(t.taskType)) {
       return false;
     }
-    return true;
+    return taskMatchesSearch(t, search);
   });
 }
 
@@ -43,7 +44,13 @@ function sameDay(a: Date, b: Date) {
   );
 }
 
-export function TaskCalendarView({ filters }: { filters: TaskFilters }) {
+export function TaskCalendarView({
+  filters,
+  search = "",
+}: {
+  filters: TaskFilters;
+  search?: string;
+}) {
   const [tasks, setTasks] = useState(() => listAllTasks());
   const [cursor, setCursor] = useState(() => new Date(2026, 6, 1));
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
@@ -54,8 +61,8 @@ export function TaskCalendarView({ filters }: { filters: TaskFilters }) {
   }, []);
 
   const filtered = useMemo(
-    () => filterTasks(tasks, filters),
-    [tasks, filters],
+    () => filterTasks(tasks, filters, search),
+    [tasks, filters, search],
   );
 
   const byDay = useMemo(() => {

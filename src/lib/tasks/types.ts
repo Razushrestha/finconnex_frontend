@@ -4,6 +4,13 @@ import {
   initials,
   type RelatedTo,
 } from "@/lib/activities/shared";
+import {
+  REMINDER_LEAD_TIMES,
+  REMINDER_TYPES,
+  type NotificationMethod,
+  type ReminderLeadTime,
+  type ReminderType,
+} from "@/lib/reminders/types";
 
 export const TASK_TYPES = [
   "Call",
@@ -54,6 +61,153 @@ export interface TaskActivityNote {
   createdAt: string;
 }
 
+export const REMINDER_NOTIFY_OPTIONS = ["Email", "Pop Up", "Both"] as const;
+export type ReminderNotifyOption = (typeof REMINDER_NOTIFY_OPTIONS)[number];
+
+export const REMINDER_SCHEDULE_MODES = ["onDate", "relative"] as const;
+export type ReminderScheduleMode = (typeof REMINDER_SCHEDULE_MODES)[number];
+
+export const REMINDER_RELATIVE_WHEN = ["Before", "After"] as const;
+export type ReminderRelativeWhen = (typeof REMINDER_RELATIVE_WHEN)[number];
+
+export const REMINDER_REPEAT_OPTIONS = [
+  "None",
+  "Daily",
+  "Weekly",
+  "Monthly",
+  "Yearly",
+] as const;
+export type ReminderRepeatType = (typeof REMINDER_REPEAT_OPTIONS)[number];
+
+export interface TaskReminder {
+  id: string;
+  type: ReminderType;
+  date: string;
+  time: string;
+  leadTime: ReminderLeadTime;
+  notificationMethod: NotificationMethod;
+  scheduleMode?: ReminderScheduleMode;
+  relativeCount?: number;
+  relativeWhen?: ReminderRelativeWhen;
+  relativeOf?: "Due Date";
+  repeatType?: ReminderRepeatType;
+  notify?: ReminderNotifyOption;
+}
+
+export function reminderNotify(reminder: TaskReminder): ReminderNotifyOption {
+  if (reminder.notify) return reminder.notify;
+  return reminder.notificationMethod === "Email" ? "Email" : "Pop Up";
+}
+
+export function notifyToMethod(
+  notify: ReminderNotifyOption,
+): NotificationMethod {
+  return notify === "Pop Up" ? "Web Push" : "Email";
+}
+
+export function createTaskReminder(
+  patch: Partial<TaskReminder> = {},
+): TaskReminder {
+  return {
+    id: `tr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    type: REMINDER_TYPES[0],
+    date: "",
+    time: "13:00",
+    leadTime: REMINDER_LEAD_TIMES[0],
+    notificationMethod: "Email",
+    scheduleMode: "onDate",
+    relativeCount: 1,
+    relativeWhen: "Before",
+    relativeOf: "Due Date",
+    repeatType: "None",
+    notify: "Email",
+    ...patch,
+  };
+}
+
+function parseTaskReminderDateTime(
+  value: string,
+): { date: string; time: string } | null {
+  const iso = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/,
+  );
+  if (iso) {
+    return {
+      date: `${iso[1]}-${iso[2]}-${iso[3]}`,
+      time: iso[4] ? `${iso[4]}:${iso[5]}` : "",
+    };
+  }
+
+  const au = value.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[,\s]+(\d{1,2}):(\d{2})\s*(AM|PM)?)?/i,
+  );
+  if (!au) return null;
+
+  const day = au[1].padStart(2, "0");
+  const month = au[2].padStart(2, "0");
+  let hour = au[4] ? Number(au[4]) : undefined;
+  const minute = au[5] ?? "00";
+  const meridiem = au[6]?.toUpperCase();
+  if (hour != null && meridiem === "PM" && hour < 12) hour += 12;
+  if (hour != null && meridiem === "AM" && hour === 12) hour = 0;
+
+  return {
+    date: `${au[3]}-${month}-${day}`,
+    time:
+      hour != null ? `${String(hour).padStart(2, "0")}:${minute}` : "",
+  };
+}
+
+export function remindersFromLegacyDate(
+  reminderDate?: string,
+): TaskReminder[] {
+  if (!reminderDate?.trim()) return [];
+  const parsed = parseTaskReminderDateTime(reminderDate.trim());
+  if (!parsed) return [];
+  return [
+    createTaskReminder({
+      type: "Task Due",
+      date: parsed.date,
+      time: parsed.time,
+      leadTime: "15 minutes before",
+      notificationMethod: "Web Push",
+    }),
+  ];
+}
+
+export function formatTaskReminderWhen(reminder: TaskReminder): string {
+  const timeLabel = formatReminderTime(reminder.time);
+  if (reminder.scheduleMode === "relative") {
+    const count = reminder.relativeCount ?? 1;
+    const when = reminder.relativeWhen ?? "Before";
+    const of = reminder.relativeOf ?? "Due Date";
+    return timeLabel
+      ? `${count} Day(s) ${when} ${of} at ${timeLabel}`
+      : `${count} Day(s) ${when} ${of}`;
+  }
+  if (!reminder.date) return "No date set";
+  const [year, month, day] = reminder.date.split("-");
+  const dateLabel = `${day}/${month}/${year}`;
+  return timeLabel ? `${dateLabel} at ${timeLabel}` : dateLabel;
+}
+
+function formatReminderTime(time?: string): string {
+  if (!time) return "";
+  const [hourRaw, minute] = time.split(":");
+  const hour = Number(hourRaw);
+  if (!Number.isFinite(hour)) return "";
+  const meridiem = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+  return `${String(hour12).padStart(2, "0")}:${minute} ${meridiem}`;
+}
+
+export function formatReminderDateLabel(
+  reminders: TaskReminder[],
+): string | undefined {
+  const first = reminders.find((reminder) => reminder.date);
+  return first ? formatTaskReminderWhen(first) : undefined;
+}
+
 export interface Task {
   taskId: string;
   title: string;
@@ -74,6 +228,7 @@ export interface Task {
   activityNotes?: TaskActivityNote[];
   actionItems?: TaskActionItem[];
   collaborators?: string[];
+  reminders?: TaskReminder[];
   commentsCount?: number;
   attachmentsCount?: number;
   assignee: {
@@ -146,6 +301,30 @@ export const taskColumns: TaskColumn[] = [
         ],
         createdBy: "John Smith",
         overdue: true,
+        reminders: [
+          {
+            id: "tr-001-1",
+            type: "Task Due",
+            date: "2026-07-21",
+            time: "09:00",
+            leadTime: "1 day before",
+            notificationMethod: "Web Push",
+            notify: "Pop Up",
+            scheduleMode: "onDate",
+            repeatType: "None",
+          },
+          {
+            id: "tr-001-2",
+            type: "Follow-up",
+            date: "2026-07-22",
+            time: "08:00",
+            leadTime: "15 minutes before",
+            notificationMethod: "Email",
+            notify: "Email",
+            scheduleMode: "onDate",
+            repeatType: "None",
+          },
+        ],
       }),
       task({
         // Extra pending competitor for William (+X coverage)

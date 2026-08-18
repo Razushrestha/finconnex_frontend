@@ -2,12 +2,15 @@
 
 import {
   taskColumns as SEED_COLUMNS,
+  formatReminderDateLabel,
   formatTaskTimestamp,
+  remindersFromLegacyDate,
   type Priority,
   type Task,
   type TaskActionItem,
   type TaskActivityNote,
   type TaskColumn,
+  type TaskReminder,
   type TaskStatus,
   type TaskType,
 } from "@/lib/tasks/types";
@@ -38,6 +41,7 @@ function cloneSeed(): TaskColumn[] {
       relatedTo: t.relatedTo ? { ...t.relatedTo } : undefined,
       collaborators: t.collaborators ? [...t.collaborators] : undefined,
       activityNotes: t.activityNotes?.map((note) => ({ ...note })),
+      reminders: t.reminders?.map((reminder) => ({ ...reminder })),
     })),
   }));
 }
@@ -46,13 +50,27 @@ function normalize(cols: TaskColumn[]): TaskColumn[] {
   return cols.map((col) => ({
     ...col,
     count: col.tasks.length,
-    tasks: col.tasks.map((t) => ({ ...t, status: col.title })),
+    tasks: col.tasks.map((t) => {
+      const createdBy = t.createdBy || t.assignedTo;
+      const createdOn = t.createdOn || "17/08/2026 09:00 AM";
+      return {
+        ...t,
+        status: col.title,
+        createdBy,
+        createdOn,
+        modifiedBy: t.modifiedBy || createdBy,
+        modifiedOn: t.modifiedOn || createdOn,
+        reminders: Array.isArray(t.reminders)
+          ? t.reminders.map((r) => ({ ...r }))
+          : remindersFromLegacyDate(t.reminderDate),
+      };
+    }),
   }));
 }
 
 const board = createBoardStore({
-  // v3: unique taskIds (T-010 was duplicated across Not Started + Review)
-  key: "activities:tasks:board:v3",
+  // v5: multiple typed reminders on each task
+  key: "activities:tasks:board:v5",
   seed: cloneSeed,
 });
 
@@ -75,6 +93,7 @@ export function createTask(input: {
   description?: string;
   notes?: string;
   reminderDate?: string;
+  reminders?: TaskReminder[];
   actionItems?: TaskActionItem[];
   collaborators?: string[];
   attachmentsCount?: number;
@@ -99,6 +118,9 @@ export function createTask(input: {
     description: input.description,
     notes: input.notes,
     reminderDate: input.reminderDate,
+    reminders: input.reminders?.length
+      ? input.reminders.map((reminder) => ({ ...reminder }))
+      : remindersFromLegacyDate(input.reminderDate),
     actionItems: input.actionItems?.length
       ? input.actionItems.map((item) => ({ ...item }))
       : undefined,
@@ -314,6 +336,59 @@ export function updateTaskDueDate(taskId: string, date: Date): Task | null {
           ...t,
           dueDate: nextDue,
           overdue: isDueDateOverdue(nextDue),
+        });
+        return updated;
+      }),
+    })),
+  );
+  return updated;
+}
+
+export function patchTask(
+  taskId: string,
+  patch: Partial<Pick<Task, "title" | "dueDate" | "assignedTo" | "priority">>,
+): Task | null {
+  let updated: Task | null = null;
+  saveTaskColumns(
+    listTaskColumns().map((col) => ({
+      ...col,
+      tasks: col.tasks.map((t) => {
+        if (t.taskId !== taskId) return t;
+        const assignedTo = patch.assignedTo ?? t.assignedTo;
+        const dueDate = patch.dueDate ?? t.dueDate;
+        updated = touchModified({
+          ...t,
+          ...patch,
+          assignedTo,
+          dueDate,
+          overdue: isDueDateOverdue(dueDate),
+          assignee: {
+            initials: initials(assignedTo),
+            colorClass: avatarColor(assignedTo),
+          },
+        });
+        return updated;
+      }),
+    })),
+  );
+  return updated;
+}
+
+export function updateTaskReminders(
+  taskId: string,
+  reminders: TaskReminder[],
+): Task | null {
+  let updated: Task | null = null;
+  const nextReminders = reminders.map((reminder) => ({ ...reminder }));
+  saveTaskColumns(
+    listTaskColumns().map((col) => ({
+      ...col,
+      tasks: col.tasks.map((t) => {
+        if (t.taskId !== taskId) return t;
+        updated = touchModified({
+          ...t,
+          reminders: nextReminders,
+          reminderDate: formatReminderDateLabel(nextReminders),
         });
         return updated;
       }),

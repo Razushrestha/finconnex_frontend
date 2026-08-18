@@ -7,7 +7,7 @@ import { CallCard } from "./CallCard";
 import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
 import { cn } from "@/lib/utils";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
-import { KANBAN_COL, KANBAN_HEADER, KANBAN_HEADER_RAIL, KANBAN_WELL } from "@/lib/layout";
+import { KANBAN_COL, KANBAN_HEADER, KANBAN_HEADER_COUNT, KANBAN_HEADER_RAIL, KANBAN_WELL } from "@/lib/layout";
 import { useRouter } from "next/navigation";
 import type { DropTargetPos } from "./CallsKanbanBoard";
 import type { Priority, TaskStatus } from "@/lib/tasks/types";
@@ -95,7 +95,7 @@ export function CallsKanbanColumn({
             <ChevronRight className="h-4 w-4 text-slate-700" />
           </button>
 
-          <span className="inline-flex shrink-0 items-center rounded-full bg-white/80 px-2 py-0.5 text-xs font-medium text-slate-700 shadow-sm">
+          <span className={KANBAN_HEADER_COUNT}>
             {column.count}
           </span>
 
@@ -127,7 +127,7 @@ export function CallsKanbanColumn({
               {column.title}
             </h3>
           </button>
-          <span className="inline-flex items-center rounded-full bg-white/80 px-2.5 py-0.5 text-xs font-medium text-slate-700 shadow-sm">
+          <span className={KANBAN_HEADER_COUNT}>
             {column.count}
           </span>
         </div>
