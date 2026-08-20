@@ -28,6 +28,8 @@
 // import {
 //   nextSignatureIds,
 //   upsertSignatureRequest,
+//   markRequestSent,
+//   type SignatureField,
 //   type SignatureSigner,
 // } from "@/lib/documents/signature/types";
 // import type {
@@ -35,6 +37,8 @@
 //   DraggingFieldType,
 // } from "@/components/documents/signature/create/PdfFieldEditor";
 // import { toast } from "sonner";
+// import { getNewlyNotifiedSigners } from "@/lib/documents/signature/mock-send";
+// import { notifySigners } from "@/components/documents/signature/create/Notify";
 
 // export default function CreateSignatureRequestPage() {
 //   return (
@@ -52,12 +56,35 @@
 
 // interface AdditionalDocPreview {
 //   fileUrl: string;
+//   persistentFileUrl: string;
 //   docHtmlContent: string;
 //   isConvertingDoc: boolean;
 // }
 
 // const isDocxFile = (file: File) =>
 //   file.name.endsWith(".docx") || file.name.endsWith(".doc");
+
+// // Converts the field-placement editor's PlacedField[] into the store's
+// // SignatureField[] shape.
+// // TODO: confirm PlacedField's actual width/height field names — guessed
+// // here since PdfFieldEditor's type definition wasn't shared.
+// function toSignatureFields(placed: PlacedField[]): SignatureField[] {
+//   return placed
+//     .filter((f) => f.recipientId) // a field with no assigned recipient can't be saved
+//     .map((f) => ({
+//       id: f.id,
+//       documentId: f.documentId,
+//       kind: f.type as SignatureField["kind"],
+//       label: f.label,
+//       x: f.xPct,
+//       y: f.yPct,
+//       w: typeof f.width === "number" && f.width <= 100 ? f.width : 20,
+//       h: typeof f.height === "number" && f.height <= 20 ? f.height : 5,
+//       page: f.page,
+//       signerId: f.recipientId!,
+//       required: true,
+//     }));
+// }
 
 // function CreateSignatureRequestForm() {
 //   const router = useRouter();
@@ -69,10 +96,24 @@
 
 //   const [documentName, setDocumentName] = useState("");
 //   const [documentFile, setDocumentFile] = useState<File | null>(null);
+//   const [persistentFileUrl, setPersistentFileUrl] = useState<string>("");
 
 //   const fileUrl = useMemo(() => {
 //     if (!documentFile || !(documentFile instanceof File)) return "";
 //     return URL.createObjectURL(documentFile);
+//   }, [documentFile]);
+
+//   useEffect(() => {
+//     if (!documentFile || !(documentFile instanceof File)) {
+//       setPersistentFileUrl("");
+//       return;
+//     }
+//     const reader = new FileReader();
+//     reader.onload = (e) => {
+//       const result = e.target?.result as string;
+//       if (result) setPersistentFileUrl(result);
+//     };
+//     reader.readAsDataURL(documentFile);
 //   }, [documentFile]);
 
 //   useEffect(() => {
@@ -153,10 +194,32 @@
 //         ...prev,
 //         [doc.id]: {
 //           fileUrl: docFileUrl,
+//           persistentFileUrl: "",
 //           docHtmlContent: "",
 //           isConvertingDoc: isDocx,
 //         },
 //       }));
+
+//       const reader = new FileReader();
+//       reader.onload = (e) => {
+//         const result = e.target?.result as string;
+//         if (result) {
+//           setAdditionalPreviews((prev) => {
+//             if (!prev[doc.id]) {
+//               return prev;
+//             }
+
+//             return {
+//               ...prev,
+//               [doc.id]: {
+//                 ...prev[doc.id],
+//                 persistentFileUrl: result,
+//               },
+//             };
+//           });
+//         }
+//       };
+//       reader.readAsDataURL(doc.file);
 
 //       if (isDocx) {
 //         doc.file
@@ -280,6 +343,7 @@
 //       signatureRequestId: ids.signatureRequestId,
 //       documentName,
 //       documentFile: documentFile?.name || "",
+//       documentFileUrl: persistentFileUrl || fileUrl,
 //       signer: recipients[0]?.name || "",
 //       signerEmail: recipients[0]?.email || "",
 //       signers: recipients,
@@ -312,6 +376,7 @@
 //       signatureRequestId: ids.signatureRequestId,
 //       documentName,
 //       documentFile: documentFile?.name || "",
+//       documentFileUrl: persistentFileUrl || fileUrl,
 //       signer: recipients[0]?.name || "",
 //       signerEmail: recipients[0]?.email || "",
 //       signers: recipients,
@@ -394,6 +459,45 @@
 //     setPlacedFields((prev) => prev.filter((f) => f.id !== id));
 //   };
 
+//   // Called by PlaceFieldsView's "Send Request" button. Persists the request
+//   // with the actual placed fields, marks it Sent, fires the (mock)
+//   // notifications, and resolves with whoever was just notified so the test
+//   // links modal can be shown before navigating away.
+//   const handleSendForSignature = async (): Promise<SignatureSigner[]> => {
+//     const fields = toSignatureFields(placedFields);
+
+//     const draft = upsertSignatureRequest({
+//       id: ids.id,
+//       signatureRequestId: ids.signatureRequestId,
+//       documentName,
+//       documentFile: documentFile?.name || "",
+//       documentFileUrl: persistentFileUrl || fileUrl,
+//       signer: recipients[0]?.name || "",
+//       signerEmail: recipients[0]?.email || "",
+//       signers: recipients,
+//       fields,
+//       signingOrder,
+//       status: "Draft",
+//       expiryDate: expiryDate || "31/10/2026",
+//       createdBy: "Current User",
+//       manageToken: ids.manageToken,
+//       audit: [
+//         {
+//           id: `a-${Date.now()}`,
+//           at: new Date().toLocaleString(),
+//           action: "Fields placed, ready to send",
+//           actor: "Current User",
+//         },
+//       ],
+//     });
+
+//     const sent = markRequestSent(draft, "Current User");
+//     const notified = getNewlyNotifiedSigners(draft, sent);
+//     await notifySigners(sent, notified); // mock for now — logs the payload
+
+//     return notified;
+//   };
+
 //   // ==========================================
 //   // STEP 2: PLACE FIELDS VIEW (?step=place-fields)
 //   // ==========================================
@@ -412,6 +516,7 @@
 //         handleSidebarDragStart={handleSidebarDragStart}
 //         handleSidebarDragEnd={handleSidebarDragEnd}
 //         handleResizeField={handleResizeField}
+//         onSend={handleSendForSignature}
 //       />
 //     );
 //   }
@@ -537,6 +642,7 @@ import {
   markRequestSent,
   type SignatureField,
   type SignatureSigner,
+  type SignatureDocument,
 } from "@/lib/documents/signature/types";
 import type {
   PlacedField,
@@ -561,7 +667,15 @@ export default function CreateSignatureRequestPage() {
 }
 
 interface AdditionalDocPreview {
+  /** blob: URL — only valid in this tab, used for the live editor preview. */
   fileUrl: string;
+  /**
+   * data: URL (base64) — same pattern as the primary document's
+   * `persistentFileUrl`. This is what actually gets persisted onto the
+   * request, since a blob: URL is dead the moment the recipient opens
+   * their own browser/email client.
+   */
+  persistentFileUrl: string;
   docHtmlContent: string;
   isConvertingDoc: boolean;
 }
@@ -587,6 +701,10 @@ function toSignatureFields(placed: PlacedField[]): SignatureField[] {
       page: f.page,
       signerId: f.recipientId!,
       required: true,
+      // Was silently dropped before — every field ended up looking like it
+      // belonged to the primary document regardless of which of the
+      // documents[] it was actually placed on.
+      documentId: f.documentId,
     }));
 }
 
@@ -698,10 +816,29 @@ function CreateSignatureRequestForm() {
         ...prev,
         [doc.id]: {
           fileUrl: docFileUrl,
+          persistentFileUrl: "",
           docHtmlContent: "",
           isConvertingDoc: isDocx,
         },
       }));
+
+      // Persistent copy so this document is still readable once the
+      // request is saved and opened elsewhere (recipient's browser,
+      // after a reload, etc.) — a blob: URL alone would 404 there.
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        if (!result) return;
+        setAdditionalPreviews((prev) =>
+          prev[doc.id]
+            ? {
+                ...prev,
+                [doc.id]: { ...prev[doc.id], persistentFileUrl: result },
+              }
+            : prev,
+        );
+      };
+      reader.readAsDataURL(doc.file);
 
       if (isDocx) {
         doc.file
@@ -786,6 +923,38 @@ function CreateSignatureRequestForm() {
     additionalPreviews,
   ]);
 
+  // What actually gets persisted onto the request (SignatureDocument[]).
+  // Unlike `documents` above (blob: URLs, editor-preview only), this uses
+  // the data: URLs so every attached file — not just the primary PDF —
+  // survives being opened by the recipient in a different browser/tab.
+  const signatureDocuments: SignatureDocument[] = useMemo(() => {
+    const list: SignatureDocument[] = [];
+    if (documentFile) {
+      list.push({
+        id: "primary",
+        name: documentName || documentFile.name,
+        fileName: documentFile.name,
+        fileUrl: persistentFileUrl,
+      });
+    }
+    additionalFiles.forEach((doc) => {
+      const preview = additionalPreviews[doc.id];
+      list.push({
+        id: doc.id,
+        name: doc.name,
+        fileName: doc.file.name,
+        fileUrl: preview?.persistentFileUrl || "",
+      });
+    });
+    return list;
+  }, [
+    documentFile,
+    documentName,
+    persistentFileUrl,
+    additionalFiles,
+    additionalPreviews,
+  ]);
+
   const [recipients, setRecipients] = useState<SignatureSigner[]>([]);
   const [signingOrder, setSigningOrder] = useState<"sequential" | "parallel">(
     "sequential",
@@ -826,6 +995,7 @@ function CreateSignatureRequestForm() {
       documentName,
       documentFile: documentFile?.name || "",
       documentFileUrl: persistentFileUrl || fileUrl,
+      documents: signatureDocuments,
       signer: recipients[0]?.name || "",
       signerEmail: recipients[0]?.email || "",
       signers: recipients,
@@ -859,6 +1029,7 @@ function CreateSignatureRequestForm() {
       documentName,
       documentFile: documentFile?.name || "",
       documentFileUrl: persistentFileUrl || fileUrl,
+      documents: signatureDocuments,
       signer: recipients[0]?.name || "",
       signerEmail: recipients[0]?.email || "",
       signers: recipients,
@@ -954,6 +1125,7 @@ function CreateSignatureRequestForm() {
       documentName,
       documentFile: documentFile?.name || "",
       documentFileUrl: persistentFileUrl || fileUrl,
+      documents: signatureDocuments,
       signer: recipients[0]?.name || "",
       signerEmail: recipients[0]?.email || "",
       signers: recipients,
