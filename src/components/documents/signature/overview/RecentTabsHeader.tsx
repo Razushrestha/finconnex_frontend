@@ -53,7 +53,7 @@ export function RecentTabsHeader({
       <div>
         {activeTab === "documents" ? (
           <Link
-            href="/documents/signature/documents"
+            href="/signature/documents"
             className="group inline-flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
           >
             View all
@@ -61,7 +61,7 @@ export function RecentTabsHeader({
           </Link>
         ) : (
           <Link
-            href="/documents/signature/templates"
+            href="/signature/templates"
             className="group inline-flex items-center gap-1.5 text-xs font-semibold text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
           >
             View templates
