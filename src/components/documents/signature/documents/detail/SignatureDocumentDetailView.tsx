@@ -56,38 +56,3 @@ export const SignatureDocumentDetailView: React.FC<
     </div>
   );
 };
-
-// --- Example usage, matching the reference screenshot ---
-//
-// <SignatureDocumentDetailView
-//   document={{
-//     name: "Example Contract",
-//     ownerName: "Demo Admin",
-//     submittedAtLabel: "Sep 13, 2024 08:46",
-//     lastUpdatedAtLabel: "Sep 13, 2024 08:48",
-//     completionPercent: 66,
-//   }}
-//   recipients={[
-//     {
-//       id: "r1",
-//       order: 1,
-//       name: "Tyler",
-//       email: "tyler@zenatta.com",
-//       accessInfo:
-//         "Accessed from IP address 38.175.167.106 using Web at Sep 13, 2024 08:48",
-//       mailed: true,
-//       viewed: true,
-//       signed: true,
-//     },
-//     {
-//       id: "r2",
-//       order: 2,
-//       name: "Tyler",
-//       email: "voiceexample@zenatta.com",
-//       mailed: true,
-//       viewed: false,
-//       signed: false,
-//     },
-//   ]}
-//   onBack={() => {}}
-// />

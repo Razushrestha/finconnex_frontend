@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
-    Send,
+  Send,
   Trash2,
   Save,
   PenLine,
@@ -152,6 +152,7 @@ export function PlaceFieldsClient({ id }: { id: string }) {
     const idNew = `fld-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
     const field: SignatureField = {
       id: idNew,
+      documentId: id,
       kind: placeKind,
       label: fieldKindLabel(placeKind),
       x: Math.min(100 - meta.w, Math.max(2, xPct - meta.w / 2)),
@@ -308,7 +309,8 @@ export function PlaceFieldsClient({ id }: { id: string }) {
             </p>
             <div className="space-y-1.5">
               {req.signers.map((s) => {
-                const color = SIGNER_COLORS[s.colorIndex % SIGNER_COLORS.length];
+                const color =
+                  SIGNER_COLORS[s.colorIndex % SIGNER_COLORS.length];
                 const active = activeSignerId === s.id;
                 return (
                   <button

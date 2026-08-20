@@ -24,6 +24,7 @@
 // } from "@/lib/documents/signature/types";
 // import { useRouter } from "next/navigation";
 // import { toast } from "sonner";
+// import { MockSendLinksModal } from "./MockSendLinksModal";
 
 // const PdfFieldEditor = dynamic(
 //   () => import("@/components/documents/signature/create/PdfFieldEditor"),
@@ -83,6 +84,12 @@
 //   handleSidebarDragEnd: () => void;
 //   /** Optional custom handler when saving as a template */
 //   handleSaveTemplate?: () => void;
+//   /**
+//    * Persists the request with placed fields, marks it sent, and fires the
+//    * (currently mock) notifications. Resolves with whoever was just notified,
+//    * so we can show test links before navigating away.
+//    */
+//   onSend?: () => Promise<SignatureSigner[]>;
 // }
 
 // const isPdfDocument = (file: File | null) =>
@@ -103,10 +110,14 @@
 //   handleSidebarDragStart,
 //   handleSidebarDragEnd,
 //   handleSaveTemplate,
+//   onSend,
 // }: PlaceFieldsViewProps) {
 //   const router = useRouter();
 //   const [activeResizingId, setActiveResizingId] = useState<string | null>(null);
 //   const [isSubmitting, setIsSubmitting] = useState(false);
+//   const [testLinksFor, setTestLinksFor] = useState<SignatureSigner[] | null>(
+//     null,
+//   );
 
 //   const [expandedDocId, setExpandedDocId] = useState<string | null>(null);
 
@@ -127,7 +138,7 @@
 //     setExpandedDocId((current) => (current === docId ? null : docId));
 //   };
 
-//   const handleSubmitAction = () => {
+//   const handleSubmitAction = async () => {
 //     setIsSubmitting(true);
 
 //     try {
@@ -135,15 +146,21 @@
 //         if (handleSaveTemplate) {
 //           handleSaveTemplate();
 //         } else {
-//           toast.success("Template created successfully!", {
-//             description: "Redirecting to templates...",
-//           });
+//           toast.success("Template created successfully!");
 //           router.push("/signature/templates");
 //         }
+//         return;
+//       }
+
+//       if (onSend) {
+//         const notified = await onSend();
+//         toast.success("Signature request sent successfully!");
+//         // Hold off navigating so the test links are actually usable —
+//         // we redirect once the person closes this modal instead.
+//         setTestLinksFor(notified);
 //       } else {
-//         toast.success("Signature request sent successfully!", {
-//           description: "Redirecting to documents...",
-//         });
+//         // Fallback if no onSend was wired up yet — old behavior.
+//         toast.success("Signature request sent successfully!");
 //         router.push("/signature/documents");
 //       }
 //     } catch (error) {
@@ -153,6 +170,7 @@
 //           ? "Failed to save template."
 //           : "Failed to send signature request.",
 //       );
+//     } finally {
 //       setIsSubmitting(false);
 //     }
 //   };
@@ -475,6 +493,16 @@
 //           </button>
 //         </div>
 //       </footer>
+
+//       {testLinksFor && (
+//         <MockSendLinksModal
+//           signers={testLinksFor}
+//           onClose={() => {
+//             setTestLinksFor(null);
+//             router.push("/signature/documents");
+//           }}
+//         />
+//       )}
 //     </div>
 //   );
 // }
@@ -488,6 +516,7 @@ import {
   ChevronRight,
   Loader2,
   BookmarkPlus,
+  FileWarning,
 } from "lucide-react";
 import { useEffect, useState, type DragEvent, type MouseEvent } from "react";
 import dynamic from "next/dynamic";
@@ -600,23 +629,43 @@ export function PlaceFieldsView({
     null,
   );
 
-  const [expandedDocId, setExpandedDocId] = useState<string | null>(null);
+  // Every document is expanded by default so nothing is hidden behind a
+  // collapsed accordion row. Tracks a *set* of open ids (not a single one)
+  // so multiple documents can stay open at once.
+  const [expandedDocIds, setExpandedDocIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (documents.length === 0) {
-      setExpandedDocId(null);
+      setExpandedDocIds(new Set());
       return;
     }
-    setExpandedDocId((current) => {
-      if (current && documents.some((doc) => doc.id === current)) {
-        return current;
-      }
-      return documents[0].id;
+    setExpandedDocIds((current) => {
+      // Preserve any manual collapse/expand the user already did; just add
+      // newly-arrived documents (e.g. additional files attached after this
+      // effect first ran) to the open set rather than resetting everything.
+      const next = new Set(current);
+      documents.forEach((doc) => {
+        if (!next.has(doc.id) && !current.has(doc.id)) {
+          next.add(doc.id);
+        }
+      });
+      return next;
     });
-  }, [documents]);
+    // Only re-run when the set of document ids actually changes, not on
+    // every content update (e.g. docHtmlContent streaming in).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documents.map((d) => d.id).join(",")]);
 
   const toggleExpandedDoc = (docId: string) => {
-    setExpandedDocId((current) => (current === docId ? null : docId));
+    setExpandedDocIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(docId)) {
+        next.delete(docId);
+      } else {
+        next.add(docId);
+      }
+      return next;
+    });
   };
 
   const handleSubmitAction = async () => {
@@ -744,7 +793,7 @@ export function PlaceFieldsView({
               documents.map((doc, index) => {
                 const isPdf = isPdfDocument(doc.file);
                 const handleContainerDrop = makeContainerDropHandler(doc.id);
-                const isExpanded = expandedDocId === doc.id;
+                const isExpanded = expandedDocIds.has(doc.id);
 
                 return (
                   <div
@@ -794,13 +843,24 @@ export function PlaceFieldsView({
                                 <div className="flex items-center justify-center py-16 text-xs text-slate-400">
                                   Converting Word document preview…
                                 </div>
-                              ) : (
+                              ) : doc.docHtmlContent ? (
                                 <div
                                   className="prose prose-sm max-w-none relative text-slate-800 pointer-events-none"
                                   dangerouslySetInnerHTML={{
                                     __html: doc.docHtmlContent,
                                   }}
                                 />
+                              ) : (
+                                <div className="flex flex-col items-center justify-center gap-2 py-16 text-xs text-slate-400">
+                                  <FileWarning className="h-8 w-8 text-slate-300" />
+                                  <p className="font-medium text-slate-600">
+                                    {doc.name}
+                                  </p>
+                                  <p className="max-w-xs text-center">
+                                    Preview isn&apos;t available for this file
+                                    type — fields can still be placed below.
+                                  </p>
+                                </div>
                               )}
 
                               {placedFields
@@ -912,8 +972,12 @@ export function PlaceFieldsView({
                             </div>
                           )
                         ) : (
-                          <div className="flex items-center justify-center text-xs text-slate-400 py-16">
-                            No preview available for this file.
+                          <div className="flex flex-col items-center justify-center gap-2 text-xs text-slate-400 py-16">
+                            <FileWarning className="h-8 w-8 text-slate-300" />
+                            <p className="font-medium text-slate-600">
+                              {doc.name}
+                            </p>
+                            <p>No preview available for this file.</p>
                           </div>
                         )}
                       </div>
