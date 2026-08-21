@@ -1,26 +1,335 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  FileText,
-  Clock,
-  User,
-  Link2,
-  Calendar,
-  ChevronLeft,
-  ChevronRight,
-  Inbox,
-} from "lucide-react";
-import type {
-  DocumentRequest,
-  DocumentRequestType,
-} from "@/lib/documents/requests/types";
-import { avatarColor, initials } from "@/lib/activities/shared";
-import { cn } from "@/lib/utils";
-import { KANBAN_CARD } from "@/lib/layout";
+import { Fragment, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  ArrowDownUp,
+  Check,
+  Download,
+  FileText,
+  MoreVertical,
+} from "lucide-react";
+import {
+  DOCUMENT_REQUEST_STATUS_LABEL,
+  DOCUMENT_REQUEST_STATUS_PILL,
+  formatRelativeFromDisplay,
+  type DocumentRequest,
+  type DocumentRequestType,
+} from "@/lib/documents/requests/types";
+import { RequestOverviewPanel } from "@/components/documents/requests/RequestOverviewPanel";
+import { cn } from "@/lib/utils";
 
-const STATUS_META: Record<
+const TYPE_SOFT: Record<DocumentRequestType, string> = {
+  Contract: "bg-violet-50 text-violet-700",
+  Proposal: "bg-sky-50 text-sky-700",
+  "ID Proof": "bg-amber-50 text-amber-800",
+  Financial: "bg-emerald-50 text-emerald-700",
+  Legal: "bg-rose-50 text-rose-700",
+  Other: "bg-slate-100 text-slate-600",
+  Refinance: "bg-indigo-50 text-indigo-700",
+  "Property purchase": "bg-teal-50 text-teal-700",
+};
+
+function ProgressRing({
+  value,
+  downloadable,
+}: {
+  value: number;
+  downloadable?: boolean;
+}) {
+  const size = 40;
+  const stroke = 3.5;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(100, value));
+  const offset = circumference - (clamped / 100) * circumference;
+  const complete = clamped >= 100;
+
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <div
+        className="relative"
+        style={{ width: size, height: size }}
+        title={`${clamped}% complete`}
+      >
+        <svg width={size} height={size} className="-rotate-90">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="#e5e7eb"
+            strokeWidth={stroke}
+          />
+          {!complete && clamped > 0 ? (
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke="#5A32A3"
+              strokeWidth={stroke}
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={offset}
+            />
+          ) : null}
+          {complete ? (
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="#16a34a"
+              stroke="#16a34a"
+              strokeWidth={stroke}
+            />
+          ) : null}
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          {complete ? (
+            <Check className="h-4 w-4 text-white" strokeWidth={3} />
+          ) : (
+            <span className="text-[10px] font-semibold tabular-nums text-slate-700">
+              {clamped}%
+            </span>
+          )}
+        </div>
+      </div>
+      {complete && downloadable ? (
+        <Download className="h-3 w-3 text-slate-400" />
+      ) : null}
+    </div>
+  );
+}
+
+function DateCell({ value }: { value: string }) {
+  const relative = formatRelativeFromDisplay(value);
+  return (
+    <div className="min-w-0">
+      <p className="whitespace-nowrap text-[13px] text-slate-800">{value}</p>
+      {relative ? (
+        <p className="text-[11px] text-slate-400">{relative}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function RowActions({ request }: { request: DocumentRequest }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative flex justify-end">
+      <button
+        type="button"
+        aria-label="Actions"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+      >
+        <MoreVertical className="h-4 w-4" />
+      </button>
+      {open ? (
+        <div className="absolute right-0 z-30 mt-1 w-44 rounded-xl border border-slate-100 bg-white py-1 shadow-lg">
+          <button
+            type="button"
+            className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3]"
+            onClick={() => {
+              setOpen(false);
+              router.push(`/documents/requests/${request.id}`);
+            }}
+          >
+            View request
+          </button>
+          <button
+            type="button"
+            className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3]"
+            onClick={() => {
+              setOpen(false);
+              router.push(`/documents/requests/${request.id}`);
+            }}
+          >
+            Send reminder
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+interface DocumentRequestsListProps {
+  data: DocumentRequest[];
+  embedded?: boolean;
+}
+
+export function DocumentRequestsList({ data }: DocumentRequestsListProps) {
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1100px] border-collapse text-left">
+          <thead>
+            <tr className="border-b border-slate-100 text-[12px] font-medium text-slate-500">
+              <th className="px-5 py-3.5 font-medium">Applicant names</th>
+              <th className="px-4 py-3.5 font-medium">Broker</th>
+              <th className="px-4 py-3.5 font-medium">Document Request ID</th>
+              <th className="px-4 py-3.5 font-medium">Type</th>
+              <th className="px-4 py-3.5 font-medium">
+                <span className="inline-flex items-center gap-1">
+                  Start date
+                  <ArrowDownUp className="h-3 w-3 text-slate-400" />
+                </span>
+              </th>
+              <th className="px-4 py-3.5 font-medium">
+                <span className="inline-flex items-center gap-1">
+                  Last updated
+                  <ArrowDownUp className="h-3 w-3 text-slate-400" />
+                </span>
+              </th>
+              <th className="px-4 py-3.5 font-medium">Status</th>
+              <th className="px-4 py-3.5 text-center font-medium">Progress</th>
+              <th className="w-12 px-3 py-3.5" />
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((r) => {
+              const open = expandedId === r.id;
+              return (
+                <Fragment key={r.id}>
+                  <tr
+                    className={cn(
+                      "cursor-pointer border-b border-slate-100 transition-colors hover:bg-[#F3ECFB]/55",
+                      open && "bg-[#F8F4FC]",
+                    )}
+                    onClick={() => setExpandedId(open ? null : r.id)}
+                  >
+                    <td className="px-5 py-4">
+                      <p
+                        className="max-w-[220px] truncate text-[13.5px] font-medium text-slate-900"
+                        title={r.requestedFrom}
+                      >
+                        {r.requestedFrom}
+                      </p>
+                    </td>
+                    <td className="max-w-[140px] truncate px-4 py-4 text-[13px] text-slate-600">
+                      {r.requestedBy}
+                    </td>
+                    <td className="px-4 py-4 font-mono text-[12.5px] text-slate-700">
+                      {r.requestId}
+                    </td>
+                    <td className="px-4 py-4 text-[13px] text-slate-700">
+                      {r.documentType}
+                    </td>
+                    <td className="px-4 py-4">
+                      <DateCell value={r.requestedDate} />
+                    </td>
+                    <td className="px-4 py-4">
+                      <DateCell value={r.lastUpdated} />
+                    </td>
+                    <td className="px-4 py-4">
+                      <span
+                        className={cn(
+                          "inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                          DOCUMENT_REQUEST_STATUS_PILL[r.status],
+                        )}
+                      >
+                        {DOCUMENT_REQUEST_STATUS_LABEL[r.status]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-center">
+                        <ProgressRing
+                          value={r.progress}
+                          downloadable={Boolean(r.receivedFileName)}
+                        />
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <RowActions request={r} />
+                    </td>
+                  </tr>
+                  {open ? (
+                    <tr className="border-b border-slate-100 last:border-b-0">
+                      <td
+                        colSpan={9}
+                        className="bg-[#F6F4F8] px-4 py-4"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <RequestOverviewPanel request={r} />
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
+              );
+            })}
+            {data.length === 0 ? (
+              <tr>
+                <td colSpan={9} className="px-5 py-16 text-center">
+                  <div className="flex flex-col items-center gap-2 text-slate-400">
+                    <FileText className="h-8 w-8 text-slate-300" />
+                    <p className="text-sm font-medium text-slate-500">
+                      No document requests match your filters
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/** Kept for kanban cards on other surfaces if needed */
+export function DocumentRequestCard({
+  request,
+}: {
+  request: DocumentRequest;
+  columnId?: string;
+  isDragging?: boolean;
+  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd?: () => void;
+}) {
+  return (
+    <Link
+      href={`/documents/requests/${request.id}`}
+      className="block rounded-xl border border-slate-200 bg-white p-3 shadow-sm hover:border-[#5A32A3]/30"
+    >
+      <p className="truncate text-[13px] font-semibold text-slate-900">
+        {request.requestedFrom}
+      </p>
+      <p className="mt-0.5 text-[11px] text-slate-400">{request.requestId}</p>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            TYPE_SOFT[request.documentType],
+          )}
+        >
+          {request.documentType}
+        </span>
+        <ProgressRing value={request.progress} />
+      </div>
+    </Link>
+  );
+}
+
+export const STATUS_META: Record<
   string,
   { soft: string; text: string; border: string; dot: string }
 > = {
@@ -37,10 +346,10 @@ const STATUS_META: Record<
     dot: "bg-amber-500",
   },
   Received: {
-    soft: "bg-violet-50",
-    text: "text-violet-700",
-    border: "border-l-violet-500",
-    dot: "bg-violet-500",
+    soft: "bg-emerald-50",
+    text: "text-emerald-700",
+    border: "border-l-emerald-500",
+    dot: "bg-emerald-500",
   },
   Approved: {
     soft: "bg-emerald-50",
@@ -62,281 +371,4 @@ const STATUS_META: Record<
   },
 };
 
-const TYPE_SOFT: Record<DocumentRequestType, string> = {
-  Contract: "bg-violet-50 text-violet-700",
-  Proposal: "bg-sky-50 text-sky-700",
-  "ID Proof": "bg-amber-50 text-amber-800",
-  Financial: "bg-emerald-50 text-emerald-700",
-  Legal: "bg-rose-50 text-rose-700",
-  Other: "bg-slate-100 text-slate-600",
-};
-
-interface DocumentRequestsListProps {
-  data: DocumentRequest[];
-  embedded?: boolean;
-}
-
-export function DocumentRequestsList({
-  data,
-  embedded = false,
-}: DocumentRequestsListProps) {
-  const [page, setPage] = useState(1);
-  const pageSize = 8;
-  const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const paginated = useMemo(
-    () => data.slice((safePage - 1) * pageSize, safePage * pageSize),
-    [data, safePage],
-  );
-
-  return (
-    <div
-      className={cn(
-        "flex h-full min-w-0 flex-col overflow-hidden",
-        !embedded && "rounded-xl border border-slate-200/80 bg-white shadow-sm",
-      )}
-    >
-      <div className="min-h-0 flex-1 overflow-auto">
-        <table className="w-full min-w-[960px] border-separate border-spacing-0 text-left text-[13px]">
-          <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm">
-            <tr>
-              {[
-                "Request",
-                "From",
-                "Type",
-                "Related To",
-                "Due",
-                "Status",
-                "Requested By",
-              ].map((label) => (
-                <th
-                  key={label}
-                  className="border-b border-slate-200 px-4 py-3 text-[11px] font-semibold tracking-wide text-slate-500 uppercase"
-                >
-                  {label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {paginated.map((r, i) => {
-              const meta = STATUS_META[r.status];
-              return (
-                <tr
-                  key={r.id}
-                  className={cn(
-                    "group transition-colors hover:bg-violet-50/50",
-                    i % 2 === 1 && "bg-slate-50/40",
-                  )}
-                >
-                  <td className="max-w-[260px] border-b border-slate-100 px-4 py-3">
-                    <Link
-                      href={`/documents/requests/${r.id}`}
-                      className="flex items-center gap-2.5"
-                    >
-                      <span
-                        className={cn(
-                          "h-8 w-1 shrink-0 rounded-full",
-                          meta?.text.replace("text-", "bg-") ?? "bg-slate-300",
-                        )}
-                      />
-                      <span className="min-w-0">
-                        <span className="block truncate font-semibold text-slate-900 group-hover:text-violet-700">
-                          {r.title}
-                        </span>
-                        {"requestId" in r && (r as any).requestId ? (
-                          <span className="block text-[10px] font-medium text-slate-400">
-                            {(r as any).requestId}
-                          </span>
-                        ) : null}
-                      </span>
-                    </Link>
-                  </td>
-                  <td className="border-b border-slate-100 px-4 py-3 text-slate-600">
-                    {r.requestedFrom}
-                  </td>
-                  <td className="border-b border-slate-100 px-4 py-3">
-                    <span
-                      className={cn(
-                        "inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold",
-                        TYPE_SOFT[r.documentType],
-                      )}
-                    >
-                      {r.documentType}
-                    </span>
-                  </td>
-                  <td className="max-w-[160px] truncate border-b border-slate-100 px-4 py-3 text-slate-500">
-                    {r.relatedTo || ""}
-                  </td>
-                  <td className="border-b border-slate-100 px-4 py-3 whitespace-nowrap text-slate-500">
-                    <span className="inline-flex items-center gap-1.5">
-                      <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                      {r.dueDate}
-                    </span>
-                  </td>
-                  <td className="border-b border-slate-100 px-4 py-3">
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold",
-                        meta?.soft,
-                        meta?.text,
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "h-1.5 w-1.5 rounded-full",
-                          meta?.dot ?? "bg-slate-400",
-                        )}
-                      />
-                      {r.status}
-                    </span>
-                  </td>
-                  <td className="border-b border-slate-100 px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold ring-2 ring-white",
-                          avatarColor(r.requestedBy),
-                        )}
-                      >
-                        {initials(r.requestedBy)}
-                      </span>
-                      <span className="truncate text-slate-700">
-                        {r.requestedBy}
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {paginated.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-16 text-center">
-                  <div className="flex flex-col items-center gap-2 text-slate-400">
-                    <Inbox className="h-8 w-8 text-slate-300" />
-                    <p className="text-sm font-medium text-slate-500">
-                      No requests match your filters
-                    </p>
-                    <p className="text-[12px] text-slate-400">
-                      Try adjusting or clearing your filters.
-                    </p>
-                  </div>
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
-      <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/60 px-4 py-2.5 text-[11.5px] text-slate-500">
-        <span>
-          Showing{" "}
-          <span className="font-medium text-slate-700">
-            {data.length === 0 ? 0 : (safePage - 1) * pageSize + 1}–
-            {Math.min(safePage * pageSize, data.length)}
-          </span>{" "}
-          of <span className="font-medium text-slate-700">{data.length}</span>
-        </span>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={safePage === 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-            Prev
-          </button>
-          <span className="px-1 text-slate-400">
-            Page <span className="font-medium text-slate-700">{safePage}</span>{" "}
-            of {totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={safePage === totalPages}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white"
-          >
-            Next
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export function DocumentRequestCard({
-  request,
-  columnId,
-  isDragging,
-  onDragStart,
-  onDragEnd,
-}: {
-  request: DocumentRequest;
-  columnId: string;
-  isDragging: boolean;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragEnd: () => void;
-}) {
-  const meta = STATUS_META[request.status];
-
-  return (
-    <div
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      data-request-id={request.id}
-      data-column-id={columnId}
-      className={cn(
-        "cursor-grab select-none rounded-md border border-slate-100 border-l-[3px] !bg-white p-3.5 shadow-sm transition-all active:cursor-grabbing",
-        KANBAN_CARD,
-        meta.border,
-        isDragging ? "opacity-40" : "hover:border-slate-200 hover:shadow-md",
-      )}
-    >
-      <Link href={`/documents/requests/${request.id}`} className="block">
-        <div className="mb-1 flex items-start justify-between gap-2">
-          <h4 className="text-[13px] font-semibold leading-snug text-slate-900">
-            {request.title}
-          </h4>
-          <FileText className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-        </div>
-        <p className="mb-2 text-[10px] font-medium text-slate-400">
-          {request.requestId}
-        </p>
-        <div className="space-y-1 text-[11px] text-slate-500">
-          <div className="flex items-center gap-1.5">
-            <User className="h-3 w-3 shrink-0 text-slate-400" />
-            <span className="truncate">{request.requestedFrom}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Calendar className="h-3 w-3 shrink-0 text-slate-400" />
-            <span>Due {request.dueDate}</span>
-          </div>
-          {request.relatedTo ? (
-            <div className="flex items-center gap-1.5">
-              <Link2 className="h-3 w-3 shrink-0 text-slate-400" />
-              <span className="truncate">{request.relatedTo}</span>
-            </div>
-          ) : null}
-        </div>
-        <div className="mt-2.5 flex items-center justify-between border-t border-slate-50 pt-2">
-          <span
-            className={cn(
-              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-              TYPE_SOFT[request.documentType],
-            )}
-          >
-            {request.documentType}
-          </span>
-          <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
-            <Clock className="h-3 w-3" />
-            {request.requestedDate}
-          </span>
-        </div>
-      </Link>
-    </div>
-  );
-}
-
-export { STATUS_META, TYPE_SOFT };
+export { TYPE_SOFT };

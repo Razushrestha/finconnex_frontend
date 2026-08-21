@@ -98,7 +98,30 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
 
   function setStatus(status: DocumentRequestStatus) {
     if (!request) return;
-    const next = { ...request, status, notes };
+    const today = new Date().toLocaleDateString("en-AU", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    const progress =
+      status === "Approved"
+        ? 100
+        : status === "Received"
+          ? 86
+          : status === "Pending"
+            ? Math.max(request.progress, 32)
+            : status === "Rejected"
+              ? Math.max(request.progress, 45)
+              : status === "Requested" || status === "Expired"
+                ? 0
+                : request.progress;
+    const next = {
+      ...request,
+      status,
+      notes,
+      progress,
+      lastUpdated: today,
+    };
     if (status === "Approved" && request.receivedFileName) {
       const today = new Date().toLocaleDateString("en-AU");
       pushLibraryDoc({
