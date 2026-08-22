@@ -86,7 +86,9 @@ function LiveKpiStrip({ layout }: { layout: DashboardLayout }) {
       setStats(computeDashboardStats(layout.filters));
     }
     refresh();
-    return onRulesChange(refresh);
+    return onRulesChange(() => {
+      queueMicrotask(refresh);
+    });
   }, [layout.filters]);
 
   const tiles = [

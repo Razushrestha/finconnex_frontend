@@ -19,7 +19,7 @@
     "smoke:phase15": "npx tsx src/lib/leads/smoke-session15.ts",
     "smoke:phase16": "npx tsx src/lib/leads/smoke-session16.ts",
     "smoke:phase17": "npx tsx src/lib/leads/smoke-session17.ts",
-    "smoke:phase18": "npx tsx src/lib/leads/smoke-session18.ts",
+    "smoke:leads": "npx tsx src/lib/leads/smoke-leads-api.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

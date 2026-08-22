@@ -11,6 +11,7 @@ import { CustomFieldsSettingsClient } from "@/components/settings/CustomFieldsSe
 import { PipelineSlaSettingsClient } from "@/components/settings/PipelineSlaSettingsClient";
 import { TwoFactorSettingsClient } from "@/components/settings/TwoFactorSettingsClient";
 import { LoginHistorySettingsClient } from "@/components/settings/LoginHistorySettingsClient";
+import { LoginSessionsSettingsClient } from "@/components/settings/LoginSessionsSettingsClient";
 import { BillingSettingsClient } from "@/components/settings/BillingSettingsClient";
 import { BackupRestoreSettingsClient } from "@/components/settings/BackupRestoreSettingsClient";
 import { FieldPermissionsSettingsClient } from "@/components/settings/FieldPermissionsSettingsClient";
@@ -53,6 +54,8 @@ export default async function SettingsSubPage({ params }: PageProps) {
       <TwoFactorSettingsClient />
     ) : key === "security/login-history" ? (
       <LoginHistorySettingsClient />
+    ) : key === "users-and-access/login-sessions" ? (
+      <LoginSessionsSettingsClient />
     ) : key === "subscription-and-billing/subscription-plan" ||
       key === "subscription-and-billing/billing" ||
       key === "subscription-and-billing/invoices" ? (

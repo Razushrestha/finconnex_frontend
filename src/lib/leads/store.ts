@@ -258,3 +258,36 @@ export function updateLead(
   saveLeadColumns(cols);
   return nextCard;
 }
+
+export function upsertLeadFromCard(card: LeadCardData, status?: LeadStatus) {
+  const stage: MortgagePipelineStage =
+    card.pipelineStage && isMortgagePipelineStage(card.pipelineStage)
+      ? card.pipelineStage
+      : status
+        ? leadStatusToPipelineStage(status)
+        : "New Lead";
+  const nextCard: LeadCardData = {
+    ...card,
+    pipelineStage: stage,
+    accentColorClass: PIPELINE_STAGE_DOT[stage] ?? card.accentColorClass,
+  };
+  const without = listLeadColumns().map((col) => ({
+    ...col,
+    cards: col.cards.filter((c) => c.id !== card.id),
+    leadCount: col.cards.filter((c) => c.id !== card.id).length,
+  }));
+  const target = without.find((c) => c.title === stage) ?? without[0];
+  if (!target) return nextCard;
+  saveLeadColumns(
+    without.map((col) =>
+      col.id === target.id
+        ? {
+            ...col,
+            cards: [nextCard, ...col.cards],
+            leadCount: col.cards.length + 1,
+          }
+        : col,
+    ),
+  );
+  return nextCard;
+}

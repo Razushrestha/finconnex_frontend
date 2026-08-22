@@ -34,17 +34,98 @@ async function wrap<T>(fn: () => Promise<T>) {
 
 const auth: AuthApi = {
   login: (input) =>
-    wrap(() =>
-      httpPost<{ user: SessionPayload }>("/auth/login", input).then((r) => ({
-        user: r.user,
-      })),
-    ),
-  logout: () => wrap(async () => {
-    await httpPost("/auth/logout");
-    return { ok: true as const };
-  }),
-  me: () => wrap(() => httpGet<SessionPayload>("/auth/me")),
+    wrap(async () => {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        user?: { id: string; email: string; name: string; role: string };
+        tenant?: { id: string; slug: string; name: string };
+        error?: string;
+      };
+      if (!res.ok) {
+        throw new Error(data.error ?? "Login failed");
+      }
+      if (!data.user || !data.tenant) {
+        const me = await auth.me();
+        if (!me.ok) throw new Error(me.error.message);
+        return { user: me.data };
+      }
+      const session: SessionPayload = {
+        userId: data.user.id,
+        email: data.user.email,
+        name: data.user.name,
+        role: data.user.role,
+        tenantId: data.tenant.id,
+        tenantSlug: data.tenant.slug,
+        tenantName: data.tenant.name,
+      };
+      return { user: session };
+    }),
+  logout: () =>
+    wrap(async () => {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+      return { ok: true as const };
+    }),
+  logoutAll: () =>
+    wrap(async () => {
+      const res = await fetch("/api/auth/logout-all", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Logout all failed");
+      return { ok: true as const };
+    }),
+  me: () => wrap(() => localMe()),
+  listSessions: () =>
+    wrap(async () => {
+      const res = await fetch("/api/auth/sessions", { credentials: "include" });
+      const data = (await res.json()) as { sessions?: never[] };
+      if (!res.ok) throw new Error("Could not list sessions");
+      return { sessions: data.sessions ?? [] };
+    }),
+  revokeSession: (id) =>
+    wrap(async () => {
+      const res = await fetch(`/api/auth/sessions/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Could not revoke session");
+      return { ok: true as const };
+    }),
+  selectWorkspace: (workspaceId) =>
+    wrap(async () => {
+      const res = await fetch("/api/auth/workspace", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId }),
+      });
+      if (!res.ok) throw new Error("Could not select workspace");
+      return { workspaceId };
+    }),
 };
+
+async function localMe(): Promise<SessionPayload> {
+  const res = await fetch("/api/auth/me", { credentials: "include" });
+  if (!res.ok) throw new Error("Not authenticated");
+  const data = (await res.json()) as {
+    user: { id: string; email: string; name: string; role: string };
+    tenant: { id: string; slug: string; name: string };
+  };
+  return {
+    userId: data.user.id,
+    email: data.user.email,
+    name: data.user.name,
+    role: data.user.role,
+    tenantId: data.tenant.id,
+    tenantSlug: data.tenant.slug,
+    tenantName: data.tenant.name,
+  };
+}
 
 const leads: LeadsApi = {
   board: () => wrap(() => httpGet("/leads/board")),

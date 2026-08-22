@@ -40,8 +40,8 @@ import {
   NextStepCard,
   OrgInfoCard,
   RelatedContactsCard,
-  type TimelineItemData,
 } from "@/components/sales/entity-detail";
+import { useParentActivityTimeline } from "@/lib/activity-timeline";
 import { EditDealModal, type EditDealFormValues } from "./EditDealModal";
 import { ComposeEmailModal } from "../ComposeEmailModal";
 import { sendEmailDemoLive } from "@/lib/comms/send-gateway";
@@ -96,17 +96,15 @@ export function DealDetailView({
   const probabilityBandIndex =
     deal.probability >= 70 ? 2 : deal.probability >= 40 ? 1 : 0;
 
-  const timelineItems: TimelineItemData[] = [
-    {
-      id: "d1",
-      type: "activity",
-      icon: CheckCircle2,
-      iconTone: "success",
-      title: `Moved to ${stage.title}`,
-      timestampLabel: "Just now",
-      body: `Stage changed by ${deal.owner}.`,
-    },
-  ];
+  const {
+    feedItems: timelineItems,
+    loading: timelineLoading,
+    error: timelineError,
+  } = useParentActivityTimeline({
+    relatedType: "DEAL",
+    relatedId: deal.id,
+    filters: { limit: 25 },
+  });
 
   function handleEditSave(values: EditDealFormValues) {
     const loc = updateDeal(deal.id, {
@@ -261,6 +259,16 @@ export function DealDetailView({
             onChange={setActiveTab}
           />
           <TimelineFeed items={timelineItems} />
+          {timelineLoading ? (
+            <p className="text-center text-[12px] text-slate-400">
+              Refreshing timeline…
+            </p>
+          ) : null}
+          {!timelineLoading && timelineError && timelineItems.length === 0 ? (
+            <p className="text-center text-[12px] text-slate-400">
+              {timelineError}
+            </p>
+          ) : null}
         </div>
 
         <div className="space-y-4">

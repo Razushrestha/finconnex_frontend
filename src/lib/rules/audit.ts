@@ -48,9 +48,9 @@ function readStore(): AuditEvent[] {
   return readJsonStore<AuditEvent[]>(STORE_KEY, []);
 }
 
-function writeStore(list: AuditEvent[]) {
+function writeStore(list: AuditEvent[], emit = true) {
   writeJsonStore(STORE_KEY, list.slice(0, MAX_EVENTS));
-  emitRulesChange("audit");
+  if (emit) emitRulesChange("audit");
 }
 
 export function listAuditEvents(): AuditEvent[] {
@@ -59,6 +59,7 @@ export function listAuditEvents(): AuditEvent[] {
 
 export function appendAuditEvent(
   partial: Omit<AuditEvent, "id" | "at"> & { at?: string },
+  options?: { emit?: boolean },
 ): AuditEvent {
   const event: AuditEvent = {
     id: newRulesId("aud"),
@@ -67,7 +68,7 @@ export function appendAuditEvent(
   };
   const list = listAuditEvents();
   list.unshift(event);
-  writeStore(list);
+  writeStore(list, options?.emit !== false);
   return event;
 }
 

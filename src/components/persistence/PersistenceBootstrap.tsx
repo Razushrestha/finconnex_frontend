@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { enableProductionComms } from "@/lib/comms/production";
 import { runLiveApiCutover } from "@/lib/persistence/cutover";
 
@@ -12,12 +13,15 @@ export function PersistenceBootstrap({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+
   useEffect(() => {
+    if (pathname === "/login") return;
     void (async () => {
       await runLiveApiCutover();
       await enableProductionComms();
     })();
-  }, []);
+  }, [pathname]);
 
   return children;
 }

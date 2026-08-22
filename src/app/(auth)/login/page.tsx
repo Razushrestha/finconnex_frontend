@@ -102,7 +102,7 @@ export default function LoginPage() {
                 Welcome back
               </h2>
               <p className="mt-1 text-sm text-gray-500">
-                Enter your username and password to continue
+                Sign in with your FinConnex account email and password
               </p>
             </div>
 

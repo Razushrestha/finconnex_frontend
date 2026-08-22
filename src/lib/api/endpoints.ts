@@ -5,17 +5,32 @@
 
 export const ENDPOINT_CATALOG = [
   // Auth
-  { method: "POST", path: "/auth/login", module: "auth", notes: "Sets session cookie" },
-  { method: "POST", path: "/auth/logout", module: "auth" },
+  { method: "POST", path: "/auth/login", module: "auth", notes: "Public; returns access + refresh tokens" },
+  { method: "POST", path: "/auth/refresh-token", module: "auth", notes: "Bearer refreshToken" },
   { method: "GET", path: "/auth/me", module: "auth" },
+  { method: "GET", path: "/auth/sessions", module: "auth" },
+  { method: "DELETE", path: "/auth/sessions/:id", module: "auth" },
+  { method: "POST", path: "/auth/workspace", module: "auth", notes: "Select workspace; returns scoped access token" },
+  { method: "POST", path: "/auth/logout", module: "auth" },
+  { method: "POST", path: "/auth/logout-all", module: "auth" },
 
   // Leads
-  { method: "GET", path: "/leads/board", module: "leads", notes: "Kanban columns" },
+  { method: "GET", path: "/leads/kanban", module: "leads", notes: "Kanban columns grouped by CRM status" },
   { method: "GET", path: "/leads", module: "leads", notes: "Paginated list" },
   { method: "GET", path: "/leads/:id", module: "leads" },
   { method: "POST", path: "/leads", module: "leads" },
   { method: "PATCH", path: "/leads/:id", module: "leads" },
-  { method: "POST", path: "/leads/:id/status", module: "leads", notes: "Converted is final" },
+  { method: "PATCH", path: "/leads/:id/owner", module: "leads" },
+  { method: "DELETE", path: "/leads/:id/owner", module: "leads" },
+  { method: "PATCH", path: "/leads/:id/company", module: "leads" },
+  { method: "DELETE", path: "/leads/:id/company", module: "leads" },
+  { method: "PATCH", path: "/leads/:id/status", module: "leads" },
+  { method: "PATCH", path: "/leads/:id/lifecycle-stage", module: "leads" },
+  { method: "PATCH", path: "/leads/:id/rating", module: "leads" },
+  { method: "PATCH", path: "/leads/:id/score", module: "leads" },
+  { method: "POST", path: "/leads/bulk", module: "leads" },
+  { method: "POST", path: "/leads/import", module: "leads", notes: "JSON rows, max 100" },
+  { method: "POST", path: "/leads/:id/convert", module: "leads", notes: "Requires existing contact/deal/company UUID" },
   { method: "DELETE", path: "/leads/:id", module: "leads", notes: "Soft-delete → recycle bin" },
 
   // Contacts
@@ -56,6 +71,20 @@ export const ENDPOINT_CATALOG = [
   { method: "POST", path: "/rules/recycle-bin/:id/restore", module: "rules" },
   { method: "DELETE", path: "/rules/recycle-bin/:id", module: "rules", notes: "Permanent purge" },
   { method: "GET", path: "/rules/permissions/me", module: "rules" },
+
+  // Activity Timeline (workspace-scoped; requires JWT workspaceId)
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/activity-timeline",
+    module: "activity-timeline",
+    notes: "Workspace feed; query: page, limit, type, from, to",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/:relatedType/:relatedId/activity-timeline",
+    module: "activity-timeline",
+    notes: "Parent feed; relatedType=LEAD|CONTACT|COMPANY|DEAL|…",
+  },
 ] as const;
 
 export type EndpointEntry = (typeof ENDPOINT_CATALOG)[number];

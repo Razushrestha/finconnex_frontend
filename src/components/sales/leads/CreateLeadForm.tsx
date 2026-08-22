@@ -20,6 +20,7 @@ import {
   type LeadSource,
 } from "@/lib/leads/types";
 import { api } from "@/lib/api";
+import { syncCreatedLead } from "@/lib/leads/api";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import {
   isMortgagePipelineStage,
@@ -140,6 +141,49 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
       return;
     }
     const pipelineStage = form.pipelineStage || "New Lead";
+    try {
+      const live = await syncCreatedLead({
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim(),
+        phone: form.phone,
+        company: form.company,
+        companyWebsite: form.companyWebsite,
+        industry: form.industry,
+        jobTitle: form.jobTitle,
+        source: form.leadSource || "Website",
+        productInterest: form.productInterest,
+        budgetRange: form.budgetRange,
+        estimatedValue: form.estimatedValue || undefined,
+        notes: form.notes,
+        pipelineStage,
+      });
+      if (live) {
+        logCreate("sales.leads", form.owner, live.id, live.name);
+        notifyOwnerAssigned({
+          owner: form.owner,
+          entityLabel: `Lead ${live.name}`,
+          relatedTo: live.name,
+          relatedHref: "/sales/leads",
+          type: "Lead Assigned",
+        });
+        if (createAnother) {
+          setForm({
+            ...makeInitialState(props.stage),
+            owner: form.owner,
+            pipelineStage,
+          });
+          setErrors({});
+          setSubmitted(false);
+          return;
+        }
+        router.push("/sales/leads");
+        return;
+      }
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Unable to create lead");
+      return;
+    }
     const result = await api.leads.create({
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),

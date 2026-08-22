@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, Trophy, XCircle } from "lucide-react";
 import { type KanbanColumn, type LeadPipelineStage } from "@/lib/leads/types";
 import { listLeadColumns, saveLeadColumns } from "@/lib/leads/store";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import { pipelineStageToCrmStatus } from "@/lib/leads/api/map";
+import { syncLeadStatus } from "@/lib/leads/api";
 import { onRulesChange } from "@/lib/rules";
 import {
   emitLeadActivityChange,
@@ -273,6 +276,16 @@ export function LeadKanbanBoard({
       return col;
     });
     persist(next);
+
+    if (isUuid(card.id)) {
+      const fromStatus = pipelineStageToCrmStatus(sourceColumn.title);
+      const toStatus = pipelineStageToCrmStatus(targetColumn.title);
+      if (fromStatus !== toStatus) {
+        void syncLeadStatus(card.id, targetColumn.title).then((live) => {
+          if (!live) flash("Could not save status on the server");
+        });
+      }
+    }
 
     logStatusChange(
       "sales.leads",

@@ -41,7 +41,7 @@ import type { SessionPayload } from "@/lib/auth/types";
 /* ── Auth ─────────────────────────────────────────────── */
 
 export interface AuthApi {
-  /** POST /auth/login: existing Next route may proxy later */
+  /** POST /auth/login */
   login(input: {
     username: string;
     password: string;
@@ -49,8 +49,30 @@ export interface AuthApi {
   }): Promise<ApiResult<{ user: SessionPayload }>>;
   /** POST /auth/logout */
   logout(): Promise<ApiResult<{ ok: true }>>;
+  /** POST /auth/logout-all */
+  logoutAll(): Promise<ApiResult<{ ok: true }>>;
   /** GET /auth/me */
   me(): Promise<ApiResult<SessionPayload>>;
+  /** GET /auth/sessions */
+  listSessions(): Promise<
+    ApiResult<{
+      sessions: Array<{
+        id: string;
+        createdAt: string;
+        lastUsedAt: string;
+        expiresAt: string;
+        ipHash: string;
+        userAgent?: string;
+        current: boolean;
+      }>;
+    }>
+  >;
+  /** DELETE /auth/sessions/:id */
+  revokeSession(id: string): Promise<ApiResult<{ ok: true }>>;
+  /** POST /auth/workspace */
+  selectWorkspace(
+    workspaceId: string,
+  ): Promise<ApiResult<{ workspaceId: string }>>;
 }
 
 /* ── Leads ────────────────────────────────────────────── */

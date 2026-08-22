@@ -16,12 +16,16 @@ import {
   type LeadFilters,
 } from "@/components/sales/leads/FilterLeadsPanel";
 import { listLeadColumns, deleteLeads, updateLeadOwner } from "@/lib/leads/store";
+import {
+  bulkCrmLeads,
+  refreshCrmLeadsBoard,
+} from "@/lib/leads/api";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { exportLeadsCsv } from "@/lib/leads/import";
 import { ImportLeadsModal } from "@/components/sales/leads/ImportLeadsModal";
 import { AdsSyncModal } from "@/components/sales/leads/AdsSyncModal";
 import { SheetsImportModal } from "@/components/sales/leads/SheetsImportModal";
 import type { AdsPlatform } from "@/lib/leads/ads-sync";
-import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import { LEAD_PIPELINE_STAGES } from "@/lib/leads/types";
 import { stageColumnId } from "@/lib/pipeline-sla/board";
 import { onRulesChange } from "@/lib/rules";
@@ -282,23 +286,48 @@ export default function LeadsPage() {
     setBulkFlash(`Exported ${n} selected leads`);
   }
 
-  function deleteSelected() {
+  async function deleteSelected() {
     if (!selectedIds.length) return;
     if (!window.confirm(`Delete ${selectedIds.length} selected lead(s)?`)) return;
-    const n = deleteLeads(selectedIds);
+    const liveIds = selectedIds.filter(isUuid);
+    if (liveIds.length) {
+      try {
+        await bulkCrmLeads({ ids: liveIds, operation: "SOFT_DELETE" });
+        await refreshCrmLeadsBoard();
+      } catch (err) {
+        setBulkFlash(err instanceof Error ? err.message : "Delete failed");
+        return;
+      }
+    }
+    const localIds = selectedIds.filter((id) => !isUuid(id));
+    const n = localIds.length ? deleteLeads(localIds) : liveIds.length;
     setSelectedIds([]);
     setBulkFlash(`Deleted ${n} lead(s)`);
   }
 
-  function changeOwnerSelected() {
+  async function changeOwnerSelected() {
     if (!selectedIds.length) return;
     const owner = window.prompt(
-      `Assign owner for ${selectedIds.length} lead(s).\nOptions: ${ACTIVITY_OWNERS.join(", ")}`,
-      ACTIVITY_OWNERS[0],
+      `Assign owner UUID for ${selectedIds.length} lead(s).\nPaste a workspace member user id.`,
+      "",
     );
     if (!owner?.trim()) return;
-    const n = updateLeadOwner(selectedIds, owner.trim());
-    setBulkFlash(`Updated owner on ${n} lead(s)`);
+    if (!isUuid(owner.trim())) {
+      const n = updateLeadOwner(selectedIds, owner.trim());
+      setBulkFlash(`Updated local owner on ${n} lead(s)`);
+      return;
+    }
+    try {
+      await bulkCrmLeads({
+        ids: selectedIds.filter(isUuid),
+        operation: "ASSIGN_OWNER",
+        ownerId: owner.trim(),
+      });
+      await refreshCrmLeadsBoard();
+      setBulkFlash("Owner updated");
+    } catch (err) {
+      setBulkFlash(err instanceof Error ? err.message : "Owner update failed");
+    }
   }
 
   function openPrintView() {
@@ -312,6 +341,10 @@ export default function LeadsPage() {
     }
     setIsKanbanSettingsOpen(true);
   }
+
+  useEffect(() => {
+    void refreshCrmLeadsBoard();
+  }, []);
 
   useEffect(() => {
     if (!bulkFlash) return;

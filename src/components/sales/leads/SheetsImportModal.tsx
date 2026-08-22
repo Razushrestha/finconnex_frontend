@@ -71,7 +71,7 @@ export function SheetsImportModal({
     const mapping = suggestLeadMapping(parsed.headers);
     const settings = defaultLeadImportSettings();
     previewLeadImport(parsed.rows, mapping, settings);
-    const summary = applyLeadImport(parsed.rows, mapping, settings);
+    const summary = await applyLeadImport(parsed.rows, mapping, settings);
     emitRulesChange("all");
     setDone(summary);
     setBusy(false);

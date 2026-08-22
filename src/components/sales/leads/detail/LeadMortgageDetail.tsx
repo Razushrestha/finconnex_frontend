@@ -13,13 +13,11 @@ import {
   Home,
   Mail,
   MapPin,
-  MessageSquare,
   MoreHorizontal,
   Phone,
   Send,
   StickyNote,
   Target,
-  Upload,
   Users,
   Wallet,
 } from "lucide-react";
@@ -36,6 +34,11 @@ import {
 } from "@/lib/leads/detail-snapshot";
 import { cn } from "@/lib/utils";
 import { avatarColor, initials } from "@/lib/activities/shared";
+import {
+  activityTypeIcon,
+  activityTypeTone,
+  useParentActivityTimeline,
+} from "@/lib/activity-timeline";
 
 const PURPLE = "#5A32A3";
 
@@ -56,13 +59,6 @@ const FINANCE_META = [
   { icon: Wallet, iconWrap: "bg-amber-50 text-amber-600" },
   { icon: Users, iconWrap: "bg-rose-50 text-rose-600" },
   { icon: Clock, iconWrap: "bg-indigo-50 text-indigo-600" },
-];
-
-const ACTIVITY = [
-  { label: "Call made", when: "Yesterday, 1:00 PM", icon: Phone, tone: "bg-orange-50 text-orange-600" },
-  { label: "SMS sent", when: "Yesterday, 11:20 AM", icon: MessageSquare, tone: "bg-sky-50 text-sky-600" },
-  { label: "Email opened", when: "3 hours ago", icon: Mail, tone: "bg-emerald-50 text-emerald-600" },
-  { label: "Document uploaded", when: "2 days ago", icon: Upload, tone: "bg-violet-50 text-violet-600" },
 ];
 
 const RELATED = [
@@ -200,6 +196,17 @@ export function LeadMortgageDetail({
   const inStage = daysInStage(card);
   const tag = leadBuyerTag(card);
   const location = leadLocation(card);
+  const {
+    rows: activityRows,
+    loading: activityLoading,
+    error: activityError,
+    source: activitySource,
+  } = useParentActivityTimeline({
+    relatedType: "LEAD",
+    relatedId: card.id,
+    leadNameFallback: card.name,
+    filters: { limit: 6 },
+  });
 
   return (
     <div className="space-y-4 bg-[#F7F6F9] -mx-3 -mb-3 px-3 pb-6 lg:-mx-5 lg:px-5 2xl:-mx-8 2xl:px-8">
@@ -457,33 +464,57 @@ export function LeadMortgageDetail({
             <Card>
               <div className="mb-3 flex items-center justify-between">
                 <Eyebrow>Recent Activity</Eyebrow>
-                <span className="text-[12px] font-semibold" style={{ color: PURPLE }}>
-                  View all
-                </span>
+                {activitySource === "api" ? (
+                  <span
+                    className="text-[12px] font-semibold"
+                    style={{ color: PURPLE }}
+                  >
+                    Live
+                  </span>
+                ) : (
+                  <span className="text-[12px] font-semibold text-slate-400">
+                    {activityLoading ? "Loading…" : "View all"}
+                  </span>
+                )}
               </div>
-              <ul className="space-y-3">
-                {ACTIVITY.map((row) => {
-                  const Icon = row.icon;
-                  return (
-                    <li key={row.label} className="flex items-center gap-2.5">
-                      <span
-                        className={cn(
-                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                          row.tone,
-                        )}
-                      >
-                        <Icon className="h-3.5 w-3.5" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[13px] font-medium text-slate-800">
-                          {row.label}
-                        </p>
-                        <p className="text-[11px] text-slate-400">{row.when}</p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+              {activityLoading && activityRows.length === 0 ? (
+                <p className="py-6 text-center text-[13px] text-slate-400">
+                  Loading activity…
+                </p>
+              ) : activityRows.length === 0 ? (
+                <p className="py-6 text-center text-[13px] text-slate-400">
+                  {activityError
+                    ? "Couldn’t load activity right now."
+                    : "No recent activity yet."}
+                </p>
+              ) : (
+                <ul className="space-y-3">
+                  {activityRows.map((row) => {
+                    const Icon = activityTypeIcon(row.activityType);
+                    return (
+                      <li key={row.id} className="flex items-center gap-2.5">
+                        <span
+                          className={cn(
+                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                            activityTypeTone(row.activityType),
+                          )}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[13px] font-medium text-slate-800">
+                            {row.label}
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            {row.when}
+                            {row.actorLabel ? ` · ${row.actorLabel}` : ""}
+                          </p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </Card>
 
             <Card>

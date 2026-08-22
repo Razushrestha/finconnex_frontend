@@ -19,29 +19,35 @@ export function ensureLeadStatusHistorySeeds() {
   const events = listAuditEvents();
   if (events.some((e) => e.meta?.seed === SEED_META)) return;
 
-  appendAuditEvent({
-    action: "status_change",
-    module: LEAD_MODULE,
-    recordId: "l-c1",
-    recordLabel: "Katherina Brooks",
-    actor: "Roshna Abraham",
-    summary: "Katherina Brooks: New → Contacted",
-    changes: [{ field: "status", from: "New", to: "Contacted" }],
-    at: "10/07/2026 09:00 AM",
-    meta: { seed: SEED_META },
-  });
+  appendAuditEvent(
+    {
+      action: "status_change",
+      module: LEAD_MODULE,
+      recordId: "l-c1",
+      recordLabel: "Katherina Brooks",
+      actor: "Roshna Abraham",
+      summary: "Katherina Brooks: New → Contacted",
+      changes: [{ field: "status", from: "New", to: "Contacted" }],
+      at: "10/07/2026 09:00 AM",
+      meta: { seed: SEED_META },
+    },
+    { emit: false },
+  );
 
-  appendAuditEvent({
-    action: "status_change",
-    module: LEAD_MODULE,
-    recordId: "l-n1",
-    recordLabel: "William Anderson",
-    actor: "John Smith",
-    summary: "William Anderson: Contacted → New",
-    changes: [{ field: "status", from: "Contacted", to: "New" }],
-    at: "01/07/2026 02:00 PM",
-    meta: { seed: SEED_META },
-  });
+  appendAuditEvent(
+    {
+      action: "status_change",
+      module: LEAD_MODULE,
+      recordId: "l-n1",
+      recordLabel: "William Anderson",
+      actor: "John Smith",
+      summary: "William Anderson: Contacted → New",
+      changes: [{ field: "status", from: "Contacted", to: "New" }],
+      at: "01/07/2026 02:00 PM",
+      meta: { seed: SEED_META },
+    },
+    { emit: false },
+  );
 }
 
 function matchesLead(event: AuditEvent, leadName: string): boolean {

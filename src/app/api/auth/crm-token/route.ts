@@ -1,27 +1,25 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { SESSION_COOKIE } from "@/lib/auth/constants";
-import { cookies } from "next/headers";
+import { readCrmTokens } from "@/lib/auth/crm-server";
 
 /**
- * Phase 14 — CRM API token bridge.
- * Returns the session JWT as a Bearer candidate + tenant id for persistence cutover.
- * Swap for a dedicated CRM OAuth token when the live API ships.
+ * Returns the live CRM access token when present, else the app session JWT.
  */
 export async function GET() {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ authenticated: false }, { status: 401 });
+    return NextResponse.json({ authenticated: false });
   }
 
-  const cookieStore = await cookies();
-  const accessToken = cookieStore.get(SESSION_COOKIE)?.value ?? null;
+  const crm = await readCrmTokens();
+  const accessToken = crm.accessToken;
 
   return NextResponse.json({
     authenticated: true,
     accessToken,
     tenantId: session.tenantId,
     tenantSlug: session.tenantSlug,
+    workspaceId: session.tenantId,
     expiresIn: null as number | null,
   });
 }

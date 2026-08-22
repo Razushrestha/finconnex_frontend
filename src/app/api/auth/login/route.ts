@@ -1,27 +1,50 @@
 import { NextResponse } from "next/server";
-import { getDefaultSession } from "@/lib/auth/tenants";
-import {
-  createPending2faToken,
-  createSessionToken,
-} from "@/lib/auth/session";
+import { createSessionToken } from "@/lib/auth/session";
 import {
   getPending2faCookieOptions,
   getSessionCookieOptions,
   PENDING_2FA_COOKIE,
   SESSION_COOKIE,
-  STATIC_LOGIN,
-  TWO_FACTOR_FLAG_COOKIE,
 } from "@/lib/auth/constants";
 import { loginSchema } from "@/lib/auth/validation";
 import {
   clientIpFromRequest,
   isIpAllowed,
 } from "@/lib/settings/ip-allowlist";
+import {
+  activateWorkspace,
+  applyCrmTokenCookies,
+  crmLogin,
+  CrmAuthError,
+  sessionFromCrmUser,
+} from "@/lib/auth/crm-server";
+
+function friendlyAuthMessage(raw: string) {
+  const key = raw.toLowerCase();
+  if (key.includes("invalid") || key.includes("unauthorized") || key.includes("credential")) {
+    return "Invalid email or password.";
+  }
+  if (key.includes("verified") || key.includes("verification")) {
+    return "Please verify your email before signing in.";
+  }
+  if (key.includes("forbidden")) {
+    return "You don’t have access to this workspace.";
+  }
+  if (raw.startsWith("auth.") || raw.startsWith("workspace.")) {
+    return "Unable to sign in. Check your email and password.";
+  }
+  return raw;
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
-    const parsed = loginSchema.safeParse(body);
+    const parsed = loginSchema.safeParse({
+      email: (body as { email?: string; username?: string }).email
+        ?? (body as { username?: string }).username,
+      password: (body as { password?: string }).password,
+      rememberMe: (body as { rememberMe?: boolean }).rememberMe,
+    });
 
     if (!parsed.success) {
       return NextResponse.json(
@@ -41,71 +64,66 @@ export async function POST(request: Request) {
       );
     }
 
-    const { username, password, rememberMe } = parsed.data;
+    const { email, password, rememberMe } = parsed.data;
 
-    if (
-      username !== STATIC_LOGIN.username ||
-      password !== STATIC_LOGIN.password
-    ) {
-      return NextResponse.json(
-        { error: "Invalid username or password" },
-        { status: 401 },
+    try {
+      const loggedIn = await crmLogin(email, password);
+      const scoped = await activateWorkspace(
+        loggedIn.accessToken,
+        loggedIn.refreshToken,
       );
-    }
-
-    const result = getDefaultSession();
-    const requires2fa = cookieHeader
-      .split(";")
-      .some((c) => c.trim().startsWith(`${TWO_FACTOR_FLAG_COOKIE}=1`));
-
-    const sessionFields = {
-      userId: result.user.id,
-      email: result.user.email,
-      name: result.user.name,
-      role: result.user.role,
-      tenantId: result.tenant.id,
-      tenantSlug: result.tenant.slug,
-      tenantName: result.tenant.name,
-    };
-
-    if (requires2fa) {
-      const pending = await createPending2faToken({
-        ...sessionFields,
-        rememberMe: !!rememberMe,
-      });
+      const sessionFields = sessionFromCrmUser(
+        loggedIn.user,
+        scoped.workspace,
+        scoped.accessToken,
+      );
+      const token = await createSessionToken(sessionFields, rememberMe);
       const response = NextResponse.json({
-        requires2fa: true,
-        user: result.user,
-        tenant: result.tenant,
+        requires2fa: false,
+        source: "crm",
+        user: {
+          id: sessionFields.userId,
+          email: sessionFields.email,
+          name: sessionFields.name,
+          role: sessionFields.role,
+        },
+        tenant: {
+          id: sessionFields.tenantId,
+          slug: sessionFields.tenantSlug,
+          name: sessionFields.tenantName,
+        },
+        workspace: scoped.workspace,
+        workspaces: scoped.workspaces,
       });
       response.cookies.set(
-        PENDING_2FA_COOKIE,
-        pending,
-        getPending2faCookieOptions(),
+        SESSION_COOKIE,
+        token,
+        getSessionCookieOptions(rememberMe),
       );
-      response.cookies.set(SESSION_COOKIE, "", {
-        ...getSessionCookieOptions(false),
+      applyCrmTokenCookies(
+        response,
+        {
+          accessToken: scoped.accessToken,
+          refreshToken: scoped.refreshToken ?? loggedIn.refreshToken,
+        },
+        rememberMe,
+      );
+      response.cookies.set(PENDING_2FA_COOKIE, "", {
+        ...getPending2faCookieOptions(),
         maxAge: 0,
       });
       return response;
+    } catch (err) {
+      const message =
+        err instanceof CrmAuthError
+          ? friendlyAuthMessage(err.message)
+          : "Unable to sign in. Please try again.";
+      const status = err instanceof CrmAuthError ? err.status : 401;
+      return NextResponse.json(
+        { error: message },
+        { status: status >= 400 && status < 600 ? status : 401 },
+      );
     }
-
-    const token = await createSessionToken(sessionFields, rememberMe);
-    const response = NextResponse.json({
-      requires2fa: false,
-      user: result.user,
-      tenant: result.tenant,
-    });
-    response.cookies.set(
-      SESSION_COOKIE,
-      token,
-      getSessionCookieOptions(rememberMe),
-    );
-    response.cookies.set(PENDING_2FA_COOKIE, "", {
-      ...getPending2faCookieOptions(),
-      maxAge: 0,
-    });
-    return response;
   } catch (error) {
     console.error("[auth/login]", error);
     return NextResponse.json(

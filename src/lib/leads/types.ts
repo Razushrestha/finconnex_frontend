@@ -71,6 +71,10 @@ export interface LeadCardData {
   email: string;
   phone: string;
   owner: string;
+  /** CRM workspace member UUID when loaded from the live API. */
+  ownerId?: string;
+  /** Linked CRM company UUID. */
+  companyId?: string;
   createdDate: string;
   source: LeadSource;
   estimatedValue?: string;

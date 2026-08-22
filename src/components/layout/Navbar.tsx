@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { menuEnter } from "@/lib/motion";
 import { logAuth } from "@/lib/rules";
+import { clearCrmTokens } from "@/lib/activity-timeline/auth";
 import { listInboxConversations } from "@/lib/marketing/inbox/types";
 import { SearchModal } from "@/components/layout/SearchModal";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -87,6 +88,7 @@ export function Navbar({
     try {
       logAuth("logout", user?.name || user?.email || "user");
       await fetch("/api/auth/logout", { method: "POST" });
+      clearCrmTokens();
       window.location.assign("/login");
     } catch {
       setIsLoggingOut(false);

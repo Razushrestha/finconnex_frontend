@@ -11,6 +11,24 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
 
 Requests go to `{BASE}/v1/...` with `credentials: "include"` (session cookies).
 
+For workspace-scoped CRM modules (Activity Timeline, etc.), also set:
+
+```bash
+NEXT_PUBLIC_CRM_API_URL=https://finconnex.payperless.app
+NEXT_PUBLIC_WORKSPACE_ID=<your-workspace-uuid>
+```
+
+After backend login, store tokens in the browser (DevTools console):
+
+The login form now calls the live CRM when `NEXT_PUBLIC_CRM_API_URL` (or `CRM_API_URL` / `NEXT_PUBLIC_API_BASE_URL`) is set **and** the username is an email:
+
+- `POST /v1/auth/login` → httpOnly access + refresh cookies
+- `GET /v1/workspaces/mine` then `POST /v1/auth/workspace` (scopes the JWT)
+- `GET /v1/auth/me`, `GET /v1/auth/sessions`, `DELETE /v1/auth/sessions/:id`
+- `POST /v1/auth/logout`, `POST /v1/auth/logout-all`
+
+Demo login (`admin` / `admin123`) still works when you type the local username instead of an email.
+
 ## Frontend usage
 
 ```ts

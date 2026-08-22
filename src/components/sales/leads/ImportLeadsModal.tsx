@@ -119,11 +119,11 @@ export function ImportLeadsModal({
     setStep("preview");
   }
 
-  function confirmImport() {
+  async function confirmImport() {
     setBusy(true);
     setError(null);
     try {
-      const result = applyLeadImport(rows, mapping, settings);
+      const result = await applyLeadImport(rows, mapping, settings);
       setSummary(result);
       setStep("done");
       emitRulesChange("all");

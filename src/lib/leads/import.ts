@@ -13,6 +13,8 @@ import {
   listLeadEmails,
   saveLeadColumns,
 } from "@/lib/leads/store";
+import { importCrmLeads, refreshCrmLeadsBoard } from "@/lib/leads/api";
+import { toCrmCreateBody, uiSourceToCrm, uiStatusToCrm } from "@/lib/leads/api/map";
 import {
   LEAD_SOURCES,
   LEAD_STATUSES,
@@ -268,12 +270,52 @@ export function previewLeadImport(
   };
 }
 
-export function applyLeadImport(
+export async function applyLeadImport(
   rows: CsvRow[],
   mapping: Record<string, string>,
   settings: LeadImportSettings,
-): { imported: number; updated: number; skipped: number; errors: number } {
+): Promise<{ imported: number; updated: number; skipped: number; errors: number }> {
   const preview = previewLeadImport(rows, mapping, settings);
+  const crmRows = rows
+    .map((row, idx) => {
+      const result = preview.results[idx];
+      if (!result || (result.status !== "ok" && result.status !== "update")) {
+        return null;
+      }
+      return toCrmCreateBody({
+        firstName: cell(row, mapping, "firstName"),
+        lastName: cell(row, mapping, "lastName"),
+        email: cell(row, mapping, "email"),
+        phone: cell(row, mapping, "phone"),
+        company: cell(row, mapping, "company"),
+        source: asSource(cell(row, mapping, "source"), settings.defaultSource),
+        estimatedValue: cell(row, mapping, "estimatedValue") || undefined,
+      });
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+
+  if (crmRows.length) {
+    try {
+      const live = await importCrmLeads({
+        rows: crmRows,
+        duplicateHandling: settings.updateExisting ? "UPDATE" : "SKIP",
+        defaultStatus: uiStatusToCrm(settings.defaultStatus),
+        defaultSource: uiSourceToCrm(settings.defaultSource),
+      });
+      if (live) {
+        await refreshCrmLeadsBoard();
+        return {
+          imported: live.created,
+          updated: live.updated,
+          skipped: live.skipped + preview.skipCount,
+          errors: live.errors.length + preview.errorCount,
+        };
+      }
+    } catch {
+      /* fall through to local import */
+    }
+  }
+
   let imported = 0;
   let updated = 0;
 

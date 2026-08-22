@@ -6,6 +6,10 @@ import { LeadCardData, type LeadStatus } from "@/lib/leads/types";
 import { logCreate, logEdit } from "@/lib/rules";
 import { emitRulesChange } from "@/lib/rules/storage";
 import { updateLead } from "@/lib/leads/store";
+import { convertCrmLead, createCrmDeal, syncLeadStatus, updateCrmLead } from "@/lib/leads/api";
+import { mapCrmLeadToCard } from "@/lib/leads/api/map";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import { upsertLeadFromCard } from "@/lib/leads/store";
 import { createDeal } from "@/lib/deals/store";
 import { sendEmailDemoLive } from "@/lib/comms/send-gateway";
 import { createEmail } from "@/lib/emails/store";
@@ -48,7 +52,37 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
     window.setTimeout(() => setFlash(null), 2800);
   }
 
-  function handleConvert(values: ConvertToDealFormValues) {
+  async function handleConvert(values: ConvertToDealFormValues) {
+    if (isUuid(card.id)) {
+      try {
+        const deal = await createCrmDeal({
+          name: values.dealName,
+          value: values.amount || card.estimatedValue,
+          expectedCloseDate: values.expectedCloseDate,
+          stage: values.dealStage,
+          companyId: card.companyId,
+          ownerId: card.ownerId,
+        });
+        if (!deal?.id) {
+          notify("Could not create deal on the server");
+          return;
+        }
+        const converted = await convertCrmLead(card.id, {
+          convertedDealId: deal.id,
+        });
+        if (converted) {
+          setCard(mapCrmLeadToCard(converted));
+          upsertLeadFromCard(mapCrmLeadToCard(converted));
+        }
+        setIsConvertOpen(false);
+        notify(`Deal created · ${values.dealName}`);
+        router.push(`/sales/deals/detail/${deal.id}`);
+        return;
+      } catch (err) {
+        notify(err instanceof Error ? err.message : "Convert failed");
+        return;
+      }
+    }
     const deal = createDeal({
       dealName: values.dealName,
       account: card.company || card.name,
@@ -94,11 +128,21 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
         onEdit={() => setIsEditOpen(true)}
         onMore={() => notify("More actions…")}
         onStatusChange={(pipelineStage) => {
-          const updated = updateLead(card.id, { pipelineStage });
-          if (updated) {
-            setCard(updated);
-            notify(`Status set to ${pipelineStage}`);
-          }
+          void (async () => {
+            if (isUuid(card.id)) {
+              const live = await syncLeadStatus(card.id, pipelineStage);
+              if (live) {
+                setCard(live);
+                notify(`Status set to ${pipelineStage}`);
+                return;
+              }
+            }
+            const updated = updateLead(card.id, { pipelineStage });
+            if (updated) {
+              setCard(updated);
+              notify(`Status set to ${pipelineStage}`);
+            }
+          })();
         }}
         onStartCall={() => notify("Starting call…")}
         onReschedule={() => notify("Reschedule next action…")}
@@ -172,38 +216,67 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
           Boolean,
         )}
         onSave={(values) => {
-          const name = `${values.firstName} ${values.lastName}`.trim();
-          let statusOpt: LeadStatus | undefined;
-          if (
-            (LEAD_STATUS_OPTIONS as readonly string[]).includes(values.status)
-          ) {
-            statusOpt = values.status as LeadStatus;
-          }
-          const patch: Parameters<typeof updateLead>[1] = {
-            name,
-            email: values.email,
-            phone: values.phone ?? "",
-            company: values.companyName ?? "",
-          };
-          if (statusOpt) patch.status = statusOpt;
-          else if (values.status) patch.pipelineStage = values.status;
-          const updated = updateLead(card.id, patch);
-          if (updated) {
-            setCard(updated);
-            logEdit(
-              "sales.leads",
-              card.owner || ACTIVITY_OWNERS[0],
-              card.id,
+          void (async () => {
+            const name = `${values.firstName} ${values.lastName}`.trim();
+            let statusOpt: LeadStatus | undefined;
+            if (
+              (LEAD_STATUS_OPTIONS as readonly string[]).includes(values.status)
+            ) {
+              statusOpt = values.status as LeadStatus;
+            }
+            if (isUuid(card.id)) {
+              try {
+                const live = await updateCrmLead(card.id, {
+                  firstName: values.firstName,
+                  lastName: values.lastName,
+                  email: values.email,
+                  phone: values.phone,
+                  companyName: values.companyName,
+                  jobTitle: values.jobTitle,
+                });
+                if (live) {
+                  let mapped = mapCrmLeadToCard(live);
+                  if (values.status && !statusOpt) {
+                    const moved = await syncLeadStatus(card.id, values.status);
+                    if (moved) mapped = moved;
+                  }
+                  setCard(mapped);
+                  upsertLeadFromCard(mapped);
+                  notify("Lead saved");
+                  setIsEditOpen(false);
+                  return;
+                }
+              } catch (err) {
+                notify(err instanceof Error ? err.message : "Save failed");
+                return;
+              }
+            }
+            const patch: Parameters<typeof updateLead>[1] = {
               name,
-              [
-                { field: "name", from: card.name, to: name },
-                { field: "email", from: card.email, to: values.email },
-              ],
-            );
-            emitRulesChange("all");
-            notify("Lead saved");
-          }
-          setIsEditOpen(false);
+              email: values.email,
+              phone: values.phone ?? "",
+              company: values.companyName ?? "",
+            };
+            if (statusOpt) patch.status = statusOpt;
+            else if (values.status) patch.pipelineStage = values.status;
+            const updated = updateLead(card.id, patch);
+            if (updated) {
+              setCard(updated);
+              logEdit(
+                "sales.leads",
+                card.owner || ACTIVITY_OWNERS[0],
+                card.id,
+                name,
+                [
+                  { field: "name", from: card.name, to: name },
+                  { field: "email", from: card.email, to: values.email },
+                ],
+              );
+              emitRulesChange("all");
+              notify("Lead saved");
+            }
+            setIsEditOpen(false);
+          })();
         }}
       />
     </div>
