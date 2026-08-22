@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { PenLine } from "lucide-react";
+import { ArrowRight, PenLine } from "lucide-react";
 import { usePortalContext } from "@/components/portals/public/PortalShell";
 import {
   listPortalTasks,
@@ -11,6 +11,11 @@ import {
   savePortalTasks,
   type PortalTask,
 } from "@/lib/portals/clientData";
+import {
+  documentRequestsForPortal,
+  requestItems,
+} from "@/lib/documents/requests/pack";
+import { displayRequestStatus } from "@/lib/documents/requests/dashboard";
 import {
   listInvoices,
 } from "@/lib/finance/invoices/types";
@@ -68,9 +73,60 @@ export function PortalDocumentsPane({ slug }: { slug: string }) {
   }, [portal?.id]);
   if (!portal) return null;
   const docs = portalDocumentsForClient(portal.clientName);
+  const requests = documentRequestsForPortal(portal);
   const canSign = canSignInPortal(portal) && !isReadOnly;
   return (
-    <Pane title="Documents" subtitle="Shared files and signature requests">
+    <Pane title="Documents" subtitle="Requested files, uploads, and signatures">
+      <h3 className="mb-2 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+        Document requests
+      </h3>
+      {requests.length === 0 ? (
+        <Empty>No document requests yet</Empty>
+      ) : (
+        <ul className="mb-6 divide-y divide-slate-100 rounded-2xl border border-slate-100 bg-white">
+          {requests.map((r) => {
+            const display = displayRequestStatus(r);
+            const awaiting = requestItems(r).filter(
+              (item) =>
+                item.status === "Awaiting" || item.status === "Rejected",
+            ).length;
+            return (
+              <li key={r.id}>
+                <Link
+                  href={`/p/${slug}/documents/requests/${r.id}`}
+                  className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-slate-50"
+                  onClick={() =>
+                    logActivity(`Opened document request ${r.requestId}`)
+                  }
+                >
+                  <div>
+                    <div className="font-semibold text-slate-900">{r.title}</div>
+                    <div className="text-[11px] text-slate-500">
+                      {r.requestId} · Due {r.dueDate}
+                      {awaiting > 0 ? ` · ${awaiting} to action` : ""}
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                        display.pill,
+                      )}
+                    >
+                      {display.label}
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5 text-slate-300" />
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <h3 className="mb-2 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+        Shared files
+      </h3>
       {docs.length === 0 ? (
         <Empty>No documents</Empty>
       ) : (

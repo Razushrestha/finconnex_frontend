@@ -18,6 +18,55 @@ export type DocumentRequestStatus =
   | "Rejected"
   | "Expired";
 
+export type RequestedDocStatus =
+  | "Awaiting"
+  | "Uploaded"
+  | "Accepted"
+  | "Rejected"
+  | "Unavailable";
+
+export interface RequestedDocLine {
+  id: string;
+  catalogId?: string;
+  title: string;
+  description?: string;
+  applicant?: string;
+  status: RequestedDocStatus;
+  fileName?: string;
+  fileKind?: "pdf" | "image" | "other";
+  uploadedAt?: string;
+  uploadedBy?: string;
+  source?: "portal" | "whatsapp" | "manual";
+  rejectionReason?: string;
+  rejectedAt?: string;
+  acceptedAt?: string;
+}
+
+export interface RequestTimelineEvent {
+  id: string;
+  at: string;
+  by: string;
+  label: string;
+  detail?: string;
+}
+
+export interface RequestMessage {
+  id: string;
+  at: string;
+  by: string;
+  from: "team" | "client";
+  text: string;
+  documentId?: string;
+}
+
+export type DocumentRequestPriority = "High" | "Normal" | "Low";
+
+export const DOCUMENT_REQUEST_PRIORITIES: DocumentRequestPriority[] = [
+  "High",
+  "Normal",
+  "Low",
+];
+
 export const DOCUMENT_REQUEST_TYPES: DocumentRequestType[] = [
   "Contract",
   "Proposal",
@@ -43,17 +92,17 @@ export const DOCUMENT_REQUEST_STATUS_LABEL: Record<DocumentRequestStatus, string
   {
     Requested: "Invite sent",
     Pending: "In progress",
-    Received: "Submitted",
-    Approved: "Submitted",
+    Received: "Review",
+    Approved: "Completed",
     Rejected: "Rejected",
-    Expired: "Expired",
+    Expired: "Cancelled / Closed",
   };
 
 export const DOCUMENT_REQUEST_STATUS_PILL: Record<DocumentRequestStatus, string> =
   {
     Requested: "bg-sky-100 text-sky-700",
     Pending: "bg-amber-100 text-amber-800",
-    Received: "bg-emerald-100 text-emerald-700",
+    Received: "bg-violet-100 text-violet-700",
     Approved: "bg-emerald-100 text-emerald-700",
     Rejected: "bg-rose-100 text-rose-700",
     Expired: "bg-slate-100 text-slate-600",
@@ -77,6 +126,9 @@ export interface DocumentRequest {
   documentType: DocumentRequestType;
   status: DocumentRequestStatus;
   dueDate: string;
+  reminderDate?: string;
+  repeat?: string;
+  notifyBy?: string[];
   /** Broker / owner */
   requestedBy: string;
   /** Start / invite date (display e.g. 20 Aug, 2026) */
@@ -84,9 +136,16 @@ export interface DocumentRequest {
   lastUpdated: string;
   /** 0–100 completion of the document pack */
   progress: number;
+  priority?: DocumentRequestPriority;
   receivedDate?: string;
   notes?: string;
   receivedFileName?: string;
+  items?: RequestedDocLine[];
+  timeline?: RequestTimelineEvent[];
+  messages?: RequestMessage[];
+  internalNotes?: string;
+  clientName?: string;
+  clientEmail?: string;
 }
 
 export interface DocumentRequestColumn {
@@ -116,6 +175,113 @@ function progressForStatus(status: DocumentRequestStatus): number {
   }
 }
 
+const EXTRA_APPLICANTS = [
+  "Ava Chen",
+  "Liam Patel",
+  "Sofia Rossi",
+  "Noah Williams",
+  "Mia Thompson",
+  "Ethan Brooks",
+  "Harper Quinn",
+  "Lucas Nguyen",
+  "Isla Kapoor",
+  "Jack Reynolds",
+  "Zara Ahmed",
+  "Owen Fraser",
+  "Emily Walsh",
+  "Leo Santos",
+  "Grace Kim",
+  "Henry Clarke",
+  "Ruby Singh",
+  "Felix Moreau",
+  "Chloe Park",
+  "Daniel Costa",
+];
+
+function formatDisplayDate(d: Date): string {
+  return d.toLocaleDateString("en-AU", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).replace(/ (\d{4})$/, ", $1");
+}
+
+function formatDueDate(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}
+
+function buildExtraDocumentRequests(): DocumentRequest[] {
+  const types = DOCUMENT_REQUEST_TYPES;
+  const brokers = DOCUMENT_REQUEST_BROKERS;
+  const today = new Date(2026, 7, 22);
+  const extras: DocumentRequest[] = [];
+
+  for (let i = 0; i < 118; i++) {
+    const applicant = EXTRA_APPLICANTS[i % EXTRA_APPLICANTS.length]!;
+    const joint =
+      i % 11 === 0 ? `${applicant}, ${EXTRA_APPLICANTS[(i + 3) % EXTRA_APPLICANTS.length]}` : applicant;
+    const bucket = i % 20;
+    let status: DocumentRequestStatus = "Pending";
+    let progress = 32;
+    let priority: DocumentRequestPriority = "Normal";
+    const start = new Date(today);
+    start.setDate(today.getDate() - (i % 28) - 1);
+    const due = new Date(today);
+    const updated = new Date(start);
+    updated.setDate(start.getDate() + Math.min(6, (i % 5) + 1));
+
+    if (bucket < 4) {
+      status = "Requested";
+      progress = 0;
+      due.setDate(today.getDate() + (i % 8) + 1);
+    } else if (bucket < 8) {
+      status = "Pending";
+      progress = 12 + (i % 5) * 10;
+      due.setDate(today.getDate() - ((i % 6) + 1));
+      priority = i % 3 === 0 ? "High" : "Normal";
+    } else if (bucket < 14) {
+      status = "Pending";
+      progress = 20 + (i % 6) * 8;
+      due.setDate(today.getDate() + (i % 10) + 1);
+    } else if (bucket < 18) {
+      status = i % 2 === 0 ? "Received" : "Approved";
+      progress = status === "Approved" ? 100 : 78 + (i % 3) * 4;
+      due.setDate(start.getDate() + 8);
+      updated.setTime(due.getTime());
+    } else {
+      status = i % 2 === 0 ? "Rejected" : "Expired";
+      progress = status === "Rejected" ? 40 : 0;
+      due.setDate(today.getDate() - 10);
+      priority = "Low";
+    }
+
+    extras.push({
+      id: `dr-x${i + 1}`,
+      requestId: `${i % 2 === 0 ? "BR" : "BN"}-${80000000 + i}`,
+      title: `${types[i % types.length]} pack — ${applicant}`,
+      requestedFrom: joint,
+      relatedTo: `Lead: ${applicant}`,
+      documentType: types[i % types.length]!,
+      status,
+      dueDate: formatDueDate(due),
+      requestedBy: brokers[i % brokers.length]!,
+      requestedDate: formatDisplayDate(start),
+      lastUpdated: formatDisplayDate(updated > today ? today : updated),
+      progress,
+      priority,
+      notes: i % 7 === 0 ? "Follow up logged from broker call." : undefined,
+      receivedDate:
+        status === "Received" || status === "Approved"
+          ? formatDueDate(updated)
+          : undefined,
+    });
+  }
+
+  return extras;
+}
+
 export const documentRequests: DocumentRequest[] = [
   {
     id: "dr1",
@@ -130,6 +296,7 @@ export const documentRequests: DocumentRequest[] = [
     requestedDate: "20 Aug, 2026",
     lastUpdated: "20 Aug, 2026",
     progress: 0,
+    priority: "Normal",
     notes: "Need passport or driver licence + last 2 payslips.",
   },
   {
@@ -145,7 +312,29 @@ export const documentRequests: DocumentRequest[] = [
     requestedDate: "18 Aug, 2026",
     lastUpdated: "19 Aug, 2026",
     progress: 32,
+    priority: "High",
+    reminderDate: "21 Aug 2026, 9:00 am",
+    repeat: "Custom · every 2 days · start 2 days after request · stop on due date",
+    notifyBy: ["Email"],
     notes: "Client said they will upload by Friday.",
+    items: [
+      {
+        id: "dr2-doc-1",
+        title: "Bank statements — month 1",
+        description: "Latest full month",
+        status: "Awaiting",
+      },
+      {
+        id: "dr2-doc-2",
+        title: "Bank statements — month 2",
+        status: "Awaiting",
+      },
+      {
+        id: "dr2-doc-3",
+        title: "Bank statements — month 3",
+        status: "Awaiting",
+      },
+    ],
   },
   {
     id: "dr3",
@@ -162,7 +351,20 @@ export const documentRequests: DocumentRequest[] = [
     progress: 86,
     receivedDate: "19/07/2026",
     receivedFileName: "Vendor_Agreement_Marcus.pdf",
+    priority: "Normal",
     notes: "Uploaded via portal: review for approval.",
+    items: [
+      {
+        id: "dr3-doc-1",
+        title: "Signed vendor agreement",
+        status: "Uploaded",
+        fileName: "Vendor_Agreement_Marcus.pdf",
+        fileKind: "pdf",
+        uploadedAt: "19/07/2026",
+        uploadedBy: "Marcus Lin",
+        source: "portal",
+      },
+    ],
   },
   {
     id: "dr4",
@@ -179,6 +381,32 @@ export const documentRequests: DocumentRequest[] = [
     progress: 100,
     receivedDate: "14/07/2026",
     receivedFileName: "Greystone_Proposal_v1.pdf",
+    priority: "Low",
+    clientName: "Greystone Realty",
+    items: [
+      {
+        id: "dr4-doc-1",
+        title: "Proposal pack",
+        status: "Accepted",
+        fileName: "Greystone_Proposal_v1.pdf",
+        fileKind: "pdf",
+        uploadedAt: "14/07/2026",
+        uploadedBy: "Olivia Bennett",
+        source: "portal",
+        acceptedAt: "14/07/2026",
+      },
+      {
+        id: "dr4-doc-2",
+        title: "ID verification",
+        status: "Accepted",
+        fileName: "Olivia_Bennett_ID.pdf",
+        fileKind: "pdf",
+        uploadedAt: "13/07/2026",
+        uploadedBy: "Olivia Bennett",
+        source: "portal",
+        acceptedAt: "14/07/2026",
+      },
+    ],
   },
   {
     id: "dr5",
@@ -195,7 +423,22 @@ export const documentRequests: DocumentRequest[] = [
     progress: 45,
     receivedDate: "09/07/2026",
     receivedFileName: "Trust_Deed_scan.pdf",
+    priority: "High",
     notes: "Scan unreadable: request clearer copy.",
+    items: [
+      {
+        id: "dr5-doc-1",
+        title: "Trust deed extract",
+        status: "Rejected",
+        fileName: "Trust_Deed_scan.pdf",
+        fileKind: "pdf",
+        uploadedAt: "09/07/2026",
+        uploadedBy: "Northwind Traders",
+        source: "portal",
+        rejectedAt: "09/07/2026",
+        rejectionReason: "Scan is unreadable. Please upload a clearer copy.",
+      },
+    ],
   },
   {
     id: "dr6",
@@ -210,6 +453,7 @@ export const documentRequests: DocumentRequest[] = [
     requestedDate: "20 Jul, 2026",
     lastUpdated: "05 Aug, 2026",
     progress: 0,
+    priority: "Normal",
     notes: "No response after two reminders.",
   },
   {
@@ -225,6 +469,7 @@ export const documentRequests: DocumentRequest[] = [
     requestedDate: "17 Aug, 2026",
     lastUpdated: "17 Aug, 2026",
     progress: 0,
+    priority: "Normal",
   },
   {
     id: "dr8",
@@ -239,6 +484,7 @@ export const documentRequests: DocumentRequest[] = [
     requestedDate: "15 Aug, 2026",
     lastUpdated: "18 Aug, 2026",
     progress: 58,
+    priority: "High",
   },
   {
     id: "dr9",
@@ -255,6 +501,7 @@ export const documentRequests: DocumentRequest[] = [
     progress: 100,
     receivedDate: "10/08/2026",
     receivedFileName: "ID_Pack_Priya.pdf",
+    priority: "Low",
   },
   {
     id: "dr10",
@@ -269,7 +516,53 @@ export const documentRequests: DocumentRequest[] = [
     requestedDate: "16 Aug, 2026",
     lastUpdated: "20 Aug, 2026",
     progress: 12,
+    priority: "Normal",
   },
+  {
+    id: "dr-portal-greystone",
+    requestId: "DR-90881236",
+    title: "Property purchase pack — Priya Mehta",
+    requestedFrom: "Priya Mehta",
+    relatedTo: "Greystone Realty",
+    documentType: "Property purchase",
+    status: "Requested",
+    dueDate: "29/08/2026",
+    requestedBy: "John Smith",
+    requestedDate: "22 Aug, 2026",
+    lastUpdated: "22 Aug, 2026",
+    progress: 0,
+    priority: "Normal",
+    clientName: "Greystone Realty",
+    clientEmail: "priya@greystone.example",
+    reminderDate: "25 Aug 2026, 9:00 am",
+    repeat:
+      "Custom · every 2 days · start 2 days after request · stop when documents are completed",
+    notifyBy: ["Email", "SMS"],
+    notes: "Please upload these so we can proceed with pre-approval.",
+    items: [
+      {
+        id: "dr-gs-licence",
+        title: "Driver licence",
+        description: "Front and back of current driver licence",
+        applicant: "Priya Mehta",
+        status: "Awaiting",
+      },
+      {
+        id: "dr-gs-payslips",
+        title: "Payslips",
+        description: "Last 2 payslips",
+        applicant: "Priya Mehta",
+        status: "Awaiting",
+      },
+      {
+        id: "dr-gs-statements",
+        title: "Bank statements — last 3 months",
+        applicant: "Priya Mehta",
+        status: "Awaiting",
+      },
+    ],
+  },
+  ...buildExtraDocumentRequests(),
 ];
 
 const COLUMN_COLORS: Record<DocumentRequestStatus, string> = {
@@ -281,7 +574,7 @@ const COLUMN_COLORS: Record<DocumentRequestStatus, string> = {
   Expired: "bg-slate-400 text-white",
 };
 
-const STORE_KEY = "documents:requests:v2";
+const STORE_KEY = "documents:requests:v3";
 
 export function buildDocumentRequestColumns(
   list: DocumentRequest[],
@@ -301,14 +594,101 @@ export function buildDocumentRequestColumns(
 export const documentRequestColumns: DocumentRequestColumn[] =
   buildDocumentRequestColumns(documentRequests);
 
+function deriveItems(req: DocumentRequest): RequestedDocLine[] {
+  if (req.items && req.items.length > 0) return req.items;
+  const status: RequestedDocStatus =
+    req.status === "Approved"
+      ? "Accepted"
+      : req.status === "Rejected"
+        ? "Rejected"
+        : req.receivedFileName
+          ? "Uploaded"
+          : "Awaiting";
+  return [
+    {
+      id: `${req.id}-doc-1`,
+      title: req.title || req.documentType,
+      status,
+      fileName: req.receivedFileName,
+      fileKind: req.receivedFileName ? "pdf" : undefined,
+      uploadedAt: req.receivedDate,
+      uploadedBy: req.receivedFileName ? req.requestedFrom : undefined,
+      source: req.receivedFileName ? "portal" : undefined,
+      acceptedAt: req.status === "Approved" ? req.receivedDate : undefined,
+      rejectedAt: req.status === "Rejected" ? req.lastUpdated : undefined,
+      rejectionReason:
+        req.status === "Rejected"
+          ? req.notes || "Please upload a clearer copy."
+          : undefined,
+    },
+  ];
+}
+
+function deriveTimeline(req: DocumentRequest): RequestTimelineEvent[] {
+  if (req.timeline && req.timeline.length > 0) return req.timeline;
+  const events: RequestTimelineEvent[] = [
+    {
+      id: `${req.id}-t-created`,
+      at: req.requestedDate,
+      by: req.requestedBy,
+      label: "Request created",
+      detail: `Invitation sent to ${req.requestedFrom}`,
+    },
+  ];
+  for (const item of req.items ?? []) {
+    if (item.uploadedAt && item.fileName) {
+      events.push({
+        id: `${req.id}-t-up-${item.id}`,
+        at: item.uploadedAt,
+        by: item.uploadedBy ?? req.requestedFrom,
+        label: `${item.title} uploaded`,
+        detail: item.fileName,
+      });
+    }
+    if (item.status === "Accepted" && item.acceptedAt) {
+      events.push({
+        id: `${req.id}-t-ok-${item.id}`,
+        at: item.acceptedAt,
+        by: req.requestedBy,
+        label: `${item.title} accepted`,
+      });
+    }
+    if (item.status === "Rejected" && item.rejectedAt) {
+      events.push({
+        id: `${req.id}-t-no-${item.id}`,
+        at: item.rejectedAt,
+        by: req.requestedBy,
+        label: `${item.title} rejected`,
+        detail: item.rejectionReason,
+      });
+    }
+    if (item.status === "Unavailable") {
+      events.push({
+        id: `${req.id}-t-na-${item.id}`,
+        at: req.lastUpdated,
+        by: req.requestedFrom,
+        label: `${item.title} marked as not available`,
+      });
+    }
+  }
+  return events;
+}
+
 function normalize(req: DocumentRequest): DocumentRequest {
+  const items = deriveItems(req);
+  const withItems = { ...req, items };
   return {
-    ...req,
+    ...withItems,
     lastUpdated: req.lastUpdated || req.requestedDate,
     progress:
       typeof req.progress === "number"
         ? req.progress
         : progressForStatus(req.status),
+    priority: req.priority ?? "Normal",
+    items,
+    timeline: deriveTimeline(withItems),
+    messages: req.messages ?? [],
+    internalNotes: req.internalNotes ?? "",
   };
 }
 

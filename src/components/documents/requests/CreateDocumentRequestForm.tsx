@@ -3,12 +3,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
-  CircleHelp,
   House,
-  Infinity,
-  Plus,
   RefreshCw,
-  Search,
   UserRound,
   Wallet,
   ShoppingCart,
@@ -21,15 +17,38 @@ import {
   nextDocumentRequestIds,
   upsertDocumentRequest,
   type DocumentRequestType,
+  type RequestedDocLine,
 } from "@/lib/documents/requests/types";
-import { RELATED_RECORD_OPTIONS } from "@/lib/activities/shared";
+import { matchPortalForApplicant } from "@/lib/documents/requests/pack";
+import { getRulesActor } from "@/lib/rules/actor";
 import { cn } from "@/lib/utils";
 import {
   REQUEST_DOC_CATEGORIES,
   type RequestDocItem,
 } from "@/lib/documents/requests/catalog";
-import { RequestDocumentsPicker } from "@/components/documents/requests/RequestDocumentsPicker";
+import {
+  firstNameOf,
+  RequestDocumentsPicker,
+} from "@/components/documents/requests/RequestDocumentsPicker";
+import {
+  emptyApplicant,
+  RequestApplicantsSection,
+  type RequestApplicant,
+} from "@/components/documents/requests/RequestApplicantsSection";
 import { PropertyDetailsEditor, emptyPropertyDetails, type PropertyDetails } from "@/components/documents/requests/PropertyDetailsEditor";
+import {
+  RequestScheduleCard,
+  defaultCustomReminder,
+  formatCustomReminder,
+  formatRequestDateTime,
+  formatRequestDueDate,
+  parseDatetimeLocal,
+  validateRequestSchedule,
+  type CustomReminderConfig,
+  type RequestNotifyMethod,
+} from "@/components/documents/requests/RequestScheduleCard";
+import { RequestQuickReview } from "@/components/documents/requests/RequestQuickReview";
+import { readCatalogDescriptionOverrides } from "@/lib/documents/requests/catalog";
 
 interface CreateDocumentRequestFormProps {
   layoutId: string;
@@ -42,135 +61,14 @@ type AssetPurpose = "Personal" | "Business";
 type Purpose = HomePurpose | AssetPurpose;
 type ApplicantCount = "1" | "2";
 
-const HOME_PURPOSES = ["Property purchase", "Refinance"] as const;
-const ASSET_PURPOSES = ["Personal", "Business"] as const;
-
 const PAGE_GRADIENT =
   "bg-[linear-gradient(90deg,#efe8f6_0%,#f5eef2_48%,#f8e6dc_100%)]";
 
 const STEPS = [
   { id: 1, label: "Document Request details" },
-  { id: 2, label: "Pre-fill client details" },
-  { id: 3, label: "Documents" },
+  { id: 2, label: "Documents" },
+  { id: 3, label: "Quick review" },
 ] as const;
-
-function Segmented<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: readonly T[];
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="w-full">
-      <p className="mb-2 text-[13px] font-medium text-slate-800">{label}</p>
-      <div className="grid w-full grid-cols-2 overflow-hidden rounded-lg border border-slate-200">
-        {options.map((opt) => {
-          const active = value === opt;
-          return (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => onChange(opt)}
-              className={cn(
-                "flex h-11 items-center justify-center px-2 text-center text-[14px] leading-none font-medium whitespace-nowrap transition-colors",
-                active
-                  ? "bg-[#EDE4FB] text-slate-900"
-                  : "bg-[#f7f6f8] text-slate-600 hover:bg-slate-100",
-              )}
-            >
-              {opt}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function ApplicantSearchRow({
-  label,
-  showHelp,
-  value,
-  error,
-  matches,
-  showResults,
-  onChange,
-  onFocus,
-  onSelect,
-  onAdd,
-}: {
-  label: string;
-  showHelp?: boolean;
-  value: string;
-  error?: string;
-  matches: { kind: string; name: string }[];
-  showResults: boolean;
-  onChange: (v: string) => void;
-  onFocus: () => void;
-  onSelect: (name: string) => void;
-  onAdd: () => void;
-}) {
-  return (
-    <div>
-      <div className="mb-2 flex items-center gap-1.5">
-        <h3 className="text-[15px] font-bold text-slate-900">{label}</h3>
-        {showHelp ? (
-          <CircleHelp className="h-3.5 w-3.5 text-slate-400" />
-        ) : null}
-      </div>
-      <div className="flex items-center gap-3">
-        <div className="relative min-w-0 flex-1">
-          <input
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onFocus={onFocus}
-            placeholder="Search for existing Middle client"
-            className={cn(
-              "h-11 w-full rounded-lg border bg-slate-50 pr-10 pl-3.5 text-[14px] text-slate-800 outline-none placeholder:text-slate-400 focus:bg-white focus:ring-2",
-              error
-                ? "border-rose-500 focus:border-rose-500 focus:ring-rose-100"
-                : "border-slate-200 focus:border-[#5A32A3]/40 focus:ring-[#5A32A3]/12",
-            )}
-          />
-          <Search className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          {showResults && matches.length > 0 ? (
-            <div className="absolute inset-x-0 top-[calc(100%+4px)] z-20 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
-              {matches.map((r) => (
-                <button
-                  key={`${r.kind}-${r.name}`}
-                  type="button"
-                  onClick={() => onSelect(r.name)}
-                  className="flex w-full items-center justify-between px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[#F3ECFB]"
-                >
-                  <span className="font-medium">{r.name}</span>
-                  <span className="text-[11px] text-slate-400">{r.kind}</span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-          {error ? (
-            <p className="mt-1 text-[12px] font-medium text-rose-500">{error}</p>
-          ) : null}
-        </div>
-        <button
-          type="button"
-          onClick={onAdd}
-          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-dashed border-[#5A32A3] bg-white px-4 text-[14px] font-medium text-slate-900 hover:bg-[#F3ECFB]"
-        >
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#5A32A3] text-white">
-            <Plus className="h-3 w-3" strokeWidth={3} />
-          </span>
-          Add client
-        </button>
-      </div>
-    </div>
-  );
-}
 
 const PREFILL_TABS = [
   { id: "property", label: "Property" },
@@ -446,7 +344,7 @@ function Field({
 
 function Stepper({ step }: { step: number }) {
   return (
-    <ol className="mx-auto flex w-full max-w-[720px] items-center justify-between gap-2 px-2">
+    <ol className="flex w-full items-center justify-between gap-2">
       {STEPS.map((s, index) => {
         const active = step === s.id;
         const done = step > s.id;
@@ -494,25 +392,45 @@ export function CreateDocumentRequestForm({
     if (!(main instanceof HTMLElement)) return;
     const previousColor = main.style.backgroundColor;
     const previousImage = main.style.backgroundImage;
+    const previousOverflow = main.style.overflow;
     main.style.backgroundColor = "transparent";
     main.style.backgroundImage =
       "linear-gradient(90deg, #efe8f6 0%, #f5eef2 48%, #f8e6dc 100%)";
+    main.style.overflow = "hidden";
     return () => {
       main.style.backgroundColor = previousColor;
       main.style.backgroundImage = previousImage;
+      main.style.overflow = previousOverflow;
     };
   }, []);
 
-  const [sendOnBehalfOf, setSendOnBehalfOf] = useState("");
-  const [loanType, setLoanType] = useState<LoanType>("Home loan");
-  const [purpose, setPurpose] = useState<Purpose>("Refinance");
+  const [sendOnBehalfOf, setSendOnBehalfOf] = useState(
+    () => getRulesActor().name.trim(),
+  );
+
+  useEffect(() => {
+    const name = getRulesActor().name.trim();
+    if (!name) return;
+    setSendOnBehalfOf((prev) => prev || name);
+  }, []);
+
+  const senderOptions = useMemo(() => {
+    const current = sendOnBehalfOf.trim() || getRulesActor().name.trim();
+    const list = [...DOCUMENT_REQUEST_BROKERS];
+    if (current && !list.includes(current as (typeof list)[number])) {
+      return [current, ...list];
+    }
+    return list;
+  }, [sendOnBehalfOf]);
+  const loanType: LoanType = "Home loan";
+  const purpose: Purpose = "Property purchase";
+  const [applicants, setApplicants] = useState<RequestApplicant[]>([
+    emptyApplicant(),
+  ]);
   const [applicantCount, setApplicantCount] = useState<ApplicantCount>("1");
-  const [skipCoApplicant, setSkipCoApplicant] = useState(false);
+  const [skipCoApplicant, setSkipCoApplicant] = useState(true);
   const [clientSearch, setClientSearch] = useState("");
   const [clientSearch2, setClientSearch2] = useState("");
-  const [showClientResults, setShowClientResults] = useState(false);
-  const [showClientResults2, setShowClientResults2] = useState(false);
-  const [activeApplicantSlot, setActiveApplicantSlot] = useState<1 | 2>(1);
 
   const [applicant1, setApplicant1] = useState("");
   const [applicant2, setApplicant2] = useState("");
@@ -522,6 +440,19 @@ export function CreateDocumentRequestForm({
   const [phone2, setPhone2] = useState("");
   const [existingAccount1, setExistingAccount1] = useState(false);
   const [existingAccount2, setExistingAccount2] = useState(false);
+
+  useEffect(() => {
+    const first = applicants[0];
+    const second = applicants[1];
+    setApplicant1(first?.name.trim() || "");
+    setEmail(first?.email.trim() || "");
+    setClientSearch(first?.name.trim() || first?.email.trim() || "");
+    setApplicant2(second?.name.trim() || "");
+    setEmail2(second?.email.trim() || "");
+    setClientSearch2(second?.name.trim() || second?.email.trim() || "");
+    setApplicantCount(applicants.length >= 2 ? "2" : "1");
+    setSkipCoApplicant(applicants.length < 2);
+  }, [applicants]);
   const [propertyDetails, setPropertyDetails] = useState<PropertyDetails>(
     emptyPropertyDetails,
   );
@@ -544,8 +475,19 @@ export function CreateDocumentRequestForm({
   const [extraDocs, setExtraDocs] = useState<Record<string, RequestDocItem[]>>(
     {},
   );
+  const [docDescOverrides, setDocDescOverrides] = useState<
+    Record<string, string>
+  >({});
   const [dueDate, setDueDate] = useState("");
+  const [reminderDate, setReminderDate] = useState("");
+  const [customReminder, setCustomReminder] =
+    useState<CustomReminderConfig>(defaultCustomReminder);
+  const [repeatEnabled, setRepeatEnabled] = useState(false);
+  const [notifyBy, setNotifyBy] = useState<RequestNotifyMethod[]>(["Email"]);
   const [notes, setNotes] = useState("");
+  const [template, setTemplate] = useState("");
+  const [requestTitle, setRequestTitle] = useState("");
+  const [titleEdited, setTitleEdited] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
@@ -554,101 +496,92 @@ export function CreateDocumentRequestForm({
     return names.join(", ");
   }, [applicant1, applicant2]);
 
-  const clientMatches = useMemo(() => {
-    const q = clientSearch.trim().toLowerCase();
-    if (!q) return [];
-    return RELATED_RECORD_OPTIONS.filter(
-      (r) =>
-        (r.kind === "Lead" || r.kind === "Contact") &&
-        r.name.toLowerCase().includes(q),
-    ).slice(0, 6);
-  }, [clientSearch]);
+  const twoApplicants = applicantCount === "2" && !skipCoApplicant;
 
-  const clientMatches2 = useMemo(() => {
-    const q = clientSearch2.trim().toLowerCase();
-    if (!q) return [];
-    return RELATED_RECORD_OPTIONS.filter(
-      (r) =>
-        (r.kind === "Lead" || r.kind === "Contact") &&
-        r.name.toLowerCase().includes(q) &&
-        r.name !== applicant1,
-    ).slice(0, 6);
-  }, [clientSearch2, applicant1]);
+  useEffect(() => {
+    if (titleEdited) return;
+    const names = [
+      firstNameOf(applicant1, ""),
+      twoApplicants ? firstNameOf(applicant2, "") : "",
+    ]
+      .filter(Boolean)
+      .join(", ");
+    if (template && names) {
+      setRequestTitle(`${template} - ${names}`);
+      return;
+    }
+    if (template) {
+      setRequestTitle(template);
+      return;
+    }
+    if (names) {
+      setRequestTitle(`${purpose} - ${names}`);
+      return;
+    }
+    setRequestTitle("");
+  }, [template, applicant1, applicant2, twoApplicants, purpose, titleEdited]);
 
-  function selectExistingClient(name: string, slot: 1 | 2 = 1) {
-    const contact = contactFromName(name);
-    if (slot === 1) {
-      setApplicant1(name);
-      setClientSearch(name);
-      setEmail((prev) => prev || contact.email);
-      setPhone((prev) => prev || contact.phone);
-      setExistingAccount1(true);
-      setShowClientResults(false);
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next.clientSearch;
-        return next;
-      });
-    } else {
-      setApplicant2(name);
-      setClientSearch2(name);
-      setEmail2((prev) => prev || contact.email);
-      setPhone2((prev) => prev || contact.phone);
-      setExistingAccount2(true);
-      setShowClientResults2(false);
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next.clientSearch2;
-        return next;
+  const reviewGroups = useMemo(() => {
+    const catalog = REQUEST_DOC_CATEGORIES.flatMap((c) => [
+      ...c.items,
+      ...(extraDocs[c.id] ?? []),
+    ]);
+    const stored = readCatalogDescriptionOverrides();
+    const resolve = (id: string): RequestDocItem => {
+      const item = catalog.find((i) => i.id === id);
+      return {
+        id,
+        title: item?.title ?? id,
+        description:
+          docDescOverrides[id] ?? stored[id] ?? item?.description ?? "",
+      };
+    };
+    const groups = [
+      {
+        applicant: applicant1.trim() || "Applicant",
+        items: selectedByApplicant[1].map(resolve),
+      },
+    ];
+    if (applicantCount === "2" && !skipCoApplicant && selectedByApplicant[2].length) {
+      groups.push({
+        applicant: applicant2.trim() || "Applicant 2",
+        items: selectedByApplicant[2].map(resolve),
       });
     }
-    setActiveApplicantSlot(slot);
-    setPrefillTab("applicant");
-    setOpenPrefill(null);
-    setStep(2);
-  }
-
-  function startAddClient(slot: 1 | 2 = 1) {
-    setActiveApplicantSlot(slot);
-    if (slot === 1) {
-      setApplicant1(clientSearch.trim());
-      setExistingAccount1(false);
-      setShowClientResults(false);
-    } else {
-      setApplicant2(clientSearch2.trim());
-      setExistingAccount2(false);
-      setShowClientResults2(false);
-    }
-    setPrefillTab("applicant");
-    setOpenPrefill(slot === 1 ? "applicant-1" : "applicant-2");
-    setStep(2);
-  }
-
-  function setLoanTypeAndPurpose(nextLoan: LoanType) {
-    setLoanType(nextLoan);
-    setPurpose(nextLoan === "Home loan" ? "Refinance" : "Business");
-  }
+    return groups.filter((g) => g.items.length > 0);
+  }, [
+    applicant1,
+    applicant2,
+    applicantCount,
+    skipCoApplicant,
+    selectedByApplicant,
+    extraDocs,
+    docDescOverrides,
+  ]);
 
   function validateStep(current: number) {
     const next: Record<string, string> = {};
+    const scheduleErrors = validateRequestSchedule(dueDate, reminderDate);
+    if (scheduleErrors.dueDate) next.dueDate = scheduleErrors.dueDate;
+    if (scheduleErrors.reminderDate) next.reminderDate = scheduleErrors.reminderDate;
+
     if (current === 1) {
       if (!sendOnBehalfOf.trim()) next.sendOnBehalfOf = "Provide a name";
-      if (!clientSearch.trim() && !applicant1.trim()) {
-        next.clientSearch = "Search or add a client to continue";
-      }
-      if (
-        applicantCount === "2" &&
-        !skipCoApplicant &&
-        !clientSearch2.trim() &&
-        !applicant2.trim()
-      ) {
-        next.clientSearch2 = "Search or add the secondary applicant";
+      if (applicants.length === 0) {
+        next.applicants = "Select the number of applicants";
+      } else {
+        const first = applicants[0];
+        if (!first?.name.trim() || !first?.email.trim()) {
+          next.applicants = "Add at least one applicant with name and email";
+        } else if (
+          applicants[1] &&
+          (!applicants[1].name.trim() || !applicants[1].email.trim())
+        ) {
+          next.applicants = "Complete the second applicant name and email";
+        }
       }
     }
     if (current === 2) {
-      // Optional pre-fill — names are already captured on step 1.
-    }
-    if (current === 3) {
       const any =
         selectedByApplicant[1].length +
         (applicantCount === "2" && !skipCoApplicant
@@ -660,6 +593,47 @@ export function CreateDocumentRequestForm({
     }
     setErrors(next);
     return Object.keys(next).length === 0;
+  }
+
+  useEffect(() => {
+    if (!dueDate.trim() && repeatEnabled) setRepeatEnabled(false);
+  }, [dueDate, repeatEnabled]);
+
+  function handleDueDateChange(value: string) {
+    let nextReminder = reminderDate;
+    if (!value.trim()) {
+      nextReminder = "";
+    } else {
+      const due = parseDatetimeLocal(value);
+      const reminder = parseDatetimeLocal(nextReminder);
+      if (due && reminder && reminder.getTime() > due.getTime()) {
+        nextReminder = "";
+      }
+    }
+    setDueDate(value);
+    setReminderDate(nextReminder);
+    setErrors((prev) => {
+      const next = { ...prev };
+      const dateErrors = validateRequestSchedule(value, nextReminder);
+      if (dateErrors.dueDate) next.dueDate = dateErrors.dueDate;
+      else delete next.dueDate;
+      if (dateErrors.reminderDate) next.reminderDate = dateErrors.reminderDate;
+      else delete next.reminderDate;
+      return next;
+    });
+  }
+
+  function handleReminderDateChange(value: string) {
+    setReminderDate(value);
+    setErrors((prev) => {
+      const next = { ...prev };
+      const dateErrors = validateRequestSchedule(dueDate, value);
+      if (dateErrors.dueDate) next.dueDate = dateErrors.dueDate;
+      else delete next.dueDate;
+      if (dateErrors.reminderDate) next.reminderDate = dateErrors.reminderDate;
+      else delete next.reminderDate;
+      return next;
+    });
   }
 
   function goNext() {
@@ -701,7 +675,7 @@ export function CreateDocumentRequestForm({
   }
 
   function handleCreate() {
-    if (!validateStep(3)) return;
+    if (!validateStep(2)) return;
     setSaving(true);
     try {
       const ids = nextDocumentRequestIds();
@@ -713,648 +687,112 @@ export function CreateDocumentRequestForm({
       const documentType = (
         purpose === "Personal" || purpose === "Business" ? "Other" : purpose
       ) as DocumentRequestType;
-      const title = `${purpose} pack — ${requestedFrom || "client"}`;
-      let due = "";
-      if (dueDate) {
-        const [y, m, d] = dueDate.split("-");
-        due = `${d}/${m}/${y}`;
-      } else {
+      const title =
+        requestTitle.trim() ||
+        `${purpose} pack — ${requestedFrom || "client"}`;
+      const due = formatRequestDueDate(dueDate) || (() => {
         const d = new Date();
         d.setDate(d.getDate() + 7);
-        due = d.toLocaleDateString("en-AU");
-      }
+        return d.toLocaleDateString("en-AU");
+      })();
 
+      const items: RequestedDocLine[] = reviewGroups.flatMap((group) =>
+        group.items.map((item) => ({
+          id: `${ids.id}-${item.id}-${group.applicant.replace(/\s+/g, "-").toLowerCase()}`,
+          catalogId: item.id,
+          title: item.title,
+          description: item.description,
+          applicant: group.applicant,
+          status: "Awaiting" as const,
+        })),
+      );
+      const portal = matchPortalForApplicant(
+        applicant1.trim() || requestedFrom,
+        email.trim() || undefined,
+      );
       const created = upsertDocumentRequest({
         id: ids.id,
         requestId: ids.requestId,
         title,
         requestedFrom: requestedFrom || "Client",
-        relatedTo: `Lead: ${applicant1.trim() || "Client"}`,
+        relatedTo: portal
+          ? `${portal.clientName}: ${applicant1.trim() || "Client"}`
+          : `Lead: ${applicant1.trim() || "Client"}`,
         documentType,
         status: "Requested",
         dueDate: due,
+        reminderDate: reminderDate
+          ? formatRequestDateTime(reminderDate)
+          : undefined,
+        repeat: repeatEnabled ? formatCustomReminder(customReminder) : undefined,
+        notifyBy,
         requestedBy: sendOnBehalfOf || DOCUMENT_REQUEST_BROKERS[0],
         requestedDate: started,
         lastUpdated: started,
         progress: 0,
-        notes:
-          [
-            `${loanType} · ${purpose} · ${applicantCount} applicant${applicantCount === "2" ? "s" : ""}`,
-            email ? `Email: ${email}` : "",
-            phone ? `Phone: ${phone}` : "",
-            email2 ? `Email 2: ${email2}` : "",
-            phone2 ? `Phone 2: ${phone2}` : "",
-            propertyDetails.address
-              ? `Property: ${propertyDetails.address}`
-              : "",
-            propertyDetails.value
-              ? `Est. value: ${propertyDetails.value}`
-              : "",
-            propertyDetails.type ? `Type: ${propertyDetails.type}` : "",
-            propertyDetails.usage ? `Usage: ${propertyDetails.usage}` : "",
-            assetSummary ? `Assets: ${assetSummary}` : "",
-            Object.entries(hemValues)
-              .filter(([, v]) => v.trim())
-              .map(([k, v]) => `HEM ${k}: $${v}/mo`)
-              .join("; ") || "",
-            Object.entries(nonHemValues)
-              .filter(([, v]) => v.trim())
-              .map(([k, v]) => `Non-HEM ${k}: $${v}/mo`)
-              .join("; ") || "",
-            (() => {
-              const catalog = REQUEST_DOC_CATEGORIES.flatMap((c) => [
-                ...c.items,
-                ...(extraDocs[c.id] ?? []),
-              ]);
-              const titleOf = (id: string) =>
-                catalog.find((i) => i.id === id)?.title ?? id;
-              const a1 = selectedByApplicant[1].map(titleOf);
-              const a2 =
-                applicantCount === "2" && !skipCoApplicant
-                  ? selectedByApplicant[2].map(titleOf)
-                  : [];
-              return [
-                a1.length ? `Docs (${applicant1.trim() || "Applicant"}): ${a1.join(", ")}` : "",
-                a2.length ? `Docs (${applicant2.trim() || "Applicant 2"}): ${a2.join(", ")}` : "",
+        notes: notes.trim() || undefined,
+        items,
+        timeline: [
+          {
+            id: `${ids.id}-t-created`,
+            at: started,
+            by: sendOnBehalfOf || DOCUMENT_REQUEST_BROKERS[0],
+            label: "Request created",
+            detail: `Invitation sent to ${requestedFrom || "client"}. Visible in the client portal.`,
+          },
+          ...(reminderDate
+            ? [
+                {
+                  id: `${ids.id}-t-reminder`,
+                  at: formatRequestDateTime(reminderDate),
+                  by: sendOnBehalfOf || DOCUMENT_REQUEST_BROKERS[0],
+                  label: "Reminder scheduled",
+                  detail: [
+                    formatRequestDateTime(reminderDate),
+                    repeatEnabled
+                      ? formatCustomReminder(customReminder)
+                      : "Does not repeat",
+                    notifyBy.length ? `Notify by ${notifyBy.join(", ")}` : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · "),
+                },
               ]
-                .filter(Boolean)
-                .join("\n");
-            })(),
-            notes.trim(),
-          ]
-            .filter(Boolean)
-            .join("\n") || undefined,
+            : []),
+        ],
+        messages: notes.trim()
+          ? [
+              {
+                id: `${ids.id}-m-note`,
+                at: started,
+                by: sendOnBehalfOf || DOCUMENT_REQUEST_BROKERS[0],
+                from: "team",
+                text: notes.trim(),
+              },
+            ]
+          : [],
+        clientName: portal?.clientName,
+        clientEmail: email.trim() || portal?.primaryContactEmail,
       });
-      router.push(`/documents/requests/${created.id}`);
+      router.push(
+        `/documents/requests/${created.id}?created=1`,
+      );
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className={cn("relative min-h-full w-full", PAGE_GRADIENT)}>
-      <div className="mx-auto flex w-full max-w-[720px] flex-col px-4 pb-28 pt-6 sm:px-6">
-        <Stepper step={step} />
-
-        {step === 1 ? (
-          <section className="mt-8 rounded-2xl bg-white p-6 shadow-[0_8px_30px_rgba(90,50,163,0.08)] sm:p-8">
-            <h1 className="text-[28px] font-bold tracking-tight text-slate-900">
-              Create Document Request
-            </h1>
-            <label className="mt-6 block text-[13px] font-medium text-slate-700">
-              Send on behalf of:
-            </label>
-            <div className="relative mt-2">
-              <select
-                value={sendOnBehalfOf}
-                onChange={(e) => {
-                  setSendOnBehalfOf(e.target.value);
-                  if (errors.sendOnBehalfOf) {
-                    setErrors((prev) => {
-                      const next = { ...prev };
-                      delete next.sendOnBehalfOf;
-                      return next;
-                    });
-                  }
-                }}
-                className={cn(
-                  "h-11 w-full appearance-none rounded-lg border bg-white px-3.5 pr-10 text-[14px] text-slate-800 outline-none focus:ring-2",
-                  errors.sendOnBehalfOf
-                    ? "border-rose-500 focus:border-rose-500 focus:ring-rose-100"
-                    : "border-slate-200 focus:border-[#5A32A3]/45 focus:ring-[#5A32A3]/12",
-                  !sendOnBehalfOf && "text-slate-400",
-                )}
-              >
-                <option value="">Select an option</option>
-                {DOCUMENT_REQUEST_BROKERS.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            </div>
-            {errors.sendOnBehalfOf ? (
-              <p className="mt-1 text-[12px] font-medium text-rose-500">
-                {errors.sendOnBehalfOf}
-              </p>
-            ) : null}
-
-            <h2 className="mt-8 text-[16px] font-bold text-slate-900">
-              General details
-            </h2>
-            <p className="mt-1 inline-flex items-center gap-1.5 text-[13px] text-slate-500">
-              Who Middle works best for
-              <CircleHelp className="h-3.5 w-3.5 text-slate-400" />
-            </p>
-
-            <div className="mt-5 flex w-full flex-col gap-5">
-              <Segmented
-                label="Loan type"
-                value={loanType}
-                options={["Home loan", "Asset / Other"] as const}
-                onChange={setLoanTypeAndPurpose}
-              />
-              <Segmented
-                label="Purpose"
-                value={purpose}
-                options={
-                  loanType === "Home loan" ? HOME_PURPOSES : ASSET_PURPOSES
-                }
-                onChange={setPurpose}
-              />
-              <div>
-                <Segmented
-                  label="Number of applicants"
-                  value={applicantCount}
-                  options={["1", "2"] as const}
-                  onChange={(v) => {
-                    setApplicantCount(v);
-                    if (v === "1") {
-                      setSkipCoApplicant(false);
-                      setClientSearch2("");
-                      setApplicant2("");
-                      setShowClientResults2(false);
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (applicantCount === "1") {
-                      setApplicantCount("2");
-                      setSkipCoApplicant(true);
-                    } else {
-                      setSkipCoApplicant((v) => !v);
-                    }
-                  }}
-                  className="mt-2.5 text-[13px] font-medium text-slate-700 underline underline-offset-2 hover:text-[#5A32A3]"
-                >
-                  {applicantCount === "2" && skipCoApplicant
-                    ? "I have the co-applicant’s details"
-                    : "Don’t know the co-applicant’s details?"}
-                </button>
-              </div>
-
-              <div className="flex gap-3 rounded-xl bg-[#f3fbf9] px-4 py-3.5">
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-400 text-white">
-                  <Infinity className="h-4 w-4" strokeWidth={2.5} />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[14px] font-bold text-slate-900">
-                    Pre-fill with Infynity data (new-to-Middle clients only)
-                  </p>
-                  <p className="mt-1 text-[13px] leading-relaxed text-slate-600">
-                    Hit ‘Add client’ and enter the exact first name, surname,
-                    and email address from the Infynity client account. If
-                    matched, you’ll be able to{" "}
-                    <span className="font-semibold text-slate-800">
-                      import the data on the next page.
-                    </span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex w-full flex-col gap-5">
-                <ApplicantSearchRow
-                  label={
-                    applicantCount === "2" && !skipCoApplicant
-                      ? "Primary applicant"
-                      : "Applicant"
-                  }
-                  showHelp={applicantCount === "2" && !skipCoApplicant}
-                  value={clientSearch}
-                  error={errors.clientSearch}
-                  matches={clientMatches}
-                  showResults={showClientResults}
-                  onChange={(v) => {
-                    setClientSearch(v);
-                    setShowClientResults(true);
-                    setShowClientResults2(false);
-                    if (errors.clientSearch) {
-                      setErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.clientSearch;
-                        return next;
-                      });
-                    }
-                  }}
-                  onFocus={() => {
-                    setShowClientResults(true);
-                    setShowClientResults2(false);
-                  }}
-                  onSelect={(name) => selectExistingClient(name, 1)}
-                  onAdd={() => {
-                    if (!sendOnBehalfOf.trim()) {
-                      setErrors((prev) => ({
-                        ...prev,
-                        sendOnBehalfOf: "Provide a name",
-                      }));
-                      return;
-                    }
-                    startAddClient(1);
-                  }}
-                />
-
-                {applicantCount === "2" && !skipCoApplicant ? (
-                  <ApplicantSearchRow
-                    label="Secondary applicant"
-                    value={clientSearch2}
-                    error={errors.clientSearch2}
-                    matches={clientMatches2}
-                    showResults={showClientResults2}
-                    onChange={(v) => {
-                      setClientSearch2(v);
-                      setShowClientResults2(true);
-                      setShowClientResults(false);
-                      if (errors.clientSearch2) {
-                        setErrors((prev) => {
-                          const next = { ...prev };
-                          delete next.clientSearch2;
-                          return next;
-                        });
-                      }
-                    }}
-                    onFocus={() => {
-                      setShowClientResults2(true);
-                      setShowClientResults(false);
-                    }}
-                    onSelect={(name) => selectExistingClient(name, 2)}
-                    onAdd={() => {
-                      if (!sendOnBehalfOf.trim()) {
-                        setErrors((prev) => ({
-                          ...prev,
-                          sendOnBehalfOf: "Provide a name",
-                        }));
-                        return;
-                      }
-                      startAddClient(2);
-                    }}
-                  />
-                ) : null}
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        {step === 2 ? (
-          <section className="mt-5">
-            <h2 className="text-[18px] font-bold text-slate-900">
-              Pre-fill client details{" "}
-              <span className="font-semibold text-slate-700">(optional)</span>
-            </h2>
-            <p className="mt-1 text-[13px] text-slate-500">
-              Save your clients time by completing any information you already
-              know about them.{" "}
-              <button
-                type="button"
-                className="font-medium text-slate-700 underline underline-offset-2 hover:text-[#5A32A3]"
-              >
-                Learn more
-              </button>
-            </p>
-
-            <div className="mt-4">
-              <div className="flex gap-0.5">
-                {PREFILL_TABS.map((tab) => {
-                  const active = prefillTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => {
-                        setPrefillTab(tab.id);
-                        setOpenPrefill(null);
-                      }}
-                      className={cn(
-                        "relative z-10 shrink-0 rounded-t-lg px-3.5 py-2 text-[13px] font-medium",
-                        active
-                          ? "bg-white text-[#5A32A3] shadow-[0_-1px_3px_rgba(15,23,42,0.06)]"
-                          : "bg-transparent text-slate-700 hover:text-slate-900",
-                      )}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="-mt-px rounded-xl rounded-tl-none border border-slate-200/70 bg-white px-3.5 py-3 shadow-sm">
-                {prefillTab === "property" ? (
-                  openPrefill === "property" ? (
-                    <PropertyDetailsEditor
-                      title={
-                        loanType === "Home loan"
-                          ? purpose === "Refinance"
-                            ? "Refinance property"
-                            : "Purchase property"
-                          : "Asset / other"
-                      }
-                      value={propertyDetails}
-                      onChange={setPropertyDetails}
-                      onCancel={() => {
-                        setPropertyDetails(propertyDraft);
-                        setOpenPrefill(null);
-                      }}
-                      onUpdate={() => setOpenPrefill(null)}
-                    />
-                  ) : (
-                    <PrefillRow
-                      icon={
-                        <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F3ECFB] text-[#5A32A3]">
-                          <House className="h-4 w-4" strokeWidth={2} />
-                          {purpose === "Refinance" ? (
-                            <span className="absolute -right-0.5 -bottom-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-sky-500 text-white">
-                              <RefreshCw className="h-2 w-2" strokeWidth={3} />
-                            </span>
-                          ) : null}
-                        </span>
-                      }
-                      label={
-                        loanType === "Home loan"
-                          ? purpose === "Refinance"
-                            ? "Refinance property"
-                            : "Purchase property"
-                          : "Asset / other"
-                      }
-                      open={false}
-                      onToggle={() => {
-                        setPropertyDraft(propertyDetails);
-                        setOpenPrefill("property");
-                      }}
-                    />
-                  )
-                ) : null}
-
-                {prefillTab === "applicant" ? (
-                  <div className="space-y-4">
-                    {existingAccount1 && applicant1.trim() ? (
-                      <ApplicantProfile
-                        name={applicant1}
-                        email={email}
-                        phone={phone}
-                        existing
-                      />
-                    ) : (
-                      <PrefillRow
-                        icon={
-                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F3ECFB] text-[#5A32A3]">
-                            <UserRound className="h-4 w-4" />
-                          </span>
-                        }
-                        label={
-                          applicant1.trim() ||
-                          (applicantCount === "2" && !skipCoApplicant
-                            ? "Primary applicant"
-                            : "Applicant")
-                        }
-                        open={openPrefill === "applicant-1"}
-                        onToggle={() =>
-                          setOpenPrefill((v) =>
-                            v === "applicant-1" ? null : "applicant-1",
-                          )
-                        }
-                      >
-                        <div className="grid gap-3 sm:grid-cols-3">
-                          <Field
-                            label="Full name"
-                            value={applicant1}
-                            onChange={setApplicant1}
-                            placeholder="Applicant name"
-                          />
-                          <Field
-                            label="Email"
-                            type="email"
-                            value={email}
-                            onChange={setEmail}
-                            placeholder="client@email.com"
-                          />
-                          <Field
-                            label="Mobile"
-                            type="tel"
-                            value={phone}
-                            onChange={setPhone}
-                            placeholder="+61 …"
-                          />
-                        </div>
-                      </PrefillRow>
-                    )}
-
-                    {applicantCount === "2" && !skipCoApplicant ? (
-                      existingAccount2 && applicant2.trim() ? (
-                        <ApplicantProfile
-                          name={applicant2}
-                          email={email2}
-                          phone={phone2}
-                          existing
-                        />
-                      ) : (
-                        <PrefillRow
-                          icon={
-                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F3ECFB] text-[#5A32A3]">
-                              <UserRound className="h-4 w-4" />
-                            </span>
-                          }
-                          label={applicant2.trim() || "Secondary applicant"}
-                          open={openPrefill === "applicant-2"}
-                          onToggle={() =>
-                            setOpenPrefill((v) =>
-                              v === "applicant-2" ? null : "applicant-2",
-                            )
-                          }
-                        >
-                          <div className="grid gap-3 sm:grid-cols-3">
-                            <Field
-                              label="Full name"
-                              value={applicant2}
-                              onChange={setApplicant2}
-                              placeholder="Applicant name"
-                            />
-                            <Field
-                              label="Email"
-                              type="email"
-                              value={email2}
-                              onChange={setEmail2}
-                              placeholder="client@email.com"
-                            />
-                            <Field
-                              label="Mobile"
-                              type="tel"
-                              value={phone2}
-                              onChange={setPhone2}
-                              placeholder="+61 …"
-                            />
-                          </div>
-                        </PrefillRow>
-                      )
-                    ) : null}
-
-                    {applicantCount === "2" && skipCoApplicant ? (
-                      <p className="rounded-lg bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
-                        Co-applicant details will be collected later from the
-                        client.
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {prefillTab === "assets" ? (
-                  existingAccount1 || existingAccount2 ? (
-                    <PrefillUnavailable
-                      title="Assets pre-fill unavailable"
-                      body="Assets can't be pre-filled if an applicant has an existing Middle account. We'll pre-fill asset details from their most recent Discovery Journey."
-                    />
-                  ) : (
-                    <PrefillRow
-                      icon={
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F3ECFB] text-[#5A32A3]">
-                          <Wallet className="h-4 w-4" />
-                        </span>
-                      }
-                      label="Assets"
-                      open={openPrefill === "assets"}
-                      onToggle={() =>
-                        setOpenPrefill((v) =>
-                          v === "assets" ? null : "assets",
-                        )
-                      }
-                    >
-                      <Field
-                        label="Known assets"
-                        value={assetSummary}
-                        onChange={setAssetSummary}
-                        placeholder="e.g. Savings, vehicle, super"
-                      />
-                    </PrefillRow>
-                  )
-                ) : null}
-
-                {prefillTab === "expenses" ? (
-                  <div className="space-y-2">
-                    {openPrefill === "hem" ? (
-                      <ExpenseEditorCard
-                        icon={
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F3ECFB] text-[#5A32A3]">
-                            <ShoppingCart className="h-4 w-4" />
-                          </span>
-                        }
-                        title="HEM comparable expenses"
-                        categories={HEM_CATEGORIES}
-                        values={hemValues}
-                        onChange={(cat, v) =>
-                          setHemValues((prev) => ({ ...prev, [cat]: v }))
-                        }
-                        onClear={() => setHemValues(emptyHemValues())}
-                        onCancel={() => {
-                          setHemValues(hemDraft);
-                          setOpenPrefill(null);
-                        }}
-                        onUpdate={() => setOpenPrefill(null)}
-                      />
-                    ) : (
-                      <PrefillRow
-                        icon={
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F3ECFB] text-[#5A32A3]">
-                            <ShoppingCart className="h-4 w-4" />
-                          </span>
-                        }
-                        label="HEM comparable expenses"
-                        open={false}
-                        onToggle={() => {
-                          setHemDraft(hemValues);
-                          setOpenPrefill("hem");
-                        }}
-                      />
-                    )}
-                    {openPrefill === "non-hem" ? (
-                      <ExpenseEditorCard
-                        icon={
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F3ECFB] text-[#5A32A3]">
-                            <Banknote className="h-4 w-4" />
-                          </span>
-                        }
-                        title="Non HEM expenses"
-                        categories={NON_HEM_CATEGORIES}
-                        values={nonHemValues}
-                        onChange={(cat, v) =>
-                          setNonHemValues((prev) => ({ ...prev, [cat]: v }))
-                        }
-                        onClear={() => setNonHemValues(emptyNonHemValues())}
-                        onCancel={() => {
-                          setNonHemValues(nonHemDraft);
-                          setOpenPrefill(null);
-                        }}
-                        onUpdate={() => setOpenPrefill(null)}
-                      />
-                    ) : (
-                      <PrefillRow
-                        icon={
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F3ECFB] text-[#5A32A3]">
-                            <Banknote className="h-4 w-4" />
-                          </span>
-                        }
-                        label="Non HEM expenses"
-                        open={false}
-                        onToggle={() => {
-                          setNonHemDraft(nonHemValues);
-                          setOpenPrefill("non-hem");
-                        }}
-                      />
-                    )}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        {step === 3 ? (
-          <>
-            <RequestDocumentsPicker
-              applicant1={applicant1}
-              applicant2={applicant2}
-              twoApplicants={applicantCount === "2" && !skipCoApplicant}
-              selected={selectedByApplicant}
-              onChange={setSelectedByApplicant}
-              extras={extraDocs}
-              onExtrasChange={setExtraDocs}
-              error={errors.docs}
-            />
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-[12px] font-medium text-slate-600">
-                  Due date
-                </label>
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] outline-none focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/12"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="mb-1 block text-[12px] font-medium text-slate-600">
-                  Notes for the client
-                </label>
-                <textarea
-                  rows={2}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Anything they should know before uploading…"
-                  className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] outline-none focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/12"
-                />
-              </div>
-            </div>
-          </>
-        ) : null}
-      </div>
-
-      <div className={cn("fixed inset-x-0 bottom-0 z-20", PAGE_GRADIENT)}>
-        <div className="mx-auto flex w-full max-w-[720px] items-center justify-end gap-3 px-4 py-4 sm:px-6">
+    <div className={cn("absolute inset-0 flex flex-col overflow-hidden", PAGE_GRADIENT)}>
+      <div className="flex shrink-0 items-center justify-between px-4 py-3 sm:px-6 2xl:px-8">
+        <h1 className="text-base font-semibold text-slate-900">
+          Create Document Request
+        </h1>
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={goBack}
-            className="text-[14px] font-medium text-slate-700 hover:text-slate-900"
+            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
             {step === 1 ? "Cancel" : "Back"}
           </button>
@@ -1362,10 +800,171 @@ export function CreateDocumentRequestForm({
             type="button"
             disabled={saving}
             onClick={goNext}
-            className="inline-flex h-10 min-w-[88px] items-center justify-center rounded-lg bg-slate-900 px-6 text-[14px] font-semibold text-white hover:bg-black disabled:opacity-60"
+            className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-black disabled:opacity-60"
           >
             {step === 3 ? (saving ? "Creating…" : "Create") : "Next"}
           </button>
+        </div>
+      </div>
+
+      <div className="mx-auto flex min-h-0 w-full max-w-[1920px] flex-1 flex-col overflow-hidden px-4 pb-4 sm:px-6 2xl:px-8">
+        <Stepper step={step} />
+
+        <div
+          className={cn(
+            "mt-4 grid min-h-0 flex-1 grid-cols-1 items-stretch gap-6 overflow-hidden",
+            step === 3
+              ? "lg:grid-cols-1"
+              : "lg:grid-cols-[minmax(0,1fr)_minmax(280px,400px)]",
+          )}
+        >
+          <div
+            className={cn(
+              "flex min-h-0 min-w-0 flex-col",
+              step === 3 ? "overflow-y-auto" : "overflow-hidden",
+            )}
+          >
+            {step === 1 ? (
+              <section className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-[0_8px_30px_rgba(90,50,163,0.08)] sm:p-6">
+                <label className="block text-[13px] font-medium text-slate-700">
+                  Send on behalf of:
+                </label>
+                <div className="relative mt-2">
+                  <select
+                    value={sendOnBehalfOf}
+                    onChange={(e) => {
+                      setSendOnBehalfOf(e.target.value);
+                      if (errors.sendOnBehalfOf) {
+                        setErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.sendOnBehalfOf;
+                          return next;
+                        });
+                      }
+                    }}
+                    className={cn(
+                      "h-11 w-full appearance-none rounded-lg border bg-white px-3.5 pr-10 text-[14px] text-slate-800 outline-none focus:ring-2",
+                      errors.sendOnBehalfOf
+                        ? "border-rose-500 focus:border-rose-500 focus:ring-rose-100"
+                        : "border-slate-200 focus:border-[#5A32A3]/45 focus:ring-[#5A32A3]/12",
+                      !sendOnBehalfOf && "text-slate-400",
+                    )}
+                  >
+                    {senderOptions.map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                </div>
+                {errors.sendOnBehalfOf ? (
+                  <p className="mt-1 text-[12px] font-medium text-rose-500">
+                    {errors.sendOnBehalfOf}
+                  </p>
+                ) : null}
+
+                <div className="mt-5">
+                  <RequestApplicantsSection
+                    applicants={applicants}
+                    onChange={(next) => {
+                      setApplicants(next);
+                      if (errors.applicants) {
+                        setErrors((prev) => {
+                          const copy = { ...prev };
+                          delete copy.applicants;
+                          return copy;
+                        });
+                      }
+                    }}
+                    error={errors.applicants}
+                  />
+                </div>
+              </section>
+            ) : null}
+
+            {step === 2 ? (
+              <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl bg-white p-5 shadow-[0_8px_30px_rgba(90,50,163,0.08)] sm:p-6">
+                <RequestDocumentsPicker
+                  applicant1={applicant1}
+                  applicant2={applicant2}
+                  twoApplicants={applicantCount === "2" && !skipCoApplicant}
+                  selected={selectedByApplicant}
+                  onChange={setSelectedByApplicant}
+                  extras={extraDocs}
+                  onExtrasChange={setExtraDocs}
+                  descriptionOverrides={docDescOverrides}
+                  onDescriptionOverridesChange={setDocDescOverrides}
+                  template={template}
+                  onTemplateChange={setTemplate}
+                  error={errors.docs}
+                />
+                <div className="mt-4">
+                  <label className="mb-1 block text-[12px] font-medium text-slate-600">
+                    Notes for the client
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Anything they should know before uploading…"
+                    className="w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] outline-none focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/12"
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {step === 3 ? (
+              <RequestQuickReview
+                clientName={requestedFrom || "Client"}
+                sendOnBehalfOf={sendOnBehalfOf}
+                requestTitle={requestTitle}
+                onRequestTitleChange={(value) => {
+                  setTitleEdited(true);
+                  setRequestTitle(value);
+                }}
+                groups={reviewGroups}
+                dueDate={
+                  dueDate ? formatRequestDateTime(dueDate) : "Not set"
+                }
+                reminderDate={
+                  reminderDate
+                    ? formatRequestDateTime(reminderDate)
+                    : "Not set"
+                }
+                repeatLabel={
+                  repeatEnabled
+                    ? formatCustomReminder(customReminder)
+                    : "Off"
+                }
+                notifyBy={notifyBy}
+                notes={notes}
+                onNotesChange={setNotes}
+              />
+            ) : null}
+          </div>
+
+          {step !== 3 ? (
+            <aside className="flex min-h-0 flex-col overflow-hidden">
+              <RequestScheduleCard
+                className="flex-1 overflow-y-auto"
+                dueDate={dueDate}
+                reminderDate={reminderDate}
+                customReminder={customReminder}
+                repeatEnabled={repeatEnabled}
+                notifyBy={notifyBy}
+                errors={{
+                  dueDate: errors.dueDate,
+                  reminderDate: errors.reminderDate,
+                }}
+                onDueDateChange={handleDueDateChange}
+                onReminderDateChange={handleReminderDateChange}
+                onCustomReminderChange={setCustomReminder}
+                onRepeatEnabledChange={setRepeatEnabled}
+                onNotifyByChange={setNotifyBy}
+              />
+            </aside>
+          ) : null}
         </div>
       </div>
     </div>

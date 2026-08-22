@@ -4,6 +4,26 @@ export interface RequestDocItem {
   description: string;
 }
 
+const CATALOG_DESC_STORE_KEY = "documents:requests:catalog-desc:v1";
+
+export function readCatalogDescriptionOverrides(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(CATALOG_DESC_STORE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function writeCatalogDescriptionOverride(id: string, description: string) {
+  if (typeof window === "undefined") return;
+  const next = { ...readCatalogDescriptionOverrides(), [id]: description };
+  localStorage.setItem(CATALOG_DESC_STORE_KEY, JSON.stringify(next));
+}
+
 export interface RequestDocCategory {
   id: string;
   label: string;

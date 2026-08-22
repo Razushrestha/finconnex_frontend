@@ -22,6 +22,7 @@ const MODULE_TITLES: { href: string; label: string }[] = [
   { href: "/booking/consultants", label: "Consultants" },
   { href: "/booking", label: "Booking" },
   { href: "/documents/library", label: "Library" },
+  { href: "/documents/requests/all", label: "All Requests" },
   { href: "/documents/requests", label: "Document Requests" },
   { href: "/signature/documents", label: "Documents" },
   { href: "/signature/templates", label: "Templates" },

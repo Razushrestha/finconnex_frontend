@@ -114,6 +114,7 @@ const dashboardItems: NavItem[] = [
     children: [
       { label: "Library", href: "/documents/library" },
       { label: "Document Requests", href: "/documents/requests" },
+      { label: "All Requests", href: "/documents/requests/all" },
     ],
   },
   {

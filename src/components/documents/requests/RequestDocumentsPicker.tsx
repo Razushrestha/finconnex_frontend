@@ -5,9 +5,12 @@ import { ChevronDown, MinusCircle, Pencil, Plus } from "lucide-react";
 import {
   REQUEST_DOC_CATEGORIES,
   REQUEST_DOC_TEMPLATES,
+  readCatalogDescriptionOverrides,
+  writeCatalogDescriptionOverride,
   type RequestDocItem,
 } from "@/lib/documents/requests/catalog";
 import { cn } from "@/lib/utils";
+import { EditDocumentModal } from "@/components/documents/requests/EditDocumentModal";
 
 type Slot = 1 | 2;
 
@@ -59,6 +62,10 @@ interface RequestDocumentsPickerProps {
   onChange: (next: Record<Slot, string[]>) => void;
   extras: Record<string, RequestDocItem[]>;
   onExtrasChange: (next: Record<string, RequestDocItem[]>) => void;
+  descriptionOverrides?: Record<string, string>;
+  onDescriptionOverridesChange?: (next: Record<string, string>) => void;
+  template?: string;
+  onTemplateChange?: (template: string) => void;
   error?: string;
 }
 
@@ -70,17 +77,33 @@ export function RequestDocumentsPicker({
   onChange,
   extras,
   onExtrasChange,
+  descriptionOverrides,
+  onDescriptionOverridesChange,
+  template: templateProp,
+  onTemplateChange,
   error,
 }: RequestDocumentsPickerProps) {
   const [openId, setOpenId] = useState<string | null>("identification");
-  const [template, setTemplate] = useState("");
+  const [internalTemplate, setInternalTemplate] = useState("");
+  const template = templateProp ?? internalTemplate;
   const [templateQ, setTemplateQ] = useState("");
   const [templateOpen, setTemplateOpen] = useState(false);
   const [addingFor, setAddingFor] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDesc, setEditDesc] = useState("");
+  const [globalDescs, setGlobalDescs] = useState<Record<string, string>>({});
+  const [internalLocalDescs, setInternalLocalDescs] = useState<
+    Record<string, string>
+  >({});
+  const localDescs = descriptionOverrides ?? internalLocalDescs;
+
+  function setLocalDescs(next: Record<string, string>) {
+    if (onDescriptionOverridesChange) onDescriptionOverridesChange(next);
+    else setInternalLocalDescs(next);
+  }
+  const [editing, setEditing] = useState<{
+    catId: string;
+    item: RequestDocItem;
+  } | null>(null);
 
   const name1 = firstNameOf(applicant1, "Applicant");
   const name2 = firstNameOf(applicant2, "Applicant 2");
@@ -91,6 +114,10 @@ export function RequestDocumentsPicker({
     if (!q) return REQUEST_DOC_TEMPLATES;
     return REQUEST_DOC_TEMPLATES.filter((t) => t.toLowerCase().includes(q));
   }, [templateQ]);
+
+  useEffect(() => {
+    setGlobalDescs(readCatalogDescriptionOverrides());
+  }, []);
 
   useEffect(() => {
     if (!templateOpen) return;
@@ -110,8 +137,15 @@ export function RequestDocumentsPicker({
     };
   }, [templateOpen]);
 
+  function resolveDescription(item: RequestDocItem) {
+    return localDescs[item.id] ?? globalDescs[item.id] ?? item.description;
+  }
+
   function itemsFor(catId: string, base: RequestDocItem[]) {
-    return [...base, ...(extras[catId] ?? [])];
+    return [...base, ...(extras[catId] ?? [])].map((item) => ({
+      ...item,
+      description: resolveDescription(item),
+    }));
   }
 
   function isOn(slot: Slot, id: string) {
@@ -137,6 +171,11 @@ export function RequestDocumentsPicker({
       1: selected[1].filter((id) => !ids.has(id)),
       2: selected[2].filter((id) => !ids.has(id)),
     });
+  }
+
+  function setTemplate(name: string) {
+    if (onTemplateChange) onTemplateChange(name);
+    else setInternalTemplate(name);
   }
 
   function applyTemplate(name: string) {
@@ -178,19 +217,32 @@ export function RequestDocumentsPicker({
     setAddingFor(null);
   }
 
-  function saveEdit(catId: string, id: string) {
+  function saveEdit(
+    catId: string,
+    id: string,
+    description: string,
+    applyToTemplates: boolean,
+  ) {
+    const nextDesc = description.trim();
     const list = extras[catId] ?? [];
     if (list.some((i) => i.id === id)) {
       onExtrasChange({
         ...extras,
         [catId]: list.map((i) =>
-          i.id === id
-            ? { ...i, title: editTitle.trim() || i.title, description: editDesc }
-            : i,
+          i.id === id ? { ...i, description: nextDesc } : i,
         ),
       });
     }
-    setEditingId(null);
+    if (applyToTemplates) {
+      writeCatalogDescriptionOverride(id, nextDesc);
+      setGlobalDescs((prev) => ({ ...prev, [id]: nextDesc }));
+      const copy = { ...localDescs };
+      delete copy[id];
+      setLocalDescs(copy);
+    } else {
+      setLocalDescs({ ...localDescs, [id]: nextDesc });
+    }
+    setEditing(null);
   }
 
   const slots: Slot[] = twoApplicants ? [1, 2] : [1];
@@ -329,52 +381,23 @@ export function RequestDocumentsPicker({
                   ) : (
                   <div className="border-t border-slate-100 px-3 pb-3">
                     {items.map((item) => {
-                      const editing = editingId === item.id;
                       return (
                         <div
                           key={item.id}
                           className="flex items-start gap-2 border-b border-slate-100 py-1.5 last:border-b-0"
                         >
                           <div className="min-w-0 flex-1">
-                            {editing ? (
-                              <div className="space-y-1.5">
-                                <input
-                                  value={editTitle}
-                                  onChange={(e) => setEditTitle(e.target.value)}
-                                  className="h-8 w-full rounded-md border border-slate-200 px-2 text-[13px] outline-none focus:border-[#5A32A3]/45"
-                                />
-                                <input
-                                  value={editDesc}
-                                  onChange={(e) => setEditDesc(e.target.value)}
-                                  className="h-8 w-full rounded-md border border-slate-200 px-2 text-[12px] outline-none focus:border-[#5A32A3]/45"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => saveEdit(cat.id, item.id)}
-                                  className="text-[12px] font-semibold text-[#5A32A3]"
-                                >
-                                  Save
-                                </button>
-                              </div>
-                            ) : (
-                              <>
-                                <p className="text-[13px] font-semibold leading-tight text-[#3d246e]">
-                                  {item.title}
-                                </p>
-                                <p className="mt-px text-[12px] leading-snug text-slate-500">
-                                  {item.description}
-                                </p>
-                              </>
-                            )}
+                            <p className="text-[13px] font-semibold leading-tight text-[#3d246e]">
+                              {item.title}
+                            </p>
+                            <p className="mt-px text-[12px] leading-snug text-slate-500">
+                              {item.description}
+                            </p>
                           </div>
                           <button
                             type="button"
                             aria-label={`Edit ${item.title}`}
-                            onClick={() => {
-                              setEditingId(item.id);
-                              setEditTitle(item.title);
-                              setEditDesc(item.description);
-                            }}
+                            onClick={() => setEditing({ catId: cat.id, item })}
                             className="mt-0.5 shrink-0 text-[#5A32A3]/70 hover:text-[#5A32A3]"
                           >
                             <Pencil className="h-3.5 w-3.5" />
@@ -441,6 +464,17 @@ export function RequestDocumentsPicker({
       </div>
       {error ? (
         <p className="mt-2 text-[12px] font-medium text-rose-500">{error}</p>
+      ) : null}
+
+      {editing ? (
+        <EditDocumentModal
+          title={editing.item.title}
+          description={editing.item.description}
+          onClose={() => setEditing(null)}
+          onConfirm={(description, applyToTemplates) =>
+            saveEdit(editing.catId, editing.item.id, description, applyToTemplates)
+          }
+        />
       ) : null}
     </section>
   );
