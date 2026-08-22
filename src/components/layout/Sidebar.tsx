@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import * as React from "react";
 import Link from "next/link";
@@ -160,6 +160,13 @@ const dashboardItems: NavItem[] = [
   { label: "Journeys", href: "/journeys", icon: Route },
   { label: "Rules", href: "/rules", icon: Scale },
   { label: "Settings", href: "/settings", icon: Settings },
+];
+
+const workItems: NavItem[] = [
+  { label: "Tasks & Projects", href: "/tasks", swatch: "bg-red-500" },
+  { label: "User Management", href: "/users", swatch: "bg-violet-600" },
+  { label: "Activities", href: "/activities", swatch: "bg-amber-500" },
+  { label: "Deals", href: "/deals", swatch: "bg-indigo-500", badge: "+24%" },
 ];
 
 interface SidebarProps {
@@ -443,6 +450,41 @@ export function Sidebar({
           </nav>
 
           <div className="my-4 border-t border-border" />
+
+          <nav className={cn("flex flex-col gap-0.5", collapsed && "md:hidden")}>
+            {workItems.map((item) => {
+              const isActive = item.href ? isNavActive(pathname, item.href) : false;
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href!}
+                  title={collapsed ? item.label : undefined}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm transition-colors md:py-2",
+                    iconOnly,
+                    isActive
+                      ? "text-violet-600 dark:text-violet-400 font-medium"
+                      : "text-foreground/80 hover:bg-accent",
+                  )}
+                >
+                  <span
+                    className={cn("h-4 w-4 shrink-0 rounded-[5px]", item.swatch)}
+                  />
+                  <span className={cn("flex-1", hideLabel)}>{item.label}</span>
+                  {item.badge && (
+                    <Badge
+                      className={cn(
+                        "bg-emerald-500 px-2 py-0 text-[11px] font-medium text-white hover:bg-emerald-500",
+                        hideLabel,
+                      )}
+                    >
+                      {item.badge}
+                    </Badge>
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
         </div>
 
         <div

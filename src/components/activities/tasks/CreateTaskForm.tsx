@@ -503,7 +503,7 @@ export function CreateTaskForm({
       <div className="flex items-center justify-between px-4 py-2">
         <h1 className="text-base font-semibold text-foreground">
           Create New Task
-        </h1>
+          </h1>
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
@@ -656,8 +656,8 @@ export function CreateTaskForm({
                       className="h-4 w-4 shrink-0 rounded border-gray-300 text-violet-600 focus:ring-violet-400"
                       aria-label={`Mark "${item.text}" complete`}
                     />
-                    <input
-                      type="text"
+          <input
+            type="text"
                       value={item.text}
                       onChange={(e) =>
                         updateActionItemText(item.id, e.target.value)
@@ -684,7 +684,7 @@ export function CreateTaskForm({
 
               <div className="flex items-center gap-2.5 rounded-md border border-dashed border-gray-200 px-3 py-2 focus-within:border-violet-300 focus-within:ring-2 focus-within:ring-violet-100">
                 <Plus className="h-4 w-4 shrink-0 text-gray-400" />
-                <input
+            <input
                   ref={newActionItemRef}
                   value={newActionItem}
                   onChange={(e) => setNewActionItem(e.target.value)}
@@ -804,7 +804,7 @@ export function CreateTaskForm({
                 <label className={labelClass}>Reminder Date</label>
                 <div className="relative">
                   <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                  <input
+          <input
                     type="datetime-local"
                     min={minReminderDate}
                     max={form.dueDate}
@@ -922,7 +922,7 @@ export function CreateTaskForm({
             <div>
               <label className={labelClass}>
                 Task Owner <span className="text-red-500">*</span>
-              </label>
+          </label>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 {form.assignedTo ? (
                   <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-2 text-sm text-gray-700">

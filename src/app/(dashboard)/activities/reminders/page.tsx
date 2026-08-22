@@ -33,7 +33,7 @@ import {
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
 import { BOARD_PAGE, KANBAN_CARD, KANBAN_COL, KANBAN_HEADER, KANBAN_HEADER_COUNT, KANBAN_WELL } from "@/lib/layout";
-import { dropTargetActive } from "@/lib/motion";
+import { dropTargetActive, cardSubject } from "@/lib/motion";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 
 type ViewMode = "kanban" | "list";
@@ -588,7 +588,12 @@ function ReminderCard({
           <Bell className="h-3.5 w-3.5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-semibold leading-snug text-slate-900">
+          <p
+            className={cn(
+              "text-[13px] font-semibold leading-snug text-slate-900",
+              cardSubject,
+            )}
+          >
             {reminder.title}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">

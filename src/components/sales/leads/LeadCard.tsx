@@ -48,7 +48,7 @@ import {
   type QuickActionItem,
 } from "@/components/sales/QuickActionsBar";
 import { cn } from "@/lib/utils";
-import { cardDragging, cardMotion, entityCardShell } from "@/lib/motion";
+import { cardDragging, cardMotion, cardSubject, entityCardShell } from "@/lib/motion";
 import { KANBAN_CARD } from "@/lib/layout";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 
@@ -204,7 +204,7 @@ export function LeadCard({
         aria-label={`Open ${vm.name}`}
         aria-labelledby={nameId}
         className={cn(
-          "group w-full shrink-0 cursor-pointer",
+          "group/card w-full shrink-0 cursor-pointer",
           entityCardShell,
           KANBAN_CARD,
           cardMotion,
@@ -216,7 +216,10 @@ export function LeadCard({
           <div className="min-w-0">
             <h3
               id={nameId}
-              className="truncate text-[13px] font-semibold text-foreground"
+              className={cn(
+                "truncate text-[13px] font-semibold text-foreground",
+                cardSubject,
+              )}
             >
               {vm.name}
             </h3>
@@ -237,7 +240,7 @@ export function LeadCard({
                 "h-3.5 w-3.5 rounded border-slate-300 transition-opacity",
                 isSelected
                   ? "opacity-100"
-                  : "opacity-0 group-hover:opacity-100",
+                  : "opacity-0 group-hover/card:opacity-100",
               )}
             />
             <LeadSlaChip sla={vm.sla} variant="badge" />
