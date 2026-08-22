@@ -27,6 +27,7 @@ import {
   CalendarClock,
   Timer,
   Scale,
+  ChevronsLeft,
 } from "lucide-react";
 
 type NavChildItem = {
@@ -165,6 +166,7 @@ interface SidebarProps {
   tenantName?: string;
   mobileOpen?: boolean;
   onMobileOpenChange?: (open: boolean) => void;
+  onToggleSidebar?: () => void;
 }
 
 export function Sidebar({
@@ -172,6 +174,7 @@ export function Sidebar({
   tenantName,
   mobileOpen: mobileOpenProp,
   onMobileOpenChange,
+  onToggleSidebar,
 }: SidebarProps) {
   const pathname = usePathname();
   const chatRef = React.useRef<HTMLInputElement>(null);
@@ -275,7 +278,12 @@ export function Sidebar({
           collapsed && "md:w-[72px] md:px-3",
         )}
       >
-        <div className="mb-2 flex items-center justify-between px-1">
+        <div
+          className={cn(
+            "mb-2 flex items-center px-1",
+            collapsed ? "justify-between md:flex-col md:gap-2" : "justify-between",
+          )}
+        >
           <Link
             href="/"
             className={cn(
@@ -296,6 +304,20 @@ export function Sidebar({
             className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-accent md:hidden"
           >
             <X className="h-4 w-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent md:flex"
+          >
+            <ChevronsLeft
+              className={cn(
+                "h-4 w-4 transition-transform",
+                collapsed && "rotate-180",
+              )}
+            />
           </button>
         </div>
 

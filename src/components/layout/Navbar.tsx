@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  ChevronsLeft,
   Menu,
   Search,
   MessageSquare,
@@ -22,11 +21,11 @@ import { logAuth } from "@/lib/rules";
 import { listInboxConversations } from "@/lib/marketing/inbox/types";
 import { SearchModal } from "@/components/layout/SearchModal";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { getModuleTitle } from "@/lib/module-title";
+import { WorkQueuePersonBar } from "@/components/work-queue/WorkQueuePersonBar";
 
 interface NavbarProps {
-  onToggleSidebar?: () => void;
   onOpenMobileMenu?: () => void;
-  collapsed?: boolean;
   user?: {
     name: string;
     role: string;
@@ -50,9 +49,7 @@ function countInboxUnread() {
 }
 
 export function Navbar({
-  onToggleSidebar,
   onOpenMobileMenu,
-  collapsed = false,
   user = { name: "John Smith", role: "Manager" },
 }: NavbarProps) {
   const router = useRouter();
@@ -98,25 +95,14 @@ export function Navbar({
   }
 
   const tenantLabel = user.tenantName ?? "FinConnex HQ";
+  const moduleTitle = getModuleTitle(pathname);
   const isInbox = pathname.startsWith("/marketing/inbox");
   const isCalendar = pathname.startsWith("/activities/calendar");
+  const isWorkQueue = pathname.startsWith("/work-queue");
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center gap-2 border-b border-border/60 bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:gap-3 sm:px-4 md:gap-4">
-      <button
-        type="button"
-        onClick={onToggleSidebar}
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted md:flex"
-      >
-        <ChevronsLeft
-          className={cn(
-            "h-4 w-4 transition-transform",
-            collapsed && "rotate-180",
-          )}
-        />
-      </button>
-
+    <header className="sticky top-0 z-30 flex w-full flex-col border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="flex h-16 w-full items-center gap-2 px-3 sm:gap-3 sm:px-4 md:gap-4">
       <button
         type="button"
         onClick={onOpenMobileMenu}
@@ -126,26 +112,30 @@ export function Navbar({
         <Menu className="h-5 w-5" />
       </button>
 
-      <button
-        type="button"
-        onClick={() => setSearchOpen(true)}
-        aria-label="Search keywords (Ctrl+K)"
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted transition-colors hover:bg-muted/80 sm:w-auto sm:max-w-xs sm:flex-1 sm:justify-start sm:gap-2 sm:px-4"
-      >
-        <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="hidden w-full truncate text-left text-sm text-muted-foreground sm:inline">
-          Search keywords
-        </span>
-        <kbd className="ml-auto hidden rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground sm:inline">
-          ⌘K
-        </kbd>
-      </button>
+      <h1 className="min-w-0 truncate text-base font-semibold tracking-tight text-slate-900 sm:text-lg dark:text-slate-100">
+        {moduleTitle}
+      </h1>
 
       <SearchModal open={searchOpen} onOpenChange={setSearchOpen} />
 
       <div className="flex-1" />
 
-      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          aria-label="Search keywords (Ctrl+K)"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/80 sm:w-[14.5rem] sm:justify-start sm:gap-2 sm:px-3"
+        >
+          <Search className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+          <span className="hidden min-w-0 flex-1 truncate text-left text-sm sm:inline">
+            Search keywords
+          </span>
+          <kbd className="ml-auto hidden rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium sm:inline">
+            ⌘K
+          </kbd>
+        </button>
+
         <Link
           href="/activities/team-chat"
           aria-label={
@@ -284,6 +274,8 @@ export function Navbar({
           </div>
         )}
       </div>
+      </div>
+      {isWorkQueue ? <WorkQueuePersonBar /> : null}
     </header>
   );
 }
