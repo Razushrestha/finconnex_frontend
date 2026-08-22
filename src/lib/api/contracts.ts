@@ -33,6 +33,7 @@ import type {
   TaskType,
 } from "@/lib/tasks/types";
 import type { RelatedTo } from "@/lib/activities/shared";
+import type { NotificationMethod } from "@/lib/reminders/types";
 import type { SupportTicket, TicketPriority, TicketStatus } from "@/lib/support/types";
 import type { AuditEvent, RecycleBinItem } from "@/lib/rules";
 import type { SessionPayload } from "@/lib/auth/types";
@@ -179,6 +180,7 @@ export interface TaskCreateInput {
   reminderDate?: string;
   actionItems?: TaskActionItem[];
   collaborators?: string[];
+  notifyBy?: NotificationMethod[];
   attachmentsCount?: number;
   createdBy?: string;
 }

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { Meeting, MeetingStatus, MeetingType } from "@/lib/meetings/types";
 import { avatarColor, initials } from "@/lib/activities/shared";
+import { cardSubject } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
@@ -183,7 +184,12 @@ export function MeetingsListTable({
                     />
                   </td>
                   <td className="max-w-[240px] px-4 py-3">
-                    <p className="truncate font-semibold text-slate-900 dark:text-slate-100">
+                    <p
+                      className={cn(
+                        "truncate font-semibold text-slate-900 dark:text-slate-100",
+                        cardSubject,
+                      )}
+                    >
                       {meeting.title}
                     </p>
                     {meeting.agenda ? (

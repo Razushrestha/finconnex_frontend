@@ -7,8 +7,14 @@ import type { TaskActivityNote } from "@/lib/tasks/types";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { listMentionPeople } from "@/lib/mentions/people";
 
+interface TaskAttachment {
+  name: string;
+  sizeLabel?: string;
+}
+
 interface TaskActivityTabsProps {
   notes?: TaskActivityNote[];
+  attachments?: TaskAttachment[];
   onAddNote?: (body: string) => void;
 }
 
@@ -49,6 +55,7 @@ function renderNoteBodyWithMentions(text: string) {
 
 export function TaskActivityTabs({
   notes = [],
+  attachments = [],
   onAddNote,
 }: TaskActivityTabsProps) {
   const [activeTab, setActiveTab] = useState<"notes" | "attachments">("notes");
@@ -79,7 +86,7 @@ export function TaskActivityTabs({
           onClick={() => setActiveTab("attachments")}
           className={`relative pb-1 text-xs font-medium transition-colors ${activeTab === "attachments" ? "font-semibold text-[#5A32A3]" : "text-slate-400 hover:text-slate-700"}`}
         >
-          Attachments (2)
+          Attachments ({attachments.length})
           {activeTab === "attachments" && (
             <span className="absolute right-0 bottom-[-13px] left-0 h-0.5 bg-[#5A32A3]" />
           )}
@@ -144,28 +151,25 @@ export function TaskActivityTabs({
 
       {activeTab === "attachments" && (
         <div className="mt-5 space-y-3">
-          <div className="flex items-center gap-3 py-1">
-            <FileText className="h-4 w-4 text-slate-400" />
-            <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-slate-800">
-                Financial_Model_Q3.xlsx
-              </p>
-              <p className="text-[10px] text-slate-400">
-                2.4 MB · Uploaded Today
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 py-1">
-            <FileText className="h-4 w-4 text-slate-400" />
-            <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-slate-800">
-                Strategy_Deck.pdf
-              </p>
-              <p className="text-[10px] text-slate-400">
-                5.1 MB · Uploaded Yesterday
-              </p>
-            </div>
-          </div>
+          {attachments.length === 0 ? (
+            <p className="py-2 text-xs text-slate-400">
+              No attachments yet.
+            </p>
+          ) : (
+            attachments.map((file) => (
+              <div key={file.name} className="flex items-center gap-3 py-1">
+                <FileText className="h-4 w-4 text-slate-400" />
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-medium text-slate-800">
+                    {file.name}
+                  </p>
+                  {file.sizeLabel ? (
+                    <p className="text-[10px] text-slate-400">{file.sizeLabel}</p>
+                  ) : null}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
     </section>

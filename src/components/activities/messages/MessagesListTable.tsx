@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Message, MessageStatus, MessageType } from "@/lib/messages/types";
+import { cardSubject } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 import { listMessages } from "@/lib/messages/store";
 import { RecordDetailModal } from "@/components/shared/RecordDetailModal";
 
@@ -75,7 +77,12 @@ export function MessagesListTable({ data }: MessagesListTableProps) {
                     {message.type}
                   </span>
                 </td>
-                <td className="border-b border-slate-100 px-3 py-2.5 font-semibold text-slate-900">
+                <td
+                  className={cn(
+                    "border-b border-slate-100 px-3 py-2.5 font-semibold text-slate-900",
+                    cardSubject,
+                  )}
+                >
                   {message.subject}
                 </td>
                 <td className="max-w-[220px] truncate border-b border-slate-100 px-3 py-2.5 text-slate-600">

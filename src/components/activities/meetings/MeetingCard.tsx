@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import type { Meeting, MeetingType } from "@/lib/meetings/types";
 import { cn } from "@/lib/utils";
-import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
+import { cardDragging, cardMotion, cardSubject, entityCardBox } from "@/lib/motion";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
 
@@ -98,7 +98,12 @@ export function MeetingCard({
       )}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <h4 className="text-[13px] font-semibold leading-snug text-slate-900 dark:text-slate-100">
+        <h4
+          className={cn(
+            "text-[13px] font-semibold leading-snug text-slate-900 dark:text-slate-100",
+            cardSubject,
+          )}
+        >
           {meeting.title}
         </h4>
         <div className="flex shrink-0 items-center gap-1.5">

@@ -32,6 +32,7 @@ import {
 import { formatRelatedTo, initials } from "@/lib/activities/shared";
 import { taskMatchesSearch } from "@/lib/tasks/search";
 import { onRulesChange } from "@/lib/rules";
+import { cardSubject } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
   ManageColumnsModal,
@@ -244,7 +245,10 @@ function buildColumnRenderers(): Record<string, ColumnRenderer> {
   return {
     title: {
       label: "Task Name",
-      tdClassName: "px-3 py-2.5 font-semibold text-slate-900",
+      tdClassName: cn(
+        "px-3 py-2.5 font-semibold text-slate-900",
+        cardSubject,
+      ),
       td: (task) => task.title,
     },
     taskId: {
@@ -322,6 +326,11 @@ function buildColumnRenderers(): Record<string, ColumnRenderer> {
       label: "Reminder Date",
       tdClassName: "px-3 py-2.5 text-slate-600",
       td: (task) => task.reminderDate || "",
+    },
+    completedBy: {
+      label: "Completed By",
+      tdClassName: "px-3 py-2.5 text-slate-600",
+      td: (task) => task.completedBy || "",
     },
     completedDate: {
       label: "Completed Date",

@@ -3,9 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Bell,
   Calendar,
   ChevronLeft,
   ListChecks,
+  Mail,
+  MessageSquare,
+  MonitorSmartphone,
   Plus,
   Repeat,
   Search,
@@ -49,6 +53,8 @@ import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import AttachmentUpload from "./AttachmentUpload";
 import { TaskDescriptionEditor } from "./TaskDescriptionEditor";
 import { getUploadAdapter } from "@/lib/attachments/upload";
+import { type NotificationMethod } from "@/lib/reminders/types";
+import { cn } from "@/lib/utils";
 
 interface CreateTaskFormProps {
   layoutId: string;
@@ -75,6 +81,7 @@ interface FormState {
   actionItems: TaskActionItem[];
   repeatEnabled: boolean;
   repeat: RepeatConfig;
+  notifyBy: NotificationMethod[];
   notes: string;
 }
 
@@ -94,8 +101,20 @@ const initialState: FormState = {
   actionItems: [],
   repeatEnabled: false,
   repeat: defaultRepeatConfig,
+  notifyBy: ["Email"],
   notes: "",
 };
+
+const NOTIFY_BY_OPTIONS: {
+  id: NotificationMethod;
+  label: string;
+  icon: typeof Mail;
+}[] = [
+  { id: "Email", label: "Email", icon: Mail },
+  { id: "SMS", label: "SMS", icon: MessageSquare },
+  { id: "In-app", label: "In App", icon: Bell },
+  { id: "Web Push", label: "Web push", icon: MonitorSmartphone },
+];
 
 // Fields required before the task can be saved.
 const REQUIRED_FIELDS = [
@@ -172,6 +191,8 @@ function validateTaskDates(
     const reminder = parseDatetimeLocal(reminderDate);
     if (!reminder) {
       errors.reminderDate = "Enter a valid reminder date and time";
+    } else if (due && reminder.getTime() > due.getTime()) {
+      errors.reminderDate = "Reminder cannot be after the due date";
     } else if (reminder.getTime() <= now.getTime()) {
       errors.reminderDate =
         "Reminder must be after the current date and time";
@@ -233,8 +254,22 @@ export function CreateTaskForm({
   }
 
   function handleDueDateChange(value: string) {
-    update("dueDate", value);
-    syncDateErrors(value, form.reminderDate);
+    let nextReminder = form.reminderDate;
+    if (!value.trim()) {
+      nextReminder = "";
+    } else {
+      const due = parseDatetimeLocal(value);
+      const reminder = parseDatetimeLocal(nextReminder);
+      if (due && reminder && reminder.getTime() > due.getTime()) {
+        nextReminder = "";
+      }
+    }
+    setForm((prev) => ({
+      ...prev,
+      dueDate: value,
+      reminderDate: nextReminder,
+    }));
+    syncDateErrors(value, nextReminder);
   }
 
   function handleReminderDateChange(value: string) {
@@ -242,8 +277,21 @@ export function CreateTaskForm({
     syncDateErrors(form.dueDate, value);
   }
 
+  function toggleNotifyBy(method: NotificationMethod) {
+    setForm((prev) => {
+      const selected = prev.notifyBy.includes(method);
+      return {
+        ...prev,
+        notifyBy: selected
+          ? prev.notifyBy.filter((item) => item !== method)
+          : [...prev.notifyBy, method],
+      };
+    });
+  }
+
   const minDueDate = toDatetimeLocalValue(startOfMinute(new Date()));
   const minReminderDate = minDueDate;
+  const hasDueDate = Boolean(form.dueDate.trim());
 
   const relatedOptions = form.relatedKind
     ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === form.relatedKind)
@@ -295,10 +343,10 @@ export function CreateTaskForm({
     return Object.keys(next).length === 0;
   }
 
-  function addActionItem() {
+  function addActionItem(options?: { focusAfter?: boolean }) {
     const text = newActionItem.trim();
     if (!text) {
-      newActionItemRef.current?.focus();
+      if (options?.focusAfter) newActionItemRef.current?.focus();
       return;
     }
     setForm((prev) => ({
@@ -309,7 +357,9 @@ export function CreateTaskForm({
       ],
     }));
     setNewActionItem("");
-    requestAnimationFrame(() => newActionItemRef.current?.focus());
+    if (options?.focusAfter) {
+      requestAnimationFrame(() => newActionItemRef.current?.focus());
+    }
   }
 
   function toggleActionItem(id: string) {
@@ -412,6 +462,7 @@ export function CreateTaskForm({
       notes: form.notes.trim() || undefined,
       collaborators: form.collaborators.length ? form.collaborators : undefined,
       actionItems: form.actionItems.length ? form.actionItems : undefined,
+      notifyBy: form.notifyBy.length ? form.notifyBy : undefined,
       attachmentsCount: attachmentsCount || undefined,
       createdBy: actor,
     });
@@ -637,10 +688,11 @@ export function CreateTaskForm({
                   ref={newActionItemRef}
                   value={newActionItem}
                   onChange={(e) => setNewActionItem(e.target.value)}
+                  onBlur={() => addActionItem()}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
-                      addActionItem();
+                      addActionItem({ focusAfter: true });
                     }
                   }}
                   placeholder="Add new action item…"
@@ -651,9 +703,8 @@ export function CreateTaskForm({
 
             <button
               type="button"
-              onClick={addActionItem}
-              disabled={!newActionItem.trim()}
-              className="mt-3 flex items-center gap-1.5 text-sm font-medium text-violet-700 transition-colors hover:text-violet-800 disabled:cursor-not-allowed disabled:text-gray-300"
+              onClick={() => addActionItem({ focusAfter: true })}
+              className="mt-3 flex items-center gap-1.5 text-sm font-medium text-violet-700 transition-colors hover:text-violet-800"
             >
               <Plus className="h-3.5 w-3.5" />
               Add Item
@@ -748,30 +799,35 @@ export function CreateTaskForm({
               ) : null}
             </div>
 
-            <div>
-              <label className={labelClass}>Reminder Date</label>
-              <div className="relative">
-                <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="datetime-local"
-                  min={minReminderDate}
-                  className={
-                    inputClass +
-                    " pl-9" +
-                    (submitted && errors.reminderDate ? " border-red-300" : "")
-                  }
-                  value={form.reminderDate}
-                  onChange={(e) => handleReminderDateChange(e.target.value)}
-                />
+            {hasDueDate ? (
+              <div>
+                <label className={labelClass}>Reminder Date</label>
+                <div className="relative">
+                  <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="datetime-local"
+                    min={minReminderDate}
+                    max={form.dueDate}
+                    className={
+                      inputClass +
+                      " pl-9" +
+                      (submitted && errors.reminderDate ? " border-red-300" : "")
+                    }
+                    value={form.reminderDate}
+                    onChange={(e) => handleReminderDateChange(e.target.value)}
+                  />
+                </div>
+                {(submitted || form.reminderDate) && errors.reminderDate ? (
+                  <p className="mt-1 text-xs text-red-600">
+                    {errors.reminderDate}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Choose a time after now and no later than the due date.
+                  </p>
+                )}
               </div>
-              {(submitted || form.reminderDate) && errors.reminderDate ? (
-                <p className="mt-1 text-xs text-red-600">{errors.reminderDate}</p>
-              ) : (
-                <p className="mt-1 text-xs text-gray-500">
-                  Any date and time after the current moment can be selected.
-                </p>
-              )}
-            </div>
+            ) : null}
 
             <div>
               <label className={labelClass}>Repeat</label>
@@ -818,6 +874,36 @@ export function CreateTaskForm({
                   Set Task Type and Due Date to enable repeat.
                 </p>
               )}
+            </div>
+
+            <div>
+              <label className={labelClass}>Notify by</label>
+              <div className="mt-1.5 grid grid-cols-2 gap-2">
+                {NOTIFY_BY_OPTIONS.map((option) => {
+                  const active = form.notifyBy.includes(option.id);
+                  const Icon = option.icon;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => toggleNotifyBy(option.id)}
+                      aria-pressed={active}
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-md border px-3 py-2 text-left text-sm font-medium transition-colors",
+                        active
+                          ? "border-[#5A32A3] bg-[#F3ECFB] text-[#5A32A3]"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5 shrink-0" />
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Choose how the owner is notified for this task.
+              </p>
             </div>
 
             <RepeatModal

@@ -80,6 +80,13 @@ export function KanbanColumn({
             KANBAN_HEADER_RAIL,
           )}
         >
+          <span className={KANBAN_HEADER_COUNT}>
+            {column.count}
+          </span>
+          <span className="mt-1 [writing-mode:vertical-rl] text-sm font-semibold text-slate-900">
+            {column.title}
+          </span>
+          <div className="flex-1" />
           <button
             type="button"
             onClick={() => setIsCollapsed(false)}
@@ -90,12 +97,6 @@ export function KanbanColumn({
           >
             <ChevronRight className="h-4 w-4 text-slate-700" />
           </button>
-          <span className={KANBAN_HEADER_COUNT}>
-            {column.count}
-          </span>
-          <span className="mt-1 flex-1 [writing-mode:vertical-rl] text-sm font-semibold text-slate-900">
-            {column.title}
-          </span>
         </div>
       </div>
     );

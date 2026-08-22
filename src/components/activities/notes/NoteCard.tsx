@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Pin, Lock, Link2, Clock } from "lucide-react";
 import type { Note, NoteType } from "@/lib/notes/types";
 import { cn } from "@/lib/utils";
-import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
+import { cardDragging, cardMotion, cardSubject, entityCardBox } from "@/lib/motion";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
 
@@ -108,7 +108,12 @@ export function NoteCard({
       )}
     >
       <div className="mb-2 flex items-start justify-between gap-2">
-        <h4 className="min-w-0 truncate text-[13px] font-semibold leading-snug text-slate-900">
+        <h4
+          className={cn(
+            "min-w-0 truncate text-[13px] font-semibold leading-snug text-slate-900",
+            cardSubject,
+          )}
+        >
           {note.title || "Untitled note"}
         </h4>
         <div className="flex shrink-0 items-center gap-1">

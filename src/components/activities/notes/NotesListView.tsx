@@ -14,6 +14,7 @@ import {
 import { type Note, type NoteType } from "@/lib/notes/types";
 import { listNotes } from "@/lib/notes/store";
 import { avatarColor, initials } from "@/lib/activities/shared";
+import { cardSubject } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
 
@@ -205,7 +206,12 @@ export function NotesListView({
                     </div>
                   </td>
                   <td className="max-w-[280px] px-4 py-3">
-                    <p className="truncate font-semibold text-slate-900">
+                    <p
+                      className={cn(
+                        "truncate font-semibold text-slate-900",
+                        cardSubject,
+                      )}
+                    >
                       {note.title || "Untitled note"}
                     </p>
                     <p className="mt-0.5 line-clamp-1 text-[11px] text-slate-400">

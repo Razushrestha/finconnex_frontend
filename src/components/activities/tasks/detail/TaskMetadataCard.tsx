@@ -7,6 +7,21 @@ import { TASK_OWNERS, TASK_PRIORITIES } from "@/lib/tasks/types";
 import { formatRelatedTo } from "@/lib/activities/shared";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
 import { useTaskSectionEdit } from "./TaskEditContext";
+import { cn } from "@/lib/utils";
+
+const PRIORITY_COLOR: Record<Priority, string> = {
+  Critical: "bg-red-50 text-red-700",
+  High: "bg-rose-50 text-rose-700",
+  Medium: "bg-amber-50 text-amber-800",
+  Low: "bg-slate-100 text-slate-600",
+};
+
+const PRIORITY_OPTION_COLOR: Record<Priority, string> = {
+  Critical: "text-red-700",
+  High: "text-rose-700",
+  Medium: "text-amber-800",
+  Low: "text-slate-600",
+};
 
 interface TaskMetadataCardProps {
   task: Task;
@@ -92,15 +107,27 @@ export function TaskMetadataCard({
         </div>
         <div className="flex shrink-0 items-center gap-3">
           {editing ? (
-            <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-              <Flag className="h-3 w-3 text-slate-400" />
+            <label
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold",
+                PRIORITY_COLOR[priority],
+              )}
+            >
+              <Flag className="h-3 w-3" />
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as Priority)}
-                className="bg-transparent py-0.5 outline-none"
+                className={cn(
+                  "bg-transparent py-0.5 outline-none",
+                  PRIORITY_OPTION_COLOR[priority],
+                )}
               >
                 {TASK_PRIORITIES.map((option) => (
-                  <option key={option} value={option}>
+                  <option
+                    key={option}
+                    value={option}
+                    className={PRIORITY_OPTION_COLOR[option]}
+                  >
                     {option} Priority
                   </option>
                 ))}
@@ -108,9 +135,10 @@ export function TaskMetadataCard({
             </label>
           ) : (
             <span
-              className={`inline-flex items-center gap-1 text-xs font-semibold ${
-                task.priority === "Critical" ? "text-rose-600" : "text-amber-600"
-              }`}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold",
+                PRIORITY_COLOR[task.priority],
+              )}
             >
               <Flag className="h-3 w-3" />
               {task.priority} Priority
@@ -193,7 +221,7 @@ export function TaskMetadataCard({
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3">
         <AuditLine
           label="Created by"
           by={task.createdBy || task.assignedTo}
@@ -204,9 +232,22 @@ export function TaskMetadataCard({
           by={task.modifiedBy || task.createdBy || task.assignedTo}
           on={task.modifiedOn || task.createdOn || "17/08/2026 09:00 AM"}
         />
+        <AuditLine
+          label="Completed by"
+          by={task.completedBy}
+          on={task.completedDate}
+        />
       </div>
     </section>
   );
+}
+
+function splitStamp(on?: string): { date: string; time: string } {
+  if (!on) return { date: "", time: "" };
+  const cleaned = on.replace(",", " ").replace(/\s+/g, " ").trim();
+  const match = cleaned.match(/^(\d{1,2}\/\d{1,2}\/\d{4})\s*(.*)$/);
+  if (match) return { date: match[1], time: match[2].trim() };
+  return { date: cleaned, time: "" };
 }
 
 function AuditLine({
@@ -218,16 +259,18 @@ function AuditLine({
   by?: string;
   on?: string;
 }) {
+  const { date, time } = splitStamp(on);
   return (
     <div>
       <p className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
         {label}
       </p>
-      <div className="mt-1.5 flex items-center gap-2 text-sm text-slate-700">
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-slate-700">
         <User className="h-3.5 w-3.5 text-slate-400" />
         <span className="font-medium">{by || "—"}</span>
-        <span className="text-slate-400">·</span>
-        <span className="text-slate-500">{on || "—"}</span>
+        {date ? <span className="text-slate-500">{date}</span> : null}
+        {time ? <span className="text-slate-500">{time}</span> : null}
+        {!date && !time ? <span className="text-slate-400">—</span> : null}
       </div>
     </div>
   );

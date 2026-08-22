@@ -59,7 +59,11 @@ export function TaskDetailsView({
               onSave={onUpdateDescription}
             />
             <TaskChecklistCard taskId={task.taskId} items={task.actionItems} />
-            <TaskActivityTabs notes={task.activityNotes} onAddNote={onAddNote} />
+            <TaskActivityTabs
+              notes={task.activityNotes}
+              attachments={[]}
+              onAddNote={onAddNote}
+            />
           </div>
 
           <aside className="px-6 py-6 lg:px-8">

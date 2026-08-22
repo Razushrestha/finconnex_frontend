@@ -19,6 +19,13 @@ export default function TaskDetailPage({ params }: PageProps) {
   useEffect(() => {
     function loadTask() {
       const found = findTaskById(id);
+      if (
+        found?.task.status === "Completed" &&
+        (!found.task.completedBy || !found.task.completedDate)
+      ) {
+        setTask(updateTaskStatus(id, "Completed") ?? found.task);
+        return;
+      }
       setTask(found?.task ?? null);
     }
     loadTask();

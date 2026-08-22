@@ -23,12 +23,43 @@ import { createBoardStore } from "@/lib/rules/module-store";
 import { newRulesId } from "@/lib/rules/storage";
 import { getRulesActor } from "@/lib/rules/actor";
 
+function currentActor(task?: Task): string {
+  return (
+    getRulesActor().name ||
+    task?.modifiedBy ||
+    task?.createdBy ||
+    task?.assignedTo ||
+    "John Smith"
+  );
+}
+
 function touchModified(task: Task): Task {
-  const actor = getRulesActor().name || task.modifiedBy || task.createdBy || task.assignedTo;
   return {
     ...task,
-    modifiedBy: actor,
+    modifiedBy: currentActor(task),
     modifiedOn: formatTaskTimestamp(new Date()),
+  };
+}
+
+function withCompletion(task: Task, status: TaskStatus): Task {
+  if (status === "Completed") {
+    const alreadyClosed = task.status === "Completed" && task.completedBy;
+    return {
+      ...task,
+      status,
+      overdue: false,
+      completedBy: alreadyClosed ? task.completedBy : currentActor(task),
+      completedDate:
+        alreadyClosed && task.completedDate
+          ? task.completedDate
+          : formatTaskTimestamp(new Date()),
+    };
+  }
+  return {
+    ...task,
+    status,
+    completedBy: undefined,
+    completedDate: undefined,
   };
 }
 
@@ -60,6 +91,16 @@ function normalize(cols: TaskColumn[]): TaskColumn[] {
         createdOn,
         modifiedBy: t.modifiedBy || createdBy,
         modifiedOn: t.modifiedOn || createdOn,
+        completedBy:
+          t.completedBy ||
+          (col.title === "Completed" || t.status === "Completed"
+            ? t.modifiedBy || createdBy
+            : undefined),
+        completedDate:
+          t.completedDate ||
+          (col.title === "Completed" || t.status === "Completed"
+            ? t.modifiedOn || createdOn
+            : undefined),
         reminders: Array.isArray(t.reminders)
           ? t.reminders.map((r) => ({ ...r }))
           : remindersFromLegacyDate(t.reminderDate),
@@ -96,6 +137,7 @@ export function createTask(input: {
   reminders?: TaskReminder[];
   actionItems?: TaskActionItem[];
   collaborators?: string[];
+  notifyBy?: Task["notifyBy"];
   attachmentsCount?: number;
   createdBy?: string;
 }): Task {
@@ -125,6 +167,7 @@ export function createTask(input: {
       ? input.actionItems.map((item) => ({ ...item }))
       : undefined,
     collaborators: input.collaborators,
+    notifyBy: input.notifyBy?.length ? [...input.notifyBy] : undefined,
     attachmentsCount: input.attachmentsCount,
     createdBy: creator,
     createdOn: now,
@@ -173,12 +216,7 @@ export function completeTask(taskId: string): Task | null {
     cols.find((c) => c.title === "Completed") ??
     cols.find((c) => c.id === "completed");
 
-  const updated: Task = touchModified({
-    ...found.task,
-    status: "Completed",
-    completedDate: new Date().toISOString().slice(0, 10),
-    overdue: false,
-  });
+  const updated: Task = touchModified(withCompletion(found.task, "Completed"));
 
   const without = cols.map((c) => ({
     ...c,
@@ -233,6 +271,20 @@ export function updateTaskPriority(
   return updated;
 }
 
+function missingCompletion(task: Task) {
+  return !task.completedBy || !task.completedDate;
+}
+
+function patchTaskInPlace(taskId: string, next: Task): Task {
+  saveTaskColumns(
+    listTaskColumns().map((col) => ({
+      ...col,
+      tasks: col.tasks.map((t) => (t.taskId === taskId ? next : t)),
+    })),
+  );
+  return next;
+}
+
 /** Move a task into the column matching `status`. */
 export function updateTaskStatus(
   taskId: string,
@@ -241,6 +293,12 @@ export function updateTaskStatus(
   const found = findTaskById(taskId);
   if (!found) return null;
   if (found.task.status === status && found.status === status) {
+    if (status === "Completed" && missingCompletion(found.task)) {
+      return patchTaskInPlace(
+        taskId,
+        touchModified(withCompletion(found.task, "Completed")),
+      );
+    }
     return found.task;
   }
 
@@ -249,15 +307,7 @@ export function updateTaskStatus(
     cols.find((c) => c.title === status) ??
     cols.find((c) => c.id === status.toLowerCase().replace(/\s+/g, "-"));
 
-  const updated: Task = touchModified({
-    ...found.task,
-    status,
-    completedDate:
-      status === "Completed"
-        ? new Date().toISOString().slice(0, 10)
-        : found.task.completedDate,
-    overdue: status === "Completed" ? false : found.task.overdue,
-  });
+  const updated: Task = touchModified(withCompletion(found.task, status));
 
   const without = cols.map((c) => ({
     ...c,

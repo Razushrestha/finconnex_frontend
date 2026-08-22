@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
+import { cardDragging, cardMotion, cardSubject, entityCardBox } from "@/lib/motion";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 import {
   Calendar,
@@ -227,7 +227,10 @@ export function TaskCard({
       >
         <div className="mb-3 flex items-center justify-between gap-2.5">
           <h4
-            className="mb-2 truncate text-[13px] font-semibold text-primary"
+            className={cn(
+              "mb-2 truncate text-[13px] font-semibold text-primary",
+              cardSubject,
+            )}
             title={task.title}
           >
         {task.title}

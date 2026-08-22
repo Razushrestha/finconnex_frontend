@@ -14,6 +14,7 @@ import {
 import type { Email, EmailStatus } from "@/lib/emails/types";
 import { deleteEmail, listEmails, updateEmail } from "@/lib/emails/store";
 import { onRulesChange } from "@/lib/rules";
+import { cardSubject } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 const STARRED_KEY = "finconnex.emails.starred";
@@ -274,7 +275,7 @@ export function EmailListTable({ data }: EmailListTableProps) {
                   {email.status === "Draft" ? (
                     <>
                       <span className="font-bold text-rose-600">Draft</span>
-                      <span className="text-slate-400">
+                      <span className={cn("text-slate-400", cardSubject)}>
                         {" "}
                         {email.subject || "(no subject)"}
                       </span>
@@ -284,6 +285,7 @@ export function EmailListTable({ data }: EmailListTableProps) {
                       <span
                         className={cn(
                           unread ? "font-bold text-slate-900" : "font-medium text-slate-800",
+                          cardSubject,
                         )}
                       >
                         {email.subject}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { FileText } from "lucide-react";
 import {
   TaskDescriptionEditor,
   sanitizeTaskDescriptionHtml,
@@ -59,9 +58,6 @@ export function TaskDescriptionCard({
 }: TaskDescriptionCardProps) {
   const [draft, setDraft] = useState(description ?? "");
 
-  const fallback =
-    "Review and analyze the financial performance metrics across all regional enterprise accounts. This includes aggregating revenue data, identifying churn risk patterns, and comparing actuals against projected forecasts outlined in the strategy deck.";
-
   const editing = useTaskSectionEdit({
     start() {
       setDraft(description ?? "");
@@ -92,22 +88,13 @@ export function TaskDescriptionCard({
             __html: sanitizeTaskDescriptionHtml(description),
           }}
         />
-      ) : (
+      ) : description ? (
         <p className="text-sm leading-relaxed text-slate-700">
-          {description
-            ? renderPlainDescriptionWithMentions(description)
-            : renderPlainDescriptionWithMentions(fallback)}
+          {renderPlainDescriptionWithMentions(description)}
         </p>
+      ) : (
+        <p className="text-sm text-slate-400">No description added yet.</p>
       )}
-
-      <div className="mt-5 flex items-center gap-2 text-sm">
-        <FileText className="h-4 w-4 text-slate-400" />
-        <span className="font-medium text-slate-800">
-          Financial_Model_Q3.xlsx
-        </span>
-        <span className="text-slate-400">·</span>
-        <span className="text-xs text-slate-400">2.4 MB</span>
-      </div>
     </section>
   );
 }

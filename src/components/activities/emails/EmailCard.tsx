@@ -3,7 +3,7 @@
 import { Mail, Clock } from "lucide-react";
 import type { Email } from "@/lib/emails/types";
 import { cn } from "@/lib/utils";
-import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
+import { cardDragging, cardMotion, cardSubject, entityCardBox } from "@/lib/motion";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 import Link from "next/link";
 
@@ -30,7 +30,12 @@ export function EmailCard({
       data-focus-id={email.id}
       data-email-id={email.id}
       data-column-id={columnId}
-      className={cn(entityCardBox, cardMotion, isDragging && cardDragging)}
+      className={cn(
+        entityCardBox,
+        "group/card",
+        cardMotion,
+        isDragging && cardDragging,
+      )}
     >
       <div className="mb-2 flex items-center gap-1.5 text-xs text-slate-400">
         <Mail className="h-3.5 w-3.5" />
@@ -41,7 +46,12 @@ export function EmailCard({
         href={`/activities/emails/detail/${email.id}`}
         className="block group cursor-pointer"
       >
-        <h4 className="mb-1.5 truncate text-sm font-semibold text-card-foreground group-hover:text-primary transition-colors">
+        <h4
+          className={cn(
+            "mb-1.5 truncate text-sm font-semibold text-card-foreground transition-colors group-hover:text-primary",
+            cardSubject,
+          )}
+        >
           {email.subject}
         </h4>
       </Link>

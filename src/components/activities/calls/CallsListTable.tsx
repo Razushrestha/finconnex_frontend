@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Phone, ChevronLeft, ChevronRight } from "lucide-react";
+import { cardSubject } from "@/lib/motion";
+import { cn } from "@/lib/utils";
 import { listCalls } from "@/lib/calls/store";
 import { onRulesChange } from "@/lib/rules/storage";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
@@ -130,7 +132,12 @@ export function CallsListTable({
                     className="h-3.5 w-3.5 rounded border-slate-300 text-violet-500"
                   />
                 </td>
-                <td className="px-3 py-2 font-semibold text-slate-900">
+                <td
+                  className={cn(
+                    "px-3 py-2 font-semibold text-slate-900",
+                    cardSubject,
+                  )}
+                >
                   <div className="flex items-center gap-2">
                     <Phone className="h-3.5 w-3.5 text-slate-400" />
                     {call.subject}

@@ -14,6 +14,7 @@ import {
 
 export const TASK_TYPES = [
   "Call",
+  "Team Action",
   "Email",
   "Meeting",
   "Follow-up",
@@ -223,11 +224,13 @@ export interface Task {
   modifiedBy?: string;
   modifiedOn?: string;
   description?: string;
+  completedBy?: string;
   completedDate?: string;
   notes?: string;
   activityNotes?: TaskActivityNote[];
   actionItems?: TaskActionItem[];
   collaborators?: string[];
+  notifyBy?: NotificationMethod[];
   reminders?: TaskReminder[];
   commentsCount?: number;
   attachmentsCount?: number;
@@ -494,7 +497,8 @@ export const taskColumns: TaskColumn[] = [
         priority: "Medium",
         status: "Completed",
         dueDate: "18/07/2026",
-        completedDate: "18/07/2026",
+        completedDate: "18/07/2026 04:30 PM",
+        completedBy: "Shiva Kadhka",
         assignedTo: "Shiva Kadhka",
         relatedTo: { kind: "Company", name: "Northwind Traders" },
         collaborators: [
@@ -512,7 +516,8 @@ export const taskColumns: TaskColumn[] = [
         priority: "High",
         status: "Completed",
         dueDate: "17/07/2026",
-        completedDate: "17/07/2026",
+        completedDate: "17/07/2026 02:15 PM",
+        completedBy: "Tejas Gokhe",
         assignedTo: "Tejas Gokhe",
         relatedTo: { kind: "Deal", name: "Atlas CRM Rollout" },
         collaborators: [

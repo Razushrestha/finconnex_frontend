@@ -16,7 +16,7 @@ import type { Call } from "@/lib/calls/types";
 import type { Priority, TaskStatus } from "@/lib/tasks/types";
 import { TASK_PRIORITIES, TASK_STATUSES } from "@/lib/tasks/types";
 import { cn } from "@/lib/utils";
-import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
+import { cardDragging, cardMotion, cardSubject, entityCardBox } from "@/lib/motion";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
 import { useRouter } from "next/navigation";
@@ -226,7 +226,10 @@ export function CallCard({
           </div>
 
           <h4
-            className="mb-1 truncate text-[13px] font-semibold text-slate-900"
+            className={cn(
+              "mb-1 truncate text-[13px] font-semibold text-slate-900",
+              cardSubject,
+            )}
             title={call.subject}
           >
             {call.subject}
