@@ -2,29 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Building2,
-  Mail,
-  Phone,
-  Clock as ClockIcon,
-  Send,
-  StickyNote,
-  Phone as PhoneIcon,
-} from "lucide-react";
-import {
-  EntityDetailHeader,
-  ScoreGaugeCard,
-  ContactInfoCard,
-  ActivityComposer,
-  ActivityTabs,
-  TimelineFeed,
-  NextStepCard,
-  OrgInfoCard,
-  RelatedContactsCard,
-  type TimelineItemData,
-} from "@/components/sales/entity-detail";
 import { LeadCardData, type LeadStatus } from "@/lib/leads/types";
-import { canField, logCreate, logEdit } from "@/lib/rules";
+import { logCreate, logEdit } from "@/lib/rules";
 import { emitRulesChange } from "@/lib/rules/storage";
 import { updateLead } from "@/lib/leads/store";
 import { createDeal } from "@/lib/deals/store";
@@ -38,6 +17,7 @@ import {
 } from "./ConvertToDealModal";
 import { ComposeEmailModal } from "../ComposeEmailModal";
 import { EditLeadModal } from "./EditLeadModal";
+import { LeadMortgageDetail } from "./detail/LeadMortgageDetail";
 
 const LEAD_STATUS_OPTIONS = [
   "New",
@@ -58,7 +38,6 @@ const DEAL_STAGES = [
 export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
   const router = useRouter();
   const [card, setCard] = useState(initial);
-  const [activeTab, setActiveTab] = useState("timeline");
   const [isConvertOpen, setIsConvertOpen] = useState(false);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -99,47 +78,6 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
     router.push(`/sales/deals/detail/${deal.id}`);
   }
 
-  const allTimelineItems: TimelineItemData[] = [
-    {
-      id: "t1",
-      type: "email",
-      icon: Mail,
-      iconTone: "info",
-      title: "Email Sent: Q4 Strategy Proposal",
-      timestampLabel: "3 hours ago",
-      body: "Hi there, following up on our conversation yesterday...",
-      attachment: { label: "1 Attachment" },
-      statusChip: "Opened 10m ago",
-    },
-    {
-      id: "t2",
-      type: "call",
-      icon: PhoneIcon,
-      iconTone: "neutral",
-      title: "Discovery Call",
-      timestampLabel: "Yesterday, 1:00 PM",
-      metaLine: "Duration 43m 12s · Outcome: Positive",
-      quote: "Mentioned they are actively evaluating vendors...",
-    },
-    {
-      id: "t3",
-      type: "note",
-      icon: StickyNote,
-      iconTone: "neutral",
-      title: "Internal Note: Pricing Feedback",
-      timestampLabel: "2 days ago",
-      body: "Client mentioned they have room in their annual budget if we can bundle onboarding.",
-    },
-  ];
-
-  const filteredItems = allTimelineItems.filter((item) => {
-    if (activeTab === "timeline") return true;
-    if (activeTab === "notes") return item.type === "note";
-    if (activeTab === "emails") return item.type === "email";
-    if (activeTab === "calls") return item.type === "call";
-    return true;
-  });
-
   return (
     <div className="relative mx-auto w-full max-w-[1920px] p-3 lg:p-5 2xl:px-8">
       {flash ? (
@@ -148,104 +86,23 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
         </div>
       ) : null}
 
-      <EntityDetailHeader
-        breadcrumb={[
-          { label: "All Leads", href: "/sales/leads" },
-          { label: card.company, href: "#" },
-        ]}
-        initials={card.initials}
-        isOnline
-        name={card.name}
-        subtitleParts={[card.company]}
-        status={{
-          label: card.pipelineStage ?? "New Lead",
-          tone: "success",
+      <LeadMortgageDetail
+        card={card}
+        onCall={() => notify("Starting call…")}
+        onEmail={() => setIsComposeOpen(true)}
+        onConvert={() => setIsConvertOpen(true)}
+        onEdit={() => setIsEditOpen(true)}
+        onMore={() => notify("More actions…")}
+        onStatusChange={(pipelineStage) => {
+          const updated = updateLead(card.id, { pipelineStage });
+          if (updated) {
+            setCard(updated);
+            notify(`Status set to ${pipelineStage}`);
+          }
         }}
-        tags={card.tags?.map((tag) => ({ label: tag, icon: Building2 })) ?? []}
-        primaryAction={{
-          label: "Convert to Deal",
-          icon: Send,
-          onClick: () => setIsConvertOpen(true),
-        }}
-        quickActions={[
-          { label: "Email", icon: Mail, onClick: () => setIsComposeOpen(true) },
-          { label: "Call", icon: Phone },
-        ]}
-        onEditDetails={() => setIsEditOpen(true)}
-        onMoreActions={() => notify("More actions…")}
+        onStartCall={() => notify("Starting call…")}
+        onReschedule={() => notify("Reschedule next action…")}
       />
-
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(240px,300px)_minmax(0,1fr)_minmax(260px,360px)] 2xl:gap-6">
-        <div className="space-y-4">
-          <ScoreGaugeCard
-            title="Lead Score"
-            score={88}
-            trendLabel="+5"
-            bands={[
-              { label: "Cold", color: "slate" },
-              { label: "Warm", color: "amber" },
-              { label: "Hot", color: "rose" },
-            ]}
-            activeBandIndex={2}
-          />
-          <ContactInfoCard
-            fields={[
-              {
-                icon: Mail,
-                label: "Email Address",
-                value: canField("sales.leads.email") ? card.email : "••••",
-              },
-              {
-                icon: Phone,
-                label: "Phone Number",
-                value: canField("sales.leads.phone") ? card.phone : "••••",
-              },
-              { icon: ClockIcon, label: "Created", value: card.createdDate },
-            ]}
-          />
-        </div>
-
-        <div className="space-y-3">
-          <ActivityComposer onSubmit={(text) => notify(`Posted: ${text.slice(0, 40)}`)} />
-          <ActivityTabs
-            tabs={[
-              { key: "timeline", label: "Timeline", icon: ClockIcon },
-              { key: "notes", label: "Notes", icon: StickyNote },
-              { key: "emails", label: "Emails", icon: Mail },
-              { key: "calls", label: "Calls", icon: PhoneIcon, count: 1 },
-            ]}
-            activeKey={activeTab}
-            onChange={setActiveTab}
-          />
-          <TimelineFeed
-            items={filteredItems}
-            onLoadMore={() => notify("Load more…")}
-          />
-        </div>
-
-        <div className="space-y-4">
-          <NextStepCard
-            title="Follow up on proposal"
-            dueLabel="Due Tomorrow"
-            dueTime="10:00 AM"
-            onComplete={() => notify("Next step completed")}
-            onEdit={() => notify("Edit next step…")}
-          />
-          <OrgInfoCard
-            name={card.company}
-            fields={[
-              { label: "Source", value: card.source },
-              {
-                label: "Est. Value",
-                value: canField("sales.leads.estimatedValue")
-                  ? (card.estimatedValue ?? "")
-                  : "••••",
-              },
-            ]}
-          />
-          <RelatedContactsCard contacts={[]} totalCount={0} />
-        </div>
-      </div>
 
       <ConvertToDealModal
         isOpen={isConvertOpen}

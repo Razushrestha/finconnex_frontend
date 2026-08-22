@@ -1,12 +1,13 @@
 "use client";
 
 import { LeadDetailView } from "@/components/sales/leads/LeadDetailView";
+import { findLeadById } from "@/lib/leads/store";
 import { findLeadCardById } from "@/lib/leads/types";
 import { useParams } from "next/navigation";
 
 export default function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const card = findLeadCardById(id);
+  const card = findLeadById(id)?.card ?? findLeadCardById(id);
 
   if (!card) {
     return (

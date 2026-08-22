@@ -418,8 +418,8 @@ export function DealsKanbanBoard({
     }
 
     const updatedDeals = dealsToMove.map((deal) => ({
-      ...deal,
-      accentColorClass: targetStage.dotColorClass,
+        ...deal,
+        accentColorClass: targetStage.dotColorClass,
     }));
 
     moveDeals(dealsToMove, sourceStage, targetStage, updatedDeals, targetIndex);
@@ -572,23 +572,23 @@ export function DealsKanbanBoard({
                   </div>
 
                   <div
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      if (dragInfo) setOverStageId(stage.id);
-                    }}
-                    onDragLeave={() =>
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (dragInfo) setOverStageId(stage.id);
+              }}
+              onDragLeave={() =>
                       setOverStageId((prev) =>
                         prev === stage.id ? null : prev,
                       )
-                    }
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      handleDrop(stage.id);
-                    }}
+              }
+              onDrop={(e) => {
+                e.preventDefault();
+                handleDrop(stage.id);
+              }}
                     className={cn(
                       "relative flex min-h-0 flex-1 flex-col rounded-sm border p-1",
                       dropTargetIdle,
-                      isOver
+                isOver
                         ? dropTargetActive
                         : "border-slate-200/60 bg-slate-100/60",
                     )}
@@ -664,8 +664,8 @@ export function DealsKanbanBoard({
                               }}
                               className="relative group/card"
                             >
-                              <DealRecordCard
-                                deal={deal}
+                  <DealRecordCard
+                    deal={deal}
                                 isDragging={isDraggedDeal}
                                 isSelected={activeSelectedIds.has(deal.id)}
                                 onSelect={(e) =>
@@ -674,7 +674,7 @@ export function DealsKanbanBoard({
                                 onDragStart={(e) =>
                                   handleDragStart(e, deal.id, stage.id)
                                 }
-                                onDragEnd={handleDragEnd}
+                    onDragEnd={handleDragEnd}
                                 onQuickAction={(kind) =>
                                   openQuickAction(kind, deal)
                                 }
@@ -697,8 +697,8 @@ export function DealsKanbanBoard({
                         return (
                           <>
                             {rendered}
-                            {stage.deals.length === 0 && (
-                              <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 py-8 text-center text-xs text-slate-400">
+                {stage.deals.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 py-8 text-center text-xs text-slate-400">
                                 No deals found
                               </div>
                             )}
@@ -715,7 +715,7 @@ export function DealsKanbanBoard({
                     />
                   </div>
                 </>
-              )}
+                )}
             </div>
           );
         })}
