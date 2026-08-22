@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import type { CompanyCardData } from "@/lib/companies/types";
 import { cn } from "@/lib/utils";
-import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
+import { cardDragging, cardMotion, cardSubject, entityCardBox } from "@/lib/motion";
 import Link from "next/link";
 import {
   CustomizeCompanyCardDrawer,
@@ -150,7 +150,7 @@ export function CompanyCard({
         data-focus-id={company.id}
         data-company-id={company.id}
         className={cn(
-          "group w-full shrink-0",
+          "group/card w-full shrink-0",
           entityCardBox,
           cardMotion,
           isDragging && cardDragging,
@@ -161,7 +161,12 @@ export function CompanyCard({
             href={`/sales/companies/detail/${company.id}`}
             className="min-w-0"
           >
-            <h3 className="truncate text-[13px] font-semibold text-slate-800">
+            <h3
+              className={cn(
+                "truncate text-[13px] font-semibold text-slate-800",
+                cardSubject,
+              )}
+            >
               {company.name}
             </h3>
           </Link>
@@ -175,7 +180,7 @@ export function CompanyCard({
             aria-label={`Select ${company.name}`}
             className={cn(
               "h-3.5 w-3.5 shrink-0 rounded border-slate-300 transition-opacity",
-              isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+              isSelected ? "opacity-100" : "opacity-0 group-hover/card:opacity-100",
             )}
           />
         </div>

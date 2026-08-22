@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import type { DealRecord } from "@/lib/deals/types";
 import { cn } from "@/lib/utils";
-import { cardDragging, cardMotion, entityCardBox } from "@/lib/motion";
+import { cardDragging, cardMotion, cardSubject, entityCardBox } from "@/lib/motion";
 import Link from "next/link";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 
@@ -107,10 +107,15 @@ export function DealRecordCard({
       )}
     >
       <div className="mb-3 flex items-center justify-between gap-2.5">
-        <h3 className="min-w-0 truncate text-[13px] font-semibold text-slate-800">
+        <h3
+          className={cn(
+            "min-w-0 truncate text-[13px] font-semibold text-slate-800",
+            cardSubject,
+          )}
+        >
           <Link
             href={`/sales/deals/detail/${deal.id}`}
-            className="hover:underline focus-visible:underline focus-visible:outline-none"
+            className="focus-visible:outline-none"
           >
             {deal.name}
           </Link>
