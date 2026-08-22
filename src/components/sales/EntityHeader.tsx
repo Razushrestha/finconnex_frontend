@@ -91,6 +91,11 @@ export interface EntityHeaderProps {
   footerOptions?: ActionOption[];
 
   importOptions?: ImportOption[];
+
+  /** Hide the page title + count (module name already lives in the top bar). */
+  hideTitle?: boolean;
+  /** Rendered immediately after the scope dropdown (e.g. view settings pencil). */
+  afterScope?: ReactNode;
 }
 
 export function EntityHeader({
@@ -120,6 +125,8 @@ export function EntityHeader({
   actionOptions,
   footerOptions,
   importOptions,
+  hideTitle = false,
+  afterScope,
 }: EntityHeaderProps) {
   const router = useRouter();
   void _breadcrumb;
@@ -189,16 +196,18 @@ export function EntityHeader({
   return (
     <div className="w-full border-b border-slate-200/80 bg-background dark:border-zinc-800">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-2 px-1 py-2 sm:gap-x-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <h1 className="truncate text-[15px] font-bold tracking-tight text-foreground">
-            {title}
-          </h1>
-          {totalCount !== undefined && (
-            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
-              {totalCount}
-            </span>
-          )}
-        </div>
+        {hideTitle ? null : (
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="truncate text-[15px] font-bold tracking-tight text-foreground">
+              {title}
+            </h1>
+            {totalCount !== undefined && (
+              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                {totalCount}
+              </span>
+            )}
+          </div>
+        )}
 
         {scopeOptions ? (
           <div className="relative" ref={scopeMenuRef}>
@@ -239,6 +248,8 @@ export function EntityHeader({
             )}
           </div>
         ) : null}
+
+        {afterScope}
 
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
           {/* Filter Button */}

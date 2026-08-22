@@ -34,12 +34,11 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
           tenantName={session.tenantName}
           mobileOpen={mobileOpen}
           onMobileOpenChange={setMobileOpen}
+          onToggleSidebar={() => setCollapsed((c) => !c)}
         />
       </div>
       <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col">
         <Navbar
-          collapsed={collapsed}
-          onToggleSidebar={() => setCollapsed((c) => !c)}
           onOpenMobileMenu={() => setMobileOpen(true)}
           user={{
             name: session.name,

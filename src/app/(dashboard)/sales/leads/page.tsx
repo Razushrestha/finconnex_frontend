@@ -37,7 +37,6 @@ import {
   ShieldCheck,
   Download,
   Pencil,
-  ChevronDown,
 } from "lucide-react";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import {
@@ -486,7 +485,27 @@ export default function LeadsPage() {
           importOptions={importOptions}
           actionOptions={actionOptions}
           footerOptions={footerOptions}
+          hideTitle
           totalCount={totalLeads}
+          afterScope={
+            <button
+              type="button"
+              onClick={openViewSettings}
+              aria-label={
+                viewMode === "list"
+                  ? "Edit list view settings"
+                  : "Edit Kanban view settings"
+              }
+              title={
+                viewMode === "list"
+                  ? "List View Settings"
+                  : "Kanban View Settings"
+              }
+              className="rounded-full border border-slate-200 bg-white p-1.5 text-slate-400 shadow-sm hover:text-slate-600 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:text-zinc-300"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          }
           viewMode={viewMode}
           onViewChange={setViewMode}
           isFilterOpen={isFilterOpen}
@@ -532,41 +551,13 @@ export default function LeadsPage() {
             onExportSelectedRecords={() => exportSelected()}
           />
           </>
-        ) : (
+        ) : bulkFlash ? (
           <div className="mt-3 flex w-fit items-center gap-2">
-            {bulkFlash ? (
-              <span className="rounded-md bg-emerald-500/10 px-2 py-1 text-xs text-emerald-700 dark:text-emerald-400">
-                {bulkFlash}
-              </span>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => console.log("pipeline selector clicked")}
-              className="flex items-center gap-1.5 rounded-sm bg-white hover:bg-white px-3 py-1 text-sm font-medium text-foreground/70"
-            >
-              <span>Lead Pipeline</span>
-              <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-            </button>
-
-            <button
-              type="button"
-              onClick={openViewSettings}
-              aria-label={
-                viewMode === "list"
-                  ? "Edit list view settings"
-                  : "Edit Kanban view settings"
-              }
-              title={
-                viewMode === "list"
-                  ? "List View Settings"
-                  : "Kanban View Settings"
-              }
-              className="rounded-full border border-slate-200 bg-white p-1.5 text-slate-400 shadow-sm hover:text-slate-600 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:text-zinc-300"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
+            <span className="rounded-md bg-emerald-500/10 px-2 py-1 text-xs text-emerald-700 dark:text-emerald-400">
+              {bulkFlash}
+            </span>
           </div>
-        )}
+        ) : null}
       </div>
 
       <div className="mt-3 flex min-h-0 flex-1 items-stretch gap-4 overflow-hidden">
