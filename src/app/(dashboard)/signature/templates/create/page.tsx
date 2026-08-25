@@ -22,9 +22,12 @@ import {
 } from "@/components/documents/signature/create/PlaceFieldsView";
 import type { StandardFieldType } from "@/components/documents/signature/create/StandardFieldsSidebar";
 import {
+  listSignatureRequests,
   nextSignatureIds,
   SignatureField,
   upsertSignatureRequest,
+  fileToDataUrl,
+  type SignatureDocument,
   type SignatureSigner,
 } from "@/lib/documents/signature/types";
 import type {
@@ -57,25 +60,163 @@ interface AdditionalDocPreview {
 const isDocxFile = (file: File) =>
   file.name.endsWith(".docx") || file.name.endsWith(".doc");
 
+/**
+ * Builds the persisted (data: URL) document payload for a template save.
+ *
+ * - New/changed primary file (size > 0) → convert to a data: URL, that's
+ *   the source of truth going forward.
+ * - No new primary file picked (e.g. editing a template without re-uploading,
+ *   where `documentFile` is a zero-byte dummy File standing in for the
+ *   already-saved doc) → fall back to `existingDocumentFileUrl` so we don't
+ *   clobber a previously-persisted file with nothing.
+ * - Additional files are always freshly converted (no edit-reload path for
+ *   them yet).
+ */
+async function buildPersistableDocuments(
+  documentFile: File | null,
+  documentName: string,
+  additionalFiles: AdditionalDocument[],
+  existingDocumentFileUrl?: string,
+): Promise<{ documentFileUrl?: string; documents: SignatureDocument[] }> {
+  const documents: SignatureDocument[] = [];
+  let documentFileUrl: string | undefined = existingDocumentFileUrl;
+
+  if (documentFile && documentFile.size > 0) {
+    documentFileUrl = await fileToDataUrl(documentFile);
+    documents.push({
+      id: "primary",
+      name: documentName || documentFile.name,
+      fileName: documentFile.name,
+      fileUrl: documentFileUrl,
+    });
+  } else if (existingDocumentFileUrl) {
+    documents.push({
+      id: "primary",
+      name: documentName || documentFile?.name || "",
+      fileName: documentFile?.name || documentName,
+      fileUrl: existingDocumentFileUrl,
+    });
+  }
+
+  for (const doc of additionalFiles) {
+    const url = await fileToDataUrl(doc.file);
+    documents.push({
+      id: doc.id,
+      name: doc.name,
+      fileName: doc.file.name,
+      fileUrl: url,
+    });
+  }
+
+  return { documentFileUrl, documents };
+}
+
 function CreateTemplateForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const step = searchParams.get("step");
   const isPlacingFields = step === "place-fields";
 
-  const [ids] = useState(() => nextSignatureIds());
+  // Support both ?edit=ID and ?id=ID query parameters
+  const editId = searchParams.get("edit") || searchParams.get("id");
+
+  const [ids, setIds] = useState(() => nextSignatureIds());
 
   const [documentName, setDocumentName] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
+  // The already-persisted data: URL when editing an existing template.
+  // Only set from the edit-load effect; never touched by a fresh file pick.
+  const [existingDocumentFileUrl, setExistingDocumentFileUrl] = useState<
+    string | undefined
+  >();
+
+  const [recipients, setRecipients] = useState<SignatureSigner[]>([
+    {
+      id: "",
+      name: "",
+      email: "",
+      colorIndex: 0,
+      order: 1,
+      role: "" as any,
+      status: "Pending",
+      token: "",
+      deliveryMethod: "email",
+    },
+  ]);
+  const [signingOrder, setSigningOrder] = useState<"sequential" | "parallel">(
+    "sequential",
+  );
+  const [enableReminders, setEnableReminders] = useState(false);
+  const [reminderDays, setReminderDays] = useState("5");
+  const [enableExpiry, setEnableExpiry] = useState(false);
+  const [expiryDate, setExpiryDate] = useState("");
+  const [expiryTime, setExpiryTime] = useState("");
+
+  const [emailTitle, setEmailTitle] = useState(`Please sign: ${documentName}`);
+  const [emailMessage, setEmailMessage] = useState("");
+
+  const [fileError, setFileError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Field placement state
+  const [placedFields, setPlacedFields] = useState<PlacedField[]>([]);
+  const [draggingFieldType, setDraggingFieldType] =
+    useState<DraggingFieldType | null>(null);
+
+  // --- Load existing template data when editing ---
+  useEffect(() => {
+    if (!editId) return;
+
+    try {
+      const allRequests = listSignatureRequests();
+      const existing = allRequests.find((req) => req.id === editId);
+
+      if (existing) {
+        setIds({
+          id: existing.id,
+          signatureRequestId: existing.signatureRequestId || existing.id,
+          manageToken: existing.manageToken || "",
+        });
+
+        setDocumentName(existing.documentName || "");
+
+        if (existing.documentFile) {
+          const dummyBlob = new Blob([""], { type: "application/pdf" });
+          const mockFile = new File([dummyBlob], existing.documentFile, {
+            type: "application/pdf",
+          });
+          setDocumentFile(mockFile);
+          setExistingDocumentFileUrl(existing.documentFileUrl);
+        }
+
+        if (existing.signers && existing.signers.length > 0) {
+          setRecipients(existing.signers);
+        }
+        if (existing.signingOrder) {
+          setSigningOrder(existing.signingOrder);
+        }
+        if (existing.fields) {
+          setPlacedFields(existing.fields as unknown as PlacedField[]);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load template for editing:", error);
+    }
+  }, [editId]);
 
   const fileUrl = useMemo(() => {
     if (!documentFile || !(documentFile instanceof File)) return "";
+    // Zero-byte dummy file from edit-load has nothing real to preview via
+    // blob: URL — prefer the persisted data: URL for the live preview too.
+    if (documentFile.size === 0) return existingDocumentFileUrl ?? "";
     return URL.createObjectURL(documentFile);
-  }, [documentFile]);
+  }, [documentFile, existingDocumentFileUrl]);
 
   useEffect(() => {
     return () => {
-      if (fileUrl) URL.revokeObjectURL(fileUrl);
+      if (fileUrl && fileUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(fileUrl);
+      }
     };
   }, [fileUrl]);
 
@@ -87,6 +228,12 @@ function CreateTemplateForm() {
     async function convertDocx() {
       if (!documentFile) {
         setDocHtmlContent("");
+        return;
+      }
+      // Skip conversion if this is an empty dummy file loaded from edit mode
+      if (documentFile.size === 0) {
+        setDocHtmlContent("<p>Existing document loaded.</p>");
+        setIsConvertingDoc(false);
         return;
       }
       if (!isDocxFile(documentFile)) {
@@ -232,41 +379,12 @@ function CreateTemplateForm() {
     additionalPreviews,
   ]);
 
-  const [recipients, setRecipients] = useState<SignatureSigner[]>([
-    {
-      id: "",
-      name: "",
-      email: "",
-      colorIndex: 0,
-      order: 1,
-      role: "" as any, // Or dynamic user-entered role name
-      status: "Pending",
-      token: "",
-      deliveryMethod: "email",
-    },
-  ]);
-  const [signingOrder, setSigningOrder] = useState<"sequential" | "parallel">(
-    "sequential",
-  );
-  const [enableReminders, setEnableReminders] = useState(false);
-  const [reminderDays, setReminderDays] = useState("5");
-  const [enableExpiry, setEnableExpiry] = useState(false);
-  const [expiryDate, setExpiryDate] = useState("");
-  const [expiryTime, setExpiryTime] = useState("");
-
-  const [emailTitle, setEmailTitle] = useState(`Please sign: ${documentName}`);
-  const [emailMessage, setEmailMessage] = useState("");
-
-  const [fileError, setFileError] = useState("");
-
-  // Field placement state
-  const [placedFields, setPlacedFields] = useState<PlacedField[]>([]);
-  const [draggingFieldType, setDraggingFieldType] =
-    useState<DraggingFieldType | null>(null);
-
   const handleFileChange = (file: File | null) => {
     setDocumentFile(file);
     setFileError("");
+    // A fresh pick replaces whatever was previously persisted; the new
+    // file's own data: URL (built at save time) is now the source of truth.
+    setExistingDocumentFileUrl(undefined);
   };
 
   const handleResizeField = (id: string, width: number, height: number) => {
@@ -275,99 +393,161 @@ function CreateTemplateForm() {
     );
   };
 
-  const handleSaveDraft = () => {
+  const handleSaveDraft = async () => {
     if (!documentName.trim()) return;
-    upsertSignatureRequest({
-      id: ids.id,
-      signatureRequestId: ids.signatureRequestId,
-      documentName,
-      documentFile: documentFile?.name || "",
-      signer: recipients[0]?.name || "",
-      signerEmail: recipients[0]?.email || "",
-      signers: recipients,
-      fields: placedFields as unknown as SignatureField[],
-      signingOrder,
-      status: "Draft",
-      expiryDate: expiryDate || "31/10/2026",
-      createdBy: "Current User",
-      manageToken: ids.manageToken,
-      audit: [
-        {
-          id: `a-${Date.now()}`,
-          at: new Date().toLocaleString(),
-          action: "Template draft created",
-          actor: "Current User",
-        },
-      ],
-    });
-    toast.success("Template draft saved successfully!");
+    setIsSaving(true);
+    try {
+      const { documentFileUrl, documents: persistedDocuments } =
+        await buildPersistableDocuments(
+          documentFile,
+          documentName,
+          additionalFiles,
+          existingDocumentFileUrl,
+        );
+
+      upsertSignatureRequest({
+        id: ids.id,
+        signatureRequestId: ids.signatureRequestId,
+        documentName,
+        documentFile: documentFile?.name || "",
+        documentFileUrl,
+        documents:
+          persistedDocuments.length > 0 ? persistedDocuments : undefined,
+        recordType: "template",
+        signer: recipients[0]?.name || "",
+        signerEmail: recipients[0]?.email || "",
+        signers: recipients,
+        fields: placedFields as unknown as SignatureField[],
+        signingOrder,
+        status: "Draft",
+        expiryDate: expiryDate || "31/10/2026",
+        createdBy: "Current User",
+        manageToken: ids.manageToken,
+        audit: [
+          {
+            id: `a-${Date.now()}`,
+            at: new Date().toLocaleString(),
+            action: "Template draft saved/updated",
+            actor: "Current User",
+          },
+        ],
+      });
+      toast.success("Template draft saved successfully!");
+    } catch (error) {
+      console.error("Failed to save template draft:", error);
+      toast.error("Failed to save template draft.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleSaveTemplate = () => {
-    upsertSignatureRequest({
-      id: ids.id,
-      signatureRequestId: ids.signatureRequestId,
-      documentName,
-      documentFile: documentFile?.name || "",
-      signer: recipients[0]?.name || "",
-      signerEmail: recipients[0]?.email || "",
-      signers: recipients,
-      fields: placedFields as unknown as SignatureField[],
-      signingOrder,
-      status: "Template" as any,
-      expiryDate: expiryDate || "31/10/2026",
-      createdBy: "Current User",
-      manageToken: ids.manageToken,
-      audit: [
-        {
-          id: `a-${Date.now()}`,
-          at: new Date().toLocaleString(),
-          action: "Template created",
-          actor: "Current User",
-        },
-      ],
-    });
-    toast.success("Template created successfully!", {
-      description: "Redirecting to templates...",
-    });
-    router.push("/signature/templates");
+  const handleSaveTemplate = async () => {
+    setIsSaving(true);
+    try {
+      const { documentFileUrl, documents: persistedDocuments } =
+        await buildPersistableDocuments(
+          documentFile,
+          documentName,
+          additionalFiles,
+          existingDocumentFileUrl,
+        );
+
+      upsertSignatureRequest({
+        id: ids.id,
+        signatureRequestId: ids.signatureRequestId,
+        documentName,
+        documentFile: documentFile?.name || "",
+        documentFileUrl,
+        documents:
+          persistedDocuments.length > 0 ? persistedDocuments : undefined,
+        recordType: "template",
+        signer: recipients[0]?.name || "",
+        signerEmail: recipients[0]?.email || "",
+        signers: recipients,
+        fields: placedFields as unknown as SignatureField[],
+        signingOrder,
+        status: "Draft",
+        expiryDate: expiryDate || "31/10/2026",
+        createdBy: "Current User",
+        manageToken: ids.manageToken,
+        audit: [
+          {
+            id: `a-${Date.now()}`,
+            at: new Date().toLocaleString(),
+            action: "Template created/updated",
+            actor: "Current User",
+          },
+        ],
+      });
+      toast.success("Template saved successfully!", {
+        description: "Redirecting to templates...",
+      });
+      router.push("/signature/templates");
+    } catch (error) {
+      console.error("Failed to save template:", error);
+      toast.error("Failed to save template.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!documentFile) {
       setFileError("Document file is required");
       return;
     }
 
-    upsertSignatureRequest({
-      id: ids.id,
-      signatureRequestId: ids.signatureRequestId,
-      documentName,
-      documentFile: documentFile?.name || "",
-      signer: recipients[0]?.name || "",
-      signerEmail: recipients[0]?.email || "",
-      signers: recipients,
-      fields: [],
-      signingOrder,
-      status: "Draft",
-      expiryDate: expiryDate || "31/10/2026",
-      createdBy: "Current User",
-      manageToken: ids.manageToken,
-      audit: [
-        {
-          id: `a-${Date.now()}`,
-          at: new Date().toLocaleString(),
-          action: "Initialized template field placement",
-          actor: "Current User",
-        },
-      ],
-    });
+    setIsSaving(true);
+    try {
+      const { documentFileUrl, documents: persistedDocuments } =
+        await buildPersistableDocuments(
+          documentFile,
+          documentName,
+          additionalFiles,
+          existingDocumentFileUrl,
+        );
 
-    router.push("/signature/templates/create?step=place-fields");
+      upsertSignatureRequest({
+        id: ids.id,
+        signatureRequestId: ids.signatureRequestId,
+        documentName,
+        documentFile: documentFile?.name || "",
+        documentFileUrl,
+        documents:
+          persistedDocuments.length > 0 ? persistedDocuments : undefined,
+        recordType: "template",
+        signer: recipients[0]?.name || "",
+        signerEmail: recipients[0]?.email || "",
+        signers: recipients,
+        fields: placedFields as unknown as SignatureField[],
+        signingOrder,
+        status: "Draft",
+        expiryDate: expiryDate || "31/10/2026",
+        createdBy: "Current User",
+        manageToken: ids.manageToken,
+        audit: [
+          {
+            id: `a-${Date.now()}`,
+            at: new Date().toLocaleString(),
+            action: "Initialized template field placement",
+            actor: "Current User",
+          },
+        ],
+      });
+
+      const editParam = editId ? `&edit=${editId}` : "";
+      router.push(`/signature/templates/create?step=place-fields${editParam}`);
+    } catch (error) {
+      console.error("Failed to save template before field placement:", error);
+      toast.error("Failed to save document. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleBackToForm = () => {
-    router.push("/signature/templates/create");
+    const editParam = editId ? `?edit=${editId}` : "";
+    router.push(`/signature/templates/create${editParam}`);
   };
 
   const handleSidebarDragStart = (
@@ -458,7 +638,7 @@ function CreateTemplateForm() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <h1 className="text-lg font-bold text-foreground tracking-tight">
-            Create Template
+            {editId ? "Edit Template" : "Create Template"}
           </h1>
         </div>
       </div>
@@ -509,7 +689,7 @@ function CreateTemplateForm() {
       <div className="sticky bottom-0 bg-white/80 backdrop-blur-md border-t border-slate-200 w-full p-2 flex items-center justify-between rounded-xl shadow-lg">
         <button
           type="button"
-          onClick={() => window.history.back()}
+          onClick={() => router.push("/signature/templates")}
           className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-colors shadow-xs"
         >
           Cancel
@@ -518,16 +698,18 @@ function CreateTemplateForm() {
           <button
             type="button"
             onClick={handleSaveDraft}
-            className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-colors shadow-xs"
+            disabled={isSaving}
+            className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-colors shadow-xs disabled:opacity-50"
           >
-            Save & New
+            {isSaving ? "Saving…" : "Save Draft"}
           </button>
           <button
             type="button"
             onClick={handleContinue}
-            className="px-6 py-2.5 rounded-xl bg-primary text-white text-xs font-semibold transition-colors shadow-sm flex items-center gap-2"
+            disabled={isSaving}
+            className="px-6 py-2.5 rounded-xl bg-primary text-white text-xs font-semibold transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50"
           >
-            <span>Continue to place fields</span>
+            <span>{isSaving ? "Saving…" : "Continue to place fields"}</span>
             <span>→</span>
           </button>
         </div>
