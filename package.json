@@ -20,6 +20,15 @@
     "smoke:phase16": "npx tsx src/lib/leads/smoke-session16.ts",
     "smoke:phase17": "npx tsx src/lib/leads/smoke-session17.ts",
     "smoke:leads": "npx tsx src/lib/leads/smoke-leads-api.ts",
+    "smoke:screenshot": "npx tsx --tsconfig tsconfig.json src/lib/crm/smoke-screenshot-apis.ts",
+    "smoke:audit-logs": "npx tsx --tsconfig tsconfig.json src/lib/audit-logs/smoke.ts",
+    "smoke:calendar": "npx tsx --tsconfig tsconfig.json src/lib/calendar/smoke.ts",
+    "smoke:calls": "npx tsx --tsconfig tsconfig.json src/lib/calls/smoke.ts",
+    "smoke:campaigns": "npx tsx --tsconfig tsconfig.json src/lib/campaigns/smoke.ts",
+    "smoke:companies": "npx tsx --tsconfig tsconfig.json src/lib/companies/smoke.ts",
+    "smoke:chat": "npx tsx --tsconfig tsconfig.json src/lib/chat/smoke.ts",
+    "smoke:settings": "npx tsx --tsconfig tsconfig.json src/lib/settings/smoke.ts",
+    "smoke:work-queue": "npx tsx --tsconfig tsconfig.json src/lib/work-queue/smoke.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

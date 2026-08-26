@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { type CallColumn } from "@/lib/calls/types";
-import { listCallColumns, saveCallColumns } from "@/lib/calls/store";
+import { type CallColumn, type CallStatus } from "@/lib/calls/types";
+import { listCallColumns, updateCall } from "@/lib/calls/store";
 import { onRulesChange } from "@/lib/rules/storage";
 import { CallsKanbanColumn } from "./CallsKanbanColumn";
 import type { Priority, TaskStatus } from "@/lib/tasks/types";
@@ -68,59 +68,8 @@ export function CallsKanbanBoard({
   }
 
   function handleChangeStatus(callId: string, status: TaskStatus) {
-    setColumns((prev) => {
-      let movedCall: any = null;
-      let sourceColId = "";
-
-      // Find the call and its current column
-      for (const col of prev) {
-        const found = col.calls.find((c) => c.id === callId);
-        if (found) {
-          movedCall = { ...found, status };
-          sourceColId = col.id;
-          break;
-        }
-      }
-
-      if (!movedCall) return prev;
-
-      // Find target column based on status title or ID
-      const targetColumn = prev.find(
-        (c) =>
-          c.title.toLowerCase() === status.toLowerCase() || c.id === status,
-      );
-      const targetColId = targetColumn ? targetColumn.id : sourceColId;
-
-      const next = prev.map((col) => {
-        if (col.id === sourceColId && col.id === targetColId) {
-          return {
-            ...col,
-            calls: col.calls.map((c) => (c.id === callId ? movedCall : c)),
-          };
-        }
-
-        if (col.id === sourceColId) {
-          return {
-            ...col,
-            calls: col.calls.filter((c) => c.id !== callId),
-            count: Math.max(0, col.count - 1),
-          };
-        }
-
-        if (col.id === targetColId) {
-          return {
-            ...col,
-            calls: [movedCall, ...col.calls],
-            count: col.count + 1,
-          };
-        }
-
-        return col;
-      });
-
-      saveCallColumns(next);
-      return next;
-    });
+    updateCall(callId, { status: status as CallStatus });
+    setColumns(listCallColumns());
   }
 
   function handleChangePriority(callId: string, priority: Priority) {
@@ -131,22 +80,13 @@ export function CallsKanbanBoard({
           call.id === callId ? { ...call, priority } : call,
         ),
       }));
-      saveCallColumns(next);
       return next;
     });
   }
 
   function handleAssignUser(callId: string, user: string) {
-    setColumns((prev) => {
-      const next = prev.map((col) => ({
-        ...col,
-        calls: col.calls.map((call) =>
-          call.id === callId ? { ...call, assignedTo: user } : call,
-        ),
-      }));
-      saveCallColumns(next);
-      return next;
-    });
+    updateCall(callId, { assignedTo: user });
+    setColumns(listCallColumns());
   }
 
   function handleAddComment(callId: string, comment: string) {
@@ -155,13 +95,12 @@ export function CallsKanbanBoard({
         ...col,
         calls: col.calls.map((call) => {
           if (call.id === callId) {
-            const currentCount = (call as any).commentsCount || 0;
+            const currentCount = (call as { commentsCount?: number }).commentsCount || 0;
             return { ...call, commentsCount: currentCount + 1 };
           }
           return call;
         }),
       }));
-      saveCallColumns(next);
       return next;
     });
   }
@@ -169,50 +108,10 @@ export function CallsKanbanBoard({
   function handleDropCall(targetColumnId: string, targetIndex?: number) {
     if (!dragInfo) return;
     const { callId, sourceColumnId } = dragInfo;
-
-    setColumns((prev) => {
-      const sourceColumn = prev.find((c) => c.id === sourceColumnId);
-      const targetColumn = prev.find((c) => c.id === targetColumnId);
-      const call = sourceColumn?.calls.find((c) => c.id === callId);
-      if (!call || !targetColumn) return prev;
-
-      const moved = { ...call, status: targetColumn.title };
-
-      const next = prev.map((col) => {
-        if (col.id === sourceColumnId && col.id === targetColumnId) {
-          const callsWithoutItem = col.calls.filter((c) => c.id !== callId);
-          const finalIndex = targetIndex ?? callsWithoutItem.length;
-          const updatedCalls = [...callsWithoutItem];
-          updatedCalls.splice(finalIndex, 0, moved);
-          return { ...col, calls: updatedCalls };
-        }
-
-        if (col.id === sourceColumnId) {
-          return {
-            ...col,
-            calls: col.calls.filter((c) => c.id !== callId),
-            count: Math.max(0, col.count - 1),
-          };
-        }
-
-        if (col.id === targetColumnId) {
-          const updatedCalls = [...col.calls];
-          const finalIndex = targetIndex ?? updatedCalls.length;
-          updatedCalls.splice(finalIndex, 0, moved);
-          return {
-            ...col,
-            calls: updatedCalls,
-            count: col.count + 1,
-          };
-        }
-
-        return col;
-      });
-
-      saveCallColumns(next);
-      return next;
-    });
-
+    const targetColumn = columns.find((c) => c.id === targetColumnId);
+    if (!targetColumn) return;
+    updateCall(callId, { status: targetColumn.title });
+    setColumns(listCallColumns());
     handleDragEndCall();
   }
 

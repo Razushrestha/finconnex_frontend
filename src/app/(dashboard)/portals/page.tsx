@@ -17,6 +17,7 @@ import {
   type PortalAccessLevel,
   type PortalStatus,
 } from "@/lib/portals/types";
+import { useCrmPortals } from "@/lib/portals/use-crm-portals";
 import { cn } from "@/lib/utils";
 
 export default function PortalsPage() {
@@ -29,10 +30,11 @@ export default function PortalsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 8;
+  const crm = useCrmPortals();
 
   useEffect(() => {
     setRows(listPortals());
-  }, []);
+  }, [crm.source, crm.loading]);
 
   useEffect(() => {
     setPage(1);
@@ -85,6 +87,20 @@ export default function PortalsPage() {
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Client Portal
             </h1>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                crm.source === "api"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-slate-100 text-slate-500",
+              )}
+            >
+              {crm.source === "api"
+                ? "Live CRM"
+                : crm.loading
+                  ? "Connecting…"
+                  : "Demo"}
+            </span>
           </div>
           <div className="flex items-center gap-1.5">
             <button

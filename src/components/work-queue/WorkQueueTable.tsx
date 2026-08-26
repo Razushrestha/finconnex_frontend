@@ -63,6 +63,7 @@ interface WorkQueueTableProps {
   onDeleteRow?: (row: QueueRow) => void;
   onAddNote?: (row: QueueRow) => void;
   onCompleteRow?: (row: QueueRow) => void;
+  source?: "api" | "demo";
 }
 
 const ACTIONS_COL = "96px";
@@ -234,6 +235,7 @@ export function WorkQueueTable({
   onDeleteRow,
   onAddNote,
   onCompleteRow,
+  source,
 }: WorkQueueTableProps) {
   const router = useRouter();
   const [filterOpen, setFilterOpen] = React.useState(false);
@@ -376,6 +378,18 @@ export function WorkQueueTable({
           <span className="shrink-0 text-[12px] font-medium tabular-nums text-slate-400">
             {total}
           </span>
+          {source ? (
+            <span
+              className={cn(
+                "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                source === "api"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-slate-100 text-slate-500",
+              )}
+            >
+              {source === "api" ? "Live CRM" : spinning ? "Connecting…" : "Demo"}
+            </span>
+          ) : null}
           <button
             type="button"
             aria-label={`Refresh ${title}`}

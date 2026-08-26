@@ -32,6 +32,7 @@ import {
   UpcomingMeetingsCard,
 } from "@/components/dashboard/static-cards";
 import { CardGridSkeleton, ChartSkeleton } from "@/components/ui/chart-skeleton";
+import { WorkspaceActivityFeed } from "@/components/dashboard/WorkspaceActivityFeed";
 import { cn } from "@/lib/utils";
 
 const DashboardMetricsSection = dynamic(
@@ -250,6 +251,8 @@ export function DashboardWorkspace() {
           </span>
         ) : null}
       </div>
+
+      <WorkspaceActivityFeed />
 
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-white px-3 py-2">
         <LayoutGrid className="h-4 w-4 text-muted-foreground" />

@@ -26,6 +26,14 @@ import {
   type EmailCampaign,
   type EmailCampaignStatus,
 } from "@/lib/marketing/email/types";
+import {
+  deleteCrmCampaign,
+  getCrmCampaign,
+  launchCrmCampaign,
+  normalizeEmailCampaign,
+  tryCrm,
+  updateCrmCampaign,
+} from "@/lib/campaigns/api";
 import { assertCampaignStatusChange, logStatusChange, softDeleteRecord } from "@/lib/rules";
 import { sendEmailDemoLive } from "@/lib/comms/send-gateway";
 import { createEmail } from "@/lib/emails/store";
@@ -51,6 +59,13 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
 
   useEffect(() => {
     setCampaign(getEmailCampaignById(id) ?? null);
+    void tryCrm(async () => {
+      const raw = await getCrmCampaign(id);
+      if (!raw) return;
+      const remote = normalizeEmailCampaign(raw, 0);
+      upsertEmailCampaign(remote);
+      setCampaign(remote);
+    });
   }, [id]);
 
   function flash(msg: string) {
@@ -61,6 +76,15 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
   function save(next: EmailCampaign, msg?: string) {
     upsertEmailCampaign(next);
     setCampaign(next);
+    void tryCrm(() =>
+      updateCrmCampaign(next.id, {
+        name: next.name,
+        subject: next.subject,
+        status: next.status,
+        scheduledAt: next.scheduledAt,
+        body: next.body,
+      }),
+    );
     if (msg) flash(msg);
   }
 
@@ -103,6 +127,9 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
       /* keep metrics */
     }
     save(next, actionLabel);
+    if (status === "Running" && actionLabel === "Launched") {
+      void tryCrm(() => launchCrmCampaign(campaign.id));
+    }
     logStatusChange(
       "marketing.email",
       campaign.createdBy,
@@ -204,6 +231,7 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
       return;
     }
     deleteEmailCampaign(campaign.id);
+    void tryCrm(() => deleteCrmCampaign(campaign.id));
     router.push("/marketing/email");
   }
 

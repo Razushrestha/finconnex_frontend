@@ -21,6 +21,8 @@ import {
 import { activityExportMenuItem } from "@/lib/activities/export";
 import { BOARD_PAGE } from "@/lib/layout";
 import { deleteCall } from "@/lib/calls/store";
+import { useCrmCalls } from "@/lib/calls/use-crm-calls";
+import { cn } from "@/lib/utils";
 
 const moreMenuItems = [
   { key: "mass-transfer", icon: ArrowRightLeft, label: "Mass Transfer" },
@@ -37,6 +39,7 @@ export default function CallsPage() {
   const [sortActive, setSortActive] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
+  const crm = useCrmCalls();
 
   function runBulkDelete() {
     if (!selectedIds.length) return;
@@ -62,6 +65,27 @@ export default function CallsPage() {
       <FocusHighlight />
       {/* Toolbar: fixed, never scrolls */}
       <div className="shrink-0">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+              crm.source === "api"
+                ? "bg-emerald-50 text-emerald-700"
+                : crm.loading
+                  ? "bg-slate-100 text-slate-500"
+                  : "bg-slate-100 text-slate-500",
+            )}
+          >
+            {crm.source === "api"
+              ? "Live CRM"
+              : crm.loading
+                ? "Connecting…"
+                : "Demo"}
+          </span>
+          {crm.error && crm.source === "demo" ? (
+            <span className="text-[10px] text-slate-500">{crm.error}</span>
+          ) : null}
+        </div>
         <ActivityToolbar
           entityLabel="Call"
           createRoute="/activities/calls/create"

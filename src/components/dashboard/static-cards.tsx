@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import {
   MoreHorizontal,
   Plus,
@@ -6,6 +9,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader } from "./card-primitives";
+import { fetchCalendarUpcoming } from "@/lib/calendar/api";
+import type { CalendarItem } from "@/lib/calendar/types";
 
 export function DashboardBreadcrumb() {
   return (
@@ -80,7 +85,39 @@ const meetings = [
   },
 ];
 
+function formatMeetingTime(item: CalendarItem): string {
+  const start = item.start.includes("T") ? item.start.split("T")[1]!.slice(0, 5) : "09:00";
+  const end = item.end?.includes("T") ? item.end.split("T")[1]!.slice(0, 5) : "";
+  return end ? `${start} - ${end}` : start;
+}
+
 export function UpcomingMeetingsCard() {
+  const [live, setLive] = useState<CalendarItem[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchCalendarUpcoming()
+      .then((items) => {
+        if (!cancelled) setLive(items);
+      })
+      .catch(() => {
+        if (!cancelled) setLive(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const rows =
+    live && live.length
+      ? live.slice(0, 6).map((item, index) => ({
+          title: item.title,
+          tag: item.type,
+          time: formatMeetingTime(item),
+          faded: index > 2,
+        }))
+      : meetings;
+
   return (
     <Card className="overflow-hidden">
       <div className="mb-4 flex items-start justify-between">
@@ -109,7 +146,7 @@ export function UpcomingMeetingsCard() {
 
       <div className="relative -mx-5 px-5">
         <div className="flex max-h-[300px] flex-col gap-3 overflow-y-auto pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {meetings.map((m) => (
+          {rows.map((m) => (
             <div
               key={m.title}
               className={cn(

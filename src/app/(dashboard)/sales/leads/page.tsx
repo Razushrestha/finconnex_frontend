@@ -247,6 +247,9 @@ export default function LeadsPage() {
   const [isMassUpdateOpen, setMassUpdateOpen] = useState(false);
   const [isManageTagsOpen, setManageTagsOpen] = useState(false);
   const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
+  const [crmSource, setCrmSource] = useState<"api" | "demo">("demo");
+  const [crmLoading, setCrmLoading] = useState(true);
+  const [crmError, setCrmError] = useState<string | null>(null);
   const [isImportOpen, setImportOpen] = useState(false);
   const [adsPlatform, setAdsPlatform] = useState<AdsPlatform | null>(null);
   const [sheetsOpen, setSheetsOpen] = useState(false);
@@ -343,7 +346,26 @@ export default function LeadsPage() {
   }
 
   useEffect(() => {
-    void refreshCrmLeadsBoard();
+    let cancelled = false;
+    setCrmLoading(true);
+    setCrmError(null);
+    void (async () => {
+      try {
+        const ok = await refreshCrmLeadsBoard();
+        if (cancelled) return;
+        setCrmSource(ok ? "api" : "demo");
+        if (!ok) setCrmError("CRM unavailable — showing local board");
+      } catch (err) {
+        if (cancelled) return;
+        setCrmSource("demo");
+        setCrmError(err instanceof Error ? err.message : "CRM unavailable");
+      } finally {
+        if (!cancelled) setCrmLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -511,6 +533,25 @@ export default function LeadsPage() {
   return (
     <div className={BOARD_PAGE}>
       {/* <FocusHighlight /> */}
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            crmSource === "api"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-slate-100 text-slate-500",
+          )}
+        >
+          {crmSource === "api"
+            ? "Live CRM"
+            : crmLoading
+              ? "Connecting…"
+              : "Demo"}
+        </span>
+        {crmError && crmSource === "demo" ? (
+          <span className="text-[10px] text-slate-500">{crmError}</span>
+        ) : null}
+      </div>
       <div className="shrink-0">
         <EntityHeader
           entityLabel="Lead"

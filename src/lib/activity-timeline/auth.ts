@@ -216,10 +216,40 @@ async function resolveWorkspaceId(
 }
 
 /**
+ * Access token without requiring a workspace claim.
+ * Used by platform-admin routes (list workspaces, delete user).
+ */
+let boundSession: CrmSession | null = null;
+
+/** Test / smoke: pin a CRM session so ensureCrmSession skips storage + workspace select. */
+export function bindCrmSession(session: CrmSession | null) {
+  boundSession = session;
+}
+
+export async function ensureCrmAccess(): Promise<{
+  baseUrl: string;
+  accessToken: string;
+} | null> {
+  if (boundSession) {
+    return {
+      baseUrl: boundSession.baseUrl,
+      accessToken: boundSession.accessToken,
+    };
+  }
+  const baseUrl = getCrmApiBaseUrl();
+  if (!baseUrl) return null;
+  const accessToken = await resolveAccessToken();
+  if (!accessToken) return null;
+  return { baseUrl, accessToken };
+}
+
+/**
  * Ensure we have a workspace-scoped CRM session.
  * Returns null when the CRM base URL or token is unavailable (UI should fall back).
  */
 export async function ensureCrmSession(): Promise<CrmSession | null> {
+  if (boundSession) return boundSession;
+
   const baseUrl = getCrmApiBaseUrl();
   if (!baseUrl) return null;
 

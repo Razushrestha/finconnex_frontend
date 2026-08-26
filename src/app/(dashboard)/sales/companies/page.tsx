@@ -19,7 +19,8 @@ import {
   type CompanyGroup,
   type CompanyStatus,
 } from "@/lib/companies/types";
-import { listCompanyGroups } from "@/lib/companies/store";
+import { deleteCompany, listCompanyGroups } from "@/lib/companies/store";
+import { useCrmCompanies } from "@/lib/companies/use-crm-companies";
 import {
   applyCompanyImport,
   COMPANY_IMPORT_FIELDS,
@@ -31,6 +32,12 @@ import {
   sampleCompanyCsvTemplate,
   suggestCompanyMapping,
 } from "@/lib/companies/import";
+import {
+  bulkCrmCompanies,
+  exportCrmCompanies,
+  importCrmCompanies,
+  tryCrmCompany,
+} from "@/lib/companies/api";
 import { EntityCsvImportModal } from "@/components/sales/import/EntityCsvImportModal";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import { onRulesChange } from "@/lib/rules";
@@ -83,6 +90,7 @@ export default function CompaniesPage() {
   const [isMassUpdateOpen, setMassUpdateOpen] = useState(false);
   const [isManageTagsOpen, setManageTagsOpen] = useState(false);
   const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
+  const crm = useCrmCompanies();
 
   useEffect(() => {
     function refresh() {
@@ -92,7 +100,7 @@ export default function CompaniesPage() {
     }
     refresh();
     return onRulesChange(refresh);
-  }, []);
+  }, [crm.source, crm.loading]);
 
   useEffect(() => {
     if (!bulkFlash) return;
@@ -102,13 +110,38 @@ export default function CompaniesPage() {
 
   function exportTasks() {
     const n = exportCompaniesCsv();
+    void tryCrmCompany(() => exportCrmCompanies({}));
     setBulkFlash(`Exported ${n} companies`);
   }
 
   function exportSelected() {
     if (!selectedIds.length) return;
     const n = exportCompaniesCsv({ ids: selectedIds });
+    void tryCrmCompany(() => exportCrmCompanies({ ids: selectedIds }));
     setBulkFlash(`Exported ${n} selected companies`);
+  }
+
+  function runBulkDelete() {
+    if (!selectedIds.length) return;
+    const count = selectedIds.length;
+    if (
+      !window.confirm(
+        `Delete ${count} compan${count === 1 ? "y" : "ies"}? This moves them to the recycle bin.`,
+      )
+    ) {
+      return;
+    }
+    let n = 0;
+    for (const id of selectedIds) {
+      if (deleteCompany(id, { skipCrm: true })) n += 1;
+    }
+    if (n) {
+      void tryCrmCompany(() =>
+        bulkCrmCompanies({ ids: selectedIds, operation: "DELETE" }),
+      );
+    }
+    setSelectedIds([]);
+    setBulkFlash(`Deleted ${n} compan${n === 1 ? "y" : "ies"}`);
   }
 
   function openPrintView() {
@@ -207,6 +240,25 @@ export default function CompaniesPage() {
   return (
     <div className={BOARD_PAGE}>
       <FocusHighlight />
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            crm.source === "api"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-slate-100 text-slate-500",
+          )}
+        >
+          {crm.source === "api"
+            ? "Live CRM"
+            : crm.loading
+              ? "Connecting…"
+              : "Demo"}
+        </span>
+        {crm.error && crm.source === "demo" ? (
+          <span className="text-[10px] text-slate-500">{crm.error}</span>
+        ) : null}
+      </div>
       <EntityHeader
         entityLabel="Company"
         entityLabelPlural="Companies"
@@ -260,7 +312,7 @@ export default function CompaniesPage() {
           }
           onMailMerge={() => setMergeOpen(true)}
           onMassConvert={() => console.log("mass convert clicked")}
-          onDelete={() => console.log("delete clicked")}
+          onDelete={runBulkDelete}
           onExportSelectedRecords={() => exportSelected()}
         />
       ) : bulkFlash ? (
@@ -321,15 +373,21 @@ export default function CompaniesPage() {
             defaultSource: settings.defaultSource,
           })
         }
-        apply={(rows, mapping, settings) =>
-          applyCompanyImport(rows, mapping, {
+        apply={(rows, mapping, settings) => {
+          const summary = applyCompanyImport(rows, mapping, {
             skipDuplicates: settings.skipDuplicates,
             updateExisting: settings.updateExisting,
             defaultOwner: settings.defaultOwner,
             defaultStatus: settings.defaultStatus as CompanyStatus,
             defaultSource: settings.defaultSource,
-          })
-        }
+          });
+          void tryCrmCompany(() =>
+            importCrmCompanies({
+              rows: rows.map((row) => ({ ...row })),
+            }),
+          );
+          return summary;
+        }}
         downloadErrorReport={downloadCompanyImportErrorReport}
         sampleTemplate={sampleCompanyCsvTemplate()}
         sampleFilename="companies-import-template.csv"

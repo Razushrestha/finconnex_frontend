@@ -13,6 +13,13 @@ import {
   saveSettingsValues,
   type SettingsValues,
 } from "@/lib/settings/settings-store";
+import {
+  overlaySettingsValues,
+  patchCrmWorkspaceSettings,
+  tryCrmSettings,
+  valuesToSettingsPatch,
+} from "@/lib/settings/api";
+import { useCrmSettings } from "@/lib/settings/use-crm-settings";
 import { ThemeModeToggle } from "@/components/layout/ThemeModeToggle";
 import { cn } from "@/lib/utils";
 
@@ -34,15 +41,20 @@ export function SettingsFormClient({
     [categorySlug, subpageSlug],
   );
   const schemaKey = `${categorySlug}/${subpageSlug}`;
+  const crm = useCrmSettings();
   const [values, setValues] = useState<SettingsValues>(() =>
     defaultsFromSchema(schema),
   );
   const [toast, setToast] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const saved = loadSettingsValues(schemaKey);
-    setValues({ ...defaultsFromSchema(schema), ...saved });
-  }, [schemaKey, schema]);
+    const base = { ...defaultsFromSchema(schema), ...saved };
+    setValues(
+      crm.settings ? overlaySettingsValues(base, crm.settings) : base,
+    );
+  }, [schemaKey, schema, crm.settings]);
 
   function setField(id: string, value: string | boolean | number) {
     setValues((v) => ({ ...v, [id]: value }));
@@ -50,17 +62,30 @@ export function SettingsFormClient({
 
   function onCancel() {
     const saved = loadSettingsValues(schemaKey);
-    setValues({ ...defaultsFromSchema(schema), ...saved });
+    const base = { ...defaultsFromSchema(schema), ...saved };
+    setValues(
+      crm.settings ? overlaySettingsValues(base, crm.settings) : base,
+    );
     setToast("Reverted to last saved");
     window.setTimeout(() => setToast(null), 1800);
   }
 
-  function onSave() {
+  async function onSave() {
+    setSaving(true);
     saveSettingsValues(schemaKey, values, {
       path,
       title: schema.title,
     });
-    setToast("Saved");
+    if (crm.source === "api") {
+      const patched = await tryCrmSettings(() =>
+        patchCrmWorkspaceSettings(
+          valuesToSettingsPatch(values, crm.settings?.revision),
+        ),
+      );
+      if (patched) crm.setSettings(patched);
+    }
+    setSaving(false);
+    setToast(crm.source === "api" ? "Saved to CRM" : "Saved");
     window.setTimeout(() => setToast(null), 1800);
   }
 
@@ -75,6 +100,20 @@ export function SettingsFormClient({
             <p className="mt-0.5 text-[12px] leading-relaxed text-slate-500">
               {schema.description}
             </p>
+            <span
+              className={cn(
+                "mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                crm.source === "api"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-slate-100 text-slate-500",
+              )}
+            >
+              {crm.source === "api"
+                ? "Live CRM"
+                : crm.loading
+                  ? "Connecting…"
+                  : "Demo"}
+            </span>
           </div>
           {moduleHref ? (
             <Link
@@ -117,10 +156,11 @@ export function SettingsFormClient({
         </button>
         <button
           type="button"
-          onClick={onSave}
-          className="h-9 rounded-lg bg-violet-600 px-3 text-[12px] font-semibold text-white shadow-sm shadow-violet-600/20 hover:bg-violet-700"
+          onClick={() => void onSave()}
+          disabled={saving}
+          className="h-9 rounded-lg bg-violet-600 px-3 text-[12px] font-semibold text-white shadow-sm shadow-violet-600/20 hover:bg-violet-700 disabled:opacity-60"
         >
-          Save changes
+          {saving ? "Saving…" : "Save changes"}
         </button>
       </div>
 

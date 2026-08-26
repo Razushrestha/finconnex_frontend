@@ -1,6 +1,7 @@
 import { SettingsToolbar } from "@/components/settings/SettingsToolbar";
 import { SettingsSectionNav } from "@/components/settings/SettingsSectionNav";
 import { SettingsBreadcrumb } from "@/components/settings/SettingsBreadcrumb";
+import { SettingsCrmBadge } from "@/components/settings/SettingsCrmBadge";
 
 export default function SettingsLayout({
   children,
@@ -12,9 +13,12 @@ export default function SettingsLayout({
       <div className="relative border-b border-slate-200 bg-white">
         <div className="mx-auto flex w-full max-w-[1920px] items-center justify-between gap-3 px-4 py-3 sm:px-6 2xl:px-8">
           <div>
-            <h1 className="text-[18px] font-semibold tracking-tight text-slate-900">
-              Settings
-            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-[18px] font-semibold tracking-tight text-slate-900">
+                Settings
+              </h1>
+              <SettingsCrmBadge />
+            </div>
             <SettingsBreadcrumb />
           </div>
         </div>

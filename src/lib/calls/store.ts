@@ -111,6 +111,15 @@ export function createCall(input: {
     ),
   );
   emitLeadActivityChange();
+  void import("@/lib/calls/api").then(async ({ createCrmCall, tryCrm }) => {
+    const remote = await tryCrm(() => createCrmCall(input));
+    if (remote?.id && remote.id !== call.id) {
+      deleteCall(call.id, { skipCrm: true });
+      mergeCrmCalls([remote]);
+    } else if (remote) {
+      mergeCrmCalls([remote]);
+    }
+  });
   return call;
 }
 
@@ -122,7 +131,7 @@ export function findCallById(id: string) {
   return null;
 }
 
-export function deleteCall(id: string): Call | null {
+export function deleteCall(id: string, opts?: { skipCrm?: boolean }): Call | null {
   const cols = listCallColumns();
   let found: Call | null = null;
   const next = cols.map((col) => {
@@ -134,6 +143,11 @@ export function deleteCall(id: string): Call | null {
   if (found) {
     saveCallColumns(next);
     emitLeadActivityChange();
+    if (!opts?.skipCrm) {
+      void import("@/lib/calls/api").then(({ deleteCrmCall, tryCrm }) => {
+        void tryCrm(() => deleteCrmCall(id));
+      });
+    }
   }
   return found;
 }
@@ -155,28 +169,71 @@ export function updateCall(id: string, patch: Partial<Call>): Call | null {
         calls: col.calls.map((c) => (c.id === id ? merged : c)),
       })),
     );
-    emitLeadActivityChange();
-    return merged;
+  } else {
+    const stripped = cols.map((col) => ({
+      ...col,
+      calls: col.calls.filter((c) => c.id !== id),
+    }));
+    const target =
+      stripped.find((c) => c.title === merged.status) ??
+      stripped.find((c) => c.id === found.columnId) ??
+      stripped[0];
+    if (!target) return null;
+    saveCallColumns(
+      stripped.map((col) =>
+        col.id === target.id
+          ? { ...col, calls: [merged, ...col.calls] }
+          : col,
+      ),
+    );
   }
 
-  const stripped = cols.map((col) => ({
-    ...col,
-    calls: col.calls.filter((c) => c.id !== id),
-  }));
-  const target =
-    stripped.find((c) => c.title === merged.status) ??
-    stripped.find((c) => c.id === found.columnId) ??
-    stripped[0];
-  if (!target) return null;
-  saveCallColumns(
-    stripped.map((col) =>
-      col.id === target.id
-        ? { ...col, calls: [merged, ...col.calls] }
-        : col,
-    ),
-  );
   emitLeadActivityChange();
+  void import("@/lib/calls/api").then(
+    async ({ syncCallStatus, updateCrmCall, rescheduleCrmCall, tryCrm }) => {
+      if (nextStatus !== found.call.status) {
+        await tryCrm(() =>
+          syncCallStatus(id, nextStatus, {
+            date: patch.date,
+            notes: patch.notes,
+            outcome: patch.outcome,
+          }),
+        );
+      } else if (patch.date && patch.date !== found.call.date) {
+        await tryCrm(() => rescheduleCrmCall(id, patch.date!));
+      } else if (Object.keys(patch).length) {
+        await tryCrm(() => updateCrmCall(id, patch));
+      }
+    },
+  );
   return merged;
+}
+
+export function mergeCrmCalls(remote: Call[]) {
+  if (!remote.length) return;
+  const remoteIds = new Set(remote.map((c) => c.id));
+  const cols = listCallColumns().map((col) => ({
+    ...col,
+    calls: col.calls.filter((c) => !remoteIds.has(c.id)),
+  }));
+  let next = cols;
+  for (const call of remote) {
+    const target =
+      next.find((c) => c.title === call.status) ??
+      next.find((c) => c.title === "Scheduled") ??
+      next[0];
+    if (!target) continue;
+    next = next.map((col) =>
+      col.id === target.id
+        ? {
+            ...col,
+            calls: [normalizeCall(call, target.title), ...col.calls],
+          }
+        : col,
+    );
+  }
+  saveCallColumns(next);
+  emitLeadActivityChange();
 }
 
 export function parseCallDurationSeconds(call: Call): number {

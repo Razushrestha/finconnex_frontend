@@ -42,6 +42,7 @@ import {
   type AnalyticsTeam,
   type BenchmarkMap,
 } from "@/lib/analytics/types";
+import { useCrmAnalytics } from "@/lib/analytics/use-crm-analytics";
 import { cn } from "@/lib/utils";
 
 const PIE_COLORS = ["#7c3aed", "#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe"];
@@ -60,10 +61,8 @@ export function AnalyticsDashboardClient() {
     setBenchmarks(loadBenchmarks());
   }, []);
 
-  const snap = useMemo(
-    () => getAnalyticsSnapshot({ period, team, owner }),
-    [period, team, owner],
-  );
+  const live = useCrmAnalytics({ period, team, owner, compare });
+  const snap = live.snapshot;
 
   const priorSnap = useMemo(
     () =>
@@ -132,6 +131,24 @@ th{text-align:left;padding:8px;border-bottom:2px solid #cbd5e1;color:#64748b;fon
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Analytics
             </h1>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                live.source === "api"
+                  ? "bg-violet-50 text-violet-700"
+                  : live.source === "mixed"
+                    ? "bg-amber-50 text-amber-700"
+                    : "bg-slate-100 text-slate-500",
+              )}
+            >
+              {live.loading
+                ? "Loading CRM…"
+                : live.source === "api"
+                  ? "Live CRM"
+                  : live.source === "mixed"
+                    ? "Live + demo"
+                    : "Demo"}
+            </span>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             <button

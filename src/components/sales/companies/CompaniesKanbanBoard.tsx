@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
-import { type CompanyGroup } from "@/lib/companies/types";
+import { type CompanyGroup, type CompanyStatus } from "@/lib/companies/types";
 import {
   listCompanyGroups,
   saveCompanyGroups,
@@ -186,6 +186,15 @@ export function CompaniesKanbanBoard({
         : { ...company, accentColorClass: targetGroup.dotColorClass };
 
     moveCompany(company, sourceGroup, targetGroup, updatedCompany, targetIndex);
+    if (sourceGroup.id !== targetGroup.id) {
+      void import("@/lib/companies/api").then(({ updateCrmCompany, tryCrmCompany }) => {
+        void tryCrmCompany(() =>
+          updateCrmCompany(company.id, {
+            status: targetGroup.title as CompanyStatus,
+          }),
+        );
+      });
+    }
     setDragInfo(null);
   }
 

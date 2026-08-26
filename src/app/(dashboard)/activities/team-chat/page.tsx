@@ -49,6 +49,14 @@ import {
   type ChatMessage,
   type ChatPresence,
 } from "@/lib/chat/types";
+import {
+  createCrmChatMessage,
+  deleteCrmChatMessage,
+  deleteCrmConversation,
+  tryCrmChat,
+  updateCrmChatMessage,
+} from "@/lib/chat/api";
+import { useCrmChat } from "@/lib/chat/use-crm-chat";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { createTask } from "@/lib/tasks/store";
 import {
@@ -111,6 +119,22 @@ export default function TeamChatPage() {
   const feedRef = useRef<HTMLDivElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const plusMenuRef = useRef<HTMLDivElement>(null);
+  const crm = useCrmChat({ activeConversationId: activeId });
+
+  useEffect(() => {
+    if (crm.source !== "api" || !crm.channels?.length) return;
+    setChannels(crm.channels);
+    setActiveId((prev) =>
+      crm.channels!.some((c) => c.id === prev)
+        ? prev
+        : (crm.channels!.find((c) => isDm(c))?.id ?? crm.channels![0]!.id),
+    );
+  }, [crm.source, crm.channels]);
+
+  useEffect(() => {
+    if (crm.source !== "api" || !crm.messages) return;
+    setMessages((prev) => ({ ...prev, ...crm.messages }));
+  }, [crm.source, crm.messages]);
 
   const active = channels.find((c) => c.id === activeId) ?? channels[0];
   const thread = (messages[activeId] ?? []).filter((m) => {
@@ -176,6 +200,9 @@ export default function TeamChatPage() {
             : m,
         ),
       }));
+      if (crm.source === "api") {
+        void tryCrmChat(() => updateCrmChatMessage(editingId, text));
+      }
       setEditingId(null);
       setDraft("");
       setReplyTo(null);
@@ -183,17 +210,19 @@ export default function TeamChatPage() {
       return;
     }
 
+    const localId = `local-${Date.now()}`;
+    const replySnapshot = replyTo;
     const msg: ChatMessage = {
-      id: `local-${Date.now()}`,
+      id: localId,
       channelId: activeId,
       author: "You",
       body: text || "Voice note",
       sentAt: "Just now",
       sentAtMs: Date.now(),
       isOwn: true,
-      replyToId: replyTo?.id,
-      replyToPreview: replyTo
-        ? `${replyTo.author}: ${replyTo.body.slice(0, 60)}`
+      replyToId: replySnapshot?.id,
+      replyToPreview: replySnapshot
+        ? `${replySnapshot.author}: ${replySnapshot.body.slice(0, 60)}`
         : undefined,
       ...extras,
     };
@@ -204,6 +233,23 @@ export default function TeamChatPage() {
     setDraft("");
     setReplyTo(null);
     setEmojiOpen(false);
+
+    if (crm.source === "api" && extras?.kind !== "voice") {
+      void tryCrmChat(() =>
+        createCrmChatMessage(activeId, {
+          body: text,
+          replyToId: replySnapshot?.id,
+        }),
+      ).then((live) => {
+        if (!live) return;
+        setMessages((prev) => ({
+          ...prev,
+          [activeId]: (prev[activeId] ?? []).map((m) =>
+            m.id === localId ? { ...live, isOwn: true, author: "You" } : m,
+          ),
+        }));
+      });
+    }
 
     // Mentions → in-app notification (demo: notify current user when @name appears)
     const mention = text.match(/@([\w.-]+)/);
@@ -230,6 +276,9 @@ export default function TeamChatPage() {
       ...prev,
       [activeId]: (prev[activeId] ?? []).filter((m) => m.id !== id),
     }));
+    if (crm.source === "api") {
+      void tryCrmChat(() => deleteCrmChatMessage(id));
+    }
     flash(setToast, "Message deleted");
   }
 
@@ -302,6 +351,23 @@ export default function TeamChatPage() {
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Team Chat
             </h1>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                crm.source === "api"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-slate-100 text-slate-500",
+              )}
+            >
+              {crm.source === "api"
+                ? "Live CRM"
+                : crm.loading
+                  ? "Connecting…"
+                  : "Demo"}
+            </span>
+            {crm.error && crm.source === "demo" ? (
+              <span className="text-[10px] text-slate-500">{crm.error}</span>
+            ) : null}
           </div>
         </div>
 
@@ -666,6 +732,9 @@ export default function TeamChatPage() {
                             if (next) setActiveId(next.id);
                             return nextList;
                           });
+                          if (crm.source === "api") {
+                            void tryCrmChat(() => deleteCrmConversation(id));
+                          }
                           flash(setToast, "Chat deleted");
                         }}
                       />

@@ -183,5 +183,14 @@ export function mergeCompanies(input: {
   }));
   saveCompanyGroups(groups);
 
+  void import("@/lib/companies/api").then(({ mergeCrmCompanies, tryCrmCompany }) => {
+    void tryCrmCompany(() =>
+      mergeCrmCompanies({
+        survivorId: input.primaryId,
+        sourceId: input.secondaryId,
+      }),
+    );
+  });
+
   return { ok: true, company: merged };
 }

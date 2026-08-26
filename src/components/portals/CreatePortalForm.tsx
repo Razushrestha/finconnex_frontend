@@ -30,6 +30,10 @@ import {
   type PortalStatus,
 } from "@/lib/portals/types";
 import {
+  createCrmClientPortal,
+  tryCrmPortal,
+} from "@/lib/portals/api";
+import {
   InputShell,
   elevatedInputClass,
   elevatedSelectClass,
@@ -163,6 +167,20 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
         createdBy,
       ),
     );
+    void tryCrmPortal(async () => {
+      const remote = await createCrmClientPortal({
+        name: created.name,
+        slug: created.slug,
+        status: created.status,
+        accessLevel: created.accessLevel,
+        modules: created.modules,
+        clientId: created.clientId,
+        clientName: created.clientName,
+        primaryContactName: created.primaryContactName,
+        primaryContactEmail: created.primaryContactEmail,
+      });
+      if (remote) upsertPortal(remote);
+    });
     if (createAnother) {
       setName("");
       setSlugTouched(false);

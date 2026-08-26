@@ -117,10 +117,21 @@ export function createCompany(input: {
         : g,
     ),
   );
+  void import("@/lib/companies/api").then(async ({ createCrmCompany, tryCrmCompany }) => {
+    const remote = await tryCrmCompany(() => createCrmCompany(input));
+    if (!remote) return;
+    if (remote.company.id !== company.id) {
+      deleteCompany(company.id, { skipCrm: true });
+    }
+    mergeCrmCompaniesIntoBoard([remote]);
+  });
   return company;
 }
 
-export function deleteCompany(id: string): CompanyCardData | null {
+export function deleteCompany(
+  id: string,
+  opts?: { skipCrm?: boolean },
+): CompanyCardData | null {
   const found = findCompanyById(id);
   if (!found) return null;
   saveCompanyGroups(
@@ -129,5 +140,87 @@ export function deleteCompany(id: string): CompanyCardData | null {
       companies: g.companies.filter((c) => c.id !== id),
     })),
   );
+  if (!opts?.skipCrm) {
+    void import("@/lib/companies/api").then(({ deleteCrmCompany, tryCrmCompany }) => {
+      void tryCrmCompany(() => deleteCrmCompany(id));
+    });
+  }
   return found.company;
+}
+
+export function updateCompany(
+  id: string,
+  patch: Partial<CompanyCardData> & { status?: CompanyStatus },
+): CompanyCardData | null {
+  const found = findCompanyById(id);
+  if (!found) return null;
+  const nextStatus = patch.status ?? found.status;
+  const merged: CompanyCardData = {
+    ...found.company,
+    ...patch,
+    id,
+    accentColorClass:
+      nextStatus !== found.status
+        ? (listCompanyGroups().find((g) => g.title === nextStatus)?.dotColorClass ??
+          found.company.accentColorClass)
+        : found.company.accentColorClass,
+  };
+
+  let groups = listCompanyGroups().map((g) => ({
+    ...g,
+    companies: g.companies.filter((c) => c.id !== id),
+  }));
+  const target =
+    groups.find((g) => g.title === nextStatus) ??
+    groups.find((g) => g.id === found.groupId) ??
+    groups[0];
+  if (!target) return null;
+  groups = groups.map((g) =>
+    g.id === target.id ? { ...g, companies: [merged, ...g.companies] } : g,
+  );
+  saveCompanyGroups(groups);
+
+  void import("@/lib/companies/api").then(({ updateCrmCompany, tryCrmCompany }) => {
+    void tryCrmCompany(() =>
+      updateCrmCompany(id, {
+        name: patch.name,
+        website: patch.website,
+        industry: patch.industry,
+        phone: patch.phone,
+        city: patch.city,
+        annualRevenue: patch.annualRevenue,
+        status: nextStatus,
+        owner: patch.owner,
+      }),
+    );
+  });
+  return merged;
+}
+
+export function mergeCrmCompaniesIntoBoard(
+  remote: Array<{ company: CompanyCardData; status: CompanyStatus }>,
+) {
+  if (!remote.length) return;
+  const remoteIds = new Set(remote.map((r) => r.company.id));
+  let groups = listCompanyGroups().map((g) => ({
+    ...g,
+    companies: g.companies.filter((c) => !remoteIds.has(c.id)),
+  }));
+  for (const item of remote) {
+    const target =
+      groups.find((g) => g.title === item.status) ??
+      groups.find((g) => g.title === "Prospect") ??
+      groups[0];
+    if (!target) continue;
+    const company: CompanyCardData = {
+      ...item.company,
+      accentColorClass: target.dotColorClass,
+    };
+    groups = groups.map((g) =>
+      g.id === target.id
+        ? { ...g, companies: [company, ...g.companies] }
+        : g,
+    );
+  }
+  saveCompanyGroups(groups);
 }

@@ -398,6 +398,8 @@ export function getAnalyticsSnapshot(opts: {
   };
 }
 
+export type AnalyticsSnapshot = ReturnType<typeof getAnalyticsSnapshot>;
+
 /** Lower-is-better KPIs for benchmark vs actual */
 export const LOWER_IS_BETTER = new Set(["cycle", "overdue", "ticketTime"]);
 

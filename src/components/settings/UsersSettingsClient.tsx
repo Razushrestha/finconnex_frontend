@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
+import { deleteAdminUser } from "@/lib/admin/api";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import {
   createCrmUser,
   deleteCrmUser,
@@ -65,6 +67,24 @@ export function UsersSettingsClient() {
     refresh();
   }
 
+  async function removeUser(u: CrmUser) {
+    if (isUuid(u.id)) {
+      try {
+        await deleteAdminUser(u.id);
+      } catch (err) {
+        flash(err instanceof Error ? err.message : "Could not delete user");
+        return;
+      }
+    }
+    const removed = deleteCrmUser(u.id);
+    if (removed || isUuid(u.id)) {
+      flash("User removed");
+      refresh();
+      return;
+    }
+    flash("Cannot remove primary admin");
+  }
+
   function startEdit(u: CrmUser) {
     setEditingId(u.id);
     setDraft({
@@ -80,8 +100,8 @@ export function UsersSettingsClient() {
       <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-4">
         <h2 className="text-[16px] font-bold text-slate-900">Users</h2>
         <p className="mt-0.5 text-[12px] text-slate-500">
-          Demo user directory — invite, edit role/status, deactivate. Login still
-          uses the static admin credential.
+          Demo user directory — invite and edit locally. Deleting a UUID user
+          calls DELETE /v1/admin/user/:id (platform admin).
         </p>
         {message ? (
           <p className="mt-2 text-[12px] font-medium text-violet-700">{message}</p>
@@ -191,12 +211,7 @@ export function UsersSettingsClient() {
                 aria-label={`Delete ${u.name}`}
                 disabled={u.id === "user_john"}
                 onClick={() => {
-                  if (deleteCrmUser(u.id)) {
-                    flash("User removed");
-                    refresh();
-                  } else {
-                    flash("Cannot remove primary admin");
-                  }
+                  void removeUser(u);
                 }}
                 className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
               >

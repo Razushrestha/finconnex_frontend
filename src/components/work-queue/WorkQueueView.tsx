@@ -31,6 +31,7 @@ import {
   type QueueSortField,
   type WorkQueueTimeFilter,
 } from "@/lib/work-queue/live";
+import { useCrmWorkQueue } from "@/lib/work-queue/use-crm-work-queue";
 import { mergeWorkQueueTabs } from "@/lib/work-queue/tab-store";
 import { onLeadActivityChange } from "@/lib/leads/lead-extras-store";
 import { onPipelineSlaChange } from "@/lib/pipeline-sla/settings";
@@ -84,6 +85,12 @@ export function WorkQueueView() {
   const [noteRow, setNoteRow] = React.useState<QueueRow | null>(null);
   const [noteBody, setNoteBody] = React.useState("");
   const [toast, setToast] = React.useState<string | null>(null);
+  const crm = useCrmWorkQueue({
+    nav: activeNav,
+    scope,
+    timeFilter,
+    tick,
+  });
 
   React.useEffect(() => {
     setCategories(readStoredCategories());
@@ -118,8 +125,11 @@ export function WorkQueueView() {
   );
 
   const rawRows = React.useMemo(
-    () => listQueueRows(activeNav, scope, timeFilter),
-    [activeNav, scope, timeFilter, tick],
+    () =>
+      crm.source === "api"
+        ? crm.rows
+        : listQueueRows(activeNav, scope, timeFilter),
+    [activeNav, scope, timeFilter, tick, crm.source, crm.rows],
   );
 
   const filteredRows = React.useMemo(
@@ -166,6 +176,7 @@ export function WorkQueueView() {
   function refresh() {
     setSpinning(true);
     setTick((n) => n + 1);
+    crm.refresh();
     window.setTimeout(() => setSpinning(false), 450);
   }
 
@@ -290,7 +301,8 @@ export function WorkQueueView() {
             totalPages={totalPages}
             onPageChange={setPage}
             onRefresh={refresh}
-            spinning={spinning}
+            spinning={spinning || crm.loading}
+            source={crm.source}
             emptyLabel={`No ${title.toLowerCase()} for ${scope || "this user"}.`}
             filters={filters}
             onFiltersChange={(f) => {

@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   RotateCw,
-    Filter,
+  Filter,
   List,
   LayoutGrid,
   Plus,
@@ -199,15 +199,15 @@ export function EntityHeader({
         {hideTitle ? null : (
           <div className="flex min-w-0 items-center gap-2">
             <h1 className="truncate text-[15px] font-bold tracking-tight text-foreground">
-              {title}
-            </h1>
-            {totalCount !== undefined && (
+            {title}
+          </h1>
+          {totalCount !== undefined && (
               <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
-                {totalCount}
-              </span>
-            )}
-          </div>
-        )}
+              {totalCount}
+            </span>
+          )}
+            </div>
+          )}
 
         {scopeOptions ? (
           <div className="relative" ref={scopeMenuRef}>
