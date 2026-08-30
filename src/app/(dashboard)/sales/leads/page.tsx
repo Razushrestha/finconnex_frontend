@@ -65,6 +65,14 @@ import {
   kanbanShowsOwnerAvatar,
 } from "@/lib/leads/kanban-view-fields";
 import { MORTGAGE_PIPELINE_STAGES } from "@/lib/pipeline-sla/types";
+import {
+  applyTablePreferenceToListView,
+  getCrmTablePreference,
+  isEmptyTablePreference,
+  persistCrmTablePreference,
+  tablePreferenceFromListView,
+  tryCrmTablePreference,
+} from "@/lib/table-preferences/api";
 
 const DEFAULT_LEAD_COLUMNS = LEAD_PIPELINE_STAGES.map((stage) => ({
   id: stageColumnId(stage),
@@ -377,6 +385,15 @@ export default function LeadsPage() {
   useEffect(() => {
     setViewConfig(loadViewConfig());
     setListViewConfig(loadListViewConfig());
+    void tryCrmTablePreference(() => getCrmTablePreference("leads")).then(
+      (pref) => {
+        if (pref && !isEmptyTablePreference(pref)) {
+          setListViewConfig((current) =>
+            applyTablePreferenceToListView(current, pref),
+          );
+        }
+      },
+    );
   }, []);
 
   useEffect(() => {
@@ -405,6 +422,10 @@ export default function LeadsPage() {
     };
     setListViewConfig(normalized);
     persistListViewConfig(normalized);
+    persistCrmTablePreference(
+      "leads",
+      tablePreferenceFromListView("leads", normalized),
+    );
     setIsListSettingsOpen(false);
   }
 
@@ -415,12 +436,20 @@ export default function LeadsPage() {
     };
     setListViewConfig(next);
     persistListViewConfig(next);
+    persistCrmTablePreference(
+      "leads",
+      tablePreferenceFromListView("leads", next),
+    );
   }
 
   function handleListPageSizeChange(size: number) {
     const next: ListViewConfig = { ...listViewConfig, pageSize: size };
     setListViewConfig(next);
     persistListViewConfig(next);
+    persistCrmTablePreference(
+      "leads",
+      tablePreferenceFromListView("leads", next),
+    );
   }
 
   function toggleFilterField(section: "source" | "status", field: string) {

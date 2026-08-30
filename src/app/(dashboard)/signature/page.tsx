@@ -6,7 +6,14 @@ import {
   signatureRequests as seed,
   listSignatureRequests,
   type SignatureRequest,
+  deleteSignatureRequest,
 } from "@/lib/documents/signature/types";
+import {
+  deleteCrmSignatureRequest,
+  isCrmSignatureRequestId,
+  tryCrmSignatureRequest,
+} from "@/lib/documents/signature/api";
+import { useCrmSignatureRequests } from "@/lib/documents/signature/use-crm-signature-requests";
 import { RecentTabsHeader } from "@/components/documents/signature/overview/RecentTabsHeader";
 import SignatureStatsGrid from "@/components/documents/signature/overview/SignatureStatsGrid";
 import {
@@ -134,6 +141,7 @@ function RowActionsMenu({
 
 export default function ESignatureOverviewPage() {
   const router = useRouter();
+  const crm = useCrmSignatureRequests();
   const [activeTab, setActiveTab] = useState<"documents" | "templates">(
     "documents",
   );
@@ -168,7 +176,7 @@ export default function ESignatureOverviewPage() {
     const all = listSignatureRequests();
     setDocsSource(all.filter((doc) => doc.recordType !== "template"));
     setTplsSource(all.filter((doc) => doc.recordType === "template"));
-  }, []);
+  }, [crm.source, crm.loading]);
 
   useEffect(() => {
     documentsTable.setItems(docsSource);
@@ -191,8 +199,10 @@ export default function ESignatureOverviewPage() {
       )
     )
       return;
-    // TODO(api): DELETE /api/signature-requests/{id}
-    console.log("delete signature request", doc.signatureRequestId);
+    deleteSignatureRequest(doc.id);
+    if (isCrmSignatureRequestId(doc.id)) {
+      void tryCrmSignatureRequest(() => deleteCrmSignatureRequest(doc.id));
+    }
     setDocsSource((prev) =>
       prev.filter((d) => d.signatureRequestId !== doc.signatureRequestId),
     );

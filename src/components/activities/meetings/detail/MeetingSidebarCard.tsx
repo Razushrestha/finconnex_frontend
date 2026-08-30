@@ -5,11 +5,19 @@ import Link from "next/link";
 import { ExternalLink, CheckSquare, Square, Mail, Plus } from "lucide-react";
 import { hrefForRelatedTo } from "@/lib/activities/related-href";
 
+import { MeetingRemindersCard } from "./MeetingRemindersCard";
+
 interface MeetingSidebarCardProps {
+  meetingId: string;
   relatedTo?: string;
+  startDateTime?: string;
 }
 
-export function MeetingSidebarCard({ relatedTo }: MeetingSidebarCardProps) {
+export function MeetingSidebarCard({
+  meetingId,
+  relatedTo,
+  startDateTime,
+}: MeetingSidebarCardProps) {
   const relatedHref = hrefForRelatedTo(relatedTo);
 
   return (
@@ -47,6 +55,11 @@ export function MeetingSidebarCard({ relatedTo }: MeetingSidebarCardProps) {
           </div>
         </div>
       </div>
+
+      <MeetingRemindersCard
+        meetingId={meetingId}
+        dueDate={startDateTime}
+      />
 
       {/* Prep Checklist Widget */}
       <div>

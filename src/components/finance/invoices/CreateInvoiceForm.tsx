@@ -6,15 +6,20 @@ import { Receipt, User, Building2, Calendar } from "lucide-react";
 import {
   INVOICE_STATUSES,
   appendInvoiceAudit,
+  formatFinanceDate,
   nextInvoiceIds,
   upsertInvoice,
   type InvoiceStatus,
 } from "@/lib/finance/invoices/types";
 import {
+  createCrmInvoice,
+  persistRemoteInvoice,
+  toCreateInvoiceBody,
+} from "@/lib/finance/invoices/api";
+import {
   FINANCE_CLIENTS,
   FINANCE_DEALS,
   FINANCE_OWNERS,
-  formatFinanceDate,
   newLineItem,
   type FinanceLineItem,
 } from "@/lib/finance/shared";
@@ -49,6 +54,8 @@ export function CreateInvoiceForm({ layoutId: _l, redirect: _r }: Props) {
     newLineItem({ name: "Brokerage fee", unitPrice: 1500, taxRate: 10 }),
   ]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const client =
     FINANCE_CLIENTS.find((c) => c.id === clientId) ?? FINANCE_CLIENTS[0];
 
@@ -62,44 +69,78 @@ export function CreateInvoiceForm({ layoutId: _l, redirect: _r }: Props) {
     return Object.keys(next).length === 0;
   }
 
-  function onSave(createAnother: boolean) {
+  async function onSave(createAnother: boolean) {
     if (!validate()) return;
-    const ids = nextInvoiceIds();
-    const created = upsertInvoice(
-      appendInvoiceAudit(
-        {
-          id: ids.id,
-          invoiceId: ids.invoiceId,
-          title: title.trim(),
-          status,
-          clientId,
-          clientName: client.name,
-          contactName: client.contact,
-          contactEmail: client.email,
-          dealName,
+    setSaving(true);
+    setSaveError(null);
+    const draft = {
+      title: title.trim(),
+      clientName: client.name,
+      clientId,
+      contactName: client.contact,
+      contactEmail: client.email,
+      dealName: dealName || undefined,
+      notes: notes.trim() || undefined,
+      status,
+      owner,
+      issueDate: issueDate.trim() || formatFinanceDate(),
+      dueDate: dueDate.trim(),
+      lineItems,
+    };
+    let created;
+    try {
+      created = persistRemoteInvoice(
+        await createCrmInvoice(toCreateInvoiceBody(draft)),
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Create failed";
+      if (!/sign in/i.test(message)) {
+        setSaveError(message);
+        setSaving(false);
+        return;
+      }
+      created = null;
+    }
+    if (!created) {
+      const ids = nextInvoiceIds();
+      created = upsertInvoice(
+        appendInvoiceAudit(
+          {
+            id: ids.id,
+            invoiceId: ids.invoiceId,
+            title: draft.title,
+            status: draft.status,
+            clientId,
+            clientName: draft.clientName,
+            contactName: draft.contactName ?? "",
+            contactEmail: draft.contactEmail ?? "",
+            dealName: draft.dealName,
+            owner,
+            issueDate: draft.issueDate,
+            dueDate: draft.dueDate,
+            notes: draft.notes,
+            lineItems,
+            subtotal: 0,
+            tax: 0,
+            total: 0,
+            amountPaid: 0,
+            amountDue: 0,
+            createdBy: owner,
+            createdAt: formatFinanceDate(),
+            audit: [],
+          },
+          "Created",
           owner,
-          issueDate: issueDate.trim() || formatFinanceDate(),
-          dueDate: dueDate.trim(),
-          notes: notes.trim() || undefined,
-          lineItems,
-          subtotal: 0,
-          tax: 0,
-          total: 0,
-          amountPaid: 0,
-          amountDue: 0,
-          createdBy: owner,
-          createdAt: formatFinanceDate(),
-          audit: [],
-        },
-        "Created",
-        owner,
-      ),
-    );
+        ),
+      );
+    }
+    setSaving(false);
     if (createAnother) {
       setTitle("");
       setNotes("");
       setLineItems([newLineItem()]);
       setErrors({});
+      setSaveError(null);
       return;
     }
     router.push(`/finance/invoices/${created.id}`);
@@ -119,6 +160,12 @@ export function CreateInvoiceForm({ layoutId: _l, redirect: _r }: Props) {
       saveLabel="Save invoice"
       onSave={onSave}
     >
+      {saveError ? (
+        <p className="sm:col-span-2 text-[12px] text-rose-600">{saveError}</p>
+      ) : null}
+      {saving ? (
+        <p className="sm:col-span-2 text-[12px] text-slate-500">Saving…</p>
+      ) : null}
       <Field label="Title" required error={errors.title} className="sm:col-span-2">
         <InputShell icon={Receipt} error={!!errors.title}>
           <input

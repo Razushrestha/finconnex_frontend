@@ -14,6 +14,7 @@ import {
   normalizeCrmCapabilities,
   normalizeCrmSecuritySettings,
   normalizeCrmWorkspaceSettings,
+  overlaySecurityValues,
   overlaySettingsValues,
   patchCrmWorkspaceSettings,
   queueCrmSmtpTest,
@@ -92,6 +93,9 @@ export function smokeSettingsWiring() {
   if (!form.includes("patchCrmWorkspaceSettings")) {
     fail("SettingsFormClient does not call patchCrmWorkspaceSettings");
   }
+  if (!form.includes("overlaySecurityValues")) {
+    fail("SettingsFormClient does not overlay GET /settings/security");
+  }
 
   const smtp = readSrc("src/components/settings/SmtpSettingsClient.tsx");
   if (!smtp.includes("queueCrmSmtpTest")) {
@@ -137,6 +141,16 @@ export function smokeSettingsWiring() {
   });
   if (!security.enforce2FA || security.sessionTimeoutMinutes !== 60) {
     fail("normalizeCrmSecuritySettings did not map security fields");
+  }
+  const securityOverlay = overlaySecurityValues(
+    { minLength: 12, idleMinutes: 30 },
+    security,
+  );
+  if (
+    securityOverlay.minLength !== 8 ||
+    securityOverlay.idleMinutes !== 60
+  ) {
+    fail("overlaySecurityValues did not map password/session fields");
   }
 
   const caps = normalizeCrmCapabilities({

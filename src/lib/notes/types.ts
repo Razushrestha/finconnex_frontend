@@ -20,6 +20,8 @@ export interface Note {
   title: string;
   body: string;
   relatedTo: string;
+  relatedType?: string;
+  relatedId?: string;
   noteType: NoteType;
   createdBy: string;
   isPrivate: boolean;

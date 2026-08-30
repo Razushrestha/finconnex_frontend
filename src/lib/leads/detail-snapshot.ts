@@ -84,7 +84,7 @@ export function leadFinancials(card: LeadCardData) {
 }
 
 export function leadScoreBreakdown(card: LeadCardData) {
-  const score = Number(card.custom?.leadScore ?? 82);
+  const score = Number(card.score ?? card.custom?.leadScore ?? 82);
   return {
     score: Number.isFinite(score) ? score : 82,
     label: score >= 75 ? "High Potential" : score >= 50 ? "Warm" : "Cold",

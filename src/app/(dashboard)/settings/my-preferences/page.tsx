@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { MY_PREFERENCES_TABS } from "@/lib/settings/settings-config";
 import { SettingsFormClient } from "@/components/settings/SettingsFormClient";
+import { NotificationPreferencesClient } from "@/components/settings/NotificationPreferencesClient";
+import { UserProfileClient } from "@/components/settings/UserProfileClient";
 import { cn } from "@/lib/utils";
 
 /** SRS Top Right: My Preferences (profile, signature, password, notifications, theme). */
@@ -46,12 +48,18 @@ export default function MyPreferencesPage() {
         ))}
       </div>
 
-      <SettingsFormClient
-        key={active.slug}
-        categorySlug="my-preferences"
-        subpageSlug={active.slug}
-        path={`/settings/my-preferences#${active.slug}`}
-      />
+      {active.slug === "notifications" ? (
+        <NotificationPreferencesClient />
+      ) : active.slug === "profile" ? (
+        <UserProfileClient />
+      ) : (
+        <SettingsFormClient
+          key={active.slug}
+          categorySlug="my-preferences"
+          subpageSlug={active.slug}
+          path={`/settings/my-preferences#${active.slug}`}
+        />
+      )}
     </div>
   );
 }

@@ -59,7 +59,7 @@ export const FINANCE_MODULE_NAV: {
 ];
 
 interface Props {
-  title: string;
+  title: ReactNode;
   section: string;
   sectionIcon?: LucideIcon;
   actions?: ReactNode;

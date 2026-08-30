@@ -24,6 +24,12 @@ import {
   type DocumentRequestType,
 } from "@/lib/documents/requests/types";
 import {
+  expireCrmDocumentRequest,
+  isCrmDocumentRequestId,
+  sendCrmDocumentRequest,
+  tryCrmDocumentRequest,
+} from "@/lib/documents/requests/api";
+import {
   displayRequestStatus,
   nextDocumentSort,
   sortDocumentRequests,
@@ -233,6 +239,9 @@ function RowActions({
         detail: request.requestedFrom,
       }),
     });
+    if (isCrmDocumentRequestId(request.id)) {
+      void tryCrmDocumentRequest(() => sendCrmDocumentRequest(request.id));
+    }
     setOpen(false);
     onRefresh?.();
     onToast?.(`Invitation resent to ${request.requestedFrom}`);
@@ -253,6 +262,9 @@ function RowActions({
           : "No further uploads are required from the client.",
       }),
     });
+    if (isCrmDocumentRequestId(request.id)) {
+      void tryCrmDocumentRequest(() => expireCrmDocumentRequest(request.id));
+    }
     setOpen(false);
     setConfirmCancel(false);
     setNotifyCancel(false);

@@ -21,6 +21,7 @@ import {
 } from "@/components/sales/CreateEntityForm";
 
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
+import { createCrmNote, persistRemoteNote, tryCrmNote } from "@/lib/notes/api";
 import { createNote } from "@/lib/notes/store";
 
 interface CreateNoteFormProps {
@@ -86,18 +87,25 @@ export function CreateNoteForm({
     return Object.keys(next).length === 0;
   }
 
-  function handleSave(createAnother: boolean) {
+  async function handleSave(createAnother: boolean) {
     setSubmitted(true);
     if (!validate()) return;
     const relatedTo = `${form.relatedKind}: ${form.relatedName}`;
-    const created = createNote({
+    const payload = {
       title: form.title.trim() || form.body.trim().slice(0, 60),
       body: form.body.trim(),
       relatedTo,
+      relatedType: form.relatedKind
+        ? form.relatedKind.toUpperCase()
+        : undefined,
       noteType: (form.noteType || "General") as NoteType,
       createdBy: form.createdBy.trim() || "John Smith",
       isPrivate: form.isPrivate,
-    });
+    };
+    const remote = await tryCrmNote(() => createCrmNote(payload));
+    const created = remote
+      ? persistRemoteNote(remote) ?? remote
+      : createNote(payload);
     if (createAnother) {
       setForm({
         ...initialState,

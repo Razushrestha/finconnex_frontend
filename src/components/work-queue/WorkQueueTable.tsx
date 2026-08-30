@@ -33,6 +33,14 @@ import {
   ManageColumnsModal,
   type ManageColumn,
 } from "./ManageColumnsModal";
+import {
+  applyTablePreferenceToColumns,
+  getCrmTablePreference,
+  isEmptyTablePreference,
+  persistCrmTablePreference,
+  tablePreferenceFromColumns,
+  tryCrmTablePreference,
+} from "@/lib/table-preferences/api";
 
 export type QueueTableFilters = {
   priority: "all" | "High" | "Medium" | "Low";
@@ -260,6 +268,15 @@ export function WorkQueueTable({
 
   React.useEffect(() => {
     setManageColumns(loadManageColumns());
+    void tryCrmTablePreference(() => getCrmTablePreference("work-queue")).then(
+      (pref) => {
+        if (pref && !isEmptyTablePreference(pref)) {
+          setManageColumns(
+            applyTablePreferenceToColumns(DEFAULT_MANAGE_COLUMNS, pref),
+          );
+        }
+      },
+    );
   }, []);
 
   const visibleCols = React.useMemo(
@@ -979,6 +996,10 @@ export function WorkQueueTable({
         onSave={(cols) => {
           setManageColumns(cols);
           persistManageColumns(cols);
+          persistCrmTablePreference(
+            "work-queue",
+            tablePreferenceFromColumns("work-queue", cols),
+          );
           onManageColumns?.();
           setManageColumnsOpen(false);
         }}

@@ -17,12 +17,14 @@ import { BillingSettingsClient } from "@/components/settings/BillingSettingsClie
 import { BackupRestoreSettingsClient } from "@/components/settings/BackupRestoreSettingsClient";
 import { FieldPermissionsSettingsClient } from "@/components/settings/FieldPermissionsSettingsClient";
 import { AutomationLogsSettingsClient } from "@/components/settings/AutomationLogsSettingsClient";
+import { WorkflowRulesSettingsClient } from "@/components/settings/WorkflowRulesSettingsClient";
 import { SmtpSettingsClient } from "@/components/settings/SmtpSettingsClient";
 import { CapabilitiesSettingsClient } from "@/components/settings/CapabilitiesSettingsClient";
 import { UsersSettingsClient } from "@/components/settings/UsersSettingsClient";
 import { WorkspacesSettingsClient } from "@/components/settings/WorkspacesSettingsClient";
 import { IpRestrictionsSettingsClient } from "@/components/settings/IpRestrictionsSettingsClient";
 import { CustomObjectsSettingsClient } from "@/components/settings/CustomObjectsSettingsClient";
+import { NotificationPreferencesClient } from "@/components/settings/NotificationPreferencesClient";
 import { cn } from "@/lib/utils";
 
 interface PageProps {
@@ -70,6 +72,8 @@ export default async function SettingsSubPage({ params }: PageProps) {
       <BackupRestoreSettingsClient />
     ) : key === "users-and-access/permissions" ? (
       <FieldPermissionsSettingsClient />
+    ) : key === "workflow-and-automation/workflow-builder" ? (
+      <WorkflowRulesSettingsClient />
     ) : key === "workflow-and-automation/automation-logs" ? (
       <AutomationLogsSettingsClient />
     ) : key === "communication/smtp" ? (
@@ -84,6 +88,13 @@ export default async function SettingsSubPage({ params }: PageProps) {
       <IpRestrictionsSettingsClient />
     ) : key === "crm-configuration/custom-objects" ? (
       <CustomObjectsSettingsClient />
+    ) : category.slug === "notifications" ? (
+      <NotificationPreferencesClient
+        title={item.title}
+        description={category.description}
+        moduleHref={item.moduleHref}
+        moduleLabel={item.moduleLabel}
+      />
     ) : null;
 
   return (

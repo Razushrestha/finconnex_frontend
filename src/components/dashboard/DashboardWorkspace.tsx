@@ -1,16 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import dynamic from "next/dynamic";
 import {
   Download,
   LayoutGrid,
+  RefreshCw,
   RotateCcw,
   Settings2,
   Star,
 } from "lucide-react";
 import {
-  computeDashboardStats,
   DASHBOARD_OWNERS,
   DASHBOARD_TEAMS,
   DASHBOARD_WIDGETS,
@@ -18,56 +17,36 @@ import {
   exportDashboardReport,
   formatCurrency,
   loadDashboardLayout,
-  moveWidget,
+  moveWidgetTo,
   restoreDefaultDashboardLayout,
+  widgetGridSpan,
   saveDashboardLayout,
   setDefaultDashboardLayout,
   type DashboardDateRange,
   type DashboardLayout,
+  type DashboardWidgetId,
 } from "@/lib/dashboard/layout";
-import { onRulesChange } from "@/lib/rules";
 import {
-  DashboardBreadcrumb,
-  OrderByTimeCard,
-  UpcomingMeetingsCard,
-} from "@/components/dashboard/static-cards";
-import { CardGridSkeleton, ChartSkeleton } from "@/components/ui/chart-skeleton";
+  industryPresetLabel,
+  loadIndustryPreset,
+} from "@/lib/dashboard/industry";
+import {
+  DASHBOARD_ROLES,
+  listRoleLayouts,
+  loadActiveDashboardRole,
+  loadRoleLayout,
+  saveActiveDashboardRole,
+  saveRoleLayout,
+  type NamedDashboardLayout,
+} from "@/lib/dashboard/role-layouts";
+import { useCrmDashboardStats } from "@/lib/dashboard/use-crm-dashboard-stats";
+import { UpcomingMeetingsCard } from "@/components/dashboard/static-cards";
+import { DashboardKpiCharts } from "@/components/dashboard/DashboardKpiCharts";
+import { DashboardTaskAttention } from "@/components/dashboard/DashboardTaskAttention";
 import { WorkspaceActivityFeed } from "@/components/dashboard/WorkspaceActivityFeed";
+import { DashboardWidgetSlot } from "@/components/dashboard/DashboardWidgetSlot";
 import { cn } from "@/lib/utils";
-
-const DashboardMetricsSection = dynamic(
-  () =>
-    import("@/components/dashboard/DashboardMetricsSection").then(
-      (m) => m.DashboardMetricsSection,
-    ),
-  { loading: () => <CardGridSkeleton count={4} /> },
-);
-
-const DashboardChartRow = dynamic(
-  () =>
-    import("@/components/dashboard/DashboardAnalyticsSection").then(
-      (m) => m.DashboardChartRow,
-    ),
-  { loading: () => <CardGridSkeleton count={2} /> },
-);
-
-const DashboardDealsRow = dynamic(
-  () =>
-    import("@/components/dashboard/DashboardAnalyticsSection").then(
-      (m) => m.DashboardDealsRow,
-    ),
-  { loading: () => <CardGridSkeleton count={2} /> },
-);
-
-const NewCustomersTable = dynamic(
-  () => import("@/components/dashboard/NewCustomersTable"),
-  { loading: () => <ChartSkeleton className="min-h-[420px]" /> },
-);
-
-const TaskUpdateCard = dynamic(
-  () => import("@/components/dashboard/TaskUpdateCard"),
-  { loading: () => <ChartSkeleton className="min-h-[420px]" /> },
-);
+import type { HierarchyLevel } from "@/lib/rules/permissions";
 
 const DATE_OPTIONS: { value: DashboardDateRange; label: string }[] = [
   { value: "7d", label: "Last 7 days" },
@@ -77,28 +56,29 @@ const DATE_OPTIONS: { value: DashboardDateRange; label: string }[] = [
   { value: "all", label: "All time" },
 ];
 
-function LiveKpiStrip({ layout }: { layout: DashboardLayout }) {
-  const [stats, setStats] = useState(() =>
-    computeDashboardStats(layout.filters),
+function KpiTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-white px-3 py-2.5">
+      <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-lg font-semibold tracking-tight text-foreground">
+        {value}
+      </p>
+    </div>
   );
+}
 
-  useEffect(() => {
-    function refresh() {
-      setStats(computeDashboardStats(layout.filters));
-    }
-    refresh();
-    return onRulesChange(() => {
-      queueMicrotask(refresh);
-    });
-  }, [layout.filters]);
-
+function LiveKpiStrip({
+  stats,
+}: {
+  stats: ReturnType<typeof useCrmDashboardStats>["stats"];
+}) {
   const tiles = [
     { label: "Total Leads", value: String(stats.totalLeads) },
     { label: "Total Contacts", value: String(stats.totalContacts) },
     { label: "Total Companies", value: String(stats.totalCompanies) },
     { label: "Total Deals", value: String(stats.totalDeals) },
     { label: "Pipeline Value", value: formatCurrency(stats.pipelineValue) },
-    { label: "Won Deals", value: formatCurrency(stats.wonDealsValue) },
+    { label: "Won Deals Value", value: formatCurrency(stats.wonDealsValue) },
     { label: "Open Tasks", value: String(stats.openTasks) },
     { label: "Overdue Tasks", value: String(stats.overdueTasks) },
     { label: "Activities Today", value: String(stats.activitiesToday) },
@@ -108,17 +88,7 @@ function LiveKpiStrip({ layout }: { layout: DashboardLayout }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
       {tiles.map((t) => (
-        <div
-          key={t.label}
-          className="rounded-xl border border-border bg-white px-3 py-2.5"
-        >
-          <p className="text-[11px] font-medium text-muted-foreground">
-            {t.label}
-          </p>
-          <p className="mt-0.5 text-lg font-semibold tracking-tight text-foreground">
-            {t.value}
-          </p>
-        </div>
+        <KpiTile key={t.label} label={t.label} value={t.value} />
       ))}
     </div>
   );
@@ -128,9 +98,21 @@ export function DashboardWorkspace() {
   const [layout, setLayout] = useState<DashboardLayout>(defaultDashboardLayout);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
+  const [role, setRole] = useState<HierarchyLevel>("Manager");
+  const [roleLayouts, setRoleLayouts] = useState<NamedDashboardLayout[]>([]);
+  const [layoutName, setLayoutName] = useState("");
+  const [dragging, setDragging] = useState<DashboardWidgetId | null>(null);
+  const [over, setOver] = useState<DashboardWidgetId | null>(null);
+  const industry = loadIndustryPreset();
+
+  const { stats, industry: industryTiles, charts, owners, loading, refresh } =
+    useCrmDashboardStats(layout.filters);
 
   useEffect(() => {
     setLayout(loadDashboardLayout());
+    const nextRole = loadActiveDashboardRole();
+    setRole(nextRole);
+    setRoleLayouts(listRoleLayouts(nextRole));
   }, []);
 
   useEffect(() => {
@@ -144,116 +126,110 @@ export function DashboardWorkspace() {
     saveDashboardLayout(next);
   }
 
+  const ownerOptions = owners.length ? owners : [...DASHBOARD_OWNERS];
+
   const visible = useMemo(
     () => new Set(layout.order.filter((id) => !layout.hidden.includes(id))),
     [layout],
   );
 
+  function dropOn(target: DashboardWidgetId) {
+    if (dragging && dragging !== target) {
+      persist({
+        ...layout,
+        order: moveWidgetTo(layout.order, dragging, target),
+      });
+    }
+    setDragging(null);
+    setOver(null);
+  }
+
   const sections = useMemo(() => {
     const out: ReactNode[] = [];
-    const done = new Set<string>();
 
     for (const id of layout.order) {
       if (!visible.has(id)) continue;
+      const span =
+        widgetGridSpan(id) === "full" ? "xl:col-span-6" : "xl:col-span-2";
 
-      if (id === "metrics" && !done.has("metrics")) {
-        done.add("metrics");
-        out.push(
-          <div key="metrics" className="space-y-3">
-            <LiveKpiStrip layout={layout} />
-            <DashboardMetricsSection />
-          </div>,
+      let body: ReactNode = null;
+      if (id === "kpis") {
+        body = (
+          <div className="space-y-2">
+            <p className="text-[11px] font-medium text-muted-foreground">
+              Core KPIs
+            </p>
+            <LiveKpiStrip stats={stats} />
+          </div>
         );
+      } else if (id === "charts") {
+        body = <DashboardKpiCharts charts={charts} />;
+      } else if (id === "industry") {
+        body = (
+          <div className="space-y-2">
+            <p className="text-[11px] font-medium text-muted-foreground">
+              {industryPresetLabel(industry)} widgets
+            </p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {industryTiles.map((t) => (
+                <div key={t.label} className="space-y-0.5">
+                  <KpiTile label={t.label} value={t.value} />
+                  {t.missingApi ? (
+                    <p className="px-1 text-[10px] text-amber-700">
+                      No API for this field yet
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      } else if (id === "activity") {
+        body = <WorkspaceActivityFeed />;
+      } else if (id === "meetings") {
+        body = <UpcomingMeetingsCard />;
+      } else if (id === "taskUpdates") {
+        body = <DashboardTaskAttention />;
       }
 
-      if (
-        (id === "charts" || id === "orderByTime") &&
-        !done.has("charts-row") &&
-        (visible.has("charts") || visible.has("orderByTime"))
-      ) {
-        done.add("charts-row");
-        out.push(
-          <div key="charts-row" className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-            {visible.has("charts") ? (
-              <div
-                className={
-                  visible.has("orderByTime") ? "lg:col-span-3" : "lg:col-span-4"
-                }
-              >
-                <DashboardChartRow />
-              </div>
-            ) : null}
-            {visible.has("orderByTime") ? <OrderByTimeCard /> : null}
-          </div>,
-        );
-      }
-
-      if (
-        (id === "meetings" || id === "deals") &&
-        !done.has("mid-row") &&
-        (visible.has("meetings") || visible.has("deals"))
-      ) {
-        done.add("mid-row");
-        out.push(
-          <div key="mid-row" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            {visible.has("meetings") ? <UpcomingMeetingsCard /> : null}
-            {visible.has("deals") ? (
-              <div
-                className={
-                  visible.has("meetings") ? "lg:col-span-2" : "lg:col-span-3"
-                }
-              >
-                <DashboardDealsRow />
-              </div>
-            ) : null}
-          </div>,
-        );
-      }
-
-      if (
-        (id === "customers" || id === "taskUpdates") &&
-        !done.has("bottom-row") &&
-        (visible.has("customers") || visible.has("taskUpdates"))
-      ) {
-        done.add("bottom-row");
-        out.push(
-          <div
-            key="bottom-row"
-            className={cn(
-              "grid grid-cols-1 gap-4",
-              visible.has("customers") && visible.has("taskUpdates")
-                ? "lg:grid-cols-[1fr_420px]"
-                : "",
-            )}
-          >
-            {visible.has("customers") ? (
-              <div className="min-w-0">
-                <NewCustomersTable />
-              </div>
-            ) : null}
-            {visible.has("taskUpdates") ? <TaskUpdateCard /> : null}
-          </div>,
-        );
-      }
+      if (!body) continue;
+      out.push(
+        <DashboardWidgetSlot
+          key={id}
+          id={id}
+          span={span}
+          editing={customizeOpen}
+          dragging={dragging}
+          over={over}
+          onDragStart={setDragging}
+          onDragOver={setOver}
+          onDrop={dropOn}
+          onDragEnd={() => {
+            setDragging(null);
+            setOver(null);
+          }}
+        >
+          {body}
+        </DashboardWidgetSlot>,
+      );
     }
 
     return out;
-  }, [layout, visible]);
+  }, [
+    charts,
+    customizeOpen,
+    dragging,
+    industry,
+    industryTiles,
+    layout,
+    over,
+    stats,
+    visible,
+  ]);
 
   return (
     <div className="flex flex-1 flex-col bg-slate-50">
     <div className="mx-auto flex w-full max-w-[1920px] flex-1 flex-col gap-3 p-4 lg:px-6 2xl:px-8 2xl:py-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <DashboardBreadcrumb />
-        {flash ? (
-          <span className="text-xs text-emerald-700 dark:text-emerald-400">
-            {flash}
-          </span>
-        ) : null}
-      </div>
-
-      <WorkspaceActivityFeed />
-
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-white px-3 py-2">
         <LayoutGrid className="h-4 w-4 text-muted-foreground" />
         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -290,7 +266,7 @@ export function DashboardWorkspace() {
             }
             className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground"
           >
-            {DASHBOARD_OWNERS.map((o) => (
+            {ownerOptions.map((o) => (
               <option key={o} value={o}>
                 {o}
               </option>
@@ -321,6 +297,22 @@ export function DashboardWorkspace() {
         </label>
 
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          {flash ? (
+            <span className="text-xs text-emerald-700 dark:text-emerald-400">
+              {flash}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => {
+              refresh();
+              setFlash("Refreshing dashboard data");
+            }}
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+            Refresh
+          </button>
           <button
             type="button"
             onClick={() => setCustomizeOpen((v) => !v)}
@@ -359,7 +351,7 @@ export function DashboardWorkspace() {
           <button
             type="button"
             onClick={() => {
-              exportDashboardReport(computeDashboardStats(layout.filters));
+              exportDashboardReport(stats);
               setFlash("Dashboard report downloaded");
             }}
             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground"
@@ -371,62 +363,107 @@ export function DashboardWorkspace() {
       </div>
 
       {customizeOpen ? (
-        <div className="rounded-xl border border-border bg-white p-3">
-          <p className="mb-2 text-xs font-semibold text-foreground">
-            Widgets — show / hide / rearrange
+        <div className="space-y-3 rounded-xl border border-violet-200 bg-violet-50/60 px-3 py-2.5">
+          <p className="text-xs font-semibold text-violet-900">
+            Drag widgets on the dashboard
           </p>
-          <ul className="space-y-1.5">
-            {layout.order.map((id) => {
-              const meta = DASHBOARD_WIDGETS.find((w) => w.id === id)!;
-              const hidden = layout.hidden.includes(id);
+          <p className="text-[11px] text-violet-800/80">
+            Grab the handle on a card and drop it on another card to move it
+            up, down, left, or right.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {DASHBOARD_WIDGETS.map((w) => {
+              const hidden = layout.hidden.includes(w.id);
               return (
-                <li
-                  key={id}
-                  className="flex items-center gap-2 rounded-lg border border-border px-2 py-1.5 text-xs"
+                <label
+                  key={w.id}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2 py-1 text-[11px] text-slate-700 ring-1 ring-slate-200"
                 >
                   <input
                     type="checkbox"
                     checked={!hidden}
                     onChange={() => {
                       const hiddenNext = hidden
-                        ? layout.hidden.filter((h) => h !== id)
-                        : [...layout.hidden, id];
+                        ? layout.hidden.filter((h) => h !== w.id)
+                        : [...layout.hidden, w.id];
                       persist({ ...layout, hidden: hiddenNext });
                     }}
+                    className="accent-violet-600"
                   />
-                  <span className="flex-1 text-foreground">{meta.label}</span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      persist({
-                        ...layout,
-                        order: moveWidget(layout.order, id, -1),
-                      })
-                    }
-                    className="rounded px-1.5 py-0.5 text-muted-foreground hover:bg-muted"
-                  >
-                    Up
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      persist({
-                        ...layout,
-                        order: moveWidget(layout.order, id, 1),
-                      })
-                    }
-                    className="rounded px-1.5 py-0.5 text-muted-foreground hover:bg-muted"
-                  >
-                    Down
-                  </button>
-                </li>
+                  {w.label}
+                </label>
               );
             })}
-          </ul>
+          </div>
+
+          <div className="border-t border-violet-200/80 pt-3">
+            <p className="mb-2 text-xs font-semibold text-foreground">
+              Save layouts per role
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={role}
+                onChange={(e) => {
+                  const next = e.target.value as HierarchyLevel;
+                  setRole(next);
+                  saveActiveDashboardRole(next);
+                  setRoleLayouts(listRoleLayouts(next));
+                }}
+                className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground"
+              >
+                {DASHBOARD_ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={layoutName}
+                onChange={(e) => setLayoutName(e.target.value)}
+                placeholder="Layout name"
+                className="min-w-[140px] rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const saved = saveRoleLayout(role, layoutName, layout);
+                  setRoleLayouts(saved);
+                  setFlash(`Saved “${layoutName.trim() || "Untitled"}” for ${role}`);
+                  setLayoutName("");
+                }}
+                className="rounded-lg bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700"
+              >
+                Save for role
+              </button>
+              {roleLayouts.length ? (
+                <select
+                  defaultValue=""
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    if (!name) return;
+                    const next = loadRoleLayout(role, name);
+                    if (next) {
+                      persist(next);
+                      setFlash(`Loaded ${role} layout “${name}”`);
+                    }
+                    e.target.value = "";
+                  }}
+                  className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground"
+                >
+                  <option value="">Load saved…</option>
+                  {roleLayouts.map((row) => (
+                    <option key={row.name} value={row.name}>
+                      {row.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </div>
+          </div>
         </div>
       ) : null}
 
-      {sections}
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-6">{sections}</div>
     </div>
     </div>
   );

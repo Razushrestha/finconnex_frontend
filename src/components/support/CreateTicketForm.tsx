@@ -41,6 +41,11 @@ import {
   elevatedSelectClass,
   elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
+import {
+  createCrmTicket,
+  persistRemoteTicket,
+  tryCrmTicket,
+} from "@/lib/support/api";
 
 interface Props {
   layoutId: string;
@@ -69,7 +74,7 @@ export function CreateTicketForm({ layoutId: _l, redirect: _r }: Props) {
     return Object.keys(next).length === 0;
   }
 
-  function onSave(createAnother: boolean) {
+  async function onSave(createAnother: boolean) {
     if (!validate()) return;
     const gate = requireAction("support.tickets.create");
     if (!gate.ok) {
@@ -120,7 +125,22 @@ export function CreateTicketForm({ layoutId: _l, redirect: _r }: Props) {
         relatedHref: `/support/${ticket.id}`,
       });
     }
-    const created = upsertTicket(ticket);
+    let created = upsertTicket(ticket);
+    const remote = persistRemoteTicket(
+      await tryCrmTicket(() =>
+        createCrmTicket({
+          subject: created.subject,
+          requester: created.requester,
+          relatedAccount: created.relatedAccount,
+          priority: created.priority,
+          status: created.status,
+          category: created.category,
+          assignedTo: created.assignedTo,
+          description: created.description,
+        }),
+      ),
+    );
+    if (remote) created = remote;
     logCreate("support.tickets", actor, created.id, created.ticketId);
     if (createAnother) {
       setSubject("");

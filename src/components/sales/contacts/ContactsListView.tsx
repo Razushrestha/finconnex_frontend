@@ -18,6 +18,14 @@ import {
   type ContactQuickActionKind,
 } from "@/components/sales/contacts/ContactRecordCard";
 import {
+  applyTablePreferenceToColumns,
+  getCrmTablePreference,
+  isEmptyTablePreference,
+  persistCrmTablePreference,
+  tablePreferenceFromColumns,
+  tryCrmTablePreference,
+} from "@/lib/table-preferences/api";
+import {
   ContactCardPanelHost,
   type ContactPanelState,
 } from "@/components/sales/contacts/ContactCardPanelHost";
@@ -165,6 +173,18 @@ export function ContactsListView({
   useEffect(() => {
     if (groupsProp) setGroups(groupsProp);
   }, [groupsProp]);
+
+  useEffect(() => {
+    void tryCrmTablePreference(() => getCrmTablePreference("contacts")).then(
+      (pref) => {
+        if (pref && !isEmptyTablePreference(pref)) {
+          setManageColumns(
+            applyTablePreferenceToColumns(DEFAULT_CONTACT_COLUMNS, pref),
+          );
+        }
+      },
+    );
+  }, []);
 
   useEffect(() => {
     return onRulesChange(() => {
@@ -370,6 +390,10 @@ export function ContactsListView({
         onClose={() => setManageColumnsOpen(false)}
         onSave={(cols) => {
           setManageColumns(cols);
+          persistCrmTablePreference(
+            "contacts",
+            tablePreferenceFromColumns("contacts", cols),
+          );
           setManageColumnsOpen(false);
         }}
       />

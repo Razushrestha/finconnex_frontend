@@ -364,11 +364,42 @@ export async function createCrmDeal(input: {
   });
 }
 
+function leadsToKanban(leads: CrmLead[]): CrmLeadKanbanColumn[] {
+  const byStatus = new Map<string, CrmLead[]>();
+  for (const lead of leads) {
+    const status = String(lead.status || "NEW");
+    byStatus.set(status, [...(byStatus.get(status) ?? []), lead]);
+  }
+  return [...byStatus.entries()].map(([status, records]) => ({
+    status,
+    records,
+    total: records.length,
+  }));
+}
+
 export async function refreshCrmLeadsBoard(): Promise<boolean> {
   try {
     const columns = await fetchLeadKanban();
-    if (!columns) return false;
-    saveLeadColumns(kanbanColumnsToBoard(columns));
+    if (columns) {
+      const empty = columns.every((col) => !(col.records ?? []).length);
+      if (!empty) {
+        saveLeadColumns(kanbanColumnsToBoard(columns));
+        emitRulesChange("all");
+        return true;
+      }
+      const listed = await fetchLeadList({ limit: 100 });
+      saveLeadColumns(
+        kanbanColumnsToBoard(
+          listed.length ? leadsToKanban(listed) : columns,
+        ),
+      );
+      emitRulesChange("all");
+      return true;
+    }
+    const session = await resolveSession();
+    if (!session) return false;
+    const listed = await fetchLeadList({ limit: 100 });
+    saveLeadColumns(kanbanColumnsToBoard(leadsToKanban(listed)));
     emitRulesChange("all");
     return true;
   } catch {

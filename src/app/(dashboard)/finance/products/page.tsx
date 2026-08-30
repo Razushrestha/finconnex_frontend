@@ -2,15 +2,25 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Package } from "lucide-react";
+import { Plus, Search, Package, Trash2 } from "lucide-react";
 import {
   PRODUCT_STATUSES,
   financeProducts as seed,
   listProducts,
   upsertProduct,
+  deleteProduct,
   type FinanceProduct,
   type ProductStatus,
 } from "@/lib/finance/products/types";
+import {
+  deleteCrmProduct,
+  isCrmProductId,
+  persistRemoteProduct,
+  toUpdateProductBody,
+  tryCrmProduct,
+  updateCrmProduct,
+} from "@/lib/finance/products/api";
+import { useCrmProducts } from "@/lib/finance/products/use-crm-products";
 import { formatAUD } from "@/lib/finance/shared";
 import { PRODUCT_STATUS_STYLE } from "@/lib/finance/statusStyles";
 import { FinanceOpsShell } from "@/components/finance/FinanceOpsShell";
@@ -18,6 +28,7 @@ import { cn } from "@/lib/utils";
 
 export default function ProductsPage() {
   const router = useRouter();
+  const crm = useCrmProducts();
   const [rows, setRows] = useState<FinanceProduct[]>(seed);
   const [statusTab, setStatusTab] = useState<ProductStatus | "All">("All");
   const [search, setSearch] = useState("");
@@ -27,8 +38,9 @@ export default function ProductsPage() {
   }
 
   useEffect(() => {
+    if (crm.loading) return;
     refresh();
-  }, []);
+  }, [crm.source, crm.loading]);
 
   const filtered = useMemo(() => {
     let data = rows;
@@ -46,16 +58,54 @@ export default function ProductsPage() {
   }, [rows, statusTab, search]);
 
   function toggleStatus(p: FinanceProduct) {
-    upsertProduct({
+    const nextStatus = p.status === "Active" ? "Inactive" : "Active";
+    const updated: FinanceProduct = {
       ...p,
-      status: p.status === "Active" ? "Inactive" : "Active",
-    });
+      status: nextStatus,
+    };
+    upsertProduct(updated);
     refresh();
+
+    if (isCrmProductId(p.id)) {
+      void tryCrmProduct(() =>
+        updateCrmProduct(p.id, toUpdateProductBody({ status: nextStatus })),
+      ).then((remote) => {
+        if (remote) persistRemoteProduct(remote);
+      });
+    }
+  }
+
+  function onDeleteItem(e: React.MouseEvent, p: FinanceProduct) {
+    e.stopPropagation();
+    if (!window.confirm(`Delete ${p.name}?`)) return;
+    deleteProduct(p.id);
+    refresh();
+    if (isCrmProductId(p.id)) {
+      void tryCrmProduct(() => deleteCrmProduct(p.id));
+    }
   }
 
   return (
     <FinanceOpsShell
-      title="Items / Services"
+      title={
+        <span className="inline-flex items-center gap-2">
+          Items / Services
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+              crm.source === "api"
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-slate-100 text-slate-500",
+            )}
+          >
+            {crm.source === "api"
+              ? "Live CRM"
+              : crm.loading
+                ? "Connecting…"
+                : "Demo"}
+          </span>
+        </span>
+      }
       section="§20.5"
       sectionIcon={Package}
       actions={
@@ -122,6 +172,7 @@ export default function ProductsPage() {
                 <th className="px-3 py-2.5">Tax</th>
                 <th className="px-3 py-2.5">Status</th>
                 <th className="px-4 py-2.5 text-right">Price</th>
+                <th className="px-3 py-2.5 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -153,11 +204,21 @@ export default function ProductsPage() {
                   <td className="px-4 py-3 text-right font-semibold text-slate-900">
                     {formatAUD(r.unitPrice)}
                   </td>
+                  <td className="px-3 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={(e) => onDeleteItem(e, r)}
+                      className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-rose-600"
+                      title="Delete item"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </td>
                 </tr>
               ))}
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-slate-400">
+                  <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
                     No catalogue items
                   </td>
                 </tr>

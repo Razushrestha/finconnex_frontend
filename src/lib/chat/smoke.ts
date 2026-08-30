@@ -168,6 +168,20 @@ export function smokeChatWiring() {
   if (!page.includes("createCrmChatMessage")) {
     fail("team-chat page does not call createCrmChatMessage");
   }
+  if (!page.includes("createCrmConversation")) {
+    fail("team-chat page does not call createCrmConversation");
+  }
+  if (!page.includes("addCrmMessageReaction")) {
+    fail("team-chat page does not call addCrmMessageReaction");
+  }
+
+  const hook = readSrc("src/lib/chat/use-crm-chat.ts");
+  if (!hook.includes('setSource("api")')) {
+    fail("chat hook must mark a successful empty list as Live CRM");
+  }
+  if (!hook.includes("markCrmMessageRead")) {
+    fail("chat hook does not mark the latest message read");
+  }
 
   const conv = normalizeCrmConversation(
     {

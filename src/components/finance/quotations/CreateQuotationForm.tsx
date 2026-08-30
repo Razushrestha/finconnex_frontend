@@ -11,6 +11,11 @@ import {
   type QuotationStatus,
 } from "@/lib/finance/quotations/types";
 import {
+  createCrmQuote,
+  persistRemoteQuote,
+  toCreateQuoteBody,
+} from "@/lib/finance/quotations/api";
+import {
   FINANCE_CLIENTS,
   FINANCE_DEALS,
   FINANCE_OWNERS,
@@ -48,6 +53,8 @@ export function CreateQuotationForm({ layoutId: _l, redirect: _r }: Props) {
     newLineItem({ name: "Home loan packaging", unitPrice: 2200, taxRate: 10 }),
   ]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const client =
     FINANCE_CLIENTS.find((c) => c.id === clientId) ?? FINANCE_CLIENTS[0];
 
@@ -61,42 +68,75 @@ export function CreateQuotationForm({ layoutId: _l, redirect: _r }: Props) {
     return Object.keys(next).length === 0;
   }
 
-  function onSave(createAnother: boolean) {
+  async function onSave(createAnother: boolean) {
     if (!validate()) return;
-    const ids = nextQuotationIds();
-    const created = upsertQuotation(
-      appendQuotationAudit(
-        {
-          id: ids.id,
-          quotationId: ids.quotationId,
-          title: title.trim(),
-          status,
-          clientId,
-          clientName: client.name,
-          contactName: client.contact,
-          contactEmail: client.email,
-          dealName,
+    setSaving(true);
+    setSaveError(null);
+    const draft = {
+      title: title.trim(),
+      clientName: client.name,
+      clientId,
+      contactName: client.contact,
+      contactEmail: client.email,
+      dealName: dealName || undefined,
+      notes: notes.trim() || undefined,
+      status,
+      owner,
+      validUntil: validUntil.trim(),
+      lineItems,
+    };
+    let created;
+    try {
+      created = persistRemoteQuote(
+        await createCrmQuote(toCreateQuoteBody(draft)),
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Create failed";
+      if (!/sign in/i.test(message)) {
+        setSaveError(message);
+        setSaving(false);
+        return;
+      }
+      created = null;
+    }
+    if (!created) {
+      const ids = nextQuotationIds();
+      created = upsertQuotation(
+        appendQuotationAudit(
+          {
+            id: ids.id,
+            quotationId: ids.quotationId,
+            title: draft.title,
+            status,
+            clientId,
+            clientName: draft.clientName,
+            contactName: draft.contactName,
+            contactEmail: draft.contactEmail,
+            dealName,
+            owner,
+            validUntil: draft.validUntil,
+            notes: draft.notes,
+            lineItems,
+            subtotal: 0,
+            tax: 0,
+            total: 0,
+            signatureStatus: "Not sent",
+            createdBy: owner,
+            createdAt: formatFinanceDate(),
+            audit: [],
+          },
+          "Created",
           owner,
-          validUntil: validUntil.trim(),
-          notes: notes.trim() || undefined,
-          lineItems,
-          subtotal: 0,
-          tax: 0,
-          total: 0,
-          signatureStatus: "Not sent",
-          createdBy: owner,
-          createdAt: formatFinanceDate(),
-          audit: [],
-        },
-        "Created",
-        owner,
-      ),
-    );
+        ),
+      );
+    }
+    setSaving(false);
     if (createAnother) {
       setTitle("");
       setNotes("");
       setLineItems([newLineItem()]);
       setErrors({});
+      setSaveError(null);
       return;
     }
     router.push(`/finance/quotations/${created.id}`);
@@ -116,6 +156,12 @@ export function CreateQuotationForm({ layoutId: _l, redirect: _r }: Props) {
       saveLabel="Save quotation"
       onSave={onSave}
     >
+      {saveError ? (
+        <p className="sm:col-span-2 text-[12px] text-rose-600">{saveError}</p>
+      ) : null}
+      {saving ? (
+        <p className="sm:col-span-2 text-[12px] text-slate-500">Saving…</p>
+      ) : null}
       <Field label="Title" required error={errors.title} className="sm:col-span-2">
         <InputShell icon={FileText} error={!!errors.title}>
           <input

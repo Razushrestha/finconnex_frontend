@@ -13,6 +13,12 @@ import {
   type PaymentStatus,
 } from "@/lib/finance/payments/types";
 import {
+  createCrmPayment,
+  persistRemotePayment,
+  toCreatePaymentBody,
+  tryCrmPayment,
+} from "@/lib/finance/payments/api";
+import {
   applyPaymentToInvoice,
   appendInvoiceAudit,
   getInvoiceById,
@@ -121,28 +127,41 @@ export function CreatePaymentForm({ layoutId: _l, redirect: _r }: Props) {
     }
 
     const ids = nextPaymentIds();
-    const created = upsertPayment(
-      appendPaymentAudit(
-        {
-          id: ids.id,
-          paymentId: ids.paymentId,
-          invoiceId: invoice.id,
-          invoiceRef: invoice.invoiceId,
-          clientName: invoice.clientName,
-          amount: n,
-          method,
-          status,
-          reference: reference.trim() || undefined,
-          notes: notes.trim() || undefined,
-          receivedAt: formatFinanceDate(),
-          recordedBy,
-          createdAt: formatFinanceDate(),
-          audit: [],
-        },
-        "Recorded",
-        recordedBy,
-      ),
-    );
+    const payload = toCreatePaymentBody({
+      invoiceId: invoice.id,
+      amount: n,
+      method,
+      status,
+      reference,
+      notes,
+      recordedBy,
+    });
+
+    const remote = await tryCrmPayment(() => createCrmPayment(payload));
+    const created = remote
+      ? (persistRemotePayment(remote) ?? remote)
+      : upsertPayment(
+          appendPaymentAudit(
+            {
+              id: ids.id,
+              paymentId: ids.paymentId,
+              invoiceId: invoice.id,
+              invoiceRef: invoice.invoiceId,
+              clientName: invoice.clientName,
+              amount: n,
+              method,
+              status,
+              reference: reference.trim() || undefined,
+              notes: notes.trim() || undefined,
+              receivedAt: formatFinanceDate(),
+              recordedBy,
+              createdAt: formatFinanceDate(),
+              audit: [],
+            },
+            "Recorded",
+            recordedBy,
+          ),
+        );
 
     if (status === "Completed") {
       const paid = applyPaymentToInvoice(invoice, n);

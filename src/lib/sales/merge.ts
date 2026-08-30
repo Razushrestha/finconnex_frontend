@@ -117,7 +117,16 @@ export function mergeContacts(input: {
   });
   if (!gate.ok) return { ok: false, message: gate.message };
 
-  deleteContact(s.id);
+  deleteContact(s.id, { skipCrm: true });
+
+  void import("@/lib/contacts/api").then(({ mergeCrmContacts, tryCrmContact }) => {
+    void tryCrmContact(() =>
+      mergeCrmContacts({
+        survivorId: input.primaryId,
+        sourceId: input.secondaryId,
+      }),
+    );
+  });
 
   const groups = listContactGroups().map((g) => ({
     ...g,

@@ -152,8 +152,14 @@ export async function readCrmTokens(): Promise<{
 }> {
   const store = await cookies();
   return {
-    accessToken: store.get(CRM_ACCESS_COOKIE)?.value ?? null,
-    refreshToken: store.get(CRM_REFRESH_COOKIE)?.value ?? null,
+    accessToken:
+      store.get(CRM_ACCESS_COOKIE)?.value ??
+      process.env.CRM_ACCESS_TOKEN?.trim() ??
+      null,
+    refreshToken:
+      store.get(CRM_REFRESH_COOKIE)?.value ??
+      process.env.CRM_REFRESH_TOKEN?.trim() ??
+      null,
   };
 }
 
@@ -247,10 +253,49 @@ async function crmFetch<T>(
 
   const data = unwrap<T>(body as Envelope<T>);
   if (data == null && res.status !== 204) {
+    if (res.status >= 200 && res.status < 300) {
+      return { data: {} as T, accessToken, refreshToken };
+    }
     throw new CrmAuthError(502, "CRM returned an empty response");
   }
 
   return { data: data as T, accessToken, refreshToken };
+}
+
+export async function crmForgotPassword(email: string): Promise<void> {
+  await crmFetch<unknown>("/auth/forgot-password", {
+    method: "POST",
+    body: { email },
+  });
+}
+
+export async function crmResetPassword(input: {
+  token: string;
+  password: string;
+  confirmPassword?: string;
+}): Promise<void> {
+  await crmFetch<unknown>("/auth/reset-password", {
+    method: "POST",
+    body: {
+      token: input.token,
+      password: input.password,
+      confirmPassword: input.confirmPassword ?? input.password,
+    },
+  });
+}
+
+export async function crmResendEmailVerification(email: string): Promise<void> {
+  await crmFetch<unknown>("/auth/email-verification/resend", {
+    method: "POST",
+    body: { email },
+  });
+}
+
+export async function crmVerifyEmail(token: string): Promise<void> {
+  await crmFetch<unknown>("/auth/email-verification/verify", {
+    method: "POST",
+    body: { token },
+  });
 }
 
 export async function crmLogin(
@@ -360,6 +405,25 @@ export async function crmSelectWorkspace(
   return result;
 }
 
+function asWorkspaceList(raw: unknown): CrmWorkspace[] {
+  if (Array.isArray(raw)) {
+    if (
+      raw.length === 2 &&
+      Array.isArray(raw[0]) &&
+      (typeof raw[1] === "number" || raw[1] == null)
+    ) {
+      return raw[0] as CrmWorkspace[];
+    }
+    return raw as CrmWorkspace[];
+  }
+  if (raw && typeof raw === "object") {
+    const rec = raw as { items?: CrmWorkspace[]; workspaces?: CrmWorkspace[] };
+    if (Array.isArray(rec.items)) return rec.items;
+    if (Array.isArray(rec.workspaces)) return rec.workspaces;
+  }
+  return [];
+}
+
 export async function crmListMyWorkspaces(
   accessToken: string,
   refreshToken?: string | null,
@@ -368,13 +432,42 @@ export async function crmListMyWorkspaces(
     "/workspaces/mine",
     { accessToken, refreshToken },
   );
-  const raw = result.data;
-  const list = Array.isArray(raw)
-    ? raw
-    : Array.isArray(raw?.items)
-      ? raw.items
-      : [];
-  return { ...result, workspaces: list };
+  return { ...result, workspaces: asWorkspaceList(result.data) };
+}
+
+export async function crmCreateWorkspace(
+  accessToken: string,
+  refreshToken?: string | null,
+  input: { name?: string; slug?: string } = {},
+) {
+  const slug =
+    input.slug?.trim() ||
+    `workspace-${Date.now().toString(36)}`;
+  const result = await crmFetch<CrmWorkspace>("/workspaces", {
+    method: "POST",
+    body: {
+      name: input.name?.trim() || "FinConnex",
+      slug,
+    },
+    accessToken,
+    refreshToken,
+  });
+  const created = result.data;
+  if (!created?.id) {
+    throw new CrmAuthError(502, "Workspace create did not return an id");
+  }
+  return { ...result, workspace: created };
+}
+
+export async function crmListAdminWorkspaces(
+  accessToken: string,
+  refreshToken?: string | null,
+) {
+  const result = await crmFetch<unknown>("/admin/workspaces?page=1&limit=50", {
+    accessToken,
+    refreshToken,
+  });
+  return { ...result, workspaces: asWorkspaceList(result.data) };
 }
 
 export async function activateWorkspace(
@@ -390,7 +483,29 @@ export async function activateWorkspace(
   const listed = await crmListMyWorkspaces(accessToken, refreshToken);
   accessToken = listed.accessToken ?? accessToken;
   refreshToken = listed.refreshToken ?? refreshToken;
-  const workspaces = listed.workspaces;
+  let workspaces = listed.workspaces;
+
+  if (!workspaces.length) {
+    try {
+      const admin = await crmListAdminWorkspaces(accessToken, refreshToken);
+      accessToken = admin.accessToken ?? accessToken;
+      refreshToken = admin.refreshToken ?? refreshToken;
+      workspaces = admin.workspaces;
+    } catch {
+      /* non-admin or route unavailable */
+    }
+  }
+
+  if (!workspaces.length) {
+    try {
+      const created = await crmCreateWorkspace(accessToken, refreshToken);
+      accessToken = created.accessToken ?? accessToken;
+      refreshToken = created.refreshToken ?? refreshToken;
+      workspaces = [created.workspace];
+    } catch {
+      /* create route unavailable */
+    }
+  }
 
   const envId =
     preferredId?.trim() ||

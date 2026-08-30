@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -19,12 +19,25 @@ import {
   Download,
 } from "lucide-react";
 import {
-  reminderColumns as initialColumns,
   type Reminder,
   type ReminderColumn,
   type ReminderStatus,
   type NotificationMethod,
 } from "@/lib/reminders/types";
+import { listReminderColumns, saveReminders } from "@/lib/reminders/store";
+import {
+  completeCrmReminder,
+  dismissCrmReminder,
+  updateCrmReminder,
+  isCrmReminderId,
+  persistRemoteReminder,
+  snoozeCrmReminder,
+  tryCrmReminder,
+} from "@/lib/reminders/api";
+import {
+  useCrmReminders,
+  type ReminderListScope,
+} from "@/lib/reminders/use-crm-reminders";
 import { exportRemindersCsv } from "@/lib/activities/export";
 import {
   CardInitialsAvatar,
@@ -37,6 +50,7 @@ import { dropTargetActive, cardSubject } from "@/lib/motion";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 
 type ViewMode = "kanban" | "list";
+type ListTab = "all" | "pending" | "upcoming" | "overdue" | "mine";
 
 const STATUS_META: Record<
   ReminderStatus,
@@ -78,12 +92,26 @@ const METHOD_ICON: Record<NotificationMethod, React.ElementType> = {
 export default function RemindersPage() {
   const router = useRouter();
   const [view, setView] = useState<ViewMode>("kanban");
-  const [columns, setColumns] = useState<ReminderColumn[]>(initialColumns);
-  const [tab, setTab] = useState<"all" | "pending">("all");
+  const [tab, setTab] = useState<ListTab>("all");
+  const scope: ReminderListScope =
+    tab === "upcoming"
+      ? "upcoming"
+      : tab === "overdue"
+        ? "overdue"
+        : tab === "mine"
+          ? "my"
+          : "all";
+  const crm = useCrmReminders(scope);
+  const [columns, setColumns] = useState<ReminderColumn[]>([]);
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (crm.loading) return;
+    setColumns(listReminderColumns());
+  }, [crm.source, crm.loading, scope]);
 
   const visibleColumns = useMemo(() => {
     if (tab === "pending") {
@@ -114,6 +142,15 @@ export default function RemindersPage() {
 
   const pendingCount = columns.find((c) => c.title === "Pending")?.count ?? 0;
 
+  function persistColumns(next: ReminderColumn[]) {
+    saveReminders(
+      next.flatMap((col) =>
+        col.reminders.map((r) => ({ ...r, status: col.title })),
+      ),
+    );
+    setColumns(next);
+  }
+
   function moveReminder(id: string, status: ReminderStatus) {
     setColumns((prev) => {
       let found: Reminder | undefined;
@@ -128,11 +165,36 @@ export default function RemindersPage() {
         };
       });
       if (!found) return prev;
-      return stripped.map((col) => {
+      const next = stripped.map((col) => {
         if (col.title !== status) return col;
         const reminders = [{ ...found!, status }, ...col.reminders];
         return { ...col, reminders, count: reminders.length };
       });
+      saveReminders(
+        next.flatMap((col) =>
+          col.reminders.map((r) => ({ ...r, status: col.title })),
+        ),
+      );
+      if (isCrmReminderId(id)) {
+        void (async () => {
+          if (status === "Snoozed") {
+            persistRemoteReminder(await tryCrmReminder(() => snoozeCrmReminder(id)));
+          } else if (status === "Triggered") {
+            persistRemoteReminder(
+              await tryCrmReminder(() => completeCrmReminder(id)),
+            );
+          } else if (status === "Dismissed") {
+            await tryCrmReminder(() => dismissCrmReminder(id));
+          } else {
+            persistRemoteReminder(
+              await tryCrmReminder(() =>
+                updateCrmReminder(id, { status: "PENDING" }),
+              ),
+            );
+          }
+        })();
+      }
+      return next;
     });
   }
 
@@ -160,8 +222,13 @@ export default function RemindersPage() {
       return;
     }
     const remove = new Set(selectedIds);
-    setColumns((prev) =>
-      prev.map((col) => {
+    for (const id of selectedIds) {
+      if (isCrmReminderId(id)) {
+        void tryCrmReminder(() => dismissCrmReminder(id));
+      }
+    }
+    persistColumns(
+      columns.map((col) => {
         const reminders = col.reminders.filter((r) => !remove.has(r.id));
         return { ...col, reminders, count: reminders.length };
       }),
@@ -181,6 +248,23 @@ export default function RemindersPage() {
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Reminders
             </h1>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                crm.source === "api"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-slate-100 text-slate-500",
+              )}
+            >
+              {crm.source === "api"
+                ? "Live CRM"
+                : crm.loading
+                  ? "Connecting…"
+                  : "Demo"}
+            </span>
+            {crm.error && crm.source === "demo" ? (
+              <span className="text-[10px] text-slate-500">{crm.error}</span>
+            ) : null}
           </div>
 
           <div className="flex items-center gap-2">
@@ -225,6 +309,24 @@ export default function RemindersPage() {
                 onClick={() => setTab("pending")}
                 label="Pending"
                 count={pendingCount}
+              />
+              <TabBtn
+                active={tab === "mine"}
+                onClick={() => setTab("mine")}
+                label="Mine"
+                count={tab === "mine" ? allReminders.length : 0}
+              />
+              <TabBtn
+                active={tab === "upcoming"}
+                onClick={() => setTab("upcoming")}
+                label="Upcoming"
+                count={tab === "upcoming" ? allReminders.length : 0}
+              />
+              <TabBtn
+                active={tab === "overdue"}
+                onClick={() => setTab("overdue")}
+                label="Overdue"
+                count={tab === "overdue" ? allReminders.length : 0}
               />
             </div>
 

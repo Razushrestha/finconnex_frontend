@@ -30,8 +30,15 @@ import {
   nextReportIds,
   upsertReport,
   type ReportSchedule,
+  type ReportStatus,
   type ReportType,
+  type SavedReport,
 } from "@/lib/reports/types";
+import {
+  createCrmReport,
+  persistRemoteReport,
+  toCreateReportBody,
+} from "@/lib/reports/api";
 import {
   InputShell,
   elevatedInputClass,
@@ -89,6 +96,8 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
   const [schedule, setSchedule] = useState<ReportSchedule>("None");
   const [createdBy, setCreatedBy] = useState<string>(REPORT_OWNERS[0]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const preview = buildPreviewRows(type);
 
@@ -105,40 +114,72 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
     return Object.keys(next).length === 0;
   }
 
-  function onSave(createAnother: boolean) {
+  async function onSave(createAnother: boolean) {
     if (!validate()) return;
-    const ids = nextReportIds();
-    const status = schedule === "None" ? "Ready" : "Scheduled";
-    let created = upsertReport(
-      appendReportAudit(
-        {
-          id: ids.id,
-          reportId: ids.reportId,
-          name: name.trim(),
-          type,
-          status,
-          dataSource,
-          dateRange,
-          customFrom: dateRange === "Custom" ? customFrom : undefined,
-          customTo: dateRange === "Custom" ? customTo : undefined,
-          filters: filters.trim() || undefined,
-          groupBy: groupBy || undefined,
-          sortBy: sortBy || undefined,
-          schedule,
+    setSaving(true);
+    setSaveError(null);
+    const status: ReportStatus = schedule === "None" ? "Ready" : "Scheduled";
+    const draft = {
+      name: name.trim(),
+      type,
+      status,
+      dataSource,
+      dateRange,
+      customFrom: dateRange === "Custom" ? customFrom : undefined,
+      customTo: dateRange === "Custom" ? customTo : undefined,
+      filters: filters.trim() || undefined,
+      groupBy: groupBy || undefined,
+      sortBy: sortBy || undefined,
+      schedule,
+    };
+    let created: SavedReport | null = null;
+    try {
+      created = persistRemoteReport(
+        await createCrmReport(toCreateReportBody(draft)),
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Create failed";
+      if (!/sign in/i.test(message)) {
+        setSaveError(message);
+        setSaving(false);
+        return;
+      }
+      created = null;
+    }
+    if (!created) {
+      const ids = nextReportIds();
+      created = upsertReport(
+        appendReportAudit(
+          {
+            id: ids.id,
+            reportId: ids.reportId,
+            name: draft.name,
+            type,
+            status,
+            dataSource,
+            dateRange,
+            customFrom: draft.customFrom,
+            customTo: draft.customTo,
+            filters: draft.filters,
+            groupBy: draft.groupBy,
+            sortBy: draft.sortBy,
+            schedule,
+            createdBy,
+            createdAt: formatReportDate(),
+            previewRows: buildPreviewRows(type),
+            audit: [],
+          },
+          "Created",
           createdBy,
-          createdAt: formatReportDate(),
-          previewRows: buildPreviewRows(type),
-          audit: [],
-        },
-        "Created",
-        createdBy,
-      ),
-    );
+        ),
+      );
+    }
     if (schedule !== "None") {
       created = upsertReport(
         appendReportAudit(created, `Scheduled ${schedule}`, createdBy),
       );
     }
+    setSaving(false);
     if (createAnother) {
       setName("");
       setFilters("");
@@ -170,6 +211,9 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               New report
             </h1>
+            {saveError ? (
+              <p className="text-[11px] font-medium text-rose-600">{saveError}</p>
+            ) : null}
           </div>
           <div className="flex items-center gap-1.5">
             <button
@@ -181,17 +225,19 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
             </button>
             <button
               type="button"
-              onClick={() => onSave(true)}
-              className="inline-flex h-8 items-center rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-semibold text-violet-700"
+              disabled={saving}
+              onClick={() => void onSave(true)}
+              className="inline-flex h-8 items-center rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-semibold text-violet-700 disabled:opacity-50"
             >
               Save &amp; New
             </button>
             <button
               type="button"
-              onClick={() => onSave(false)}
-              className="inline-flex h-8 items-center rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-sm shadow-violet-600/20"
+              disabled={saving}
+              onClick={() => void onSave(false)}
+              className="inline-flex h-8 items-center rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-sm shadow-violet-600/20 disabled:opacity-50"
             >
-              Create report
+              {saving ? "Saving…" : "Create report"}
             </button>
           </div>
         </div>

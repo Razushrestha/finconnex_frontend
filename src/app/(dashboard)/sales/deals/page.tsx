@@ -36,6 +36,8 @@ import {
   deleteDeals,
   updateDealOwners,
 } from "@/lib/deals/store";
+import { useCrmDeals } from "@/lib/deals/use-crm-deals";
+import { bulkCrmDeals, tryCrmDeal } from "@/lib/deals/api";
 import { emitRulesChange } from "@/lib/rules/storage";
 import {
   applyDealImport,
@@ -94,6 +96,7 @@ const DEAL_FIELDS: KanbanField[] = [
 ];
 
 export default function DealsPage() {
+  const crm = useCrmDeals();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [filters, setFilters] = useState<DealFilters>(EMPTY_DEAL_FILTERS);
@@ -132,9 +135,9 @@ export default function DealsPage() {
     function refresh() {
       setAllStages(listDealPipelines());
     }
-    refresh();
+    if (!crm.loading) refresh();
     return onRulesChange(refresh);
-  }, []);
+  }, [crm.source, crm.loading]);
 
   useEffect(() => {
     if (!bulkFlash) return;
@@ -199,6 +202,9 @@ export default function DealsPage() {
   function deleteSelected() {
     if (!selectedIds.length) return;
     if (!window.confirm(`Delete ${selectedIds.length} deal(s)?`)) return;
+    void tryCrmDeal(() =>
+      bulkCrmDeals({ ids: selectedIds, operation: "DELETE" }),
+    );
     const n = deleteDeals(selectedIds);
     emitRulesChange("all");
     setSelectedIds([]);
@@ -358,6 +364,30 @@ export default function DealsPage() {
   return (
     <div className={BOARD_PAGE}>
       <FocusHighlight />
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            crm.source === "api"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-slate-100 text-slate-500",
+          )}
+        >
+          {crm.source === "api"
+            ? "Live CRM"
+            : crm.loading
+              ? "Connecting…"
+              : "Demo"}
+        </span>
+        {crm.forecast && crm.source === "api" ? (
+          <span className="text-[10px] text-slate-500">
+            Forecast expected {crm.forecast.expected} · actual {crm.forecast.actual}
+          </span>
+        ) : null}
+        {crm.error && crm.source === "demo" ? (
+          <span className="text-[10px] text-slate-500">{crm.error}</span>
+        ) : null}
+      </div>
       <EntityHeader
         entityLabel="Deal"
         createRoute="/sales/deals/create"

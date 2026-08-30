@@ -25,6 +25,13 @@ export const ESTIMATE_STATUSES: EstimateStatus[] = [
   "Converted",
 ];
 
+export interface EstimateAttachment {
+  id: string;
+  name: string;
+  sizeLabel?: string;
+  url?: string;
+}
+
 export interface Estimate {
   id: string;
   estimateId: string;
@@ -43,6 +50,8 @@ export interface Estimate {
   tax: number;
   total: number;
   quotationId?: string;
+  publicLink?: string;
+  attachments?: EstimateAttachment[];
   createdBy: string;
   createdAt: string;
   sentAt?: string;
@@ -252,6 +261,20 @@ export function nextEstimateIds() {
     .filter((n) => !Number.isNaN(n));
   const n = (nums.length ? Math.max(...nums) : 3000) + 1;
   return { id: `est-${Date.now()}`, estimateId: `EST-${n}` };
+}
+
+function cloneEstimate(row: Estimate): Estimate {
+  return {
+    ...row,
+    lineItems: row.lineItems.map((l) => ({ ...l })),
+    attachments: [...(row.attachments ?? [])],
+    audit: [...(row.audit ?? [])],
+  };
+}
+
+/** Replace the session store with live CRM rows (empty list is a valid live result). */
+export function replaceCrmEstimates(remote: Estimate[]) {
+  writeStore(remote.map(cloneEstimate));
 }
 
 export function appendEstimateAudit(

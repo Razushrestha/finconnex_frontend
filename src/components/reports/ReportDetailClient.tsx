@@ -45,6 +45,18 @@ import {
   type ReportType,
   type SavedReport,
 } from "@/lib/reports/types";
+import {
+  deleteCrmReport,
+  exportCrmReport,
+  getCrmReport,
+  isCrmReportId,
+  persistRemoteReport,
+  runCrmReport,
+  saveCrmReportAsTemplate,
+  toCreateReportBody,
+  tryCrmReport,
+  updateCrmReport,
+} from "@/lib/reports/api";
 import { cn } from "@/lib/utils";
 import {
   InputShell,
@@ -64,6 +76,8 @@ export function ReportDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const [row, setRow] = useState<SavedReport | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<"results" | "edit" | "activity">("results");
   const [dirty, setDirty] = useState(false);
   const [shareTarget, setShareTarget] = useState("Managers");
@@ -83,9 +97,30 @@ export function ReportDetailClient({ id }: { id: string }) {
   const [createdBy, setCreatedBy] = useState("");
 
   useEffect(() => {
-    const r = getReportById(id) ?? null;
-    setRow(r);
-    if (r) hydrate(r);
+    const local = getReportById(id) ?? null;
+    setRow(local);
+    if (local) hydrate(local);
+    let cancelled = false;
+    void (async () => {
+      if (!isCrmReportId(id)) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const remote = await getCrmReport(id);
+        if (cancelled || !remote) return;
+        persistRemoteReport(remote);
+        setRow(remote);
+        hydrate(remote);
+      } catch {
+        /* keep local overlay */
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   function hydrate(r: SavedReport) {
@@ -117,26 +152,70 @@ export function ReportDetailClient({ id }: { id: string }) {
   }
 
   function run() {
-    if (!row) return;
-    let next = appendReportAudit(
-      { ...row, status: "Running" },
-      "Run started",
-      row.createdBy,
-    );
-    save(next, "Running…");
-    window.setTimeout(() => {
-      next = appendReportAudit(
-        {
-          ...next,
-          status: next.schedule === "None" ? "Ready" : "Scheduled",
-          lastRunAt: formatReportAt(),
-          previewRows: buildPreviewRows(next.type),
-        },
-        "Run completed",
-        "System",
+    if (!row || busy) return;
+    void (async () => {
+      setBusy(true);
+      save(
+        appendReportAudit(
+          { ...row, status: "Running" },
+          "Run started",
+          row.createdBy,
+        ),
+        "Running…",
       );
-      save(next, "Run completed");
-    }, 700);
+      try {
+        const remote = isCrmReportId(row.id)
+          ? await runCrmReport(row.id)
+          : null;
+        if (remote) {
+          persistRemoteReport(remote);
+          save(
+            appendReportAudit(remote, "Run completed", "System"),
+            "Run completed",
+          );
+          return;
+        }
+        save(
+          appendReportAudit(
+            {
+              ...row,
+              status: row.schedule === "None" ? "Ready" : "Scheduled",
+              lastRunAt: formatReportAt(),
+              previewRows: buildPreviewRows(row.type),
+            },
+            "Run completed",
+            "System",
+          ),
+          "Run completed",
+        );
+      } catch (err) {
+        flash(err instanceof Error ? err.message : "Run failed");
+        save({ ...row, status: row.status === "Running" ? "Ready" : row.status });
+      } finally {
+        setBusy(false);
+      }
+    })();
+  }
+
+  async function exportViaCrm(format: string, fallback: () => void, label: string) {
+    if (!row) return;
+    if (isCrmReportId(row.id)) {
+      try {
+        const blob = await exportCrmReport(row.id, format);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${row.reportId}.${format === "excel" ? "xls" : format}`;
+        a.click();
+        URL.revokeObjectURL(url);
+        save(appendReportAudit(row, `Exported ${label}`, row.createdBy), `Exported ${label}`);
+        return;
+      } catch {
+        /* fall back to local preview export */
+      }
+    }
+    fallback();
+    save(appendReportAudit(row, `Exported ${label}`, row.createdBy), `Exported ${label}`);
   }
 
   function saveEdits() {
@@ -185,6 +264,26 @@ export function ReportDetailClient({ id }: { id: string }) {
     );
     logEdit("reports", createdBy, row.id, row.reportId, changes);
     save(next, "Changes saved");
+    if (isCrmReportId(row.id)) {
+      void tryCrmReport(() =>
+        updateCrmReport(
+          row.id,
+          toCreateReportBody({
+            name: next.name,
+            type: next.type,
+            dataSource: next.dataSource,
+            dateRange: next.dateRange,
+            customFrom: next.customFrom,
+            customTo: next.customTo,
+            filters: next.filters,
+            groupBy: next.groupBy,
+            sortBy: next.sortBy,
+            schedule: next.schedule,
+            status: next.status,
+          }),
+        ),
+      );
+    }
     setDirty(false);
     setTab("results");
   }
@@ -233,10 +332,28 @@ export function ReportDetailClient({ id }: { id: string }) {
 
   function doTemplate() {
     if (!row) return;
-    const tpl = saveReportAsTemplate(row, row.createdBy);
-    save(
-      appendReportAudit(row, `Saved as template ${tpl.reportId}`, row.createdBy),
-      `Template ${tpl.reportId} saved`,
+    void (async () => {
+      const remote = isCrmReportId(row.id)
+        ? await tryCrmReport(() => saveCrmReportAsTemplate(row.id))
+        : null;
+      if (remote) persistRemoteReport(remote);
+      const tpl = remote ?? saveReportAsTemplate(row, row.createdBy);
+      save(
+        appendReportAudit(
+          row,
+          `Saved as template ${tpl.reportId}`,
+          row.createdBy,
+        ),
+        `Template ${tpl.reportId} saved`,
+      );
+    })();
+  }
+
+  if (loading && !row) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center bg-slate-50 text-sm text-slate-500">
+        Loading report…
+      </div>
     );
   }
 
@@ -290,6 +407,11 @@ export function ReportDetailClient({ id }: { id: string }) {
             >
               {row.type}
             </span>
+            {isCrmReportId(row.id) ? (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-700">
+                Live CRM
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -301,7 +423,7 @@ export function ReportDetailClient({ id }: { id: string }) {
           <button
             type="button"
             onClick={run}
-            disabled={row.status === "Running"}
+            disabled={busy || row.status === "Running"}
             className="inline-flex h-8 items-center gap-1 rounded-lg bg-violet-600 px-2.5 text-[11px] font-semibold text-white disabled:opacity-50"
           >
             <Play className="h-3.5 w-3.5" />
@@ -310,11 +432,7 @@ export function ReportDetailClient({ id }: { id: string }) {
           <button
             type="button"
             onClick={() => {
-              exportReportCsv(row);
-              save(
-                appendReportAudit(row, "Exported CSV", row.createdBy),
-                "Exported CSV",
-              );
+              void exportViaCrm("csv", () => exportReportCsv(row), "CSV");
             }}
             className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600"
           >
@@ -324,11 +442,7 @@ export function ReportDetailClient({ id }: { id: string }) {
           <button
             type="button"
             onClick={() => {
-              exportReportExcel(row);
-              save(
-                appendReportAudit(row, "Exported Excel", row.createdBy),
-                "Exported Excel",
-              );
+              void exportViaCrm("excel", () => exportReportExcel(row), "Excel");
             }}
             className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600"
           >
@@ -338,11 +452,7 @@ export function ReportDetailClient({ id }: { id: string }) {
           <button
             type="button"
             onClick={() => {
-              exportReportPdf(row);
-              save(
-                appendReportAudit(row, "Exported PDF", row.createdBy),
-                "Opened PDF print view",
-              );
+              void exportViaCrm("pdf", () => exportReportPdf(row), "PDF");
             }}
             className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600"
           >
@@ -390,6 +500,9 @@ export function ReportDetailClient({ id }: { id: string }) {
                 return;
               }
               deleteReport(row.id);
+              if (isCrmReportId(row.id)) {
+                void tryCrmReport(() => deleteCrmReport(row.id));
+              }
               router.push("/reports");
             }}
             className="ml-auto inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-rose-600"

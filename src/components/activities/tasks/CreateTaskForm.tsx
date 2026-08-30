@@ -33,6 +33,11 @@ import {
 } from "@/lib/activities/shared";
 import { api } from "@/lib/api";
 import {
+  createCrmTask,
+  persistRemoteTask,
+  tryCrmTask,
+} from "@/lib/tasks/api";
+import {
   logCreate,
   notifyOwnerAssigned,
   notifyTaskDue,
@@ -447,30 +452,36 @@ export function CreateTaskForm({
       }
     }
 
-    const result = await api.tasks.create({
+    const draft = {
       title: form.title.trim(),
       taskType: form.taskType as TaskType,
       priority: form.priority as Priority,
       status: form.status as TaskStatus,
       dueDate: formatStoredTaskDateTime(form.dueDate),
-      reminderDate: form.reminderDate.trim()
-        ? formatStoredTaskDateTime(form.reminderDate)
-        : undefined,
       assignedTo: form.assignedTo,
       relatedTo: related,
       description: form.description || undefined,
       notes: form.notes.trim() || undefined,
       collaborators: form.collaborators.length ? form.collaborators : undefined,
-      actionItems: form.actionItems.length ? form.actionItems : undefined,
-      notifyBy: form.notifyBy.length ? form.notifyBy : undefined,
-      attachmentsCount: attachmentsCount || undefined,
-      createdBy: actor,
-    });
-    if (!result.ok) {
-      window.alert(result.error.message);
-      return;
+    };
+    let task = persistRemoteTask(await tryCrmTask(() => createCrmTask(draft)));
+    if (!task) {
+      const result = await api.tasks.create({
+        ...draft,
+        reminderDate: form.reminderDate.trim()
+          ? formatStoredTaskDateTime(form.reminderDate)
+          : undefined,
+        actionItems: form.actionItems.length ? form.actionItems : undefined,
+        notifyBy: form.notifyBy.length ? form.notifyBy : undefined,
+        attachmentsCount: attachmentsCount || undefined,
+        createdBy: actor,
+      });
+      if (!result.ok) {
+        window.alert(result.error.message);
+        return;
+      }
+      task = result.data;
     }
-    const task = result.data;
     logCreate("activities.tasks", form.assignedTo, task.taskId, form.title);
     notifyOwnerAssigned({
       owner: form.assignedTo,

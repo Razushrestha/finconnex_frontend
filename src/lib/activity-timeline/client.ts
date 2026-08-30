@@ -3,6 +3,7 @@ import {
   isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
+import { crmFetch } from "@/lib/crm/request";
 import type {
   ActivityParentType,
   ActivityTimelineFilters,
@@ -25,41 +26,15 @@ async function getJson(
   path: string,
   filters: ActivityTimelineFilters = {},
 ): Promise<ActivityTimelinePage> {
-  const res = await fetch(`${session.baseUrl}${path}`, {
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${session.accessToken}`,
-    },
-  });
-
-  const text = await res.text();
-  let body: unknown = null;
-  if (text) {
-    try {
-      body = JSON.parse(text);
-    } catch {
-      body = null;
-    }
-  }
-
-  if (!res.ok) {
-    const message =
-      body &&
-      typeof body === "object" &&
-      body !== null &&
-      "message" in body &&
-      typeof (body as { message: unknown }).message === "string"
-        ? (body as { message: string }).message
-        : `Activity timeline failed (${res.status})`;
-    throw new Error(message);
-  }
-
-  const envelope = body as {
-    data?: ActivityTimelinePage;
-  } | null;
-
-  const page = envelope?.data;
-  if (!page || !Array.isArray(page.items)) {
+  const data = await crmFetch<ActivityTimelinePage | { items?: unknown }>(
+    session,
+    path,
+  );
+  const page =
+    data && typeof data === "object" && Array.isArray((data as ActivityTimelinePage).items)
+      ? (data as ActivityTimelinePage)
+      : null;
+  if (!page) {
     return {
       items: [],
       metadata: {

@@ -150,6 +150,98 @@ export const localAuthApi: AuthApi = {
     }
   },
 
+  async forgotPassword(email: string) {
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        return apiFail(
+          new ApiError(res.status, {
+            code: "INTERNAL",
+            message: body.error ?? "Could not request password reset",
+          }),
+        );
+      }
+      return apiOk({ ok: true as const });
+    } catch (e) {
+      return apiFail(toApiError(e));
+    }
+  },
+
+  async resetPassword(input: { token: string; password: string }) {
+    try {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: input.token,
+          password: input.password,
+          confirmPassword: input.password,
+        }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        return apiFail(
+          new ApiError(res.status, {
+            code: "INTERNAL",
+            message: body.error ?? "Could not reset password",
+          }),
+        );
+      }
+      return apiOk({ ok: true as const });
+    } catch (e) {
+      return apiFail(toApiError(e));
+    }
+  },
+
+  async resendEmailVerification(email: string) {
+    try {
+      const res = await fetch("/api/auth/email-verification/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        return apiFail(
+          new ApiError(res.status, {
+            code: "INTERNAL",
+            message: body.error ?? "Could not resend verification",
+          }),
+        );
+      }
+      return apiOk({ ok: true as const });
+    } catch (e) {
+      return apiFail(toApiError(e));
+    }
+  },
+
+  async verifyEmail(token: string) {
+    try {
+      const res = await fetch("/api/auth/email-verification/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        return apiFail(
+          new ApiError(res.status, {
+            code: "INTERNAL",
+            message: body.error ?? "Could not verify email",
+          }),
+        );
+      }
+      return apiOk({ ok: true as const });
+    } catch (e) {
+      return apiFail(toApiError(e));
+    }
+  },
+
   async selectWorkspace(workspaceId: string) {
     try {
       const res = await fetch("/api/auth/workspace", {

@@ -107,6 +107,50 @@ const auth: AuthApi = {
       if (!res.ok) throw new Error("Could not select workspace");
       return { workspaceId };
     }),
+  forgotPassword: (email) =>
+    wrap(async () => {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) throw new Error("Could not request password reset");
+      return { ok: true as const };
+    }),
+  resetPassword: (input) =>
+    wrap(async () => {
+      const res = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token: input.token,
+          password: input.password,
+          confirmPassword: input.password,
+        }),
+      });
+      if (!res.ok) throw new Error("Could not reset password");
+      return { ok: true as const };
+    }),
+  resendEmailVerification: (email) =>
+    wrap(async () => {
+      const res = await fetch("/api/auth/email-verification/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) throw new Error("Could not resend verification");
+      return { ok: true as const };
+    }),
+  verifyEmail: (token) =>
+    wrap(async () => {
+      const res = await fetch("/api/auth/email-verification/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      if (!res.ok) throw new Error("Could not verify email");
+      return { ok: true as const };
+    }),
 };
 
 async function localMe(): Promise<SessionPayload> {
@@ -164,7 +208,7 @@ const contacts: ContactsApi = {
 };
 
 const deals: DealsApi = {
-  pipelines: () => wrap(() => httpGet("/deals/pipelines")),
+  pipelines: () => wrap(() => httpGet("/deals/pipeline")),
   list: (params) =>
     wrap(() =>
       httpGet("/deals", {

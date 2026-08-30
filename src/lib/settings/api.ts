@@ -104,6 +104,8 @@ export const SETTINGS_FIELD_MAP: Record<string, keyof CrmSettingsPatch> = {
   customDomain: "customDomain",
   minLength: "passwordMinLength",
   idleMinutes: "sessionTimeoutMinutes",
+  logo: "logoKey",
+  favicon: "faviconKey",
 };
 
 export function settingsPath(suffix = ""): string {
@@ -224,6 +226,18 @@ export function overlaySettingsValues(
     }
   }
   return next;
+}
+
+/** Overlay the safe security subset from GET /v1/settings/security. */
+export function overlaySecurityValues(
+  values: SettingsValues,
+  security: CrmSecuritySettings,
+): SettingsValues {
+  return {
+    ...values,
+    minLength: security.passwordMinLength,
+    idleMinutes: security.sessionTimeoutMinutes,
+  };
 }
 
 export function valuesToSettingsPatch(

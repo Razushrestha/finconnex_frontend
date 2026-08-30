@@ -943,6 +943,13 @@ export function deleteSignatureRequest(id: string): SignatureRequest[] {
   return list;
 }
 
+/** Replace the local store with live CRM rows (empty list is a valid live result). */
+export function replaceCrmSignatureRequests(remote: SignatureRequest[]) {
+  writeStore(
+    remote.map((row) => normalizeSignatureRequest(row, { allowEmptyFields: true })),
+  );
+}
+
 export function createDocumentFromTemplate(
   templateId: string,
 ): SignatureRequest | null {

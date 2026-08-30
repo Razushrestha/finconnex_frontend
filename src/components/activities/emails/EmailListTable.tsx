@@ -12,6 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { Email, EmailStatus } from "@/lib/emails/types";
+import { deleteCrmEmail, tryCrmEmail } from "@/lib/emails/api";
 import { deleteEmail, listEmails, updateEmail } from "@/lib/emails/store";
 import { onRulesChange } from "@/lib/rules";
 import { cardSubject } from "@/lib/motion";
@@ -145,7 +146,10 @@ export function EmailListTable({ data }: EmailListTableProps) {
   }
 
   function removeEmails(ids: string[]) {
-    for (const id of ids) deleteEmail(id);
+    for (const id of ids) {
+      void tryCrmEmail(() => deleteCrmEmail(id));
+      deleteEmail(id);
+    }
     setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
     setEmails(listEmails());
   }

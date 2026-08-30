@@ -11,6 +11,8 @@ import {
 } from "@/lib/tasks/types";
 import { findTaskById, updateTaskReminders } from "@/lib/tasks/store";
 import { onRulesChange } from "@/lib/rules";
+import { useRelatedCrmReminders } from "@/lib/reminders/use-related-crm-reminders";
+import { cn } from "@/lib/utils";
 
 const EMPTY_REMINDERS: TaskReminder[] = [];
 
@@ -32,6 +34,7 @@ export function TaskRemindersCard({
   reminders,
   dueDate,
 }: TaskRemindersCardProps) {
+  const crm = useRelatedCrmReminders("Task", taskId);
   const [items, setItems] = useState<TaskReminder[]>(
     () => reminders ?? EMPTY_REMINDERS,
   );
@@ -47,6 +50,12 @@ export function TaskRemindersCard({
     return onRulesChange(load);
   }, [taskId]);
 
+  useEffect(() => {
+    if (crm.source !== "api") return;
+    setItems(crm.items);
+    updateTaskReminders(taskId, crm.items);
+  }, [crm.source, crm.items, taskId]);
+
   function persist(next: TaskReminder[]) {
     setItems(next);
     updateTaskReminders(taskId, next);
@@ -61,12 +70,21 @@ export function TaskRemindersCard({
     });
   }
 
-  function handleDone(next: TaskReminder) {
-    persist(
-      isNew
-        ? [...items, next]
-        : items.map((item) => (item.id === next.id ? next : item)),
-    );
+  async function handleDone(next: TaskReminder) {
+    if (isNew && crm.live) {
+      try {
+        const created = await crm.create(next);
+        persist([...items, created]);
+      } catch {
+        persist([...items, next]);
+      }
+    } else {
+      persist(
+        isNew
+          ? [...items, next]
+          : items.map((item) => (item.id === next.id ? next : item)),
+      );
+    }
     setEditor(null);
     setIsNew(false);
   }
@@ -82,6 +100,11 @@ export function TaskRemindersCard({
         <h2 className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
           Reminders
           {items.length > 0 ? ` (${items.length})` : ""}
+          {crm.source === "api" ? (
+            <span className={cn("ml-2 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700")}>
+              Live CRM
+            </span>
+          ) : null}
         </h2>
       </div>
 
@@ -119,9 +142,10 @@ export function TaskRemindersCard({
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  persist(items.filter((row) => row.id !== item.id))
-                }
+                onClick={() => {
+                  if (crm.live) void crm.remove(item.id);
+                  persist(items.filter((row) => row.id !== item.id));
+                }}
                 className="rounded-md p-1 text-slate-300 opacity-0 transition hover:bg-white hover:text-rose-600 group-hover:opacity-100"
                 aria-label="Remove reminder"
               >
@@ -149,7 +173,7 @@ export function TaskRemindersCard({
         value={editor ?? defaultReminder()}
         dueDate={dueDate}
         onCancel={handleCancel}
-        onDone={handleDone}
+        onDone={(next) => void handleDone(next)}
       />
     </section>
   );

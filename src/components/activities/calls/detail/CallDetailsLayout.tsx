@@ -114,6 +114,7 @@ export function CallDetailsLayout({
           />
           <RelatedEntitySidebarCard relatedTo={call.relatedTo} />
           <CallRemindersCard
+            callId={call.id}
             reminders={call.reminders ?? []}
             dueDate={call.date}
             onChange={(reminders: TaskReminder[]) => {

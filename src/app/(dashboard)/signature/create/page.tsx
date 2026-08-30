@@ -644,6 +644,7 @@ import {
   type SignatureSigner,
   type SignatureDocument,
 } from "@/lib/documents/signature/types";
+import { tryCrmStorage, uploadCrmStorageFile } from "@/lib/storage/api";
 import type {
   PlacedField,
   DraggingFieldType,
@@ -979,6 +980,10 @@ function CreateSignatureRequestForm() {
   const handleFileChange = (file: File | null) => {
     setDocumentFile(file);
     setFileError("");
+    if (!file) return;
+    void tryCrmStorage(() => uploadCrmStorageFile(file)).then((stored) => {
+      if (stored?.url) setPersistentFileUrl(stored.url);
+    });
   };
 
   const handleResizeField = (id: string, width: number, height: number) => {

@@ -7,11 +7,15 @@ import { Attendee } from "@/lib/meetings/types";
 interface MeetingParticipantsProps {
   attendees: Attendee[];
   organizer: string;
+  onManage?: () => void;
+  onRemove?: (id: string) => void;
 }
 
 export function MeetingParticipants({
   attendees,
   organizer,
+  onManage,
+  onRemove,
 }: MeetingParticipantsProps) {
   return (
     <div className="space-y-4">
@@ -22,7 +26,11 @@ export function MeetingParticipants({
             Participants ({attendees.length})
           </h3>
         </div>
-        <button className="text-xs font-medium text-primary hover:underline cursor-pointer">
+        <button
+          type="button"
+          onClick={onManage}
+          className="text-xs font-medium text-primary hover:underline cursor-pointer"
+        >
           Manage
         </button>
       </div>
@@ -61,6 +69,15 @@ export function MeetingParticipants({
                   {attendee.email}
                 </p>
               </div>
+              {onRemove ? (
+                <button
+                  type="button"
+                  onClick={() => onRemove(attendee.id)}
+                  className="text-[11px] font-semibold text-rose-600"
+                >
+                  Remove
+                </button>
+              ) : null}
             </div>
           );
         })}

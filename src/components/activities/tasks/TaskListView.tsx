@@ -24,7 +24,9 @@ import {
   updateTaskPriority,
   updateTaskStatus,
 } from "@/lib/tasks/store";
+import { persistRemoteTask, syncTaskStatus, tryCrmTask } from "@/lib/tasks/api";
 import {
+  DEFAULT_TASK_LIST_COLUMNS,
   isTaskColumnSortable,
   loadTaskListColumns,
   saveTaskListColumns,
@@ -40,6 +42,14 @@ import {
 } from "@/components/work-queue/ManageColumnsModal";
 import { TableDisplayOptionsMenu } from "@/components/common/TableDisplayOptionsMenu";
 import { CardInitialsAvatar } from "@/components/shared/CardInitialsAvatar";
+import {
+  applyTablePreferenceToColumns,
+  getCrmTablePreference,
+  isEmptyTablePreference,
+  persistCrmTablePreference,
+  tablePreferenceFromColumns,
+  tryCrmTablePreference,
+} from "@/lib/table-preferences/api";
 
 interface FlatTask extends Task {
   statusColorClass: string;
@@ -214,6 +224,9 @@ function TaskStatusCell({ task }: { task: FlatTask }) {
                   e.stopPropagation();
                   if (status !== task.status) {
                     updateTaskStatus(task.taskId, status);
+                    void tryCrmTask(() =>
+                      syncTaskStatus(task.taskId, status),
+                    ).then(persistRemoteTask);
                     toast.success(`Status changed to "${status}"`);
                   }
                   setOpen(false);
@@ -440,6 +453,15 @@ export function TaskListView({
 
   useEffect(() => {
     setManageColumns(loadTaskListColumns());
+    void tryCrmTablePreference(() => getCrmTablePreference("tasks")).then(
+      (pref) => {
+        if (pref && !isEmptyTablePreference(pref)) {
+          setManageColumns(
+            applyTablePreferenceToColumns(DEFAULT_TASK_LIST_COLUMNS, pref),
+          );
+        }
+      },
+    );
   }, []);
 
   useEffect(() => {
@@ -455,9 +477,9 @@ export function TaskListView({
     return listTaskColumns().flatMap((column) =>
       column.tasks.map(
         (task): FlatTask => ({
-          ...task,
-          status: column.title,
-          statusColorClass: column.badgeColorClass,
+    ...task,
+    status: column.title,
+    statusColorClass: column.badgeColorClass,
         }),
       ),
     );
@@ -581,6 +603,10 @@ export function TaskListView({
     const merged = next.map((c) => ({ ...c }));
     setManageColumns(merged);
     saveTaskListColumns(merged);
+    persistCrmTablePreference(
+      "tasks",
+      tablePreferenceFromColumns("tasks", merged),
+    );
     setManageColumnsOpen(false);
     toast.success("Column layout saved");
   }
@@ -592,7 +618,7 @@ export function TaskListView({
           <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/90 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
             <tr>
               <th className="sticky left-0 z-20 w-10 bg-slate-50/90 px-3 py-2.5">
-                <input
+        <input
                   type="checkbox"
                   checked={allPageSelected}
                   ref={(el) => {

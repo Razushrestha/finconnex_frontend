@@ -18,8 +18,10 @@ import type { RelatedListItem } from "@/components/shared/detail/types";
 import {
   findContactById,
   listAllContacts,
+  mergeCrmContactsIntoBoard,
   unlinkDealFromContact,
 } from "@/lib/contacts/store";
+import { getCrmContact, tryCrmContact } from "@/lib/contacts/api";
 import {
   findDealById,
   linkContactToDeal,
@@ -78,6 +80,18 @@ export default function ContactDetailPage() {
   useEffect(() => {
     return onRulesChange(() => setRevision((n) => n + 1));
   }, []);
+
+  useEffect(() => {
+    const id = params.id;
+    if (!id) return;
+    void tryCrmContact(async () => {
+      const remote = await getCrmContact(id);
+      if (remote) {
+        mergeCrmContactsIntoBoard([remote]);
+        setRevision((n) => n + 1);
+      }
+    });
+  }, [params.id]);
 
   const contacts = useMemo(() => {
     void revision;

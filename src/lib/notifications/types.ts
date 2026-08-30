@@ -210,6 +210,11 @@ export function writeAllNotifications(list: AppNotification[]) {
   writeStore(list);
 }
 
+/** Replace the session store with live CRM rows (empty list is a valid live result). */
+export function replaceCrmNotifications(remote: AppNotification[]) {
+  writeStore(remote.map((n) => ({ ...n })));
+}
+
 export function getNotificationById(id: string) {
   return listNotifications().find((n) => n.id === id);
 }
@@ -234,6 +239,14 @@ export function markNotificationDismissed(n: AppNotification): AppNotification {
     ...n,
     status: "Dismissed",
     readAt: n.readAt ?? formatNotificationAt(),
+  };
+}
+
+export function markNotificationUnread(n: AppNotification): AppNotification {
+  return {
+    ...n,
+    status: "Unread",
+    readAt: undefined,
   };
 }
 

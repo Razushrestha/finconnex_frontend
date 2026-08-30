@@ -1,15 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-    ArrowLeft,
+  ArrowLeft,
   Send,
   Trash2,
   Banknote,
   AlertTriangle,
+  Download,
+  Link2,
+  Paperclip,
 } from "lucide-react";
+import {
+  addCrmInvoiceAttachment,
+  createCrmInvoiceStripePayment,
+  deleteCrmInvoice,
+  deleteCrmInvoiceAttachment,
+  downloadCrmInvoicePdf,
+  getCrmInvoice,
+  getCrmInvoicePublicLink,
+  isCrmInvoiceId,
+  listCrmInvoiceAttachments,
+  persistRemoteInvoice,
+  sendCrmInvoice,
+  tryCrmInvoice,
+  updateCrmInvoice,
+} from "@/lib/finance/invoices/api";
 import {
   appendInvoiceAudit,
   applyPaymentToInvoice,
@@ -38,12 +56,39 @@ import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 
 export function InvoiceDetailClient({ id }: { id: string }) {
   const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [row, setRow] = useState<Invoice | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [payAmount, setPayAmount] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setRow(getInvoiceById(id) ?? null);
+    setLoading(true);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const remote = await getCrmInvoice(id);
+        if (cancelled || !remote) return;
+        persistRemoteInvoice(remote);
+        const attachments = await tryCrmInvoice(() =>
+          listCrmInvoiceAttachments(id),
+        );
+        const next = attachments
+          ? { ...remote, attachments }
+          : { ...remote, attachments: remote.attachments ?? [] };
+        persistRemoteInvoice(next);
+        setRow(next);
+      } catch {
+        /* keep local overlay */
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   function flash(msg: string) {
@@ -62,6 +107,137 @@ export function InvoiceDetailClient({ id }: { id: string }) {
     const next = appendInvoiceAudit({ ...row, status }, action);
     if (status === "Sent") next.sentAt = formatFinanceAt();
     save(next, action);
+    if (isCrmInvoiceId(row.id) && status !== "Sent") {
+      void tryCrmInvoice(() =>
+        updateCrmInvoice(row.id, {
+          status: status.toUpperCase().replace(/ /g, "_"),
+        }),
+      );
+    }
+  }
+
+  async function onSend() {
+    if (!row || busy) return;
+    setBusy(true);
+    try {
+      const remote = isCrmInvoiceId(row.id)
+        ? await sendCrmInvoice(row.id)
+        : null;
+      const next = persistRemoteInvoice(remote) ?? {
+        ...row,
+        status: "Sent" as const,
+        sentAt: formatFinanceAt(),
+      };
+      save(appendInvoiceAudit(next, "Sent"), "Invoice sent");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Send failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onPdf() {
+    if (!row || busy || !isCrmInvoiceId(row.id)) return;
+    setBusy(true);
+    try {
+      const blob = await downloadCrmInvoicePdf(row.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${row.invoiceId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      flash("PDF downloaded");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "PDF download failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onPublicLink() {
+    if (!row || busy || !isCrmInvoiceId(row.id)) return;
+    setBusy(true);
+    try {
+      const link = await getCrmInvoicePublicLink(row.id);
+      if (!link?.url) {
+        flash("No public link returned");
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(link.url);
+      } catch {
+        /* ignore */
+      }
+      save({ ...row, publicLink: link.url }, "Public link copied");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Public link failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onAttach(file: File) {
+    if (!row || busy || !isCrmInvoiceId(row.id)) return;
+    setBusy(true);
+    try {
+      const added = await addCrmInvoiceAttachment(row.id, file);
+      const attachments = added
+        ? [...(row.attachments ?? []), added]
+        : (await tryCrmInvoice(() => listCrmInvoiceAttachments(row.id))) ??
+          row.attachments ??
+          [];
+      save({ ...row, attachments }, "Attachment uploaded");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRemoveAttachment(attachmentId: string) {
+    if (!row || busy) return;
+    setBusy(true);
+    try {
+      if (isCrmInvoiceId(row.id)) {
+        await deleteCrmInvoiceAttachment(row.id, attachmentId);
+      }
+      save(
+        {
+          ...row,
+          attachments: (row.attachments ?? []).filter((a) => a.id !== attachmentId),
+        },
+        "Attachment removed",
+      );
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Remove failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onStripe() {
+    if (!row || busy || !isCrmInvoiceId(row.id)) return;
+    setBusy(true);
+    try {
+      const result = await createCrmInvoiceStripePayment(row.id, {
+        amount: row.amountDue,
+      });
+      if (result?.url) {
+        window.open(result.url, "_blank", "noopener,noreferrer");
+        flash("Stripe checkout opened");
+        return;
+      }
+      flash(
+        result?.clientSecret
+          ? "Stripe payment intent created"
+          : "Stripe payment created",
+      );
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Stripe payment failed");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function recordPayment() {
@@ -109,6 +285,14 @@ export function InvoiceDetailClient({ id }: { id: string }) {
     setPayAmount("");
   }
 
+  if (loading && !row) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center bg-slate-50 text-sm text-slate-500">
+        Loading invoice…
+      </div>
+    );
+  }
+
   if (!row) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center bg-slate-50 text-sm text-slate-500">
@@ -153,12 +337,46 @@ export function InvoiceDetailClient({ id }: { id: string }) {
             {!terminal && row.status === "Draft" ? (
               <button
                 type="button"
-                onClick={() => setStatus("Sent", "Sent")}
-                className="inline-flex h-8 items-center gap-1 rounded-lg bg-violet-600 px-2.5 text-[11px] font-semibold text-white"
+                disabled={busy}
+                onClick={() => void onSend()}
+                className="inline-flex h-8 items-center gap-1 rounded-lg bg-violet-600 px-2.5 text-[11px] font-semibold text-white disabled:opacity-50"
               >
                 <Send className="h-3.5 w-3.5" />
                 Send
               </button>
+            ) : null}
+            {isCrmInvoiceId(row.id) ? (
+              <>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void onPdf()}
+                  className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  PDF
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void onPublicLink()}
+                  className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 disabled:opacity-50"
+                >
+                  <Link2 className="h-3.5 w-3.5" />
+                  Public link
+                </button>
+                {!terminal && row.amountDue > 0 ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void onStripe()}
+                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-semibold text-violet-700 disabled:opacity-50"
+                  >
+                    <Banknote className="h-3.5 w-3.5" />
+                    Stripe
+                  </button>
+                ) : null}
+              </>
             ) : null}
             {!terminal && row.status === "Sent" ? (
               <button
@@ -203,6 +421,9 @@ export function InvoiceDetailClient({ id }: { id: string }) {
                     return;
                   }
                   deleteInvoice(row.id);
+                  if (isCrmInvoiceId(row.id)) {
+                    void tryCrmInvoice(() => deleteCrmInvoice(row.id));
+                  }
                   router.push("/finance/invoices");
                 }}
                 className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-rose-600"
@@ -273,6 +494,16 @@ export function InvoiceDetailClient({ id }: { id: string }) {
                 </div>
               </div>
             </div>
+            {row.publicLink ? (
+              <a
+                href={row.publicLink}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 block truncate text-[11px] text-violet-600"
+              >
+                {row.publicLink}
+              </a>
+            ) : null}
 
             {!terminal && row.amountDue > 0 ? (
               <div className="mt-4 flex flex-wrap items-end gap-2">
@@ -304,6 +535,64 @@ export function InvoiceDetailClient({ id }: { id: string }) {
 
           <div className="px-5 py-4">
             <LineItemsEditor items={row.lineItems} onChange={() => {}} readOnly />
+          </div>
+
+          <div className="border-t border-slate-100 px-5 py-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-[12px] font-bold tracking-wide text-slate-700 uppercase">
+                Attachments
+              </h3>
+              {isCrmInvoiceId(row.id) ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => fileRef.current?.click()}
+                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 disabled:opacity-50"
+                  >
+                    <Paperclip className="h-3.5 w-3.5" />
+                    Add file
+                  </button>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) void onAttach(file);
+                    }}
+                  />
+                </>
+              ) : null}
+            </div>
+            {(row.attachments ?? []).length === 0 ? (
+              <p className="text-[12px] text-slate-400">No attachments</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {(row.attachments ?? []).map((att) => (
+                  <li
+                    key={att.id}
+                    className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-[12px]"
+                  >
+                    <span className="min-w-0 truncate text-slate-700">
+                      {att.name}
+                      {att.sizeLabel ? (
+                        <span className="ml-1 text-slate-400">{att.sizeLabel}</span>
+                      ) : null}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void onRemoveAttachment(att.id)}
+                      className="text-[11px] font-semibold text-rose-600 disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="border-t border-slate-100 px-5 py-4">

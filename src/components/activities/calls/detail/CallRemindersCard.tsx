@@ -9,8 +9,11 @@ import {
   reminderNotify,
   type TaskReminder,
 } from "@/lib/tasks/types";
+import { useRelatedCrmReminders } from "@/lib/reminders/use-related-crm-reminders";
+import { cn } from "@/lib/utils";
 
 interface CallRemindersCardProps {
+  callId: string;
   reminders: TaskReminder[];
   dueDate?: string;
   onChange: (next: TaskReminder[]) => void;
@@ -24,12 +27,15 @@ function dueDateToInput(value?: string): string {
 }
 
 export function CallRemindersCard({
+  callId,
   reminders,
   dueDate,
   onChange,
 }: CallRemindersCardProps) {
+  const crm = useRelatedCrmReminders("Call", callId);
   const [editor, setEditor] = useState<TaskReminder | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const rows = crm.source === "api" ? crm.items : reminders;
 
   function openNew() {
     setIsNew(true);
@@ -48,7 +54,12 @@ export function CallRemindersCard({
     <div className="flex flex-col rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
         <h4 className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-          Reminder{reminders.length ? `s (${reminders.length})` : ""}
+          Reminder{rows.length ? `s (${rows.length})` : ""}
+          {crm.source === "api" ? (
+            <span className={cn("ml-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700")}>
+              Live
+            </span>
+          ) : null}
         </h4>
         <button
           type="button"
@@ -60,7 +71,7 @@ export function CallRemindersCard({
         </button>
       </div>
 
-      {reminders.length === 0 ? (
+      {rows.length === 0 ? (
         <button
           type="button"
           onClick={openNew}
@@ -73,7 +84,7 @@ export function CallRemindersCard({
         </button>
       ) : (
         <div className="space-y-2">
-          {reminders.map((item) => (
+          {rows.map((item) => (
             <div
               key={item.id}
               className="group flex items-start gap-2 rounded-xl border border-slate-100 bg-[#F3ECFB]/30 px-3 py-2.5"
@@ -103,9 +114,10 @@ export function CallRemindersCard({
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  onChange(reminders.filter((r) => r.id !== item.id))
-                }
+                onClick={() => {
+                  if (crm.live) void crm.remove(item.id);
+                  onChange(rows.filter((r) => r.id !== item.id));
+                }}
                 className="mt-1 rounded-md p-1 text-slate-300 opacity-0 hover:bg-white hover:text-rose-500 group-hover:opacity-100"
                 aria-label="Delete reminder"
               >
@@ -126,13 +138,24 @@ export function CallRemindersCard({
             setIsNew(false);
           }}
           onDone={(next) => {
-            onChange(
-              isNew
-                ? [...reminders, next]
-                : reminders.map((item) => (item.id === next.id ? next : item)),
-            );
-            setEditor(null);
-            setIsNew(false);
+            void (async () => {
+              if (isNew && crm.live) {
+                try {
+                  const created = await crm.create(next);
+                  onChange([...rows, created]);
+                } catch {
+                  onChange([...rows, next]);
+                }
+              } else {
+                onChange(
+                  isNew
+                    ? [...rows, next]
+                    : rows.map((item) => (item.id === next.id ? next : item)),
+                );
+              }
+              setEditor(null);
+              setIsNew(false);
+            })();
           }}
         />
       ) : null}

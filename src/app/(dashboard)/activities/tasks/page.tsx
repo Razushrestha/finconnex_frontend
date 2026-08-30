@@ -33,6 +33,16 @@ import {
   listAllTasks,
   reassignTask,
 } from "@/lib/tasks/store";
+import {
+  bulkCrmTasks,
+  bulkDeleteCrmTasks,
+  completeCrmTask,
+  duplicateCrmTask,
+  isCrmTaskId,
+  persistRemoteTask,
+  tryCrmTask,
+} from "@/lib/tasks/api";
+import { useCrmTasks } from "@/lib/tasks/use-crm-tasks";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import { downloadCsv, toCsv } from "@/lib/import/csv";
 import { emitRulesChange } from "@/lib/rules/storage";
@@ -127,6 +137,7 @@ const taskSortOptions = [
 ];
 
 export default function TasksPage() {
+  const { source: tasksSource } = useCrmTasks();
   const [view, setView] = useState<ActivityView>("kanban");
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState<TaskFilters>(EMPTY_TASK_FILTERS);
@@ -189,9 +200,20 @@ export default function TasksPage() {
   }
 
   function runBulkComplete() {
+    const ids = [...selectedTaskIds];
     let n = 0;
-    for (const id of selectedTaskIds) {
+    for (const id of ids) {
       if (completeTask(id)) n += 1;
+    }
+    const crmIds = ids.filter(isCrmTaskId);
+    if (crmIds.length) {
+      void tryCrmTask(() => bulkCrmTasks(crmIds, "complete")).then((ok) => {
+        if (ok == null) {
+          for (const id of crmIds) {
+            void tryCrmTask(() => completeCrmTask(id)).then(persistRemoteTask);
+          }
+        }
+      });
     }
     emitRulesChange("all");
     setSelectedTaskIds([]);
@@ -199,9 +221,13 @@ export default function TasksPage() {
   }
 
   function runBulkClone() {
+    const ids = [...selectedTaskIds];
     let n = 0;
-    for (const id of selectedTaskIds) {
+    for (const id of ids) {
       if (cloneTask(id)) n += 1;
+    }
+    for (const id of ids.filter(isCrmTaskId)) {
+      void tryCrmTask(() => duplicateCrmTask(id)).then(persistRemoteTask);
     }
     emitRulesChange("all");
     setSelectedTaskIds([]);
@@ -230,9 +256,14 @@ export default function TasksPage() {
     ) {
       return;
     }
+    const ids = [...selectedTaskIds];
     let n = 0;
-    for (const id of selectedTaskIds) {
+    for (const id of ids) {
       if (deleteTask(id)) n += 1;
+    }
+    const crmIds = ids.filter(isCrmTaskId);
+    if (crmIds.length) {
+      void tryCrmTask(() => bulkDeleteCrmTasks(crmIds));
     }
     emitRulesChange("all");
     setSelectedTaskIds([]);
@@ -240,7 +271,7 @@ export default function TasksPage() {
   }
 
   return (
-    <div className={BOARD_PAGE}>
+    <div className={BOARD_PAGE} data-crm-source={tasksSource}>
       <FocusHighlight />
       <div className="shrink-0">
         <ActivityToolbar

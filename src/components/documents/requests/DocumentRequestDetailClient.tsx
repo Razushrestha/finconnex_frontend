@@ -32,6 +32,14 @@ import {
   type DocumentRequestStatus,
   type RequestedDocLine,
 } from "@/lib/documents/requests/types";
+import {
+  getCrmDocumentRequest,
+  isCrmDocumentRequestId,
+  syncCrmDocumentRequestStatus,
+  toCreateDocumentRequestBody,
+  tryCrmDocumentRequest,
+  updateCrmDocumentRequest,
+} from "@/lib/documents/requests/api";
 import { pushLibraryDoc } from "@/lib/documents/library/types";
 import {
   displayRequestStatus,
@@ -93,9 +101,29 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const live = getDocumentRequestById(id) ?? null;
-    setRequest(live);
-    setInternalNotes(live?.internalNotes ?? "");
+    const local = getDocumentRequestById(id) ?? null;
+    setRequest(local);
+    setInternalNotes(local?.internalNotes ?? "");
+    if (!isCrmDocumentRequestId(id)) return;
+    let cancelled = false;
+    void (async () => {
+      const remote = await tryCrmDocumentRequest(() => getCrmDocumentRequest(id));
+      if (cancelled || !remote) return;
+      const merged = {
+        ...local,
+        ...remote,
+        items: remote.items ?? local?.items,
+        timeline: local?.timeline ?? remote.timeline,
+        messages: local?.messages ?? remote.messages,
+        internalNotes: local?.internalNotes ?? remote.notes,
+      };
+      upsertDocumentRequest(merged);
+      setRequest(merged);
+      setInternalNotes(merged.internalNotes ?? "");
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   useEffect(() => {
@@ -125,9 +153,18 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
     window.setTimeout(() => setToast(null), 2800);
   }
 
-  function save(next: DocumentRequest, msg?: string) {
+  function save(
+    next: DocumentRequest,
+    msg?: string,
+    options?: { patch?: boolean },
+  ) {
     upsertDocumentRequest(next);
     setRequest(next);
+    if (options?.patch !== false && isCrmDocumentRequestId(next.id)) {
+      void tryCrmDocumentRequest(() =>
+        updateCrmDocumentRequest(next.id, toCreateDocumentRequestBody(next)),
+      );
+    }
     if (msg) flash(msg);
   }
 
@@ -160,7 +197,13 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
         }),
       },
       `Status → ${status}`,
+      { patch: false },
     );
+    if (isCrmDocumentRequestId(request.id)) {
+      void tryCrmDocumentRequest(() =>
+        syncCrmDocumentRequestStatus(request.id, status),
+      );
+    }
   }
 
   function sendReminder() {
@@ -209,7 +252,13 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
       notifyCancel
         ? `Request cancelled · email sent to ${request.requestedFrom}`
         : "Request cancelled",
+      { patch: false },
     );
+    if (isCrmDocumentRequestId(request.id)) {
+      void tryCrmDocumentRequest(() =>
+        syncCrmDocumentRequestStatus(request.id, "Expired"),
+      );
+    }
     setConfirmCancel(false);
     setNotifyCancel(false);
   }

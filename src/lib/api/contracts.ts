@@ -73,6 +73,17 @@ export interface AuthApi {
   selectWorkspace(
     workspaceId: string,
   ): Promise<ApiResult<{ workspaceId: string }>>;
+  /** POST /auth/forgot-password */
+  forgotPassword(email: string): Promise<ApiResult<{ ok: true }>>;
+  /** POST /auth/reset-password */
+  resetPassword(input: {
+    token: string;
+    password: string;
+  }): Promise<ApiResult<{ ok: true }>>;
+  /** POST /auth/email-verification/resend */
+  resendEmailVerification(email: string): Promise<ApiResult<{ ok: true }>>;
+  /** POST /auth/email-verification/verify */
+  verifyEmail(token: string): Promise<ApiResult<{ ok: true }>>;
 }
 
 /* ── Leads ────────────────────────────────────────────── */
@@ -166,7 +177,7 @@ export interface DealCreateInput {
 }
 
 export interface DealsApi {
-  /** GET /deals/pipelines */
+  /** GET /deals/pipeline */
   pipelines(): Promise<ApiResult<Record<DealPipeline, DealStage[]>>>;
   /** GET /deals */
   list(params?: PageParams & { pipeline?: DealPipeline }): Promise<
@@ -178,7 +189,7 @@ export interface DealsApi {
   >;
   /** POST /deals */
   create(input: DealCreateInput): Promise<ApiResult<DealRecord>>;
-  /** POST /deals/:id/stage */
+  /** PATCH /deals/:id (stage via update) */
   setStage(
     id: string,
     input: { stage: string; pipeline?: DealPipeline },

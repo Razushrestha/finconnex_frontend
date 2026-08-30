@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,39 @@ export function LoginForm() {
   const [rememberMe, setRememberMe] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [resendNote, setResendNote] = React.useState<string | null>(null);
+  const [resending, setResending] = React.useState(false);
+
+  const needsVerification = (error ?? "").toLowerCase().includes("verify");
+
+  async function resendVerification() {
+    if (!email.trim()) {
+      setResendNote("Enter your email first.");
+      return;
+    }
+    setResending(true);
+    setResendNote(null);
+    try {
+      const response = await fetch("/api/auth/email-verification/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+      };
+      setResendNote(
+        response.ok
+          ? (data.message ?? "If that email needs verification, we sent a new message.")
+          : (data.error ?? "Unable to resend verification."),
+      );
+    } catch {
+      setResendNote("Network error. Try again.");
+    } finally {
+      setResending(false);
+    }
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -90,8 +124,21 @@ export function LoginForm() {
           className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
         >
           {error}
+          {needsVerification ? (
+            <button
+              type="button"
+              onClick={() => void resendVerification()}
+              disabled={resending}
+              className="mt-2 block font-semibold text-red-800 underline disabled:opacity-50"
+            >
+              {resending ? "Sending…" : "Resend verification email"}
+            </button>
+          ) : null}
         </div>
       )}
+      {resendNote ? (
+        <p className="text-sm text-slate-600">{resendNote}</p>
+      ) : null}
 
       <div className="space-y-1.5">
         <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -130,18 +177,26 @@ export function LoginForm() {
         />
       </div>
 
-      <label className="flex cursor-pointer items-center gap-2.5">
-        <input
-          type="checkbox"
-          checked={rememberMe}
-          onChange={(e) => setRememberMe(e.target.checked)}
-          className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
-          disabled={isLoading}
-        />
-        <span className="text-sm text-gray-600">
-          Keep me signed in for 30 days
-        </span>
-      </label>
+      <div className="flex items-center justify-between gap-3">
+        <label className="flex cursor-pointer items-center gap-2.5">
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+            disabled={isLoading}
+          />
+          <span className="text-sm text-gray-600">
+            Keep me signed in for 30 days
+          </span>
+        </label>
+        <Link
+          href="/forgot-password"
+          className="shrink-0 text-sm font-medium text-violet-600 hover:text-violet-700"
+        >
+          Forgot password?
+        </Link>
+      </div>
 
       <button
         type="submit"

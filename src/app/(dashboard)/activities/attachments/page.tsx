@@ -21,6 +21,7 @@ import {
   createAttachment,
   listAttachments,
 } from "@/lib/attachments/store";
+import { tryCrmStorage, uploadCrmStorageFile } from "@/lib/storage/api";
 import {
   ACTIVITY_OWNERS,
   RELATED_RECORD_OPTIONS,
@@ -81,7 +82,9 @@ export default function AttachmentsPage() {
     bootstrap.folder,
   );
   const [composeOpen, setComposeOpen] = useState(bootstrap.composeOpen);
+  const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [kind, setKind] = useState<AttachmentKind>("Document");
   const [clientName, setClientName] = useState(
     bootstrap.relatedTo
@@ -166,28 +169,41 @@ export default function AttachmentsPage() {
     setComposeOpen(true);
   }
 
-  function onUpload(e: React.FormEvent) {
+  async function onUpload(e: React.FormEvent) {
     e.preventDefault();
-    if (!fileName.trim()) return;
+    const name = fileName.trim() || file?.name || "";
+    if (!name) return;
     if (!clientName.trim()) {
       flash("Choose a client folder name");
       return;
     }
+    setUploading(true);
+    const stored = file
+      ? await tryCrmStorage(() => uploadCrmStorageFile(file))
+      : null;
+    setUploading(false);
     const relatedTo = relatedToFromClient(clientName, relatedKind);
     createAttachment({
-      fileName: fileName.trim(),
+      fileName: name,
       kind,
       relatedTo: relatedTo || undefined,
       uploadedBy: ACTIVITY_OWNERS[0],
       notes: notes || undefined,
+      sizeLabel: stored?.size
+        ? `${Math.max(1, Math.round(stored.size / 1024))} KB`
+        : undefined,
+      storageUrl: stored?.url,
+      contentType: stored?.contentType,
+      byteSize: stored?.size,
     });
     const folder = clientNameFromRelatedTo(relatedTo);
+    setFile(null);
     setFileName("");
     setNotes("");
     setComposeOpen(false);
     refresh();
     setActiveFolder(folder);
-    flash(`Uploaded to ${folder}`);
+    flash(stored ? `Uploaded to CRM storage · ${folder}` : `Uploaded to ${folder}`);
   }
 
   const clientOptions = useMemo(() => {
@@ -423,6 +439,18 @@ export default function AttachmentsPage() {
             </label>
 
             <label className="mb-3 block text-xs font-medium text-slate-600">
+              File
+              <input
+                type="file"
+                onChange={(e) => {
+                  const next = e.target.files?.[0] ?? null;
+                  setFile(next);
+                  if (next) setFileName(next.name);
+                }}
+                className="mt-1 block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-violet-50 file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-violet-700"
+              />
+            </label>
+            <label className="mb-3 block text-xs font-medium text-slate-600">
               File name
               <input
                 autoFocus
@@ -467,9 +495,10 @@ export default function AttachmentsPage() {
               </button>
               <button
                 type="submit"
-                className="h-9 rounded-lg bg-violet-600 px-3 text-[12px] font-semibold text-white"
+                disabled={uploading}
+                className="h-9 rounded-lg bg-violet-600 px-3 text-[12px] font-semibold text-white disabled:opacity-50"
               >
-                Upload
+                {uploading ? "Uploading…" : "Upload"}
               </button>
             </div>
           </form>

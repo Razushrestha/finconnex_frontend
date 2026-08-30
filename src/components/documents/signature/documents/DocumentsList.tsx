@@ -24,6 +24,12 @@ import {
   SignatureRequest,
 } from "@/lib/documents/signature/types";
 import {
+  deleteCrmSignatureRequest,
+  isCrmSignatureRequestId,
+  tryCrmSignatureRequest,
+} from "@/lib/documents/signature/api";
+import { useCrmSignatureRequests } from "@/lib/documents/signature/use-crm-signature-requests";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -100,6 +106,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 
 export default function DocumentsList() {
   const router = useRouter();
+  const crm = useCrmSignatureRequests();
 
   const {
     isMounted,
@@ -149,13 +156,18 @@ export default function DocumentsList() {
       (req) => req.recordType !== "template",
     );
     setItems(documentsOnly);
-  }, [setItems]);
+  }, [setItems, crm.source, crm.loading]);
 
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
       deleteSignatureRequest(deleteTarget.id);
+      if (isCrmSignatureRequestId(deleteTarget.id)) {
+        await tryCrmSignatureRequest(() =>
+          deleteCrmSignatureRequest(deleteTarget.id),
+        );
+      }
       setItems((prev) => prev.filter((req) => req.id !== deleteTarget.id));
     } finally {
       setIsDeleting(false);
@@ -222,6 +234,11 @@ export default function DocumentsList() {
         <div>
           <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
             Signature Documents
+            {crm.source === "api" ? (
+              <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-700">
+                Live CRM
+              </span>
+            ) : null}
           </h1>
         </div>
       </div>

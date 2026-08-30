@@ -29,9 +29,15 @@ const PAGE_SIZE = 10;
 
 export function AllDocumentRequestsPage({
   rows,
+  source,
+  loading,
+  error,
   onRefresh,
 }: {
   rows: DocumentRequest[];
+  source?: "api" | "demo";
+  loading?: boolean;
+  error?: string | null;
   onRefresh?: () => void;
 }) {
   const [search, setSearch] = useState("");
@@ -70,6 +76,25 @@ export function AllDocumentRequestsPage({
             <h2 className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
               <FileText className="h-4 w-4 shrink-0 text-[#5A32A3]" />
               All Requests
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                  source === "api"
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "bg-slate-100 text-slate-500",
+                )}
+              >
+                {source === "api"
+                  ? "Live CRM"
+                  : loading
+                    ? "Connecting…"
+                    : "Demo"}
+              </span>
+              {error && source === "demo" ? (
+                <span className="text-[10px] font-normal text-slate-500">
+                  {error}
+                </span>
+              ) : null}
             </h2>
             <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
               <div className="relative w-[220px]">

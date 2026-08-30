@@ -6,6 +6,7 @@ import {
   listCrmConversations,
   listCrmChatMessages,
   markCrmConversationRead,
+  markCrmMessageRead,
   tryCrmChat,
 } from "@/lib/chat/api";
 import type { ChatChannel, ChatMessage } from "@/lib/chat/types";
@@ -37,15 +38,10 @@ export function useCrmChat(opts?: {
       try {
         const remote = await listCrmConversations();
         if (cancelled) return;
-        if (remote.length) {
-          setChannels(remote);
-          setSource("api");
-          const unread = await tryCrmChat(() => getCrmChatUnreadCount());
-          if (!cancelled && unread != null) setUnreadTotal(unread);
-        } else {
-          setChannels(null);
-          setSource("demo");
-        }
+        setChannels(remote);
+        setSource("api");
+        const unread = await tryCrmChat(() => getCrmChatUnreadCount());
+        if (!cancelled && unread != null) setUnreadTotal(unread);
       } catch (err) {
         if (cancelled) return;
         setChannels(null);
@@ -72,6 +68,10 @@ export function useCrmChat(opts?: {
       if (cancelled || !thread) return;
       setMessages((prev) => ({ ...(prev ?? {}), [activeId]: thread }));
       void tryCrmChat(() => markCrmConversationRead(activeId));
+      const last = thread[thread.length - 1];
+      if (last?.id) {
+        void tryCrmChat(() => markCrmMessageRead(last.id));
+      }
       setChannels((prev) =>
         (prev ?? []).map((c) =>
           c.id === activeId ? { ...c, unread: 0 } : c,

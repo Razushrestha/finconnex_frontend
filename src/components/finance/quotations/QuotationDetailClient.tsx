@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -14,7 +14,24 @@ import {
   ExternalLink,
   Copy,
   FileSignature,
+  Download,
+  Link2,
+  Paperclip,
 } from "lucide-react";
+import {
+  addCrmQuoteAttachment,
+  deleteCrmQuote,
+  deleteCrmQuoteAttachment,
+  downloadCrmQuotePdf,
+  getCrmQuote,
+  getCrmQuotePublicLink,
+  isCrmQuoteId,
+  listCrmQuoteAttachments,
+  persistRemoteQuote,
+  sendCrmQuote,
+  tryCrmQuote,
+  updateCrmQuote,
+} from "@/lib/finance/quotations/api";
 import {
   appendQuotationAudit,
   deleteQuotation,
@@ -50,11 +67,38 @@ import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 
 export function QuotationDetailClient({ id }: { id: string }) {
   const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [row, setRow] = useState<Quotation | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setRow(getQuotationById(id) ?? null);
+    setLoading(true);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const remote = await getCrmQuote(id);
+        if (cancelled || !remote) return;
+        persistRemoteQuote(remote);
+        const attachments = await tryCrmQuote(() =>
+          listCrmQuoteAttachments(id),
+        );
+        const next = attachments
+          ? { ...remote, attachments }
+          : { ...remote, attachments: remote.attachments ?? [] };
+        persistRemoteQuote(next);
+        setRow(next);
+      } catch {
+        /* keep local overlay */
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   function flash(msg: string) {
@@ -73,6 +117,109 @@ export function QuotationDetailClient({ id }: { id: string }) {
     const next = appendQuotationAudit({ ...row, status }, action);
     if (status === "Sent") next.sentAt = formatFinanceAt();
     save(next, action);
+    if (isCrmQuoteId(row.id) && status !== "Sent") {
+      void tryCrmQuote(() =>
+        updateCrmQuote(row.id, { status: status.toUpperCase() }),
+      );
+    }
+  }
+
+  async function onSend() {
+    if (!row || busy) return;
+    setBusy(true);
+    try {
+      const remote = isCrmQuoteId(row.id) ? await sendCrmQuote(row.id) : null;
+      const next = persistRemoteQuote(remote) ?? {
+        ...row,
+        status: "Sent" as const,
+        sentAt: formatFinanceAt(),
+      };
+      save(appendQuotationAudit(next, "Sent"), "Quote sent");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Send failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onPdf() {
+    if (!row || busy || !isCrmQuoteId(row.id)) return;
+    setBusy(true);
+    try {
+      const blob = await downloadCrmQuotePdf(row.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${row.quotationId}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      flash("PDF downloaded");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "PDF download failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onPublicLink() {
+    if (!row || busy || !isCrmQuoteId(row.id)) return;
+    setBusy(true);
+    try {
+      const link = await getCrmQuotePublicLink(row.id);
+      if (!link?.url) {
+        flash("No public link returned");
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(link.url);
+      } catch {
+        /* ignore */
+      }
+      save({ ...row, publicLink: link.url }, "Public link copied");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Public link failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onAttach(file: File) {
+    if (!row || busy || !isCrmQuoteId(row.id)) return;
+    setBusy(true);
+    try {
+      const added = await addCrmQuoteAttachment(row.id, file);
+      const attachments = added
+        ? [...(row.attachments ?? []), added]
+        : (await tryCrmQuote(() => listCrmQuoteAttachments(row.id))) ??
+          row.attachments ??
+          [];
+      save({ ...row, attachments }, "Attachment uploaded");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRemoveAttachment(attachmentId: string) {
+    if (!row || busy) return;
+    setBusy(true);
+    try {
+      if (isCrmQuoteId(row.id)) {
+        await deleteCrmQuoteAttachment(row.id, attachmentId);
+      }
+      save(
+        {
+          ...row,
+          attachments: (row.attachments ?? []).filter((a) => a.id !== attachmentId),
+        },
+        "Attachment removed",
+      );
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Remove failed");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function sendForSignature() {
@@ -162,6 +309,14 @@ export function QuotationDetailClient({ id }: { id: string }) {
     router.push(`/finance/invoices/${inv.id}`);
   }
 
+  if (loading && !row) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center bg-slate-50 text-sm text-slate-500">
+        Loading quote…
+      </div>
+    );
+  }
+
   if (!row) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center bg-slate-50 text-sm text-slate-500">
@@ -215,12 +370,35 @@ export function QuotationDetailClient({ id }: { id: string }) {
             {!locked && row.status === "Draft" ? (
               <button
                 type="button"
-                onClick={() => setStatus("Sent", "Sent")}
-                className="inline-flex h-8 items-center gap-1 rounded-lg bg-violet-600 px-2.5 text-[11px] font-semibold text-white"
+                disabled={busy}
+                onClick={() => void onSend()}
+                className="inline-flex h-8 items-center gap-1 rounded-lg bg-violet-600 px-2.5 text-[11px] font-semibold text-white disabled:opacity-50"
               >
                 <Send className="h-3.5 w-3.5" />
                 Send
               </button>
+            ) : null}
+            {isCrmQuoteId(row.id) ? (
+              <>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void onPdf()}
+                  className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  PDF
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void onPublicLink()}
+                  className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 disabled:opacity-50"
+                >
+                  <Link2 className="h-3.5 w-3.5" />
+                  Public link
+                </button>
+              </>
             ) : null}
             {!locked && row.signatureStatus !== "Signed" ? (
               <button
@@ -327,6 +505,9 @@ export function QuotationDetailClient({ id }: { id: string }) {
                     window.alert(gate.message);
                     return;
                   }
+                  if (isCrmQuoteId(row.id)) {
+                    void tryCrmQuote(() => deleteCrmQuote(row.id));
+                  }
                   deleteQuotation(row.id);
                   router.push("/finance/quotations");
                 }}
@@ -420,6 +601,16 @@ export function QuotationDetailClient({ id }: { id: string }) {
                 </span>
               ) : null}
             </div>
+            {row.publicLink ? (
+              <a
+                href={row.publicLink}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 block truncate text-[11px] text-violet-600"
+              >
+                {row.publicLink}
+              </a>
+            ) : null}
           </div>
           <div className="px-5 py-4">
             <LineItemsEditor
@@ -427,6 +618,63 @@ export function QuotationDetailClient({ id }: { id: string }) {
               onChange={() => {}}
               readOnly
             />
+          </div>
+          <div className="border-t border-slate-100 px-5 py-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-[12px] font-bold tracking-wide text-slate-700 uppercase">
+                Attachments
+              </h3>
+              {isCrmQuoteId(row.id) ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => fileRef.current?.click()}
+                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 disabled:opacity-50"
+                  >
+                    <Paperclip className="h-3.5 w-3.5" />
+                    Add file
+                  </button>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) void onAttach(file);
+                    }}
+                  />
+                </>
+              ) : null}
+            </div>
+            {(row.attachments ?? []).length === 0 ? (
+              <p className="text-[12px] text-slate-400">No attachments</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {(row.attachments ?? []).map((att) => (
+                  <li
+                    key={att.id}
+                    className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-[12px]"
+                  >
+                    <span className="min-w-0 truncate text-slate-700">
+                      {att.name}
+                      {att.sizeLabel ? (
+                        <span className="ml-1 text-slate-400">{att.sizeLabel}</span>
+                      ) : null}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void onRemoveAttachment(att.id)}
+                      className="text-[11px] font-semibold text-rose-600 disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <div className="border-t border-slate-100 px-5 py-4">
             <RecordAuditHistory

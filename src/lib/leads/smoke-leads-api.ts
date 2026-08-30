@@ -143,6 +143,23 @@ export async function smokeLeadClientWiring() {
   if (!detail.includes("convertCrmLead")) {
     fail("LeadDetailView does not call convertCrmLead");
   }
+  for (const name of [
+    "assignCrmLeadOwner",
+    "unassignCrmLeadOwner",
+    "linkCrmLeadCompany",
+    "unlinkCrmLeadCompany",
+    "changeCrmLeadLifecycleStage",
+    "changeCrmLeadRating",
+    "changeCrmLeadScore",
+    "softDeleteCrmLead",
+  ]) {
+    if (!detail.includes(name)) {
+      fail(`LeadDetailView does not call ${name}`);
+    }
+  }
+  if (!clientSrc.includes("fetchLeadList")) {
+    fail("refresh path must still use GET /v1/leads");
+  }
 }
 
 export async function smokeLeadClientMock() {

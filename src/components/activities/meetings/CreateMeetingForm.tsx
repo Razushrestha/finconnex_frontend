@@ -14,6 +14,7 @@ import {
 import {
   MEETING_TYPES,
   MEETING_STATUSES,
+  type Meeting,
   type MeetingStatus,
   type MeetingType,
 } from "@/lib/meetings/types";
@@ -25,6 +26,13 @@ import {
 } from "@/lib/activities/shared";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { createMeeting } from "@/lib/meetings/store";
+import {
+  createCrmMeeting,
+  isCrmMeetingId,
+  persistRemoteMeeting,
+  replaceCrmMeetingAttendees,
+  tryCrmMeeting,
+} from "@/lib/meetings/api";
 import {
   CreateEntityFormShell,
   Field,
@@ -90,6 +98,8 @@ export function CreateMeetingForm({
     {},
   );
   const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -111,14 +121,16 @@ export function CreateMeetingForm({
     return Object.keys(next).length === 0;
   }
 
-  function handleSave(createAnother: boolean) {
+  async function handleSave(createAnother: boolean) {
     setSubmitted(true);
     if (!validate()) return;
+    setSaving(true);
+    setSaveError(null);
     const relatedTo =
       form.relatedKind && form.relatedName
         ? `${form.relatedKind}: ${form.relatedName}`
         : undefined;
-    const created = createMeeting({
+    const draft = {
       title: form.title.trim(),
       relatedTo,
       type: form.type as MeetingType,
@@ -130,7 +142,34 @@ export function CreateMeetingForm({
       status: form.status as MeetingStatus,
       agenda: form.agenda.trim() || undefined,
       notes: form.notes.trim() || undefined,
-    });
+    };
+    let created: Meeting | null = null;
+    try {
+      created = persistRemoteMeeting(await createCrmMeeting(draft));
+      const attendeeIds = form.attendees
+        .split(",")
+        .map((part) => part.trim())
+        .filter(isCrmMeetingId);
+      if (created && attendeeIds.length) {
+        const meetingId = created.id;
+        const withAttendees = await tryCrmMeeting(() =>
+          replaceCrmMeetingAttendees(meetingId, attendeeIds),
+        );
+        persistRemoteMeeting(withAttendees);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Create failed";
+      if (!/sign in/i.test(message)) {
+        setSaveError(message);
+        setSaving(false);
+        return;
+      }
+      created = null;
+    }
+    if (!created) {
+      created = createMeeting(draft);
+    }
+    setSaving(false);
     if (createAnother) {
       setForm({
         ...initialState,
@@ -140,6 +179,7 @@ export function CreateMeetingForm({
       });
       setErrors({});
       setSubmitted(false);
+      setSaveError(null);
       return;
     }
     void layoutId;
@@ -161,6 +201,12 @@ export function CreateMeetingForm({
       saveLabel="Save Meeting"
       onSave={handleSave}
     >
+      {saveError ? (
+        <p className="col-span-full text-[12px] text-rose-600">{saveError}</p>
+      ) : null}
+      {saving ? (
+        <p className="col-span-full text-[12px] text-slate-500">Saving…</p>
+      ) : null}
       <Field
         label="Title"
         required

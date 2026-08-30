@@ -75,6 +75,9 @@ export interface LeadCardData {
   ownerId?: string;
   /** Linked CRM company UUID. */
   companyId?: string;
+  lifecycleStage?: string;
+  rating?: string;
+  score?: number;
   createdDate: string;
   source: LeadSource;
   estimatedValue?: string;

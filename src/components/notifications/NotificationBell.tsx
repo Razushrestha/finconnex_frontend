@@ -16,9 +16,18 @@ import {
   writeAllNotifications,
   type AppNotification,
 } from "@/lib/notifications/types";
+import {
+  isCrmNotificationId,
+  markAllCrmNotificationsRead,
+  markCrmNotificationRead,
+  persistRemoteNotification,
+  tryCrmNotification,
+} from "@/lib/notifications/api";
+import { useCrmNotifications } from "@/lib/notifications/use-crm-notifications";
 
 export function NotificationBell() {
   const router = useRouter();
+  const crm = useCrmNotifications();
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<AppNotification[]>([]);
   const ref = useRef<HTMLDivElement>(null);
@@ -28,8 +37,9 @@ export function NotificationBell() {
   }
 
   useEffect(() => {
+    if (crm.loading) return;
     reload();
-  }, []);
+  }, [crm.source, crm.loading]);
 
   useEffect(() => {
     if (!open) return;
@@ -46,7 +56,7 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const unread = countUnread(rows);
+  const unread = crm.source === "api" ? crm.unreadCount : countUnread(rows);
   const preview = rows
     .filter((n) => n.status !== "Dismissed")
     .slice(0, 6);
@@ -58,6 +68,12 @@ export function NotificationBell() {
       );
       writeAllNotifications(next);
       setRows(next);
+      crm.setUnreadCount(countUnread(next));
+      if (isCrmNotificationId(n.id)) {
+        void tryCrmNotification(() => markCrmNotificationRead(n.id)).then(
+          (remote) => persistRemoteNotification(remote),
+        );
+      }
     }
     setOpen(false);
     router.push("/notifications");
@@ -67,6 +83,8 @@ export function NotificationBell() {
     const next = markAllNotificationsRead(listNotifications());
     writeAllNotifications(next);
     setRows(next);
+    crm.setUnreadCount(0);
+    void tryCrmNotification(() => markAllCrmNotificationsRead());
   }
 
   return (

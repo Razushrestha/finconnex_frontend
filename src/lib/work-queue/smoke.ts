@@ -30,6 +30,8 @@ const SESSION = {
 
 const SOURCE_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
+const DECOY_PATH = "/v1/__no_such_module_work_queue_probe__";
+
 const LIVE_ROUTES: Array<{ method: string; path: string }> = [
   {
     method: "GET",
@@ -64,6 +66,11 @@ export function smokeWorkQueueWiring() {
   const view = readSrc("src/components/work-queue/WorkQueueView.tsx");
   if (!view.includes("useCrmWorkQueue")) {
     fail("WorkQueueView does not call useCrmWorkQueue");
+  }
+
+  const hook = readSrc("src/lib/work-queue/use-crm-work-queue.ts");
+  if (!hook.includes('setSource("api")')) {
+    fail("work-queue hook must mark a successful empty list as Live CRM");
   }
 
   if (!navToWorkQueueTypes("tasks")?.includes("TASK")) {
@@ -161,24 +168,50 @@ export async function smokeWorkQueueLive(): Promise<{
   }> = [];
   let ok = true;
 
+  const decoy = await fetch(`${base}${DECOY_PATH}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+  });
+  rows.push({
+    method: "GET",
+    path: DECOY_PATH,
+    status: decoy.status,
+    note:
+      decoy.status === 404
+        ? "control 404"
+        : `expected 404, got ${decoy.status}`,
+  });
+  if (decoy.status !== 404) ok = false;
+
   for (const route of LIVE_ROUTES) {
     try {
       const res = await fetch(`${base}${route.path}`, {
         method: route.method,
         headers: { Accept: "application/json" },
       });
-      const routed = res.status !== 404 && res.status !== 405;
+      const text = await res.text();
+      let message = text.slice(0, 180);
+      try {
+        const json = JSON.parse(text) as { message?: unknown };
+        if (typeof json.message === "string") message = json.message;
+      } catch {
+        /* keep */
+      }
+      const msg = message.toLowerCase();
+      const routed =
+        (res.status === 401 || res.status === 403) &&
+        (msg.includes("token") ||
+          msg.includes("unauthorized") ||
+          msg.includes("forbidden") ||
+          msg.includes("jwt"));
       if (!routed) ok = false;
       rows.push({
         method: route.method,
         path: route.path,
         status: res.status,
-        note:
-          res.status === 401 || res.status === 403
-            ? "route live, auth required"
-            : routed
-              ? `HTTP ${res.status}`
-              : "missing route",
+        note: routed
+          ? `routed + auth required: ${message}`
+          : `unexpected ${res.status}: ${message}`,
       });
     } catch (err) {
       ok = false;
@@ -209,8 +242,12 @@ export async function runWorkQueueSmoke() {
   console.log("\n3) Live CRM probe…");
   const live = await smokeWorkQueueLive();
   for (const row of live.rows) {
-    const mark =
-      row.status !== 404 && row.status !== 405 && row.status !== 0
+    const isDecoy = row.path === DECOY_PATH;
+    const mark = isDecoy
+      ? row.status === 404
+        ? "OK"
+        : "FAIL"
+      : row.note.startsWith("routed + auth required")
         ? "OK"
         : "FAIL";
     console.log(

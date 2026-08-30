@@ -1,13 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  MoreHorizontal,
-  Plus,
-  Clock,
-  Video,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import Link from "next/link";
+import { Clock, CalendarDays, ArrowUpRight } from "lucide-react";
 import { Card, CardHeader } from "./card-primitives";
 import { fetchCalendarUpcoming } from "@/lib/calendar/api";
 import type { CalendarItem } from "@/lib/calendar/types";
@@ -64,27 +59,6 @@ export function OrderByTimeCard() {
   );
 }
 
-const meetings = [
-  {
-    title: "Team Stand Up",
-    tag: "Marketing",
-    time: "06:00 - 07:00",
-    faded: false,
-  },
-  {
-    title: "All Hands Meeting",
-    tag: "Manager",
-    time: "06:00 - 07:00",
-    faded: false,
-  },
-  {
-    title: "Sprint Planning",
-    tag: "Design",
-    time: "06:00 - 07:00",
-    faded: false,
-  },
-];
-
 function formatMeetingTime(item: CalendarItem): string {
   const start = item.start.includes("T") ? item.start.split("T")[1]!.slice(0, 5) : "09:00";
   const end = item.end?.includes("T") ? item.end.split("T")[1]!.slice(0, 5) : "";
@@ -93,6 +67,7 @@ function formatMeetingTime(item: CalendarItem): string {
 
 export function UpcomingMeetingsCard() {
   const [live, setLive] = useState<CalendarItem[] | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -102,83 +77,105 @@ export function UpcomingMeetingsCard() {
       })
       .catch(() => {
         if (!cancelled) setLive(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const rows =
-    live && live.length
-      ? live.slice(0, 6).map((item, index) => ({
-          title: item.title,
-          tag: item.type,
-          time: formatMeetingTime(item),
-          faded: index > 2,
-        }))
-      : meetings;
+  const rows = (live ?? []).slice(0, 5).map((item) => ({
+    id: item.id ?? item.title,
+    title: item.title,
+    tag: item.type,
+    time: formatMeetingTime(item),
+    day: meetingDay(item.start),
+  }));
 
   return (
-    <Card className="overflow-hidden">
-      <div className="mb-4 flex items-start justify-between">
-        <h3 className="text-[15px] font-semibold leading-snug text-gray-900">
-          Upcoming
-          <br />
-          Meetings
-        </h3>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            aria-label="Add meeting"
-            className="flex h-7 w-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="More options"
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <MoreHorizontal className="h-[18px] w-[18px]" />
-          </button>
+    <section className="flex min-h-[320px] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_8px_24px_-18px_rgba(15,23,42,0.35)]">
+      <header className="flex items-center justify-between gap-2 border-b border-sky-100 bg-gradient-to-r from-sky-50 to-white px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-sky-100 text-sky-600">
+            <CalendarDays className="h-4 w-4" />
+          </span>
+          <div>
+            <h2 className="text-[13px] font-semibold leading-tight text-slate-900">
+              Meetings
+            </h2>
+            <p className="text-[10px] text-slate-500">Coming up on the calendar</p>
+          </div>
         </div>
-      </div>
+        <Link
+          href="/activities/meetings"
+          className="text-slate-400 hover:text-violet-700"
+          aria-label="Open meetings"
+        >
+          <ArrowUpRight className="h-4 w-4" />
+        </Link>
+      </header>
 
-      <div className="relative -mx-5 px-5">
-        <div className="flex max-h-[300px] flex-col gap-3 overflow-y-auto pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {rows.map((m) => (
-            <div
-              key={m.title}
-              className={cn(
-                "rounded-xl bg-gray-50 p-4 transition-opacity",
-                m.faded && "opacity-40",
-              )}
+      <div className="flex-1 px-3 py-3">
+        {!loaded ? (
+          <p className="py-10 text-center text-[12px] text-slate-400">
+            Loading meetings…
+          </p>
+        ) : rows.length === 0 ? (
+          <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-2 text-center">
+            <p className="text-[13px] font-medium text-slate-600">
+              {live === null ? "Calendar not connected" : "No meetings booked"}
+            </p>
+            <p className="max-w-[200px] text-[11px] text-slate-400">
+              Scheduled calls and stand-ups will show here.
+            </p>
+            <Link
+              href="/activities/meetings"
+              className="mt-1 text-[11px] font-semibold text-violet-700"
             >
-              <div className="mb-2 flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-gray-900">
-                  {m.title}
-                </h4>
-                <MoreHorizontal className="h-4 w-4 text-gray-400" />
-              </div>
-              <div className="mb-3 flex items-center gap-1.5 text-xs text-gray-500">
-                <Video className="h-3.5 w-3.5 text-emerald-500" />
-                On Google Meet
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-700 shadow-sm">
-                  {m.tag}
-                </span>
-                <span className="flex items-center gap-1 text-xs text-gray-500">
-                  <Clock className="h-3.5 w-3.5" />
-                  {m.time}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-white/90" />
+              Open meetings
+            </Link>
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {rows.map((m) => (
+              <li
+                key={m.id}
+                className="flex gap-3 rounded-xl bg-slate-50 px-2.5 py-2"
+              >
+                <div className="flex h-12 w-11 shrink-0 flex-col items-center justify-center rounded-lg bg-white text-center ring-1 ring-slate-200">
+                  <span className="text-[9px] font-semibold uppercase tracking-wide text-sky-600">
+                    {m.day.month}
+                  </span>
+                  <span className="text-sm font-bold leading-none text-slate-900">
+                    {m.day.date}
+                  </span>
+                </div>
+                <div className="min-w-0 pt-0.5">
+                  <p className="truncate text-[12px] font-semibold text-slate-800">
+                    {m.title}
+                  </p>
+                  <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
+                    <Clock className="h-3 w-3" />
+                    {m.time}
+                    {m.tag ? ` · ${m.tag}` : ""}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-    </Card>
+    </section>
   );
+}
+
+function meetingDay(start: string) {
+  const parsed = Date.parse(start);
+  const d = Number.isNaN(parsed) ? new Date() : new Date(parsed);
+  return {
+    month: d.toLocaleString("en-AU", { month: "short" }),
+    date: String(d.getDate()),
+  };
 }

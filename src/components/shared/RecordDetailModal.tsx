@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
@@ -15,6 +16,7 @@ interface RecordDetailModalProps {
   subtitle?: string;
   fields: RecordDetailField[];
   body?: string;
+  actions?: ReactNode;
 }
 
 /** Lightweight read-only detail dialog for Activity deep-links. */
@@ -25,6 +27,7 @@ export function RecordDetailModal({
   subtitle,
   fields,
   body,
+  actions,
 }: RecordDetailModalProps) {
   return (
     <Dialog
@@ -73,6 +76,11 @@ export function RecordDetailModal({
             <p className="mt-1 whitespace-pre-wrap text-[13px] text-slate-700">
               {body}
             </p>
+          </div>
+        ) : null}
+        {actions ? (
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-5 py-3">
+            {actions}
           </div>
         ) : null}
       </DialogContent>

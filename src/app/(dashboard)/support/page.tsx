@@ -16,9 +16,11 @@ import {
   TICKET_STATUS_STYLE,
 } from "@/lib/support/types";
 import { cn } from "@/lib/utils";
+import { useCrmTickets } from "@/lib/support/use-crm-tickets";
 
 export default function SupportTicketsPage() {
   const router = useRouter();
+  const crm = useCrmTickets();
   const [rows, setRows] = useState<SupportTicket[]>(seed);
   const [statusTab, setStatusTab] = useState<TicketStatus | "All">("All");
   const [priorityFilter, setPriorityFilter] = useState<TicketPriority | "All">(
@@ -30,7 +32,7 @@ export default function SupportTicketsPage() {
 
   useEffect(() => {
     setRows(listTickets());
-  }, []);
+  }, [crm.source, crm.loading]);
 
   useEffect(() => {
     setPage(1);
@@ -117,6 +119,20 @@ export default function SupportTicketsPage() {
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Support Tickets
             </h1>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                crm.source === "api"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-slate-100 text-slate-500",
+              )}
+            >
+              {crm.source === "api"
+                ? "Live CRM"
+                : crm.loading
+                  ? "Connecting…"
+                  : "Demo"}
+            </span>
           </div>
           <div className="flex items-center gap-1.5">
             <button

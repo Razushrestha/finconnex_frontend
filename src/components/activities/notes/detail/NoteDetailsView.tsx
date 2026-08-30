@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Clock, Link2, Lock, Pin } from "lucide-react";
+import { ArrowLeft, Clock, Link2, Lock, Pin, RotateCcw, Trash2 } from "lucide-react";
 import type { Note, NoteType } from "@/lib/notes/types";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
@@ -17,14 +17,23 @@ const TYPE_META: Record<NoteType, { soft: string; text: string }> = {
 interface NoteDetailsViewProps {
   note: Note;
   onBack: () => void;
+  busy?: boolean;
+  onDelete?: () => void;
+  onRestore?: () => void;
 }
 
-export function NoteDetailsView({ note, onBack }: NoteDetailsViewProps) {
+export function NoteDetailsView({
+  note,
+  onBack,
+  busy,
+  onDelete,
+  onRestore,
+}: NoteDetailsViewProps) {
   const meta = TYPE_META[note.noteType];
 
   return (
     <div className="min-h-screen bg-background px-4 py-2">
-      <div className="mb-4 flex items-center gap-4 border-b border-border px-2 py-3">
+      <div className="mb-4 flex items-center justify-between gap-4 border-b border-border px-2 py-3">
         <button
           type="button"
           onClick={onBack}
@@ -33,6 +42,28 @@ export function NoteDetailsView({ note, onBack }: NoteDetailsViewProps) {
           <ArrowLeft className="h-4 w-4" />
           Back to Notes
         </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {onRestore ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onRestore}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-medium text-slate-700 disabled:opacity-50"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Restore
+            </button>
+          ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onDelete}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-[12px] font-medium text-rose-700 disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 lg:grid-cols-3">

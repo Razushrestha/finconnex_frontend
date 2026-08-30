@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
     Plus,
@@ -22,10 +21,12 @@ import {
   type ResourceItem,
   type ResourceType,
 } from "@/lib/resources/types";
+import { useCrmResources } from "@/lib/resources/use-crm-resources";
 import { cn } from "@/lib/utils";
 
 export default function ResourcesPage() {
   const router = useRouter();
+  const crm = useCrmResources();
   const [rows, setRows] = useState<ResourceItem[]>(seed);
   const [typeFilter, setTypeFilter] = useState<ResourceType | "All">("All");
   const [categoryFilter, setCategoryFilter] = useState<ResourceCategory | "All">(
@@ -40,7 +41,7 @@ export default function ResourcesPage() {
 
   useEffect(() => {
     setRows(listResources());
-  }, []);
+  }, [crm.source, crm.loading]);
 
   useEffect(() => {
     setPage(1);
@@ -92,6 +93,11 @@ export default function ResourcesPage() {
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Resources
             </h1>
+            {crm.source === "api" ? (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-700">
+                Live CRM
+              </span>
+            ) : null}
           </div>
           <div className="flex items-center gap-1.5">
             <button

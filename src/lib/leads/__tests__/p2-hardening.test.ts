@@ -266,7 +266,7 @@ describe("Phase 15 comms + files", () => {
     });
     const { getSendGateway } = await import("@/lib/comms/send-gateway");
     await getSendGateway().sendSms({ phone: "+100", body: "hi" });
-    expect(log.some((e) => e.path === "/v1/messages/send")).toBe(true);
+    expect(log.some((e) => e.path === "/v1/messages")).toBe(true);
     enableDeviceIntentGateway();
   });
 });

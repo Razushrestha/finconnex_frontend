@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Search, Download } from "lucide-react";
 import {
@@ -17,10 +16,12 @@ import {
   type ReportType,
   type SavedReport,
 } from "@/lib/reports/types";
+import { useCrmReports } from "@/lib/reports/use-crm-reports";
 import { cn } from "@/lib/utils";
 
 export default function ReportsPage() {
   const router = useRouter();
+  const crm = useCrmReports();
   const [rows, setRows] = useState<SavedReport[]>(seed);
   const [statusTab, setStatusTab] = useState<ReportStatus | "All">("All");
   const [typeFilter, setTypeFilter] = useState<ReportType | "All">("All");
@@ -33,7 +34,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     setRows(listReports());
-  }, []);
+  }, [crm.source, crm.loading]);
 
   useEffect(() => {
     setPage(1);
@@ -118,6 +119,11 @@ export default function ReportsPage() {
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Reports
             </h1>
+            {crm.source === "api" ? (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-700">
+                Live CRM
+              </span>
+            ) : null}
           </div>
           <div className="flex items-center gap-1.5">
             <button

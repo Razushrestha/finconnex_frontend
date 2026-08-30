@@ -88,28 +88,54 @@ export function updateContact(
       | "source"
       | "dealIds"
     >
-  >,
+  > & { status?: ContactStatus },
 ): ContactCardData | null {
   const found = findContactById(id);
   if (!found) return null;
-  let updated: ContactCardData | null = null;
-  saveContactGroups(
-    listContactGroups().map((g) => ({
-      ...g,
-      contacts: g.contacts.map((c) => {
-        if (c.id !== id) return c;
-        updated = {
-          ...c,
-          ...patch,
-          name: patch.name?.trim() || c.name,
-          email: patch.email?.trim() || c.email,
-          dealIds: patch.dealIds ?? c.dealIds,
-        };
-        return updated;
-      }),
-    })),
+  const nextStatus = patch.status ?? found.status;
+  const merged: ContactCardData = {
+    ...found.contact,
+    ...patch,
+    id,
+    name: patch.name?.trim() || found.contact.name,
+    email: patch.email?.trim() || found.contact.email,
+    dealIds: patch.dealIds ?? found.contact.dealIds,
+    accentColorClass:
+      nextStatus !== found.status
+        ? (listContactGroups().find((g) => g.title === nextStatus)?.dotColorClass ??
+          found.contact.accentColorClass)
+        : found.contact.accentColorClass,
+  };
+
+  let groups = listContactGroups().map((g) => ({
+    ...g,
+    contacts: g.contacts.filter((c) => c.id !== id),
+  }));
+  const target =
+    groups.find((g) => g.title === nextStatus) ??
+    groups.find((g) => g.id === found.groupId) ??
+    groups[0];
+  if (!target) return null;
+  groups = groups.map((g) =>
+    g.id === target.id ? { ...g, contacts: [merged, ...g.contacts] } : g,
   );
-  return updated;
+  saveContactGroups(groups);
+
+  void import("@/lib/contacts/api").then(({ updateCrmContact, tryCrmContact }) => {
+    void tryCrmContact(() =>
+      updateCrmContact(id, {
+        name: patch.name,
+        email: patch.email,
+        phone: patch.phone,
+        mobile: patch.mobile,
+        company: patch.company,
+        owner: patch.owner,
+        source: patch.source,
+        status: nextStatus,
+      }),
+    );
+  });
+  return merged;
 }
 
 /** Bidirectional contact ↔ deal link. */
@@ -176,10 +202,21 @@ export function createContact(input: {
         : g,
     ),
   );
+  void import("@/lib/contacts/api").then(async ({ createCrmContact, tryCrmContact }) => {
+    const remote = await tryCrmContact(() => createCrmContact(input));
+    if (!remote) return;
+    if (remote.contact.id !== contact.id) {
+      deleteContact(contact.id, { skipCrm: true });
+    }
+    mergeCrmContactsIntoBoard([remote]);
+  });
   return contact;
 }
 
-export function deleteContact(id: string): ContactCardData | null {
+export function deleteContact(
+  id: string,
+  opts?: { skipCrm?: boolean },
+): ContactCardData | null {
   const found = findContactById(id);
   if (!found) return null;
   saveContactGroups(
@@ -188,5 +225,38 @@ export function deleteContact(id: string): ContactCardData | null {
       contacts: g.contacts.filter((c) => c.id !== id),
     })),
   );
+  if (!opts?.skipCrm) {
+    void import("@/lib/contacts/api").then(({ deleteCrmContact, tryCrmContact }) => {
+      void tryCrmContact(() => deleteCrmContact(id));
+    });
+  }
   return found.contact;
+}
+
+export function mergeCrmContactsIntoBoard(
+  remote: Array<{ contact: ContactCardData; status: ContactStatus }>,
+) {
+  if (!remote.length) return;
+  const remoteIds = new Set(remote.map((r) => r.contact.id));
+  let groups = listContactGroups().map((g) => ({
+    ...g,
+    contacts: g.contacts.filter((c) => !remoteIds.has(c.id)),
+  }));
+  for (const item of remote) {
+    const target =
+      groups.find((g) => g.title === item.status) ??
+      groups.find((g) => g.title === "Active") ??
+      groups[0];
+    if (!target) continue;
+    const contact: ContactCardData = {
+      ...item.contact,
+      accentColorClass: target.dotColorClass,
+    };
+    groups = groups.map((g) =>
+      g.id === target.id
+        ? { ...g, contacts: [contact, ...g.contacts] }
+        : g,
+    );
+  }
+  saveContactGroups(groups);
 }

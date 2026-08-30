@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
 import Link from "next/link";
@@ -145,6 +145,7 @@ const dashboardItems: NavItem[] = [
       { label: "Estimates", href: "/finance/estimates" },
       { label: "Quotations", href: "/finance/quotations" },
       { label: "Invoices", href: "/finance/invoices" },
+      { label: "Credit Notes", href: "/finance/credit-notes" },
       { label: "Payments", href: "/finance/payments" },
       { label: "Items / Services", href: "/finance/products" },
     ],

@@ -1,3 +1,4 @@
+import type { CreditNoteStatus } from "@/lib/finance/credit-notes/types";
 import type { EstimateStatus } from "@/lib/finance/estimates/types";
 import type { QuotationStatus } from "@/lib/finance/quotations/types";
 import type { InvoiceStatus } from "@/lib/finance/invoices/types";
@@ -20,6 +21,14 @@ export const QUOTATION_STATUS_STYLE: Record<QuotationStatus, string> = {
   Rejected: "bg-rose-50 text-rose-700",
   Expired: "bg-amber-50 text-amber-800",
   Invoiced: "bg-violet-50 text-violet-700",
+};
+
+export const CREDIT_NOTE_STATUS_STYLE: Record<CreditNoteStatus, string> = {
+  Draft: "bg-slate-100 text-slate-600",
+  Sent: "bg-sky-50 text-sky-700",
+  Applied: "bg-emerald-50 text-emerald-700",
+  Void: "bg-slate-200 text-slate-600",
+  Cancelled: "bg-slate-100 text-slate-500",
 };
 
 export const INVOICE_STATUS_STYLE: Record<InvoiceStatus, string> = {

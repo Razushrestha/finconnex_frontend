@@ -22,11 +22,11 @@ export function unwrapCrmData<T>(json: unknown): T {
   return json as T;
 }
 
-export async function crmFetch<T>(
+async function sendCrm(
   session: Pick<CrmSession, "baseUrl" | "accessToken">,
   path: string,
   init?: RequestInit,
-): Promise<T> {
+) {
   const res = await fetch(`${session.baseUrl}${path}`, {
     ...init,
     headers: {
@@ -36,7 +36,6 @@ export async function crmFetch<T>(
       ...(init?.headers ?? {}),
     },
   });
-
   const text = await res.text();
   let json: unknown = null;
   if (text) {
@@ -44,6 +43,23 @@ export async function crmFetch<T>(
       json = JSON.parse(text);
     } catch {
       json = null;
+    }
+  }
+  return { res, json };
+}
+
+export async function crmFetch<T>(
+  session: Pick<CrmSession, "baseUrl" | "accessToken">,
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  let { res, json } = await sendCrm(session, path, init);
+
+  if ([401, 403, 404, 405].includes(res.status)) {
+    const { ensureCrmSession } = await import("@/lib/activity-timeline/auth");
+    const next = await ensureCrmSession();
+    if (next?.accessToken && next.accessToken !== session.accessToken) {
+      ({ res, json } = await sendCrm(next, path, init));
     }
   }
 

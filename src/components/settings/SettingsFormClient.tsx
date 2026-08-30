@@ -14,13 +14,21 @@ import {
   type SettingsValues,
 } from "@/lib/settings/settings-store";
 import {
+  overlaySecurityValues,
   overlaySettingsValues,
   patchCrmWorkspaceSettings,
   tryCrmSettings,
   valuesToSettingsPatch,
 } from "@/lib/settings/api";
 import { useCrmSettings } from "@/lib/settings/use-crm-settings";
+import {
+  overlayMemberPreferences,
+  tryCrmWorkspaceOperations,
+  updateCrmWorkspaceMemberPreferences,
+} from "@/lib/workspace-operations/api";
+import { useCrmWorkspaceMemberPreferences } from "@/lib/workspace-operations/use-crm-workspace-member-preferences";
 import { ThemeModeToggle } from "@/components/layout/ThemeModeToggle";
+import { tryCrmStorage, uploadCrmStorageFile } from "@/lib/storage/api";
 import { cn } from "@/lib/utils";
 
 export function SettingsFormClient({
@@ -42,6 +50,9 @@ export function SettingsFormClient({
   );
   const schemaKey = `${categorySlug}/${subpageSlug}`;
   const crm = useCrmSettings();
+  const memberPrefs = useCrmWorkspaceMemberPreferences(
+    categorySlug === "my-preferences",
+  );
   const [values, setValues] = useState<SettingsValues>(() =>
     defaultsFromSchema(schema),
   );
@@ -50,11 +61,14 @@ export function SettingsFormClient({
 
   useEffect(() => {
     const saved = loadSettingsValues(schemaKey);
-    const base = { ...defaultsFromSchema(schema), ...saved };
-    setValues(
-      crm.settings ? overlaySettingsValues(base, crm.settings) : base,
-    );
-  }, [schemaKey, schema, crm.settings]);
+    let next = { ...defaultsFromSchema(schema), ...saved };
+    if (crm.settings) next = overlaySettingsValues(next, crm.settings);
+    if (crm.security) next = overlaySecurityValues(next, crm.security);
+    if (memberPrefs.preferences) {
+      next = overlayMemberPreferences(next, memberPrefs.preferences);
+    }
+    setValues(next);
+  }, [schemaKey, schema, crm.settings, crm.security, memberPrefs.preferences]);
 
   function setField(id: string, value: string | boolean | number) {
     setValues((v) => ({ ...v, [id]: value }));
@@ -62,10 +76,13 @@ export function SettingsFormClient({
 
   function onCancel() {
     const saved = loadSettingsValues(schemaKey);
-    const base = { ...defaultsFromSchema(schema), ...saved };
-    setValues(
-      crm.settings ? overlaySettingsValues(base, crm.settings) : base,
-    );
+    let next = { ...defaultsFromSchema(schema), ...saved };
+    if (crm.settings) next = overlaySettingsValues(next, crm.settings);
+    if (crm.security) next = overlaySecurityValues(next, crm.security);
+    if (memberPrefs.preferences) {
+      next = overlayMemberPreferences(next, memberPrefs.preferences);
+    }
+    setValues(next);
     setToast("Reverted to last saved");
     window.setTimeout(() => setToast(null), 1800);
   }
@@ -76,6 +93,12 @@ export function SettingsFormClient({
       path,
       title: schema.title,
     });
+    if (categorySlug === "my-preferences") {
+      const patched = await tryCrmWorkspaceOperations(() =>
+        updateCrmWorkspaceMemberPreferences(values),
+      );
+      if (patched) memberPrefs.setPreferences(patched);
+    }
     if (crm.source === "api") {
       const patched = await tryCrmSettings(() =>
         patchCrmWorkspaceSettings(
@@ -85,7 +108,11 @@ export function SettingsFormClient({
       if (patched) crm.setSettings(patched);
     }
     setSaving(false);
-    setToast(crm.source === "api" ? "Saved to CRM" : "Saved");
+    setToast(
+      crm.source === "api" || memberPrefs.source === "api"
+        ? "Saved to CRM"
+        : "Saved",
+    );
     window.setTimeout(() => setToast(null), 1800);
   }
 
@@ -243,13 +270,25 @@ function FieldRenderer({
           </div>
         </div>
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => onChange("uploaded-demo.png")}
-            className="h-8 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white"
-          >
+          <label className="inline-flex h-8 cursor-pointer items-center rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white">
             Upload
-          </button>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/svg+xml,image/x-icon,.ico"
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                void (async () => {
+                  const stored = await tryCrmStorage(() =>
+                    uploadCrmStorageFile(file),
+                  );
+                  onChange(stored?.key || stored?.url || file.name);
+                })();
+              }}
+            />
+          </label>
           <button
             type="button"
             onClick={() => onChange("")}

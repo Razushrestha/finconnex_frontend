@@ -34,7 +34,13 @@ import {
   nextSignatureIds,
   upsertSignatureRequest,
   type SigningOrderMode,
+  deleteSignatureRequest,
 } from "@/lib/documents/signature/types";
+import {
+  createCrmSignatureRequest,
+  persistRemoteSignatureRequest,
+  toCreateSignatureRequestBody,
+} from "@/lib/documents/signature/api";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -189,7 +195,7 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
     );
   }
 
-  function onSave(createAnother: boolean) {
+  async function onSave(createAnother: boolean) {
     if (!validate()) {
       window.requestAnimationFrame(() => {
         const el =
@@ -200,7 +206,25 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
       return;
     }
     try {
-      const draft = buildDraft();
+      let draft = buildDraft();
+      try {
+        const remote = persistRemoteSignatureRequest(
+          await createCrmSignatureRequest(toCreateSignatureRequestBody(draft)),
+        );
+        if (remote) {
+          deleteSignatureRequest(draft.id);
+          persistRemoteSignatureRequest(remote);
+          draft = {
+            ...remote,
+            updatedAt: remote.updatedAt ?? draft.updatedAt,
+          };
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "";
+        if (message && !/sign in/i.test(message)) {
+          /* keep local draft and continue */
+        }
+      }
       if (createAnother) {
         setDocumentName("");
         setDocumentFile("");

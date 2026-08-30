@@ -29,6 +29,15 @@ import {
   type SignerStatus,
 } from "@/lib/documents/signature/types";
 import {
+  deleteCrmSignatureRequest,
+  downloadCrmSignatureRequest,
+  getCrmSignatureRequest,
+  isCrmSignatureRequestId,
+  persistRemoteSignatureRequest,
+  sendCrmSignatureRequest,
+  tryCrmSignatureRequest,
+} from "@/lib/documents/signature/api";
+import {
   downloadArtifactBlob,
   getSignedArtifact,
   persistSignedPackage,
@@ -63,6 +72,19 @@ export function SignatureDetailClient({ id }: { id: string }) {
   useEffect(() => {
     const live = getSignatureRequestById(id);
     setReq(live ? normalizeSignatureRequest(live) : null);
+    if (!isCrmSignatureRequestId(id)) return;
+    let cancelled = false;
+    void (async () => {
+      const remote = await tryCrmSignatureRequest(() =>
+        getCrmSignatureRequest(id),
+      );
+      if (cancelled || !remote) return;
+      persistRemoteSignatureRequest(remote);
+      setReq(normalizeSignatureRequest(remote, { allowEmptyFields: true }));
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   function flash(msg: string) {
@@ -90,6 +112,17 @@ export function SignatureDetailClient({ id }: { id: string }) {
     }
     const sent = markRequestSent(req, req.createdBy);
     setReq(sent);
+    if (isCrmSignatureRequestId(req.id)) {
+      void (async () => {
+        const remote = await tryCrmSignatureRequest(() =>
+          sendCrmSignatureRequest(req.id),
+        );
+        if (remote) {
+          persistRemoteSignatureRequest(remote);
+          setReq(normalizeSignatureRequest(remote, { allowEmptyFields: true }));
+        }
+      })();
+    }
     flash(
       `Sent · ${sent.signers.filter((s) => s.role !== "CC").length} signer link(s)`,
     );
@@ -113,6 +146,9 @@ export function SignatureDetailClient({ id }: { id: string }) {
       },
       "Request cancelled",
     );
+    if (isCrmSignatureRequestId(req.id)) {
+      void tryCrmSignatureRequest(() => deleteCrmSignatureRequest(req.id));
+    }
   }
 
   function resend() {
@@ -156,6 +192,20 @@ export function SignatureDetailClient({ id }: { id: string }) {
 
   function downloadSigned() {
     if (!req) return;
+    if (isCrmSignatureRequestId(req.id)) {
+      void (async () => {
+        const hit = await tryCrmSignatureRequest(() =>
+          downloadCrmSignatureRequest(req.id),
+        );
+        if (hit?.url) {
+          window.open(hit.url, "_blank", "noopener,noreferrer");
+          flash("Download ready");
+          return;
+        }
+        flash(`Document not fully signed yet: ${req.documentFile}`);
+      })();
+      return;
+    }
     if (req.status === "Signed") {
       const doc = persistSignedPackage(req);
       const artifact = getSignedArtifact(doc.id);

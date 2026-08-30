@@ -528,6 +528,14 @@ import {
   type SignatureRequest,
   type SignatureSigner,
 } from "@/lib/documents/signature/types";
+import {
+  declineCrmSignatureRequest,
+  isCrmSignatureRequestId,
+  persistRemoteSignatureRequest,
+  signCrmSignatureRequest,
+  tryCrmSignatureRequest,
+  viewCrmSignatureRequest,
+} from "@/lib/documents/signature/api";
 import { syncQuotationFromSignature } from "@/lib/finance/quotations/signatureBridge";
 import { persistSignedPackage } from "@/lib/documents/signed-artifacts";
 import { SignatureDocPreview } from "./SignatureDocPreview";
@@ -590,6 +598,14 @@ export function PublicSignClient({ token }: { token: string }) {
     setReq(liveReq);
     setSigner(liveSigner);
     setHydrated(true);
+    if (isCrmSignatureRequestId(liveReq.id)) {
+      void tryCrmSignatureRequest(() => viewCrmSignatureRequest(liveReq.id)).then(
+        (remote) => {
+          if (!remote) return;
+          persistRemoteSignatureRequest(remote);
+        },
+      );
+    }
   }, [token]);
 
   function afterPersist(next: SignatureRequest) {
@@ -648,6 +664,15 @@ export function PublicSignClient({ token }: { token: string }) {
     }
     const next = applySignerSignature(req, signer.id, pendingSignatureData);
     afterPersist(next);
+    if (isCrmSignatureRequestId(req.id)) {
+      void tryCrmSignatureRequest(() =>
+        signCrmSignatureRequest(req.id, {
+          signatureData: pendingSignatureData,
+        }),
+      ).then((remote) => {
+        if (remote) persistRemoteSignatureRequest(remote);
+      });
+    }
   }
 
   function handleFieldClick(fieldId: string) {
@@ -691,6 +716,13 @@ export function PublicSignClient({ token }: { token: string }) {
     if (!req || !signer) return;
     const next = applySignerDecline(req, signer.id);
     afterPersist(next);
+    if (isCrmSignatureRequestId(req.id)) {
+      void tryCrmSignatureRequest(() =>
+        declineCrmSignatureRequest(req.id),
+      ).then((remote) => {
+        if (remote) persistRemoteSignatureRequest(remote);
+      });
+    }
   }
 
   if (!hydrated) {

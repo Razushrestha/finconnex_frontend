@@ -3,7 +3,15 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Note } from "@/lib/notes/types";
-import { findNoteById } from "@/lib/notes/store";
+import { deleteNote, findNoteById } from "@/lib/notes/store";
+import {
+  deleteCrmNote,
+  getCrmNote,
+  isCrmNoteId,
+  persistRemoteNote,
+  restoreCrmNote,
+  tryCrmNote,
+} from "@/lib/notes/api";
 import { NoteDetailsView } from "@/components/activities/notes/detail/NoteDetailsView";
 import { onRulesChange } from "@/lib/rules";
 
@@ -16,6 +24,8 @@ export default function NoteDetailPage({ params }: PageProps) {
   const router = useRouter();
   const [note, setNote] = useState<Note | null>(null);
   const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
 
   useEffect(() => {
     function loadNote() {
@@ -23,8 +33,25 @@ export default function NoteDetailPage({ params }: PageProps) {
       setReady(true);
     }
     loadNote();
-    return onRulesChange(loadNote);
+    const off = onRulesChange(loadNote);
+    let cancelled = false;
+    void (async () => {
+      if (!isCrmNoteId(id)) return;
+      const remote = await tryCrmNote(() => getCrmNote(id));
+      if (cancelled || !remote) return;
+      persistRemoteNote(remote);
+      setNote(remote);
+    })();
+    return () => {
+      cancelled = true;
+      off();
+    };
   }, [id]);
+
+  function notify(msg: string) {
+    setFlash(msg);
+    window.setTimeout(() => setFlash(null), 2600);
+  }
 
   if (!ready) {
     return (
@@ -51,10 +78,48 @@ export default function NoteDetailPage({ params }: PageProps) {
     );
   }
 
+  const live = isCrmNoteId(note.id);
+
   return (
-    <NoteDetailsView
-      note={note}
-      onBack={() => router.push("/activities/notes")}
-    />
+    <>
+      {flash ? (
+        <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
+          {flash}
+        </div>
+      ) : null}
+      <NoteDetailsView
+        note={note}
+        busy={busy}
+        onBack={() => router.push("/activities/notes")}
+        onRestore={
+          live
+            ? () => {
+                void (async () => {
+                  if (busy) return;
+                  setBusy(true);
+                  const remote = await tryCrmNote(() => restoreCrmNote(note.id));
+                  if (remote) {
+                    persistRemoteNote(remote);
+                    setNote(remote);
+                    notify("Restored");
+                  } else {
+                    notify("Restore failed");
+                  }
+                  setBusy(false);
+                })();
+              }
+            : undefined
+        }
+        onDelete={() => {
+          if (!window.confirm(`Delete ${note.title || "this note"}?`)) return;
+          void (async () => {
+            setBusy(true);
+            if (live) await tryCrmNote(() => deleteCrmNote(note.id));
+            deleteNote(note.id);
+            router.push("/activities/notes");
+          })();
+        }}
+      />
+    </>
   );
 }

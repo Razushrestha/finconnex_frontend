@@ -1,4 +1,6 @@
 /** Live calls board store (session-backed). */
+/** @deprecated Phase 9 hydrate alias — live key is activities:calls:board:v2 */
+export const CALLS_HYDRATE_KEY_V1 = "activities:calls:board:v1";
 
 import {
   callColumns as SEED_COLUMNS,

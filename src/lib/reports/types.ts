@@ -516,6 +516,19 @@ export function getReportById(id: string) {
   return listReports().find((r) => r.id === id);
 }
 
+function cloneReport(row: SavedReport): SavedReport {
+  return {
+    ...row,
+    previewRows: row.previewRows.map((p) => ({ ...p })),
+    audit: row.audit.map((a) => ({ ...a })),
+  };
+}
+
+/** Replace the session store with live CRM rows (empty list is a valid live result). */
+export function replaceCrmReports(remote: SavedReport[]) {
+  writeStore(remote.map(cloneReport));
+}
+
 export function nextReportIds() {
   const list = listReports();
   const nums = list
