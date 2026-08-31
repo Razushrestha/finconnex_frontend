@@ -20,7 +20,12 @@ import {
   type LeadSource,
 } from "@/lib/leads/types";
 import { api } from "@/lib/api";
-import { syncCreatedLead } from "@/lib/leads/api";
+import {
+  CRM_COMPANY_SIZE_LABELS,
+  CRM_COMPANY_SIZES,
+  syncCreatedLead,
+} from "@/lib/leads/api";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import {
   isMortgagePipelineStage,
@@ -150,7 +155,9 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
         company: form.company,
         companyWebsite: form.companyWebsite,
         industry: form.industry,
+        companySize: form.companySize,
         jobTitle: form.jobTitle,
+        ownerId: isUuid(form.owner) ? form.owner : undefined,
         source: form.leadSource || "Website",
         productInterest: form.productInterest,
         budgetRange: form.budgetRange,
@@ -335,12 +342,18 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
       </Field>
       <Field label="Company Size">
         <InputShell>
-          <input
-            className={elevatedInputClass(false)}
+          <select
+            className={elevatedSelectClass(false)}
             value={form.companySize}
             onChange={(e) => update("companySize", e.target.value)}
-            placeholder="e.g. 11–50"
-          />
+          >
+            <option value="">Select size</option>
+            {CRM_COMPANY_SIZES.map((size) => (
+              <option key={size} value={size}>
+                {CRM_COMPANY_SIZE_LABELS[size]}
+              </option>
+            ))}
+          </select>
         </InputShell>
       </Field>
       <Field label="Lead Source">

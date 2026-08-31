@@ -415,12 +415,15 @@ export async function syncCreatedLead(input: {
   company?: string;
   companyWebsite?: string;
   industry?: string;
+  companySize?: string;
   jobTitle?: string;
+  linkedinUrl?: string;
   source?: LeadSource;
   productInterest?: string;
   budgetRange?: string;
   estimatedValue?: string;
   notes?: string;
+  ownerId?: string;
   pipelineStage?: string;
 }): Promise<LeadCardData | null> {
   const created = await createCrmLead(toCrmCreateBody(input));

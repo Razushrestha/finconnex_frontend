@@ -694,7 +694,7 @@ export const ENDPOINT_CATALOG = [
     method: "GET",
     path: "/workspaces/:workspaceId/work-queue",
     module: "work-queue",
-    notes: "Bounded normalized queue; query: page, limit, type, status, priority, assigneeId, from, to",
+    notes: "Normalized activity queue with related CRM fields; query: page, limit, type, status, priority, assigneeId, from, to (max 10 years)",
   },
   {
     method: "GET",

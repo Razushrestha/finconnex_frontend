@@ -10,6 +10,7 @@ import {
   initials,
 } from "@/lib/activities/shared";
 import { getRulesActor } from "@/lib/rules/actor";
+import { displayNameForWorkQueueId } from "@/lib/work-queue/people";
 import { listTaskColumns } from "@/lib/tasks/store";
 import { listLeadColumns } from "@/lib/leads/store";
 import { listContactGroups } from "@/lib/contacts/store";
@@ -38,7 +39,12 @@ import {
 export type WorkQueueTimeFilter =
   | "today-overdue"
   | "today"
+  | "tomorrow"
+  | "overdue"
   | "this-week"
+  | "next-week"
+  | "this-month"
+  | "next-month"
   | "all"
   | "specific-date";
 
@@ -71,6 +77,9 @@ export interface QueueRow {
   createdBy?: string;
   description?: string;
   lastActivityTime?: string;
+  unreadCount?: number;
+  mentioned?: boolean;
+  assigneeId?: string;
   sortKey: number;
   href: string;
 }
@@ -171,6 +180,20 @@ function addDays(d: Date, n: number) {
   return x;
 }
 
+function mondayOfWeek(d: Date) {
+  const day = d.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  return addDays(startOfDay(d), mondayOffset);
+}
+
+function startOfMonth(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+function endOfMonth(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+
 export function formatDueLabel(due: Date | null, now = new Date()): string {
   if (!due) return "";
   const today = startOfDay(now).getTime();
@@ -215,21 +238,48 @@ function matchesTimeFilter(
   due: Date | null,
   filter: WorkQueueTimeFilter,
   now = new Date(),
+  specificDate?: Date,
 ): boolean {
   if (filter === "all") return true;
-  if (!due) return false;
+  if (!due) return filter === "today-overdue";
   const today0 = startOfDay(now);
   const today1 = endOfDay(now);
-  const weekEnd = endOfDay(addDays(today0, 7));
+  const monday = mondayOfWeek(now);
 
   if (filter === "today") return due >= today0 && due <= today1;
+  if (filter === "tomorrow") {
+    const t0 = startOfDay(addDays(today0, 1));
+    return due >= t0 && due <= endOfDay(t0);
+  }
+  if (filter === "overdue") return due < today0;
   if (filter === "today-overdue") return due <= today1;
-  if (filter === "this-week") return due <= weekEnd;
+  if (filter === "this-week") {
+    return due >= monday && due <= endOfDay(addDays(monday, 6));
+  }
+  if (filter === "next-week") {
+    const next = addDays(monday, 7);
+    return due >= next && due <= endOfDay(addDays(next, 6));
+  }
+  if (filter === "this-month") {
+    return due >= startOfMonth(now) && due <= endOfMonth(now);
+  }
+  if (filter === "next-month") {
+    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return due >= startOfMonth(next) && due <= endOfMonth(next);
+  }
+  if (filter === "specific-date") {
+    const day = specificDate ?? now;
+    const d0 = startOfDay(day);
+    return due >= d0 && due <= endOfDay(d0);
+  }
   return true;
 }
 
 function ownerMatches(ownerName: string, scope: WorkQueueScope): boolean {
-  return ownerName === scope;
+  if (!scope) return true;
+  if (ownerName === scope) return true;
+  const named = displayNameForWorkQueueId(scope);
+  return Boolean(named) && (ownerName === named || namesRoughlyMatch(ownerName, named));
 }
 
 /** Recently assigned: true 3h window when time present; same calendar day when date-only. */
@@ -284,20 +334,21 @@ function namesRoughlyMatch(a: string, b: string) {
 }
 
 function meetingOwnedBy(m: Meeting, scope: WorkQueueScope) {
-  if (m.attendees.some((a) => namesRoughlyMatch(a.name, scope))) return true;
+  const name = displayNameForWorkQueueId(scope);
+  if (m.attendees.some((a) => namesRoughlyMatch(a.name, name))) return true;
   const org = m.organizer.toLowerCase();
-  const first = scope.split(/\s+/)[0]?.toLowerCase() ?? "";
+  const first = name.split(/\s+/)[0]?.toLowerCase() ?? "";
   return first.length > 2 && org.startsWith(first);
 }
 
 function emailOwnedBy(e: Email, scope: WorkQueueScope) {
+  const name = displayNameForWorkQueueId(scope);
   const related = e.relatedTo ?? "";
-  if (related && namesRoughlyMatch(related, scope)) return true;
+  if (related && namesRoughlyMatch(related, name)) return true;
   const blob = `${related} ${e.to.join(" ")} ${e.from}`.toLowerCase();
-  const first = scope.split(/\s+/)[0]?.toLowerCase() ?? "";
+  const first = name.split(/\s+/)[0]?.toLowerCase() ?? "";
   if (first.length > 2 && blob.includes(first)) return true;
-  // Unassigned org drafts are visible to the active actor only
-  return getRulesActor().name === scope && !e.relatedTo;
+  return getRulesActor().name === name && !e.relatedTo;
 }
 
 function hrefFor(module: keyof typeof HREF, id: string, q?: string) {
@@ -320,17 +371,21 @@ function toRow(
   timeFilter: WorkQueueTimeFilter,
   now: Date,
   href: string,
-  opts?: { requireDue?: boolean } & QueueRowExtras,
+  opts?: { requireDue?: boolean; specificDate?: Date } & QueueRowExtras,
 ): QueueRow | null {
   const due = parseFlexibleDate(dueRaw);
-  if (opts?.requireDue !== false && !matchesTimeFilter(due, timeFilter, now)) {
+  if (
+    opts?.requireDue !== false &&
+    !matchesTimeFilter(due, timeFilter, now, opts?.specificDate)
+  ) {
     return null;
   }
   if (opts?.requireDue === false && timeFilter !== "all" && due) {
-    if (!matchesTimeFilter(due, timeFilter, now)) return null;
+    if (!matchesTimeFilter(due, timeFilter, now, opts.specificDate)) return null;
   }
   const dueLabel = due ? formatDueLabel(due, now) : "";
-  const { requireDue: _requireDue, ...extras } = opts ?? {};
+  const { requireDue: _requireDue, specificDate: _specificDate, ...extras } =
+    opts ?? {};
   return {
     id,
     subject,
@@ -357,8 +412,15 @@ export function listActivityRows(
   scope: WorkQueueScope,
   timeFilter: WorkQueueTimeFilter,
   now = new Date(),
+  specificDate?: Date,
 ): QueueRow[] {
   const rows: QueueRow[] = [];
+  const stamp = (
+    extras?: QueueRowExtras & { requireDue?: boolean },
+  ): { requireDue?: boolean; specificDate?: Date } & QueueRowExtras => ({
+    ...extras,
+    specificDate,
+  });
 
   if (kind === "tasks") {
     for (const col of listTaskColumns()) {
@@ -379,14 +441,14 @@ export function listActivityRows(
           timeFilter,
           now,
           hrefFor("tasks", t.taskId, t.title),
-          {
+          stamp({
             contactName,
             fileHandler: t.assignedTo,
             taskOwner: t.assignedTo,
             createdBy: t.createdBy,
             description: t.description,
             closedTime: t.completedDate,
-          },
+          }),
         );
         if (row) rows.push(row);
       }
@@ -407,11 +469,11 @@ export function listActivityRows(
         timeFilter,
         now,
         hrefFor("calls", c.id, c.subject),
-        {
+        stamp({
           contactName: c.contact || undefined,
           taskOwner: c.assignedTo,
           fileHandler: c.assignedTo,
-        },
+        }),
       );
       if (row) rows.push(row);
     }
@@ -431,10 +493,10 @@ export function listActivityRows(
         timeFilter,
         now,
         hrefFor("reminders", r.id, r.title),
-        {
+        stamp({
           taskOwner: r.owner,
           fileHandler: r.owner,
-        },
+        }),
       );
       if (row) rows.push(row);
     }
@@ -454,6 +516,7 @@ export function listActivityRows(
         timeFilter,
         now,
         hrefFor("meetings", m.id, m.title),
+        stamp(),
       );
       if (row) rows.push(row);
     }
@@ -473,7 +536,7 @@ export function listActivityRows(
         timeFilter,
         now,
         hrefFor("emails", e.id, e.subject),
-        { requireDue: false },
+        stamp({ requireDue: false }),
       );
       if (row) {
         // Emails without dates still appear under "all" / when filter allows undated
@@ -486,7 +549,14 @@ export function listActivityRows(
   if (kind === "messages") {
     for (const msg of listMessages()) {
       if (!OPEN_MESSAGE.has(msg.status)) continue;
-      if (msg.from !== scope && msg.to !== scope) continue;
+      const named = displayNameForWorkQueueId(scope);
+      if (
+        msg.from !== scope &&
+        msg.to !== scope &&
+        msg.from !== named &&
+        msg.to !== named
+      )
+        continue;
       const row = toRow(
         msg.id,
         msg.subject,
@@ -497,7 +567,7 @@ export function listActivityRows(
         timeFilter,
         now,
         hrefFor("messages", msg.id, msg.subject),
-        { requireDue: false },
+        stamp({ requireDue: false }),
       );
       if (row) {
         if (!msg.sentDate && timeFilter !== "all") continue;
@@ -713,6 +783,7 @@ export function listWorkqueueItemRows(
   scope: WorkQueueScope,
   timeFilter: WorkQueueTimeFilter,
   now = new Date(),
+  specificDate?: Date,
 ): QueueRow[] {
   const leads = scopedLeads(scope);
   const contacts = scopedContacts(scope);
@@ -786,30 +857,30 @@ export function listWorkqueueItemRows(
       );
     case "awaiting-action":
       return [
-        ...listActivityRows("tasks", scope, timeFilter, now).filter(
+        ...listActivityRows("tasks", scope, timeFilter, now, specificDate).filter(
           (r) => r.status === "Not Started",
         ),
-        ...listActivityRows("calls", scope, timeFilter, now),
+        ...listActivityRows("calls", scope, timeFilter, now, specificDate),
       ].sort((a, b) => a.sortKey - b.sortKey);
 
     case "waiting-approval":
       return dealRows(deals.filter((d) => d.status === "Proposal"));
     case "overdue":
       return [
-        ...listActivityRows("tasks", scope, "today-overdue", now),
-        ...listActivityRows("calls", scope, "today-overdue", now),
-        ...listActivityRows("reminders", scope, "today-overdue", now),
+        ...listActivityRows("tasks", scope, "today-overdue", now, specificDate),
+        ...listActivityRows("calls", scope, "today-overdue", now, specificDate),
+        ...listActivityRows("reminders", scope, "today-overdue", now, specificDate),
       ]
         .filter(
           (r) => r.dueLabel === "Yesterday" || r.dueLabel.includes("overdue"),
         )
         .sort((a, b) => a.sortKey - b.sortKey);
     case "high-priority":
-      return listActivityRows("tasks", scope, timeFilter, now).filter(
+      return listActivityRows("tasks", scope, timeFilter, now, specificDate).filter(
         (r) => r.priority.toLowerCase() === "high",
       );
     case "escalated":
-      return listActivityRows("tasks", scope, timeFilter, now).filter(
+      return listActivityRows("tasks", scope, timeFilter, now, specificDate).filter(
         (r) =>
           r.priority.toLowerCase() === "high" &&
           (r.dueLabel === "Yesterday" || r.dueLabel.includes("overdue")),
@@ -822,10 +893,12 @@ export function listWorkqueueItemRows(
 export function getActivityNav(
   scope: WorkQueueScope,
   timeFilter: WorkQueueTimeFilter,
+  specificDate?: Date,
 ): ActivityNavItem[] {
   return ACTIVITY_DEFAULT.map((a) => ({
     ...a,
-    count: listActivityRows(a.id, scope, timeFilter).length,
+    count: listActivityRows(a.id, scope, timeFilter, new Date(), specificDate)
+      .length,
   }));
 }
 
@@ -833,6 +906,7 @@ export function getWorkqueueSidebar(
   scope: WorkQueueScope,
   categories: WorkqueueCategoryDef[],
   timeFilter: WorkQueueTimeFilter,
+  specificDate?: Date,
 ): WorkqueueSidebarCategory[] {
   return categories
     .filter((c) => c.checked)
@@ -844,7 +918,13 @@ export function getWorkqueueSidebar(
         .map((it) => ({
           id: it.id,
           label: it.label,
-          count: listWorkqueueItemRows(it.id, scope, timeFilter).length,
+          count: listWorkqueueItemRows(
+            it.id,
+            scope,
+            timeFilter,
+            new Date(),
+            specificDate,
+          ).length,
           danger: it.danger,
         })),
     }))
@@ -876,11 +956,24 @@ export function listQueueRows(
   nav: WorkQueueNavId,
   scope: WorkQueueScope,
   timeFilter: WorkQueueTimeFilter,
+  specificDate?: Date,
 ): QueueRow[] {
   if (ACTIVITY_DEFAULT.some((a) => a.id === nav)) {
-    return listActivityRows(nav as ActivityNavId, scope, timeFilter);
+    return listActivityRows(
+      nav as ActivityNavId,
+      scope,
+      timeFilter,
+      new Date(),
+      specificDate,
+    );
   }
-  return listWorkqueueItemRows(nav as WorkqueueItemId, scope, timeFilter);
+  return listWorkqueueItemRows(
+    nav as WorkqueueItemId,
+    scope,
+    timeFilter,
+    new Date(),
+    specificDate,
+  );
 }
 
 export function filterQueueRows(

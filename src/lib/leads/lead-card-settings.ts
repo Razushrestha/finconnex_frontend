@@ -34,6 +34,8 @@ export const LEAD_CARD_FIELD_OPTIONS = [
   { key: "industry", label: "Industry" },
   { key: "jobTitle", label: "Job Title" },
   { key: "companyWebsite", label: "Website" },
+  { key: "companySize", label: "Company Size" },
+  { key: "notes", label: "Notes" },
   { key: "estimatedValue", label: "Estimated Value" },
   { key: "productInterest", label: "Product Interest" },
   { key: "budgetRange", label: "Budget" },

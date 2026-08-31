@@ -36,6 +36,10 @@ export function daysInStage(card: LeadCardData, now = new Date()) {
 }
 
 export function leadLocation(card: LeadCardData) {
+  const parts = [card.city, card.state, card.country].filter(
+    (part) => part?.trim(),
+  );
+  if (parts.length) return parts.join(", ");
   return card.custom?.preferredBranch || "Sydney, NSW";
 }
 

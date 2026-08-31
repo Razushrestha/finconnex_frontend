@@ -214,7 +214,9 @@ function cellText(row: QueueRow, colId: string): string {
     case "description":
       return row.description ?? "";
     case "lastActivityTime":
-      return row.lastActivityTime ?? "";
+      if (row.lastActivityTime) return row.lastActivityTime;
+      if (row.unreadCount) return `${row.unreadCount} unread`;
+      return "";
     default:
       return "";
   }
@@ -279,10 +281,13 @@ export function WorkQueueTable({
     );
   }, []);
 
-  const visibleCols = React.useMemo(
-    () => visibleColumns(manageColumns),
-    [manageColumns],
-  );
+  const visibleCols = React.useMemo(() => {
+    const cols = visibleColumns(manageColumns);
+    if (source !== "api") return cols;
+    return cols.map((c) =>
+      c.id === "relatedTo" ? { ...c, label: "Related To" } : c,
+    );
+  }, [manageColumns, source]);
   const gridTemplate = React.useMemo(
     () => buildGridTemplate(visibleCols),
     [visibleCols],

@@ -12,6 +12,7 @@ import {
   listCrmWorkQueueForNav,
   navToWorkQueueTypes,
   normalizeCrmWorkQueueItem,
+  rangeForTimeFilter,
   workspaceWorkQueuePath,
 } from "@/lib/work-queue/api";
 import {
@@ -77,6 +78,22 @@ export function smokeWorkQueueWiring() {
     fail("navToWorkQueueTypes did not map tasks");
   }
 
+  const overdueRange = rangeForTimeFilter(
+    "today-overdue",
+    new Date("2026-08-31T12:00:00.000Z"),
+  );
+  if (!overdueRange.to || !overdueRange.from) {
+    fail("today-overdue must query a bounded past through today");
+  }
+  const specificRange = rangeForTimeFilter(
+    "specific-date",
+    new Date("2026-08-31T12:00:00.000Z"),
+    new Date("2026-01-15T08:00:00.000Z"),
+  );
+  if (!specificRange.from || !specificRange.to) {
+    fail("specific-date must emit from/to");
+  }
+
   const row = normalizeCrmWorkQueueItem({
     id: `TASK:${SOURCE_ID}`,
     type: "TASK",
@@ -88,10 +105,21 @@ export function smokeWorkQueueWiring() {
     dueAt: "2026-01-01T00:00:00.000Z",
     createdAt: "2026-01-01T00:00:00.000Z",
     assigneeId: SESSION.workspaceId,
+    assigneeName: "Ada Khan",
+    contactName: "Priya Shah",
+    fileHandler: "Ada Khan",
+    tag: "renewal",
+    createdByName: "Ada Khan",
+    description: "Call the buyer",
+    lastActivityAt: "2026-01-02T00:00:00.000Z",
+    relatedTo: { kind: "CONTACT", id: SOURCE_ID, name: "Priya Shah" },
     deepLink: { resource: "tasks", id: SOURCE_ID },
   });
   if (row.subject !== "Follow up Acme" || row.status !== "In Progress") {
     fail("normalizeCrmWorkQueueItem did not map Swagger-shaped fields");
+  }
+  if (row.related !== "Contact: Priya Shah" || row.taskOwner !== "Ada Khan") {
+    fail("normalizeCrmWorkQueueItem did not map related CRM fields");
   }
   if (!hrefFromWorkQueueDeepLink("tasks", SOURCE_ID).includes(SOURCE_ID)) {
     fail("deep link href missing source id");

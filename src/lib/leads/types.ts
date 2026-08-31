@@ -75,6 +75,25 @@ export interface LeadCardData {
   ownerId?: string;
   /** Linked CRM company UUID. */
   companyId?: string;
+  leadNumber?: number | null;
+  jobTitle?: string;
+  industry?: string;
+  companyWebsite?: string;
+  companySize?: string;
+  mobilePhone?: string;
+  department?: string;
+  linkedinUrl?: string;
+  websiteUrl?: string;
+  notes?: string;
+  description?: string;
+  productInterest?: string;
+  budgetRange?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  street?: string;
+  postalCode?: string;
+  modifiedDate?: string;
   lifecycleStage?: string;
   rating?: string;
   score?: number;

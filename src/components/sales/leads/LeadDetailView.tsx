@@ -20,7 +20,7 @@ import {
   unlinkCrmLeadCompany,
   updateCrmLead,
 } from "@/lib/leads/api";
-import { mapCrmLeadToCard } from "@/lib/leads/api/map";
+import { asHttpUrl, mapCrmLeadToCard } from "@/lib/leads/api/map";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { deleteLead, upsertLeadFromCard } from "@/lib/leads/store";
 import { createDeal } from "@/lib/deals/store";
@@ -442,10 +442,10 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
           lastName: card.name.split(" ").slice(1).join(" "),
           email: card.email,
           phone: card.phone,
-          linkedinUrl: "",
+          linkedinUrl: card.linkedinUrl ?? "",
           companyName: card.company,
-          jobTitle: "",
-          website: "",
+          jobTitle: card.jobTitle ?? "",
+          website: card.companyWebsite ?? card.websiteUrl ?? "",
           status: card.pipelineStage ?? LEAD_STATUS_OPTIONS[0],
         }}
         statusOptions={[...LEAD_STATUS_OPTIONS, card.pipelineStage ?? ""].filter(
@@ -469,6 +469,9 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
                   phone: values.phone,
                   companyName: values.companyName,
                   jobTitle: values.jobTitle,
+                  linkedinUrl: asHttpUrl(values.linkedinUrl),
+                  companyWebsite: asHttpUrl(values.website),
+                  websiteUrl: asHttpUrl(values.website),
                 });
                 if (live) {
                   let mapped = mapCrmLeadToCard(live);
@@ -492,6 +495,10 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
               email: values.email,
               phone: values.phone ?? "",
               company: values.companyName ?? "",
+              jobTitle: values.jobTitle,
+              companyWebsite: values.website,
+              linkedinUrl: values.linkedinUrl,
+              websiteUrl: values.website,
             };
             if (statusOpt) patch.status = statusOpt;
             else if (values.status) patch.pipelineStage = values.status;

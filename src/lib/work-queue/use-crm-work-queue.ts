@@ -17,6 +17,9 @@ export function useCrmWorkQueue(opts: {
   nav: WorkQueueNavId;
   scope: string;
   timeFilter: WorkQueueTimeFilter;
+  specificDate?: Date | null;
+  filters?: { priority?: string; status?: string };
+  nameById?: Record<string, string>;
   tick?: number;
 }) {
   const [source, setSource] = useState<WorkQueueDataSource>("demo");
@@ -27,6 +30,10 @@ export function useCrmWorkQueue(opts: {
   const [localTick, setLocalTick] = useState(0);
 
   const refresh = useCallback(() => setLocalTick((n) => n + 1), []);
+  const priority = opts.filters?.priority ?? "all";
+  const status = opts.filters?.status ?? "all";
+  const specificKey = opts.specificDate?.toISOString() ?? "";
+  const namesKey = JSON.stringify(opts.nameById ?? {});
 
   useEffect(() => {
     if (!isActivityNav(opts.nav)) {
@@ -47,6 +54,10 @@ export function useCrmWorkQueue(opts: {
         listCrmWorkQueueForNav(opts.nav as ActivityNavId, {
           scope: opts.scope,
           timeFilter: opts.timeFilter,
+          specificDate: opts.specificDate ?? undefined,
+          status,
+          priority,
+          nameById: opts.nameById,
         }),
       );
       if (cancelled) return;
@@ -70,7 +81,19 @@ export function useCrmWorkQueue(opts: {
     return () => {
       cancelled = true;
     };
-  }, [opts.nav, opts.scope, opts.timeFilter, opts.tick, localTick]);
+  }, [
+    opts.nav,
+    opts.scope,
+    opts.timeFilter,
+    opts.tick,
+    localTick,
+    priority,
+    status,
+    specificKey,
+    namesKey,
+    opts.specificDate,
+    opts.nameById,
+  ]);
 
   return { source, loading, error, rows, total, refresh };
 }

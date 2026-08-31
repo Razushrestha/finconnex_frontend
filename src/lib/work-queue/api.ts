@@ -35,6 +35,12 @@ export type CrmWorkQueueUrgency =
   | "UNREAD"
   | "NORMAL";
 
+export type CrmWorkQueueRelatedTo = {
+  kind: "LEAD" | "CONTACT" | "COMPANY" | "DEAL";
+  id: string;
+  name: string;
+};
+
 export type CrmWorkQueueItem = {
   id: string;
   type: CrmWorkQueueItemType;
@@ -46,6 +52,17 @@ export type CrmWorkQueueItem = {
   dueAt: string | null;
   createdAt: string;
   assigneeId: string;
+  assigneeName?: string | null;
+  contactName?: string | null;
+  fileHandler?: string | null;
+  tag?: string | null;
+  createdByName?: string | null;
+  modifiedByName?: string | null;
+  modifiedAt?: string | null;
+  closedAt?: string | null;
+  description?: string | null;
+  lastActivityAt?: string | null;
+  relatedTo?: CrmWorkQueueRelatedTo | null;
   unreadCount?: number;
   mentioned?: boolean;
   deepLink: { resource: string; id: string };
@@ -60,6 +77,7 @@ export type CrmWorkQueueQuery = {
   assigneeId?: string;
   from?: string;
   to?: string;
+  nameById?: Record<string, string>;
 };
 
 export type CrmWorkQueuePage = {
@@ -88,6 +106,41 @@ function toQuery(params: Record<string, string | number | undefined>): string {
   return q ? `?${q}` : "";
 }
 
+function formatQueueDate(value?: string | null): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toLocaleString("en-AU");
+}
+
+function parseRelatedTo(raw: unknown): CrmWorkQueueRelatedTo | null {
+  if (!raw || typeof raw !== "object") return null;
+  const rec = raw as Record<string, unknown>;
+  const kind = pickStr(rec.kind).toUpperCase();
+  const id = pickStr(rec.id);
+  const name = pickStr(rec.name);
+  if (!id || !name) return null;
+  if (
+    kind !== "LEAD" &&
+    kind !== "CONTACT" &&
+    kind !== "COMPANY" &&
+    kind !== "DEAL"
+  ) {
+    return null;
+  }
+  return { kind, id, name };
+}
+
+function relatedLabel(
+  relatedTo: CrmWorkQueueRelatedTo | null,
+  type: string,
+): string {
+  if (relatedTo?.name) {
+    return `${prettyLabel(relatedTo.kind)}: ${relatedTo.name}`;
+  }
+  return prettyLabel(type);
+}
+
 function prettyLabel(raw: string): string {
   if (!raw) return "";
   if (raw.includes(" ") && raw !== raw.toUpperCase()) return raw;
@@ -111,27 +164,100 @@ function addDays(d: Date, n: number) {
   return x;
 }
 
+function mondayOfWeek(d: Date) {
+  const day = d.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  return addDays(startOfDay(d), mondayOffset);
+}
+
+function startOfMonth(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+function endOfMonth(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+}
+
+/** Map UI labels like "In Progress" / "High" to API enums. */
+export function toWorkQueueApiFilter(label: string | undefined): string | undefined {
+  if (!label || label === "all") return undefined;
+  return label.trim().toUpperCase().replace(/[\s-]+/g, "_");
+}
+
+export function assigneeIdFromScope(
+  scope: string | undefined,
+  nameById?: Record<string, string>,
+): string | undefined {
+  if (!scope) return undefined;
+  if (isUuid(scope)) return scope;
+  if (!nameById) return undefined;
+  const key = scope.trim().toLowerCase();
+  for (const [id, name] of Object.entries(nameById)) {
+    if (name.trim().toLowerCase() === key && isUuid(id)) return id;
+  }
+  return undefined;
+}
+
 export function rangeForTimeFilter(
   filter: WorkQueueTimeFilter,
   now = new Date(),
+  specificDate?: Date,
 ): { from?: string; to?: string } {
   if (filter === "all") return {};
   if (filter === "today") {
     return { from: startOfDay(now).toISOString(), to: endOfDay(now).toISOString() };
   }
+  if (filter === "tomorrow") {
+    const day = addDays(startOfDay(now), 1);
+    return { from: day.toISOString(), to: endOfDay(day).toISOString() };
+  }
+  if (filter === "overdue") {
+    return {
+      from: addDays(startOfDay(now), -3650).toISOString(),
+      to: new Date(startOfDay(now).getTime() - 1).toISOString(),
+    };
+  }
+  if (filter === "today-overdue") {
+    return {
+      from: addDays(startOfDay(now), -3650).toISOString(),
+      to: endOfDay(now).toISOString(),
+    };
+  }
   if (filter === "this-week") {
-    const day = now.getDay();
-    const mondayOffset = day === 0 ? -6 : 1 - day;
-    const monday = addDays(startOfDay(now), mondayOffset);
+    const monday = mondayOfWeek(now);
     return {
       from: monday.toISOString(),
       to: endOfDay(addDays(monday, 6)).toISOString(),
     };
   }
-  return {
-    from: addDays(startOfDay(now), -365).toISOString(),
-    to: endOfDay(now).toISOString(),
-  };
+  if (filter === "next-week") {
+    const next = addDays(mondayOfWeek(now), 7);
+    return {
+      from: next.toISOString(),
+      to: endOfDay(addDays(next, 6)).toISOString(),
+    };
+  }
+  if (filter === "this-month") {
+    return {
+      from: startOfMonth(now).toISOString(),
+      to: endOfMonth(now).toISOString(),
+    };
+  }
+  if (filter === "next-month") {
+    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return {
+      from: startOfMonth(next).toISOString(),
+      to: endOfMonth(next).toISOString(),
+    };
+  }
+  if (filter === "specific-date") {
+    const day = specificDate ?? now;
+    return {
+      from: startOfDay(day).toISOString(),
+      to: endOfDay(day).toISOString(),
+    };
+  }
+  return {};
 }
 
 export function navToWorkQueueTypes(
@@ -186,6 +312,7 @@ function dueLabelForItem(item: CrmWorkQueueItem, now: Date): string {
 export function normalizeCrmWorkQueueItem(
   raw: Record<string, unknown>,
   now = new Date(),
+  nameById?: Record<string, string>,
 ): QueueRow {
   const deep =
     raw.deepLink && typeof raw.deepLink === "object"
@@ -196,6 +323,7 @@ export function normalizeCrmWorkQueueItem(
   const title = pickStr(raw.title, raw.subject, "Untitled");
   const dueAt = pickStr(raw.dueAt) || null;
   const urgency = pickStr(raw.urgency).toUpperCase() as CrmWorkQueueUrgency;
+  const relatedTo = parseRelatedTo(raw.relatedTo);
   const item: CrmWorkQueueItem = {
     id: pickStr(raw.id) || `${raw.type}:${sourceId}`,
     type: (pickStr(raw.type).toUpperCase() || "TASK") as CrmWorkQueueItemType,
@@ -207,6 +335,17 @@ export function normalizeCrmWorkQueueItem(
     dueAt,
     createdAt: pickStr(raw.createdAt),
     assigneeId: pickStr(raw.assigneeId),
+    assigneeName: pickStr(raw.assigneeName) || null,
+    contactName: pickStr(raw.contactName) || null,
+    fileHandler: pickStr(raw.fileHandler) || null,
+    tag: pickStr(raw.tag) || null,
+    createdByName: pickStr(raw.createdByName) || null,
+    modifiedByName: pickStr(raw.modifiedByName) || null,
+    modifiedAt: pickStr(raw.modifiedAt) || null,
+    closedAt: pickStr(raw.closedAt) || null,
+    description: pickStr(raw.description) || null,
+    lastActivityAt: pickStr(raw.lastActivityAt) || null,
+    relatedTo,
     unreadCount:
       typeof raw.unreadCount === "number" ? raw.unreadCount : undefined,
     mentioned: Boolean(raw.mentioned),
@@ -215,21 +354,32 @@ export function normalizeCrmWorkQueueItem(
   const dueLabel = dueLabelForItem(item, now);
   const due = dueAt ? new Date(dueAt) : null;
   const dueMs = due && !Number.isNaN(due.getTime()) ? due.getTime() : Date.now();
+  const ownerName =
+    item.assigneeName ||
+    (item.assigneeId && nameById?.[item.assigneeId]) ||
+    item.assigneeId;
   return {
     id: item.sourceId || item.id,
     subject: item.title,
     dueLabel,
     dueColor: dueColorForLabel(dueLabel),
     status: prettyLabel(item.status),
-    priority: prettyLabel(item.priority ?? "") || "Medium",
-    related: prettyLabel(item.type),
-    taskOwner: item.assigneeId,
-    createdTime: item.createdAt
-      ? new Date(item.createdAt).toLocaleString("en-AU")
-      : undefined,
-    lastActivityTime: item.unreadCount
-      ? `${item.unreadCount} unread`
-      : undefined,
+    priority: prettyLabel(item.priority ?? "") || "",
+    related: relatedLabel(item.relatedTo ?? null, item.type),
+    contactName: item.contactName || undefined,
+    fileHandler: item.fileHandler || ownerName || undefined,
+    tag: item.tag || undefined,
+    taskOwner: ownerName,
+    assigneeId: item.assigneeId || undefined,
+    createdTime: formatQueueDate(item.createdAt),
+    createdBy: item.createdByName || undefined,
+    modifiedBy: item.modifiedByName || undefined,
+    modifiedTime: formatQueueDate(item.modifiedAt),
+    closedTime: formatQueueDate(item.closedAt),
+    description: item.description || undefined,
+    lastActivityTime: formatQueueDate(item.lastActivityAt),
+    unreadCount: item.unreadCount,
+    mentioned: item.mentioned,
     sortKey: dueMs,
     href: hrefFromWorkQueueDeepLink(
       item.deepLink.resource,
@@ -304,7 +454,9 @@ export async function listCrmWorkQueue(
   const page = extractPage(data);
   const now = new Date();
   return {
-    items: page.records.map((row) => normalizeCrmWorkQueueItem(row, now)),
+    items: page.records.map((row) =>
+      normalizeCrmWorkQueueItem(row, now, query.nameById),
+    ),
     total: page.total,
   };
 }
@@ -314,20 +466,31 @@ export async function listCrmWorkQueueForNav(
   opts: {
     scope?: string;
     timeFilter?: WorkQueueTimeFilter;
+    specificDate?: Date;
+    status?: string;
+    priority?: string;
+    nameById?: Record<string, string>;
   } = {},
 ): Promise<CrmWorkQueuePage> {
   const types = navToWorkQueueTypes(nav);
   if (!types) return { items: [], total: 0 };
-  const range = rangeForTimeFilter(opts.timeFilter ?? "today-overdue");
+  const range = rangeForTimeFilter(
+    opts.timeFilter ?? "today-overdue",
+    new Date(),
+    opts.specificDate,
+  );
   const pages = await Promise.all(
     types.map((type) =>
       listCrmWorkQueue({
         type,
         limit: 50,
         page: 1,
-        assigneeId: opts.scope,
+        status: toWorkQueueApiFilter(opts.status),
+        priority: toWorkQueueApiFilter(opts.priority),
+        assigneeId: assigneeIdFromScope(opts.scope, opts.nameById),
         from: range.from,
         to: range.to,
+        nameById: opts.nameById,
       }),
     ),
   );

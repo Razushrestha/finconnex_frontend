@@ -24,6 +24,15 @@ export const CRM_LEAD_SOURCES = [
 ] as const;
 export type CrmLeadSource = (typeof CRM_LEAD_SOURCES)[number];
 
+export const CRM_COMPANY_SIZES = [
+  "MICRO",
+  "SMALL",
+  "MEDIUM",
+  "LARGE",
+  "ENTERPRISE",
+] as const;
+export type CrmCompanySize = (typeof CRM_COMPANY_SIZES)[number];
+
 export type CrmLead = {
   id: string;
   workspaceId?: string;
@@ -34,18 +43,33 @@ export type CrmLead = {
   phone?: string | null;
   mobilePhone?: string | null;
   jobTitle?: string | null;
+  department?: string | null;
+  linkedinUrl?: string | null;
+  websiteUrl?: string | null;
+  twitterUrl?: string | null;
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  country?: string | null;
+  postalCode?: string | null;
   companyId?: string | null;
   companyName?: string | null;
   companyWebsite?: string | null;
   industry?: string | null;
+  companySize?: CrmCompanySize | string | null;
   status: CrmLeadStatus | string;
   lifecycleStage?: string;
   source?: CrmLeadSource | string | null;
   score?: number;
   rating?: string | null;
+  doNotContact?: boolean;
   productInterest?: string | null;
   budgetRange?: string | null;
   estimatedValue?: string | null;
+  currency?: string | null;
+  probability?: number | null;
+  expectedCloseDate?: string | null;
+  description?: string | null;
   notes?: string | null;
   isConverted?: boolean;
   convertedAt?: string | null;
@@ -55,6 +79,37 @@ export type CrmLead = {
   ownerId?: string | null;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type CrmCreateLeadInput = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  mobilePhone?: string;
+  jobTitle?: string;
+  department?: string;
+  linkedinUrl?: string;
+  websiteUrl?: string;
+  twitterUrl?: string;
+  street?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+  companyId?: string;
+  companyName?: string;
+  companyWebsite?: string;
+  industry?: string;
+  companySize?: CrmCompanySize;
+  source?: CrmLeadSource;
+  productInterest?: string;
+  budgetRange?: string;
+  estimatedValue?: string;
+  notes?: string;
+  description?: string;
+  ownerId?: string;
+  doNotContact?: boolean;
 };
 
 export type CrmLeadKanbanColumn = {
@@ -71,23 +126,6 @@ export type CrmLeadListPage = {
     totalItems: number;
     totalPages: number;
   };
-};
-
-export type CrmCreateLeadInput = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone?: string;
-  jobTitle?: string;
-  companyName?: string;
-  companyWebsite?: string;
-  industry?: string;
-  source?: CrmLeadSource;
-  productInterest?: string;
-  budgetRange?: string;
-  estimatedValue?: string;
-  notes?: string;
-  ownerId?: string;
 };
 
 export type CrmImportResult = {

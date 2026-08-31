@@ -13,6 +13,7 @@ import { ManageQueueModal } from "@/components/work-queue/ManageQueueModal";
 import {
   CATEGORIES_DEFAULT,
   QUEUE_STORAGE_KEY,
+  USER_TAB_COLORS,
   cloneCategories,
   getActivityTitle,
   isActivityNav,
@@ -32,7 +33,13 @@ import {
   type WorkQueueTimeFilter,
 } from "@/lib/work-queue/live";
 import { useCrmWorkQueue } from "@/lib/work-queue/use-crm-work-queue";
-import { mergeWorkQueueTabs } from "@/lib/work-queue/tab-store";
+import { mergeWorkQueueTabs, setWorkQueueScope, setWorkQueueTabs, getWorkQueueTabState } from "@/lib/work-queue/tab-store";
+import { setWorkQueueCrmDirectory } from "@/lib/work-queue/people";
+import {
+  listCrmWorkspaceMembers,
+  tryCrmWorkspaceMembers,
+} from "@/lib/workspace-members/api";
+import { initials } from "@/lib/activities/shared";
 import { onLeadActivityChange } from "@/lib/leads/lead-extras-store";
 import { onPipelineSlaChange } from "@/lib/pipeline-sla/settings";
 import { onRulesChange } from "@/lib/rules";
@@ -68,6 +75,8 @@ export function WorkQueueView() {
   const scope = useWorkQueueScope();
   const [timeFilter, setTimeFilter] =
     React.useState<WorkQueueTimeFilter>("today-overdue");
+  const [specificDate, setSpecificDate] = React.useState<Date | null>(null);
+  const [nameById, setNameById] = React.useState<Record<string, string>>({});
   const [activeNav, setActiveNav] = React.useState<WorkQueueNavId>("tasks");
   const [page, setPage] = React.useState(1);
   const [tick, setTick] = React.useState(0);
@@ -89,12 +98,42 @@ export function WorkQueueView() {
     nav: activeNav,
     scope,
     timeFilter,
+    specificDate,
+    filters,
+    nameById,
     tick,
   });
 
   React.useEffect(() => {
     setCategories(readStoredCategories());
     mergeWorkQueueTabs(getUserTabs());
+    void tryCrmWorkspaceMembers(() => listCrmWorkspaceMembers()).then(
+      (members) => {
+        if (!members?.length) return;
+        const people = members.map((m) => ({
+          id: m.userId || m.id,
+          name: m.name,
+          role: m.role,
+          email: m.email,
+        }));
+        setWorkQueueCrmDirectory(people);
+        const names: Record<string, string> = {};
+        for (const p of people) names[p.id] = p.name;
+        setNameById(names);
+        const tabs = people.map((p, i) => ({
+          id: p.id,
+          name: p.name,
+          role: p.role || "User",
+          initials: initials(p.name),
+          color: USER_TAB_COLORS[i % USER_TAB_COLORS.length],
+        }));
+        setWorkQueueTabs(tabs);
+        const current = getWorkQueueTabState().scope;
+        if (!tabs.some((t) => t.id === current)) {
+          setWorkQueueScope(tabs[0]?.id ?? "");
+        }
+      },
+    );
   }, []);
 
   React.useEffect(() => {
@@ -115,21 +154,27 @@ export function WorkQueueView() {
   }, []);
 
   const activityItems = React.useMemo(
-    () => getActivityNav(scope, timeFilter),
-    [scope, timeFilter, tick],
+    () => getActivityNav(scope, timeFilter, specificDate ?? undefined),
+    [scope, timeFilter, specificDate, tick],
   );
 
   const sidebarCategories = React.useMemo(
-    () => getWorkqueueSidebar(scope, categories, timeFilter),
-    [scope, categories, timeFilter, tick],
+    () =>
+      getWorkqueueSidebar(
+        scope,
+        categories,
+        timeFilter,
+        specificDate ?? undefined,
+      ),
+    [scope, categories, timeFilter, specificDate, tick],
   );
 
   const rawRows = React.useMemo(
     () =>
       crm.source === "api"
         ? crm.rows
-        : listQueueRows(activeNav, scope, timeFilter),
-    [activeNav, scope, timeFilter, tick, crm.source, crm.rows],
+        : listQueueRows(activeNav, scope, timeFilter, specificDate ?? undefined),
+    [activeNav, scope, timeFilter, specificDate, tick, crm.source, crm.rows],
   );
 
   const filteredRows = React.useMemo(
@@ -282,8 +327,9 @@ export function WorkQueueView() {
           activityItems={activityItems}
           sidebarCategories={sidebarCategories}
           timeFilter={timeFilter}
-          onTimeFilterChange={(v) => {
+          onTimeFilterChange={(v, date) => {
             setTimeFilter(v);
+            setSpecificDate(date ?? null);
             setPage(1);
             setFilters((f) => ({ ...f, status: "all" }));
           }}
@@ -292,7 +338,7 @@ export function WorkQueueView() {
 
         <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", viewEnter)}>
           <WorkQueueTable
-            key={`${activeNav}-${scope}-${timeFilter}`}
+            key={`${activeNav}-${scope}-${timeFilter}-${specificDate?.toISOString() ?? ""}`}
             rows={pageRows}
             title={title}
             page={page}
