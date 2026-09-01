@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
     ArrowLeft,
@@ -28,6 +27,11 @@ import {
   type ResourceCategory,
   type ResourceType,
 } from "@/lib/resources/types";
+import {
+  createCrmResource,
+  persistRemoteResource,
+  toCreateResourceBody,
+} from "@/lib/resources/api";
 import {
   InputShell,
   elevatedInputClass,
@@ -82,6 +86,8 @@ export function CreateResourceForm({ layoutId: _l, redirect: _r }: Props) {
   const [accessLevel, setAccessLevel] = useState<ResourceAccess>("Internal");
   const [uploadedBy, setUploadedBy] = useState<string>(RESOURCE_OWNERS[0]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   function validate() {
     const next: Record<string, string> = {};
@@ -93,36 +99,63 @@ export function CreateResourceForm({ layoutId: _l, redirect: _r }: Props) {
     return Object.keys(next).length === 0;
   }
 
-  function onSave(createAnother: boolean) {
+  async function onSave(createAnother: boolean) {
     if (!validate()) return;
-    const ids = nextResourceIds();
+    setSaving(true);
+    setSaveError(null);
     const tags = tagsRaw
       .split(/[,;]/)
       .map((t) => t.trim())
       .filter(Boolean);
-    const external = looksLikeUrl(fileOrUrl);
-    const created = upsertResource(
-      appendResourceAudit(
-        {
-          id: ids.id,
-          resourceId: ids.resourceId,
-          name: name.trim(),
-          type,
-          category,
-          fileOrUrl: fileOrUrl.trim(),
-          isExternalUrl: external,
-          description: description.trim() || undefined,
-          tags,
-          accessLevel,
+    const draft = {
+      name: name.trim(),
+      type,
+      category,
+      fileOrUrl: fileOrUrl.trim(),
+      description: description.trim() || undefined,
+      tags,
+      accessLevel,
+    };
+    let created;
+    try {
+      created = persistRemoteResource(
+        await createCrmResource(toCreateResourceBody(draft)),
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Create failed";
+      if (!/sign in/i.test(message)) {
+        setSaveError(message);
+        setSaving(false);
+        return;
+      }
+      created = null;
+    }
+    if (!created) {
+      const ids = nextResourceIds();
+      created = upsertResource(
+        appendResourceAudit(
+          {
+            id: ids.id,
+            resourceId: ids.resourceId,
+            name: draft.name,
+            type,
+            category,
+            fileOrUrl: draft.fileOrUrl,
+            isExternalUrl: looksLikeUrl(draft.fileOrUrl),
+            description: draft.description,
+            tags,
+            accessLevel,
+            uploadedBy,
+            uploadDate: formatResourceDate(),
+            downloadCount: 0,
+            audit: [],
+          },
+          "Uploaded",
           uploadedBy,
-          uploadDate: formatResourceDate(),
-          downloadCount: 0,
-          audit: [],
-        },
-        "Uploaded",
-        uploadedBy,
-      ),
-    );
+        ),
+      );
+    }
+    setSaving(false);
     if (createAnother) {
       setName("");
       setFileOrUrl("");
@@ -149,21 +182,26 @@ export function CreateResourceForm({ layoutId: _l, redirect: _r }: Props) {
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Upload resource
             </h1>
+            {saveError ? (
+              <p className="text-[11px] font-medium text-rose-600">{saveError}</p>
+            ) : null}
           </div>
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => onSave(true)}
-              className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+              disabled={saving}
+              onClick={() => void onSave(true)}
+              className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
             >
               Save &amp; new
             </button>
             <button
               type="button"
-              onClick={() => onSave(false)}
-              className="h-8 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-md shadow-violet-600/20 hover:bg-violet-700"
+              disabled={saving}
+              onClick={() => void onSave(false)}
+              className="h-8 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-md shadow-violet-600/20 hover:bg-violet-700 disabled:opacity-50"
             >
-              Save resource
+              {saving ? "Saving…" : "Save resource"}
             </button>
           </div>
         </div>

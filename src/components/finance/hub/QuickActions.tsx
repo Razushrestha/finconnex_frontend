@@ -55,6 +55,22 @@ export const QuickActions: React.FC = () => {
             Add Item
           </span>
         </button>
+
+        <button
+          onClick={() =>
+            router.push(
+              `/finance/credit-notes/create?layoutid=standard&redirect=false`,
+            )
+          }
+          className="flex flex-col items-center justify-center p-4 bg-muted/50 hover:bg-primary/10 border border-transparent hover:border-primary/20 rounded-xl transition-all group"
+        >
+          <span className="p-3 bg-background text-primary rounded-xl shadow-sm mb-2 group-hover:scale-110 transition-transform">
+            ↩️
+          </span>
+          <span className="text-xs font-semibold text-foreground group-hover:text-primary">
+            New Credit Note
+          </span>
+        </button>
       </div>
     </div>
   );

@@ -130,6 +130,26 @@ export function createDeal(input: {
     s.id === target.id ? { ...s, deals: [deal, ...s.deals] } : s,
   );
   saveDealPipelines(pipelines);
+  void import("@/lib/deals/api").then(async ({ createCrmDeal, toCreateDealBody, tryCrmDeal }) => {
+    const remote = await tryCrmDeal(() =>
+      createCrmDeal(
+        toCreateDealBody({
+          name: deal.name,
+          account: deal.account,
+          contact: deal.contact,
+          stage: target.title,
+          value: deal.value,
+          currency: deal.currency,
+          probability: deal.probability,
+          owner: deal.owner,
+          closeDate: deal.closeDate,
+        }),
+      ),
+    );
+    if (!remote) return;
+    if (remote.id !== deal.id) deleteDeal(deal.id);
+    mergeCrmDealsIntoBoard([remote]);
+  });
   return deal;
 }
 
@@ -143,7 +163,12 @@ export function deleteDeal(id: string): DealRecord | null {
       return { ...s, deals: s.deals.filter((d) => d.id !== id) };
     });
   }
-  if (found) saveDealPipelines(pipelines);
+  if (found) {
+    saveDealPipelines(pipelines);
+    void import("@/lib/deals/api").then(({ deleteCrmDeal, tryCrmDeal, isCrmDealId }) => {
+      if (isCrmDealId(id)) void tryCrmDeal(() => deleteCrmDeal(id));
+    });
+  }
   return found;
 }
 
@@ -240,6 +265,26 @@ export function updateDeal(
     s.id === target.id ? { ...s, deals: [moved, ...s.deals] } : s,
   );
   saveDealPipelines(pipelines);
+  void import("@/lib/deals/api").then(({ updateCrmDeal, toCreateDealBody, tryCrmDeal, isCrmDealId }) => {
+    if (!isCrmDealId(id)) return;
+    void tryCrmDeal(() =>
+      updateCrmDeal(
+        id,
+        toCreateDealBody({
+          name: moved.name,
+          account: moved.account,
+          contact: moved.contact,
+          contactId: moved.contactId,
+          stage: target.title,
+          value: moved.value,
+          currency: moved.currency,
+          probability: moved.probability,
+          owner: moved.owner,
+          closeDate: moved.closeDate,
+        }),
+      ),
+    );
+  });
   return { deal: moved, stage: target, pipeline: found.pipeline };
 }
 
@@ -291,6 +336,11 @@ export function linkContactToDeal(
   }
 
   linkDealToContact(contactId, dealId);
+  void import("@/lib/deals/api").then(({ addCrmDealContact, tryCrmDeal, isCrmDealId }) => {
+    if (isCrmDealId(dealId) && isCrmDealId(contactId)) {
+      void tryCrmDeal(() => addCrmDealContact(dealId, { contactId }));
+    }
+  });
 
   const pipelines = listDealPipelines();
   pipelines[found.pipeline] = pipelines[found.pipeline].map((s) => ({
@@ -310,6 +360,12 @@ export function unlinkContactFromDeal(dealId: string): DealLocation | null {
   if (!found) return null;
   if (found.deal.contactId) {
     unlinkDealFromContact(found.deal.contactId, dealId);
+    const contactId = found.deal.contactId;
+    void import("@/lib/deals/api").then(({ removeCrmDealContact, tryCrmDeal, isCrmDealId }) => {
+      if (isCrmDealId(dealId) && isCrmDealId(contactId)) {
+        void tryCrmDeal(() => removeCrmDealContact(dealId, contactId));
+      }
+    });
   }
   const pipelines = listDealPipelines();
   pipelines[found.pipeline] = pipelines[found.pipeline].map((s) => ({
@@ -326,4 +382,38 @@ export function listAllDeals(): DealRecord[] {
   return Object.values(listDealPipelines()).flatMap((stages) =>
     stages.flatMap((s) => s.deals),
   );
+}
+
+/** Replace the board with live CRM pipelines (empty columns are a valid live result). */
+export function replaceCrmDealPipelines(
+  remote: Record<DealPipeline, DealStage[]>,
+) {
+  saveDealPipelines(remote);
+}
+
+export function mergeCrmDealsIntoBoard(
+  deals: Array<DealRecord & { stageTitle?: string }>,
+) {
+  const pipelines = listDealPipelines();
+  const ids = new Set(deals.map((d) => d.id));
+  for (const pipe of Object.keys(pipelines) as DealPipeline[]) {
+    pipelines[pipe] = pipelines[pipe].map((s) => ({
+      ...s,
+      deals: s.deals.filter(
+        (d) => !ids.has(d.id) && !/^(d-p\d+|d-\d+|r-\d+|c-\d+|i-\d+)$/.test(d.id),
+      ),
+    }));
+  }
+  for (const deal of deals) {
+    const title = deal.stageTitle ?? "Prospecting";
+    const stages = pipelines.Deals;
+    const target =
+      stages.find((s) => s.title === title) ?? stages[0];
+    if (!target) continue;
+    target.deals.unshift({
+      ...deal,
+      accentColorClass: target.dotColorClass,
+    });
+  }
+  saveDealPipelines(pipelines);
 }

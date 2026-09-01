@@ -28,6 +28,13 @@ export const QUOTATION_STATUSES: QuotationStatus[] = [
   "Invoiced",
 ];
 
+export interface QuotationAttachment {
+  id: string;
+  name: string;
+  sizeLabel?: string;
+  url?: string;
+}
+
 export interface Quotation {
   id: string;
   quotationId: string;
@@ -49,6 +56,8 @@ export interface Quotation {
   estimateId?: string;
   estimateRef?: string;
   invoiceId?: string;
+  publicLink?: string;
+  attachments?: QuotationAttachment[];
   signatureStatus?: "Not sent" | "Pending" | "Signed";
   /** Linked §9.3 SignatureRequest id */
   signatureRequestId?: string;
@@ -223,6 +232,20 @@ export function deleteQuotation(id: string) {
 
 export function getQuotationById(id: string) {
   return listQuotations().find((q) => q.id === id);
+}
+
+function cloneQuotation(row: Quotation): Quotation {
+  return {
+    ...row,
+    lineItems: row.lineItems.map((l) => ({ ...l })),
+    attachments: [...(row.attachments ?? [])],
+    audit: [...(row.audit ?? [])],
+  };
+}
+
+/** Replace the session store with live CRM rows (empty list is a valid live result). */
+export function replaceCrmQuotations(remote: Quotation[]) {
+  writeStore(remote.map(cloneQuotation));
 }
 
 export function nextQuotationIds() {

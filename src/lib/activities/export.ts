@@ -6,7 +6,7 @@ import { listCalls } from "@/lib/calls/store";
 import { listEmails } from "@/lib/emails/store";
 import { listMessages } from "@/lib/messages/store";
 import { listMeetings } from "@/lib/meetings/store";
-import { reminderColumns } from "@/lib/reminders/types";
+import { listReminders } from "@/lib/reminders/store";
 import type { MoreMenuItem } from "@/components/activities/ActivityToolbar";
 
 export function exportCallsCsv(): number {
@@ -116,7 +116,7 @@ export function exportMeetingsCsv(): number {
 }
 
 export function exportRemindersCsv(): number {
-  const rows = reminderColumns.flatMap((c) => c.reminders);
+  const rows = listReminders();
   downloadCsv(
     `reminders-${Date.now()}.csv`,
     toCsv(

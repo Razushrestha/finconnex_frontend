@@ -137,6 +137,15 @@ export function upsertPayment(p: Payment) {
   return p;
 }
 
+export function writeAllPayments(list: Payment[]) {
+  writeStore(list);
+}
+
+/** Replace the session store with live CRM rows (empty list is a valid live result). */
+export function replaceCrmPayments(remote: Payment[]) {
+  writeStore(remote.map((p) => ({ ...p })));
+}
+
 export function deletePayment(id: string) {
   writeStore(listPayments().filter((p) => p.id !== id));
 }

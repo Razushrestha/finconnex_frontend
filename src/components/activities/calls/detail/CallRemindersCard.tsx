@@ -12,8 +12,11 @@ import {
 } from "@/lib/tasks/types";
 import { mergeReminderSeries } from "@/lib/tasks/reminder-series";
 import { parseTaskDueDate } from "@/lib/dashboard/layout";
+import { useRelatedCrmReminders } from "@/lib/reminders/use-related-crm-reminders";
+import { cn } from "@/lib/utils";
 
 interface CallRemindersCardProps {
+  callId: string;
   reminders: TaskReminder[];
   dueDate?: string;
   onChange: (next: TaskReminder[]) => void;
@@ -31,15 +34,18 @@ function reminderStatus(item: TaskReminder) {
 }
 
 export function CallRemindersCard({
+  callId,
   reminders,
   dueDate,
   onChange,
 }: CallRemindersCardProps) {
+  const crm = useRelatedCrmReminders("Call", callId);
   const [editor, setEditor] = useState<TaskReminder | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const rows = crm.source === "api" ? crm.items : reminders;
   const activeItems = useMemo(
-    () => reminders.filter((item) => reminderStatus(item) === "Pending"),
-    [reminders],
+    () => rows.filter((item) => reminderStatus(item) === "Pending"),
+    [rows],
   );
 
   function defaultReminder(): TaskReminder {
@@ -62,6 +68,15 @@ export function CallRemindersCard({
       <h2 className="mb-3 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
         Reminders
         {activeItems.length > 0 ? ` (${activeItems.length})` : ""}
+        {crm.source === "api" ? (
+          <span
+            className={cn(
+              "ml-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700",
+            )}
+          >
+            Live
+          </span>
+        ) : null}
       </h2>
 
       {activeItems.length === 0 ? (
@@ -93,9 +108,10 @@ export function CallRemindersCard({
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  onChange(reminders.filter((row) => row.id !== item.id))
-                }
+                onClick={() => {
+                  if (crm.live) void crm.remove(item.id);
+                  onChange(rows.filter((row) => row.id !== item.id));
+                }}
                 className="rounded-md p-1 text-slate-300 opacity-0 transition hover:text-rose-600 group-hover:opacity-100"
                 aria-label="Remove reminder"
               >
@@ -124,16 +140,41 @@ export function CallRemindersCard({
           setIsNew(false);
         }}
         onDone={(next) => {
-          onChange(
-            mergeReminderSeries(
-              reminders,
-              next,
-              dueDate ? parseTaskDueDate(dueDate) : null,
-              isNew ? "add" : "replace",
-            ),
-          );
-          setEditor(null);
-          setIsNew(false);
+          void (async () => {
+            if (isNew && crm.live) {
+              try {
+                const created = await crm.create(next);
+                onChange(
+                  mergeReminderSeries(
+                    rows,
+                    created,
+                    dueDate ? parseTaskDueDate(dueDate) : null,
+                    "add",
+                  ),
+                );
+              } catch {
+                onChange(
+                  mergeReminderSeries(
+                    rows,
+                    next,
+                    dueDate ? parseTaskDueDate(dueDate) : null,
+                    "add",
+                  ),
+                );
+              }
+            } else {
+              onChange(
+                mergeReminderSeries(
+                  rows,
+                  next,
+                  dueDate ? parseTaskDueDate(dueDate) : null,
+                  isNew ? "add" : "replace",
+                ),
+              );
+            }
+            setEditor(null);
+            setIsNew(false);
+          })();
         }}
       />
     </section>

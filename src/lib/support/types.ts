@@ -345,6 +345,14 @@ export function listTickets(): SupportTicket[] {
   );
 }
 
+function cloneTicket(t: SupportTicket): SupportTicket {
+  return {
+    ...t,
+    notes: t.notes.map((n) => ({ ...n })),
+    audit: t.audit.map((a) => ({ ...a })),
+  };
+}
+
 export function upsertTicket(t: SupportTicket) {
   const list = listTickets();
   const i = list.findIndex((x) => x.id === t.id);
@@ -352,6 +360,11 @@ export function upsertTicket(t: SupportTicket) {
   else list.unshift(t);
   writeStore(list);
   return t;
+}
+
+/** Replace the session store with live CRM rows (empty list is a valid live result). */
+export function replaceCrmTickets(remote: SupportTicket[]) {
+  writeStore(remote.map(cloneTicket));
 }
 
 export function deleteTicket(id: string) {

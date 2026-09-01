@@ -34,6 +34,10 @@ export function daysInStage(card: LeadCardData, now = new Date()) {
 }
 
 export function leadLocation(card: LeadCardData) {
+  const parts = [card.city, card.state, card.country].filter(
+    (part) => part?.trim(),
+  );
+  if (parts.length) return parts.join(", ");
   return card.custom?.preferredBranch || "Sydney, NSW";
 }
 
@@ -171,7 +175,7 @@ export function leadFinancials(card: LeadCardData) {
 }
 
 export function leadScoreBreakdown(card: LeadCardData) {
-  const score = Number(card.custom?.leadScore ?? 82);
+  const score = Number(card.score ?? card.custom?.leadScore ?? 82);
   return {
     score: Number.isFinite(score) ? score : 82,
     label: score >= 75 ? "High Potential" : score >= 50 ? "Warm" : "Cold",

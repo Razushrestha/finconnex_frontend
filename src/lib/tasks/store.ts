@@ -152,6 +152,9 @@ function normalize(cols: TaskColumn[]): TaskColumn[] {
   }));
 }
 
+/** @deprecated Phase 9 hydrate alias — live key is activities:tasks:board:v5 */
+export const TASKS_HYDRATE_KEY_V2 = "activities:tasks:board:v2";
+
 const board = createBoardStore({
   // v5: multiple typed reminders on each task
   key: "activities:tasks:board:v5",
@@ -813,6 +816,53 @@ export function reassignTask(
 }
 
 /** Push due date by N days and set reminderDate (SRS snooze). */
+function cloneTaskRow(row: Task): Task {
+  return {
+    ...row,
+    assignee: { ...row.assignee },
+    relatedTo: row.relatedTo ? { ...row.relatedTo } : undefined,
+    collaborators: row.collaborators ? [...row.collaborators] : undefined,
+    activityNotes: row.activityNotes?.map((note) => ({ ...note })),
+    reminders: row.reminders?.map((reminder) => ({ ...reminder })),
+    actionItems: row.actionItems?.map((item) => ({ ...item })),
+    notifyBy: row.notifyBy ? [...row.notifyBy] : undefined,
+  };
+}
+
+export function upsertTask(row: Task) {
+  const next = cloneTaskRow(row);
+  const cols = listTaskColumns();
+  const without = cols.map((c) => ({
+    ...c,
+    tasks: c.tasks.filter((t) => t.taskId !== next.taskId),
+    count: c.tasks.filter((t) => t.taskId !== next.taskId).length,
+  }));
+  const target =
+    without.find((c) => c.title === next.status) ??
+    without.find((c) => c.title === "Not Started") ??
+    without[0];
+  saveTaskColumns(
+    without.map((c) =>
+      c.id === target.id
+        ? { ...c, tasks: [next, ...c.tasks], count: c.tasks.length + 1 }
+        : c,
+    ),
+  );
+  return next;
+}
+
+/** Replace the session board with live CRM rows (empty list is a valid live result). */
+export function replaceCrmTasks(remote: Task[]) {
+  const cols = listTaskColumns();
+  const cloned = remote.map(cloneTaskRow);
+  saveTaskColumns(
+    cols.map((col) => {
+      const tasks = cloned.filter((t) => t.status === col.title);
+      return { ...col, tasks, count: tasks.length };
+    }),
+  );
+}
+
 export function snoozeTask(
   taskId: string,
   days: number,

@@ -180,7 +180,6 @@ async function main() {
     "/finance/invoices",
     "/finance/payments",
     "/finance/products",
-    "/team",
     "/support",
     "/portals",
     "/reports",

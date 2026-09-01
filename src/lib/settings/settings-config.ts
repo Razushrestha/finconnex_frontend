@@ -66,6 +66,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     description: "People, teams, roles, permissions, and access activity.",
     items: [
       { title: "Users", slug: "users" },
+      { title: "Workspaces", slug: "workspaces" },
       { title: "Teams", slug: "teams" },
       { title: "Departments", slug: "departments" },
       { title: "Roles", slug: "roles" },

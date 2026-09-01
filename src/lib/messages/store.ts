@@ -34,6 +34,8 @@ export function createMessage(input: {
   from: string;
   to: string;
   relatedTo?: string;
+  relatedType?: string;
+  relatedId?: string;
   status: MessageStatus;
   sentDate?: string;
   template?: string;
@@ -46,6 +48,8 @@ export function createMessage(input: {
     from: input.from,
     to: input.to,
     relatedTo: input.relatedTo,
+    relatedType: input.relatedType,
+    relatedId: input.relatedId,
     status: input.status,
     sentDate: input.sentDate ?? formatRulesAt(new Date()),
     template: input.template,
@@ -58,4 +62,37 @@ export function createMessage(input: {
 export function findMessageById(id: string) {
   const message = listMessages().find((m) => m.id === id);
   return message ? { message } : null;
+}
+
+function cloneMessage(row: Message): Message {
+  return {
+    ...row,
+    attachments: [...(row.attachments ?? [])],
+  };
+}
+
+export function upsertMessage(row: Message) {
+  const next = cloneMessage(row);
+  const items = listMessages();
+  const i = items.findIndex((m) => m.id === next.id);
+  if (i >= 0) items[i] = next;
+  else items.unshift(next);
+  saveMessages(items);
+  emitLeadActivityChange();
+  return next;
+}
+
+export function deleteMessage(id: string): Message | null {
+  const items = listMessages();
+  const found = items.find((m) => m.id === id) ?? null;
+  if (!found) return null;
+  saveMessages(items.filter((m) => m.id !== id));
+  emitLeadActivityChange();
+  return found;
+}
+
+/** Replace the session store with live CRM rows (empty list is a valid live result). */
+export function replaceCrmMessages(remote: Message[]) {
+  saveMessages(remote.map(cloneMessage));
+  emitLeadActivityChange();
 }

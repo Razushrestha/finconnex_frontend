@@ -31,6 +31,11 @@ import {
 import { liveRelatedRecords } from "@/lib/activities/related-records";
 import { api } from "@/lib/api";
 import {
+  createCrmTask,
+  persistRemoteTask,
+  tryCrmTask,
+} from "@/lib/tasks/api";
+import {
   logCreate,
   notifyOwnerAssigned,
   notifyTaskDue,
@@ -484,7 +489,7 @@ export function CreateTaskForm({
       }
     }
 
-    const result = await api.tasks.create({
+    const draft = {
       title: form.title.trim(),
       taskType: form.taskType as TaskType,
       priority: form.priority as Priority,
@@ -519,12 +524,16 @@ export function CreateTaskForm({
           : undefined,
       attachmentsCount: attachmentsCount || undefined,
       createdBy: actor,
-    });
-    if (!result.ok) {
-      window.alert(result.error.message);
-      return;
+    };
+    let task = persistRemoteTask(await tryCrmTask(() => createCrmTask(draft)));
+    if (!task) {
+      const result = await api.tasks.create(draft);
+      if (!result.ok) {
+        window.alert(result.error.message);
+        return;
+      }
+      task = result.data;
     }
-    const task = result.data;
     logCreate("activities.tasks", form.assignedTo, task.taskId, form.title);
     notifyOwnerAssigned({
       owner: form.assignedTo,

@@ -296,6 +296,19 @@ export function getResourceById(id: string) {
   return listResources().find((r) => r.id === id);
 }
 
+function cloneResource(row: ResourceItem): ResourceItem {
+  return {
+    ...row,
+    tags: [...row.tags],
+    audit: row.audit.map((a) => ({ ...a })),
+  };
+}
+
+/** Replace the session store with live CRM rows (empty list is a valid live result). */
+export function replaceCrmResources(remote: ResourceItem[]) {
+  writeStore(remote.map(cloneResource));
+}
+
 export function nextResourceIds() {
   const list = listResources();
   const nums = list

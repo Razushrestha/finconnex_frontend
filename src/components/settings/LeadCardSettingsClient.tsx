@@ -13,9 +13,11 @@ import {
   type LeadCardSettings,
 } from "@/lib/leads/lead-card-settings";
 import { onCustomFieldsChange } from "@/lib/custom-fields/store";
+import { useCrmCustomFields } from "@/lib/custom-fields/use-crm-custom-fields";
 import { cn } from "@/lib/utils";
 
 export function LeadCardSettingsClient() {
+  useCrmCustomFields();
   const [settings, setSettings] = useState<LeadCardSettings>(() =>
     loadLeadCardSettings(),
   );

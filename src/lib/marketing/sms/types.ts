@@ -173,6 +173,13 @@ export function upsertSmsCampaign(c: SmsCampaign) {
   return c;
 }
 
+export function mergeCrmSmsCampaigns(remote: SmsCampaign[]) {
+  if (!remote.length) return;
+  const remoteIds = new Set(remote.map((c) => c.id));
+  const local = listSmsCampaigns().filter((c) => !remoteIds.has(c.id));
+  writeStore([...remote, ...local]);
+}
+
 export function deleteSmsCampaign(id: string) {
   writeStore(listSmsCampaigns().filter((c) => c.id !== id));
 }

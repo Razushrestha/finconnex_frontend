@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell,
@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import {
   EMPTY_REMINDER_FILTERS,
-  reminderColumns as initialColumns,
   reminderMatchesFilters,
   type Reminder,
   type ReminderColumn,
@@ -34,6 +33,17 @@ import {
 import { RemindersFilterPanel } from "@/components/activities/reminders/RemindersFilterPanel";
 import { RemindersTimelineView } from "@/components/activities/reminders/RemindersTimelineView";
 import { printViewItems } from "../tasks/page";
+import { listReminderColumns, saveReminders } from "@/lib/reminders/store";
+import {
+  completeCrmReminder,
+  dismissCrmReminder,
+  updateCrmReminder,
+  isCrmReminderId,
+  persistRemoteReminder,
+  snoozeCrmReminder,
+  tryCrmReminder,
+} from "@/lib/reminders/api";
+import { useCrmReminders } from "@/lib/reminders/use-crm-reminders";
 import {
   CardInitialsAvatar,
   CardOwnerRow,
@@ -135,8 +145,9 @@ const METHOD_ICON: Record<NotificationMethod, React.ElementType> = {
 
 export default function RemindersPage() {
   const router = useRouter();
+  const crm = useCrmReminders("all");
   const [view, setView] = useState<ActivityView>("kanban");
-  const [columns, setColumns] = useState<ReminderColumn[]>(initialColumns);
+  const [columns, setColumns] = useState<ReminderColumn[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState<ReminderFilters>(EMPTY_REMINDER_FILTERS);
   const [sortField, setSortField] = useState<string | undefined>();
@@ -146,6 +157,11 @@ export default function RemindersPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (crm.loading) return;
+    setColumns(listReminderColumns());
+  }, [crm.source, crm.loading]);
 
   const allReminders = useMemo(
     () =>
@@ -240,6 +256,14 @@ export default function RemindersPage() {
     visibleReminders.length > 0 &&
     visibleReminders.every((r) => selectedIds.includes(r.id));
 
+  function persistColumns(next: ReminderColumn[]) {
+    saveReminders(
+      next.flatMap((col) =>
+        col.reminders.map((r) => ({ ...r, status: col.title })),
+      ),
+    );
+    setColumns(next);
+  }
   function moveReminder(id: string, status: ReminderStatus) {
     setColumns((prev) => {
       let found: Reminder | undefined;
@@ -254,11 +278,36 @@ export default function RemindersPage() {
         };
       });
       if (!found) return prev;
-      return stripped.map((col) => {
+      const next = stripped.map((col) => {
         if (col.title !== status) return col;
         const reminders = [{ ...found!, status }, ...col.reminders];
         return { ...col, reminders, count: reminders.length };
       });
+      saveReminders(
+        next.flatMap((col) =>
+          col.reminders.map((r) => ({ ...r, status: col.title })),
+        ),
+      );
+      if (isCrmReminderId(id)) {
+        void (async () => {
+          if (status === "Snoozed") {
+            persistRemoteReminder(await tryCrmReminder(() => snoozeCrmReminder(id)));
+          } else if (status === "Triggered") {
+            persistRemoteReminder(
+              await tryCrmReminder(() => completeCrmReminder(id)),
+            );
+          } else if (status === "Dismissed") {
+            await tryCrmReminder(() => dismissCrmReminder(id));
+          } else {
+            persistRemoteReminder(
+              await tryCrmReminder(() =>
+                updateCrmReminder(id, { status: "PENDING" }),
+              ),
+            );
+          }
+        })();
+      }
+      return next;
     });
   }
 
@@ -286,8 +335,13 @@ export default function RemindersPage() {
       return;
     }
     const remove = new Set(selectedIds);
-    setColumns((prev) =>
-      prev.map((col) => {
+    for (const id of selectedIds) {
+      if (isCrmReminderId(id)) {
+        void tryCrmReminder(() => dismissCrmReminder(id));
+      }
+    }
+    persistColumns(
+      columns.map((col) => {
         const reminders = col.reminders.filter((r) => !remove.has(r.id));
         return { ...col, reminders, count: reminders.length };
       }),
@@ -302,6 +356,25 @@ export default function RemindersPage() {
       <FocusHighlight />
 
       <div className="shrink-0">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+              crm.source === "api"
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-slate-100 text-slate-500",
+            )}
+          >
+            {crm.source === "api"
+              ? "Live CRM"
+              : crm.loading
+                ? "Connecting…"
+                : "Demo"}
+          </span>
+          {crm.error && crm.source === "demo" ? (
+            <span className="text-[10px] text-slate-500">{crm.error}</span>
+          ) : null}
+        </div>
         <ActivityToolbar
           entityLabel="Reminder"
           createRoute="/activities/reminders/create"

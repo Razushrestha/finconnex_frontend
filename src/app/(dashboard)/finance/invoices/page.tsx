@@ -249,13 +249,14 @@ import { EntityTable } from "@/components/finance/EntityTable";
 import { EntityFilters } from "@/components/finance/EntityFilters";
 import { MetricCardConfig, TableColumn } from "@/components/finance/types";
 import {
-  invoices as seed,
   listInvoices,
   Invoice,
   InvoiceStatus,
 } from "@/lib/finance/invoices/types";
+import { useCrmInvoices } from "@/lib/finance/invoices/use-crm-invoices";
 import { formatAUD } from "@/lib/finance/shared";
 import { onRecordsChange } from "@/lib/records-sync";
+import { cn } from "@/lib/utils";
 
 interface InvoiceRow {
   id: string;
@@ -270,16 +271,18 @@ interface InvoiceRow {
 
 export default function InvoicesPage() {
   const router = useRouter();
+  const crm = useCrmInvoices();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [dateFilter, setDateFilter] = useState("30d");
-  const [data, setData] = useState<Invoice[]>(seed);
+  const [data, setData] = useState<Invoice[]>([]);
 
   useEffect(() => {
+    if (crm.loading) return;
     const refresh = () => setData(listInvoices());
     refresh();
     return onRecordsChange(refresh);
-  }, []);
+  }, [crm.source, crm.loading]);
 
   // Filter based on search input and status dropdown
   const filteredData = data.filter((item) => {
@@ -331,7 +334,7 @@ export default function InvoicesPage() {
     {
       title: "TOTAL INVOICES",
       value: data.length,
-      subtext: "📋 Tracked in system",
+      subtext: crm.source === "api" ? "📋 Live CRM" : "📋 Tracked in system",
       subtextVariant: "default",
     },
   ];
@@ -422,6 +425,25 @@ export default function InvoicesPage() {
 
   return (
     <div className="h-auto min-h-full w-full overflow-y-auto bg-slate-50 p-6 pb-16 text-slate-900">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            crm.source === "api"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-slate-100 text-slate-500",
+          )}
+        >
+          {crm.source === "api"
+            ? "Live CRM"
+            : crm.loading
+              ? "Connecting…"
+              : "Demo"}
+        </span>
+        {crm.error && crm.source === "demo" ? (
+          <span className="text-[10px] text-slate-500">{crm.error}</span>
+        ) : null}
+      </div>
       <EntityHeader {...headerProps} />
       <EntityCards cards={cardsData} />
       <EntityFilters
@@ -435,12 +457,11 @@ export default function InvoicesPage() {
         statusOptions={[
           { label: "All", value: "All" },
           { label: "Draft", value: "Draft" },
-          { label: "Awaiting Approval", value: "Awaiting Approval" },
-          { label: "Approved", value: "Approved" },
           { label: "Sent", value: "Sent" },
-          { label: "Partial", value: "Partial" },
+          { label: "Partially Paid", value: "Partially Paid" },
           { label: "Paid", value: "Paid" },
           { label: "Overdue", value: "Overdue" },
+          { label: "Cancelled", value: "Cancelled" },
           { label: "Void", value: "Void" },
         ]}
       />

@@ -16,6 +16,12 @@ import {
   updateTaskStatus,
   reassignTask,
 } from "@/lib/tasks/store";
+import {
+  persistRemoteTask,
+  syncTaskStatus,
+  tryCrmTask,
+  updateCrmTask,
+} from "@/lib/tasks/api";
 import { onRulesChange } from "@/lib/rules";
 import { taskMatchesFilters, taskMatchesSearch } from "@/lib/tasks/search";
 import { KanbanColumn } from "./KanbanColumn";
@@ -188,17 +194,27 @@ export function KanbanBoard({
       }),
     );
 
+    if (sourceColumnId !== targetColumnId) {
+      void tryCrmTask(() =>
+        syncTaskStatus(taskId, targetColumn.title as TaskStatus),
+      ).then(persistRemoteTask);
+    }
+
     handleDragEndTask();
   }
 
   function handleChangePriority(taskId: string, priority: Priority) {
     const updated = updateTaskPriority(taskId, priority);
     if (updated) setColumns(listTaskColumns());
+    void tryCrmTask(() => updateCrmTask(taskId, { priority })).then(
+      persistRemoteTask,
+    );
   }
 
   function handleChangeStatus(taskId: string, status: TaskStatus) {
     const updated = updateTaskStatus(taskId, status);
     if (updated) setColumns(listTaskColumns());
+    void tryCrmTask(() => syncTaskStatus(taskId, status)).then(persistRemoteTask);
   }
 
   return (

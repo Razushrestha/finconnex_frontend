@@ -19,14 +19,10 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import {
-  REPORT_DATA_SOURCES,
   REPORT_DATE_RANGES,
-  REPORT_FILTER_PRESETS,
-  REPORT_GROUP_BY,
   REPORT_OWNERS,
   REPORT_SCHEDULES,
   REPORT_SHARE_TARGETS,
-  REPORT_SORT_BY,
   REPORT_STATUS_STYLE,
   REPORT_TYPES,
   REPORT_TYPE_STYLE,
@@ -41,10 +37,33 @@ import {
   resolveDateRangeLabel,
   saveReportAsTemplate,
   upsertReport,
+  type ReportFilter,
   type ReportSchedule,
   type ReportType,
   type SavedReport,
 } from "@/lib/reports/types";
+import {
+  REPORT_DATA_SOURCE_OPTIONS,
+  REPORT_FILTER_OPERATORS,
+  fieldsForSource,
+  formatFilterLabel,
+  labelForDataSource,
+  sortOptionsForSource,
+} from "@/lib/reports/catalog";
+import {
+  deleteCrmReport,
+  emailCrmReport,
+  exportCrmReport,
+  getCrmReport,
+  isCrmReportId,
+  persistRemoteReport,
+  runCrmReport,
+  saveCrmReportAsTemplate,
+  shareCrmReport,
+  toUpdateReportBody,
+  tryCrmReport,
+  updateCrmReport,
+} from "@/lib/reports/api";
 import { cn } from "@/lib/utils";
 import {
   InputShell,
@@ -64,6 +83,8 @@ export function ReportDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const [row, setRow] = useState<SavedReport | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<"results" | "edit" | "activity">("results");
   const [dirty, setDirty] = useState(false);
   const [shareTarget, setShareTarget] = useState("Managers");
@@ -76,16 +97,40 @@ export function ReportDetailClient({ id }: { id: string }) {
   const [dateRange, setDateRange] = useState("");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
-  const [filters, setFilters] = useState("");
+  const [filterField, setFilterField] = useState("");
+  const [filterOperator, setFilterOperator] =
+    useState<ReportFilter["operator"]>("eq");
+  const [filterValue, setFilterValue] = useState("");
   const [groupBy, setGroupBy] = useState("");
   const [sortBy, setSortBy] = useState("");
   const [schedule, setSchedule] = useState<ReportSchedule>("None");
   const [createdBy, setCreatedBy] = useState("");
 
   useEffect(() => {
-    const r = getReportById(id) ?? null;
-    setRow(r);
-    if (r) hydrate(r);
+    const local = getReportById(id) ?? null;
+    setRow(local);
+    if (local) hydrate(local);
+    let cancelled = false;
+    void (async () => {
+      if (!isCrmReportId(id)) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const remote = await getCrmReport(id);
+        if (cancelled || !remote) return;
+        persistRemoteReport(remote);
+        setRow(remote);
+        hydrate(remote);
+      } catch {
+        /* keep local overlay */
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   function hydrate(r: SavedReport) {
@@ -95,7 +140,9 @@ export function ReportDetailClient({ id }: { id: string }) {
     setDateRange(r.dateRange);
     setCustomFrom(r.customFrom ?? "");
     setCustomTo(r.customTo ?? "");
-    setFilters(r.filters ?? "");
+    setFilterField(r.filterField ?? "");
+    setFilterOperator(r.filterOperator ?? "eq");
+    setFilterValue(r.filterValue ?? "");
     setGroupBy(r.groupBy ?? "");
     setSortBy(r.sortBy ?? "");
     setSchedule(r.schedule);
@@ -117,26 +164,73 @@ export function ReportDetailClient({ id }: { id: string }) {
   }
 
   function run() {
-    if (!row) return;
-    let next = appendReportAudit(
-      { ...row, status: "Running" },
-      "Run started",
-      row.createdBy,
-    );
-    save(next, "Running…");
-    window.setTimeout(() => {
-      next = appendReportAudit(
-        {
-          ...next,
-          status: next.schedule === "None" ? "Ready" : "Scheduled",
-          lastRunAt: formatReportAt(),
-          previewRows: buildPreviewRows(next.type),
-        },
-        "Run completed",
-        "System",
+    if (!row || busy) return;
+    void (async () => {
+      setBusy(true);
+      save(
+        appendReportAudit(
+          { ...row, status: "Running" },
+          "Run started",
+          row.createdBy,
+        ),
+        "Running…",
       );
-      save(next, "Run completed");
-    }, 700);
+      try {
+        const remote = isCrmReportId(row.id)
+          ? await runCrmReport(row.id)
+          : null;
+        if (remote) {
+          persistRemoteReport(remote);
+          save(
+            appendReportAudit(remote, "Run completed", "System"),
+            "Run completed",
+          );
+          return;
+        }
+        save(
+          appendReportAudit(
+            {
+              ...row,
+              status: row.schedule === "None" ? "Ready" : "Scheduled",
+              lastRunAt: formatReportAt(),
+              previewRows: buildPreviewRows(row.type),
+            },
+            "Run completed",
+            "System",
+          ),
+          "Run completed",
+        );
+      } catch (err) {
+        flash(err instanceof Error ? err.message : "Run failed");
+        save({ ...row, status: row.status === "Running" ? "Ready" : row.status });
+      } finally {
+        setBusy(false);
+      }
+    })();
+  }
+
+  async function exportViaCrm(format: string, fallback: () => void, label: string) {
+    if (!row) return;
+    if (isCrmReportId(row.id)) {
+      try {
+        const blob = await exportCrmReport(row.id, format);
+        const named = blob as Blob & { filename?: string };
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download =
+          named.filename ||
+          `${row.reportId}.${format === "excel" ? "xls" : format === "pdf" ? "pdf" : "csv"}`;
+        a.click();
+        URL.revokeObjectURL(url);
+        save(appendReportAudit(row, `Exported ${label}`, row.createdBy), `Exported ${label}`);
+        return;
+      } catch {
+        /* fall back to local preview export */
+      }
+    }
+    fallback();
+    save(appendReportAudit(row, `Exported ${label}`, row.createdBy), `Exported ${label}`);
   }
 
   function saveEdits() {
@@ -166,7 +260,10 @@ export function ReportDetailClient({ id }: { id: string }) {
       dateRange,
       customFrom: dateRange === "Custom" ? customFrom : undefined,
       customTo: dateRange === "Custom" ? customTo : undefined,
-      filters: filters.trim() || undefined,
+      filters: formatFilterLabel(filterField, filterOperator, filterValue),
+      filterField: filterField || undefined,
+      filterOperator: filterField ? filterOperator : undefined,
+      filterValue: filterValue.trim() || undefined,
       groupBy: groupBy || undefined,
       sortBy: sortBy || undefined,
       schedule,
@@ -185,6 +282,30 @@ export function ReportDetailClient({ id }: { id: string }) {
     );
     logEdit("reports", createdBy, row.id, row.reportId, changes);
     save(next, "Changes saved");
+    if (isCrmReportId(row.id)) {
+      void tryCrmReport(() =>
+        updateCrmReport(
+          row.id,
+          toUpdateReportBody({
+            name: next.name,
+            type: next.type,
+            dataSource: next.dataSource,
+            dateRange: next.dateRange,
+            customFrom: next.customFrom,
+            customTo: next.customTo,
+            filters: next.filters,
+            filterField: next.filterField,
+            filterOperator: next.filterOperator,
+            filterValue: next.filterValue,
+            groupBy: next.groupBy,
+            sortBy: next.sortBy,
+            schedule: next.schedule,
+            status: next.status,
+            reportCode: next.reportId,
+          }),
+        ),
+      );
+    }
     setDirty(false);
     setTab("results");
   }
@@ -192,51 +313,119 @@ export function ReportDetailClient({ id }: { id: string }) {
   function onSchedule(s: ReportSchedule) {
     if (!row) return;
     setSchedule(s);
-    save(
-      appendReportAudit(
-        {
-          ...row,
-          schedule: s,
-          status: s === "None" ? "Ready" : "Scheduled",
-        },
-        s === "None" ? "Schedule cleared" : `Scheduled ${s}`,
-        row.createdBy,
-      ),
-      s === "None" ? "Unscheduled" : `Scheduled ${s}`,
+    const next = appendReportAudit(
+      {
+        ...row,
+        schedule: s,
+        status: s === "None" ? "Ready" : "Scheduled",
+      },
+      s === "None" ? "Schedule cleared" : `Scheduled ${s}`,
+      row.createdBy,
     );
+    save(next, s === "None" ? "Unscheduled" : `Scheduled ${s}`);
+    if (isCrmReportId(row.id)) {
+      void tryCrmReport(() =>
+        updateCrmReport(
+          row.id,
+          toUpdateReportBody({
+            name: next.name,
+            type: next.type,
+            dataSource: next.dataSource,
+            dateRange: next.dateRange,
+            customFrom: next.customFrom,
+            customTo: next.customTo,
+            filterField: next.filterField,
+            filterOperator: next.filterOperator,
+            filterValue: next.filterValue,
+            groupBy: next.groupBy,
+            sortBy: next.sortBy,
+            schedule: s,
+            status: next.status,
+            reportCode: next.reportId,
+          }),
+        ),
+      );
+    }
   }
 
   function doShare() {
     if (!row) return;
-    save(
-      appendReportAudit(
-        { ...row, sharedWith: shareTarget },
+    void (async () => {
+      const remote = isCrmReportId(row.id)
+        ? await tryCrmReport(() => shareCrmReport(row.id, shareTarget))
+        : null;
+      const next = remote
+        ? { ...remote, sharedWith: shareTarget }
+        : { ...row, sharedWith: shareTarget };
+      save(
+        appendReportAudit(next, `Shared with ${shareTarget}`, row.createdBy),
         `Shared with ${shareTarget}`,
-        row.createdBy,
-      ),
-      `Shared with ${shareTarget}`,
-    );
+      );
+    })();
   }
 
   function doEmail() {
     if (!row) return;
-    const to = emailTo.trim() || "team@finconnex.example";
-    save(
-      appendReportAudit(
-        { ...row, emailedTo: to },
-        `Emailed report to ${to}`,
-        row.createdBy,
-      ),
-      `Email queued to ${to}`,
-    );
+    const to = emailTo.trim();
+    if (!to) {
+      flash("Enter an email address");
+      return;
+    }
+    void (async () => {
+      try {
+        if (isCrmReportId(row.id)) {
+          await emailCrmReport(row.id, to, "csv");
+        } else {
+          window.open(
+            `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(`Report: ${row.name}`)}`,
+            "_self",
+          );
+        }
+        save(
+          appendReportAudit(
+            { ...row, emailedTo: to },
+            `Emailed report to ${to}`,
+            row.createdBy,
+          ),
+          `Emailed ${to}`,
+        );
+      } catch (err) {
+        window.open(
+          `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(`Report: ${row.name}`)}`,
+          "_self",
+        );
+        flash(err instanceof Error ? err.message : "Email failed");
+      }
+    })();
   }
 
   function doTemplate() {
     if (!row) return;
-    const tpl = saveReportAsTemplate(row, row.createdBy);
-    save(
-      appendReportAudit(row, `Saved as template ${tpl.reportId}`, row.createdBy),
-      `Template ${tpl.reportId} saved`,
+    void (async () => {
+      const remote = isCrmReportId(row.id)
+        ? await tryCrmReport(() => saveCrmReportAsTemplate(row.id))
+        : null;
+      if (remote) persistRemoteReport(remote);
+      const tpl = remote ?? saveReportAsTemplate(row, row.createdBy);
+      save(
+        appendReportAudit(
+          row,
+          `Saved as template ${tpl.reportId}`,
+          row.createdBy,
+        ),
+        `Template ${tpl.reportId} saved`,
+      );
+    })();
+  }
+
+  const sourceFields = fieldsForSource(dataSource || "leads");
+  const sortOptions = sortOptionsForSource(dataSource || "leads");
+
+  if (loading && !row) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center bg-slate-50 text-sm text-slate-500">
+        Loading report…
+      </div>
     );
   }
 
@@ -290,6 +479,11 @@ export function ReportDetailClient({ id }: { id: string }) {
             >
               {row.type}
             </span>
+            {isCrmReportId(row.id) ? (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-700">
+                Live CRM
+              </span>
+            ) : null}
           </div>
         </div>
 
@@ -301,7 +495,7 @@ export function ReportDetailClient({ id }: { id: string }) {
           <button
             type="button"
             onClick={run}
-            disabled={row.status === "Running"}
+            disabled={busy || row.status === "Running"}
             className="inline-flex h-8 items-center gap-1 rounded-lg bg-violet-600 px-2.5 text-[11px] font-semibold text-white disabled:opacity-50"
           >
             <Play className="h-3.5 w-3.5" />
@@ -310,11 +504,7 @@ export function ReportDetailClient({ id }: { id: string }) {
           <button
             type="button"
             onClick={() => {
-              exportReportCsv(row);
-              save(
-                appendReportAudit(row, "Exported CSV", row.createdBy),
-                "Exported CSV",
-              );
+              void exportViaCrm("csv", () => exportReportCsv(row), "CSV");
             }}
             className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600"
           >
@@ -324,11 +514,7 @@ export function ReportDetailClient({ id }: { id: string }) {
           <button
             type="button"
             onClick={() => {
-              exportReportExcel(row);
-              save(
-                appendReportAudit(row, "Exported Excel", row.createdBy),
-                "Exported Excel",
-              );
+              void exportViaCrm("excel", () => exportReportExcel(row), "Excel");
             }}
             className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600"
           >
@@ -338,11 +524,7 @@ export function ReportDetailClient({ id }: { id: string }) {
           <button
             type="button"
             onClick={() => {
-              exportReportPdf(row);
-              save(
-                appendReportAudit(row, "Exported PDF", row.createdBy),
-                "Opened PDF print view",
-              );
+              void exportViaCrm("pdf", () => exportReportPdf(row), "PDF");
             }}
             className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600"
           >
@@ -390,6 +572,9 @@ export function ReportDetailClient({ id }: { id: string }) {
                 return;
               }
               deleteReport(row.id);
+              if (isCrmReportId(row.id)) {
+                void tryCrmReport(() => deleteCrmReport(row.id));
+              }
               router.push("/reports");
             }}
             className="ml-auto inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-rose-600"
@@ -433,7 +618,7 @@ export function ReportDetailClient({ id }: { id: string }) {
                     {row.name}
                   </h2>
                   <p className="mt-1 text-[12px] text-slate-500">
-                    {row.dataSource} · {resolveDateRangeLabel(row)}
+                    {labelForDataSource(row.dataSource)} · {resolveDateRangeLabel(row)}
                     {row.groupBy ? ` · Group: ${row.groupBy}` : ""}
                     {row.sortBy ? ` · Sort: ${row.sortBy}` : ""}
                   </p>
@@ -606,9 +791,9 @@ export function ReportDetailClient({ id }: { id: string }) {
                         setDirty(true);
                       }}
                     >
-                      {REPORT_DATA_SOURCES.map((d) => (
-                        <option key={d} value={d}>
-                          {d}
+                      {REPORT_DATA_SOURCE_OPTIONS.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.label}
                         </option>
                       ))}
                     </select>
@@ -709,9 +894,9 @@ export function ReportDetailClient({ id }: { id: string }) {
                       }}
                     >
                       <option value=""></option>
-                      {REPORT_GROUP_BY.map((g) => (
-                        <option key={g} value={g}>
-                          {g}
+                      {sourceFields.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.label}
                         </option>
                       ))}
                     </select>
@@ -728,32 +913,65 @@ export function ReportDetailClient({ id }: { id: string }) {
                       }}
                     >
                       <option value=""></option>
-                      {REPORT_SORT_BY.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
+                      {sortOptions.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.label}
                         </option>
                       ))}
                     </select>
                   </InputShell>
                 </Field>
                 <Field label="Filters" className="sm:col-span-2 xl:col-span-3">
-                  <InputShell>
-                    <input
-                      className={inputSm(false)}
-                      list="edit-filter-presets"
-                      value={filters}
-                      onChange={(e) => {
-                        setFilters(e.target.value);
-                        setDirty(true);
-                      }}
-                      placeholder="Filter expression"
-                    />
-                  </InputShell>
-                  <datalist id="edit-filter-presets">
-                    {REPORT_FILTER_PRESETS.map((f) => (
-                      <option key={f} value={f} />
-                    ))}
-                  </datalist>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <InputShell>
+                      <select
+                        className={selectSm(false)}
+                        value={filterField}
+                        onChange={(e) => {
+                          setFilterField(e.target.value);
+                          setDirty(true);
+                        }}
+                      >
+                        <option value="">No filter</option>
+                        {sourceFields.map((field) => (
+                          <option key={field.id} value={field.id}>
+                            {field.label}
+                          </option>
+                        ))}
+                      </select>
+                    </InputShell>
+                    <InputShell>
+                      <select
+                        className={selectSm(false)}
+                        value={filterOperator}
+                        onChange={(e) => {
+                          setFilterOperator(
+                            e.target.value as ReportFilter["operator"],
+                          );
+                          setDirty(true);
+                        }}
+                        disabled={!filterField}
+                      >
+                        {REPORT_FILTER_OPERATORS.map((op) => (
+                          <option key={op.id} value={op.id}>
+                            {op.label}
+                          </option>
+                        ))}
+                      </select>
+                    </InputShell>
+                    <InputShell>
+                      <input
+                        className={inputSm(false)}
+                        value={filterValue}
+                        onChange={(e) => {
+                          setFilterValue(e.target.value);
+                          setDirty(true);
+                        }}
+                        placeholder="Value"
+                        disabled={!filterField}
+                      />
+                    </InputShell>
+                  </div>
                 </Field>
               </div>
             </div>

@@ -9,12 +9,14 @@ import type { MortgagePipelineStage } from "@/lib/pipeline-sla/types";
 import { MORTGAGE_PIPELINE_STAGES } from "@/lib/pipeline-sla/types";
 import type { KanbanColumn } from "@/lib/leads/types";
 import type {
+  CrmCompanySize,
   CrmCreateLeadInput,
   CrmLead,
   CrmLeadKanbanColumn,
   CrmLeadSource,
   CrmLeadStatus,
 } from "@/lib/leads/api/types";
+import { CRM_COMPANY_SIZES } from "@/lib/leads/api/types";
 
 const AVATAR_COLORS = [
   "bg-amber-50 text-amber-600",
@@ -175,6 +177,56 @@ export function asHttpUrl(value: string | undefined): string | undefined {
   return undefined;
 }
 
+export const CRM_COMPANY_SIZE_LABELS: Record<CrmCompanySize, string> = {
+  MICRO: "1–9",
+  SMALL: "10–49",
+  MEDIUM: "50–249",
+  LARGE: "250–999",
+  ENTERPRISE: "1,000+",
+};
+
+export function uiCompanySizeToCrm(
+  value: string | undefined,
+): CrmCompanySize | undefined {
+  const raw = value?.trim();
+  if (!raw) return undefined;
+  const upper = raw.toUpperCase().replace(/[\s,]/g, "");
+  if ((CRM_COMPANY_SIZES as readonly string[]).includes(upper)) {
+    return upper as CrmCompanySize;
+  }
+  const labeled = (Object.entries(CRM_COMPANY_SIZE_LABELS) as Array<
+    [CrmCompanySize, string]
+  >).find(([, label]) => label === raw);
+  if (labeled) return labeled[0];
+  if (/^1[-–—]9$/.test(raw)) return "MICRO";
+  const compact = raw.toLowerCase().replace(/[\s–—,-]/g, "");
+  if (compact.includes("enterprise") || compact.includes("1000")) {
+    return "ENTERPRISE";
+  }
+  if (compact.includes("large") || compact.includes("250")) return "LARGE";
+  if (compact.includes("medium") || compact.includes("50")) return "MEDIUM";
+  if (compact.includes("small") || compact.includes("10") || compact.includes("11")) {
+    return "SMALL";
+  }
+  if (compact.includes("micro") || compact.includes("1–9") || /^[1-9]$/.test(compact)) {
+    return "MICRO";
+  }
+  return undefined;
+}
+
+export function crmCompanySizeToUi(
+  value: string | null | undefined,
+): string | undefined {
+  if (!value) return undefined;
+  const key = value.toUpperCase() as CrmCompanySize;
+  return CRM_COMPANY_SIZE_LABELS[key] ?? value;
+}
+
+function opt(value: string | null | undefined): string | undefined {
+  const t = value?.trim();
+  return t || undefined;
+}
+
 export function mapCrmLeadToCard(lead: CrmLead): LeadCardData {
   const stage = crmStatusToPipelineStage(lead.status);
   const first = lead.firstName?.trim() || "";
@@ -194,6 +246,28 @@ export function mapCrmLeadToCard(lead: CrmLead): LeadCardData {
     owner: lead.ownerId ?? "Unassigned",
     ownerId: lead.ownerId ?? undefined,
     companyId: lead.companyId ?? undefined,
+    leadNumber: lead.leadNumber ?? undefined,
+    jobTitle: opt(lead.jobTitle),
+    industry: opt(lead.industry),
+    companyWebsite: opt(lead.companyWebsite) ?? opt(lead.websiteUrl),
+    companySize: crmCompanySizeToUi(lead.companySize),
+    mobilePhone: opt(lead.mobilePhone),
+    department: opt(lead.department),
+    linkedinUrl: opt(lead.linkedinUrl),
+    websiteUrl: opt(lead.websiteUrl),
+    notes: opt(lead.notes),
+    description: opt(lead.description),
+    productInterest: opt(lead.productInterest),
+    budgetRange: opt(lead.budgetRange),
+    city: opt(lead.city),
+    state: opt(lead.state),
+    country: opt(lead.country),
+    street: opt(lead.street),
+    postalCode: opt(lead.postalCode),
+    modifiedDate: formatCreated(lead.updatedAt),
+    lifecycleStage: lead.lifecycleStage ?? undefined,
+    rating: lead.rating ?? undefined,
+    score: typeof lead.score === "number" ? lead.score : undefined,
     createdDate: created,
     source: crmSourceToUi(lead.source),
     estimatedValue: formatEstimatedValue(lead.estimatedValue),
@@ -243,31 +317,42 @@ export function toCrmCreateBody(input: {
   lastName: string;
   email: string;
   phone?: string;
+  mobilePhone?: string;
   company?: string;
   companyWebsite?: string;
   industry?: string;
+  companySize?: string;
   jobTitle?: string;
+  linkedinUrl?: string;
+  websiteUrl?: string;
   source?: LeadSource;
   productInterest?: string;
   budgetRange?: string;
   estimatedValue?: string;
   notes?: string;
+  description?: string;
   ownerId?: string;
 }): CrmCreateLeadInput {
+  const website = asHttpUrl(input.companyWebsite) ?? asHttpUrl(input.websiteUrl);
   return {
     firstName: input.firstName,
     lastName: input.lastName,
     email: input.email,
     phone: input.phone?.trim() || undefined,
+    mobilePhone: input.mobilePhone?.trim() || undefined,
     jobTitle: input.jobTitle?.trim() || undefined,
+    linkedinUrl: asHttpUrl(input.linkedinUrl),
+    websiteUrl: website,
     companyName: input.company?.trim() || undefined,
-    companyWebsite: asHttpUrl(input.companyWebsite),
+    companyWebsite: website,
     industry: input.industry?.trim() || undefined,
+    companySize: uiCompanySizeToCrm(input.companySize),
     source: input.source ? uiSourceToCrm(input.source) : undefined,
     productInterest: input.productInterest?.trim() || undefined,
     budgetRange: input.budgetRange?.trim() || undefined,
     estimatedValue: parseEstimatedValue(input.estimatedValue),
     notes: input.notes?.trim() || undefined,
+    description: input.description?.trim() || undefined,
     ownerId: input.ownerId,
   };
 }

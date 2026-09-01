@@ -23,6 +23,11 @@ import {
   type AuditEvent,
   type RecycleBinItem,
 } from "@/lib/rules";
+import {
+  recycleEntityTypeOf,
+  restoreCrmRecycleBinItem,
+} from "@/lib/recycle-bin/api";
+import { useCrmRecycleBin } from "@/lib/recycle-bin/use-crm-recycle-bin";
 import { cn } from "@/lib/utils";
 
 const SECTION_ICONS = {
@@ -39,6 +44,7 @@ export function RulesHubClient() {
   );
   const [audit, setAudit] = useState<AuditEvent[]>([]);
   const [bin, setBin] = useState<RecycleBinItem[]>([]);
+  const crmBin = useCrmRecycleBin();
 
   function refresh() {
     setAudit(listAuditEvents());
@@ -46,9 +52,10 @@ export function RulesHubClient() {
   }
 
   useEffect(() => {
+    if (tab === "bin" && crmBin.loading) return;
     refresh();
     return onRulesChange(() => refresh());
-  }, [tab]);
+  }, [tab, crmBin.source, crmBin.loading]);
 
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
@@ -179,7 +186,8 @@ export function RulesHubClient() {
         {tab === "bin" && (
           <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
             <div className="border-b border-slate-100 px-4 py-3 text-[12px] font-semibold text-slate-700">
-              Recycle Bin · unlimited retention · {bin.length} items
+              Recycle Bin · {bin.length} items
+              {crmBin.source === "api" ? " · Live CRM" : ""}
             </div>
             <ul className="divide-y divide-slate-50">
               {bin.length === 0 && (
@@ -203,14 +211,34 @@ export function RulesHubClient() {
                   </div>
                   <button
                     type="button"
-                    disabled={!canRestoreModule(item.module)}
+                    disabled={
+                      crmBin.source !== "api" && !canRestoreModule(item.module)
+                    }
                     onClick={() => {
-                      const result = restoreRecord(item.id);
-                      if (!result.ok) {
-                        window.alert(result.message);
-                        return;
-                      }
-                      refresh();
+                      void (async () => {
+                        if (crmBin.source === "api") {
+                          try {
+                            await restoreCrmRecycleBinItem(
+                              recycleEntityTypeOf(item),
+                              item.recordId,
+                            );
+                            crmBin.refresh();
+                          } catch (err) {
+                            window.alert(
+                              err instanceof Error
+                                ? err.message
+                                : "Restore failed",
+                            );
+                          }
+                          return;
+                        }
+                        const result = restoreRecord(item.id);
+                        if (!result.ok) {
+                          window.alert(result.message);
+                          return;
+                        }
+                        refresh();
+                      })();
                     }}
                     className="h-8 rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-semibold text-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
                   >

@@ -10,6 +10,13 @@ import {
 } from "lucide-react";
 import type { EmailImportance, EmailStatus } from "@/lib/emails/types";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
+import {
+  applyCrmEmailTemplate,
+  createCrmEmail,
+  persistRemoteEmail,
+  sendCrmEmail,
+  tryCrmEmail,
+} from "@/lib/emails/api";
 import { createEmail } from "@/lib/emails/store";
 import { takeCompose } from "@/lib/emails/outlook";
 import {
@@ -59,6 +66,12 @@ interface Attachment {
   id: string;
   name: string;
   size: number;
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 interface FormState {
@@ -277,24 +290,76 @@ export function CreateEmailForm({
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
+    const relatedTo =
+      form.relatedKind && form.relatedName
+        ? `${form.relatedKind}: ${form.relatedName}`
+        : undefined;
+
+    setSending(true);
+    const remote = await tryCrmEmail(() =>
+      createCrmEmail({
+        subject: form.subject.trim(),
+        body: form.body.trim(),
+        from: form.from.trim(),
+        to,
+        cc,
+        bcc,
+        relatedType: form.relatedKind ? form.relatedKind.toUpperCase() : undefined,
+        relatedTo,
+        status: "Draft",
+        template: form.template || undefined,
+      }),
+    );
+
+    if (remote) {
+      persistRemoteEmail(remote);
+      if (form.template) {
+        persistRemoteEmail(
+          await tryCrmEmail(() =>
+            applyCrmEmailTemplate(remote.id, {
+              template: form.template,
+              templateName: form.template,
+            }),
+          ),
+        );
+      }
+      if (status === "Sent" || status === "Scheduled") {
+        const sent = await tryCrmEmail(() =>
+          sendCrmEmail(
+            remote.id,
+            status === "Scheduled" ? { scheduled: true } : {},
+          ),
+        );
+        if (!sent && status === "Sent") {
+          setSending(false);
+          setSendError("CRM created the draft but send failed. Open the email to retry.");
+          router.push(`/activities/emails/detail/${remote.id}`);
+          return;
+        }
+        persistRemoteEmail(
+          sent ?? { ...remote, status, sentDate: formatRulesAt(new Date()) },
+        );
+      }
+      setSending(false);
+      void layoutId;
+      void redirect;
+      router.push(`/activities/emails?focus=${remote.id}`);
+      return;
+    }
+
     if (status === "Sent") {
-      setSending(true);
       const result = await sendEmailDemoLive({
         email: to[0],
         subject: form.subject.trim(),
         body: form.body.trim(),
       });
-      setSending(false);
       if (!result.ok) {
+        setSending(false);
         setSendError(result.message);
         return;
       }
     }
 
-    const relatedTo =
-      form.relatedKind && form.relatedName
-        ? `${form.relatedKind}: ${form.relatedName}`
-        : undefined;
     const body = form.body.trim();
     const created = createEmail({
       subject: form.subject.trim(),
@@ -304,11 +369,18 @@ export function CreateEmailForm({
       cc,
       bcc,
       relatedTo,
+      relatedType: form.relatedKind ? form.relatedKind.toUpperCase() : undefined,
       status,
       sentDate: status === "Draft" ? undefined : formatRulesAt(at ?? new Date()),
       templateUsed: form.template || undefined,
       importance: form.importance,
+      attachments: form.attachments.map((a) => ({
+        id: a.id,
+        name: a.name,
+        sizeLabel: formatBytes(a.size),
+      })),
     });
+    setSending(false);
     void layoutId;
     void redirect;
     if (after === "follow-up") {

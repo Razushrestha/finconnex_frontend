@@ -236,6 +236,13 @@ export function upsertEmailCampaign(c: EmailCampaign) {
   return c;
 }
 
+export function mergeCrmEmailCampaigns(remote: EmailCampaign[]) {
+  if (!remote.length) return;
+  const remoteIds = new Set(remote.map((c) => c.id));
+  const local = listEmailCampaigns().filter((c) => !remoteIds.has(c.id));
+  writeStore([...remote, ...local]);
+}
+
 export function deleteEmailCampaign(id: string) {
   writeStore(listEmailCampaigns().filter((c) => c.id !== id));
 }

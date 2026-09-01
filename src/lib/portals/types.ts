@@ -281,6 +281,13 @@ export function upsertPortal(p: ClientPortal) {
   return p;
 }
 
+export function mergeCrmPortals(remote: ClientPortal[]) {
+  if (!remote.length) return;
+  const remoteIds = new Set(remote.map((p) => p.id));
+  const local = listPortals().filter((p) => !remoteIds.has(p.id));
+  writeStore([...remote, ...local]);
+}
+
 export function deletePortal(id: string) {
   writeStore(listPortals().filter((p) => p.id !== id));
 }

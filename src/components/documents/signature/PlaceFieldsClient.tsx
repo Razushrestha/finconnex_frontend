@@ -25,6 +25,14 @@ import {
   type SignatureFieldKind,
   type SignatureRequest,
 } from "@/lib/documents/signature/types";
+import {
+  isCrmSignatureRequestId,
+  persistRemoteSignatureRequest,
+  sendCrmSignatureRequest,
+  toCreateSignatureRequestBody,
+  tryCrmSignatureRequest,
+  updateCrmSignatureRequest,
+} from "@/lib/documents/signature/api";
 import { SignatureDocPreview } from "./SignatureDocPreview";
 import { cn } from "@/lib/utils";
 
@@ -142,6 +150,11 @@ export function PlaceFieldsClient({ id }: { id: string }) {
     setReq(next);
     setFields(next.fields);
     fieldsRef.current = next.fields;
+    if (isCrmSignatureRequestId(next.id)) {
+      void tryCrmSignatureRequest(() =>
+        updateCrmSignatureRequest(next.id, toCreateSignatureRequestBody(next)),
+      );
+    }
     if (msg) flash(msg);
   }
 
@@ -206,6 +219,20 @@ export function PlaceFieldsClient({ id }: { id: string }) {
     }
     const withFields = upsertSignatureRequest({ ...req, fields });
     markRequestSent(withFields, withFields.createdBy);
+    if (isCrmSignatureRequestId(withFields.id)) {
+      void (async () => {
+        await tryCrmSignatureRequest(() =>
+          updateCrmSignatureRequest(
+            withFields.id,
+            toCreateSignatureRequestBody(withFields),
+          ),
+        );
+        const remote = await tryCrmSignatureRequest(() =>
+          sendCrmSignatureRequest(withFields.id),
+        );
+        if (remote) persistRemoteSignatureRequest(remote);
+      })();
+    }
     flash("Sent to signers");
     router.push(`/documents/signature/${id}`);
   }

@@ -9,6 +9,12 @@ export type EmailStatus =
 
 export type EmailImportance = "high" | "normal" | "low";
 
+export interface EmailAttachmentMeta {
+  id: string;
+  name: string;
+  sizeLabel?: string;
+}
+
 export interface Email {
   id: string;
   subject: string;
@@ -18,11 +24,14 @@ export interface Email {
   cc?: string[];
   bcc?: string[];
   relatedTo?: string;
+  relatedType?: string;
+  relatedId?: string;
   templateUsed?: string;
   status: EmailStatus;
   sentDate?: string;
   openedDate?: string;
   importance?: EmailImportance;
+  attachments?: EmailAttachmentMeta[];
 }
 
 export interface EmailColumn {

@@ -19,6 +19,8 @@ import { afterCompletionSummary } from "@/lib/tasks/repeat-reminder";
 import { mergeReminderSeries } from "@/lib/tasks/reminder-series";
 import { parseTaskDueDate } from "@/lib/dashboard/layout";
 import { onRulesChange } from "@/lib/rules";
+import { useRelatedCrmReminders } from "@/lib/reminders/use-related-crm-reminders";
+import { cn } from "@/lib/utils";
 
 const EMPTY_REMINDERS: TaskReminder[] = [];
 
@@ -44,6 +46,7 @@ export function TaskRemindersCard({
   reminders,
   dueDate,
 }: TaskRemindersCardProps) {
+  const crm = useRelatedCrmReminders("Task", taskId);
   const [items, setItems] = useState<TaskReminder[]>(
     () => reminders ?? EMPTY_REMINDERS,
   );
@@ -65,6 +68,12 @@ export function TaskRemindersCard({
     [items],
   );
 
+  useEffect(() => {
+    if (crm.source !== "api") return;
+    setItems(crm.items);
+    updateTaskReminders(taskId, crm.items);
+  }, [crm.source, crm.items, taskId]);
+
   function persist(next: TaskReminder[]) {
     setItems(next);
     updateTaskReminders(taskId, next);
@@ -79,15 +88,38 @@ export function TaskRemindersCard({
     });
   }
 
-  function handleDone(next: TaskReminder) {
-    persist(
-      mergeReminderSeries(
-        items,
-        next,
-        dueDate ? parseTaskDueDate(dueDate) : null,
-        isNew ? "add" : "replace",
-      ),
-    );
+  async function handleDone(next: TaskReminder) {
+    if (isNew && crm.live) {
+      try {
+        const created = await crm.create(next);
+        persist(
+          mergeReminderSeries(
+            items,
+            created,
+            dueDate ? parseTaskDueDate(dueDate) : null,
+            "add",
+          ),
+        );
+      } catch {
+        persist(
+          mergeReminderSeries(
+            items,
+            next,
+            dueDate ? parseTaskDueDate(dueDate) : null,
+            "add",
+          ),
+        );
+      }
+    } else {
+      persist(
+        mergeReminderSeries(
+          items,
+          next,
+          dueDate ? parseTaskDueDate(dueDate) : null,
+          isNew ? "add" : "replace",
+        ),
+      );
+    }
     setEditor(null);
     setIsNew(false);
   }
@@ -104,6 +136,7 @@ export function TaskRemindersCard({
   }
 
   function handleRemove(item: TaskReminder) {
+    if (crm.live) void crm.remove(item.id);
     persist(
       items.filter((row) => {
         if (row.id === item.id) return false;
@@ -126,6 +159,11 @@ export function TaskRemindersCard({
         <h2 className="text-[11px] font-medium tracking-wide text-slate-400 uppercase">
           Reminders
           {activeItems.length > 0 ? ` (${activeItems.length})` : ""}
+          {crm.source === "api" ? (
+            <span className={cn("ml-2 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700")}>
+              Live CRM
+            </span>
+          ) : null}
         </h2>
       </div>
 
@@ -217,7 +255,7 @@ export function TaskRemindersCard({
         value={editor ?? defaultReminder()}
         dueDate={dueDate}
         onCancel={handleCancel}
-        onDone={handleDone}
+        onDone={(next) => void handleDone(next)}
       />
     </section>
   );

@@ -4,7 +4,12 @@ import { jwtVerify } from "jose";
 import { getAuthSecretKey, SESSION_COOKIE } from "@/lib/auth/constants";
 
 /** Exact paths anyone can open (logged-out or logged-in). */
-const PUBLIC_EXACT = new Set(["/login"]);
+const PUBLIC_EXACT = new Set([
+  "/login",
+  "/forgot-password",
+  "/reset-password",
+  "/verify-email",
+]);
 
 /**
  * Prefixes for client-facing surfaces: must work without CRM login.
@@ -18,6 +23,8 @@ const PUBLIC_PREFIXES = [
   "/f/", // Marketing forms
   "/l/", // Linktree
   "/j/", // Proposal-to-payment journey (client link)
+  "/invite/", // One-time workspace invitation accept
+  "/public/", // Public sales quotes / estimates / invoices
 ] as const;
 
 function isPublicPath(pathname: string): boolean {

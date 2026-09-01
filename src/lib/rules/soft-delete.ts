@@ -17,6 +17,8 @@ export interface RecycleBinItem {
   recordType: string;
   deletedAt: string;
   deletedBy: string;
+  /** CRM recycle-bin entity type (lead, contact, …) */
+  entityType?: string;
   /** Original payload for restore (demo) */
   snapshot: unknown;
 }
@@ -34,6 +36,10 @@ function writeStore(list: RecycleBinItem[]) {
 
 export function listRecycleBin(): RecycleBinItem[] {
   return readStore();
+}
+
+export function replaceCrmRecycleBin(remote: RecycleBinItem[]) {
+  writeStore(remote.map((row) => ({ ...row })));
 }
 
 /** Deleted records move to the Recycle Bin for unlimited retention. */

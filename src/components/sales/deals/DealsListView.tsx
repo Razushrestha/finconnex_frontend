@@ -20,6 +20,14 @@ import {
   ManageColumnsModal,
   type ManageColumn,
 } from "@/components/work-queue/ManageColumnsModal";
+import {
+  applyTablePreferenceToColumns,
+  getCrmTablePreference,
+  isEmptyTablePreference,
+  persistCrmTablePreference,
+  tablePreferenceFromColumns,
+  tryCrmTablePreference,
+} from "@/lib/table-preferences/api";
 
 interface DealsListViewProps {
   pipeline: DealPipeline;
@@ -179,6 +187,18 @@ export function DealsListView({
   }, [stagesProp, pipeline]);
 
   useEffect(() => {
+    void tryCrmTablePreference(() => getCrmTablePreference("deals")).then(
+      (pref) => {
+        if (pref && !isEmptyTablePreference(pref)) {
+          setManageColumns(
+            applyTablePreferenceToColumns(DEFAULT_DEAL_COLUMNS, pref),
+          );
+        }
+      },
+    );
+  }, []);
+
+  useEffect(() => {
     return onRulesChange(() => {
       if (!stagesProp) setStages(listDealPipelines()[pipeline] ?? []);
     });
@@ -330,6 +350,10 @@ export function DealsListView({
         onClose={() => setManageColumnsOpen(false)}
         onSave={(cols) => {
           setManageColumns(cols);
+          persistCrmTablePreference(
+            "deals",
+            tablePreferenceFromColumns("deals", cols),
+          );
           setManageColumnsOpen(false);
         }}
       />

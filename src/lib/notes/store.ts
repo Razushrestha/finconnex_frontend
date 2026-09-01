@@ -61,6 +61,8 @@ export function createNote(input: {
   title: string;
   body: string;
   relatedTo: string;
+  relatedType?: string;
+  relatedId?: string;
   noteType?: NoteType;
   createdBy: string;
   isPrivate?: boolean;
@@ -71,6 +73,8 @@ export function createNote(input: {
     title: input.title.trim(),
     body: input.body,
     relatedTo: input.relatedTo,
+    relatedType: input.relatedType,
+    relatedId: input.relatedId,
     noteType: input.noteType ?? "General",
     createdBy: input.createdBy,
     isPrivate: input.isPrivate ?? false,
@@ -154,6 +158,21 @@ export function updateNote(
   return next;
 }
 
+function cloneNote(row: Note): Note {
+  return { ...row };
+}
+
+export function upsertNote(row: Note) {
+  const next = cloneNote(row);
+  const items = listNotes();
+  const i = items.findIndex((n) => n.id === next.id);
+  if (i >= 0) items[i] = next;
+  else items.unshift(next);
+  saveNotes(items);
+  emitLeadActivityChange();
+  return next;
+}
+
 function normalizeRelated(value: string) {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
@@ -220,4 +239,10 @@ export function listNotesForQueueRow(row: {
     const blob = `${note.relatedTo} ${note.title}`.toLowerCase();
     return keys.some((key) => matchKey(blob, key));
   });
+}
+
+/** Replace the session store with live CRM rows (empty list is a valid live result). */
+export function replaceCrmNotes(remote: Note[]) {
+  saveNotes(remote.map(cloneNote));
+  emitLeadActivityChange();
 }

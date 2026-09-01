@@ -12,6 +12,14 @@ import {
   ManageColumnsModal,
   type ManageColumn,
 } from "@/components/work-queue/ManageColumnsModal";
+import {
+  applyTablePreferenceToColumns,
+  getCrmTablePreference,
+  isEmptyTablePreference,
+  persistCrmTablePreference,
+  tablePreferenceFromColumns,
+  tryCrmTablePreference,
+} from "@/lib/table-preferences/api";
 
 interface CompaniesListViewProps {
   groups?: CompanyGroup[];
@@ -132,6 +140,18 @@ export function CompaniesListView({
   useEffect(() => {
     if (groupsProp) setGroups(groupsProp);
   }, [groupsProp]);
+
+  useEffect(() => {
+    void tryCrmTablePreference(() => getCrmTablePreference("companies")).then(
+      (pref) => {
+        if (pref && !isEmptyTablePreference(pref)) {
+          setManageColumns(
+            applyTablePreferenceToColumns(DEFAULT_COMPANY_COLUMNS, pref),
+          );
+        }
+      },
+    );
+  }, []);
 
   useEffect(() => {
     return onRulesChange(() => {
@@ -284,6 +304,10 @@ export function CompaniesListView({
         onClose={() => setManageColumnsOpen(false)}
         onSave={(cols) => {
           setManageColumns(cols);
+          persistCrmTablePreference(
+            "companies",
+            tablePreferenceFromColumns("companies", cols),
+          );
           setManageColumnsOpen(false);
         }}
       />

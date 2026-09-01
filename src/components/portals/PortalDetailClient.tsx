@@ -40,6 +40,13 @@ import {
   type PortalStatus,
 } from "@/lib/portals/types";
 import {
+  deleteCrmClientPortal,
+  getCrmClientPortal,
+  resetCrmClientPortalPassword,
+  tryCrmPortal,
+  updateCrmClientPortal,
+} from "@/lib/portals/api";
+import {
   sendPortalInvite,
   sendPortalPasswordReset,
 } from "@/lib/portals/auth";
@@ -83,6 +90,17 @@ export function PortalDetailClient({ id }: { id: string }) {
       setContactEmail(p.primaryContactEmail);
       setDirty(false);
     }
+    void tryCrmPortal(async () => {
+      const remote = await getCrmClientPortal(id);
+      if (!remote) return;
+      upsertPortal(remote);
+      setRow(remote);
+      setName(remote.name);
+      setSlug(remote.slug);
+      setClientId(remote.clientId);
+      setContactName(remote.primaryContactName);
+      setContactEmail(remote.primaryContactEmail);
+    });
   }, [id]);
 
   function flash(msg: string) {
@@ -93,6 +111,19 @@ export function PortalDetailClient({ id }: { id: string }) {
   function save(next: ClientPortal, msg?: string) {
     upsertPortal(next);
     setRow(next);
+    void tryCrmPortal(() =>
+      updateCrmClientPortal(next.id, {
+        name: next.name,
+        slug: next.slug,
+        status: next.status,
+        accessLevel: next.accessLevel,
+        modules: next.modules,
+        primaryContactName: next.primaryContactName,
+        primaryContactEmail: next.primaryContactEmail,
+        clientId: next.clientId,
+        clientName: next.clientName,
+      }),
+    );
     if (msg) flash(msg);
   }
 
@@ -160,6 +191,7 @@ export function PortalDetailClient({ id }: { id: string }) {
       return;
     }
     setRow(result.portal);
+    void tryCrmPortal(() => resetCrmClientPortalPassword(row.id));
     flash(`Password reset emailed · temp: ${result.tempPassword}`);
   }
 
@@ -347,6 +379,7 @@ export function PortalDetailClient({ id }: { id: string }) {
                 return;
               }
               deletePortal(row.id);
+              void tryCrmPortal(() => deleteCrmClientPortal(row.id));
               router.push("/portals");
             }}
             className="ml-auto inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-rose-600"

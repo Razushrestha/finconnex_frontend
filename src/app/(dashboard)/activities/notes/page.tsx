@@ -10,6 +10,14 @@ import {
   type NoteType,
 } from "@/lib/notes/types";
 import { listNoteColumns, saveNotes, deleteNote } from "@/lib/notes/store";
+import {
+  bulkDeleteCrmNotes,
+  isCrmNoteId,
+  persistRemoteNote,
+  tryCrmNote,
+  updateCrmNote,
+} from "@/lib/notes/api";
+import { useCrmNotes } from "@/lib/notes/use-crm-notes";
 import { NotesListView } from "@/components/activities/notes/NotesListView";
 import { NotesKanbanColumn } from "@/components/activities/notes/NotesKanbanColumn";
 import { NotesTimelineView } from "@/components/activities/notes/NotesTimelineView";
@@ -28,6 +36,7 @@ type TypeTab = "All" | NoteType;
 
 export default function NotesPage() {
   const router = useRouter();
+  const crm = useCrmNotes();
   const [view, setView] = useState<ActivityView>("kanban");
   const [typeTab, setTypeTab] = useState<TypeTab>("All");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -43,8 +52,9 @@ export default function NotesPage() {
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
 
   useEffect(() => {
+    if (crm.loading) return;
     setColumns(listNoteColumns());
-  }, []);
+  }, [crm.source, crm.loading]);
 
   useEffect(() => {
     const focus = new URLSearchParams(window.location.search).get("focus");
@@ -113,6 +123,14 @@ export default function NotesPage() {
         return col;
       });
       saveNotes(next.flatMap((c) => c.notes));
+      const target = next.find((c) => c.id === targetColumnId);
+      if (target && isCrmNoteId(noteId)) {
+        void tryCrmNote(() =>
+          updateCrmNote(noteId, { noteType: target.title }),
+        ).then((live) => {
+          persistRemoteNote(live);
+        });
+      }
       return next;
     });
     setDragInfo(null);
@@ -134,6 +152,10 @@ export default function NotesPage() {
     ) {
       return;
     }
+    const crmIds = selectedIds.filter(isCrmNoteId);
+    if (crmIds.length) {
+      void tryCrmNote(() => bulkDeleteCrmNotes(crmIds));
+    }
     let n = 0;
     for (const id of selectedIds) {
       if (deleteNote(id)) n += 1;
@@ -151,6 +173,25 @@ export default function NotesPage() {
     <div className={BOARD_PAGE}>
       <FocusHighlight />
       <div className="shrink-0">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+              crm.source === "api"
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-slate-100 text-slate-500",
+            )}
+          >
+            {crm.source === "api"
+              ? "Live CRM"
+              : crm.loading
+                ? "Connecting…"
+                : "Demo"}
+          </span>
+          {crm.error && crm.source === "demo" ? (
+            <span className="text-[10px] text-slate-500">{crm.error}</span>
+          ) : null}
+        </div>
         <ActivityToolbar
           entityLabel="Note"
           createRoute="/activities/notes/create?layoutid=standard&redirect=false"

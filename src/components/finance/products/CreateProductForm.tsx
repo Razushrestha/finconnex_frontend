@@ -9,6 +9,12 @@ import {
   upsertProduct,
   type ProductType,
 } from "@/lib/finance/products/types";
+import {
+  createCrmProduct,
+  persistRemoteProduct,
+  toCreateProductBody,
+  tryCrmProduct,
+} from "@/lib/finance/products/api";
 import { FINANCE_OWNERS, formatFinanceDate } from "@/lib/finance/shared";
 import {
   CreateEntityFormShell,
@@ -44,11 +50,10 @@ export function CreateProductForm({ layoutId: _l, redirect: _r }: Props) {
     return Object.keys(next).length === 0;
   }
 
-  function onSave(createAnother: boolean) {
+  async function onSave(createAnother: boolean) {
     if (!validate()) return;
     const ids = nextProductIds();
-    const created = upsertProduct({
-      id: ids.id,
+    const payload = toCreateProductBody({
       sku: ids.sku,
       name: name.trim(),
       type,
@@ -58,8 +63,27 @@ export function CreateProductForm({ layoutId: _l, redirect: _r }: Props) {
       taxRate: Number(taxRate) || 0,
       unit: unit.trim() || "unit",
       createdBy,
-      createdAt: formatFinanceDate(),
     });
+
+    const remote = await tryCrmProduct(() => createCrmProduct(payload));
+    if (remote) {
+      persistRemoteProduct(remote);
+    } else {
+      upsertProduct({
+        id: ids.id,
+        sku: ids.sku,
+        name: name.trim(),
+        type,
+        status: "Active",
+        description: description.trim() || undefined,
+        unitPrice: Number(unitPrice) || 0,
+        taxRate: Number(taxRate) || 0,
+        unit: unit.trim() || "unit",
+        createdBy,
+        createdAt: formatFinanceDate(),
+      });
+    }
+
     if (createAnother) {
       setName("");
       setDescription("");
@@ -84,7 +108,7 @@ export function CreateProductForm({ layoutId: _l, redirect: _r }: Props) {
       cardDescription="SRS §20.5: maintain pricing in one place"
       listHref="/finance/products"
       saveLabel="Save item"
-      onSave={onSave}
+      onSave={(again) => void onSave(again)}
     >
       <Field label="Name" required error={errors.name} className="sm:col-span-2">
         <InputShell icon={Package} error={!!errors.name}>

@@ -15,6 +15,8 @@ export {
 } from "@/lib/activity-timeline/types";
 export {
   ensureCrmSession,
+  ensureCrmAccess,
+  bindCrmSession,
   persistCrmTokens,
   clearCrmTokens,
   getCrmApiBaseUrl,

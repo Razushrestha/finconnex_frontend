@@ -12,15 +12,26 @@ const ROLE_STYLE: Record<MeetingAttendeeRole, string> = {
 };
 
 interface MeetingParticipantsProps {
-  meeting: Pick<Meeting, "organizer" | "relatedTo" | "attendees">;
+  meeting?: Pick<Meeting, "organizer" | "relatedTo" | "attendees">;
+  attendees?: Attendee[];
+  organizer?: string;
   onManage?: () => void;
+  onRemove?: (id: string) => void;
 }
 
 export function MeetingParticipants({
   meeting,
+  attendees: attendeesProp,
+  organizer,
   onManage,
+  onRemove,
 }: MeetingParticipantsProps) {
-  const attendees = withResolvedRoles(meeting);
+  const resolvedMeeting = meeting ?? {
+    organizer: organizer ?? "",
+    relatedTo: undefined,
+    attendees: attendeesProp ?? [],
+  };
+  const attendees = withResolvedRoles(resolvedMeeting);
 
   return (
     <div className="space-y-4">
@@ -47,7 +58,8 @@ export function MeetingParticipants({
           <ParticipantCard
             key={attendee.id}
             attendee={attendee}
-            role={resolveAttendeeRole(attendee, meeting)}
+            role={resolveAttendeeRole(attendee, resolvedMeeting)}
+            onRemove={onRemove}
           />
         ))}
       </div>
@@ -58,9 +70,11 @@ export function MeetingParticipants({
 function ParticipantCard({
   attendee,
   role,
+  onRemove,
 }: {
   attendee: Attendee;
   role: MeetingAttendeeRole;
+  onRemove?: (id: string) => void;
 }) {
   const initials = attendee.name
     .split(" ")
@@ -93,6 +107,15 @@ function ParticipantCard({
           {attendee.email}
         </p>
       </div>
+      {onRemove ? (
+        <button
+          type="button"
+          onClick={() => onRemove(attendee.id)}
+          className="text-[11px] font-semibold text-rose-600"
+        >
+          Remove
+        </button>
+      ) : null}
     </div>
   );
 }

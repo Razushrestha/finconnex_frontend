@@ -12,6 +12,11 @@ import {
   type EstimateStatus,
 } from "@/lib/finance/estimates/types";
 import {
+  createCrmEstimate,
+  persistRemoteEstimate,
+  toCreateEstimateBody,
+} from "@/lib/finance/estimates/api";
+import {
   FINANCE_OWNERS,
   newLineItem,
   type FinanceLineItem,
@@ -69,6 +74,8 @@ export function CreateEstimateForm({
     newLineItem({ name: "Home loan packaging", unitPrice: 2200, taxRate: 10 }),
   ]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const client = clients.find((c) => c.id === clientId) ?? clients[0];
 
@@ -84,42 +91,76 @@ export function CreateEstimateForm({
     return Object.keys(next).length === 0;
   }
 
-  function onSave(createAnother: boolean) {
+  async function onSave(createAnother: boolean) {
     if (!validate() || !client) return;
-    const ids = nextEstimateIds();
-    const created = upsertEstimate(
-      appendEstimateAudit(
-        {
-          id: ids.id,
-          estimateId: ids.estimateId,
-          title: title.trim(),
-          status,
-          clientId,
-          clientName: client.name,
-          contactName: client.contact,
-          contactEmail: client.email,
-          dealName: dealName || undefined,
-          relatedTo,
+    setSaving(true);
+    setSaveError(null);
+    const draft = {
+      title: title.trim(),
+      clientName: client.name,
+      clientId,
+      contactName: client.contact,
+      contactEmail: client.email,
+      dealName: dealName || undefined,
+      relatedTo,
+      notes: notes.trim() || undefined,
+      status,
+      owner,
+      validUntil: validUntil.trim(),
+      lineItems,
+    };
+    let created;
+    try {
+      created = persistRemoteEstimate(
+        await createCrmEstimate(toCreateEstimateBody(draft)),
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Create failed";
+      if (!/sign in/i.test(message)) {
+        setSaveError(message);
+        setSaving(false);
+        return;
+      }
+      created = null;
+    }
+    if (!created) {
+      const ids = nextEstimateIds();
+      created = upsertEstimate(
+        appendEstimateAudit(
+          {
+            id: ids.id,
+            estimateId: ids.estimateId,
+            title: draft.title,
+            status: draft.status,
+            clientId,
+            clientName: draft.clientName,
+            contactName: draft.contactName,
+            contactEmail: draft.contactEmail,
+            dealName: draft.dealName,
+            relatedTo,
+            owner,
+            validUntil: draft.validUntil,
+            notes: draft.notes,
+            lineItems,
+            subtotal: 0,
+            tax: 0,
+            total: 0,
+            createdBy: owner,
+            createdAt: formatFinanceDate(),
+            audit: [],
+          },
+          "Created",
           owner,
-          validUntil: validUntil.trim(),
-          notes: notes.trim() || undefined,
-          lineItems,
-          subtotal: 0,
-          tax: 0,
-          total: 0,
-          createdBy: owner,
-          createdAt: formatFinanceDate(),
-          audit: [],
-        },
-        "Created",
-        owner,
-      ),
-    );
+        ),
+      );
+    }
+    setSaving(false);
     if (createAnother) {
       setTitle("");
       setNotes("");
       setLineItems([newLineItem()]);
       setErrors({});
+      setSaveError(null);
       return;
     }
     router.push(`/finance/estimates/${created.id}`);
@@ -128,7 +169,7 @@ export function CreateEstimateForm({
   return (
     <CreateEntityFormShell
       breadcrumbParent={{ label: "Estimates", href: "/finance/estimates" }}
-      badge="§13.1"
+      badge="Live CRM"
       title="Create Estimate"
       subtitle="Create, edit, send, and track estimates linked to deals and contacts."
       tip="Title, Client, Owner, Valid until, and line items are required."
@@ -150,7 +191,12 @@ export function CreateEstimateForm({
           </InputShell>
         </Field>
       ) : null}
-
+      {saveError ? (
+        <p className="sm:col-span-2 text-[12px] text-rose-600">{saveError}</p>
+      ) : null}
+      {saving ? (
+        <p className="sm:col-span-2 text-[12px] text-slate-500">Saving…</p>
+      ) : null}
       <Field label="Title" required error={errors.title} className="sm:col-span-2">
         <InputShell icon={FileText} error={!!errors.title}>
           <input

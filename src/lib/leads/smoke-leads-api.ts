@@ -85,6 +85,81 @@ export async function smokeLeadClientWiring() {
   if (CRM_LEAD_ENDPOINTS.length !== 17) {
     fail(`expected 17 swagger lead routes, got ${CRM_LEAD_ENDPOINTS.length}`);
   }
+
+  const catalog = readFileSync(
+    path.join(repoRoot(), "src/lib/api/endpoints.ts"),
+    "utf8",
+  );
+  for (const fragment of [
+    'path: "/leads"',
+    'path: "/leads/kanban"',
+    'path: "/leads/:id"',
+    'path: "/leads/:id/owner"',
+    'path: "/leads/:id/company"',
+    'path: "/leads/:id/status"',
+    'path: "/leads/:id/lifecycle-stage"',
+    'path: "/leads/:id/rating"',
+    'path: "/leads/:id/score"',
+    'path: "/leads/bulk"',
+    'path: "/leads/import"',
+    'path: "/leads/:id/convert"',
+  ]) {
+    if (!catalog.includes(fragment)) {
+      fail(`endpoint catalog missing ${fragment}`);
+    }
+  }
+
+  const page = readFileSync(
+    path.join(repoRoot(), "src/app/(dashboard)/sales/leads/page.tsx"),
+    "utf8",
+  );
+  if (!page.includes("refreshCrmLeadsBoard")) {
+    fail("leads page does not call refreshCrmLeadsBoard");
+  }
+  if (!page.includes("bulkCrmLeads")) {
+    fail("leads page does not call bulkCrmLeads");
+  }
+
+  const create = readFileSync(
+    path.join(repoRoot(), "src/components/sales/leads/CreateLeadForm.tsx"),
+    "utf8",
+  );
+  if (!create.includes("syncCreatedLead")) {
+    fail("CreateLeadForm does not call syncCreatedLead");
+  }
+
+  const kanban = readFileSync(
+    path.join(repoRoot(), "src/components/sales/leads/LeadKanbanBoard.tsx"),
+    "utf8",
+  );
+  if (!kanban.includes("syncLeadStatus")) {
+    fail("LeadKanbanBoard does not call syncLeadStatus");
+  }
+
+  const detail = readFileSync(
+    path.join(repoRoot(), "src/components/sales/leads/LeadDetailView.tsx"),
+    "utf8",
+  );
+  if (!detail.includes("convertCrmLead")) {
+    fail("LeadDetailView does not call convertCrmLead");
+  }
+  for (const name of [
+    "assignCrmLeadOwner",
+    "unassignCrmLeadOwner",
+    "linkCrmLeadCompany",
+    "unlinkCrmLeadCompany",
+    "changeCrmLeadLifecycleStage",
+    "changeCrmLeadRating",
+    "changeCrmLeadScore",
+    "softDeleteCrmLead",
+  ]) {
+    if (!detail.includes(name)) {
+      fail(`LeadDetailView does not call ${name}`);
+    }
+  }
+  if (!clientSrc.includes("fetchLeadList")) {
+    fail("refresh path must still use GET /v1/leads");
+  }
 }
 
 export async function smokeLeadClientMock() {

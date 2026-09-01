@@ -234,6 +234,27 @@ export function deleteMeeting(id: string): Meeting | null {
   return found;
 }
 
+function cloneMeeting(row: Meeting): Meeting {
+  return { ...row, attendees: row.attendees.map((a) => ({ ...a })) };
+}
+
+export function upsertMeeting(row: Meeting) {
+  const next = cloneMeeting(row);
+  const items = listMeetings();
+  const i = items.findIndex((m) => m.id === next.id);
+  if (i >= 0) items[i] = next;
+  else items.unshift(next);
+  saveMeetings(items);
+  emitLeadActivityChange();
+  return next;
+}
+
+/** Replace the session store with live CRM rows (empty list is a valid live result). */
+export function replaceCrmMeetings(remote: Meeting[]) {
+  saveMeetings(remote.map(cloneMeeting));
+  emitLeadActivityChange();
+}
+
 export function formatMeetingDateTime(d: Date): string {
   return formatRulesAt(d);
 }

@@ -1,4 +1,6 @@
 /** Live emails store (session-backed). */
+/** @deprecated Phase 9 hydrate alias — live key is activities:emails:list:v2 */
+export const EMAILS_HYDRATE_KEY_V1 = "activities:emails:list:v1";
 
 import {
   emails as SEED_EMAILS,
@@ -93,10 +95,13 @@ export function createEmail(input: {
   cc?: string[];
   bcc?: string[];
   relatedTo?: string;
+  relatedType?: string;
+  relatedId?: string;
   status: EmailStatus;
   sentDate?: string;
   templateUsed?: string;
   importance?: Email["importance"];
+  attachments?: Email["attachments"];
 }): Email {
   const email: Email = {
     id: newRulesId("email"),
@@ -107,10 +112,15 @@ export function createEmail(input: {
     cc: input.cc?.length ? [...input.cc] : undefined,
     bcc: input.bcc?.length ? [...input.bcc] : undefined,
     relatedTo: input.relatedTo,
+    relatedType: input.relatedType,
+    relatedId: input.relatedId,
     status: input.status,
     sentDate: input.sentDate ?? formatRulesAt(new Date()),
     templateUsed: input.templateUsed,
     importance: input.importance,
+    attachments: input.attachments?.length
+      ? input.attachments.map((a) => ({ ...a }))
+      : undefined,
   };
   saveEmails([email, ...listEmails()]);
   emitLeadActivityChange();
@@ -142,4 +152,20 @@ export function deleteEmail(id: string): Email | null {
   saveEmails(items.filter((email) => email.id !== id));
   emitLeadActivityChange();
   return found;
+}
+
+export function mergeCrmEmails(remote: Email[]) {
+  if (!remote.length) return;
+  const remoteIds = new Set(remote.map((e) => e.id));
+  const local = listEmails().filter((e) => !remoteIds.has(e.id));
+  saveEmails([
+    ...remote.map((e) => ({
+      ...e,
+      to: [...e.to],
+      cc: e.cc ? [...e.cc] : undefined,
+      bcc: e.bcc ? [...e.bcc] : undefined,
+      attachments: e.attachments?.map((a) => ({ ...a })),
+    })),
+    ...local,
+  ]);
 }

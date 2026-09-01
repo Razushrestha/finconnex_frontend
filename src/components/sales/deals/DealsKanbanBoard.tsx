@@ -342,6 +342,15 @@ export function DealsKanbanBoard({
 
     persist({ ...allStages, [pipeline]: nextStages });
 
+    void import("@/lib/deals/api").then(({ updateCrmDeal, apiDealStage, tryCrmDeal, isCrmDealId }) => {
+      for (const deal of dealsToMove) {
+        if (!isCrmDealId(deal.id)) continue;
+        void tryCrmDeal(() =>
+          updateCrmDeal(deal.id, { stage: apiDealStage(targetStage.title) }),
+        );
+      }
+    });
+
     dealsToMove.forEach((deal) => {
       logStatusChange(
         "sales.deals",

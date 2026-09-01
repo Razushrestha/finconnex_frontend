@@ -7,18 +7,32 @@ import {
   saveIpAllowlist,
   type IpAllowlistConfig,
 } from "@/lib/settings/ip-allowlist";
+import {
+  patchCrmWorkspaceSettings,
+  tryCrmSettings,
+} from "@/lib/settings/api";
+import { useCrmSettings } from "@/lib/settings/use-crm-settings";
+import { cn } from "@/lib/utils";
 
 /** Settings → Security → IP Restrictions */
 export function IpRestrictionsSettingsClient() {
+  const crm = useCrmSettings();
   const [cfg, setCfg] = useState<IpAllowlistConfig>(() => loadIpAllowlist());
   const [text, setText] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const next = loadIpAllowlist();
-    setCfg(next);
-    setText(next.entries.join("\n"));
-  }, []);
+    const entries =
+      crm.security?.ipAllowlist?.length
+        ? crm.security.ipAllowlist
+        : crm.settings?.ipAllowlist?.length
+          ? crm.settings.ipAllowlist
+          : next.entries;
+    const enabled = entries.length > 0 ? next.enabled || Boolean(crm.security) : next.enabled;
+    setCfg({ ...next, entries, enabled });
+    setText(entries.join("\n"));
+  }, [crm.security, crm.settings]);
 
   function flash(msg: string) {
     setMessage(msg);
@@ -38,6 +52,14 @@ export function IpRestrictionsSettingsClient() {
     });
     setCfg(saved);
     setText(saved.entries.join("\n"));
+    if (crm.source === "api") {
+      void tryCrmSettings(() =>
+        patchCrmWorkspaceSettings({
+          ipAllowlist: saved.enabled ? saved.entries : [],
+          expectedRevision: crm.settings?.revision,
+        }),
+      );
+    }
     flash(
       saved.enabled
         ? "IP allowlist on — next login checks cookie"
@@ -52,16 +74,23 @@ export function IpRestrictionsSettingsClient() {
           IP restrictions
         </h2>
         <p className="mt-0.5 text-[12px] text-slate-500">
-          Demo allowlist for staff login. When enabled,{" "}
-          <code className="rounded bg-slate-100 px-1 text-[10px]">
-            /api/auth/login
-          </code>{" "}
-          rejects clients whose IP is not listed (uses{" "}
-          <code className="rounded bg-slate-100 px-1 text-[10px]">
-            x-forwarded-for
-          </code>{" "}
-          or 127.0.0.1).
+          Workspace IP allow-list from GET /v1/settings/security. Empty list
+          permits all addresses.
         </p>
+        <span
+          className={cn(
+            "mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            crm.source === "api"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-slate-100 text-slate-500",
+          )}
+        >
+          {crm.source === "api"
+            ? "Live CRM"
+            : crm.loading
+              ? "Connecting…"
+              : "Demo"}
+        </span>
         {message ? (
           <p className="mt-2 text-[12px] font-medium text-violet-700">{message}</p>
         ) : null}

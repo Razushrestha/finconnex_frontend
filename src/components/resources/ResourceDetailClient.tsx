@@ -33,6 +33,15 @@ import {
   type ResourceItem,
   type ResourceType,
 } from "@/lib/resources/types";
+import {
+  deleteCrmResource,
+  getCrmResource,
+  isCrmResourceId,
+  persistRemoteResource,
+  toCreateResourceBody,
+  tryCrmResource,
+  updateCrmResource,
+} from "@/lib/resources/api";
 import { cn } from "@/lib/utils";
 import { RecordTagChip } from "@/components/shared/tags/RecordTags";
 import {
@@ -47,6 +56,7 @@ export function ResourceDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const [row, setRow] = useState<ResourceItem | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"overview" | "edit" | "activity">("overview");
   const [dirty, setDirty] = useState(false);
   const [shareTarget, setShareTarget] = useState("Sales team");
@@ -61,9 +71,30 @@ export function ResourceDetailClient({ id }: { id: string }) {
   const [uploadedBy, setUploadedBy] = useState("");
 
   useEffect(() => {
-    const r = getResourceById(id) ?? null;
-    setRow(r);
-    if (r) hydrate(r);
+    const local = getResourceById(id) ?? null;
+    setRow(local);
+    if (local) hydrate(local);
+    let cancelled = false;
+    void (async () => {
+      if (!isCrmResourceId(id)) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const remote = await getCrmResource(id);
+        if (cancelled || !remote) return;
+        persistRemoteResource(remote);
+        setRow(remote);
+        hydrate(remote);
+      } catch {
+        /* keep local overlay */
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   function hydrate(r: ResourceItem) {
@@ -167,6 +198,22 @@ export function ResourceDetailClient({ id }: { id: string }) {
       changes,
     );
     persist(next, "Resource updated");
+    if (isCrmResourceId(row.id)) {
+      void tryCrmResource(() =>
+        updateCrmResource(
+          row.id,
+          toCreateResourceBody({
+            name: next.name,
+            type: next.type,
+            category: next.category,
+            fileOrUrl: next.fileOrUrl,
+            description: next.description,
+            tags: next.tags,
+            accessLevel: next.accessLevel,
+          }),
+        ),
+      );
+    }
     setTab("overview");
   }
 
@@ -186,7 +233,18 @@ export function ResourceDetailClient({ id }: { id: string }) {
       return;
     }
     deleteResource(row.id);
+    if (isCrmResourceId(row.id)) {
+      void tryCrmResource(() => deleteCrmResource(row.id));
+    }
     router.push("/resources");
+  }
+
+  if (loading && !row) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center bg-slate-50 text-sm text-slate-500">
+        Loading resource…
+      </div>
+    );
   }
 
   if (!row) {
@@ -247,6 +305,11 @@ export function ResourceDetailClient({ id }: { id: string }) {
               >
                 {row.accessLevel}
               </span>
+              {isCrmResourceId(row.id) ? (
+                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-700">
+                  Live CRM
+                </span>
+              ) : null}
             </div>
             <p className="mt-0.5 text-[13px] font-medium text-slate-700">
               {row.name}

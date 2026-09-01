@@ -12,6 +12,16 @@ import {
   type Payment,
 } from "@/lib/finance/payments/types";
 import {
+  deleteCrmPayment,
+  getCrmPayment,
+  isCrmPaymentId,
+  persistRemotePayment,
+  refundCrmPayment,
+  toUpdatePaymentBody,
+  tryCrmPayment,
+  updateCrmPayment,
+} from "@/lib/finance/payments/api";
+import {
   applyPaymentToInvoice,
   appendInvoiceAudit,
   getInvoiceById,
@@ -30,7 +40,16 @@ export function PaymentDetailClient({ id }: { id: string }) {
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    setRow(getPaymentById(id) ?? null);
+    const local = getPaymentById(id) ?? null;
+    setRow(local);
+    if (isCrmPaymentId(id)) {
+      void tryCrmPayment(() => getCrmPayment(id)).then((remote) => {
+        if (remote) {
+          persistRemotePayment(remote);
+          setRow(remote);
+        }
+      });
+    }
   }, [id]);
 
   function flash(msg: string) {
@@ -41,6 +60,13 @@ export function PaymentDetailClient({ id }: { id: string }) {
   function save(next: Payment, msg?: string) {
     upsertPayment(next);
     setRow(next);
+    if (isCrmPaymentId(next.id)) {
+      void tryCrmPayment(() =>
+        updateCrmPayment(next.id, toUpdatePaymentBody(next)),
+      ).then((remote) => {
+        if (remote) persistRemotePayment(remote);
+      });
+    }
     if (msg) flash(msg);
   }
 
@@ -148,6 +174,9 @@ export function PaymentDetailClient({ id }: { id: string }) {
                 if (!gate.ok) {
                   window.alert(gate.message);
                   return;
+                }
+                if (isCrmPaymentId(row.id)) {
+                  void tryCrmPayment(() => refundCrmPayment(row.id));
                 }
                 deletePayment(row.id);
                 router.push("/finance/payments");

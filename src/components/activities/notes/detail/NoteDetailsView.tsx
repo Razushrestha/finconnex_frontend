@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Clock, Link2, Lock, Pin } from "lucide-react";
+import { ArrowLeft, Clock, Link2, Lock, Pin, RotateCcw, Trash2 } from "lucide-react";
 import { ActivityTimelineButton } from "@/components/activities/ActivityTimelineButton";
 import type { Note, NoteType } from "@/lib/notes/types";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
@@ -19,12 +19,18 @@ interface NoteDetailsViewProps {
   note: Note;
   onBack: () => void;
   backLabel?: string;
+  busy?: boolean;
+  onDelete?: () => void;
+  onRestore?: () => void;
 }
 
 export function NoteDetailsView({
   note,
   onBack,
   backLabel = "Back to Notes",
+  busy,
+  onDelete,
+  onRestore,
 }: NoteDetailsViewProps) {
   const meta = TYPE_META[note.noteType];
 
@@ -39,9 +45,31 @@ export function NoteDetailsView({
           <ArrowLeft className="h-4 w-4" />
           {backLabel}
         </button>
-        <ActivityTimelineButton
-          href={`/activities/notes/detail/${note.id}/timeline`}
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          <ActivityTimelineButton
+            href={`/activities/notes/detail/${note.id}/timeline`}
+          />
+          {onRestore ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onRestore}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-medium text-slate-700 disabled:opacity-50"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Restore
+            </button>
+          ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onDelete}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-[12px] font-medium text-rose-700 disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 lg:grid-cols-3">

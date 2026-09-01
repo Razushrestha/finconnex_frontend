@@ -21,6 +21,11 @@ import {
   type EmailCampaignType,
 } from "@/lib/marketing/email/types";
 import {
+  createCrmCampaign,
+  normalizeEmailCampaign,
+  tryCrm,
+} from "@/lib/campaigns/api";
+import {
   AUDIENCE_OPTIONS,
   EMAIL_TEMPLATE_SEEDS,
 } from "@/lib/marketing/templates/seed";
@@ -118,6 +123,30 @@ export function CreateEmailCampaignForm({
           actor: createdBy,
         },
       ],
+    });
+    void tryCrm(async () => {
+      const remote = await createCrmCampaign({
+        name: created.name,
+        channel: "EMAIL",
+        type: created.type,
+        status: created.status,
+        audience: created.audience,
+        subject: created.subject,
+        fromName: created.fromName,
+        fromEmail: created.fromEmail,
+        scheduledAt: created.scheduledAt,
+        body: created.body,
+        previewText: created.previewText,
+      });
+      if (!remote) return;
+      const normalized = normalizeEmailCampaign(remote, 0);
+      if (normalized.id !== created.id) {
+        const { deleteEmailCampaign } = await import(
+          "@/lib/marketing/email/types"
+        );
+        deleteEmailCampaign(created.id);
+      }
+      upsertEmailCampaign(normalized);
     });
     if (createAnother) {
       setName("");

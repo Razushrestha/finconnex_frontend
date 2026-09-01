@@ -161,7 +161,7 @@ export interface DocumentRequestColumn {
   requests: DocumentRequest[];
 }
 
-function progressForStatus(status: DocumentRequestStatus): number {
+export function progressForStatus(status: DocumentRequestStatus): number {
   switch (status) {
     case "Requested":
       return 0;
@@ -724,6 +724,14 @@ export function upsertDocumentRequest(req: DocumentRequest) {
 
 export function replaceDocumentRequests(list: DocumentRequest[]) {
   writeStore(list.map(normalize));
+}
+
+export function removeDocumentRequest(id: string): DocumentRequest | null {
+  const list = listDocumentRequests();
+  const found = list.find((r) => r.id === id) ?? null;
+  if (!found) return null;
+  writeStore(list.filter((r) => r.id !== id));
+  return found;
 }
 
 export function getDocumentRequestById(id: string) {

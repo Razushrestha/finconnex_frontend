@@ -6,6 +6,10 @@ import { findLeadById } from "@/lib/leads/store";
 import { findLeadCardById } from "@/lib/leads/types";
 import { fetchLeadById, mapCrmLeadToCard } from "@/lib/leads/api";
 import { upsertLeadFromCard } from "@/lib/leads/store";
+import {
+  listCrmCustomFieldValues,
+  tryCrmCustomField,
+} from "@/lib/custom-fields/api";
 import { useParams } from "next/navigation";
 import type { LeadCardData } from "@/lib/leads/types";
 
@@ -25,8 +29,14 @@ export default function LeadDetailPage() {
           return;
         }
         const mapped = mapCrmLeadToCard(live);
-        upsertLeadFromCard(mapped);
-        setCard(mapped);
+        const values = await tryCrmCustomField(() =>
+          listCrmCustomFieldValues(mapped.id),
+        );
+        const next = values
+          ? { ...mapped, custom: { ...mapped.custom, ...values } }
+          : mapped;
+        upsertLeadFromCard(next);
+        setCard(next);
       } finally {
         if (!cancelled) setLoading(false);
       }

@@ -16,6 +16,8 @@ import {
   type CalendarItem,
   type CalendarItemType,
 } from "@/lib/calendar/types";
+import { mergeCalendarItems } from "@/lib/calendar/api";
+import { useCrmCalendar } from "@/lib/calendar/use-crm-calendar";
 import {
   buildCalendarIcs,
   createCalendarItem,
@@ -73,7 +75,7 @@ const TYPE_FILTERS: (CalendarItemType | "All")[] = [
   "Reminder",
 ];
 
-const TODAY = new Date(2026, 6, 22);
+const DEMO_TODAY = new Date(2026, 6, 22);
 
 export default function CalendarPage() {
   const [calendarItems, setCalendarItems] = useState<CalendarItem[]>(() =>
@@ -82,14 +84,28 @@ export default function CalendarPage() {
   const [view, setView] = useState<CalendarView>("Week");
   const [typeFilter, setTypeFilter] =
     useState<(typeof TYPE_FILTERS)[number]>("All");
-  const [anchor, setAnchor] = useState(() => new Date(TODAY));
+  const [anchor, setAnchor] = useState(() => new Date(DEMO_TODAY));
   const [flash, setFlash] = useState<string | null>(null);
+  const crm = useCrmCalendar({ view, anchor });
+  const highlightToday =
+    crm.source === "api" ? new Date() : DEMO_TODAY;
+  const displayItems = useMemo(
+    () => mergeCalendarItems(calendarItems, crm.remoteItems),
+    [calendarItems, crm.remoteItems],
+  );
+  const dataSource =
+    crm.source === "api" &&
+    calendarItems.some(
+      (item) => !crm.remoteItems.some((remote) => remote.id === item.id),
+    )
+      ? "mixed"
+      : crm.source;
 
   // Modal State for adding events
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newType, setNewType] = useState<CalendarItemType>("Event");
-  const [newDate, setNewDate] = useState(isoDate(TODAY));
+  const [newDate, setNewDate] = useState(isoDate(DEMO_TODAY));
   const [newTime, setNewTime] = useState("09:00");
 
   useEffect(() => {
@@ -108,13 +124,20 @@ export default function CalendarPage() {
   }
 
   function syncExternal() {
-    const added = syncExternalCalendarEvents();
-    setCalendarItems(listCalendarItems());
-    setFlash(
-      added.length
-        ? `Synced ${added.length} external event(s)`
-        : "Already up to date with Google/Outlook mock feeds",
-    );
+    crm.refresh();
+    if (crm.source === "demo") {
+      const added = syncExternalCalendarEvents();
+      setCalendarItems(listCalendarItems());
+      setFlash(
+        added.length
+          ? `Synced ${added.length} external event(s)`
+          : crm.error
+            ? `CRM calendar: ${crm.error}`
+            : "Already up to date — sign in for live CRM calendar",
+      );
+      return;
+    }
+    setFlash("Refreshing live CRM calendar");
   }
 
   async function shareCalendar() {
@@ -130,28 +153,28 @@ export default function CalendarPage() {
   function exportIcs() {
     downloadCalendarIcs(
       `finconnex-calendar-${Date.now()}.ics`,
-      buildCalendarIcs(calendarItems),
+      buildCalendarIcs(displayItems),
     );
-    setFlash(`Exported ${calendarItems.length} events`);
+    setFlash(`Exported ${displayItems.length} events`);
   }
 
   // Drag and drop state tracking
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
-    return calendarItems.filter(
+    return displayItems.filter(
       (item) => typeFilter === "All" || item.type === typeFilter,
     );
-  }, [calendarItems, typeFilter]);
+  }, [displayItems, typeFilter]);
 
   const counts = useMemo(() => {
     const base = { Event: 0, Task: 0, Meeting: 0, Reminder: 0, All: 0 };
-    for (const item of calendarItems) {
+    for (const item of displayItems) {
       if (base[item.type] !== undefined) base[item.type] += 1;
       base.All += 1;
     }
     return base;
-  }, [calendarItems]);
+  }, [displayItems]);
 
   const weekDays = useMemo(() => {
     const start = startOfWeek(anchor);
@@ -245,6 +268,24 @@ export default function CalendarPage() {
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Calendar
             </h1>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                dataSource === "api"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : dataSource === "mixed"
+                    ? "bg-amber-50 text-amber-800"
+                    : "bg-slate-100 text-slate-500",
+              )}
+            >
+              {dataSource === "api"
+                ? "Live CRM"
+                : dataSource === "mixed"
+                  ? "Live + demo"
+                  : crm.loading
+                    ? "Connecting…"
+                    : "Demo"}
+            </span>
           </div>
 
           <button
@@ -282,6 +323,15 @@ export default function CalendarPage() {
         </div>
         {flash ? (
           <p className="mt-1 text-[11px] font-medium text-emerald-700">{flash}</p>
+        ) : null}
+        {crm.error && crm.source === "demo" ? (
+          <p className="mt-1 text-[11px] font-medium text-slate-500">{crm.error}</p>
+        ) : null}
+        {crm.conflicts.length > 0 ? (
+          <p className="mt-1 text-[11px] font-medium text-amber-800">
+            {crm.conflicts.length} overlapping event
+            {crm.conflicts.length === 1 ? "" : "s"} in this range
+          </p>
         ) : null}
 
         {/* ONE surface: toolbar + grid */}
@@ -330,7 +380,7 @@ export default function CalendarPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setAnchor(new Date(TODAY))}
+                  onClick={() => setAnchor(new Date(highlightToday))}
                   className="rounded-md px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
                 >
                   Today
@@ -394,6 +444,7 @@ export default function CalendarPage() {
                 days={view === "Day" ? [anchor] : weekDays}
                 filtered={filtered}
                 columns={view === "Day" ? 1 : 7}
+                today={highlightToday}
                 onDragStartItem={setDraggedItemId}
                 onDropOnDay={handleDropOnDay}
               />
@@ -403,6 +454,7 @@ export default function CalendarPage() {
                 days={monthDays}
                 anchor={anchor}
                 filtered={filtered}
+                today={highlightToday}
                 onDragStartItem={setDraggedItemId}
                 onDropOnDay={handleDropOnDay}
               />
@@ -508,12 +560,14 @@ function WeekDayGrid({
   days,
   filtered,
   columns,
+  today,
   onDragStartItem,
   onDropOnDay,
 }: {
   days: Date[];
   filtered: CalendarItem[];
   columns: number;
+  today: Date;
   onDragStartItem: (id: string) => void;
   onDropOnDay: (dateStr: string) => void;
 }) {
@@ -529,7 +583,7 @@ function WeekDayGrid({
         const items = filtered
           .filter((i) => i.start.startsWith(key))
           .sort((a, b) => a.start.localeCompare(b.start));
-        const isToday = sameDay(day, TODAY);
+        const isToday = sameDay(day, today);
 
         return (
           <div
@@ -583,12 +637,14 @@ function MonthGrid({
   days,
   anchor,
   filtered,
+  today,
   onDragStartItem,
   onDropOnDay,
 }: {
   days: Date[];
   anchor: Date;
   filtered: CalendarItem[];
+  today: Date;
   onDragStartItem: (id: string) => void;
   onDropOnDay: (dateStr: string) => void;
 }) {
@@ -605,7 +661,7 @@ function MonthGrid({
       {days.map((day, idx) => {
         const key = isoDate(day);
         const inMonth = day.getMonth() === anchor.getMonth();
-        const isToday = sameDay(day, TODAY);
+        const isToday = sameDay(day, today);
         const items = filtered.filter((i) => i.start.startsWith(key));
 
         return (

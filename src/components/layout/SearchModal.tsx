@@ -18,9 +18,15 @@ import {
   Inbox,
   CheckSquare,
   Scale,
+  Building2,
+  FileText,
+  StickyNote,
+  Phone,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCrmRecordSearch } from "@/lib/search/use-crm-record-search";
+import type { CrmRecordSearchHit } from "@/lib/search/api";
 
 interface SearchModalProps {
   open: boolean;
@@ -71,11 +77,29 @@ function writeRecent(hrefs: string[]) {
   sessionStorage.setItem(RECENT_KEY, JSON.stringify(hrefs.slice(0, 6)));
 }
 
+function iconForRecordType(type: string): LucideIcon {
+  const key = type.toLowerCase();
+  if (key.includes("lead") || key.includes("contact")) return Users;
+  if (key.includes("compan")) return Building2;
+  if (key.includes("deal")) return Handshake;
+  if (key.includes("email")) return Mail;
+  if (key.includes("meeting") || key.includes("calendar")) return Calendar;
+  if (key.includes("task")) return CheckSquare;
+  if (key.includes("note")) return StickyNote;
+  if (key.includes("call")) return Phone;
+  if (key.includes("ticket") || key.includes("support")) return LifeBuoy;
+  if (key.includes("invoice") || key.includes("quote") || key.includes("estimate")) {
+    return FileText;
+  }
+  return Search;
+}
+
 export function SearchModal({ open, onOpenChange }: SearchModalProps) {
   const router = useRouter();
   const [query, setQuery] = React.useState("");
   const [recentHrefs, setRecentHrefs] = React.useState<string[]>([]);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const records = useCrmRecordSearch(query);
 
   React.useEffect(() => {
     if (open) {
@@ -107,19 +131,32 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
       : DESTINATIONS.slice(0, 6)
     : filtered;
 
-  function go(item: SearchItem) {
-    const next = [item.href, ...readRecent().filter((h) => h !== item.href)];
-    writeRecent(next);
-    setRecentHrefs(next);
+  function go(href: string, remember = true) {
+    if (remember) {
+      const next = [href, ...readRecent().filter((h) => h !== href)];
+      writeRecent(next);
+      setRecentHrefs(next);
+    }
     onOpenChange(false);
-    router.push(item.href);
+    router.push(href);
+  }
+
+  function goNav(item: SearchItem) {
+    go(item.href, true);
+  }
+
+  function goRecord(hit: CrmRecordSearchHit) {
+    go(hit.href, false);
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter" && list[0]) {
-      e.preventDefault();
-      go(list[0]);
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (records.hits[0]) {
+      goRecord(records.hits[0]);
+      return;
     }
+    if (list[0]) goNav(list[0]);
   }
 
   return (
@@ -137,7 +174,7 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Search keywords"
+            placeholder="Search records or pages"
             className="w-full bg-transparent text-base text-foreground placeholder:text-muted-foreground focus:outline-none"
             aria-label="Search keywords"
           />
@@ -157,24 +194,93 @@ export function SearchModal({ open, onOpenChange }: SearchModalProps) {
         <div className="border-t border-border" />
 
         <div className="max-h-96 overflow-y-auto px-3 py-3">
+          {!showRecent ? (
+            <div className="mb-3">
+              <div className="flex items-center justify-between px-2">
+                <span className="text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                  Records
+                </span>
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                    records.source === "api"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-slate-100 text-slate-500",
+                  )}
+                >
+                  {records.loading
+                    ? "Searching…"
+                    : records.source === "api"
+                      ? "Live CRM"
+                      : records.source === "error"
+                        ? "Offline"
+                        : "Type to search"}
+                </span>
+              </div>
+              {records.error && records.source === "error" ? (
+                <p className="px-2 pt-1 text-[11px] text-slate-500">
+                  {records.error}
+                </p>
+              ) : null}
+              <div className="mt-1 flex flex-col">
+                {records.hits.map((hit) => {
+                  const Icon = iconForRecordType(hit.type);
+                  return (
+                    <button
+                      key={`${hit.type}-${hit.id}`}
+                      type="button"
+                      onClick={() => goRecord(hit)}
+                      className="flex items-center gap-3 rounded-md px-2 py-2 text-left text-[14px] text-foreground transition-colors hover:bg-slate-100 dark:hover:bg-zinc-800"
+                    >
+                      <Icon
+                        className="h-[18px] w-[18px] shrink-0 text-muted-foreground"
+                        strokeWidth={1.75}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">
+                          {hit.title}
+                        </span>
+                        {hit.subtitle ? (
+                          <span className="block truncate text-[11px] text-muted-foreground">
+                            {hit.subtitle}
+                          </span>
+                        ) : null}
+                      </span>
+                      <span className="shrink-0 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                        {hit.type}
+                      </span>
+                    </button>
+                  );
+                })}
+                {!records.loading &&
+                records.source === "api" &&
+                records.hits.length === 0 ? (
+                  <p className="px-2 py-2 text-[12px] text-slate-400">
+                    No CRM records match
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           <span className="px-2 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
             {showRecent
               ? recentItems.length > 0
                 ? "Recently searched"
                 : "Quick links"
               : filtered.length
-                ? "Results"
-                : "No matches"}
+                ? "Pages"
+                : "No page matches"}
           </span>
 
           <div className="mt-1 flex flex-col">
-            {list.map((item, index) => {
+            {list.map((item) => {
               const Icon = item.icon;
               return (
                 <button
                   key={item.href + item.label}
                   type="button"
-                  onClick={() => go(item)}
+                  onClick={() => goNav(item)}
                   className={cn(
                     "flex items-center gap-3 rounded-md px-2 py-2 text-left text-[14px] text-foreground transition-colors hover:bg-slate-100 dark:hover:bg-zinc-800",
                   )}

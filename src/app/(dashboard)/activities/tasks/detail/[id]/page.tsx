@@ -5,6 +5,17 @@ import { useRouter } from "next/navigation";
 import { useModuleBack } from "@/hooks/useModuleBack";
 import type { Priority, Task, TaskStatus } from "@/lib/tasks/types";
 import { findTaskById, addTaskActivityNote, patchTask, updateTaskDescription, updateTaskStatus } from "@/lib/tasks/store";
+import {
+  cancelCrmTask,
+  completeCrmTask,
+  getCrmTask,
+  isCrmTaskId,
+  persistRemoteTask,
+  reopenCrmTask,
+  syncTaskStatus,
+  tryCrmTask,
+  updateCrmTask,
+} from "@/lib/tasks/api";
 import { TaskDetailsView } from "@/components/activities/tasks/detail/TaskDetailsView";
 import { onRulesChange } from "@/lib/rules";
 
@@ -31,17 +42,42 @@ export default function TaskDetailPage({ params }: PageProps) {
       setTask(found?.task ?? null);
     }
     loadTask();
-    return onRulesChange(loadTask);
+    const off = onRulesChange(loadTask);
+    let cancelled = false;
+    void (async () => {
+      if (!isCrmTaskId(id)) return;
+      const remote = await tryCrmTask(() => getCrmTask(id));
+      if (cancelled || !remote) return;
+      persistRemoteTask(remote);
+      setTask(remote);
+    })();
+    return () => {
+      cancelled = true;
+      off();
+    };
   }, [id]);
+
+  function applyRemote(run: () => Promise<Task | null>) {
+    void tryCrmTask(run).then((remote) => {
+      if (!remote) return;
+      persistRemoteTask(remote);
+      setTask(remote);
+    });
+  }
 
   function handleUpdateStatus(newStatus: TaskStatus) {
     const updated = updateTaskStatus(id, newStatus);
     if (updated) setTask(updated);
+    if (newStatus === "Completed") applyRemote(() => completeCrmTask(id));
+    else if (newStatus === "Cancelled") applyRemote(() => cancelCrmTask(id));
+    else if (newStatus === "Not Started") applyRemote(() => reopenCrmTask(id));
+    else applyRemote(() => syncTaskStatus(id, newStatus));
   }
 
   function handleUpdateDescription(description: string) {
     const updated = updateTaskDescription(id, description);
     if (updated) setTask(updated);
+    applyRemote(() => updateCrmTask(id, { description }));
   }
 
   function handleAddNote(body: string) {
@@ -57,6 +93,7 @@ export default function TaskDetailPage({ params }: PageProps) {
   }) {
     const updated = patchTask(id, next);
     if (updated) setTask(updated);
+    applyRemote(() => updateCrmTask(id, next));
   }
 
   if (!task) {

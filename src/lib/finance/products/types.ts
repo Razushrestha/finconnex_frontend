@@ -119,6 +119,15 @@ export function upsertProduct(p: FinanceProduct) {
   return p;
 }
 
+export function writeAllProducts(list: FinanceProduct[]) {
+  writeStore(list);
+}
+
+/** Replace the session store with live CRM rows (empty list is a valid live result). */
+export function replaceCrmProducts(remote: FinanceProduct[]) {
+  writeStore(remote.map((p) => ({ ...p })));
+}
+
 export function deleteProduct(id: string) {
   writeStore(listProducts().filter((p) => p.id !== id));
 }

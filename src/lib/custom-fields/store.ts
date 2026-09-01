@@ -12,10 +12,15 @@ import {
 } from "@/lib/rules/storage";
 
 const STORAGE_KEY = "settings:custom-fields:v1";
+const SOURCE_KEY = "settings:custom-fields:source";
 
 function read(): CustomFieldDef[] {
   if (!isBrowser()) return customFieldsSeed.map((f) => ({ ...f }));
   const saved = readJsonStore<CustomFieldDef[] | null>(STORAGE_KEY, null);
+  const source = readJsonStore<string | null>(SOURCE_KEY, null);
+  if (source === "api") {
+    return Array.isArray(saved) ? saved : [];
+  }
   if (!saved || !Array.isArray(saved) || saved.length === 0) {
     writeJsonStore(STORAGE_KEY, customFieldsSeed);
     return customFieldsSeed.map((f) => ({ ...f }));
@@ -66,4 +71,10 @@ export function upsertCustomField(def: CustomFieldDef) {
 
 export function saveCustomFields(defs: CustomFieldDef[]) {
   write(defs);
+}
+
+/** Replace local definitions with live CRM rows (empty list is a valid live result). */
+export function replaceCrmCustomFields(remote: CustomFieldDef[]) {
+  writeJsonStore(SOURCE_KEY, "api");
+  write(remote.map((f) => ({ ...f, options: f.options ? [...f.options] : undefined })));
 }

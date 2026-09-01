@@ -125,7 +125,7 @@ interface WorkQueueSidebarProps {
   activityItems: ActivityNavItem[];
   sidebarCategories: WorkqueueSidebarCategory[];
   timeFilter: WorkQueueTimeFilter;
-  onTimeFilterChange: (v: WorkQueueTimeFilter) => void;
+  onTimeFilterChange: (v: WorkQueueTimeFilter, specificDate?: Date) => void;
   onOpenManage: () => void;
 }
 
@@ -461,7 +461,7 @@ export function WorkQueueSidebar({
                 if (selectedDate) {
                   const customValue = `date-${selectedDate.toISOString()}`;
                   setSpecificDateValue(customValue);
-                  onTimeFilterChange("specific-date" as WorkQueueTimeFilter);
+                  onTimeFilterChange("specific-date", selectedDate);
                 }
                 setIsCalendarOpen(false);
               }}

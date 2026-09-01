@@ -11,15 +11,20 @@ import { CustomFieldsSettingsClient } from "@/components/settings/CustomFieldsSe
 import { PipelineSlaSettingsClient } from "@/components/settings/PipelineSlaSettingsClient";
 import { TwoFactorSettingsClient } from "@/components/settings/TwoFactorSettingsClient";
 import { LoginHistorySettingsClient } from "@/components/settings/LoginHistorySettingsClient";
+import { AuditLogsSettingsClient } from "@/components/settings/AuditLogsSettingsClient";
 import { LoginSessionsSettingsClient } from "@/components/settings/LoginSessionsSettingsClient";
 import { BillingSettingsClient } from "@/components/settings/BillingSettingsClient";
 import { BackupRestoreSettingsClient } from "@/components/settings/BackupRestoreSettingsClient";
 import { FieldPermissionsSettingsClient } from "@/components/settings/FieldPermissionsSettingsClient";
 import { AutomationLogsSettingsClient } from "@/components/settings/AutomationLogsSettingsClient";
+import { WorkflowRulesSettingsClient } from "@/components/settings/WorkflowRulesSettingsClient";
 import { SmtpSettingsClient } from "@/components/settings/SmtpSettingsClient";
+import { CapabilitiesSettingsClient } from "@/components/settings/CapabilitiesSettingsClient";
 import { UsersSettingsClient } from "@/components/settings/UsersSettingsClient";
+import { WorkspacesSettingsClient } from "@/components/settings/WorkspacesSettingsClient";
 import { IpRestrictionsSettingsClient } from "@/components/settings/IpRestrictionsSettingsClient";
 import { CustomObjectsSettingsClient } from "@/components/settings/CustomObjectsSettingsClient";
+import { NotificationPreferencesClient } from "@/components/settings/NotificationPreferencesClient";
 import { cn } from "@/lib/utils";
 
 interface PageProps {
@@ -54,6 +59,8 @@ export default async function SettingsSubPage({ params }: PageProps) {
       <TwoFactorSettingsClient />
     ) : key === "security/login-history" ? (
       <LoginHistorySettingsClient />
+    ) : key === "security/audit-logs" ? (
+      <AuditLogsSettingsClient />
     ) : key === "users-and-access/login-sessions" ? (
       <LoginSessionsSettingsClient />
     ) : key === "subscription-and-billing/subscription-plan" ||
@@ -65,16 +72,29 @@ export default async function SettingsSubPage({ params }: PageProps) {
       <BackupRestoreSettingsClient />
     ) : key === "users-and-access/permissions" ? (
       <FieldPermissionsSettingsClient />
+    ) : key === "workflow-and-automation/workflow-builder" ? (
+      <WorkflowRulesSettingsClient />
     ) : key === "workflow-and-automation/automation-logs" ? (
       <AutomationLogsSettingsClient />
     ) : key === "communication/smtp" ? (
       <SmtpSettingsClient />
+    ) : key === "system/enable-disable-modules" ? (
+      <CapabilitiesSettingsClient />
     ) : key === "users-and-access/users" ? (
       <UsersSettingsClient />
+    ) : key === "users-and-access/workspaces" ? (
+      <WorkspacesSettingsClient />
     ) : key === "security/ip-restrictions" ? (
       <IpRestrictionsSettingsClient />
     ) : key === "crm-configuration/custom-objects" ? (
       <CustomObjectsSettingsClient />
+    ) : category.slug === "notifications" ? (
+      <NotificationPreferencesClient
+        title={item.title}
+        description={category.description}
+        moduleHref={item.moduleHref}
+        moduleLabel={item.moduleLabel}
+      />
     ) : null;
 
   return (

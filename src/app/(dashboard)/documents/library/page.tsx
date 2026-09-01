@@ -19,12 +19,24 @@ import {
 import {
   ACCESS_LEVELS,
   LIBRARY_FOLDERS,
-  libraryDocuments as seedDocs,
-  readExtraLibraryDocs,
+  listLibraryDocuments,
+  removeLibraryDocument,
+  upsertLibraryDocument,
   type DocumentAccessLevel,
   type LibraryDocument,
   type LibraryFolder,
 } from "@/lib/documents/library/types";
+import { useCrmDocuments } from "@/lib/documents/library/use-crm-documents";
+import {
+  createCrmDocument,
+  deleteCrmDocument,
+  getCrmDocumentDownload,
+  isCrmDocumentId,
+  toCreateDocumentBody,
+  tryCrmDocument,
+  updateCrmDocument,
+} from "@/lib/documents/library/api";
+import { tryCrmStorage, uploadCrmStorageFile } from "@/lib/storage/api";
 import { downloadLibraryDocument } from "@/lib/documents/signed-artifacts";
 import {
   ACTIVITY_OWNERS,
@@ -52,7 +64,8 @@ const ACCESS_STYLE: Record<DocumentAccessLevel, string> = {
 };
 
 export default function DocumentLibraryPage() {
-  const [docs, setDocs] = useState<LibraryDocument[]>(seedDocs);
+  const crm = useCrmDocuments();
+  const [docs, setDocs] = useState<LibraryDocument[]>([]);
   const [folders, setFolders] = useState<string[]>([...LIBRARY_FOLDERS]);
   const [folder, setFolder] = useState<LibraryFolder>("All Files");
   const [search, setSearch] = useState("");
@@ -67,14 +80,9 @@ export default function DocumentLibraryPage() {
   const [menuId, setMenuId] = useState<string | null>(null);
 
   useEffect(() => {
-    const extras = readExtraLibraryDocs();
-    if (extras.length) {
-      setDocs((prev) => {
-        const ids = new Set(prev.map((d) => d.id));
-        return [...extras.filter((e) => !ids.has(e.id)), ...prev];
-      });
-    }
-  }, []);
+    if (crm.loading) return;
+    setDocs(listLibraryDocuments());
+  }, [crm.source, crm.loading]);
 
   const folderCounts = useMemo(() => {
     const map: Record<string, number> = { "All Files": docs.length };
@@ -117,9 +125,14 @@ export default function DocumentLibraryPage() {
   function renameDoc(doc: LibraryDocument) {
     const name = window.prompt("Rename file", doc.fileName);
     if (!name?.trim()) return;
-    setDocs((prev) =>
-      prev.map((d) => (d.id === doc.id ? { ...d, fileName: name.trim() } : d)),
-    );
+    const next = { ...doc, fileName: name.trim() };
+    upsertLibraryDocument(next);
+    setDocs((prev) => prev.map((d) => (d.id === doc.id ? next : d)));
+    if (isCrmDocumentId(doc.id)) {
+      void tryCrmDocument(() =>
+        updateCrmDocument(doc.id, toCreateDocumentBody(next)),
+      );
+    }
     flash("File renamed");
     setMenuId(null);
   }
@@ -129,9 +142,14 @@ export default function DocumentLibraryPage() {
     const next = window.prompt(`Move to folder (${options})`, doc.folder);
     if (!next || !folders.includes(next)) return;
     if (next === "All Files") return;
-    setDocs((prev) =>
-      prev.map((d) => (d.id === doc.id ? { ...d, folder: next } : d)),
-    );
+    const moved = { ...doc, folder: next };
+    upsertLibraryDocument(moved);
+    setDocs((prev) => prev.map((d) => (d.id === doc.id ? moved : d)));
+    if (isCrmDocumentId(doc.id)) {
+      void tryCrmDocument(() =>
+        updateCrmDocument(doc.id, toCreateDocumentBody(moved)),
+      );
+    }
     flash(`Moved to ${next}`);
     setMenuId(null);
   }
@@ -144,6 +162,24 @@ export default function DocumentLibraryPage() {
   }
 
   function downloadDoc(doc: LibraryDocument) {
+    if (isCrmDocumentId(doc.id)) {
+      void (async () => {
+        const remote = await tryCrmDocument(() => getCrmDocumentDownload(doc.id));
+        if (remote?.url) {
+          window.open(remote.url, "_blank", "noopener,noreferrer");
+          flash(`Download ready for ${doc.fileName}`);
+          return;
+        }
+        const ok = downloadLibraryDocument(doc);
+        flash(
+          ok
+            ? `Downloaded ${doc.fileName}`
+            : `No file bytes for ${doc.fileName}`,
+        );
+      })();
+      setMenuId(null);
+      return;
+    }
     const ok = downloadLibraryDocument(doc);
     flash(
       ok
@@ -167,15 +203,27 @@ export default function DocumentLibraryPage() {
       flash(gate.message);
       return;
     }
+    removeLibraryDocument(doc.id);
     setDocs((prev) => prev.filter((d) => d.id !== doc.id));
+    if (isCrmDocumentId(doc.id)) {
+      void tryCrmDocument(() => deleteCrmDocument(doc.id));
+    }
     flash("Moved to Recycle Bin");
     setMenuId(null);
   }
 
   function handleUploaded(doc: LibraryDocument) {
-    setDocs((prev) => [doc, ...prev]);
+    upsertLibraryDocument(doc);
+    setDocs((prev) => [doc, ...prev.filter((d) => d.id !== doc.id)]);
     setDrawer(null);
     flash("File uploaded to library");
+    void tryCrmDocument(async () => {
+      const remote = await createCrmDocument(toCreateDocumentBody(doc));
+      if (!remote) return;
+      if (remote.id !== doc.id) removeLibraryDocument(doc.id);
+      upsertLibraryDocument({ ...doc, ...remote });
+      setDocs(listLibraryDocuments());
+    });
   }
 
   function handleCreateFolder(e: React.FormEvent) {
@@ -200,6 +248,23 @@ export default function DocumentLibraryPage() {
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Library
             </h1>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                crm.source === "api"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-slate-100 text-slate-500",
+              )}
+            >
+              {crm.source === "api"
+                ? "Live CRM"
+                : crm.loading
+                  ? "Connecting…"
+                  : "Demo"}
+            </span>
+            {crm.error && crm.source === "demo" ? (
+              <span className="text-[10px] text-slate-500">{crm.error}</span>
+            ) : null}
           </div>
           <button
             type="button"
@@ -614,7 +679,9 @@ function UploadForm({
   onCancel: () => void;
   onSave: (doc: LibraryDocument) => void;
 }) {
+  const [file, setFile] = useState<File | null>(null);
   const [fileName, setFileName] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [folder, setFolder] = useState("Clients");
   const [owner, setOwner] = useState<string>(ACTIVITY_OWNERS[0]);
   const [relatedKind, setRelatedKind] = useState<RelatedEntityKind | "">("");
@@ -627,17 +694,26 @@ function UploadForm({
     ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === relatedKind)
     : RELATED_RECORD_OPTIONS;
 
-  function submit() {
-    if (!fileName.trim()) {
-      setError("File name is required");
+  async function submit() {
+    const name = fileName.trim() || file?.name || "";
+    if (!name) {
+      setError("Choose a file or enter a file name");
       return;
     }
+    setUploading(true);
+    const stored = file
+      ? await tryCrmStorage(() => uploadCrmStorageFile(file))
+      : null;
+    setUploading(false);
     const today = new Date().toLocaleDateString("en-AU");
     const relatedTo =
       relatedKind && relatedName ? `${relatedKind}: ${relatedName}` : undefined;
+    const sizeLabel = stored?.size
+      ? `${Math.max(1, Math.round(stored.size / 1024))} KB`
+      : "120 KB";
     onSave({
       id: `lib-${Date.now()}`,
-      fileName: fileName.trim(),
+      fileName: name,
       folder,
       owner,
       relatedTo,
@@ -648,14 +724,16 @@ function UploadForm({
         .filter(Boolean),
       uploadedAt: today,
       accessLevel,
-      sizeLabel: "120 KB",
+      sizeLabel,
+      storageKey: stored?.key,
+      storageUrl: stored?.url,
       versions: [
         {
           version: 1,
           uploadedAt: today,
           uploadedBy: owner,
-          sizeLabel: "120 KB",
-          note: "Uploaded",
+          sizeLabel,
+          note: stored ? "Uploaded to CRM storage" : "Uploaded",
         },
       ],
     });
@@ -663,7 +741,18 @@ function UploadForm({
 
   return (
     <div className="space-y-3">
-      <Field label="File name" required error={error}>
+      <Field label="File" required error={error}>
+        <input
+          type="file"
+          onChange={(e) => {
+            const next = e.target.files?.[0] ?? null;
+            setFile(next);
+            if (next) setFileName(next.name);
+          }}
+          className="block w-full text-[12px] text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-violet-50 file:px-3 file:py-1.5 file:text-[11px] file:font-semibold file:text-violet-700"
+        />
+      </Field>
+      <Field label="File name" required>
         <InputShell icon={FileText} error={!!error}>
           <input
             value={fileName}
@@ -776,10 +865,11 @@ function UploadForm({
         </button>
         <button
           type="button"
-          onClick={submit}
-          className="h-9 flex-1 rounded-lg bg-violet-600 text-[12px] font-semibold text-white"
+          disabled={uploading}
+          onClick={() => void submit()}
+          className="h-9 flex-1 rounded-lg bg-violet-600 text-[12px] font-semibold text-white disabled:opacity-50"
         >
-          Upload
+          {uploading ? "Uploading…" : "Upload"}
         </button>
       </div>
     </div>

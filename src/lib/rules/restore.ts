@@ -21,7 +21,11 @@ import { upsertCalculation } from "@/lib/calculator/types";
 import { pushLibraryDoc } from "@/lib/documents/library/types";
 import { listLeadColumns, saveLeadColumns } from "@/lib/leads/store";
 import { listContactGroups, saveContactGroups } from "@/lib/contacts/store";
-import { listDealPipelines, saveDealPipelines } from "@/lib/deals/store";
+import {
+  listDealPipelines,
+  mergeCrmDealsIntoBoard,
+  saveDealPipelines,
+} from "@/lib/deals/store";
 import { listTaskColumns, saveTaskColumns } from "@/lib/tasks/store";
 import type { LeadCardData } from "@/lib/leads/types";
 import type { ContactCardData } from "@/lib/contacts/types";
@@ -78,6 +82,15 @@ function restoreDeal(snapshot: unknown) {
     s.id === target.id ? { ...s, deals: [data.deal, ...s.deals] } : s,
   );
   saveDealPipelines(pipelines);
+  void import("@/lib/deals/api").then(
+    ({ restoreCrmDeal, tryCrmDeal, isCrmDealId }) => {
+      if (!isCrmDealId(data.deal.id)) return;
+      void tryCrmDeal(async () => {
+        const remote = await restoreCrmDeal(data.deal.id);
+        if (remote) mergeCrmDealsIntoBoard([remote]);
+      });
+    },
+  );
 }
 
 function restoreTask(snapshot: unknown) {
@@ -125,7 +138,15 @@ const HANDLERS: Record<string, RestoreHandler> = {
     upsertCalculation(s as Parameters<typeof upsertCalculation>[0]),
   "documents.library": (s) => {
     const doc = s as LibraryDocument;
-    if (doc?.id) pushLibraryDoc(doc);
+    if (!doc?.id) return;
+    pushLibraryDoc(doc);
+    void import("@/lib/documents/library/api").then(
+      ({ restoreCrmDocument, tryCrmDocument, isCrmDocumentId }) => {
+        if (isCrmDocumentId(doc.id)) {
+          void tryCrmDocument(() => restoreCrmDocument(doc.id));
+        }
+      },
+    );
   },
   "sales.leads": restoreLead,
   "sales.contacts": restoreContact,

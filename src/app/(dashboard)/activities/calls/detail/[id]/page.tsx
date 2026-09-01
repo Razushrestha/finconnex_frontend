@@ -4,7 +4,8 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useModuleBack } from "@/hooks/useModuleBack";
 import type { Call } from "@/lib/calls/types";
-import { findCallById } from "@/lib/calls/store";
+import { findCallById, mergeCrmCalls } from "@/lib/calls/store";
+import { getCrmCall, tryCrm } from "@/lib/calls/api";
 import { onRulesChange } from "@/lib/rules";
 import { CallDetailsLayout } from "@/components/activities/calls/detail/CallDetailsLayout";
 
@@ -27,6 +28,13 @@ export default function CallDetailPage({ params }: PageProps) {
       setReady(true);
     }
     load();
+    void tryCrm(async () => {
+      const remote = await getCrmCall(id);
+      if (remote) {
+        mergeCrmCalls([remote]);
+        setCall(findCallById(id)?.call ?? remote);
+      }
+    });
     return onRulesChange(load);
   }, [id]);
 

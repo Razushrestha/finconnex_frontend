@@ -12,8 +12,21 @@ import {
   updateLead,
   upsertLeadFromCard,
 } from "@/lib/leads/store";
-import { convertCrmLead, createCrmDeal, syncLeadStatus, updateCrmLead } from "@/lib/leads/api";
-import { mapCrmLeadToCard } from "@/lib/leads/api/map";
+import {
+  assignCrmLeadOwner,
+  changeCrmLeadLifecycleStage,
+  changeCrmLeadRating,
+  changeCrmLeadScore,
+  convertCrmLead,
+  createCrmDeal,
+  linkCrmLeadCompany,
+  softDeleteCrmLead,
+  syncLeadStatus,
+  unassignCrmLeadOwner,
+  unlinkCrmLeadCompany,
+  updateCrmLead,
+} from "@/lib/leads/api";
+import { asHttpUrl, mapCrmLeadToCard } from "@/lib/leads/api/map";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { leadSendHref } from "@/lib/leads/convert-actions";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
@@ -47,6 +60,17 @@ const DEAL_STAGES = [
   "Closed Lost",
 ];
 
+const LIFECYCLE_STAGES = [
+  "SUBSCRIBER",
+  "LEAD",
+  "MQL",
+  "SQL",
+  "OPPORTUNITY",
+  "CUSTOMER",
+] as const;
+
+const RATINGS = ["HOT", "WARM", "COLD"] as const;
+
 export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
   const router = useRouter();
   const back = useModuleBack("/sales/leads", "Back to Leads");
@@ -55,7 +79,14 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [isMoreOpen, setIsMoreOpen] = useState(() => isUuid(initial.id));
   const [flash, setFlash] = useState<string | null>(null);
+
+  function applyLive(live: ReturnType<typeof mapCrmLeadToCard>) {
+    setCard(live);
+    upsertLeadFromCard(live);
+    return live;
+  }
 
   function notify(msg: string) {
     setFlash(msg);
@@ -253,6 +284,211 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
         onComplete={() => notify("Next action marked completed")}
       />
 
+      {isMoreOpen ? (
+        <div className="mb-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-[12px] font-bold tracking-wide text-slate-700 uppercase">
+              CRM actions
+            </h3>
+            <button
+              type="button"
+              onClick={() => setIsMoreOpen(false)}
+              className="text-[11px] font-semibold text-slate-500"
+            >
+              Close
+            </button>
+          </div>
+          <p className="mb-3 text-[11px] text-slate-500">
+            {card.lifecycleStage ? `Lifecycle ${card.lifecycleStage}` : "No lifecycle"}
+            {card.rating ? ` · ${card.rating}` : ""}
+            {typeof card.score === "number" ? ` · Score ${card.score}` : ""}
+            {card.ownerId ? ` · Owner ${card.ownerId.slice(0, 8)}…` : " · Unassigned"}
+            {card.companyId ? ` · Company linked` : " · No company"}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600"
+              onClick={() => {
+                void (async () => {
+                  const ownerId = window.prompt("Assign owner — workspace member UUID");
+                  if (!ownerId?.trim() || !isUuid(card.id)) return;
+                  try {
+                    const live = await assignCrmLeadOwner(card.id, ownerId.trim());
+                    if (live) applyLive(mapCrmLeadToCard(live));
+                    notify("Owner assigned");
+                  } catch (err) {
+                    notify(err instanceof Error ? err.message : "Owner assign failed");
+                  }
+                })();
+              }}
+            >
+              Assign owner
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600"
+              onClick={() => {
+                void (async () => {
+                  if (!isUuid(card.id)) return;
+                  try {
+                    const live = await unassignCrmLeadOwner(card.id);
+                    if (live) applyLive(mapCrmLeadToCard(live));
+                    notify("Owner removed");
+                  } catch (err) {
+                    notify(err instanceof Error ? err.message : "Unassign failed");
+                  }
+                })();
+              }}
+            >
+              Unassign owner
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600"
+              onClick={() => {
+                void (async () => {
+                  const companyId = window.prompt("Link company — workspace company UUID");
+                  if (!companyId?.trim() || !isUuid(card.id)) return;
+                  try {
+                    const live = await linkCrmLeadCompany(card.id, companyId.trim());
+                    if (live) applyLive(mapCrmLeadToCard(live));
+                    notify("Company linked");
+                  } catch (err) {
+                    notify(err instanceof Error ? err.message : "Link failed");
+                  }
+                })();
+              }}
+            >
+              Link company
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600"
+              onClick={() => {
+                void (async () => {
+                  if (!isUuid(card.id)) return;
+                  try {
+                    const live = await unlinkCrmLeadCompany(card.id);
+                    if (live) applyLive(mapCrmLeadToCard(live));
+                    notify("Company unlinked");
+                  } catch (err) {
+                    notify(err instanceof Error ? err.message : "Unlink failed");
+                  }
+                })();
+              }}
+            >
+              Unlink company
+            </button>
+            {LIFECYCLE_STAGES.map((stage) => (
+              <button
+                key={stage}
+                type="button"
+                className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600"
+                onClick={() => {
+                  void (async () => {
+                    if (!isUuid(card.id)) return;
+                    try {
+                      const live = await changeCrmLeadLifecycleStage(card.id, stage);
+                      if (live) applyLive(mapCrmLeadToCard(live));
+                      notify(`Lifecycle ${stage}`);
+                    } catch (err) {
+                      notify(err instanceof Error ? err.message : "Lifecycle failed");
+                    }
+                  })();
+                }}
+              >
+                {stage}
+              </button>
+            ))}
+            {RATINGS.map((rating) => (
+              <button
+                key={rating}
+                type="button"
+                className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600"
+                onClick={() => {
+                  void (async () => {
+                    if (!isUuid(card.id)) return;
+                    try {
+                      const live = await changeCrmLeadRating(card.id, rating);
+                      if (live) applyLive(mapCrmLeadToCard(live));
+                      notify(`Rating ${rating}`);
+                    } catch (err) {
+                      notify(err instanceof Error ? err.message : "Rating failed");
+                    }
+                  })();
+                }}
+              >
+                {rating}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600"
+              onClick={() => {
+                void (async () => {
+                  if (!isUuid(card.id)) return;
+                  try {
+                    const live = await changeCrmLeadRating(card.id, null);
+                    if (live) applyLive(mapCrmLeadToCard(live));
+                    notify("Rating cleared");
+                  } catch (err) {
+                    notify(err instanceof Error ? err.message : "Clear rating failed");
+                  }
+                })();
+              }}
+            >
+              Clear rating
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600"
+              onClick={() => {
+                void (async () => {
+                  const raw = window.prompt("Lead score (0–100)", String(card.score ?? 50));
+                  if (raw == null || !isUuid(card.id)) return;
+                  const score = Number(raw);
+                  if (!Number.isFinite(score)) {
+                    notify("Enter a number");
+                    return;
+                  }
+                  try {
+                    const live = await changeCrmLeadScore(card.id, score);
+                    if (live) applyLive(mapCrmLeadToCard(live));
+                    notify(`Score ${score}`);
+                  } catch (err) {
+                    notify(err instanceof Error ? err.message : "Score failed");
+                  }
+                })();
+              }}
+            >
+              Set score
+            </button>
+            <button
+              type="button"
+              className="rounded-lg border border-rose-200 px-2.5 py-1 text-[11px] font-semibold text-rose-600"
+              onClick={() => {
+                void (async () => {
+                  if (!window.confirm(`Delete ${card.name}?`)) return;
+                  deleteLead(card.id);
+                  if (isUuid(card.id)) {
+                    try {
+                      await softDeleteCrmLead(card.id);
+                    } catch (err) {
+                      notify(err instanceof Error ? err.message : "Delete failed");
+                      return;
+                    }
+                  }
+                  router.push("/sales/leads");
+                })();
+              }}
+            >
+              Delete lead
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <ConvertToDealModal
         isOpen={isConvertOpen}
         onClose={() => setIsConvertOpen(false)}
@@ -358,10 +594,10 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
           lastName: card.name.split(" ").slice(1).join(" "),
           email: card.email,
           phone: card.phone,
-          linkedinUrl: "",
+          linkedinUrl: card.linkedinUrl ?? "",
           companyName: card.company,
-          jobTitle: "",
-          website: "",
+          jobTitle: card.jobTitle ?? "",
+          website: card.companyWebsite ?? card.websiteUrl ?? "",
           status: card.pipelineStage ?? LEAD_STATUS_OPTIONS[0],
         }}
         statusOptions={[...LEAD_STATUS_OPTIONS, card.pipelineStage ?? ""].filter(
@@ -385,6 +621,9 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
                   phone: values.phone,
                   companyName: values.companyName,
                   jobTitle: values.jobTitle,
+                  linkedinUrl: asHttpUrl(values.linkedinUrl),
+                  companyWebsite: asHttpUrl(values.website),
+                  websiteUrl: asHttpUrl(values.website),
                 });
                 if (live) {
                   let mapped = mapCrmLeadToCard(live);
@@ -408,6 +647,10 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
               email: values.email,
               phone: values.phone ?? "",
               company: values.companyName ?? "",
+              jobTitle: values.jobTitle,
+              companyWebsite: values.website,
+              linkedinUrl: values.linkedinUrl,
+              websiteUrl: values.website,
             };
             if (statusOpt) patch.status = statusOpt;
             else if (values.status) patch.pipelineStage = values.status;

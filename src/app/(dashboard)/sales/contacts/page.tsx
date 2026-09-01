@@ -24,7 +24,18 @@ import {
   type ContactFilters,
 } from "@/components/sales/contacts/FilterContactsPanel";
 import { CONTACT_GROUPS, CONTACT_SOURCES, CONTACT_STATUSES } from "@/lib/contacts/types";
-import { listContactGroups, updateContact, findContactById } from "@/lib/contacts/store";
+import {
+  deleteContact,
+  findContactById,
+  listContactGroups,
+  updateContact,
+} from "@/lib/contacts/store";
+import { useCrmContacts } from "@/lib/contacts/use-crm-contacts";
+import {
+  bulkCrmContacts,
+  importCrmContacts,
+  tryCrmContact,
+} from "@/lib/contacts/api";
 import {
   applyContactImport,
   CONTACT_IMPORT_FIELDS,
@@ -102,6 +113,7 @@ export default function ContactsPage() {
   const [totalContacts, setTotalContacts] = useState(0);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
   const defaults = defaultContactImportSettings();
+  const crm = useCrmContacts();
 
   useEffect(() => {
     setViewMode(loadContactViewMode());
@@ -115,7 +127,7 @@ export default function ContactsPage() {
     }
     refresh();
     return onRulesChange(refresh);
-  }, []);
+  }, [crm.source, crm.loading]);
 
   useEffect(() => {
     if (!bulkFlash) return;
@@ -150,6 +162,29 @@ export default function ContactsPage() {
     });
   }
 
+  function runBulkDelete() {
+    if (!selectedIds.length) return;
+    const count = selectedIds.length;
+    if (
+      !window.confirm(
+        `Delete ${count} contact${count === 1 ? "" : "s"}? This moves them to the recycle bin.`,
+      )
+    ) {
+      return;
+    }
+    let n = 0;
+    for (const id of selectedIds) {
+      if (deleteContact(id, { skipCrm: true })) n += 1;
+    }
+    if (n) {
+      void tryCrmContact(() =>
+        bulkCrmContacts({ ids: selectedIds, operation: "DELETE" }),
+      );
+    }
+    setSelectedIds([]);
+    setBulkFlash(`Deleted ${n} contact${n === 1 ? "" : "s"}`);
+  }
+
   function toggleSelected(id: string) {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
@@ -181,7 +216,10 @@ export default function ContactsPage() {
       id: "mass-delete",
       label: "Mass Delete",
       icon: <Trash2 className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setMassDeleteOpen(true),
+      onClick: () => {
+        setMassDeleteOpen(true);
+        runBulkDelete();
+      },
     },
     {
       id: "mass-update",
@@ -231,6 +269,25 @@ export default function ContactsPage() {
   return (
     <div className={BOARD_PAGE}>
       <FocusHighlight />
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            crm.source === "api"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-slate-100 text-slate-500",
+          )}
+        >
+          {crm.source === "api"
+            ? "Live CRM"
+            : crm.loading
+              ? "Connecting…"
+              : "Demo"}
+        </span>
+        {crm.error && crm.source === "demo" ? (
+          <span className="text-[10px] text-slate-500">{crm.error}</span>
+        ) : null}
+      </div>
       <EntityHeader
         entityLabel="Contact"
         actionOptions={actionOptions}
@@ -294,7 +351,7 @@ export default function ContactsPage() {
           }
           onMailMerge={() => setMergeOpen(true)}
           onMassConvert={() => console.log("mass convert clicked")}
-          onDelete={() => console.log("delete clicked")}
+          onDelete={() => runBulkDelete()}
           onExportSelectedRecords={() => exportSelected()}
         />
       ) : bulkFlash ? (
@@ -350,15 +407,21 @@ export default function ContactsPage() {
             defaultSource: settings.defaultSource as ContactSource,
           })
         }
-        apply={(rows, mapping, settings) =>
-          applyContactImport(rows, mapping, {
+        apply={(rows, mapping, settings) => {
+          const summary = applyContactImport(rows, mapping, {
             skipDuplicates: settings.skipDuplicates,
             updateExisting: settings.updateExisting,
             defaultOwner: settings.defaultOwner,
             defaultStatus: settings.defaultStatus as ContactStatus,
             defaultSource: settings.defaultSource as ContactSource,
-          })
-        }
+          });
+          void tryCrmContact(() =>
+            importCrmContacts({
+              rows: rows.map((row) => ({ ...row })),
+            }),
+          );
+          return summary;
+        }}
         downloadErrorReport={downloadContactImportErrorReport}
         sampleTemplate={sampleContactCsvTemplate()}
         sampleFilename="contacts-import-template.csv"

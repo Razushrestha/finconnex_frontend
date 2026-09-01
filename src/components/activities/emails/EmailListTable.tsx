@@ -21,6 +21,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { Email, EmailStatus } from "@/lib/emails/types";
+import { deleteCrmEmail, tryCrmEmail } from "@/lib/emails/api";
 import { deleteEmail, listEmails, updateEmail } from "@/lib/emails/store";
 import { onRulesChange } from "@/lib/rules";
 import { cn } from "@/lib/utils";
@@ -191,7 +192,10 @@ export function EmailListTable({
 
   function removeEmails(ids: string[]) {
     if (folder === "trash") {
-      for (const id of ids) deleteEmail(id);
+      for (const id of ids) {
+        void tryCrmEmail(() => deleteCrmEmail(id));
+        deleteEmail(id);
+      }
     } else {
       for (const id of ids) setMailboxFlag(id, "trash", true);
     }

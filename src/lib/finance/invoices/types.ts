@@ -8,6 +8,7 @@ import {
   type FinanceAuditEvent,
   type FinanceLineItem,
   formatFinanceAt,
+  formatFinanceDate,
   totalsFromLines,
 } from "@/lib/finance/shared";
 
@@ -29,6 +30,13 @@ export const INVOICE_STATUSES: InvoiceStatus[] = [
   "Cancelled",
   "Void",
 ];
+
+export interface InvoiceAttachment {
+  id: string;
+  name: string;
+  sizeLabel?: string;
+  url?: string;
+}
 
 export interface Invoice {
   id: string;
@@ -53,6 +61,8 @@ export interface Invoice {
   amountDue: number;
   quotationId?: string;
   quotationRef?: string;
+  publicLink?: string;
+  attachments?: InvoiceAttachment[];
   createdBy: string;
   createdAt: string;
   sentAt?: string;
@@ -265,6 +275,20 @@ export function nextInvoiceIds() {
   return { id: `inv-${Date.now()}`, invoiceId: `INV-${n}` };
 }
 
+function cloneInvoice(row: Invoice): Invoice {
+  return {
+    ...row,
+    lineItems: row.lineItems.map((l) => ({ ...l })),
+    attachments: [...(row.attachments ?? [])],
+    audit: [...(row.audit ?? [])],
+  };
+}
+
+/** Replace the session store with live CRM rows (empty list is a valid live result). */
+export function replaceCrmInvoices(remote: Invoice[]) {
+  writeStore(remote.map(cloneInvoice));
+}
+
 export function appendInvoiceAudit(
   inv: Invoice,
   action: string,
@@ -287,3 +311,5 @@ export function applyPaymentToInvoice(inv: Invoice, amount: number): Invoice {
   else if (amountPaid > 0) status = "Partially Paid";
   return { ...inv, amountPaid, amountDue, status };
 }
+
+export { formatFinanceAt, formatFinanceDate, totalsFromLines };

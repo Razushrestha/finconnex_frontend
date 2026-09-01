@@ -4,22 +4,23 @@ import { readCrmTokens } from "@/lib/auth/crm-server";
 
 /**
  * Returns the live CRM access token when present, else the app session JWT.
+ * Cookies win; `.env.local` CRM_ACCESS_TOKEN is a local fallback.
  */
 export async function GET() {
   const session = await getSession();
-  if (!session) {
+  const crm = await readCrmTokens();
+
+  if (!session && !crm.accessToken) {
     return NextResponse.json({ authenticated: false });
   }
 
-  const crm = await readCrmTokens();
-  const accessToken = crm.accessToken;
-
   return NextResponse.json({
     authenticated: true,
-    accessToken,
-    tenantId: session.tenantId,
-    tenantSlug: session.tenantSlug,
-    workspaceId: session.tenantId,
+    accessToken: crm.accessToken,
+    refreshToken: crm.refreshToken,
+    tenantId: session?.tenantId ?? null,
+    tenantSlug: session?.tenantSlug ?? null,
+    workspaceId: session?.tenantId ?? null,
     expiresIn: null as number | null,
   });
 }

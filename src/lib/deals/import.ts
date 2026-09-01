@@ -11,6 +11,7 @@ import {
   createDeal,
   listDealKeys,
   listDealPipelines,
+  mergeCrmDealsIntoBoard,
   saveDealPipelines,
 } from "@/lib/deals/store";
 import {
@@ -462,6 +463,20 @@ export function cloneDeal(id: string): { ok: true; id: string; name: string } | 
         s.id === stage.id ? { ...s, deals: [copy, ...s.deals] } : s,
       );
       saveDealPipelines(pipelines);
+      void import("@/lib/deals/api").then(async ({ cloneCrmDeal, tryCrmDeal, isCrmDealId }) => {
+        if (!isCrmDealId(id)) return;
+        const remote = await tryCrmDeal(() => cloneCrmDeal(id));
+        if (!remote) return;
+        const next = listDealPipelines();
+        for (const p of Object.keys(next) as DealPipeline[]) {
+          next[p] = next[p].map((s) => ({
+            ...s,
+            deals: s.deals.filter((d) => d.id !== copy.id),
+          }));
+        }
+        saveDealPipelines(next);
+        mergeCrmDealsIntoBoard([remote]);
+      });
       return { ok: true, id: copy.id, name: copy.name };
     }
   }

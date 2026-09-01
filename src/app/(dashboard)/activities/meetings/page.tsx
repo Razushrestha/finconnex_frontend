@@ -18,6 +18,14 @@ import {
   meetingMatchesScope,
   type MeetingScope,
 } from "@/lib/meetings/store";
+import {
+  deleteCrmMeeting,
+  isCrmMeetingId,
+  persistRemoteMeeting,
+  syncMeetingStatus,
+  tryCrmMeeting,
+} from "@/lib/meetings/api";
+import { useCrmMeetings } from "@/lib/meetings/use-crm-meetings";
 import { MeetingsListTable } from "@/components/activities/meetings/MeetingsListTable";
 import { MeetingsKanbanColumn } from "@/components/activities/meetings/MeetingsKanbanColumn";
 import {
@@ -41,6 +49,7 @@ const TYPE_ICON: Record<MeetingType, React.ElementType> = {
 
 export default function MeetingsPage() {
   const router = useRouter();
+  const crm = useCrmMeetings();
   const [view, setView] = useState<ActivityView>("kanban");
   const [statusFilters, setStatusFilters] = useState<MeetingStatus[]>([]);
   const [typeFilter, setTypeFilter] = useState<MeetingType | "All">("All");
@@ -67,9 +76,10 @@ export default function MeetingsPage() {
         : "all";
 
   useEffect(() => {
+    if (crm.loading) return;
     setColumns(listMeetingColumns());
     return onRulesChange(() => setColumns(listMeetingColumns()));
-  }, []);
+  }, [crm.source, crm.loading]);
 
   useEffect(() => {
     const focus = new URLSearchParams(window.location.search).get("focus");
@@ -152,6 +162,17 @@ export default function MeetingsPage() {
         return col;
       });
       saveMeetingColumns(next);
+      const target = next.find((c) => c.id === targetColumnId);
+      if (target && isCrmMeetingId(meetingId)) {
+        void tryCrmMeeting(() =>
+          syncMeetingStatus(meetingId, target.title, {
+            startDateTime: meeting.startDateTime,
+            endDateTime: meeting.endDateTime,
+          }),
+        ).then((live) => {
+          persistRemoteMeeting(live);
+        });
+      }
       return next;
     });
     setDragInfo(null);
@@ -176,6 +197,9 @@ export default function MeetingsPage() {
     let n = 0;
     for (const id of selectedIds) {
       if (deleteMeeting(id)) n += 1;
+      if (isCrmMeetingId(id)) {
+        void tryCrmMeeting(() => deleteCrmMeeting(id));
+      }
     }
     setColumns(listMeetingColumns());
     setSelectedIds([]);
@@ -187,6 +211,25 @@ export default function MeetingsPage() {
     <div className={BOARD_PAGE}>
       <FocusHighlight />
       <div className="shrink-0">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+              crm.source === "api"
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-slate-100 text-slate-500",
+            )}
+          >
+            {crm.source === "api"
+              ? "Live CRM"
+              : crm.loading
+                ? "Connecting…"
+                : "Demo"}
+          </span>
+          {crm.error && crm.source === "demo" ? (
+            <span className="text-[10px] text-slate-500">{crm.error}</span>
+          ) : null}
+        </div>
         <ActivityToolbar
           entityLabel="Meeting"
           createRoute="/activities/meetings/create?layoutid=standard&redirect=false"

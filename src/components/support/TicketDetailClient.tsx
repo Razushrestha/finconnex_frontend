@@ -38,6 +38,18 @@ import {
   type TicketStatus,
 } from "@/lib/support/types";
 import {
+  addCrmTicketNote,
+  addCrmTicketReply,
+  deleteCrmTicket,
+  hydrateCrmTicket,
+  isCrmTicketId,
+  mergeCrmTickets,
+  persistRemoteTicket,
+  suggestCrmTicketReply,
+  tryCrmTicket,
+  updateCrmTicket,
+} from "@/lib/support/api";
+import {
   assertTicketStatusChange,
   getRulesActor,
   logStatusChange,
@@ -69,6 +81,12 @@ export function TicketDetailClient({ id }: { id: string }) {
 
   useEffect(() => {
     setRow(getTicketById(id) ?? null);
+    if (!isCrmTicketId(id)) return;
+    void tryCrmTicket(() => hydrateCrmTicket(id)).then((remote) => {
+      if (!remote) return;
+      persistRemoteTicket(remote);
+      setRow(remote);
+    });
   }, [id]);
 
   const mergeCandidates = useMemo(() => {
@@ -90,6 +108,11 @@ export function TicketDetailClient({ id }: { id: string }) {
   function save(next: SupportTicket, msg?: string) {
     upsertTicket(next);
     setRow(next);
+    if (isCrmTicketId(next.id)) {
+      void tryCrmTicket(() => updateCrmTicket(next.id, next)).then(
+        persistRemoteTicket,
+      );
+    }
     if (msg) flash(msg);
   }
 
@@ -223,6 +246,13 @@ export function TicketDetailClient({ id }: { id: string }) {
       actor(),
     );
     save(next, noteKind === "internal" ? "Internal note added" : "Reply sent");
+    if (isCrmTicketId(row.id)) {
+      void tryCrmTicket(() =>
+        noteKind === "internal"
+          ? addCrmTicketNote(row.id, note.body)
+          : addCrmTicketReply(row.id, note.body),
+      );
+    }
     setNoteBody("");
   }
 
@@ -282,6 +312,11 @@ export function TicketDetailClient({ id }: { id: string }) {
       actor(),
     );
     upsertTicket(targetNext);
+    if (isCrmTicketId(row.id) && isCrmTicketId(target.id)) {
+      void tryCrmTicket(() => mergeCrmTickets(row.id, target.id)).then(
+        persistRemoteTicket,
+      );
+    }
     setShowMerge(false);
     flash(`Merged into ${target.ticketId}`);
     router.push(`/support/${target.id}`);
@@ -461,6 +496,9 @@ export function TicketDetailClient({ id }: { id: string }) {
                   return;
                 }
                 deleteTicket(row.id);
+                if (isCrmTicketId(row.id)) {
+                  void tryCrmTicket(() => deleteCrmTicket(row.id));
+                }
                 router.push("/support");
               }}
               className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-rose-600"
@@ -732,14 +770,36 @@ export function TicketDetailClient({ id }: { id: string }) {
                     : "Public reply to requester… Type @ to assign someone."
                 }
               />
-              <button
-                type="button"
-                onClick={addNote}
-                className="mt-2 inline-flex h-8 items-center gap-1 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white"
-              >
-                <Send className="h-3.5 w-3.5" />
-                {noteKind === "internal" ? "Add note" : "Send reply"}
-              </button>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {noteKind === "public" && isCrmTicketId(row.id) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void tryCrmTicket(() =>
+                        suggestCrmTicketReply(row.id),
+                      ).then((text) => {
+                        if (!text) {
+                          flash("No suggestion available");
+                          return;
+                        }
+                        setNoteBody(text);
+                        flash("Suggested reply inserted");
+                      });
+                    }}
+                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-3 text-[11px] font-semibold text-violet-700"
+                  >
+                    Suggest reply
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={addNote}
+                  className="inline-flex h-8 items-center gap-1 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  {noteKind === "internal" ? "Add note" : "Send reply"}
+                </button>
+              </div>
             </div>
           ) : null}
 

@@ -176,7 +176,7 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
   return (
     <CreateEntityFormShell
       breadcrumbParent={{ label: "Deals", href: "/sales/deals" }}
-      badge="New deal"
+      badge="Live CRM"
       title="Create Deal"
       subtitle="Track an opportunity from first interest through close: value, stage, and owner in one place."
       tip="Tip: Name, account, stage, value, currency & owner are required."

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Search, Download } from "lucide-react";
 import {
@@ -17,10 +16,13 @@ import {
   type ReportType,
   type SavedReport,
 } from "@/lib/reports/types";
+import { labelForDataSource } from "@/lib/reports/catalog";
+import { useCrmReports } from "@/lib/reports/use-crm-reports";
 import { cn } from "@/lib/utils";
 
 export default function ReportsPage() {
   const router = useRouter();
+  const crm = useCrmReports();
   const [rows, setRows] = useState<SavedReport[]>(seed);
   const [statusTab, setStatusTab] = useState<ReportStatus | "All">("All");
   const [typeFilter, setTypeFilter] = useState<ReportType | "All">("All");
@@ -33,7 +35,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     setRows(listReports());
-  }, []);
+  }, [crm.source, crm.loading]);
 
   useEffect(() => {
     setPage(1);
@@ -60,6 +62,7 @@ export default function ReportsPage() {
           r.name.toLowerCase().includes(q) ||
           r.reportId.toLowerCase().includes(q) ||
           r.dataSource.toLowerCase().includes(q) ||
+          labelForDataSource(r.dataSource).toLowerCase().includes(q) ||
           r.createdBy.toLowerCase().includes(q) ||
           r.type.toLowerCase().includes(q),
       );
@@ -91,7 +94,7 @@ export default function ReportsPage() {
         r.name,
         r.type,
         r.status,
-        r.dataSource,
+        labelForDataSource(r.dataSource),
         r.dateRange,
         r.schedule,
         r.lastRunAt ?? "",
@@ -115,9 +118,11 @@ export default function ReportsPage() {
       <div className="relative mx-auto flex max-w-[1920px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
-              Reports
-            </h1>
+            {crm.source === "api" ? (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-700">
+                Live CRM
+              </span>
+            ) : null}
           </div>
           <div className="flex items-center gap-1.5">
             <button
@@ -243,7 +248,9 @@ export default function ReportsPage() {
                       {r.type}
                     </span>
                   </td>
-                  <td className="px-3 py-3 text-slate-600">{r.dataSource}</td>
+                  <td className="px-3 py-3 text-slate-600">
+                    {labelForDataSource(r.dataSource)}
+                  </td>
                   <td className="px-3 py-3 text-slate-600">{r.dateRange}</td>
                   <td className="px-3 py-3 text-slate-600">{r.schedule}</td>
                   <td className="px-3 py-3">

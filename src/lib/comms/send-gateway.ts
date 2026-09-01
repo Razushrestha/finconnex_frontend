@@ -82,14 +82,18 @@ async function postSend(
     if (!res.ok) {
       return { ok: false, message: `Send failed (${res.status})` };
     }
-    const json = (await res.json()) as { id?: string };
-    return { ok: true, mode: "gateway", providerId: json.id };
+    const json = (await res.json()) as {
+      id?: string;
+      data?: { id?: string };
+    };
+    const providerId = json.data?.id ?? json.id;
+    return { ok: true, mode: "gateway", providerId };
   } catch {
     return { ok: false, message: "Send network error" };
   }
 }
 
-/** Live CRM send — Call initiate / SMS / Email. */
+/** Live CRM send — Call / SMS / Email (real Swagger paths, not /initiate or /emails/send). */
 export function createApiSendGateway(config: ApiSendGatewayConfig): SendGateway {
   return {
     mode: "api",
@@ -97,14 +101,20 @@ export function createApiSendGateway(config: ApiSendGatewayConfig): SendGateway 
       if (!phone?.trim()) {
         return { ok: false, message: "This lead has no phone number." };
       }
-      return postSend(config, "/v1/calls/initiate", { phone: phone.trim() });
+      return postSend(config, "/v1/calls", {
+        phone: phone.trim(),
+        fromNumber: phone.trim(),
+        type: "OUTBOUND",
+        subject: "Outbound call",
+      });
     },
     async sendSms({ phone, body }) {
       if (!phone?.trim()) {
         return { ok: false, message: "This lead has no phone number." };
       }
-      return postSend(config, "/v1/messages/send", {
+      return postSend(config, "/v1/messages", {
         phone: phone.trim(),
+        to: phone.trim(),
         body: body ?? "",
       });
     },
@@ -112,16 +122,19 @@ export function createApiSendGateway(config: ApiSendGatewayConfig): SendGateway 
       if (!email?.trim() || !email.includes("@")) {
         return { ok: false, message: "This lead has no email address." };
       }
-      return postSend(config, "/v1/emails/send", {
-        to: email.trim(),
+      const created = await postSend(config, "/v1/emails", {
+        to: [email.trim()],
         subject: subject ?? "",
         body: body ?? "",
+        status: "DRAFT",
       });
+      if (!created.ok || !created.providerId) return created;
+      return postSend(config, `/v1/emails/${created.providerId}/send`, {});
     },
   };
 }
 
-/** Mock fetch for `/v1/calls/initiate`, `/v1/messages/send`, `/v1/emails/send`. */
+/** Mock fetch for live CRM send paths (and legacy initiate/send aliases). */
 export function createMockSendFetch(
   log: { path: string; body: unknown }[] = [],
 ): typeof fetch {
@@ -132,9 +145,14 @@ export function createMockSendFetch(
         : input instanceof URL
           ? input.href
           : input.url;
-    const path = ["/v1/calls/initiate", "/v1/messages/send", "/v1/emails/send"].find(
-      (p) => url.includes(p),
-    );
+    const path = [
+      "/v1/emails/send",
+      "/v1/calls/initiate",
+      "/v1/messages/send",
+      "/v1/calls",
+      "/v1/messages",
+      "/v1/emails",
+    ].find((p) => url.includes(p));
     if (!path) {
       return new Response(JSON.stringify({ error: "not_found" }), {
         status: 404,
@@ -186,6 +204,35 @@ export async function sendEmailDemoLive(input: {
   subject?: string;
   body?: string;
 }): Promise<SendResult> {
+  try {
+    const { createCrmEmail, persistRemoteEmail, sendCrmEmail } = await import(
+      "@/lib/emails/api"
+    );
+    const created = await createCrmEmail({
+      subject: input.subject ?? "",
+      body: input.body ?? "",
+      to: input.email ? [input.email] : [],
+      status: "Draft",
+    });
+    if (created) {
+      try {
+        const sent = await sendCrmEmail(created.id);
+        persistRemoteEmail(sent ?? created);
+        return { ok: true, mode: "gateway", providerId: created.id };
+      } catch (err) {
+        persistRemoteEmail(created);
+        return {
+          ok: false,
+          message:
+            err instanceof Error
+              ? err.message
+              : "CRM created the draft but send failed",
+        };
+      }
+    }
+  } catch {
+    /* fall through to SMTP / mock */
+  }
   if (typeof window !== "undefined") {
     try {
       const { loadSmtpConfig } = await import("@/lib/comms/smtp");

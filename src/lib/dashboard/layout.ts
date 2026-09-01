@@ -25,13 +25,12 @@ export interface DashboardFilters {
 }
 
 export const DASHBOARD_WIDGETS = [
-  { id: "metrics", label: "KPI metrics" },
-  { id: "charts", label: "Analytics charts" },
-  { id: "orderByTime", label: "Order by time" },
+  { id: "kpis", label: "Core KPIs" },
+  { id: "charts", label: "KPI charts" },
+  { id: "industry", label: "Industry widgets" },
+  { id: "activity", label: "Workspace activity" },
   { id: "meetings", label: "Upcoming meetings" },
-  { id: "deals", label: "Deals snapshot" },
-  { id: "customers", label: "New customers" },
-  { id: "taskUpdates", label: "Task updates" },
+  { id: "taskUpdates", label: "Open task updates" },
 ] as const;
 
 export type DashboardWidgetId = (typeof DASHBOARD_WIDGETS)[number]["id"];
@@ -43,8 +42,13 @@ export interface DashboardLayout {
   isDefault: boolean;
 }
 
-const LAYOUT_KEY = "dashboard:layout:v1";
-const DEFAULT_LAYOUT_KEY = "dashboard:default-layout:v1";
+const LAYOUT_KEY = "dashboard:layout:v2";
+const DEFAULT_LAYOUT_KEY = "dashboard:default-layout:v2";
+const LEGACY_LAYOUT_KEY = "dashboard:layout:v1";
+
+const WIDGET_ALIASES: Record<string, DashboardWidgetId> = {
+  metrics: "kpis",
+};
 
 export function defaultDashboardFilters(): DashboardFilters {
   return {
@@ -63,17 +67,31 @@ export function defaultDashboardLayout(): DashboardLayout {
   };
 }
 
+function migrateWidgetId(id: string): DashboardWidgetId | null {
+  const aliased = WIDGET_ALIASES[id] ?? id;
+  return DASHBOARD_WIDGETS.some((w) => w.id === aliased)
+    ? (aliased as DashboardWidgetId)
+    : null;
+}
+
 export function loadDashboardLayout(): DashboardLayout {
-  const stored = readJsonStore<DashboardLayout | null>(LAYOUT_KEY, null);
+  const stored =
+    readJsonStore<DashboardLayout | null>(LAYOUT_KEY, null) ??
+    readJsonStore<DashboardLayout | null>(LEGACY_LAYOUT_KEY, null);
   if (!stored?.order?.length) return defaultDashboardLayout();
-  const known = new Set(DASHBOARD_WIDGETS.map((w) => w.id));
-  const order = stored.order.filter((id) => known.has(id));
+  const order: DashboardWidgetId[] = [];
+  for (const id of stored.order) {
+    const next = migrateWidgetId(String(id));
+    if (next && !order.includes(next)) order.push(next);
+  }
   for (const w of DASHBOARD_WIDGETS) {
     if (!order.includes(w.id)) order.push(w.id);
   }
   return {
     order,
-    hidden: (stored.hidden ?? []).filter((id) => known.has(id)),
+    hidden: (stored.hidden ?? [])
+      .map((id) => migrateWidgetId(String(id)))
+      .filter((id): id is DashboardWidgetId => !!id),
     filters: { ...defaultDashboardFilters(), ...stored.filters },
     isDefault: !!stored.isDefault,
   };
@@ -112,7 +130,30 @@ export function moveWidget(
   return next;
 }
 
-function parseMoney(value: string): number {
+/** Move `fromId` so it sits in `toId`'s slot (grid drag). */
+export function moveWidgetTo(
+  order: DashboardWidgetId[],
+  fromId: DashboardWidgetId,
+  toId: DashboardWidgetId,
+): DashboardWidgetId[] {
+  const from = order.indexOf(fromId);
+  const to = order.indexOf(toId);
+  if (from < 0 || to < 0 || from === to) return order;
+  const next = [...order];
+  const [item] = next.splice(from, 1);
+  if (!item) return order;
+  next.splice(to, 0, item);
+  return next;
+}
+
+export function widgetGridSpan(id: DashboardWidgetId): "full" | "third" {
+  if (id === "activity" || id === "meetings" || id === "taskUpdates") {
+    return "third";
+  }
+  return "full";
+}
+
+export function parseMoney(value: string): number {
   const n = Number.parseFloat(value.replace(/[^0-9.]/g, ""));
   return Number.isFinite(n) ? n : 0;
 }

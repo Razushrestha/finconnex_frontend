@@ -297,6 +297,7 @@ import {
   type SmsCampaignStatus,
   type SmsCampaignType,
 } from "@/lib/marketing/sms/types";
+import { useCrmCampaigns } from "@/lib/campaigns/use-crm-campaigns";
 import {
   CampaignHeader,
   MarketingListShell,
@@ -308,6 +309,7 @@ import {
   type DataTableColumn,
 } from "@/components/marketing/index";
 import { SearchInput } from "@/components/ui/search-input";
+import { cn } from "@/lib/utils";
 
 const STATUS_STYLE: Record<SmsCampaignStatus, string> = {
   Draft: "bg-slate-100 text-slate-600",
@@ -389,10 +391,11 @@ export default function SmsCampaignsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const pageSize = 8;
+  const crm = useCrmCampaigns("sms");
 
   useEffect(() => {
     setRows(listSmsCampaigns());
-  }, []);
+  }, [crm.source, crm.loading]);
 
   useEffect(() => {
     setPage(1);
@@ -486,6 +489,25 @@ export default function SmsCampaignsPage() {
         }
         createLabel="New SMS"
       />
+      <div className="mb-1 flex items-center gap-2 px-1">
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            crm.source === "api"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-slate-100 text-slate-500",
+          )}
+        >
+          {crm.source === "api"
+            ? "Live CRM"
+            : crm.loading
+              ? "Connecting…"
+              : "Demo"}
+        </span>
+        {crm.error && crm.source === "demo" ? (
+          <span className="text-[10px] text-slate-500">{crm.error}</span>
+        ) : null}
+      </div>
 
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-1 py-2">
         <StatusDropdown

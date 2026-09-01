@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import {
   Equal,
   RotateCcw,
@@ -13,6 +12,15 @@ import {
   Play,
 } from "lucide-react";
 import {
+  createCrmCalculation,
+  deleteCrmCalculation,
+  isCrmCalculationId,
+  listCrmCalculations,
+  persistRemoteCalculation,
+  toCreateCalculationBody,
+  tryCrmCalculation,
+} from "@/lib/calculator/api";
+import {
   CALCULATOR_FIELDS,
   CALCULATOR_FORMULAS,
   CALCULATOR_TYPE_STYLE,
@@ -22,9 +30,12 @@ import {
   CALC_SHARE_TARGETS,
   deleteCalculation,
   emptyInputs,
+  exportCalculationCsv,
   exportCalculationText,
   formatCalcAt,
   formatCalcValue,
+  formatCalculationShare,
+  suggestedFxRate,
   listCalculations,
   nextCalcIds,
   runCalculator,
@@ -54,7 +65,20 @@ export function CalculatorWorkspaceClient() {
   const [panel, setPanel] = useState<"workspace" | "history">("workspace");
 
   useEffect(() => {
-    setHistory(listCalculations());
+    let cancelled = false;
+    void (async () => {
+      try {
+        const remote = await listCrmCalculations();
+        if (cancelled) return;
+        remote.forEach((row) => persistRemoteCalculation(row));
+        setHistory(remote);
+      } catch {
+        if (!cancelled) setHistory(listCalculations());
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const fields = CALCULATOR_FIELDS[type];
@@ -76,14 +100,40 @@ export function CalculatorWorkspaceClient() {
 
   function selectType(next: CalculatorType) {
     setType(next);
-    setInputs(emptyInputs(next));
+    const nextInputs = emptyInputs(next);
+    if (next === "Currency") {
+      nextInputs.fxRate = suggestedFxRate(
+        currency,
+        (nextInputs.toCurrency as CalcCurrency) || "USD",
+      );
+    }
+    setInputs(nextInputs);
     setResult(null);
     setError(null);
   }
 
   function setField(key: string, value: string) {
-    setInputs((prev) => ({ ...prev, [key]: value }));
+    setInputs((prev) => {
+      const next = { ...prev, [key]: value };
+      if (type === "Currency" && key === "toCurrency") {
+        const to = value as CalcCurrency;
+        if (CALC_CURRENCIES.includes(to)) {
+          next.fxRate = suggestedFxRate(currency, to);
+        }
+      }
+      return next;
+    });
     setError(null);
+  }
+
+  function setWorkspaceCurrency(next: CalcCurrency) {
+    setCurrency(next);
+    if (type === "Currency") {
+      const to = (inputs.toCurrency as CalcCurrency) || "USD";
+      if (CALC_CURRENCIES.includes(to)) {
+        setInputs((prev) => ({ ...prev, fxRate: suggestedFxRate(next, to) }));
+      }
+    }
   }
 
   function onCalculate() {
@@ -104,26 +154,64 @@ export function CalculatorWorkspaceClient() {
     setTitle("");
   }
 
-  function onSave() {
+  async function persistCurrent(sharedWith?: string) {
     if (!result) {
       flash("Calculate first");
-      return;
+      return null;
     }
-    const ids = nextCalcIds();
-    const saved = upsertCalculation({
-      id: ids.id,
-      calcId: ids.calcId,
+    const payload = {
       title: title.trim() || `${type} calculation`,
       type,
       currency,
       inputs: { ...inputs },
       result,
       formula: result.formula,
+      sharedWith,
+    };
+    const remote = await tryCrmCalculation(() =>
+      createCrmCalculation(toCreateCalculationBody(payload)),
+    );
+    if (remote) {
+      persistRemoteCalculation(remote);
+      const latest =
+        (await tryCrmCalculation(() => listCrmCalculations())) ??
+        listCalculations();
+      setHistory(latest);
+      return remote;
+    }
+    const ids = nextCalcIds();
+    const saved = upsertCalculation({
+      id: ids.id,
+      calcId: ids.calcId,
+      title: payload.title,
+      type,
+      currency,
+      inputs: payload.inputs,
+      result,
+      formula: result.formula,
       savedBy,
       savedAt: formatCalcAt(),
+      sharedWith,
     });
     setHistory(listCalculations());
-    flash(`Saved ${saved.calcId}`);
+    return saved;
+  }
+
+  async function onSave() {
+    const saved = await persistCurrent();
+    if (saved) flash(`Saved ${saved.calcId}`);
+  }
+
+  function draftPayload() {
+    return {
+      calcId: "DRAFT",
+      title: title.trim() || `${type} calculation`,
+      type,
+      currency,
+      inputs,
+      result: result!,
+      formula: result!.formula,
+    };
   }
 
   function onExport() {
@@ -131,39 +219,37 @@ export function CalculatorWorkspaceClient() {
       flash("Calculate first");
       return;
     }
-    exportCalculationText({
-      calcId: "DRAFT",
-      title: title.trim() || `${type} calculation`,
-      type,
-      currency,
-      inputs,
-      result,
-      formula: result.formula,
-    });
-    flash("Result exported");
+    const payload = draftPayload();
+    exportCalculationCsv(payload);
+    exportCalculationText(payload);
+    flash("Exported CSV and text");
   }
 
-  function onShare() {
+  async function onShare() {
     if (!result) {
       flash("Calculate first");
       return;
     }
-    const ids = nextCalcIds();
-    upsertCalculation({
-      id: ids.id,
-      calcId: ids.calcId,
-      title: title.trim() || `${type} calculation`,
-      type,
-      currency,
-      inputs: { ...inputs },
-      result,
-      formula: result.formula,
-      savedBy,
-      savedAt: formatCalcAt(),
-      sharedWith: shareTarget,
-    });
-    setHistory(listCalculations());
-    flash(`Shared with ${shareTarget}`);
+    const saved = await persistCurrent(shareTarget);
+    if (!saved) return;
+    const text = formatCalculationShare(saved);
+    if (shareTarget === "Client (email)") {
+      const subject = encodeURIComponent(`Calculation: ${saved.title}`);
+      const body = encodeURIComponent(text);
+      window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
+      flash("Opened email draft");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      flash(
+        shareTarget === "Copy link"
+          ? "Result copied"
+          : `Copied and saved for ${shareTarget}`,
+      );
+    } catch {
+      flash(`Saved for ${shareTarget}`);
+    }
   }
 
   function loadFromHistory(c: SavedCalculation) {
@@ -178,7 +264,9 @@ export function CalculatorWorkspaceClient() {
   }
 
   function removeHistory(id: string) {
-    const row = listCalculations().find((c) => c.id === id);
+    const row =
+      history.find((c) => c.id === id) ??
+      listCalculations().find((c) => c.id === id);
     if (!row) return;
     const gate = softDeleteRecord({
       action: "calculator.history.delete",
@@ -193,7 +281,10 @@ export function CalculatorWorkspaceClient() {
       return;
     }
     deleteCalculation(id);
-    setHistory(listCalculations());
+    if (isCrmCalculationId(id)) {
+      void tryCrmCalculation(() => deleteCrmCalculation(id));
+    }
+    setHistory(listCalculations().filter((c) => c.id !== id));
     flash("Moved to Recycle Bin");
   }
 
@@ -206,12 +297,7 @@ export function CalculatorWorkspaceClient() {
       ) : null}
 
       <div className="relative mx-auto flex max-w-[1200px] flex-col p-2.5 sm:p-3 lg:p-4">
-        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
-              Calculator
-            </h1>
-          </div>
+        <div className="mb-2.5 flex flex-wrap items-center justify-end gap-2">
           <div className="flex items-center gap-1.5">
             <button
               type="button"
@@ -298,8 +384,9 @@ export function CalculatorWorkspaceClient() {
                         <button
                           type="button"
                           onClick={() => {
+                            exportCalculationCsv(c);
                             exportCalculationText(c);
-                            flash("Exported");
+                            flash("Exported CSV and text");
                           }}
                           className="rounded-md border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"
                         >
@@ -333,29 +420,6 @@ export function CalculatorWorkspaceClient() {
           <div className="grid gap-3 lg:grid-cols-[1fr_320px]">
             <div className="space-y-3">
               <div className="rounded-2xl border border-slate-100/80 bg-white p-4 shadow-sm sm:p-5">
-                <div className="mb-3 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                  Select calculator
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {CALCULATOR_TYPES.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => selectType(t)}
-                      className={cn(
-                        "rounded-full px-2.5 py-1 text-[10px] font-semibold transition-colors",
-                        type === t
-                          ? "bg-violet-600 text-white"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200",
-                      )}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-100/80 bg-white p-4 shadow-sm sm:p-5">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
                     Enter values
@@ -365,7 +429,7 @@ export function CalculatorWorkspaceClient() {
                     <select
                       value={currency}
                       onChange={(e) =>
-                        setCurrency(e.target.value as CalcCurrency)
+                        setWorkspaceCurrency(e.target.value as CalcCurrency)
                       }
                       className="h-7 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold outline-none"
                     >
@@ -379,6 +443,25 @@ export function CalculatorWorkspaceClient() {
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[11px] font-semibold text-slate-600">
+                      Calculator type
+                      <span className="ml-0.5 text-rose-500">*</span>
+                    </span>
+                    <select
+                      value={type}
+                      onChange={(e) =>
+                        selectType(e.target.value as CalculatorType)
+                      }
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-800 outline-none focus:border-violet-500"
+                    >
+                      {CALCULATOR_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   {fields.map((f) => (
                     <label key={f.key} className="flex flex-col gap-1">
                       <span className="text-[11px] font-semibold text-slate-600">
@@ -389,13 +472,27 @@ export function CalculatorWorkspaceClient() {
                           </span>
                         ) : null}
                       </span>
-                      <input
-                        value={inputs[f.key] ?? ""}
-                        onChange={(e) => setField(f.key, e.target.value)}
-                        placeholder={f.placeholder}
-                        inputMode="decimal"
-                        className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-violet-500"
-                      />
+                      {f.kind === "select" && f.options ? (
+                        <select
+                          value={inputs[f.key] ?? f.options[0] ?? ""}
+                          onChange={(e) => setField(f.key, e.target.value)}
+                          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-800 outline-none focus:border-violet-500"
+                        >
+                          {f.options.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          value={inputs[f.key] ?? ""}
+                          onChange={(e) => setField(f.key, e.target.value)}
+                          placeholder={f.placeholder}
+                          inputMode={f.kind === "text" ? "text" : "decimal"}
+                          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-violet-500"
+                        />
+                      )}
                       {f.hint ? (
                         <span className="text-[10px] text-slate-400">
                           {f.hint}

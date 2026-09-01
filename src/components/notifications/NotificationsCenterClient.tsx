@@ -12,6 +12,7 @@ import {
   X,
   Search,
   Eye,
+  Trash2,
 } from "lucide-react";
 import {
   NOTIFICATION_SETTINGS_HREF,
@@ -25,17 +26,31 @@ import {
   markAllNotificationsRead,
   markNotificationDismissed,
   markNotificationRead,
-  seedNotifications,
+  markNotificationUnread,
   writeAllNotifications,
   type AppNotification,
   type NotificationStatus,
   type NotificationType,
 } from "@/lib/notifications/types";
+import {
+  archiveCrmNotification,
+  clearReadCrmNotifications,
+  dismissCrmNotification,
+  getCrmNotification,
+  isCrmNotificationId,
+  markAllCrmNotificationsRead,
+  markCrmNotificationRead,
+  markCrmNotificationUnread,
+  persistRemoteNotification,
+  tryCrmNotification,
+} from "@/lib/notifications/api";
+import { useCrmNotifications } from "@/lib/notifications/use-crm-notifications";
 import { cn } from "@/lib/utils";
 
 export function NotificationsCenterClient() {
   const router = useRouter();
-  const [rows, setRows] = useState<AppNotification[]>(seedNotifications);
+  const crm = useCrmNotifications();
+  const [rows, setRows] = useState<AppNotification[]>([]);
   const [typeFilter, setTypeFilter] = useState<NotificationType | "All">(
     "All",
   );
@@ -51,8 +66,9 @@ export function NotificationsCenterClient() {
   }
 
   useEffect(() => {
+    if (crm.loading) return;
     reload();
-  }, []);
+  }, [crm.source, crm.loading]);
 
   function flash(msg: string) {
     setToast(msg);
@@ -88,34 +104,100 @@ export function NotificationsCenterClient() {
     rows.find((n) => n.id === selectedId) ??
     null;
 
-  const unread = countUnread(rows);
+  const unread = crm.source === "api" ? crm.unreadCount : countUnread(rows);
+
+  useEffect(() => {
+    if (!selectedId || !isCrmNotificationId(selectedId)) return;
+    void tryCrmNotification(() => getCrmNotification(selectedId)).then(
+      (remote) => {
+        if (!remote) return;
+        persistRemoteNotification(remote);
+        setRows(listNotifications());
+      },
+    );
+  }, [selectedId]);
 
   function onView(n: AppNotification) {
     setSelectedId(n.id);
-    if (n.status === "Unread") {
-      const next = rows.map((x) =>
-        x.id === n.id ? markNotificationRead(x) : x,
+    if (n.status !== "Unread") return;
+    const next = rows.map((x) =>
+      x.id === n.id ? markNotificationRead(x) : x,
+    );
+    persist(next);
+    crm.setUnreadCount(countUnread(next));
+    if (isCrmNotificationId(n.id)) {
+      void tryCrmNotification(() => markCrmNotificationRead(n.id)).then(
+        (remote) => {
+          persistRemoteNotification(remote);
+          setRows(listNotifications());
+        },
       );
-      persist(next);
     }
   }
 
   function onMarkRead(n: AppNotification) {
-    persist(rows.map((x) => (x.id === n.id ? markNotificationRead(x) : x)));
+    const next = rows.map((x) => (x.id === n.id ? markNotificationRead(x) : x));
+    persist(next);
+    crm.setUnreadCount(countUnread(next));
+    if (isCrmNotificationId(n.id)) {
+      void tryCrmNotification(() => markCrmNotificationRead(n.id)).then(
+        (remote) => persistRemoteNotification(remote),
+      );
+    }
     flash("Marked as read");
   }
 
+  function onMarkUnread(n: AppNotification) {
+    const next = rows.map((x) => (x.id === n.id ? markNotificationUnread(x) : x));
+    persist(next);
+    crm.setUnreadCount(countUnread(next));
+    if (isCrmNotificationId(n.id)) {
+      void tryCrmNotification(() => markCrmNotificationUnread(n.id)).then(
+        (remote) => persistRemoteNotification(remote),
+      );
+    }
+    flash("Marked as unread");
+  }
+
   function onMarkAllRead() {
-    persist(markAllNotificationsRead(rows));
+    const next = markAllNotificationsRead(rows);
+    persist(next);
+    crm.setUnreadCount(0);
+    void tryCrmNotification(() => markAllCrmNotificationsRead());
     flash("All marked as read");
   }
 
   function onDismiss(n: AppNotification) {
-    persist(
-      rows.map((x) => (x.id === n.id ? markNotificationDismissed(x) : x)),
+    const next = rows.map((x) =>
+      x.id === n.id ? markNotificationDismissed(x) : x,
     );
+    persist(next);
+    crm.setUnreadCount(countUnread(next));
     if (selectedId === n.id) setSelectedId(null);
+    if (isCrmNotificationId(n.id)) {
+      void tryCrmNotification(() => dismissCrmNotification(n.id)).then(
+        (remote) => persistRemoteNotification(remote),
+      );
+    }
     flash("Dismissed");
+  }
+
+  function onClearRead() {
+    const next = rows.filter((n) => n.status !== "Read");
+    persist(next);
+    if (selected && selected.status === "Read") setSelectedId(null);
+    void tryCrmNotification(() => clearReadCrmNotifications());
+    flash("Read notifications archived");
+  }
+
+  function onArchive(n: AppNotification) {
+    persist(rows.filter((x) => x.id !== n.id));
+    crm.setUnreadCount(countUnread(rows.filter((x) => x.id !== n.id)));
+    if (selectedId === n.id) setSelectedId(null);
+    if (isCrmNotificationId(n.id)) {
+      void tryCrmNotification(() => archiveCrmNotification(n.id));
+    }
+    flash("Archived");
   }
 
   return (
@@ -132,6 +214,20 @@ export function NotificationsCenterClient() {
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Notifications
             </h1>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                crm.source === "api"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-slate-100 text-slate-500",
+              )}
+            >
+              {crm.source === "api"
+                ? "Live CRM"
+                : crm.loading
+                  ? "Connecting…"
+                  : "Demo"}
+            </span>
             {unread > 0 ? (
               <span className="rounded-full bg-violet-600 px-2 py-0.5 text-[9px] font-bold text-white">
                 {unread} unread
@@ -147,6 +243,14 @@ export function NotificationsCenterClient() {
             >
               <CheckCheck className="h-3.5 w-3.5" />
               Mark all read
+            </button>
+            <button
+              type="button"
+              onClick={onClearRead}
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Clear read
             </button>
             <button
               type="button"
@@ -380,6 +484,16 @@ export function NotificationsCenterClient() {
                       Mark as read
                     </button>
                   ) : null}
+                  {selected.status === "Read" ? (
+                    <button
+                      type="button"
+                      onClick={() => onMarkUnread(selected)}
+                      className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      Mark as unread
+                    </button>
+                  ) : null}
                   {selected.status !== "Dismissed" ? (
                     <button
                       type="button"
@@ -389,6 +503,14 @@ export function NotificationsCenterClient() {
                       Dismiss
                     </button>
                   ) : null}
+                  <button
+                    type="button"
+                    onClick={() => onArchive(selected)}
+                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Archive
+                  </button>
                 </div>
               </div>
             ) : (

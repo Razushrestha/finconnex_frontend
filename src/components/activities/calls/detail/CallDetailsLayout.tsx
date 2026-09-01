@@ -16,6 +16,7 @@ import { CallNotesFields } from "./CallNotesFields";
 import { CallRecordingsSection } from "./CallRecordingsSection";
 import { CallTranscriptSection } from "./CallTranscriptSection";
 import { ContactSidebarCard } from "./ContactSidebarCard";
+import { RelatedEntitySidebarCard } from "./RelatedEntitySidebarCard";
 import { CallParticipantsCard } from "./CallParticipantsCard";
 import { NextStepsSidebarCard, type NextStepItem } from "./NextStepSidebarCard";
 import { CallRemindersCard } from "./CallRemindersCard";
@@ -149,6 +150,7 @@ export function CallDetailsLayout({
               contactName={call.contact || call.callFor}
               relatedTo={call.relatedTo}
             />
+            <RelatedEntitySidebarCard relatedTo={call.relatedTo} />
             <CallParticipantsCard
               owner={call.assignedTo}
               calledBy={
@@ -158,6 +160,7 @@ export function CallDetailsLayout({
               contact={call.contact || call.callFor}
             />
             <CallRemindersCard
+              callId={call.id}
               reminders={call.reminders ?? []}
               dueDate={call.date}
               onChange={(reminders: TaskReminder[]) => {

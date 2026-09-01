@@ -120,9 +120,15 @@ function KpiCard({
 
 export function DocumentRequestsDashboard({
   rows,
+  source,
+  loading,
+  error,
   onRefresh,
 }: {
   rows: DocumentRequest[];
+  source?: "api" | "demo";
+  loading?: boolean;
+  error?: string | null;
   onRefresh?: () => void;
 }) {
   const [attention, setAttention] = useState<AttentionFilter>("all");
@@ -154,6 +160,25 @@ export function DocumentRequestsDashboard({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#f4f2f7]">
       <div className="mx-auto flex h-full min-h-0 w-full max-w-[1920px] flex-col gap-4 px-5 py-4">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+              source === "api"
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-slate-100 text-slate-500",
+            )}
+          >
+            {source === "api"
+              ? "Live CRM"
+              : loading
+                ? "Connecting…"
+                : "Demo"}
+          </span>
+          {error && source === "demo" ? (
+            <span className="text-[10px] text-slate-500">{error}</span>
+          ) : null}
+        </div>
         <div className="grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
           <KpiCard
             label="Total Requests"

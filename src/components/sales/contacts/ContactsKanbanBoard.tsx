@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { type ContactGroup } from "@/lib/contacts/types";
+import { ChevronRight } from "lucide-react";
+import { type ContactGroup, type ContactStatus } from "@/lib/contacts/types";
 import {
   listContactGroups,
   saveContactGroups,
@@ -202,11 +203,17 @@ export function ContactsKanbanBoard({
         : { ...contact, accentColorClass: targetGroup.dotColorClass };
 
     moveContact(contact, sourceGroup, targetGroup, updatedContact, targetIndex);
-    setDragInfo(null);
-
     if (sourceGroup.id !== targetGroup.id) {
+      void import("@/lib/contacts/api").then(({ updateCrmContact, tryCrmContact }) => {
+        void tryCrmContact(() =>
+          updateCrmContact(contact.id, {
+            status: targetGroup.title as ContactStatus,
+          }),
+        );
+      });
       flash(`${contact.name} moved to ${targetGroup.title}`);
     }
+    setDragInfo(null);
   }
 
   return (

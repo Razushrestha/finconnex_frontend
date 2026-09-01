@@ -239,12 +239,13 @@ import { EntityTable } from "@/components/finance/EntityTable";
 import { EntityFilters } from "@/components/finance/EntityFilters";
 import { MetricCardConfig, TableColumn } from "@/components/finance/types";
 import {
-  quotations,
   listQuotations,
-  Quotation,
-  QuotationStatus,
+  type Quotation,
+  type QuotationStatus,
 } from "@/lib/finance/quotations/types";
+import { useCrmQuotations } from "@/lib/finance/quotations/use-crm-quotations";
 import { onRecordsChange } from "@/lib/records-sync";
+import { cn } from "@/lib/utils";
 
 interface QuotationRow {
   id: string;
@@ -258,16 +259,18 @@ interface QuotationRow {
 
 export const QuotationsPage: React.FC = () => {
   const router = useRouter();
+  const crm = useCrmQuotations();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [dateFilter, setDateFilter] = useState("30d");
-  const [data, setData] = useState<Quotation[]>(quotations);
+  const [data, setData] = useState<Quotation[]>([]);
 
   useEffect(() => {
+    if (crm.loading) return;
     const refresh = () => setData(listQuotations());
     refresh();
     return onRecordsChange(refresh);
-  }, []);
+  }, [crm.source, crm.loading]);
 
   const tableData: QuotationRow[] = data.map((item) => ({
     id: item.id, // Real unique ID for router.push (`quo1`, `quo2`, etc.)
@@ -307,24 +310,29 @@ export const QuotationsPage: React.FC = () => {
       router.push("/finance/quotations/create?layoutid=standard&redirect=false"),
   };
 
+  const pendingValue = data
+    .filter((q) => q.status === "Sent" || q.status === "Draft")
+    .reduce((acc, curr) => acc + curr.total, 0);
+  const acceptedCount = data.filter((q) => q.status === "Accepted").length;
+
   const cardsData: MetricCardConfig[] = [
     {
       title: "PENDING VALUE",
-      value: "$45,230",
-      subtext: "📈 +12% vs last month",
+      value: `$${pendingValue.toLocaleString()}`,
+      subtext: "📈 Open quote pipeline",
       subtextVariant: "default",
     },
     {
-      title: "APPROVED THIS MONTH",
-      value: "18",
-      subtext: "🎯 82% conversion rate",
+      title: "ACCEPTED QUOTES",
+      value: acceptedCount,
+      subtext: "🎯 Ready to invoice",
       subtextVariant: "default",
     },
     {
-      title: "ACTION REQUIRED",
-      value: "3",
-      subtext: "⚠️ Expiring within 48h",
-      subtextVariant: "destructive",
+      title: "TOTAL QUOTES",
+      value: data.length,
+      subtext: crm.source === "api" ? "📋 Live CRM" : "📋 Tracked in system",
+      subtextVariant: "default",
     },
   ];
 
@@ -388,6 +396,25 @@ export const QuotationsPage: React.FC = () => {
 
   return (
     <div className="h-auto min-h-full w-full overflow-y-auto bg-slate-50 p-6 pb-16 text-slate-900">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            crm.source === "api"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-slate-100 text-slate-500",
+          )}
+        >
+          {crm.source === "api"
+            ? "Live CRM"
+            : crm.loading
+              ? "Connecting…"
+              : "Demo"}
+        </span>
+        {crm.error && crm.source === "demo" ? (
+          <span className="text-[10px] text-slate-500">{crm.error}</span>
+        ) : null}
+      </div>
       <EntityHeader {...headerProps} />
       <EntityCards cards={cardsData} />
 

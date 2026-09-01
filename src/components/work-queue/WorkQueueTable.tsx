@@ -33,6 +33,14 @@ import {
   ManageColumnsModal,
   type ManageColumn,
 } from "./ManageColumnsModal";
+import {
+  applyTablePreferenceToColumns,
+  getCrmTablePreference,
+  isEmptyTablePreference,
+  persistCrmTablePreference,
+  tablePreferenceFromColumns,
+  tryCrmTablePreference,
+} from "@/lib/table-preferences/api";
 
 export type QueueTableFilters = {
   priority: "all" | "High" | "Medium" | "Low";
@@ -63,6 +71,7 @@ interface WorkQueueTableProps {
   onDeleteRow?: (row: QueueRow) => void;
   onAddNote?: (row: QueueRow) => void;
   onCompleteRow?: (row: QueueRow) => void;
+  source?: "api" | "demo";
 }
 
 const ACTIONS_COL = "96px";
@@ -205,7 +214,9 @@ function cellText(row: QueueRow, colId: string): string {
     case "description":
       return row.description ?? "";
     case "lastActivityTime":
-      return row.lastActivityTime ?? "";
+      if (row.lastActivityTime) return row.lastActivityTime;
+      if (row.unreadCount) return `${row.unreadCount} unread`;
+      return "";
     default:
       return "";
   }
@@ -234,6 +245,7 @@ export function WorkQueueTable({
   onDeleteRow,
   onAddNote,
   onCompleteRow,
+  source,
 }: WorkQueueTableProps) {
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [sortOpen, setSortOpen] = React.useState(false);
@@ -257,12 +269,24 @@ export function WorkQueueTable({
 
   React.useEffect(() => {
     setManageColumns(loadManageColumns());
+    void tryCrmTablePreference(() => getCrmTablePreference("work-queue")).then(
+      (pref) => {
+        if (pref && !isEmptyTablePreference(pref)) {
+          setManageColumns(
+            applyTablePreferenceToColumns(DEFAULT_MANAGE_COLUMNS, pref),
+          );
+        }
+      },
+    );
   }, []);
 
-  const visibleCols = React.useMemo(
-    () => visibleColumns(manageColumns),
-    [manageColumns],
-  );
+  const visibleCols = React.useMemo(() => {
+    const cols = visibleColumns(manageColumns);
+    if (source !== "api") return cols;
+    return cols.map((c) =>
+      c.id === "relatedTo" ? { ...c, label: "Related To" } : c,
+    );
+  }, [manageColumns, source]);
   const gridTemplate = React.useMemo(
     () => buildGridTemplate(visibleCols),
     [visibleCols],
@@ -375,6 +399,18 @@ export function WorkQueueTable({
           <span className="shrink-0 text-[12px] font-medium tabular-nums text-slate-400">
             {total}
           </span>
+          {source ? (
+            <span
+              className={cn(
+                "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                source === "api"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-slate-100 text-slate-500",
+              )}
+            >
+              {source === "api" ? "Live CRM" : spinning ? "Connecting…" : "Demo"}
+            </span>
+          ) : null}
           <button
             type="button"
             aria-label={`Refresh ${title}`}
@@ -957,6 +993,10 @@ export function WorkQueueTable({
         onSave={(cols) => {
           setManageColumns(cols);
           persistManageColumns(cols);
+          persistCrmTablePreference(
+            "work-queue",
+            tablePreferenceFromColumns("work-queue", cols),
+          );
           onManageColumns?.();
           setManageColumnsOpen(false);
         }}

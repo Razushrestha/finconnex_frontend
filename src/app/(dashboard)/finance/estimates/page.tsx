@@ -236,13 +236,14 @@ import { EntityCards } from "@/components/finance/EntityCards";
 import { EntityTable } from "@/components/finance/EntityTable";
 import { MetricCardConfig, TableColumn } from "@/components/finance/types";
 import {
-  estimates,
   listEstimates,
-  Estimate,
-  EstimateStatus,
+  type Estimate,
+  type EstimateStatus,
 } from "@/lib/finance/estimates/types";
+import { useCrmEstimates } from "@/lib/finance/estimates/use-crm-estimates";
 import { onRecordsChange } from "@/lib/records-sync";
 import { EntityFilters } from "@/components/finance/EntityFilters";
+import { cn } from "@/lib/utils";
 
 interface EstimateRow {
   id: string;
@@ -258,16 +259,18 @@ interface EstimateRow {
 
 export const EstimatesPage: React.FC = () => {
   const router = useRouter();
+  const crm = useCrmEstimates();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [dateFilter, setDateFilter] = useState("30d");
-  const [data, setData] = useState<Estimate[]>(estimates);
+  const [data, setData] = useState<Estimate[]>([]);
 
   useEffect(() => {
+    if (crm.loading) return;
     const refresh = () => setData(listEstimates());
     refresh();
     return onRecordsChange(refresh);
-  }, []);
+  }, [crm.source, crm.loading]);
 
   // Filter based on search input and status dropdown
   const filteredData = data.filter((item) => {
@@ -318,7 +321,7 @@ export const EstimatesPage: React.FC = () => {
     {
       title: "TOTAL ESTIMATES",
       value: data.length,
-      subtext: "📋 Tracked in system",
+      subtext: crm.source === "api" ? "📋 Live CRM" : "📋 Tracked in system",
       subtextVariant: "default",
     },
   ];
@@ -416,6 +419,25 @@ export const EstimatesPage: React.FC = () => {
 
   return (
     <div className="h-auto min-h-full w-full overflow-y-auto bg-slate-50 p-6 pb-16 text-slate-900">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            crm.source === "api"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-slate-100 text-slate-500",
+          )}
+        >
+          {crm.source === "api"
+            ? "Live CRM"
+            : crm.loading
+              ? "Connecting…"
+              : "Demo"}
+        </span>
+        {crm.error && crm.source === "demo" ? (
+          <span className="text-[10px] text-slate-500">{crm.error}</span>
+        ) : null}
+      </div>
       <EntityHeader {...headerProps} />
       <EntityCards cards={cardsData} />
       <EntityFilters

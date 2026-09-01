@@ -49,6 +49,19 @@ import {
   type ChatMessage,
   type ChatPresence,
 } from "@/lib/chat/types";
+import {
+  addCrmConversationMember,
+  addCrmMessageReaction,
+  createCrmChatMessage,
+  createCrmConversation,
+  deleteCrmChatMessage,
+  deleteCrmConversation,
+  removeCrmMessageReaction,
+  tryCrmChat,
+  updateCrmChatMessage,
+} from "@/lib/chat/api";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import { useCrmChat } from "@/lib/chat/use-crm-chat";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { createTask } from "@/lib/tasks/store";
 import {
@@ -111,6 +124,23 @@ export default function TeamChatPage() {
   const feedRef = useRef<HTMLDivElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const plusMenuRef = useRef<HTMLDivElement>(null);
+  const crm = useCrmChat({ activeConversationId: activeId });
+
+  useEffect(() => {
+    if (crm.source !== "api" || crm.channels == null) return;
+    setChannels(crm.channels);
+    if (!crm.channels.length) return;
+    setActiveId((prev) =>
+      crm.channels!.some((c) => c.id === prev)
+        ? prev
+        : (crm.channels!.find((c) => isDm(c))?.id ?? crm.channels![0]!.id),
+    );
+  }, [crm.source, crm.channels]);
+
+  useEffect(() => {
+    if (crm.source !== "api" || !crm.messages) return;
+    setMessages((prev) => ({ ...prev, ...crm.messages }));
+  }, [crm.source, crm.messages]);
 
   const active = channels.find((c) => c.id === activeId) ?? channels[0];
   const thread = (messages[activeId] ?? []).filter((m) => {
@@ -176,6 +206,9 @@ export default function TeamChatPage() {
             : m,
         ),
       }));
+      if (crm.source === "api") {
+        void tryCrmChat(() => updateCrmChatMessage(editingId, text));
+      }
       setEditingId(null);
       setDraft("");
       setReplyTo(null);
@@ -183,17 +216,19 @@ export default function TeamChatPage() {
       return;
     }
 
+    const localId = `local-${Date.now()}`;
+    const replySnapshot = replyTo;
     const msg: ChatMessage = {
-      id: `local-${Date.now()}`,
+      id: localId,
       channelId: activeId,
       author: "You",
       body: text || "Voice note",
       sentAt: "Just now",
       sentAtMs: Date.now(),
       isOwn: true,
-      replyToId: replyTo?.id,
-      replyToPreview: replyTo
-        ? `${replyTo.author}: ${replyTo.body.slice(0, 60)}`
+      replyToId: replySnapshot?.id,
+      replyToPreview: replySnapshot
+        ? `${replySnapshot.author}: ${replySnapshot.body.slice(0, 60)}`
         : undefined,
       ...extras,
     };
@@ -204,6 +239,23 @@ export default function TeamChatPage() {
     setDraft("");
     setReplyTo(null);
     setEmojiOpen(false);
+
+    if (crm.source === "api" && extras?.kind !== "voice") {
+      void tryCrmChat(() =>
+        createCrmChatMessage(activeId, {
+          body: text,
+          replyToId: replySnapshot?.id,
+        }),
+      ).then((live) => {
+        if (!live) return;
+        setMessages((prev) => ({
+          ...prev,
+          [activeId]: (prev[activeId] ?? []).map((m) =>
+            m.id === localId ? { ...live, isOwn: true, author: "You" } : m,
+          ),
+        }));
+      });
+    }
 
     // Mentions → in-app notification (demo: notify current user when @name appears)
     const mention = text.match(/@([\w.-]+)/);
@@ -230,6 +282,9 @@ export default function TeamChatPage() {
       ...prev,
       [activeId]: (prev[activeId] ?? []).filter((m) => m.id !== id),
     }));
+    if (crm.source === "api") {
+      void tryCrmChat(() => deleteCrmChatMessage(id));
+    }
     flash(setToast, "Message deleted");
   }
 
@@ -281,6 +336,33 @@ export default function TeamChatPage() {
     return task;
   }
 
+  async function startConversation(input: {
+    name: string;
+    type: "GROUP" | "DIRECT";
+    memberIds?: string[];
+  }) {
+    if (crm.source !== "api") {
+      flash(setToast, "Sign in to start a live conversation");
+      return;
+    }
+    const created = await tryCrmChat(() => createCrmConversation(input));
+    if (!created) {
+      flash(setToast, "Could not create conversation");
+      return;
+    }
+    const memberId = input.memberIds?.[0];
+    if (memberId && isUuid(memberId)) {
+      void tryCrmChat(() => addCrmConversationMember(created.id, memberId));
+    }
+    setChannels((prev) =>
+      prev.some((c) => c.id === created.id) ? prev : [created, ...prev],
+    );
+    setActiveId(created.id);
+    setSidebarTab(input.type === "GROUP" ? "groups" : "chat");
+    crm.refresh();
+    flash(setToast, `Opened ${channelLabel(created)}`);
+  }
+
   function onPlusAction(label: string) {
     setPlusMenuOpen(false);
     if (label === "Create task…") {
@@ -302,6 +384,23 @@ export default function TeamChatPage() {
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Team Chat
             </h1>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                crm.source === "api"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-slate-100 text-slate-500",
+              )}
+            >
+              {crm.source === "api"
+                ? "Live CRM"
+                : crm.loading
+                  ? "Connecting…"
+                  : "Demo"}
+            </span>
+            {crm.error && crm.source === "demo" ? (
+              <span className="text-[10px] text-slate-500">{crm.error}</span>
+            ) : null}
           </div>
         </div>
 
@@ -414,9 +513,25 @@ export default function TeamChatPage() {
 
               {sidebarTab === "groups" ? (
                 <>
-                  <p className="mb-1.5 px-2 text-[11px] font-medium text-slate-400">
-                    Groups
-                  </p>
+                  <div className="mb-1.5 flex items-center justify-between px-2">
+                    <p className="text-[11px] font-medium text-slate-400">
+                      Groups
+                    </p>
+                    <button
+                      type="button"
+                      className="text-[11px] font-semibold text-violet-600 hover:text-violet-800"
+                      onClick={() => {
+                        const name = window.prompt("New group name");
+                        if (!name?.trim()) return;
+                        void startConversation({
+                          name: name.trim(),
+                          type: "GROUP",
+                        });
+                      }}
+                    >
+                      New
+                    </button>
+                  </div>
                   <div className="space-y-0.5">
                     {groupChats.map((ch) => (
                       <RecentChatRow
@@ -453,12 +568,13 @@ export default function TeamChatPage() {
                           if (c.channelId) {
                             setActiveId(c.channelId);
                             setSidebarTab("chat");
-                          } else {
-                            flash(
-                              setToast,
-                              `Start chat with ${c.name} (coming soon)`,
-                            );
+                            return;
                           }
+                          void startConversation({
+                            name: c.name,
+                            type: "DIRECT",
+                            memberIds: isUuid(c.id) ? [c.id] : undefined,
+                          });
                         }}
                         className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-slate-50"
                       >
@@ -666,6 +782,9 @@ export default function TeamChatPage() {
                             if (next) setActiveId(next.id);
                             return nextList;
                           });
+                          if (crm.source === "api") {
+                            void tryCrmChat(() => deleteCrmConversation(id));
+                          }
                           flash(setToast, "Chat deleted");
                         }}
                       />
@@ -719,6 +838,30 @@ export default function TeamChatPage() {
                       key={msg.id}
                       msg={msg}
                       showMeta={showMeta}
+                      onReact={(emoji) => {
+                        if (crm.source !== "api") {
+                          flash(setToast, `${emoji} reacted`);
+                          return;
+                        }
+                        void tryCrmChat(() =>
+                          addCrmMessageReaction(msg.id, emoji),
+                        ).then((ok) => {
+                          if (ok != null) {
+                            flash(setToast, `Reacted ${emoji}`);
+                            return;
+                          }
+                          void tryCrmChat(() =>
+                            removeCrmMessageReaction(msg.id, emoji),
+                          ).then((cleared) => {
+                            flash(
+                              setToast,
+                              cleared != null
+                                ? `Removed ${emoji}`
+                                : "Could not react",
+                            );
+                          });
+                        });
+                      }}
                       onAction={(action) => {
                         if (action === "reply") {
                           setReplyTo(msg);
@@ -1180,10 +1323,12 @@ function MessageBubble({
   msg,
   showMeta,
   onAction,
+  onReact,
 }: {
   msg: ChatMessage;
   showMeta: boolean;
   onAction: (action: MsgAction) => void;
+  onReact?: (emoji: string) => void;
 }) {
   const own = !!msg.isOwn;
   const editable = canEditMessage(msg);
@@ -1336,6 +1481,23 @@ function MessageBubble({
                 own ? "right-0" : "left-0",
               )}
             >
+              {onReact ? (
+                <div className="flex flex-wrap gap-0.5 px-2 py-1.5">
+                  {EMOJIS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      className="flex h-7 w-7 items-center justify-center rounded-lg text-sm hover:bg-slate-50"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onReact(emoji);
+                      }}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               <MenuItem
                 icon={Reply}
                 label="Reply"

@@ -95,7 +95,7 @@ export type ApiUploadConfig = {
   baseUrl: string;
   getAccessToken: () => string | null | Promise<string | null>;
   fetchImpl?: typeof fetch;
-  /** Default `/v1/attachments/upload` */
+  /** Default `/v1/storage/upload` */
   path?: string;
 };
 
@@ -104,7 +104,7 @@ export function createApiUploadAdapter(
   config: ApiUploadConfig,
 ): AttachmentUploadAdapter {
   const fetchImpl = config.fetchImpl ?? fetch;
-  const path = config.path ?? "/v1/attachments/upload";
+  const path = config.path ?? "/v1/storage/upload";
 
   return {
     mode: "api",
@@ -138,6 +138,9 @@ export function createApiUploadAdapter(
             body: JSON.stringify(payload),
           },
         );
+        if (res.status === 404 || res.status === 405) {
+          return createLocalUploadAdapter().upload(input);
+        }
         if (!res.ok) {
           return { ok: false, message: `Upload failed (${res.status})` };
         }
@@ -175,7 +178,7 @@ export function createMockUploadFetch(store?: Map<string, string>): typeof fetch
         : input instanceof URL
           ? input.href
           : input.url;
-    if (!url.includes("/v1/attachments/upload")) {
+    if (!url.includes("/v1/storage/upload") && !url.includes("/v1/attachments/upload")) {
       return new Response(JSON.stringify({ error: "not_found" }), {
         status: 404,
       });

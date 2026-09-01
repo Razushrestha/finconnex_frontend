@@ -31,6 +31,12 @@ import {
   elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
 
+import {
+  createCrmMessage,
+  persistRemoteMessage,
+  sendCrmMessage,
+  tryCrmMessage,
+} from "@/lib/messages/api";
 import { createMessage } from "@/lib/messages/store";
 import { formatRulesAt } from "@/lib/rules/storage";
 
@@ -91,6 +97,7 @@ export function CreateMessageForm({
     {},
   );
   const [submitted, setSubmitted] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -109,25 +116,57 @@ export function CreateMessageForm({
     return Object.keys(next).length === 0;
   }
 
-  function handleSave(createAnother: boolean) {
+  async function handleSave(createAnother: boolean) {
     setSubmitted(true);
+    setSendError(null);
     if (!validate()) return;
     const relatedTo =
       form.relatedKind && form.relatedName
         ? `${form.relatedKind}: ${form.relatedName}`
         : undefined;
-    const status = (form.status || "Sent") as MessageStatus;
-    const created = createMessage({
+    const status = (form.status || "Draft") as MessageStatus;
+    const payload = {
       type: form.type as MessageType,
       subject: form.subject.trim(),
       body: form.body.trim(),
       from: form.from.trim() || "John Smith",
       to: form.to.trim() || form.relatedName,
       relatedTo,
-      status,
-      sentDate: status === "Draft" ? undefined : formatRulesAt(new Date()),
+      relatedType: form.relatedKind
+        ? form.relatedKind.toUpperCase()
+        : undefined,
+      status: "Draft" as MessageStatus,
       template: form.template || undefined,
-    });
+    };
+
+    const remote = await tryCrmMessage(() => createCrmMessage(payload));
+    let createdId: string;
+
+    if (remote) {
+      persistRemoteMessage(remote);
+      createdId = remote.id;
+      if (status !== "Draft" && status !== "Failed") {
+        const sent = await tryCrmMessage(() => sendCrmMessage(remote.id));
+        if (!sent && status === "Sent") {
+          setSendError(
+            "CRM created the draft but send failed. Open the message to retry.",
+          );
+          router.push(`/activities/messages?focus=${remote.id}`);
+          return;
+        }
+        persistRemoteMessage(
+          sent ?? { ...remote, status, sentDate: formatRulesAt(new Date()) },
+        );
+      }
+    } else {
+      const local = createMessage({
+        ...payload,
+        status,
+        sentDate: status === "Draft" ? undefined : formatRulesAt(new Date()),
+      });
+      createdId = local.id;
+    }
+
     if (createAnother) {
       setForm({
         ...initialState,
@@ -141,7 +180,7 @@ export function CreateMessageForm({
     }
     void layoutId;
     void redirect;
-    router.push(`/activities/messages?focus=${created.id}`);
+    router.push(`/activities/messages?focus=${createdId}`);
   }
 
   return (
@@ -158,6 +197,11 @@ export function CreateMessageForm({
       saveLabel="Save Message"
       onSave={handleSave}
     >
+      {sendError ? (
+        <p className="col-span-full rounded-lg bg-rose-50 px-3 py-2 text-[12px] text-rose-700">
+          {sendError}
+        </p>
+      ) : null}
       <Field
         label="Type"
         required

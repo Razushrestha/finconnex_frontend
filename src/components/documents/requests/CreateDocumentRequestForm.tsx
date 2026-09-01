@@ -15,10 +15,16 @@ import {
 import {
   DOCUMENT_REQUEST_BROKERS,
   nextDocumentRequestIds,
+  removeDocumentRequest,
   upsertDocumentRequest,
   type DocumentRequestType,
   type RequestedDocLine,
 } from "@/lib/documents/requests/types";
+import {
+  createCrmDocumentRequest,
+  toCreateDocumentRequestBody,
+  tryCrmDocumentRequest,
+} from "@/lib/documents/requests/api";
 import { matchPortalForApplicant } from "@/lib/documents/requests/pack";
 import { getRulesActor } from "@/lib/rules/actor";
 import { cn } from "@/lib/utils";
@@ -739,7 +745,7 @@ export function CreateDocumentRequestForm({
     setStep((s) => s - 1);
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!validateStep(2)) return;
     setSaving(true);
     try {
@@ -842,9 +848,22 @@ export function CreateDocumentRequestForm({
         clientName: portal?.clientName,
         clientEmail: email.trim() || portal?.primaryContactEmail,
       });
-      router.push(
-        `/documents/requests/${created.id}?created=1`,
+      const remote = await tryCrmDocumentRequest(() =>
+        createCrmDocumentRequest(toCreateDocumentRequestBody(created)),
       );
+      if (remote) {
+        if (remote.id !== created.id) removeDocumentRequest(created.id);
+        upsertDocumentRequest({
+          ...created,
+          ...remote,
+          items: created.items,
+          timeline: created.timeline,
+          messages: created.messages,
+        });
+        router.push(`/documents/requests/${remote.id}?created=1`);
+        return;
+      }
+      router.push(`/documents/requests/${created.id}?created=1`);
     } finally {
       setSaving(false);
     }

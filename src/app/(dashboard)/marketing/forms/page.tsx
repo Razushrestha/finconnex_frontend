@@ -203,6 +203,8 @@ import {
   type DataTableColumn,
 } from "@/components/marketing/index";
 import { SearchInput } from "@/components/ui/search-input";
+import { CreateFormModal } from "@/components/marketing/forms/CreateFormModal";
+import { NameFormModal } from "@/components/marketing/forms/NameFormModal";
 
 const STATUS_STYLE: Record<FormStatus, string> = {
   Draft: "bg-slate-100 text-slate-600",
@@ -287,6 +289,9 @@ export default function MarketingFormsPage() {
   const [rows, setRows] = useState<MarketingForm[]>(seed);
   const [statusTab, setStatusTab] = useState<FormStatus | "All">("All");
   const [search, setSearch] = useState("");
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [nameModalOpen, setNameModalOpen] = useState(false);
+
   const [page, setPage] = useState(1);
   const pageSize = 8;
 
@@ -329,6 +334,14 @@ export default function MarketingFormsPage() {
     safePage * pageSize,
   );
 
+  const handleConfirmName = (name: string) => {
+    // TODO(api): create the form record with `name`, then navigate using the returned id
+    console.log("create blank form:", name);
+    router.push(
+      `/marketing/forms/create?layoutid=standard&redirect=false&name=${encodeURIComponent(name)}`,
+    );
+  };
+
   return (
     <MarketingListShell>
       <CampaignHeader
@@ -339,12 +352,31 @@ export default function MarketingFormsPage() {
         ]}
         title="Forms"
         totalCount={filtered.length}
-        onCreate={() =>
-          router.push(
-            "/marketing/forms/create?layoutid=standard&redirect=false",
-          )
-        }
+        onCreate={() => setCreateModalOpen(true)}
         createLabel="New form"
+      />
+
+      <CreateFormModal
+        open={createModalOpen}
+        onOpenChange={setCreateModalOpen}
+        onSelectBlank={() => {
+          setCreateModalOpen(false);
+          setNameModalOpen(true);
+        }}
+        onSelectAi={() => {
+          setCreateModalOpen(false);
+          router.push("/marketing/forms/create?layoutid=ai&redirect=false");
+        }}
+        onSelectTemplates={() => {
+          setCreateModalOpen(false);
+          router.push("/marketing/forms/templates");
+        }}
+      />
+
+      <NameFormModal
+        open={nameModalOpen}
+        onOpenChange={setNameModalOpen}
+        onConfirm={handleConfirmName}
       />
 
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-1 py-2">

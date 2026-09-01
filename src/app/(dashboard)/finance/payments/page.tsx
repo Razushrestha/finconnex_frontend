@@ -10,6 +10,7 @@ import {
   type Payment,
   type PaymentStatus,
 } from "@/lib/finance/payments/types";
+import { useCrmPayments } from "@/lib/finance/payments/use-crm-payments";
 import { formatAUD } from "@/lib/finance/shared";
 import { PAYMENT_STATUS_STYLE } from "@/lib/finance/statusStyles";
 import { FinanceOpsShell } from "@/components/finance/FinanceOpsShell";
@@ -17,6 +18,7 @@ import { cn } from "@/lib/utils";
 
 export default function PaymentsPage() {
   const router = useRouter();
+  const crm = useCrmPayments();
   const [rows, setRows] = useState<Payment[]>(seed);
   const [statusTab, setStatusTab] = useState<PaymentStatus | "All">("All");
   const [search, setSearch] = useState("");
@@ -24,8 +26,9 @@ export default function PaymentsPage() {
   const pageSize = 8;
 
   useEffect(() => {
+    if (crm.loading) return;
     setRows(listPayments());
-  }, []);
+  }, [crm.source, crm.loading]);
 
   useEffect(() => {
     setPage(1);
@@ -87,7 +90,25 @@ export default function PaymentsPage() {
 
   return (
     <FinanceOpsShell
-      title="Payments"
+      title={
+        <span className="inline-flex items-center gap-2">
+          Payments
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+              crm.source === "api"
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-slate-100 text-slate-500",
+            )}
+          >
+            {crm.source === "api"
+              ? "Live CRM"
+              : crm.loading
+                ? "Connecting…"
+                : "Demo"}
+          </span>
+        </span>
+      }
       section="§20.4"
       sectionIcon={Banknote}
       actions={
