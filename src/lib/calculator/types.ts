@@ -18,6 +18,8 @@ export interface CalcFieldDef {
   suffix?: string;
   /** hint under the field */
   hint?: string;
+  kind?: "number" | "text" | "select";
+  options?: readonly string[];
 }
 
 export interface CalcResultLine {
@@ -131,10 +133,17 @@ export const CALCULATOR_FIELDS: Record<CalculatorType, CalcFieldDef[]> = {
   Currency: [
     { key: "amount", label: "Amount", placeholder: "1000" },
     {
+      key: "toCurrency",
+      label: "Convert to",
+      kind: "select",
+      options: ["AUD", "USD", "GBP", "EUR", "NZD"],
+      placeholder: "USD",
+    },
+    {
       key: "fxRate",
       label: "Exchange rate",
       placeholder: "0.66",
-      hint: "1 unit of currency → target",
+      hint: "Auto-filled from the pair; override if the client quoted a different rate",
     },
   ],
   Loan: [
@@ -155,11 +164,13 @@ export const CALCULATOR_FIELDS: Record<CalculatorType, CalcFieldDef[]> = {
   Custom: [
     { key: "a", label: "Value A", placeholder: "100" },
     { key: "b", label: "Value B", placeholder: "20" },
+    { key: "c", label: "Value C (optional)", placeholder: "1" },
     {
-      key: "op",
-      label: "Operation",
-      placeholder: "+ | - | * | / | %",
-      hint: "Use +, -, *, /, or % (A% of B treated as A% of B)",
+      key: "expression",
+      label: "Formula",
+      kind: "text",
+      placeholder: "(a + b) * c",
+      hint: "Use a, b, c with + − * / and parentheses. Example: a * b / 100",
     },
   ],
 };
@@ -169,10 +180,24 @@ export const CALCULATOR_FORMULAS: Record<CalculatorType, string> = {
   ROI: "ROI % = ((Gain − Cost) ÷ Cost) × 100",
   Discount: "Net = List × (1 − Discount% ÷ 100); Savings = List − Net",
   Tax: "Tax = Amount × (Rate ÷ 100); Total = Amount + Tax",
-  Currency: "Converted = Amount × Exchange rate",
+  Currency: "Converted = Amount × Exchange rate (from workspace currency → target)",
   Loan: "Monthly = P × r(1+r)^n ÷ ((1+r)^n − 1); r = annual÷12; n = years×12",
-  Custom: "Result = A ⊕ B (where ⊕ is the chosen operation)",
+  Custom: "Result = evaluate(formula) using values a, b, c",
 };
+
+/** Mid-market style defaults vs 1 AUD. Override on the form when quoting live. */
+export const FX_PER_AUD: Record<CalcCurrency, number> = {
+  AUD: 1,
+  USD: 0.66,
+  GBP: 0.52,
+  EUR: 0.61,
+  NZD: 1.09,
+};
+
+export function suggestedFxRate(from: CalcCurrency, to: CalcCurrency): string {
+  const rate = FX_PER_AUD[to] / FX_PER_AUD[from];
+  return rate.toFixed(4);
+}
 
 const STORE_KEY = "calculator:history:v1";
 
@@ -194,8 +219,48 @@ function num(inputs: Record<string, string>, key: string): number {
 
 export function emptyInputs(type: CalculatorType): Record<string, string> {
   return Object.fromEntries(
-    CALCULATOR_FIELDS[type].map((f) => [f.key, ""]),
+    CALCULATOR_FIELDS[type].map((f) => {
+      if (type === "Custom" && f.key === "expression") {
+        return [f.key, "(a + b) * c"];
+      }
+      if (type === "Currency" && f.key === "toCurrency") return [f.key, "USD"];
+      if (type === "Currency" && f.key === "fxRate") {
+        return [f.key, suggestedFxRate("AUD", "USD")];
+      }
+      return [f.key, ""];
+    }),
   );
+}
+
+/** Safe arithmetic for Custom: digits, a/b/c, + - * / ( ) and spaces only. */
+export function evaluateCustomExpression(
+  expression: string,
+  vars: { a: number; b: number; c: number },
+): { ok: true; value: number } | { ok: false; error: string } {
+  const raw = expression.trim().toLowerCase();
+  if (!raw) return { ok: false, error: "Enter a formula using a, b, and c" };
+  if (!/^[0-9abc+\-*/().\s]+$/.test(raw)) {
+    return { ok: false, error: "Formula can only use a, b, c and + − * / ( )" };
+  }
+  let replaced = raw.replace(/\b([abc])\b/g, (_, key: "a" | "b" | "c") => {
+    const n = vars[key];
+    return Number.isFinite(n) ? `(${n})` : "NaN";
+  });
+  if (/[a-z]/.test(replaced)) {
+    return { ok: false, error: "Unknown name in formula — use only a, b, c" };
+  }
+  if (/NaN/.test(replaced)) {
+    return { ok: false, error: "Enter numeric values for a, b, and c" };
+  }
+  try {
+    const value = Function(`"use strict"; return (${replaced});`)() as unknown;
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      return { ok: false, error: "Formula did not produce a number" };
+    }
+    return { ok: true, value };
+  } catch {
+    return { ok: false, error: "Could not calculate that formula" };
+  }
 }
 
 export function runCalculator(
@@ -378,54 +443,26 @@ export function runCalculator(
   // Custom
   const a = num(inputs, "a");
   const b = num(inputs, "b");
-  const op = (inputs.op ?? "+").trim();
-  if (![a, b].every(Number.isFinite)) {
-    return { ok: false, error: "Enter numeric values for A and B" };
+  const cRaw = (inputs.c ?? "").trim();
+  const c = cRaw ? num(inputs, "c") : 1;
+  if (![a, b, c].every(Number.isFinite)) {
+    return { ok: false, error: "Enter numeric values for A, B, and C" };
   }
-  let value: number;
-  let label: string;
-  switch (op) {
-    case "+":
-      value = a + b;
-      label = "A + B";
-      break;
-    case "-":
-      value = a - b;
-      label = "A − B";
-      break;
-    case "*":
-    case "x":
-    case "×":
-      value = a * b;
-      label = "A × B";
-      break;
-    case "/":
-    case "÷":
-      if (b === 0) return { ok: false, error: "Cannot divide by zero" };
-      value = a / b;
-      label = "A ÷ B";
-      break;
-    case "%":
-      value = (a / 100) * b;
-      label = "A% of B";
-      break;
-    default:
-      return {
-        ok: false,
-        error: "Operation must be +, -, *, /, or %",
-      };
-  }
+  const expression = (inputs.expression ?? "").trim() || "(a + b) * c";
+  const evaluated = evaluateCustomExpression(expression, { a, b, c });
+  if (!evaluated.ok) return evaluated;
   return {
     ok: true,
     result: {
-      primaryLabel: label,
-      primaryValue: value,
+      primaryLabel: "Result",
+      primaryValue: evaluated.value,
       primaryFormat: "number",
-      formula: `${formula} → ${label}`,
+      formula: `${expression}  →  ${evaluated.value}`,
       lines: [
         { label: "A", value: a, format: "number" },
         { label: "B", value: b, format: "number" },
-        { label, value, format: "number" },
+        { label: "C", value: c, format: "number" },
+        { label: "Formula", value: evaluated.value, format: "number" },
       ],
     },
   };
@@ -454,7 +491,9 @@ export function formatCalcValue(
 function readStore(): SavedCalculation[] | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(STORE_KEY);
+    const raw =
+      window.localStorage.getItem(STORE_KEY) ??
+      window.sessionStorage.getItem(STORE_KEY);
     return raw ? (JSON.parse(raw) as SavedCalculation[]) : null;
   } catch {
     return null;
@@ -463,7 +502,7 @@ function readStore(): SavedCalculation[] | null {
 
 function writeStore(list: SavedCalculation[]) {
   if (typeof window === "undefined") return;
-  sessionStorage.setItem(STORE_KEY, JSON.stringify(list));
+  window.localStorage.setItem(STORE_KEY, JSON.stringify(list));
 }
 
 export const seedCalculations: SavedCalculation[] = [
@@ -583,4 +622,70 @@ export function exportCalculationText(
   a.download = `${(c.calcId ?? "calc").toLowerCase()}-result.txt`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+export function exportCalculationCsv(
+  c: Pick<
+    SavedCalculation,
+    "title" | "type" | "currency" | "inputs" | "result" | "formula" | "calcId"
+  >,
+) {
+  const rows: string[][] = [
+    ["Field", "Value"],
+    ["Id", c.calcId ?? "draft"],
+    ["Title", c.title],
+    ["Type", c.type],
+    ["Currency", c.currency],
+    ["Formula", c.formula],
+    ...Object.entries(c.inputs).map(([k, v]) => [`Input ${k}`, v]),
+    ...c.result.lines.map((l) => [
+      l.label,
+      formatCalcValue(l.value, l.format, c.currency),
+    ]),
+    [
+      c.result.primaryLabel,
+      formatCalcValue(
+        c.result.primaryValue,
+        c.result.primaryFormat,
+        c.currency,
+      ),
+    ],
+  ];
+  const csv = rows
+    .map((row) =>
+      row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","),
+    )
+    .join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${(c.calcId ?? "calc").toLowerCase()}-result.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function formatCalculationShare(
+  c: Pick<
+    SavedCalculation,
+    "title" | "type" | "currency" | "inputs" | "result" | "formula" | "calcId"
+  >,
+) {
+  const primary = formatCalcValue(
+    c.result.primaryValue,
+    c.result.primaryFormat,
+    c.currency,
+  );
+  const extras = c.result.lines
+    .map((l) => `${l.label}: ${formatCalcValue(l.value, l.format, c.currency)}`)
+    .join("\n");
+  return [
+    `${c.title} (${c.calcId ?? "draft"})`,
+    `Type: ${c.type} · ${c.currency}`,
+    `Result: ${c.result.primaryLabel} = ${primary}`,
+    `Formula: ${c.formula}`,
+    extras,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }

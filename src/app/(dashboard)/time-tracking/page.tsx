@@ -179,12 +179,7 @@ export default function TimeTrackingPage() {
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
       <div className="relative mx-auto flex max-w-[1920px] flex-col p-2.5 sm:p-3 lg:p-4">
-        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
-              Time Tracking
-            </h1>
-          </div>
+        <div className="mb-2.5 flex flex-wrap items-center justify-end gap-2">
           <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"

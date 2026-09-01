@@ -14,9 +14,6 @@ export default function SettingsLayout({
         <div className="mx-auto flex w-full max-w-[1920px] items-center justify-between gap-3 px-4 py-3 sm:px-6 2xl:px-8">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-[18px] font-semibold tracking-tight text-slate-900">
-                Settings
-              </h1>
               <SettingsCrmBadge />
             </div>
             <SettingsBreadcrumb />

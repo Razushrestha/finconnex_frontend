@@ -363,28 +363,28 @@ export function getAnalyticsSnapshot(opts: {
       dealsWon: Math.round(8 * f),
       revenue: Math.round(620000 * f),
       activities: Math.round(54 * f),
-      href: "/team",
+      href: "/settings/users-and-access/users",
     },
     {
       name: "Tejas Gokhe",
       dealsWon: Math.round(6 * f),
       revenue: Math.round(410000 * f),
       activities: Math.round(48 * f),
-      href: "/team",
+      href: "/settings/users-and-access/users",
     },
     {
       name: "Roshna Abraham",
       dealsWon: Math.round(5 * f),
       revenue: Math.round(355000 * f),
       activities: Math.round(61 * f),
-      href: "/team",
+      href: "/settings/users-and-access/users",
     },
     {
       name: "Shiva Kadhka",
       dealsWon: Math.round(4 * f),
       revenue: Math.round(290000 * f),
       activities: Math.round(39 * f),
-      href: "/team",
+      href: "/settings/users-and-access/users",
     },
   ].filter((u) => opts.owner === "All" || u.name === opts.owner);
 

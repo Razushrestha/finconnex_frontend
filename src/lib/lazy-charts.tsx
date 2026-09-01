@@ -44,18 +44,3 @@ export const SalesGrowthCard = dynamic(
   { loading: chartLoading("min-h-[280px]") },
 );
 
-export const NewTeamMembersCard = dynamic(
-  () =>
-    import("@/components/teams/NewTeamMembersCard").then(
-      (m) => m.NewTeamMembersCard,
-    ),
-  { loading: chartLoading("min-h-[280px]") },
-);
-
-export const TeamPerformancesCard = dynamic(
-  () =>
-    import("@/components/teams/TeamPerformancesCard").then(
-      (m) => m.TeamPerformancesCard,
-    ),
-  { loading: chartLoading("min-h-[320px]") },
-);

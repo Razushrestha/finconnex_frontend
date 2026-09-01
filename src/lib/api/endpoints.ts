@@ -612,6 +612,12 @@ export const ENDPOINT_CATALOG = [
     notes: "Save as reusable template",
   },
 
+  // Calculator history (JWT)
+  { method: "GET", path: "/calculations", module: "calculations", notes: "List saved calculator results" },
+  { method: "POST", path: "/calculations", module: "calculations", notes: "Save a calculator result" },
+  { method: "GET", path: "/calculations/:id", module: "calculations" },
+  { method: "DELETE", path: "/calculations/:id", module: "calculations", notes: "Soft-delete" },
+
   // Resources (JWT)
   { method: "GET", path: "/resources", module: "resources", notes: "List resources" },
   { method: "POST", path: "/resources", module: "resources", notes: "Create a resource" },

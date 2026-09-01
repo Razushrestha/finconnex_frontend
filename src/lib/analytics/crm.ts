@@ -223,7 +223,7 @@ function overlayTopUsers(
     dealsWon: toNum(row.wonDeals) ?? toNum(row.dealsWon) ?? 0,
     revenue: toNum(row.revenue) ?? 0,
     activities: toNum(row.activities) ?? 0,
-    href: "/team",
+    href: "/settings/users-and-access/users",
   }));
 }
 

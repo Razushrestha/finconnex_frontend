@@ -116,9 +116,6 @@ export default function ReportsPage() {
       <div className="relative mx-auto flex max-w-[1920px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
-              Reports
-            </h1>
             {crm.source === "api" ? (
               <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-700">
                 Live CRM
