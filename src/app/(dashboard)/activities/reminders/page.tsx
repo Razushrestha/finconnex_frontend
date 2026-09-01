@@ -417,11 +417,16 @@ export default function RemindersPage() {
           />
         ) : null}
 
-        <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+        <div
+          className={cn(
+            "min-h-0 min-w-0 flex-1",
+            view === "kanban" ? "overflow-hidden" : "overflow-auto",
+          )}
+        >
             {view === "timeline" ? (
               <RemindersTimelineView reminders={visibleReminders} />
             ) : view === "kanban" ? (
-              <div className={cn(KANBAN_BOARD_ROW, "min-h-[420px]")}>
+              <div className={KANBAN_BOARD_ROW}>
                 {visibleColumns.map((col) => {
                   const isOver = overCol === col.id;
                   const isCollapsed = collapsed.has(col.id);

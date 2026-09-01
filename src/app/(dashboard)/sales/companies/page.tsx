@@ -338,7 +338,7 @@ export default function CompaniesPage() {
         </div>
       ) : null}
 
-      <div className="mt-3 flex items-start gap-4">
+      <div className="mt-3 flex min-h-0 flex-1 items-stretch gap-4 overflow-hidden">
         {isFilterOpen && (
           <div className="sticky top-6">
             <FilterCompaniesPanel
@@ -349,7 +349,7 @@ export default function CompaniesPage() {
           </div>
         )}
 
-        <div key={viewMode} className={cn("flex-1 overflow-x-auto", viewEnter)}>
+        <div key={viewMode} className={cn("min-h-0 min-w-0 flex-1 overflow-hidden", viewEnter)}>
           {viewMode === "kanban" ? (
             <CompaniesKanbanBoard
               filters={filters}

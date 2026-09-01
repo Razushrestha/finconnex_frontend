@@ -498,7 +498,7 @@ export default function DealsPage() {
         />
       )}
 
-      <div className="mt-3 flex items-start gap-4">
+      <div className="mt-3 flex min-h-0 flex-1 items-stretch gap-4 overflow-hidden">
         {isFilterOpen && (
           <div className="sticky top-6">
             <FilterDealsPanel
@@ -512,7 +512,7 @@ export default function DealsPage() {
 
         <div
           key={`${viewMode}-${activePipeline}`}
-          className={cn("flex-1 overflow-x-auto", viewEnter)}
+          className={cn("min-h-0 min-w-0 flex-1 overflow-hidden", viewEnter)}
         >
           {viewMode === "kanban" ? (
             <DealsKanbanBoard

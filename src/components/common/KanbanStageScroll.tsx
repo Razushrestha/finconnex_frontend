@@ -13,7 +13,7 @@ export function KanbanStageScroll({
   footer?: ReactNode;
 }) {
   return (
-    <div className="relative min-h-0 flex-1">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col">
       <div className={cn(KANBAN_STAGE_SCROLL, className)} {...props}>
         {children}
       </div>
