@@ -26,12 +26,40 @@ import { saveLeadColumns, upsertLeadFromCard } from "@/lib/leads/store";
 import { emitRulesChange } from "@/lib/rules/storage";
 import type { LeadCardData, LeadSource } from "@/lib/leads/types";
 import { uiSourceToCrm, uiStatusToCrm } from "@/lib/leads/api/map";
+import { listCrmWorkspaceMembers } from "@/lib/workspace-members/api";
 
 type Envelope<T> = {
   statusCode?: number;
-  message?: string;
+  message?: string | string[];
   data?: T;
 };
+
+function compactBody(input: Record<string, unknown>) {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined || value === null || value === "") continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+function crmErrorMessage(json: unknown, status: number): string {
+  const raw =
+    json && typeof json === "object" && "message" in json
+      ? (json as Envelope<unknown>).message
+      : undefined;
+  const text = Array.isArray(raw)
+    ? raw.map(String).filter(Boolean).join("; ")
+    : raw != null
+      ? String(raw)
+      : "";
+  if (status >= 500) {
+    return text && text !== "Internal Server Error"
+      ? text
+      : "The CRM could not save this lead. Try New Lead as the stage, or save again.";
+  }
+  return text || `Lead request failed (${status})`;
+}
 
 let sessionOverride: CrmSession | null = null;
 let fetchImpl: typeof fetch = fetch;
@@ -77,11 +105,7 @@ async function crmRequest<T>(
   }
 
   if (!res.ok) {
-    const message =
-      json && typeof json === "object" && "message" in json
-        ? String((json as Envelope<T>).message)
-        : `Lead request failed (${res.status})`;
-    throw new Error(message);
+    throw new Error(crmErrorMessage(json, res.status));
   }
 
   if (json && typeof json === "object" && "data" in json) {
@@ -153,16 +177,57 @@ export async function fetchLeadById(id: string): Promise<CrmLead | null> {
   return crmRequest<CrmLead>(session, `/v1/leads/${id}`);
 }
 
+async function resolveLeadOwnerId(preferred?: string): Promise<string | undefined> {
+  if (preferred && isUuid(preferred)) return preferred;
+  const session = await resolveSession();
+  const jwt = session ? currentCrmUserId(session.accessToken) : undefined;
+  try {
+    const members = await listCrmWorkspaceMembers();
+    const hint = preferred?.trim().toLowerCase();
+    const match =
+      members.find((m) => m.userId === jwt || m.id === jwt) ??
+      (hint
+        ? members.find((m) => m.name.trim().toLowerCase() === hint)
+        : undefined) ??
+      members.find((m) => isUuid(m.userId));
+    if (match && isUuid(match.userId)) return match.userId;
+    if (match && isUuid(match.id)) return match.id;
+  } catch {
+    /* directory optional */
+  }
+  return jwt;
+}
+
 export async function createCrmLead(
   input: CrmCreateLeadInput,
+  ownerHint?: string,
 ): Promise<CrmLead | null> {
   const session = await resolveSession();
   if (!session) return null;
-  const ownerId = input.ownerId ?? currentCrmUserId(session.accessToken);
-  return crmRequest<CrmLead>(session, "/v1/leads", {
-    method: "POST",
-    body: JSON.stringify({ ...input, ownerId }),
-  });
+  const ownerId = await resolveLeadOwnerId(input.ownerId ?? ownerHint);
+  const full = compactBody({ ...input, ownerId });
+  try {
+    return await crmRequest<CrmLead>(session, "/v1/leads", {
+      method: "POST",
+      body: JSON.stringify(full),
+    });
+  } catch (err) {
+    const minimal = compactBody({
+      firstName: input.firstName,
+      lastName: input.lastName,
+      email: input.email,
+      phone: input.phone,
+      companyName: input.companyName,
+      source: input.source,
+      notes: input.notes,
+      ownerId,
+    });
+    if (JSON.stringify(minimal) === JSON.stringify(full)) throw err;
+    return crmRequest<CrmLead>(session, "/v1/leads", {
+      method: "POST",
+      body: JSON.stringify(minimal),
+    });
+  }
 }
 
 export async function updateCrmLead(
@@ -424,18 +489,29 @@ export async function syncCreatedLead(input: {
   estimatedValue?: string;
   notes?: string;
   ownerId?: string;
+  ownerName?: string;
   pipelineStage?: string;
 }): Promise<LeadCardData | null> {
-  const created = await createCrmLead(toCrmCreateBody(input));
+  const created = await createCrmLead(
+    toCrmCreateBody(input),
+    input.ownerId ?? input.ownerName,
+  );
   if (!created) return null;
   let lead = created;
   if (input.pipelineStage) {
     const desired = pipelineStageToCrmStatus(input.pipelineStage);
     if (desired !== "NEW") {
-      lead = (await changeCrmLeadStatus(created.id, desired)) ?? created;
+      try {
+        lead = (await changeCrmLeadStatus(created.id, desired)) ?? created;
+      } catch {
+        lead = created;
+      }
     }
   }
   const card = mapCrmLeadToCard(lead);
+  if (input.ownerName && !isUuid(input.ownerName)) {
+    card.owner = input.ownerName;
+  }
   upsertLeadFromCard(card);
   emitRulesChange("all");
   return card;

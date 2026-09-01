@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   User,
@@ -26,6 +26,7 @@ import {
   syncCreatedLead,
 } from "@/lib/leads/api";
 import { isUuid } from "@/lib/activity-timeline/auth";
+import { listCrmWorkspaceMembers } from "@/lib/workspace-members/api";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import {
   isMortgagePipelineStage,
@@ -110,6 +111,37 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
     Partial<Record<keyof LeadFormState, string>>
   >({});
   const [submitted, setSubmitted] = useState(false);
+  const [ownerOptions, setOwnerOptions] = useState<
+    Array<{ id: string; name: string }>
+  >(() => OWNERS.map((name) => ({ id: name, name })));
+
+  useEffect(() => {
+    let cancelled = false;
+    void listCrmWorkspaceMembers()
+      .then((members) => {
+        const live = members.filter(
+          (m) => m.status !== "Inactive" && (isUuid(m.userId) || isUuid(m.id)),
+        );
+        if (cancelled || !live.length) return;
+        const options = live.map((m) => ({
+          id: isUuid(m.userId) ? m.userId : m.id,
+          name: m.name,
+        }));
+        setOwnerOptions(options);
+        setForm((prev) => {
+          const match = options.find(
+            (o) => o.id === prev.owner || o.name === prev.owner,
+          );
+          return { ...prev, owner: match?.id ?? options[0]?.id ?? prev.owner };
+        });
+      })
+      .catch(() => {
+        /* keep demo owner names */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function update<K extends keyof LeadFormState>(
     key: K,
@@ -146,6 +178,8 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
       return;
     }
     const pipelineStage = form.pipelineStage || "New Lead";
+    const ownerLabel =
+      ownerOptions.find((o) => o.id === form.owner)?.name ?? form.owner;
     try {
       const live = await syncCreatedLead({
         firstName: form.firstName.trim(),
@@ -158,6 +192,8 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
         companySize: form.companySize,
         jobTitle: form.jobTitle,
         ownerId: isUuid(form.owner) ? form.owner : undefined,
+        ownerName:
+          ownerOptions.find((o) => o.id === form.owner)?.name ?? form.owner,
         source: form.leadSource || "Website",
         productInterest: form.productInterest,
         budgetRange: form.budgetRange,
@@ -166,9 +202,9 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
         pipelineStage,
       });
       if (live) {
-        logCreate("sales.leads", form.owner, live.id, live.name);
+        logCreate("sales.leads", ownerLabel, live.id, live.name);
         notifyOwnerAssigned({
-          owner: form.owner,
+          owner: ownerLabel,
           entityLabel: `Lead ${live.name}`,
           relatedTo: live.name,
           relatedHref: "/sales/leads",
@@ -212,9 +248,9 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
     }
     const card = result.data;
     const label = card.name;
-    logCreate("sales.leads", form.owner, card.id, label);
+    logCreate("sales.leads", ownerLabel, card.id, label);
     notifyOwnerAssigned({
-      owner: form.owner,
+      owner: ownerLabel,
       entityLabel: `Lead ${label}`,
       relatedTo: label,
       relatedHref: "/sales/leads",
@@ -406,9 +442,9 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
             value={form.owner}
             onChange={(e) => update("owner", e.target.value)}
           >
-            {OWNERS.map((o) => (
-              <option key={o} value={o}>
-                {o}
+            {ownerOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name}
               </option>
             ))}
           </select>
