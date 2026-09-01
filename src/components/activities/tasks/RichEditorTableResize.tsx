@@ -85,6 +85,7 @@ export function RichEditorTableResize({
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
+    const root = editor;
 
     function borderHit(targetTable: HTMLTableElement, x: number, y: number) {
       const rows = [...targetTable.rows];
@@ -107,12 +108,12 @@ export function RichEditorTableResize({
     function onMoveCursor(event: PointerEvent) {
       if (dragRef.current) return;
       const targetTable = (event.target as HTMLElement | null)?.closest?.("table");
-      if (!targetTable || !editor.contains(targetTable)) {
-        if (editor.style.cursor) editor.style.cursor = "";
+      if (!targetTable || !root.contains(targetTable)) {
+        if (root.style.cursor) root.style.cursor = "";
         return;
       }
       const hit = borderHit(targetTable, event.clientX, event.clientY);
-      editor.style.cursor = hit?.kind === "col" ? "col-resize" : hit?.kind === "row" ? "row-resize" : "";
+      root.style.cursor = hit?.kind === "col" ? "col-resize" : hit?.kind === "row" ? "row-resize" : "";
     }
 
     function onPointerDown(event: PointerEvent) {
@@ -120,7 +121,7 @@ export function RichEditorTableResize({
       const node = event.target as HTMLElement | null;
       if (node?.closest?.("[data-table-resize]")) return;
       const next = node?.closest?.("table");
-      if (!next || !editor.contains(next)) {
+      if (!next || !root.contains(next)) {
         setTable(null);
         return;
       }
@@ -134,18 +135,18 @@ export function RichEditorTableResize({
     function onDocDown(event: PointerEvent) {
       const node = event.target as HTMLElement | null;
       if (node?.closest?.("[data-table-resize]")) return;
-      if (editor.contains(node)) return;
+      if (root.contains(node)) return;
       setTable(null);
     }
 
-    editor.addEventListener("pointerdown", onPointerDown);
-    editor.addEventListener("pointermove", onMoveCursor);
+    root.addEventListener("pointerdown", onPointerDown);
+    root.addEventListener("pointermove", onMoveCursor);
     document.addEventListener("pointerdown", onDocDown);
     return () => {
-      editor.removeEventListener("pointerdown", onPointerDown);
-      editor.removeEventListener("pointermove", onMoveCursor);
+      root.removeEventListener("pointerdown", onPointerDown);
+      root.removeEventListener("pointermove", onMoveCursor);
       document.removeEventListener("pointerdown", onDocDown);
-      if (editor.style.cursor) editor.style.cursor = "";
+      if (root.style.cursor) root.style.cursor = "";
     };
   }, [editorRef]);
 

@@ -29,6 +29,11 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("theme");if(t!=="dark"&&t!=="light")t="light";document.documentElement.classList.add(t);document.documentElement.style.colorScheme=t;}catch(e){document.documentElement.classList.add("light");document.documentElement.style.colorScheme="light";}})();`,
+          }}
+        />
         <Toaster />
         <Providers>{children}</Providers>
       </body>

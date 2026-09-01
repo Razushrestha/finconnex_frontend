@@ -730,8 +730,11 @@ export function addTaskActivityNote(
 ): Task | null {
   const trimmed = body.trim();
   if (!trimmed) return null;
+  const found = findTaskById(taskId);
+  if (!found) return null;
 
-  const author = getRulesActor().name || "John Smith";
+  const actor = getRulesActor();
+  const author = actor.name || "John Smith";
   const note: TaskActivityNote = {
     id: newRulesId("task-note"),
     body: trimmed,
@@ -758,8 +761,8 @@ export function addTaskActivityNote(
       action: "edit",
       module: "activities.tasks",
       recordId: taskId,
-      recordLabel: updated.title,
-      actor,
+      recordLabel: found.task.title,
+      actor: actor.name,
       summary: "Added note",
       changes: [{ field: "note", from: "", to: trimmed }],
       meta: { kind: "note" },

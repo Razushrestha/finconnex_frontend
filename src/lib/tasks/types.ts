@@ -141,7 +141,6 @@ export function createTaskReminder(
 ): TaskReminder {
   const id = patch.id ?? `tr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   return {
-    id,
     type: REMINDER_TYPES[0],
     date: "",
     time: "13:00",
@@ -155,7 +154,6 @@ export function createTaskReminder(
     notify: "Email",
     status: "Pending",
     occurrenceIndex: 1,
-    sequenceId: id,
     ...patch,
     id,
     sequenceId: patch.sequenceId ?? id,

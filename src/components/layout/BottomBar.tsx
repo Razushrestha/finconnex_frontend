@@ -238,7 +238,7 @@ export function BottomBar() {
       setVoiceOpen(false);
       setNotesOpen(false);
       setPhoneOpen(false);
-      setPanel("quick-add");
+      setPanel("quick");
       return;
     }
   }

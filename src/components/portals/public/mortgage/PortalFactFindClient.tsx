@@ -43,7 +43,6 @@ import {
   hasThreeYearResidence,
   incomesAnnualTotal,
   isFactFindScreenComplete,
-  isUnemployed,
   liabilitiesBalanceTotal,
   monthsSince,
   normalizePropertyUsage,
@@ -228,6 +227,7 @@ export function PortalFactFindClient({ slug }: { slug: string }) {
   }
 
   function goNext() {
+    if (!mortgage) return;
     if (!isFactFindScreenComplete(mortgage.factFind, screen.fields)) {
       setShowErrors(true);
       window.setTimeout(() => {
@@ -378,30 +378,7 @@ export function PortalFactFindClient({ slug }: { slug: string }) {
                 disabled={locked}
                 onChange={setAnswer}
               />
-            ) : (
-              <div className="mt-7 space-y-6">
-                {screen.fields.map((id) => {
-                  const field = factFindFieldById(id);
-                  if (!field) return null;
-                  if (
-                    isUnemployed(mortgage.factFind) &&
-                    (id === "employer" || id === "occupation" || id === "startDate")
-                  ) {
-                    return null;
-                  }
-                  return (
-                    <FieldControl
-                      key={id}
-                      field={field}
-                      value={valueOf(id)}
-                      disabled={locked}
-                      showErrors={showErrors}
-                      onChange={(next) => setAnswer(id, next)}
-                    />
-                  );
-                })}
-              </div>
-            )}
+            ) : null}
 
             <div className="mt-10 flex items-center justify-between gap-3">
               <button

@@ -1,15 +1,10 @@
 "use client";
-import { ThemeProvider } from "next-themes";
+import { ThemeProvider } from "@/components/theme/theme-provider";
 import { PersistenceBootstrap } from "@/components/persistence/PersistenceBootstrap";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="light"
-      enableSystem={false}
-      disableTransitionOnChange
-    >
+    <ThemeProvider>
       <PersistenceBootstrap>{children}</PersistenceBootstrap>
     </ThemeProvider>
   );

@@ -121,7 +121,7 @@ export function PortalMortgageDocumentsClient({ slug }: { slug: string }) {
   }
 
   function pickFile(id: string) {
-    if (!canUpload) return;
+    if (!canUpload || !mortgage) return;
     const current = mortgage.documents.find((d) => d.id === id);
     if (!current || current.notApplicable) return;
     if (!canReplaceDocument(current.status)) {
@@ -137,7 +137,7 @@ export function PortalMortgageDocumentsClient({ slug }: { slug: string }) {
     const id = uploadingId;
     e.target.value = "";
     setUploadingId(null);
-    if (!picked.length || !id) return;
+    if (!picked.length || !id || !mortgage) return;
     const current = mortgage.documents.find((d) => d.id === id);
     if (!current || !canReplaceDocument(current.status) || current.notApplicable) {
       flash("This document is approved and cannot be changed.");
@@ -209,7 +209,7 @@ export function PortalMortgageDocumentsClient({ slug }: { slug: string }) {
   }
 
   function removeFile(id: string, fileId: string) {
-    if (!canUpload) return;
+    if (!canUpload || !mortgage) return;
     const current = mortgage.documents.find((d) => d.id === id);
     if (!current || !canReplaceDocument(current.status)) {
       flash("This document is approved and cannot be changed.");
@@ -244,7 +244,7 @@ export function PortalMortgageDocumentsClient({ slug }: { slug: string }) {
   }
 
   function toggleNotApplicable(id: string, checked: boolean, reason = "") {
-    if (!canUpload) return;
+    if (!canUpload || !mortgage) return;
     const current = mortgage.documents.find((d) => d.id === id);
     if (!current || !canReplaceDocument(current.status)) return;
     const stamp = formatPortalStamp();

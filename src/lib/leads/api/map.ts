@@ -69,14 +69,14 @@ export function crmStatusToPipelineStage(status: string): MortgagePipelineStage 
     case "CONTACTED":
       return "In Conversation";
     case "QUALIFIED":
-      return "Waiting on Documents";
+      return "Waiting on Docs";
     case "NURTURE":
-      return "Documents Received";
+      return "Document Received";
     case "CONVERTED":
-      return "Settled";
+      return "Closed Won";
     case "UNQUALIFIED":
     case "LOST":
-      return "Lost";
+      return "Closed Lost";
     default:
       return "New Lead";
   }
@@ -89,13 +89,17 @@ export function pipelineStageToCrmStatus(stage: string): CrmLeadStatus {
     case "In Conversation":
       return "CONTACTED";
     case "Waiting on Documents":
+    case "Waiting on Docs":
     case "Processing":
       return "QUALIFIED";
     case "Documents Received":
+    case "Document Received":
       return "NURTURE";
     case "Settled":
+    case "Closed Won":
       return "CONVERTED";
     case "Lost":
+    case "Closed Lost":
       return "LOST";
     default:
       return "NEW";
