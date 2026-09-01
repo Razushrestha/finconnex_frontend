@@ -9,7 +9,7 @@ describe("Reports API smoke (CI)", () => {
     smokeReportsWiring();
   });
 
-  it("mocks all 8 Swagger routes", async () => {
+  it("mocks report routes including email and share", async () => {
     await smokeReportsMock();
   });
 

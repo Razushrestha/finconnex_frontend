@@ -15,13 +15,9 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import {
-  REPORT_DATA_SOURCES,
   REPORT_DATE_RANGES,
-  REPORT_FILTER_PRESETS,
-  REPORT_GROUP_BY,
   REPORT_OWNERS,
   REPORT_SCHEDULES,
-  REPORT_SORT_BY,
   REPORT_TYPE_STYLE,
   REPORT_TYPES,
   appendReportAudit,
@@ -29,11 +25,20 @@ import {
   formatReportDate,
   nextReportIds,
   upsertReport,
+  type ReportFilter,
   type ReportSchedule,
   type ReportStatus,
   type ReportType,
   type SavedReport,
 } from "@/lib/reports/types";
+import {
+  REPORT_DATA_SOURCE_OPTIONS,
+  REPORT_FILTER_OPERATORS,
+  REPORT_TYPE_DEFAULT_SOURCE,
+  fieldsForSource,
+  formatFilterLabel,
+  sortOptionsForSource,
+} from "@/lib/reports/catalog";
 import {
   createCrmReport,
   persistRemoteReport,
@@ -86,13 +91,20 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [type, setType] = useState<ReportType>("Lead");
-  const [dataSource, setDataSource] = useState<string>(REPORT_DATA_SOURCES[0]);
+  const [dataSource, setDataSource] = useState<string>(
+    REPORT_TYPE_DEFAULT_SOURCE.Lead,
+  );
   const [dateRange, setDateRange] = useState<string>(REPORT_DATE_RANGES[1]);
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
-  const [filters, setFilters] = useState("");
-  const [groupBy, setGroupBy] = useState<string>(REPORT_GROUP_BY[0]);
-  const [sortBy, setSortBy] = useState<string>(REPORT_SORT_BY[0]);
+  const [filterField, setFilterField] = useState("");
+  const [filterOperator, setFilterOperator] =
+    useState<ReportFilter["operator"]>("eq");
+  const [filterValue, setFilterValue] = useState("");
+  const sourceFields = fieldsForSource(dataSource);
+  const sortOptions = sortOptionsForSource(dataSource);
+  const [groupBy, setGroupBy] = useState<string>(sourceFields[0]?.id ?? "");
+  const [sortBy, setSortBy] = useState<string>(sortOptions[0]?.id ?? "");
   const [schedule, setSchedule] = useState<ReportSchedule>("None");
   const [createdBy, setCreatedBy] = useState<string>(REPORT_OWNERS[0]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -127,7 +139,10 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
       dateRange,
       customFrom: dateRange === "Custom" ? customFrom : undefined,
       customTo: dateRange === "Custom" ? customTo : undefined,
-      filters: filters.trim() || undefined,
+      filters: formatFilterLabel(filterField, filterOperator, filterValue),
+      filterField: filterField || undefined,
+      filterOperator: filterField ? filterOperator : undefined,
+      filterValue: filterValue.trim() || undefined,
       groupBy: groupBy || undefined,
       sortBy: sortBy || undefined,
       schedule,
@@ -161,6 +176,9 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
             customFrom: draft.customFrom,
             customTo: draft.customTo,
             filters: draft.filters,
+            filterField: draft.filterField,
+            filterOperator: draft.filterOperator,
+            filterValue: draft.filterValue,
             groupBy: draft.groupBy,
             sortBy: draft.sortBy,
             schedule,
@@ -182,7 +200,7 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
     setSaving(false);
     if (createAnother) {
       setName("");
-      setFilters("");
+      setFilterValue("");
       setErrors({});
       return;
     }
@@ -270,7 +288,16 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
                     <select
                       className={selectSm(true)}
                       value={type}
-                      onChange={(e) => setType(e.target.value as ReportType)}
+                      onChange={(e) => {
+                        const next = e.target.value as ReportType;
+                        setType(next);
+                        const source = REPORT_TYPE_DEFAULT_SOURCE[next];
+                        setDataSource(source);
+                        const fields = fieldsForSource(source);
+                        setGroupBy(fields[0]?.id ?? "");
+                        setSortBy(sortOptionsForSource(source)[0]?.id ?? "");
+                        setFilterField("");
+                      }}
                     >
                       {REPORT_TYPES.map((t) => (
                         <option key={t} value={t}>
@@ -290,11 +317,18 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
                     <select
                       className={selectSm(true)}
                       value={dataSource}
-                      onChange={(e) => setDataSource(e.target.value)}
+                      onChange={(e) => {
+                        const source = e.target.value;
+                        setDataSource(source);
+                        const fields = fieldsForSource(source);
+                        setGroupBy(fields[0]?.id ?? "");
+                        setSortBy(sortOptionsForSource(source)[0]?.id ?? "");
+                        setFilterField("");
+                      }}
                     >
-                      {REPORT_DATA_SOURCES.map((d) => (
-                        <option key={d} value={d}>
-                          {d}
+                      {REPORT_DATA_SOURCE_OPTIONS.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.label}
                         </option>
                       ))}
                     </select>
@@ -388,9 +422,9 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
                       onChange={(e) => setGroupBy(e.target.value)}
                     >
                       <option value=""></option>
-                      {REPORT_GROUP_BY.map((g) => (
-                        <option key={g} value={g}>
-                          {g}
+                      {sourceFields.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.label}
                         </option>
                       ))}
                     </select>
@@ -405,9 +439,9 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
                       onChange={(e) => setSortBy(e.target.value)}
                     >
                       <option value=""></option>
-                      {REPORT_SORT_BY.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
+                      {sortOptions.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.label}
                         </option>
                       ))}
                     </select>
@@ -417,22 +451,51 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
                 <CompactField
                   label="Filters"
                   className="sm:col-span-2 xl:col-span-3"
-                  hint="Pick a preset or type a custom expression"
+                  hint="Optional field + operator + value against the selected source"
                 >
-                  <InputShell icon={Filter}>
-                    <input
-                      className={inputSm(true)}
-                      list="report-filter-presets"
-                      value={filters}
-                      onChange={(e) => setFilters(e.target.value)}
-                      placeholder="e.g. Status ≠ Unqualified"
-                    />
-                  </InputShell>
-                  <datalist id="report-filter-presets">
-                    {REPORT_FILTER_PRESETS.map((f) => (
-                      <option key={f} value={f} />
-                    ))}
-                  </datalist>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <InputShell icon={Filter}>
+                      <select
+                        className={selectSm(true)}
+                        value={filterField}
+                        onChange={(e) => setFilterField(e.target.value)}
+                      >
+                        <option value="">No filter</option>
+                        {sourceFields.map((field) => (
+                          <option key={field.id} value={field.id}>
+                            {field.label}
+                          </option>
+                        ))}
+                      </select>
+                    </InputShell>
+                    <InputShell>
+                      <select
+                        className={selectSm(false)}
+                        value={filterOperator}
+                        onChange={(e) =>
+                          setFilterOperator(
+                            e.target.value as ReportFilter["operator"],
+                          )
+                        }
+                        disabled={!filterField}
+                      >
+                        {REPORT_FILTER_OPERATORS.map((op) => (
+                          <option key={op.id} value={op.id}>
+                            {op.label}
+                          </option>
+                        ))}
+                      </select>
+                    </InputShell>
+                    <InputShell>
+                      <input
+                        className={inputSm(false)}
+                        value={filterValue}
+                        onChange={(e) => setFilterValue(e.target.value)}
+                        placeholder="Value"
+                        disabled={!filterField}
+                      />
+                    </InputShell>
+                  </div>
                 </CompactField>
               </div>
             </div>
@@ -465,7 +528,10 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
                   <div className="flex justify-between gap-2">
                     <span className="text-slate-400">Source</span>
                     <span className="font-semibold text-slate-700">
-                      {dataSource}
+                      {
+                        REPORT_DATA_SOURCE_OPTIONS.find((d) => d.id === dataSource)
+                          ?.label ?? dataSource
+                      }
                     </span>
                   </div>
                   <div className="flex justify-between gap-2">

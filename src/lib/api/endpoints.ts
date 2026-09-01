@@ -604,13 +604,10 @@ export const ENDPOINT_CATALOG = [
   { method: "PATCH", path: "/reports/:id", module: "reports" },
   { method: "DELETE", path: "/reports/:id", module: "reports", notes: "Soft-delete" },
   { method: "POST", path: "/reports/:id/run", module: "reports" },
-  { method: "GET", path: "/reports/:id/export", module: "reports" },
-  {
-    method: "POST",
-    path: "/reports/:id/template",
-    module: "reports",
-    notes: "Save as reusable template",
-  },
+  { method: "GET", path: "/reports/:id/export", module: "reports", notes: "PDF, Excel, CSV" },
+  { method: "POST", path: "/reports/:id/template", module: "reports", notes: "Save as reusable template" },
+  { method: "POST", path: "/reports/:id/email", module: "reports", notes: "Email report export" },
+  { method: "POST", path: "/reports/:id/share", module: "reports", notes: "Share with team or role" },
 
   // Calculator history (JWT)
   { method: "GET", path: "/calculations", module: "calculations", notes: "List saved calculator results" },

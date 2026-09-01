@@ -26,6 +26,12 @@ export interface ReportRow {
   secondary?: string;
 }
 
+export type ReportFilter = {
+  field: string;
+  operator: "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "contains";
+  value: string;
+};
+
 export interface SavedReport {
   id: string;
   reportId: string;
@@ -38,6 +44,9 @@ export interface SavedReport {
   customFrom?: string;
   customTo?: string;
   filters?: string;
+  filterField?: string;
+  filterOperator?: ReportFilter["operator"];
+  filterValue?: string;
   groupBy?: string;
   sortBy?: string;
   schedule: ReportSchedule;
@@ -75,15 +84,7 @@ export const REPORT_STATUSES: ReportStatus[] = [
   "Running",
 ];
 
-export const REPORT_DATA_SOURCES = [
-  "Leads",
-  "Deals",
-  "Activities",
-  "Invoices",
-  "Campaigns",
-  "Support Tickets",
-  "Payments",
-] as const;
+export { REPORT_DATA_SOURCES } from "@/lib/reports/catalog";
 
 export const REPORT_DATE_RANGES = [
   "Last 7 days",
@@ -372,7 +373,7 @@ export const savedReports: SavedReport[] = [
     name: "Monthly lead funnel",
     type: "Lead",
     status: "Ready",
-    dataSource: "Leads",
+    dataSource: "leads",
     dateRange: "Last 30 days",
     filters: "Status ≠ Unqualified",
     groupBy: "Status",
@@ -395,7 +396,7 @@ export const savedReports: SavedReport[] = [
     name: "Q3 revenue collected",
     type: "Revenue",
     status: "Scheduled",
-    dataSource: "Invoices",
+    dataSource: "invoices",
     dateRange: "This quarter",
     groupBy: "Owner",
     sortBy: "Collected desc",
@@ -415,7 +416,7 @@ export const savedReports: SavedReport[] = [
     name: "Pipeline by stage",
     type: "Pipeline",
     status: "Ready",
-    dataSource: "Deals",
+    dataSource: "deals",
     dateRange: "This year",
     groupBy: "Stage",
     schedule: "None",
@@ -434,7 +435,7 @@ export const savedReports: SavedReport[] = [
     name: "Support resolution draft",
     type: "Custom",
     status: "Draft",
-    dataSource: "Support Tickets",
+    dataSource: "tickets",
     dateRange: "Last 30 days",
     filters: "Status = Resolved OR Closed",
     schedule: "None",
@@ -456,7 +457,7 @@ export const savedReports: SavedReport[] = [
     name: "Activity load by owner",
     type: "Activity",
     status: "Ready",
-    dataSource: "Activities",
+    dataSource: "activities",
     dateRange: "Last 7 days",
     groupBy: "Assigned To",
     schedule: "Daily",

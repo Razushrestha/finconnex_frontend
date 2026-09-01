@@ -9,6 +9,7 @@ import { bindCrmSession, getCrmApiBaseUrl } from "@/lib/activity-timeline";
 import {
   createCrmReport,
   deleteCrmReport,
+  emailCrmReport,
   exportCrmReport,
   getCrmReport,
   listCrmReports,
@@ -16,6 +17,8 @@ import {
   reportsPath,
   runCrmReport,
   saveCrmReportAsTemplate,
+  shareCrmReport,
+  toCreateReportBody,
   updateCrmReport,
 } from "@/lib/reports/api";
 import {
@@ -44,6 +47,8 @@ const LIVE_ROUTES: Array<{ method: string; path: string }> = [
   { method: "POST", path: `/v1/reports/${ID}/run` },
   { method: "GET", path: `/v1/reports/${ID}/export` },
   { method: "POST", path: `/v1/reports/${ID}/template` },
+  { method: "POST", path: `/v1/reports/${ID}/email` },
+  { method: "POST", path: `/v1/reports/${ID}/share` },
 ];
 
 function repoRoot() {
@@ -67,6 +72,8 @@ export function smokeReportsWiring() {
     "runCrmReport",
     "exportCrmReport",
     "saveCrmReportAsTemplate",
+    "emailCrmReport",
+    "shareCrmReport",
   ]) {
     if (!api.includes(`export async function ${name}`)) {
       fail(`reports client missing ${name}`);
@@ -83,6 +90,8 @@ export function smokeReportsWiring() {
     'path: "/reports/:id/run"',
     'path: "/reports/:id/export"',
     'path: "/reports/:id/template"',
+    'path: "/reports/:id/email"',
+    'path: "/reports/:id/share"',
   ]) {
     if (!catalog.includes(fragment)) {
       fail(`endpoint catalog missing ${fragment}`);
@@ -114,6 +123,8 @@ export function smokeReportsWiring() {
     "saveCrmReportAsTemplate",
     "deleteCrmReport",
     "updateCrmReport",
+    "emailCrmReport",
+    "shareCrmReport",
   ]) {
     if (!detail.includes(name)) {
       fail(`report detail does not call ${name}`);
@@ -136,6 +147,30 @@ export function smokeReportsWiring() {
   if (normalized.type !== "Lead") {
     fail("normalizeReport did not map type LEAD");
   }
+
+  const body = toCreateReportBody({
+    name: "Monthly lead funnel",
+    type: "Lead",
+    dataSource: "Leads",
+    dateRange: "Last 30 days",
+    filterField: "status",
+    filterOperator: "neq",
+    filterValue: "UNQUALIFIED",
+    groupBy: "Status",
+    sortBy: "Count desc",
+    schedule: "None",
+    status: "Ready",
+  });
+  if (body.dataSource !== "leads") fail("toCreateReportBody did not normalize source");
+  if (!body.dateRange || typeof body.dateRange !== "object") {
+    fail("toCreateReportBody must send start/end dateRange");
+  }
+  if (body.schedule) fail("ad hoc reports must omit schedule");
+  const filters = body.filters as Array<{ field: string }> | undefined;
+  if (!filters?.[0] || filters[0].field !== "status") {
+    fail("toCreateReportBody must send structured filters");
+  }
+  if (body.groupBy !== "status") fail("toCreateReportBody must map groupBy to field id");
 }
 
 export async function smokeReportsMock() {
@@ -148,9 +183,18 @@ export async function smokeReportsMock() {
     const parsed = new URL(String(input));
     hits.push(`${method} ${parsed.pathname}`);
     if (parsed.pathname.endsWith("/export")) {
-      return new Response(new Blob(["id,name\n1,funnel"], { type: "text/csv" }), {
-        status: 200,
-      });
+      return new Response(
+        JSON.stringify({
+          statusCode: 200,
+          data: {
+            format: "csv",
+            filename: "funnel.csv",
+            contentType: "text/csv",
+            data: Buffer.from("id,name\n1,funnel").toString("base64"),
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
     }
     return new Response(
       JSON.stringify({
@@ -178,6 +222,8 @@ export async function smokeReportsMock() {
     await runCrmReport(ID);
     await exportCrmReport(ID);
     await saveCrmReportAsTemplate(ID);
+    await emailCrmReport(ID, "finance@company.com");
+    await shareCrmReport(ID, "Finance");
     await deleteCrmReport(ID);
 
     const expected = [
@@ -188,6 +234,8 @@ export async function smokeReportsMock() {
       `POST ${reportsPath(`/${ID}/run`)}`,
       `GET ${reportsPath(`/${ID}/export`)}`,
       `POST ${reportsPath(`/${ID}/template`)}`,
+      `POST ${reportsPath(`/${ID}/email`)}`,
+      `POST ${reportsPath(`/${ID}/share`)}`,
       `DELETE ${reportsPath(`/${ID}`)}`,
     ];
     for (const hit of expected) {
@@ -296,7 +344,7 @@ export async function runReportsSmoke() {
 
   console.log("\n2) Mock fetch…");
   await smokeReportsMock();
-  console.log("   OK — all 8 Swagger routes hit");
+  console.log("   OK — all report routes hit");
 
   console.log("\n3) Live CRM probe (decoy 404 vs reports 401)…");
   const live = await smokeReportsLive();

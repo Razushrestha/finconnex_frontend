@@ -3,12 +3,21 @@ import {
   ensureCrmSession,
   isUuid,
 } from "@/lib/activity-timeline/auth";
-import { crmErrorMessage, crmFetch, unwrapCrmData } from "@/lib/crm/request";
+import { crmErrorMessage, crmFetch } from "@/lib/crm/request";
+import {
+  formatFilterLabel,
+  inferDateRangePreset,
+  normalizeDataSourceId,
+  resolveApiDateRange,
+  toApiField,
+  toApiSortBy,
+} from "@/lib/reports/catalog";
 import {
   buildPreviewRows,
   formatReportAt,
   formatReportDate,
   upsertReport,
+  type ReportFilter,
   type ReportRow,
   type ReportSchedule,
   type ReportStatus,
@@ -132,25 +141,48 @@ function apiType(type: ReportType): string {
   return type.toUpperCase();
 }
 
-function apiStatus(status: ReportStatus): string {
-  return status.toUpperCase();
-}
-
-function apiSchedule(schedule: ReportSchedule): string {
+function apiSchedule(schedule: ReportSchedule): string | undefined {
+  if (schedule === "None") return undefined;
   return schedule.toUpperCase();
 }
 
-function mapPreviewRows(raw: unknown, type: ReportType): ReportRow[] {
+function asDefinition(raw: unknown): Record<string, unknown> {
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+  return {};
+}
+
+function parseFilters(
+  raw: unknown,
+): { field?: string; operator?: ReportFilter["operator"]; value?: string } {
+  if (Array.isArray(raw) && raw[0] && typeof raw[0] === "object") {
+    const first = raw[0] as Record<string, unknown>;
+    return {
+      field: pickStr(first.field) || undefined,
+      operator: (pickStr(first.operator, "eq") || "eq") as ReportFilter["operator"],
+      value: String(first.value ?? ""),
+    };
+  }
+  return {};
+}
+
+function rowsToPreview(raw: unknown, type: ReportType): ReportRow[] {
   const records = extractRecords(raw);
   if (!records.length) return buildPreviewRows(type);
-  return records.map((row) => ({
-    label: pickStr(row.label, row.name, row.metric, row.key, "Metric"),
-    value:
-      typeof row.value === "number" && Number.isFinite(row.value)
-        ? row.value
-        : pickStr(row.value, row.count, row.amount, row.total, "—"),
-    secondary: pickStr(row.secondary, row.note, row.period) || undefined,
-  }));
+  return records.map((row, index) => {
+    const keys = Object.keys(row).filter((key) => key !== "id");
+    const labelKey = keys.find((key) => key !== "count") ?? keys[0];
+    const valueKey = keys.includes("count") ? "count" : keys[1] ?? keys[0];
+    return {
+      label: pickStr(row.label, row.name, labelKey ? row[labelKey] : "", `Row ${index + 1}`),
+      value:
+        typeof row[valueKey] === "number" && Number.isFinite(row[valueKey])
+          ? (row[valueKey] as number)
+          : pickStr(row.value, row.count, row.amount, row.total, valueKey ? row[valueKey] : "—"),
+      secondary: pickStr(row.secondary, row.note, row.period) || undefined,
+    };
+  });
 }
 
 export function normalizeReport(
@@ -173,17 +205,39 @@ export function normalizeReport(
       : "",
     `RPT-${index + 1}`,
   );
+  const definition = asDefinition(raw.definition);
+  const filters = parseFilters(raw.filters);
+  const dataSource = normalizeDataSourceId(
+    pickStr(raw.dataSource, raw.source, raw.entity, "leads"),
+  );
+  const dateRange = inferDateRangePreset(
+    pickStr(definition.dateRangePreset) || raw.dateRange,
+  );
   return {
     id,
     reportId,
     name: pickStr(raw.name, raw.title, raw.subject, "Report"),
     type,
-    status: mapReportStatus(pickStr(raw.status, raw.state, "DRAFT")),
-    dataSource: pickStr(raw.dataSource, raw.source, raw.entity, "Leads"),
-    dateRange: pickStr(raw.dateRange, raw.range, raw.period, "Last 30 days"),
-    customFrom: pickStr(raw.customFrom, raw.from, raw.startDate) || undefined,
-    customTo: pickStr(raw.customTo, raw.to, raw.endDate) || undefined,
-    filters: pickStr(raw.filters, raw.filter) || undefined,
+    status: mapReportStatus(
+      pickStr(
+        raw.status,
+        raw.state,
+        pickStr(raw.schedule) && pickStr(raw.schedule) !== "NONE"
+          ? "SCHEDULED"
+          : "READY",
+      ),
+    ),
+    dataSource,
+    dateRange,
+    customFrom: pickStr(raw.customFrom, raw.from, definition.customFrom) || undefined,
+    customTo: pickStr(raw.customTo, raw.to, definition.customTo) || undefined,
+    filters:
+      formatFilterLabel(filters.field, filters.operator, filters.value) ||
+      pickStr(raw.filter) ||
+      undefined,
+    filterField: filters.field,
+    filterOperator: filters.operator,
+    filterValue: filters.value,
     groupBy: pickStr(raw.groupBy, raw.group) || undefined,
     sortBy: pickStr(raw.sortBy, raw.sort) || undefined,
     schedule: mapReportSchedule(pickStr(raw.schedule, raw.cadence, "NONE")),
@@ -196,12 +250,16 @@ export function normalizeReport(
       "—",
     ),
     createdAt: formatDate(raw.createdAt) || formatReportDate(),
-    lastRunAt: formatAt(raw.lastRunAt ?? raw.ranAt ?? raw.executedAt) || undefined,
-    sharedWith: pickStr(raw.sharedWith) || undefined,
-    emailedTo: pickStr(raw.emailedTo, raw.emailTo) || undefined,
+    lastRunAt:
+      formatAt(
+        definition.lastRunAt ?? raw.lastRunAt ?? raw.ranAt ?? raw.executedAt,
+      ) || undefined,
+    sharedWith:
+      pickStr(definition.sharedWith, raw.sharedWith) || undefined,
+    emailedTo: pickStr(definition.emailedTo, raw.emailedTo, raw.emailTo) || undefined,
     isTemplate: Boolean(raw.isTemplate ?? raw.template),
-    previewRows: mapPreviewRows(
-      raw.previewRows ?? raw.results ?? raw.metrics ?? raw.data,
+    previewRows: rowsToPreview(
+      raw.previewRows ?? raw.results ?? raw.metrics ?? raw.rows ?? raw.data,
       type,
     ),
     audit: [],
@@ -298,12 +356,19 @@ export async function deleteCrmReport(id: string): Promise<void> {
 }
 
 export async function runCrmReport(id: string): Promise<SavedReport | null> {
-  return asReport(
-    await reportsRequest(`/${id}/run`, {
-      method: "POST",
-      body: "{}",
-    }),
-  );
+  const payload = await reportsRequest(`/${id}/run`, {
+    method: "POST",
+    body: "{}",
+  });
+  const report = await getCrmReport(id);
+  if (!report) return asReport(payload);
+  const rec = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+  return {
+    ...report,
+    status: report.schedule === "None" ? "Ready" : "Scheduled",
+    lastRunAt: formatAt(rec.generatedAt) || formatReportAt(),
+    previewRows: rowsToPreview(rec.rows ?? rec, report.type),
+  };
 }
 
 export async function exportCrmReport(
@@ -311,6 +376,19 @@ export async function exportCrmReport(
   format?: string,
 ): Promise<Blob> {
   const q = format ? `?format=${encodeURIComponent(format)}` : "";
+  const payload = await reportsRequest(`/${id}/export${q}`);
+  if (payload && typeof payload === "object") {
+    const rec = payload as Record<string, unknown>;
+    if (typeof rec.data === "string") {
+      const binary = atob(rec.data);
+      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+      const blob = new Blob([bytes], {
+        type: pickStr(rec.contentType) || "application/octet-stream",
+      });
+      Object.assign(blob, { filename: pickStr(rec.filename) });
+      return blob;
+    }
+  }
   return reportsBlob(`/${id}/export${q}`);
 }
 
@@ -321,6 +399,29 @@ export async function saveCrmReportAsTemplate(
     await reportsRequest(`/${id}/template`, {
       method: "POST",
       body: "{}",
+    }),
+  );
+}
+
+export async function emailCrmReport(
+  id: string,
+  to: string,
+  format = "csv",
+): Promise<void> {
+  await reportsRequest(`/${id}/email`, {
+    method: "POST",
+    body: JSON.stringify({ to, format }),
+  });
+}
+
+export async function shareCrmReport(
+  id: string,
+  sharedWith: string,
+): Promise<SavedReport | null> {
+  return asReport(
+    await reportsRequest(`/${id}/share`, {
+      method: "POST",
+      body: JSON.stringify({ sharedWith }),
     }),
   );
 }
@@ -346,28 +447,54 @@ export function toCreateReportBody(input: {
   customFrom?: string;
   customTo?: string;
   filters?: string;
+  filterField?: string;
+  filterOperator?: ReportFilter["operator"];
+  filterValue?: string;
   groupBy?: string;
   sortBy?: string;
   schedule: ReportSchedule;
   status: ReportStatus;
+  sharedWith?: string;
+  reportCode?: string;
 }): Record<string, unknown> {
+  const dataSource = normalizeDataSourceId(input.dataSource);
+  const groupBy = toApiField(dataSource, input.groupBy);
+  const sortBy = toApiSortBy(dataSource, input.sortBy);
+  const field =
+    input.filterField ||
+    (input.filters ? toApiField(dataSource, input.filters.split(" ")[0]) : undefined);
+  const operator = input.filterOperator;
+  const value = input.filterValue;
+  const filters =
+    field && operator && value
+      ? [{ field, operator, value }]
+      : undefined;
+  const schedule = apiSchedule(input.schedule);
   return {
     name: input.name,
-    title: input.name,
-    type: apiType(input.type),
     reportType: apiType(input.type),
-    dataSource: input.dataSource,
-    source: input.dataSource,
-    dateRange: input.dateRange,
-    range: input.dateRange,
-    ...(input.customFrom ? { customFrom: input.customFrom, from: input.customFrom } : {}),
-    ...(input.customTo ? { customTo: input.customTo, to: input.customTo } : {}),
-    ...(input.filters ? { filters: input.filters } : {}),
-    ...(input.groupBy ? { groupBy: input.groupBy } : {}),
-    ...(input.sortBy ? { sortBy: input.sortBy } : {}),
-    schedule: apiSchedule(input.schedule),
-    status: apiStatus(input.status),
+    dataSource,
+    dateRange: resolveApiDateRange(
+      input.dateRange,
+      input.customFrom,
+      input.customTo,
+    ),
+    dateRangePreset: input.dateRange,
+    ...(filters ? { filters } : {}),
+    ...(groupBy ? { groupBy } : {}),
+    ...(sortBy ? { sortBy } : {}),
+    ...(schedule ? { schedule } : {}),
+    ...(input.sharedWith ? { sharedWith: input.sharedWith } : {}),
+    ...(input.reportCode ? { reportCode: input.reportCode } : {}),
   };
+}
+
+export function toUpdateReportBody(
+  input: Parameters<typeof toCreateReportBody>[0],
+): Record<string, unknown> {
+  const body = toCreateReportBody(input);
+  if (input.schedule === "None") body.schedule = null;
+  return body;
 }
 
 export function isCrmReportId(id: string): boolean {

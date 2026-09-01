@@ -16,6 +16,7 @@ import {
   type ReportType,
   type SavedReport,
 } from "@/lib/reports/types";
+import { labelForDataSource } from "@/lib/reports/catalog";
 import { useCrmReports } from "@/lib/reports/use-crm-reports";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +62,7 @@ export default function ReportsPage() {
           r.name.toLowerCase().includes(q) ||
           r.reportId.toLowerCase().includes(q) ||
           r.dataSource.toLowerCase().includes(q) ||
+          labelForDataSource(r.dataSource).toLowerCase().includes(q) ||
           r.createdBy.toLowerCase().includes(q) ||
           r.type.toLowerCase().includes(q),
       );
@@ -92,7 +94,7 @@ export default function ReportsPage() {
         r.name,
         r.type,
         r.status,
-        r.dataSource,
+        labelForDataSource(r.dataSource),
         r.dateRange,
         r.schedule,
         r.lastRunAt ?? "",
@@ -246,7 +248,9 @@ export default function ReportsPage() {
                       {r.type}
                     </span>
                   </td>
-                  <td className="px-3 py-3 text-slate-600">{r.dataSource}</td>
+                  <td className="px-3 py-3 text-slate-600">
+                    {labelForDataSource(r.dataSource)}
+                  </td>
                   <td className="px-3 py-3 text-slate-600">{r.dateRange}</td>
                   <td className="px-3 py-3 text-slate-600">{r.schedule}</td>
                   <td className="px-3 py-3">
