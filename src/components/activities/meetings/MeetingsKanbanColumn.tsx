@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import type { MeetingColumn } from "@/lib/meetings/types";
 import { MeetingCard } from "./MeetingCard";
 import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
+import { KanbanEmptyStage } from "@/components/common/KanbanEmptyStage";
+import { KanbanStageScroll } from "@/components/common/KanbanStageScroll";
+import { KanbanCollapsedRail } from "@/components/common/KanbanCollapsedRail";
 import { cn } from "@/lib/utils";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
-import { KANBAN_COL, KANBAN_HEADER, KANBAN_HEADER_COUNT, KANBAN_HEADER_RAIL, KANBAN_WELL } from "@/lib/layout";
+import { KANBAN_COL, KANBAN_DROP_GHOST, KANBAN_HEADER, KANBAN_HEADER_COUNT, KANBAN_WELL } from "@/lib/layout";
 import { useRouter } from "next/navigation";
 import type { DropTargetPos } from "./MeetingsKanbanBoard";
 
@@ -36,7 +39,6 @@ export function MeetingsKanbanColumn({
   onDragStartMeeting,
   onDragEndMeeting,
   onDropMeeting,
-  embedded = false,
   selectedIds = [],
   onToggleSelect,
 }: MeetingsKanbanColumnProps) {
@@ -68,76 +70,52 @@ export function MeetingsKanbanColumn({
     setDropTargetPos({ columnId: column.id, targetIndex });
   }
 
-  if (!embedded && isCollapsed) {
+  if (isCollapsed) {
     return (
-      <div className="mb-4 flex h-full w-10 shrink-0 flex-col rounded-sm">
-        <div
-          className={cn(
-            "flex h-full flex-col items-center gap-3 p-2",
-            KANBAN_HEADER_RAIL,
-          )}
-        >
-          <button
-            type="button"
-            onClick={() => setIsCollapsed(false)}
-            className="shrink-0 rounded-sm hover:opacity-70"
-            title="Expand"
-            aria-expanded={false}
-            aria-label={`Expand ${column.title}`}
-          >
-            <ChevronRight className="h-4 w-4 text-slate-700" />
-          </button>
-
-          <span className={KANBAN_HEADER_COUNT}>
-            {column.meetings.length}
-          </span>
-
-          <span className="mt-1 flex-1 [writing-mode:vertical-rl] text-sm font-semibold text-slate-900">
-            {column.title}
-          </span>
-        </div>
-      </div>
+      <KanbanCollapsedRail
+        title={column.title}
+        count={column.meetings.length}
+        onExpand={() => setIsCollapsed(false)}
+      />
     );
   }
 
   return (
-    <div
-      className={cn(
-        "group mb-4 flex h-full min-w-[220px] flex-1 flex-col",
-        !embedded && KANBAN_COL,
-      )}
-    >
+    <div className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}>
       {/* Separate Header Box */}
       <div
         className={cn("mb-2 shrink-0", KANBAN_HEADER)}
       >
         <div className="flex items-center justify-between gap-4">
-          {embedded ? (
+          <button
+            type="button"
+            onClick={() => setIsCollapsed(true)}
+            title="Collapse"
+            className="flex items-center gap-1.5 rounded-sm hover:opacity-70"
+            aria-expanded={true}
+            aria-label={`Collapse ${column.title}`}
+          >
+            <ChevronDown className="h-4 w-4 shrink-0 text-slate-700" />
             <h3 className="text-sm font-semibold text-slate-900">
               {column.title}
             </h3>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setIsCollapsed(true)}
-              title="Collapse"
-              className="flex items-center gap-1.5 rounded-sm hover:opacity-70"
-              aria-expanded={true}
-              aria-label={`Collapse ${column.title}`}
-            >
-              <ChevronDown className="h-4 w-4 shrink-0 text-slate-700" />
-              <h3 className="text-sm font-semibold text-slate-900">
-                {column.title}
-              </h3>
-            </button>
-          )}
+          </button>
           <span className={KANBAN_HEADER_COUNT}>
             {column.meetings.length}
           </span>
         </div>
       </div>
 
-      {/* Meeting List / Drop Zone Container */}
+      <KanbanStageScroll
+        footer={
+          <KanbanColumnFooter
+            createLabel="Create meeting"
+            onCreate={() => router.push("/activities/meetings/create")}
+            onCollapse={() => setIsCollapsed(true)}
+            collapseLabel={`Collapse ${column.title}`}
+          />
+        }
+      >
       <div
         onDragOver={handleDragOverContainer}
         onDragLeave={() => {
@@ -152,12 +130,12 @@ export function MeetingsKanbanColumn({
           onDropMeeting(column.id, dropTargetPos?.targetIndex);
         }}
         className={cn(
-          "flex min-h-0 flex-1 flex-col rounded-sm border border-transparent p-2",
+          "flex min-h-full flex-col rounded-sm border border-transparent p-2",
           dropTargetIdle,
           isOver ? dropTargetActive : KANBAN_WELL,
         )}
       >
-        <div className="flex-1 space-y-2 overflow-y-auto pb-4 pr-0.5 [scrollbar-width:thin]">
+        <div className="flex min-h-[180px] flex-1 flex-col space-y-2 pb-4">
           {column.meetings.map((meeting, index) => {
             const showPlaceholderBefore =
               dropTargetPos?.columnId === column.id &&
@@ -173,7 +151,7 @@ export function MeetingsKanbanColumn({
             return (
               <div key={meeting.id} className="space-y-2">
                 {showPlaceholderBefore && (
-                  <div className="h-20 w-full animate-pulse rounded-xl border-2 border-dashed border-indigo-400 bg-indigo-50/50 transition-all" />
+                  <div className={KANBAN_DROP_GHOST} />
                 )}
 
                 <div data-meeting-card>
@@ -195,34 +173,18 @@ export function MeetingsKanbanColumn({
                 </div>
 
                 {showPlaceholderAfter && (
-                  <div className="h-20 w-full animate-pulse rounded-xl border-2 border-dashed border-indigo-400 bg-indigo-50/50 transition-all" />
+                  <div className={KANBAN_DROP_GHOST} />
                 )}
               </div>
             );
           })}
 
-          {column.meetings.length === 0 && (
-            <div
-              className={cn(
-                "py-8 text-center text-[11px] text-slate-300",
-                !embedded &&
-                  "rounded-xl border border-dashed border-slate-200 bg-white/70 py-10 text-slate-400",
-              )}
-            >
-              {embedded ? "Empty" : "Drop a meeting here"}
-            </div>
-          )}
+          {column.meetings.length === 0 ? (
+            <KanbanEmptyStage entity="Meetings" />
+          ) : null}
         </div>
       </div>
-
-      {!embedded && (
-        <KanbanColumnFooter
-          createLabel="Create meeting"
-          onCreate={() => router.push("/activities/meetings/create")}
-          onCollapse={() => setIsCollapsed(true)}
-          collapseLabel={`Collapse ${column.title}`}
-        />
-      )}
+      </KanbanStageScroll>
     </div>
   );
 }

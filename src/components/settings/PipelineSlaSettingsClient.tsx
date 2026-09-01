@@ -175,7 +175,8 @@ export function PipelineSlaSettingsClient() {
               </thead>
               <tbody>
                 {config.stageSlas.map((row: StageSlaRow) => {
-                  const locked = row.stage === "Settled" || row.stage === "Lost";
+                  const locked =
+                    row.stage === "Closed Won" || row.stage === "Closed Lost";
                   return (
                     <tr
                       key={row.stage}
@@ -324,9 +325,9 @@ export function PipelineSlaSettingsClient() {
           <code className="rounded bg-slate-100 px-1">
             {PIPELINE_SLA_SETTINGS_PATH}
           </code>
-          . Kanban statuses map to mortgage stages (New→New Lead, Contacted→In
-          Conversation, Qualified→Waiting on Documents, Converted→Settled,
-          Unqualified→Lost).
+          . Kanban statuses map to lead stages (New→New Lead, Contacted→In
+          Conversation, Qualified→Waiting on Docs, Converted→Closed Won,
+          Unqualified→Closed Lost).
         </p>
       </div>
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useModuleBack } from "@/hooks/useModuleBack";
 import Link from "next/link";
 import { EntityDetailHeader } from "@/components/shared/detail/EntityDetailHeader";
 import { RelatedListSidebar } from "@/components/shared/detail/RelatedListSidebar";
@@ -19,6 +20,7 @@ import {
   findContactById,
   listAllContacts,
   unlinkDealFromContact,
+  updateContact,
 } from "@/lib/contacts/store";
 import {
   findDealById,
@@ -29,6 +31,7 @@ import {
 import { onRulesChange } from "@/lib/rules";
 import { emitRulesChange } from "@/lib/rules/storage";
 import type { ContactCardData } from "@/lib/contacts/types";
+import { relatedToLabel } from "@/lib/related-entity";
 import type { DealRecord } from "@/lib/deals/types";
 
 const RELATED_LIST_CATALOG: RelatedListItem[] = [
@@ -66,6 +69,7 @@ interface FlatContact extends ContactCardData {
 export default function ContactDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const back = useModuleBack("/sales/contacts", "Back to Contacts");
   const [activeRelated, setActiveRelated] = useState("deals");
   const [activeTab, setActiveTab] = useState("Overview");
   const [visibleRelatedIds, setVisibleRelatedIds] = useState<string[]>(
@@ -147,7 +151,12 @@ export default function ContactDetailPage() {
         name={contact.name}
         relatedLabel={contact.company}
         onRelatedClick={() => {}}
-        onAddTag={() => {}}
+        tags={contact.tags ?? []}
+        relatedTo={relatedToLabel("Contact", contact.name)}
+        onTagsChange={(tags) => {
+          updateContact(contact.id, { tags });
+          setRevision((n) => n + 1);
+        }}
         actions={[
           {
             label: "Send Email",
@@ -164,7 +173,7 @@ export default function ContactDetailPage() {
           { label: "Send SMS" },
           { label: "Delete", destructive: true },
         ]}
-        onBack={() => router.push("/sales/contacts")}
+        onBack={() => router.push(back.href)}
         onPrev={
           prevContact
             ? () => router.push(`/sales/contacts/detail/${prevContact.id}`)

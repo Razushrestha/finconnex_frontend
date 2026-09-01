@@ -40,6 +40,7 @@ export interface ContactCardData {
   avatarBgClass: string;
   /** Linked deal record ids (SRS contact ↔ deal). */
   dealIds?: string[];
+  tags?: string[];
 }
 
 export interface ContactGroup {

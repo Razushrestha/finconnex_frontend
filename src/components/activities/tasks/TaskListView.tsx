@@ -29,8 +29,9 @@ import {
   loadTaskListColumns,
   saveTaskListColumns,
 } from "@/lib/tasks/list-columns";
-import { formatRelatedTo, initials } from "@/lib/activities/shared";
-import { taskMatchesSearch } from "@/lib/tasks/search";
+import { avatarColor, initials } from "@/lib/activities/shared";
+import { RelatedToLink } from "@/components/activities/RelatedToLink";
+import { taskMatchesFilters, taskMatchesSearch } from "@/lib/tasks/search";
 import { onRulesChange } from "@/lib/rules";
 import { cardSubject } from "@/lib/motion";
 import { cn } from "@/lib/utils";
@@ -269,7 +270,12 @@ function buildColumnRenderers(): Record<string, ColumnRenderer> {
     relatedTo: {
       label: "Related To",
       tdClassName: "px-3 py-2.5 text-slate-500",
-      td: (task) => formatRelatedTo(task.relatedTo) || "",
+      td: (task) => (
+        <RelatedToLink
+          relatedTo={task.relatedTo}
+          className="text-slate-600"
+        />
+      ),
     },
     dueDate: {
       label: "Due Date",
@@ -293,7 +299,7 @@ function buildColumnRenderers(): Record<string, ColumnRenderer> {
           <span
             className={cn(
               "flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold",
-              task.assignee.colorClass,
+              avatarColor(task.assignedTo),
             )}
           >
             {task.assignee.initials}
@@ -448,7 +454,7 @@ export function TaskListView({
 
   useEffect(() => {
     setPage(1);
-  }, [filters?.priorities, filters?.statuses, filters?.types, pageSize, search]);
+  }, [filters?.priorities, filters?.statuses, filters?.types, filters?.scope, pageSize, search]);
 
   const allTasks = useMemo(() => {
     void revision;
@@ -466,23 +472,9 @@ export function TaskListView({
   const processedData = useMemo(() => {
     let data = [...allTasks];
 
-    const priorityFilter = filters?.priorities ?? [];
-    const statusFilter = filters?.statuses ?? [];
-    const typeFilter = filters?.types ?? [];
-
-    if (priorityFilter.length > 0) {
-      data = data.filter((t) => priorityFilter.includes(t.priority));
-    }
-    if (statusFilter.length > 0) {
-      data = data.filter((t) => statusFilter.includes(t.status));
-    }
-    if (typeFilter.length > 0) {
-      data = data.filter((t) => typeFilter.includes(t.taskType));
-    }
-
-    if (search) {
-      data = data.filter((t) => taskMatchesSearch(t, search));
-    }
+    data = data.filter(
+      (t) => taskMatchesFilters(t, filters) && taskMatchesSearch(t, search),
+    )
 
     if (sortField) {
       data.sort((a, b) => {

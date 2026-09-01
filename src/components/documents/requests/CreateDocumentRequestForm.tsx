@@ -49,10 +49,57 @@ import {
 } from "@/components/documents/requests/RequestScheduleCard";
 import { RequestQuickReview } from "@/components/documents/requests/RequestQuickReview";
 import { readCatalogDescriptionOverrides } from "@/lib/documents/requests/catalog";
+import {
+  leadDocumentRequestPeople,
+  type DocumentRequestPersonSeed,
+} from "@/lib/leads/convert-actions";
+import { findLeadById } from "@/lib/leads/store";
 
 interface CreateDocumentRequestFormProps {
   layoutId: string;
   redirect: boolean;
+  relatedId?: string;
+  relatedKind?: string;
+  relatedName?: string;
+  seedApplicants?: DocumentRequestPersonSeed[];
+}
+
+function toRequestApplicants(
+  people: DocumentRequestPersonSeed[],
+): RequestApplicant[] {
+  const rows = people.slice(0, 2);
+  if (!rows.length) return [emptyApplicant()];
+  return rows.map((person, index) => ({
+    id: `ap-lead-${index + 1}`,
+    source: "lead" as const,
+    name: person.name,
+    email: person.email,
+    deliverVia: "email" as const,
+  }));
+}
+
+function resolvePrefill(props: CreateDocumentRequestFormProps): {
+  applicants: RequestApplicant[];
+  phones: [string, string];
+  relatedKind: string;
+  relatedName: string;
+} {
+  const fromUrl = (props.seedApplicants ?? []).slice(0, 2);
+  const live =
+    !fromUrl.length && props.relatedId
+      ? findLeadById(props.relatedId)?.card
+      : null;
+  const people = fromUrl.length
+    ? fromUrl
+    : live
+      ? leadDocumentRequestPeople(live)
+      : [];
+  return {
+    applicants: toRequestApplicants(people),
+    phones: [people[0]?.phone ?? "", people[1]?.phone ?? ""],
+    relatedKind: props.relatedKind?.trim() || (live ? "Lead" : ""),
+    relatedName: props.relatedName?.trim() || live?.name || "",
+  };
 }
 
 type LoanType = "Home loan" | "Asset / Other";
@@ -383,9 +430,23 @@ function Stepper({ step }: { step: number }) {
 export function CreateDocumentRequestForm({
   layoutId: _layoutId,
   redirect: _redirect,
+  relatedId,
+  relatedKind,
+  relatedName,
+  seedApplicants,
 }: CreateDocumentRequestFormProps) {
   const router = useRouter();
   const [step, setStep] = useState(1);
+  const [prefill] = useState(() =>
+    resolvePrefill({
+      layoutId: _layoutId,
+      redirect: _redirect,
+      relatedId,
+      relatedKind,
+      relatedName,
+      seedApplicants,
+    }),
+  );
 
   useEffect(() => {
     const main = document.querySelector("main");
@@ -424,9 +485,9 @@ export function CreateDocumentRequestForm({
   }, [sendOnBehalfOf]);
   const loanType: LoanType = "Home loan";
   const purpose: Purpose = "Property purchase";
-  const [applicants, setApplicants] = useState<RequestApplicant[]>([
-    emptyApplicant(),
-  ]);
+  const [applicants, setApplicants] = useState<RequestApplicant[]>(
+    () => prefill.applicants,
+  );
   const [applicantCount, setApplicantCount] = useState<ApplicantCount>("1");
   const [skipCoApplicant, setSkipCoApplicant] = useState(true);
   const [clientSearch, setClientSearch] = useState("");
@@ -435,11 +496,15 @@ export function CreateDocumentRequestForm({
   const [applicant1, setApplicant1] = useState("");
   const [applicant2, setApplicant2] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(() => prefill.phones[0]);
   const [email2, setEmail2] = useState("");
-  const [phone2, setPhone2] = useState("");
-  const [existingAccount1, setExistingAccount1] = useState(false);
-  const [existingAccount2, setExistingAccount2] = useState(false);
+  const [phone2, setPhone2] = useState(() => prefill.phones[1]);
+  const [existingAccount1, setExistingAccount1] = useState(() =>
+    Boolean(prefill.applicants[0]?.name && prefill.applicants[0]?.email),
+  );
+  const [existingAccount2, setExistingAccount2] = useState(() =>
+    Boolean(prefill.applicants[1]?.name && prefill.applicants[1]?.email),
+  );
 
   useEffect(() => {
     const first = applicants[0];
@@ -710,14 +775,17 @@ export function CreateDocumentRequestForm({
         applicant1.trim() || requestedFrom,
         email.trim() || undefined,
       );
+      const relatedTo = prefill.relatedName
+        ? `${prefill.relatedKind || "Lead"}: ${prefill.relatedName}`
+        : portal
+          ? `${portal.clientName}: ${applicant1.trim() || "Client"}`
+          : `Lead: ${applicant1.trim() || "Client"}`;
       const created = upsertDocumentRequest({
         id: ids.id,
         requestId: ids.requestId,
         title,
         requestedFrom: requestedFrom || "Client",
-        relatedTo: portal
-          ? `${portal.clientName}: ${applicant1.trim() || "Client"}`
-          : `Lead: ${applicant1.trim() || "Client"}`,
+        relatedTo,
         documentType,
         status: "Requested",
         dueDate: due,

@@ -2,8 +2,10 @@
 
 import { use, useEffect, useState } from "react";
 import { Calendar, Clock, Edit3, Video, ArrowLeft } from "lucide-react";
+import { ActivityTimelineButton } from "@/components/activities/ActivityTimelineButton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useModuleBack } from "@/hooks/useModuleBack";
 import type { Meeting } from "@/lib/meetings/types";
 import { findMeetingById } from "@/lib/meetings/store";
 import { MeetingInfoCard } from "@/components/activities/meetings/detail/MeetingInfoCard";
@@ -11,7 +13,9 @@ import { MeetingAgenda } from "@/components/activities/meetings/detail/MeetingAg
 import { MeetingParticipants } from "@/components/activities/meetings/detail/MeetingParticipants";
 import { MeetingNotes } from "@/components/activities/meetings/detail/MeetingNotes";
 import { MeetingSidebarCard } from "@/components/activities/meetings/detail/MeetingSidebarCard";
+import { EditMeetingModal } from "@/components/activities/meetings/detail/EditMeetingModal";
 import { onRulesChange } from "@/lib/rules";
+import { toast } from "sonner";
 
 export default function MeetingDetailsPage({
   params,
@@ -20,8 +24,10 @@ export default function MeetingDetailsPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
+  const back = useModuleBack("/activities/meetings", "Back to Meetings");
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [ready, setReady] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     function load() {
@@ -47,10 +53,10 @@ export default function MeetingDetailsPage({
           <p className="text-sm font-medium text-slate-700">Meeting not found</p>
           <button
             type="button"
-            onClick={() => router.push("/activities/meetings")}
+            onClick={() => router.push(back.href)}
             className="mt-3 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
           >
-            Back to Meetings
+            {back.label}
           </button>
         </div>
       </div>
@@ -65,20 +71,31 @@ export default function MeetingDetailsPage({
       <div className="flex flex-1 flex-col overflow-y-auto border-r border-border">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white px-8 py-4 backdrop-blur-md">
           <Link
-            href="/activities/meetings"
+            href={back.href}
             className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
-            <ArrowLeft className="w-4 h-4" /> Back to Meetings
+            <ArrowLeft className="w-4 h-4" /> {back.label}
           </Link>
           <div className="flex items-center gap-3">
+            <ActivityTimelineButton
+              href={`/activities/meetings/detail/${meeting.id}/timeline`}
+            />
             <button
               type="button"
+              onClick={() => setEditing(true)}
               className="flex cursor-pointer items-center gap-2 rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
             >
               <Edit3 className="w-4 h-4" /> Edit Details
             </button>
             <button
               type="button"
+              onClick={() => {
+                if (meeting.meetingLink) {
+                  window.open(meeting.meetingLink, "_blank", "noopener,noreferrer");
+                  return;
+                }
+                toast.error("This meeting has no join link");
+              }}
               className="flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90"
             >
               <Video className="w-4 h-4" /> Join Meeting
@@ -121,8 +138,8 @@ export default function MeetingDetailsPage({
           <MeetingAgenda agenda={meeting.agenda} />
 
           <MeetingParticipants
-            attendees={meeting.attendees}
-            organizer={meeting.organizer}
+            meeting={meeting}
+            onManage={() => setEditing(true)}
           />
 
           <MeetingNotes initialNotes={meeting.notes} />
@@ -132,6 +149,14 @@ export default function MeetingDetailsPage({
       <div className="hidden w-96 overflow-y-auto border-l border-border bg-white p-6 xl:block">
         <MeetingSidebarCard relatedTo={meeting.relatedTo} />
       </div>
+
+      {editing ? (
+        <EditMeetingModal
+          meeting={meeting}
+          onClose={() => setEditing(false)}
+          onSaved={setMeeting}
+        />
+      ) : null}
     </div>
   );
 }

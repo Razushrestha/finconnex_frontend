@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useModuleBack } from "@/hooks/useModuleBack";
 import type { Call } from "@/lib/calls/types";
 import { findCallById } from "@/lib/calls/store";
 import { onRulesChange } from "@/lib/rules";
@@ -16,6 +17,7 @@ interface PageProps {
 export default function CallDetailPage({ params }: PageProps) {
   const router = useRouter();
   const { id } = use(params);
+  const back = useModuleBack("/activities/calls", "Back to Calls");
   const [call, setCall] = useState<Call | null>(null);
   const [ready, setReady] = useState(false);
 
@@ -46,10 +48,10 @@ export default function CallDetailPage({ params }: PageProps) {
         </p>
         <button
           type="button"
-          onClick={() => router.push("/activities/calls")}
+          onClick={() => router.push(back.href)}
           className="rounded-xl bg-[#5A32A3] px-4 py-2 text-xs font-medium text-white hover:opacity-90"
         >
-          Back to Calls
+          {back.label}
         </button>
       </div>
     );
@@ -58,7 +60,8 @@ export default function CallDetailPage({ params }: PageProps) {
   return (
     <CallDetailsLayout
       call={call}
-      onBack={() => router.push("/activities/calls")}
+      onBack={() => router.push(back.href)}
+      backLabel={back.label}
       onChange={setCall}
     />
   );

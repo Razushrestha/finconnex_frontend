@@ -116,11 +116,11 @@ export function runSmokeSession18() {
   const jenniferRow = johnAttention.find(
     (r) => r.subject === "Jennifer Adams",
   )!;
-  if (!jenniferRow.href.includes("focus=")) {
-    fail("SLA row must deep-link with focus=");
+  if (!jenniferRow.href.includes("/sales/leads/detail/")) {
+    fail("SLA row must open the lead detail page");
   }
-  if (!jenniferRow.href.includes("/sales/leads")) {
-    fail("SLA row must link to /sales/leads");
+  if (!jenniferRow.href.includes("from=work-queue")) {
+    fail("SLA row must return to Workqueue");
   }
   if (jenniferRow.status !== "Overdue") {
     fail(`Jennifer row status expected Overdue, got ${jenniferRow.status}`);

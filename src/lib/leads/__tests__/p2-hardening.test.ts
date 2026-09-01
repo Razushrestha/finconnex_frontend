@@ -283,7 +283,7 @@ describe("Phase 16 pipeline SLA", () => {
 
     expect(getPhase16Manifest().status).toBe("pipeline_sla_shipped");
     expect(leadStatusToPipelineStage("Qualified")).toBe(
-      "Waiting on Documents",
+      "Waiting on Docs",
     );
 
     const now = new Date("2026-07-23T12:00:00");

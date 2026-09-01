@@ -32,7 +32,11 @@ export function CardInitialsAvatar({
   const label = name?.trim() || title || "";
   const letters =
     initialsProp?.trim() || (label ? initials(label) : "?");
-  const colors = colorClass ?? (label ? avatarColor(label) : "bg-slate-100 text-slate-600");
+  const colors =
+    colorClass ??
+    (label
+      ? avatarColor(label)
+      : "bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100");
 
   return (
     <span

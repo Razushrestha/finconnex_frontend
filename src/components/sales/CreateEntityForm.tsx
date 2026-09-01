@@ -5,6 +5,7 @@ import * as React from "react";
 import {
     ChevronLeft,
   CheckCircle2,
+  ChevronDown,
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -59,6 +60,19 @@ export function InputShell({
   children: React.ReactNode;
   error?: boolean;
 }) {
+  const hasSelect = React.Children.toArray(children).some(
+    (child) => React.isValidElement(child) && child.type === "select",
+  );
+  const content = hasSelect
+    ? React.Children.map(children, (child) => {
+        if (!React.isValidElement<{ className?: string }>(child)) return child;
+        if (child.type !== "select") return child;
+        return React.cloneElement(child, {
+          className: cn(child.props.className, "fc-select-caret pr-9"),
+        });
+      })
+    : children;
+
   return (
     <div
       className={cn(
@@ -71,7 +85,10 @@ export function InputShell({
       {Icon ? (
         <Icon className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-slate-400 transition-colors group-focus-within:text-violet-500" />
       ) : null}
-      {children}
+      {content}
+      {hasSelect ? (
+        <ChevronDown className="pointer-events-none absolute right-3 h-3.5 w-3.5 text-slate-400" />
+      ) : null}
     </div>
   );
 }
@@ -104,7 +121,7 @@ export const elevatedInputClass = (hasIcon?: boolean) =>
   );
 
 export const elevatedSelectClass = (hasIcon?: boolean) =>
-  cn(elevatedInputClass(hasIcon), "cursor-pointer appearance-none");
+  cn(elevatedInputClass(hasIcon), "cursor-pointer appearance-none pr-9");
 
 export const elevatedTextareaClass =
   "min-h-[110px] w-full resize-y rounded-lg bg-transparent px-3 py-2.5 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100";

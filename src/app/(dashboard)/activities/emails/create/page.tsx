@@ -14,14 +14,16 @@ interface PageProps {
 export default async function CreateEmailPage({ searchParams }: PageProps) {
   const params = await searchParams;
   return (
-    <CreateEmailForm
-      layoutId={params.layoutid ?? "standard"}
-      redirect={params.redirect === "true"}
-      defaults={{
-        relatedKind: asRelatedKind(params.relatedKind),
-        relatedName: params.relatedName,
-        to: params.to,
-      }}
-    />
+    <div className="absolute inset-0 flex min-h-0 flex-col overflow-hidden">
+      <CreateEmailForm
+        layoutId={params.layoutid ?? "standard"}
+        redirect={params.redirect === "true"}
+        defaults={{
+          relatedKind: asRelatedKind(params.relatedKind),
+          relatedName: params.relatedName,
+          to: params.to,
+        }}
+      />
+    </div>
   );
 }

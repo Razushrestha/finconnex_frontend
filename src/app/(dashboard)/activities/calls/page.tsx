@@ -4,8 +4,10 @@ import { useState } from "react";
 import { CallsFilterPanel } from "@/components/activities/calls/CallsFilterPanel";
 import { CallsKanbanBoard } from "@/components/activities/calls/CallsKanbanBoard";
 import { CallsListTable } from "@/components/activities/calls/CallsListTable";
+import { CallsTimelineView } from "@/components/activities/calls/CallsTimelineView";
 import {
   ActivityToolbar,
+  TIMELINE_VIEW_TOGGLE,
   type ActivityView,
 } from "@/components/activities/ActivityToolbar";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
@@ -20,7 +22,8 @@ import {
 } from "lucide-react";
 import { activityExportMenuItem } from "@/lib/activities/export";
 import { BOARD_PAGE } from "@/lib/layout";
-import { deleteCall } from "@/lib/calls/store";
+import { deleteCall, type CallScope } from "@/lib/calls/store";
+import { openSoftphone } from "@/lib/softphone/events";
 
 const moreMenuItems = [
   { key: "mass-transfer", icon: ArrowRightLeft, label: "Mass Transfer" },
@@ -37,6 +40,14 @@ export default function CallsPage() {
   const [sortActive, setSortActive] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
+  const [scopeTab, setScopeTab] = useState("All Calls");
+
+  const scope: CallScope =
+    scopeTab === "My Calls"
+      ? "mine"
+      : scopeTab === "My Overdue Calls"
+        ? "my-overdue"
+        : "all";
 
   function runBulkDelete() {
     if (!selectedIds.length) return;
@@ -74,15 +85,21 @@ export default function CallsPage() {
             {
               key: "log",
               label: "Log a call",
-              href: "/activities/calls/create?mode=log&layoutid=standard&redirect=false",
+              onSelect: () => openSoftphone(),
             },
           ]}
-          tabs={["All Calls"]}
+          tabs={["My Overdue Calls"]}
+          leadingTabMenu={{
+            items: ["All Calls", "My Calls"],
+          }}
+          activeTab={scopeTab}
+          onTabChange={setScopeTab}
           view={view}
           onViewChange={setView}
           filterOpen={filterOpen}
           onToggleFilter={() => setFilterOpen((v) => !v)}
           onClearSort={() => setSortActive(false)}
+          extraViewIcons={[TIMELINE_VIEW_TOGGLE]}
           moreMenuItems={moreMenuItems}
           printViewItems={printViewItems}
         />
@@ -110,11 +127,15 @@ export default function CallsPage() {
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl">
           {view === "kanban" ? (
             <CallsKanbanBoard
+              scope={scope}
               selectedIds={selectedIds}
               onSelectedIdsChange={setSelectedIds}
             />
+          ) : view === "timeline" ? (
+            <CallsTimelineView scope={scope} />
           ) : (
             <CallsListTable
+              scope={scope}
               sortActive={sortActive}
               filterOpen={filterOpen}
               selectedIds={selectedIds}

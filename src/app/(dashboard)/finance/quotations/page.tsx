@@ -231,7 +231,7 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EntityHeader } from "@/components/finance/EntityHeader";
 import { EntityCards } from "@/components/finance/EntityCards";
@@ -240,9 +240,11 @@ import { EntityFilters } from "@/components/finance/EntityFilters";
 import { MetricCardConfig, TableColumn } from "@/components/finance/types";
 import {
   quotations,
+  listQuotations,
   Quotation,
   QuotationStatus,
 } from "@/lib/finance/quotations/types";
+import { onRecordsChange } from "@/lib/records-sync";
 
 interface QuotationRow {
   id: string;
@@ -259,7 +261,13 @@ export const QuotationsPage: React.FC = () => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [dateFilter, setDateFilter] = useState("30d");
-  const [data] = useState<Quotation[]>(quotations);
+  const [data, setData] = useState<Quotation[]>(quotations);
+
+  useEffect(() => {
+    const refresh = () => setData(listQuotations());
+    refresh();
+    return onRecordsChange(refresh);
+  }, []);
 
   const tableData: QuotationRow[] = data.map((item) => ({
     id: item.id, // Real unique ID for router.push (`quo1`, `quo2`, etc.)
@@ -295,7 +303,8 @@ export const QuotationsPage: React.FC = () => {
     searchValue: "",
     onSearchChange: () => {},
     actionLabel: "Create Quote",
-    onActionClick: () => console.log("Open Create Quote Modal"),
+    onActionClick: () =>
+      router.push("/finance/quotations/create?layoutid=standard&redirect=false"),
   };
 
   const cardsData: MetricCardConfig[] = [

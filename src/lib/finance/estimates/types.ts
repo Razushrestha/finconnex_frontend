@@ -1,6 +1,10 @@
 /** SRS §13.1 / §20.1 Estimates */
 
 import {
+  readJsonArrayStore,
+  writeJsonArrayStore,
+} from "@/lib/browser-json-store";
+import {
   type FinanceAuditEvent,
   type FinanceLineItem,
   formatFinanceAt,
@@ -35,6 +39,7 @@ export interface Estimate {
   contactName: string;
   contactEmail: string;
   dealName?: string;
+  relatedTo?: string;
   owner: string;
   validUntil: string;
   notes?: string;
@@ -208,18 +213,11 @@ export const estimates: Estimate[] = [
 ];
 
 function readStore(): Estimate[] | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = sessionStorage.getItem(STORE_KEY);
-    return raw ? (JSON.parse(raw) as Estimate[]) : null;
-  } catch {
-    return null;
-  }
+  return readJsonArrayStore<Estimate>(STORE_KEY);
 }
 
 function writeStore(list: Estimate[]) {
-  if (typeof window === "undefined") return;
-  sessionStorage.setItem(STORE_KEY, JSON.stringify(list));
+  writeJsonArrayStore(STORE_KEY, list);
 }
 
 export function listEstimates(): Estimate[] {

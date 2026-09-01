@@ -3,15 +3,21 @@
 import {
   callColumns as SEED_COLUMNS,
   type Call,
+  type CallAttachment,
   type CallColumn,
   type CallFollowUp,
   type CallStatus,
   type CallType,
 } from "@/lib/calls/types";
-import type { TaskReminder } from "@/lib/tasks/types";
+import type { TaskActionItem, TaskReminder } from "@/lib/tasks/types";
+import type { ReminderRepeatRule } from "@/lib/tasks/repeat-reminder";
 import { createBoardStore } from "@/lib/rules/module-store";
 import { formatRulesAt, newRulesId } from "@/lib/rules/storage";
 import { emitLeadActivityChange } from "@/lib/leads/lead-extras-store";
+import { parseTaskDueDate } from "@/lib/dashboard/layout";
+import { stopPendingReminders } from "@/lib/tasks/reminder-series";
+import { isAssignedToCurrentUser } from "@/lib/activities/assigned-to-me";
+import { getRulesActor } from "@/lib/rules/actor";
 
 function cloneSeed(): CallColumn[] {
   return SEED_COLUMNS.map((col) => ({
@@ -35,6 +41,15 @@ function normalizeCall(call: Call, status: CallStatus): Call {
     nextSteps: Array.isArray(call.nextSteps)
       ? call.nextSteps.map((s) => ({ ...s }))
       : [],
+    actionItems: Array.isArray(call.actionItems)
+      ? call.actionItems.map((item) => ({ ...item }))
+      : [],
+    attachments: Array.isArray(call.attachments)
+      ? call.attachments.map((file) => ({ ...file }))
+      : [],
+    attachmentsCount: Array.isArray(call.attachments)
+      ? call.attachments.length
+      : (call.attachmentsCount ?? 0),
   };
 }
 
@@ -47,7 +62,7 @@ function normalize(cols: CallColumn[]): CallColumn[] {
 }
 
 const board = createBoardStore({
-  key: "activities:calls:board:v2",
+  key: "activities:calls:board:v3",
   seed: cloneSeed,
 });
 
@@ -61,6 +76,32 @@ export function saveCallColumns(cols: CallColumn[]) {
 
 export function listCalls(): Call[] {
   return listCallColumns().flatMap((c) => c.calls);
+}
+
+export function parseCallWhen(date: string): Date | null {
+  return parseTaskDueDate(date);
+}
+
+export function isCallOverdue(
+  call: Pick<Call, "status" | "date">,
+  now = new Date(),
+): boolean {
+  if (call.status !== "Scheduled") return false;
+  const at = parseCallWhen(call.date);
+  if (!at) return false;
+  return at.getTime() < now.getTime();
+}
+
+export type CallScope = "all" | "mine" | "my-overdue";
+
+export function callMatchesScope(
+  call: Pick<Call, "assignedTo" | "status" | "date">,
+  scope: CallScope = "all",
+) {
+  if (scope === "all") return true;
+  if (!isAssignedToCurrentUser(call.assignedTo)) return false;
+  if (scope === "my-overdue") return isCallOverdue(call);
+  return true;
 }
 
 export function createCall(input: {
@@ -77,8 +118,16 @@ export function createCall(input: {
   agenda?: string;
   purpose?: string;
   assignedTo: string;
+  calledBy?: string;
   reminders?: TaskReminder[];
+  reminderDate?: string;
+  reminderRepeat?: ReminderRepeatRule;
+  repeatRule?: ReminderRepeatRule;
   nextSteps?: CallFollowUp[];
+  actionItems?: TaskActionItem[];
+  createdBy?: string;
+  createdOn?: string;
+  attachments?: CallAttachment[];
 }): Call {
   const cols = listCallColumns();
   const target =
@@ -100,8 +149,19 @@ export function createCall(input: {
     agenda: input.agenda,
     purpose: input.purpose,
     assignedTo: input.assignedTo,
+    calledBy: input.calledBy,
     reminders: input.reminders?.map((r) => ({ ...r })) ?? [],
+    reminderDate: input.reminderDate,
+    reminderRepeat: input.reminderRepeat,
+    repeatRule: input.repeatRule,
     nextSteps: input.nextSteps?.map((s) => ({ ...s })) ?? [],
+    actionItems: input.actionItems?.map((item) => ({ ...item })) ?? [],
+    createdBy: input.createdBy,
+    createdOn: input.createdOn,
+    modifiedBy: input.createdBy,
+    modifiedOn: input.createdOn,
+    attachments: input.attachments?.map((file) => ({ ...file })) ?? [],
+    attachmentsCount: input.attachments?.length ?? 0,
   };
   saveCallColumns(
     cols.map((c) =>
@@ -142,8 +202,28 @@ export function updateCall(id: string, patch: Partial<Call>): Call | null {
   const found = findCallById(id);
   if (!found) return null;
   const nextStatus = (patch.status ?? found.call.status) as CallStatus;
+  const stopReminders =
+    (nextStatus === "Completed" || nextStatus === "Cancelled") &&
+    nextStatus !== found.call.status;
+  const becamePlaced =
+    PLACED_STATUSES.has(nextStatus) &&
+    !PLACED_STATUSES.has(found.call.status);
+  const recordingAdded = Boolean(patch.recording) && !found.call.recording;
   const merged: Call = normalizeCall(
-    { ...found.call, ...patch, id },
+    {
+      ...found.call,
+      ...patch,
+      id,
+      calledBy:
+        patch.calledBy ||
+        found.call.calledBy ||
+        (becamePlaced || recordingAdded
+          ? getRulesActor().name || found.call.assignedTo
+          : found.call.calledBy),
+      reminders: stopReminders
+        ? stopPendingReminders(patch.reminders ?? found.call.reminders)
+        : (patch.reminders ?? found.call.reminders),
+    },
     nextStatus,
   );
   const cols = listCallColumns();
@@ -179,10 +259,68 @@ export function updateCall(id: string, patch: Partial<Call>): Call | null {
   return merged;
 }
 
+const PLACED_STATUSES = new Set<CallStatus>([
+  "Completed",
+  "Voicemail Left",
+  "Left Voicemail",
+]);
+
+export function callWasPlaced(call: Call) {
+  return PLACED_STATUSES.has(call.status);
+}
+
+/** Who placed or answered the call — not the same as the assigned owner. */
+export function callPlacedBy(
+  call: Pick<Call, "calledBy" | "createdBy" | "assignedTo">,
+): string {
+  return (call.calledBy || call.createdBy || call.assignedTo).trim();
+}
+
+export function callPlacedByCaption(
+  call: Pick<Call, "callType" | "calledBy" | "createdBy" | "assignedTo">,
+): string {
+  const name = callPlacedBy(call);
+  if (!name) return "";
+  if (call.callType === "Inbound" || call.callType === "Missed") {
+    return `Answered by ${name}`;
+  }
+  return `Called by ${name}`;
+}
+
+export function callHasPlayableRecording(call: Call) {
+  return callWasPlaced(call) && (call.recording?.durationSeconds ?? 0) > 0;
+}
+
+function sameCallPerson(left: Call, right: Call) {
+  const leftName = (left.contact || left.callFor || "").trim().toLowerCase();
+  const rightName = (right.contact || right.callFor || "").trim().toLowerCase();
+  if (leftName && rightName && leftName === rightName) return true;
+  const leftPhone = (left.fromNumber ?? "").replace(/\D/g, "");
+  const rightPhone = (right.fromNumber ?? "").replace(/\D/g, "");
+  if (leftPhone.length >= 8 && leftPhone === rightPhone) return true;
+  const leftRelated = (left.relatedTo ?? "").trim().toLowerCase();
+  const rightRelated = (right.relatedTo ?? "").trim().toLowerCase();
+  return Boolean(leftRelated && rightRelated && leftRelated === rightRelated);
+}
+
+/** Other calls for the same contact / number / related record that have a recording. */
+export function listRelatedCallRecordings(call: Call): Call[] {
+  return listCalls()
+    .filter((other) => other.id !== call.id && callHasPlayableRecording(other))
+    .filter((other) => sameCallPerson(call, other))
+    .sort((a, b) => {
+      const ta = parseCallWhen(a.date)?.getTime() ?? 0;
+      const tb = parseCallWhen(b.date)?.getTime() ?? 0;
+      return tb - ta;
+    });
+}
+
 export function parseCallDurationSeconds(call: Call): number {
   if (call.recording?.durationSeconds) return call.recording.durationSeconds;
   const raw = call.duration?.trim();
   if (!raw) return 0;
+  const minSec = raw.match(/^(\d+)\s*Min\s+(\d+)\s*Sec$/i);
+  if (minSec) return Number(minSec[1]) * 60 + Number(minSec[2]);
   const minutes = raw.match(/^(\d+)\s*min/i);
   if (minutes) return Number(minutes[1]) * 60;
   const clock = raw.match(/^(\d+):(\d{2})$/);

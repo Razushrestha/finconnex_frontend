@@ -1,6 +1,7 @@
 "use client";
 
 import { FoldHorizontal, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function KanbanColumnFooter({
   createLabel,
@@ -16,7 +17,14 @@ export function KanbanColumnFooter({
   collapseLabel: string;
 }) {
   return (
-    <div className="mt-2 flex w-full shrink-0 overflow-hidden rounded-md bg-white shadow-sm opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+    <div
+      className={cn(
+        "pointer-events-none absolute inset-x-1 bottom-1 z-20 flex overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm",
+        "opacity-0 transition-opacity duration-150",
+        "group-hover/stage:pointer-events-auto group-hover/stage:opacity-100",
+        "group-focus-within/stage:pointer-events-auto group-focus-within/stage:opacity-100",
+      )}
+    >
       <button
         type="button"
         onClick={onCreate}

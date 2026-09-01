@@ -9,7 +9,25 @@ import { MORTGAGE_PIPELINE_STAGES } from "@/lib/pipeline-sla/types";
 import { formatPipelineTimestamp } from "@/lib/pipeline-sla/ui";
 import { fail, ok, type RuleResult } from "@/lib/rules/types";
 
-export const FINAL_PIPELINE_STAGES = ["Settled"] as const;
+export const FINAL_PIPELINE_STAGES = ["Closed Won"] as const;
+
+/** Older Kanban titles → current pipeline stages. */
+const PIPELINE_STAGE_ALIASES: Record<string, MortgagePipelineStage> = {
+  "Waiting on Documents": "Waiting on Docs",
+  "Documents Received": "Document Received",
+  Processing: "Research & Servicing",
+  Settled: "Closed Won",
+  Lost: "Closed Lost",
+};
+
+export function resolvePipelineStage(
+  value: string,
+): MortgagePipelineStage | null {
+  if ((MORTGAGE_PIPELINE_STAGES as readonly string[]).includes(value)) {
+    return value as MortgagePipelineStage;
+  }
+  return PIPELINE_STAGE_ALIASES[value] ?? null;
+}
 
 /** Reverse of leadStatusToPipelineStage — CRM status from mortgage stage. */
 export function pipelineStageToLeadStatus(
@@ -18,16 +36,23 @@ export function pipelineStageToLeadStatus(
   switch (stage) {
     case "New Lead":
     case "Appointment Booked":
+    case "Appointment Missed":
       return "New";
     case "In Conversation":
+    case "Hold":
+    case "No Answer":
       return "Contacted";
-    case "Waiting on Documents":
-    case "Documents Received":
-    case "Processing":
+    case "Waiting on Docs":
+    case "Document Received":
+    case "Findings":
+    case "Research & Servicing":
+    case "Servicing Completed":
+    case "Loan Proposal Presented":
+    case "Future Potential Clients":
       return "Qualified";
-    case "Settled":
+    case "Closed Won":
       return "Converted";
-    case "Lost":
+    case "Closed Lost":
       return "Unqualified";
     default:
       return "New";
@@ -41,25 +66,27 @@ export function isMortgagePipelineStage(
 }
 
 export function isFinalPipelineStage(stage: string) {
-  return (FINAL_PIPELINE_STAGES as readonly string[]).includes(stage);
+  const resolved = resolvePipelineStage(stage) ?? stage;
+  return (FINAL_PIPELINE_STAGES as readonly string[]).includes(resolved);
 }
 
-/** Settled is final (mirrors Converted). Lost may still move. */
+/** Closed Won is final (mirrors Converted). Closed Lost may still move. */
 export function assertPipelineStageChange(
   from: string,
   to: string,
 ): RuleResult {
   if (from === to) return ok();
-  if (!isMortgagePipelineStage(to)) {
+  const toStage = resolvePipelineStage(to);
+  if (!toStage) {
     return fail(
       "PIPELINE_STAGE_UNKNOWN",
       `Unknown pipeline stage "${to}"`,
     );
   }
-  if (isFinalPipelineStage(from) && from !== to) {
+  if (isFinalPipelineStage(from) && from !== toStage) {
     return fail(
       "PIPELINE_STAGE_FINAL",
-      'Pipeline stage "Settled" is final and cannot be changed',
+      'Pipeline stage "Closed Won" is final and cannot be changed',
     );
   }
   return ok();
@@ -68,12 +95,19 @@ export function assertPipelineStageChange(
 export const PIPELINE_STAGE_DOT: Record<MortgagePipelineStage, string> = {
   "New Lead": "bg-sky-500",
   "Appointment Booked": "bg-cyan-500",
+  "Appointment Missed": "bg-rose-400",
   "In Conversation": "bg-amber-400",
-  "Waiting on Documents": "bg-orange-500",
-  "Documents Received": "bg-violet-500",
-  Processing: "bg-indigo-500",
-  Settled: "bg-emerald-500",
-  Lost: "bg-slate-400",
+  Hold: "bg-slate-400",
+  "No Answer": "bg-orange-400",
+  "Waiting on Docs": "bg-orange-500",
+  "Document Received": "bg-violet-500",
+  Findings: "bg-fuchsia-500",
+  "Research & Servicing": "bg-indigo-500",
+  "Servicing Completed": "bg-blue-500",
+  "Loan Proposal Presented": "bg-purple-500",
+  "Future Potential Clients": "bg-teal-500",
+  "Closed Won": "bg-emerald-500",
+  "Closed Lost": "bg-slate-400",
 };
 
 export function stageColumnId(stage: MortgagePipelineStage): string {
@@ -111,9 +145,7 @@ export function normalizeMortgageBoard(
 ): KanbanColumn[] {
   const byStage = new Map<string, KanbanColumn>();
   for (const col of cols) {
-    const stage = isMortgagePipelineStage(col.title)
-      ? col.title
-      : null;
+    const stage = resolvePipelineStage(col.title);
     if (!stage) continue;
     const existing = byStage.get(stage);
     const cards = [

@@ -255,6 +255,7 @@ import {
   InvoiceStatus,
 } from "@/lib/finance/invoices/types";
 import { formatAUD } from "@/lib/finance/shared";
+import { onRecordsChange } from "@/lib/records-sync";
 
 interface InvoiceRow {
   id: string;
@@ -275,7 +276,9 @@ export default function InvoicesPage() {
   const [data, setData] = useState<Invoice[]>(seed);
 
   useEffect(() => {
-    setData(listInvoices());
+    const refresh = () => setData(listInvoices());
+    refresh();
+    return onRecordsChange(refresh);
   }, []);
 
   // Filter based on search input and status dropdown

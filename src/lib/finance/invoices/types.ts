@@ -1,6 +1,10 @@
 /** SRS §13.4 / §20.3 Sales Invoices */
 
 import {
+  readJsonArrayStore,
+  writeJsonArrayStore,
+} from "@/lib/browser-json-store";
+import {
   type FinanceAuditEvent,
   type FinanceLineItem,
   formatFinanceAt,
@@ -36,6 +40,7 @@ export interface Invoice {
   contactName: string;
   contactEmail: string;
   dealName?: string;
+  relatedTo?: string;
   owner: string;
   issueDate: string;
   dueDate: string;
@@ -211,18 +216,11 @@ export const invoices: Invoice[] = [
 ];
 
 function readStore(): Invoice[] | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = sessionStorage.getItem(STORE_KEY);
-    return raw ? (JSON.parse(raw) as Invoice[]) : null;
-  } catch {
-    return null;
-  }
+  return readJsonArrayStore<Invoice>(STORE_KEY);
 }
 
 function writeStore(list: Invoice[]) {
-  if (typeof window === "undefined") return;
-  sessionStorage.setItem(STORE_KEY, JSON.stringify(list));
+  writeJsonArrayStore(STORE_KEY, list);
 }
 
 export function listInvoices(): Invoice[] {

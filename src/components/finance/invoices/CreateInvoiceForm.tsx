@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Receipt, User, Building2, Calendar } from "lucide-react";
 import {
@@ -11,46 +11,66 @@ import {
   type InvoiceStatus,
 } from "@/lib/finance/invoices/types";
 import {
-  FINANCE_CLIENTS,
-  FINANCE_DEALS,
   FINANCE_OWNERS,
   formatFinanceDate,
   newLineItem,
   type FinanceLineItem,
 } from "@/lib/finance/shared";
+import {
+  defaultFinanceDealName,
+  defaultFinanceTitle,
+  defaultFinanceValidUntil,
+  financeClientsWithRelated,
+  financeDealOptions,
+  financeRelatedTo,
+  type RelatedFinancePrefill,
+} from "@/lib/finance/related-prefill";
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import {
   CreateEntityFormShell,
   Field,
   InputShell,
-  TextAreaShell,
   elevatedInputClass,
   elevatedSelectClass,
-  elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
 
-interface Props {
+interface Props extends RelatedFinancePrefill {
   layoutId: string;
   redirect: boolean;
 }
 
-export function CreateInvoiceForm({ layoutId: _l, redirect: _r }: Props) {
+export function CreateInvoiceForm({
+  layoutId: _l,
+  redirect: _r,
+  relatedKind,
+  relatedName,
+  relatedId,
+  email,
+}: Props) {
   const router = useRouter();
-  const [title, setTitle] = useState("");
+  const prefill = useMemo(
+    () => ({ relatedKind, relatedName, relatedId, email }),
+    [relatedKind, relatedName, relatedId, email],
+  );
+  const clients = useMemo(() => financeClientsWithRelated(prefill), [prefill]);
+  const dealOptions = useMemo(() => financeDealOptions(prefill), [prefill]);
+  const relatedTo = financeRelatedTo(prefill);
+  const [title, setTitle] = useState(defaultFinanceTitle("invoice", prefill));
   const [status, setStatus] = useState<InvoiceStatus>("Draft");
-  const [clientId, setClientId] = useState<string>(FINANCE_CLIENTS[0].id);
-  const [dealName, setDealName] = useState<string>(FINANCE_DEALS[0]);
+  const [clientId, setClientId] = useState<string>(clients[0]?.id ?? "");
+  const [dealName, setDealName] = useState<string>(
+    defaultFinanceDealName(prefill),
+  );
   const [owner, setOwner] = useState<string>(FINANCE_OWNERS[0]);
   const [issueDate, setIssueDate] = useState(formatFinanceDate());
-  const [dueDate, setDueDate] = useState("");
+  const [dueDate, setDueDate] = useState(defaultFinanceValidUntil());
   const [notes, setNotes] = useState("");
   const [lineItems, setLineItems] = useState<FinanceLineItem[]>([
     newLineItem({ name: "Brokerage fee", unitPrice: 1500, taxRate: 10 }),
   ]);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const client =
-    FINANCE_CLIENTS.find((c) => c.id === clientId) ?? FINANCE_CLIENTS[0];
+  const client = clients.find((c) => c.id === clientId) ?? clients[0];
 
   function validate() {
     const next: Record<string, string> = {};
@@ -63,7 +83,7 @@ export function CreateInvoiceForm({ layoutId: _l, redirect: _r }: Props) {
   }
 
   function onSave(createAnother: boolean) {
-    if (!validate()) return;
+    if (!validate() || !client) return;
     const ids = nextInvoiceIds();
     const created = upsertInvoice(
       appendInvoiceAudit(
@@ -76,7 +96,8 @@ export function CreateInvoiceForm({ layoutId: _l, redirect: _r }: Props) {
           clientName: client.name,
           contactName: client.contact,
           contactEmail: client.email,
-          dealName,
+          dealName: dealName || undefined,
+          relatedTo,
           owner,
           issueDate: issueDate.trim() || formatFinanceDate(),
           dueDate: dueDate.trim(),
@@ -119,6 +140,17 @@ export function CreateInvoiceForm({ layoutId: _l, redirect: _r }: Props) {
       saveLabel="Save invoice"
       onSave={onSave}
     >
+      {relatedTo ? (
+        <Field label="Related to" className="sm:col-span-2">
+          <InputShell icon={Building2}>
+            <input
+              readOnly
+              className={elevatedInputClass(true)}
+              value={relatedTo}
+            />
+          </InputShell>
+        </Field>
+      ) : null}
       <Field label="Title" required error={errors.title} className="sm:col-span-2">
         <InputShell icon={Receipt} error={!!errors.title}>
           <input
@@ -136,7 +168,7 @@ export function CreateInvoiceForm({ layoutId: _l, redirect: _r }: Props) {
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
           >
-            {FINANCE_CLIENTS.map((c) => (
+            {clients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -166,9 +198,9 @@ export function CreateInvoiceForm({ layoutId: _l, redirect: _r }: Props) {
             value={dealName}
             onChange={(e) => setDealName(e.target.value)}
           >
-            {FINANCE_DEALS.map((d) => (
-              <option key={d} value={d}>
-                {d}
+            {dealOptions.map((d) => (
+              <option key={d || "none"} value={d}>
+                {d || "None"}
               </option>
             ))}
           </select>

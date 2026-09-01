@@ -89,9 +89,7 @@ export function TaskChecklistCard({
             Action Items
           </h2>
         </div>
-        <p className="mb-4 text-sm text-slate-500">
-          No action items on this task yet.
-        </p>
+        <p className="mb-4 text-2xl font-light leading-none text-slate-300">—</p>
         <div className="flex items-center gap-2 border-b border-slate-200 py-1.5 focus-within:border-violet-400">
           <input
             value={draft}

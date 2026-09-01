@@ -46,12 +46,12 @@ export function initials(name: string) {
 }
 
 export const AVATAR_COLORS = [
-  "bg-amber-50 text-amber-700",
-  "bg-pink-50 text-pink-700",
-  "bg-teal-50 text-teal-700",
-  "bg-blue-50 text-blue-700",
-  "bg-violet-50 text-violet-700",
-  "bg-emerald-50 text-emerald-700",
+  "bg-amber-200 text-amber-950 dark:bg-amber-800 dark:text-amber-50",
+  "bg-pink-200 text-pink-950 dark:bg-pink-800 dark:text-pink-50",
+  "bg-teal-200 text-teal-950 dark:bg-teal-800 dark:text-teal-50",
+  "bg-blue-200 text-blue-950 dark:bg-blue-800 dark:text-blue-50",
+  "bg-violet-200 text-violet-950 dark:bg-violet-800 dark:text-violet-50",
+  "bg-emerald-200 text-emerald-950 dark:bg-emerald-800 dark:text-emerald-50",
 ] as const;
 
 export function avatarColor(name: string) {

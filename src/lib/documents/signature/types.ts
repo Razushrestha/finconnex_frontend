@@ -1,3 +1,5 @@
+import { emitRecordsChange } from "@/lib/records-sync";
+
 // export type SignatureStatus =
 //   | "Draft"
 //   | "Sent"
@@ -933,6 +935,8 @@ export interface SignatureSigner {
   id: string;
   name: string;
   email: string;
+  /** Required when Direct Email + Email + SMS delivery is selected. */
+  phone?: string;
   /** 1-based signing order when sequential */
   order: number;
   role: SignerRole;
@@ -1060,6 +1064,7 @@ export function makeSigner(partial: {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   order: number;
   token: string;
   colorIndex?: number;
@@ -1072,6 +1077,7 @@ export function makeSigner(partial: {
     id: partial.id,
     name: partial.name,
     email: partial.email,
+    phone: partial.phone,
     order: partial.order,
     role: partial.role ?? "Signer",
     deliveryMethod: "email",
@@ -1479,6 +1485,7 @@ function readStore(): SignatureRequest[] | null {
 function writeStore(list: SignatureRequest[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORE_KEY, JSON.stringify(list));
+  emitRecordsChange(STORE_KEY);
 }
 
 export function listSignatureRequests(): SignatureRequest[] {

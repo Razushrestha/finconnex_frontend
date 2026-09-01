@@ -1,5 +1,10 @@
 /** SRS §9.2 Document Requests */
 
+import {
+  readJsonArrayStore,
+  writeJsonArrayStore,
+} from "@/lib/browser-json-store";
+
 export type DocumentRequestType =
   | "Contract"
   | "Proposal"
@@ -693,20 +698,12 @@ function normalize(req: DocumentRequest): DocumentRequest {
 }
 
 function readStore(): DocumentRequest[] | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = sessionStorage.getItem(STORE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as DocumentRequest[];
-    return parsed.map(normalize);
-  } catch {
-    return null;
-  }
+  const parsed = readJsonArrayStore<DocumentRequest>(STORE_KEY);
+  return parsed ? parsed.map(normalize) : null;
 }
 
 function writeStore(list: DocumentRequest[]) {
-  if (typeof window === "undefined") return;
-  sessionStorage.setItem(STORE_KEY, JSON.stringify(list.map(normalize)));
+  writeJsonArrayStore(STORE_KEY, list.map(normalize));
 }
 
 export function listDocumentRequests(): DocumentRequest[] {

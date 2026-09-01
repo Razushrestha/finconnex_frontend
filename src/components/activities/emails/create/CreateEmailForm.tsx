@@ -1,24 +1,45 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
-  Clock,
-  MapPin,
-  Paperclip,
-  Send,
-  Sparkles,
-  Users,
-  X,
+  Check,
+  ChevronDown,
+  LayoutTemplate,
+  Search,
 } from "lucide-react";
-import type { EmailStatus } from "@/lib/emails/types";
+import type { EmailImportance, EmailStatus } from "@/lib/emails/types";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
 import { createEmail } from "@/lib/emails/store";
+import { takeCompose } from "@/lib/emails/outlook";
+import {
+  editEmailWithPrompt,
+  plainTextToEmailHtml,
+  rewriteEmailWithAi,
+  type EmailTone,
+} from "@/lib/emails/ai-compose";
+import { searchEmailTemplates, type EmailTemplate } from "@/lib/emails/templates";
+import {
+  appendSignature,
+  applyPersonaSignature,
+  getActiveSignatureProfile,
+  getSignatureProfileForEmail,
+  hasAnySignature,
+  listSignatureProfiles,
+  setActiveSignatureId,
+  stripAllSignatures,
+  stripSignature,
+} from "@/lib/emails/signature";
 import { sendEmailDemoLive } from "@/lib/comms/send-gateway";
+import { canChooseFromAddress, listFromIdentities, sendAsLabel } from "@/lib/emails/send-as";
 import { formatRulesAt } from "@/lib/rules/storage";
+import { relatedRecordsForPerson } from "@/lib/emails/related-records";
+import { ComposeContextRail } from "./ComposeContextRail";
+import { ComposeActionBar } from "./ComposeActionBar";
 import { EmailEditor } from "./EmailEditor";
 import { EmailRecipients } from "./EmailRecipients";
+import { EditWithAiModal } from "./EditWithAiModal";
+import { SubjectImproveButton } from "./SubjectImproveButton";
 
 interface CreateEmailFormProps {
   layoutId: string;
@@ -27,15 +48,12 @@ interface CreateEmailFormProps {
     relatedKind?: RelatedEntityKind;
     relatedName?: string;
     to?: string;
+    cc?: string;
+    subject?: string;
+    body?: string;
+    template?: string;
   };
 }
-
-const EMAIL_TEMPLATES = [
-  "Follow-up Template",
-  "Intro Template",
-  "Meeting Recap",
-  "Proposal Follow-up",
-];
 
 interface Attachment {
   id: string;
@@ -54,6 +72,7 @@ interface FormState {
   relatedName: string;
   template: string;
   attachments: Attachment[];
+  importance: EmailImportance;
 }
 
 const initialState: FormState = {
@@ -67,38 +86,8 @@ const initialState: FormState = {
   relatedName: "",
   template: "",
   attachments: [],
+  importance: "normal",
 };
-
-const MOCK_CONTACT = {
-  name: "Sarah Jenkins",
-  title: "VP of Operations",
-  company: "Acme Corp",
-  location: "Seattle, WA",
-  localTime: "9:42 AM",
-};
-const MOCK_DEAL = {
-  name: "Acme Q3 Enterprise",
-  stage: "Negotiation",
-  value: "$145,000",
-  probability: 75,
-};
-const MOCK_ACTIVITY = [
-  {
-    id: "1",
-    title: "Discovery Call Completed",
-    when: "Yesterday, 2:30 PM",
-    note: "Sarah seems very interested.",
-  },
-];
-
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-const cardClass =
-  "rounded-md border border-border bg-white text-card-foreground shadow-sm";
 
 export function CreateEmailForm({
   layoutId,
@@ -110,20 +99,89 @@ export function CreateEmailForm({
     ...initialState,
     relatedKind: defaults?.relatedKind ?? "",
     relatedName: defaults?.relatedName ?? "",
-    to: defaults?.to ? [defaults.to] : [],
+    to: defaults?.to
+      ? defaults.to.split(/[,;]/).map((item) => item.trim()).filter(Boolean)
+      : [],
+    cc: defaults?.cc
+      ? defaults.cc.split(/[,;]/).map((item) => item.trim()).filter(Boolean)
+      : [],
+    subject: defaults?.subject ?? "",
+    body: defaults?.body ?? "",
+    template: defaults?.template ?? "",
   });
   const [errors, setErrors] = useState<
     Partial<Record<keyof FormState, string>>
   >({});
   const [submitted, setSubmitted] = useState(false);
-  const [showCc, setShowCc] = useState(false);
+  const [showCc, setShowCc] = useState(() => Boolean(defaults?.cc));
+
+  useEffect(() => {
+    const draft = takeCompose();
+    const fromEmail = listFromIdentities()[0]?.email ?? initialState.from;
+    const profile = getSignatureProfileForEmail(fromEmail);
+    setActiveSignatureId(profile.id);
+    if (draft?.cc?.length) setShowCc(true);
+    setForm((prev) => {
+      const next = draft
+        ? {
+            ...prev,
+            to: draft.to.length ? draft.to : prev.to,
+            cc: draft.cc?.length ? draft.cc : prev.cc,
+            subject: draft.subject || prev.subject,
+            body: draft.body || prev.body,
+            relatedName: draft.relatedName || prev.relatedName,
+            template: draft.templateUsed || prev.template,
+          }
+        : prev;
+      return {
+        ...next,
+        from: fromEmail,
+        body: hasAnySignature(next.body)
+          ? next.body
+          : appendSignature(next.body, profile.body),
+      };
+    });
+  }, []);
   const [showBcc, setShowBcc] = useState(false);
   const [recipientDraft, setRecipientDraft] = useState("");
   const [ccDraft, setCcDraft] = useState("");
   const [bccDraft, setBccDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [improving, setImproving] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [templateQuery, setTemplateQuery] = useState("");
+  const [fromOpen, setFromOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const templatesRef = useRef<HTMLDivElement>(null);
+  const fromRef = useRef<HTMLDivElement>(null);
+  const fromIdentities = listFromIdentities();
+  const canPickFrom = canChooseFromAddress();
+
+  useEffect(() => {
+    if (!templatesOpen && !fromOpen) return;
+    function onPointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (templatesOpen && !templatesRef.current?.contains(target)) {
+        setTemplatesOpen(false);
+      }
+      if (fromOpen && !fromRef.current?.contains(target)) {
+        setFromOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      setTemplatesOpen(false);
+      setFromOpen(false);
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [templatesOpen, fromOpen]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -187,14 +245,21 @@ export function CreateEmailForm({
       name: f.name,
       size: f.size,
     }));
-    update("attachments", [...form.attachments, ...next]);
+    setForm((prev) => ({
+      ...prev,
+      attachments: [...prev.attachments, ...next],
+    }));
   }
 
   function mergeList(list: string[], draft: string) {
     return [...new Set([...list, ...parseAddresses(draft)])];
   }
 
-  async function save(status: EmailStatus) {
+  async function save(
+    status: EmailStatus,
+    after: "emails" | "follow-up" | "deal" = "emails",
+    at?: Date,
+  ) {
     setSubmitted(true);
     setSendError(null);
     const to = mergeList(form.to, recipientDraft);
@@ -230,84 +295,138 @@ export function CreateEmailForm({
       form.relatedKind && form.relatedName
         ? `${form.relatedKind}: ${form.relatedName}`
         : undefined;
+    const body = form.body.trim();
     const created = createEmail({
       subject: form.subject.trim(),
-      body: form.body.trim(),
+      body,
       from: form.from.trim(),
       to,
       cc,
       bcc,
       relatedTo,
       status,
-      sentDate: status === "Draft" ? undefined : formatRulesAt(new Date()),
+      sentDate: status === "Draft" ? undefined : formatRulesAt(at ?? new Date()),
       templateUsed: form.template || undefined,
+      importance: form.importance,
     });
     void layoutId;
     void redirect;
+    if (after === "follow-up") {
+      router.push("/activities/reminders/create");
+      return;
+    }
+    if (after === "deal") {
+      const deal = relatedRecordsForPerson(
+        form.relatedName || undefined,
+        to[0],
+      ).find((item) => item.kind === "deal");
+      router.push(deal?.href ?? "/sales/deals");
+      return;
+    }
     router.push(`/activities/emails?focus=${created.id}`);
   }
 
-  const showContactCard =
-    Boolean(form.relatedName) || Boolean(defaults?.relatedName);
-  const contactName = form.relatedName || MOCK_CONTACT.name;
+  const contactName = form.relatedName || form.to[0] || "";
+  const related = relatedRecordsForPerson(
+    contactName.includes("@") ? undefined : contactName,
+    form.to[0],
+  );
+  const primaryDeal = related.find((item) => item.kind === "deal");
+  const visibleTemplates = searchEmailTemplates(templateQuery);
+
+  function keepSignatureIfPresent(nextHtml: string) {
+    if (!hasAnySignature(form.body)) return nextHtml;
+    return appendSignature(nextHtml, getActiveSignatureProfile().body);
+  }
+
+  function applyAiBody(nextHtml: string) {
+    update("body", keepSignatureIfPresent(nextHtml));
+  }
+
+  function runAi(build: () => string) {
+    setImproving(true);
+    window.setTimeout(() => {
+      applyAiBody(build());
+      setImproving(false);
+      setAskOpen(false);
+    }, 280);
+  }
+
+  const aiRecipient = contactName.includes("@") ? undefined : contactName;
+
+  function writeFromPrompt(prompt: string) {
+    runAi(() =>
+      editEmailWithPrompt({
+        html: stripAllSignatures(form.body),
+        prompt,
+        recipientName: aiRecipient,
+        subject: form.subject,
+      }),
+    );
+  }
+
+  function rewriteWith(tone: EmailTone, action?: "brief" | "clarity") {
+    runAi(() =>
+      rewriteEmailWithAi({
+        html: stripAllSignatures(form.body),
+        tone,
+        action,
+        recipientName: aiRecipient,
+        subject: form.subject,
+      }),
+    );
+  }
+
+  function insertHtml(chunk: string) {
+    const profile = getActiveSignatureProfile();
+    setForm((prev) => {
+      let html = prev.body;
+      for (const item of listSignatureProfiles()) {
+        html = stripSignature(html, item.body);
+      }
+      html = html.replace(/(<p><\/p>\s*)+$/g, "").trim();
+      return { ...prev, body: appendSignature(`${html}${chunk}`, profile.body) };
+    });
+  }
+
+  function insertImageFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const src = String(reader.result ?? "");
+      if (src) {
+        insertHtml(
+          `<p><img src="${src}" alt="" style="max-width:100%;height:auto;border-radius:4px;" /></p>`,
+        );
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function applyTemplate(item: EmailTemplate) {
+    setForm((prev) => ({
+      ...prev,
+      template: item.name,
+      subject: item.subject,
+      body: keepSignatureIfPresent(plainTextToEmailHtml(item.body)),
+    }));
+    setTemplatesOpen(false);
+    setTemplateQuery("");
+  }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border bg-white px-6 py-1">
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => router.push("/activities/emails")}
-            className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </button>
-          <span className="h-4 w-px bg-border" />
-          <span className="text-sm font-medium text-foreground">
-            Compose Email
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            disabled={sending}
-            onClick={() => void save("Draft")}
-            className="rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
-          >
-            Save Draft
-          </button>
-          <button
-            type="button"
-            disabled={sending}
-            onClick={() => void save("Scheduled")}
-            className="rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"
-          >
-            Schedule
-          </button>
-          <button
-            type="button"
-            disabled={sending}
-            onClick={() => void save("Sent")}
-            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-          >
-            {sending ? "Sending…" : "Send Email"}
-            <Send className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      </div>
-
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
       {sendError ? (
         <div className="mx-6 mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
           {sendError}
         </div>
       ) : null}
 
-      <div className="mx-auto grid w-full max-w-[1920px] grid-cols-1 gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,400px)] lg:gap-6 2xl:px-8">
-        {/* Left column */}
-        <div className={`${cardClass} divide-y divide-border`}>
+      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-white">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="shrink-0">
           <EmailRecipients
+            onBack={() => router.push("/activities/emails")}
             to={form.to}
             recipientDraft={recipientDraft}
             onDraftChange={setRecipientDraft}
@@ -317,6 +436,14 @@ export function CreateEmailForm({
             showBcc={showBcc}
             onToggleCc={() => setShowCc((v) => !v)}
             onToggleBcc={() => setShowBcc((v) => !v)}
+            onHideCc={() => {
+              setShowCc(false);
+              setCcDraft("");
+            }}
+            onHideBcc={() => {
+              setShowBcc(false);
+              setBccDraft("");
+            }}
             cc={form.cc}
             ccDraft={ccDraft}
             onCcDraftChange={setCcDraft}
@@ -330,33 +457,125 @@ export function CreateEmailForm({
             error={errors.to}
             submitted={submitted}
           />
+          </div>
 
-          {/* Subject Line */}
-          <div className="flex items-center justify-between gap-3 px-5 py-4">
-            <div className="flex flex-1 items-center gap-2">
-              <span className="text-sm text-muted-foreground">Subject:</span>
+          <div className="flex shrink-0 items-center gap-2 border-t border-slate-100 px-5 py-3">
+            <span className="text-sm text-muted-foreground">From:</span>
+            {canPickFrom ? (
+              <div className="relative min-w-0 flex-1" ref={fromRef}>
+                <button
+                  type="button"
+                  onClick={() => setFromOpen((v) => !v)}
+                  className="inline-flex max-w-full items-center gap-1.5 rounded-md py-0.5 text-sm font-medium text-foreground hover:bg-slate-50"
+                >
+                  <span className="truncate">{form.from}</span>
+                  <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+                </button>
+                {fromOpen ? (
+                  <div className="absolute top-8 left-0 z-30 w-[min(100%,22rem)] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                    {fromIdentities.map((item) => (
+                      <button
+                        key={item.email}
+                        type="button"
+                        onClick={() => {
+                          setForm((prev) => ({
+                            ...prev,
+                            from: item.email,
+                            body: applyPersonaSignature(prev.body, item.email),
+                          }));
+                          setFromOpen(false);
+                        }}
+                        className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-slate-50"
+                      >
+                        <Check
+                          className={`mt-0.5 h-4 w-4 shrink-0 ${
+                            form.from === item.email
+                              ? "text-[#5A32A3]"
+                              : "text-transparent"
+                          }`}
+                        />
+                        <span className="min-w-0">
+                          <span className="block truncate text-[13px] font-medium text-slate-800">
+                            {item.name}
+                          </span>
+                          <span className="block truncate text-[11px] text-slate-500">
+                            {item.email} · {sendAsLabel(item.kind)}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <span className="truncate text-sm font-medium text-foreground">
+                {form.from}
+              </span>
+            )}
+          </div>
+
+          <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 px-5 py-3">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="text-sm text-muted-foreground">Subject</span>
               <input
-                className="flex-1 bg-transparent text-sm font-semibold text-foreground placeholder:font-normal placeholder:text-muted-foreground focus:outline-none"
+                className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-foreground placeholder:font-normal placeholder:text-muted-foreground focus:outline-none"
                 value={form.subject}
                 onChange={(e) => update("subject", e.target.value)}
-                placeholder="Email subject line"
+                placeholder="Add a subject"
+              />
+              <SubjectImproveButton
+                current={form.subject}
+                recipientName={contactName.includes("@") ? undefined : contactName}
+                dealTitle={primaryDeal?.title}
+                dealStage={primaryDeal?.stage}
+                onPick={(subject) => update("subject", subject)}
               />
             </div>
-            <div className="relative flex shrink-0 items-center gap-1 text-sm font-medium text-primary">
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>{form.template || "Templates"}</span>
-              <select
-                value={form.template}
-                onChange={(e) => update("template", e.target.value)}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            <div className="relative" ref={templatesRef}>
+              <button
+                type="button"
+                onClick={() => setTemplatesOpen((v) => !v)}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-[12px] font-semibold text-[#5A32A3] hover:bg-violet-50"
               >
-                <option value="">Templates</option>
-                {EMAIL_TEMPLATES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+                <LayoutTemplate className="h-3.5 w-3.5" />
+                {form.template || "Templates"}
+              </button>
+              {templatesOpen ? (
+                <div className="absolute top-9 right-0 z-30 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+                  <div className="relative border-b border-slate-100 p-2">
+                    <Search className="pointer-events-none absolute top-1/2 left-4 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <input
+                      autoFocus
+                      value={templateQuery}
+                      onChange={(e) => setTemplateQuery(e.target.value)}
+                      placeholder="Search templates"
+                      className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pr-3 pl-8 text-[12px] outline-none"
+                    />
+                  </div>
+                  <div className="max-h-72 overflow-y-auto py-1">
+                    {visibleTemplates.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => applyTemplate(item)}
+                        className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-slate-50"
+                      >
+                        <span className="text-[12px] font-semibold text-slate-800">
+                          {item.name}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          {item.category} · {item.subject}
+                        </span>
+                      </button>
+                    ))}
+                    {visibleTemplates.length === 0 ? (
+                      <p className="px-3 py-4 text-[12px] text-slate-400">
+                        No templates match “{templateQuery}”
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
           {submitted && errors.subject && (
@@ -365,174 +584,78 @@ export function CreateEmailForm({
             </p>
           )}
 
-          {/* Editor Component */}
           <EmailEditor
             body={form.body}
             onChange={(val) => update("body", val)}
-            recipientName={form.relatedName || form.to[0]}
-            subject={form.subject}
             error={errors.body}
             submitted={submitted}
+            recipientName={form.relatedName || form.to[0]}
+            subject={form.subject}
+            importance={form.importance}
+            onImportanceChange={(value) => update("importance", value)}
+            attachments={form.attachments}
+            onAttachClick={() => fileInputRef.current?.click()}
+            onRemoveAttachment={(id) =>
+              update(
+                "attachments",
+                form.attachments.filter((item) => item.id !== id),
+              )
+            }
+            onDropFiles={handleFilesSelected}
+            aiBusy={improving}
+            onAskMeTo={() => setAskOpen(true)}
+            onAiTone={(tone) => rewriteWith(tone)}
+            onAiShorten={() => rewriteWith("professional", "brief")}
+            onAiClarity={() => rewriteWith("professional", "clarity")}
+            onAiRegenerate={() => rewriteWith("professional")}
           />
-
-          {/* Attachments Section */}
-          <div className="px-5 py-4">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">
-                Attachments ({form.attachments.length})
-              </span>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1 text-sm font-medium text-primary hover:opacity-80"
-              >
-                + Add File
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                className="hidden"
-                onChange={(e) => handleFilesSelected(e.target.files)}
-              />
-            </div>
-            {form.attachments.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {form.attachments.map((a) => (
-                  <div
-                    key={a.id}
-                    className="group flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2"
-                  >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-md bg-secondary text-secondary-foreground">
-                      <Paperclip className="h-4 w-4" />
-                    </span>
-                    <div className="leading-tight">
-                      <p className="text-xs font-medium text-foreground">
-                        {a.name}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {formatBytes(a.size)}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        update(
-                          "attachments",
-                          form.attachments.filter((item) => item.id !== a.id),
-                        )
-                      }
-                      className="ml-1 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              handleFilesSelected(e.target.files);
+              e.target.value = "";
+            }}
+          />
+        <ComposeActionBar
+          sending={sending}
+          improving={improving}
+          body={form.body}
+          onAttach={() => fileInputRef.current?.click()}
+          onInsertImage={insertImageFile}
+          onInsertTable={() =>
+            insertHtml(
+              `<table class="fc-email-table" style="border-collapse:collapse;width:100%;max-width:100%;table-layout:fixed;margin:8px 0;"><tbody>${`<tr>${`<td style="border:1px solid #cbd5e1;padding:6px 8px;min-width:48px;vertical-align:top;"><br></td>`.repeat(3)}</tr>`.repeat(3)}</tbody></table><p><br></p>`,
+            )
+          }
+          onInsertEmoji={(emoji) => insertHtml(`<p>${emoji}</p>`)}
+          onSignature={(html) => update("body", html)}
+          onImprove={() => setAskOpen(true)}
+          onReminder={() => router.push("/activities/reminders/create")}
+          onSaveDraft={() => void save("Draft")}
+          onSend={(action, at) => {
+            if (action === "schedule") void save("Scheduled", "emails", at);
+            else if (action === "follow-up") void save("Sent", "follow-up");
+            else if (action === "deal-stage") void save("Sent", "deal");
+            else void save("Sent");
+          }}
+        />
         </div>
 
-        {/* Right column — contextual sidebar */}
-        <div className="space-y-6">
-          {showContactCard ? (
-            <>
-              <div className={`${cardClass} p-4`}>
-                <div className="flex items-start gap-3">
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-secondary-foreground">
-                    {contactName
-                      .split(" ")
-                      .filter(Boolean)
-                      .slice(0, 2)
-                      .map((p) => p[0]?.toUpperCase())
-                      .join("")}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-foreground">
-                      {contactName}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {MOCK_CONTACT.title}, {MOCK_CONTACT.company}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {MOCK_CONTACT.location}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5" />
-                    {MOCK_CONTACT.localTime} (Local)
-                  </div>
-                </div>
-              </div>
-
-              <div className={`${cardClass} p-4`}>
-                <p className="mb-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                  Active Deal Context
-                </p>
-                <div className="rounded-xl border border-border bg-muted/40 p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-sm font-semibold text-foreground">
-                      {MOCK_DEAL.name}
-                    </span>
-                    <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">
-                      {MOCK_DEAL.stage}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <div>
-                      <p className="text-muted-foreground">Value</p>
-                      <p className="font-medium text-primary">
-                        {MOCK_DEAL.value}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-muted-foreground">Probability</p>
-                      <p className="font-medium text-foreground">
-                        {MOCK_DEAL.probability}%
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className={`${cardClass} p-4`}>
-                <div className="mb-3 flex items-center justify-between">
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    Recent Activity
-                  </p>
-                </div>
-                <div className="space-y-3">
-                  {MOCK_ACTIVITY.map((item) => (
-                    <div key={item.id} className="flex gap-2.5">
-                      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-foreground">
-                          {item.title}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {item.when}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className={`${cardClass} p-4 text-sm text-muted-foreground`}>
-              <div className="mb-2 flex items-center gap-2 text-foreground">
-                <Users className="h-4 w-4" />
-                No related record
-              </div>
-              Link this email to a contact or deal to see their profile, active
-              deal, and recent activity here.
-            </div>
-          )}
-        </div>
+        <ComposeContextRail
+          recipientName={contactName.includes("@") ? undefined : contactName}
+          recipientEmail={form.to[0]}
+        />
       </div>
+      <EditWithAiModal
+        open={askOpen}
+        busy={improving}
+        onClose={() => setAskOpen(false)}
+        onWrite={writeFromPrompt}
+      />
     </div>
   );
 }

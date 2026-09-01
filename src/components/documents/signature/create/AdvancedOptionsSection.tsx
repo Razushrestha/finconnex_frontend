@@ -57,36 +57,38 @@ export const AdvancedOptionsSection: React.FC<AdvancedOptionsProps> = ({
       </div>
 
       {/* Expiry */}
-      <div className="space-y-3 pt-2 border-t border-slate-100">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={enableExpiry}
-            onChange={(e) => setEnableExpiry(e.target.checked)}
-            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
-          />
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-            Document expiry{" "}
-            <span className="text-slate-400 font-normal">(optional)</span>
-          </span>
-        </label>
+      <div className="pt-2 border-t border-slate-100">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <label className="flex shrink-0 items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={enableExpiry}
+              onChange={(e) => setEnableExpiry(e.target.checked)}
+              className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+            />
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              Document expiry{" "}
+              <span className="text-slate-400 font-normal">(optional)</span>
+            </span>
+          </label>
 
-        {enableExpiry && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-6">
-            <input
-              type="date"
-              value={expiryDate}
-              onChange={(e) => setExpiryDate(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-slate-200 text-xs text-slate-800 bg-white"
-            />
-            <input
-              type="time"
-              value={expiryTime}
-              onChange={(e) => setExpiryTime(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-slate-200 text-xs text-slate-800 bg-white"
-            />
-          </div>
-        )}
+          {enableExpiry && (
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <input
+                type="date"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+                className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-800"
+              />
+              <input
+                type="time"
+                value={expiryTime}
+                onChange={(e) => setExpiryTime(e.target.value)}
+                className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-800"
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

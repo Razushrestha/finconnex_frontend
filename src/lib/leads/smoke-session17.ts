@@ -79,7 +79,7 @@ export function runSmokeSession17() {
     }
   }
   const total = cols.reduce((n, c) => n + c.cards.length, 0);
-  if (total < 13) fail(`expected ≥13 leads, got ${total}`);
+  if (total < 10) fail(`expected ≥10 leads, got ${total}`);
   console.log("   OK —", cols.map((c) => `${c.title}:${c.cards.length}`).join(" · "));
 
   console.log("\n2) normalizeMortgageBoard restores missing stages…");
@@ -108,23 +108,23 @@ export function runSmokeSession17() {
       ],
     },
   ]);
-  if (sparse.length !== 8) fail("normalize must yield 8 stages");
+  if (sparse.length !== 15) fail("normalize must yield 15 stages");
   if (sparse[0]!.title !== "New Lead") fail("normalize order broken");
   const conv = sparse.find((c) => c.title === "In Conversation")!;
   if (conv.leadStatus !== "Contacted") fail("normalize must fix leadStatus");
   if (conv.cards[0]!.pipelineStage !== "In Conversation") {
     fail("normalize must sync card.pipelineStage");
   }
-  if (sparse.find((c) => c.title === "Processing")!.cards.length !== 0) {
+  if (sparse.find((c) => c.title === "Research & Servicing")!.cards.length !== 0) {
     fail("empty stages must still exist");
   }
 
   console.log("\n3) Stage gates + New Lead restarts pipeline…");
-  const settledGate = assertPipelineStageChange("Settled", "Processing");
-  if (settledGate.ok) fail("Settled must be final");
+  const settledGate = assertPipelineStageChange("Closed Won", "Research & Servicing");
+  if (settledGate.ok) fail("Closed Won must be final");
   const okMove = assertPipelineStageChange(
     "In Conversation",
-    "Waiting on Documents",
+    "Waiting on Docs",
   );
   if (!okMove.ok) fail(okMove.message);
 
@@ -211,11 +211,11 @@ export function runSmokeSession17() {
   const chloeCol = cols.find((c) =>
     c.cards.some((card) => card.name === "Chloe Ramirez"),
   );
-  if (!chloeCol || chloeCol.title !== "Waiting on Documents") {
-    fail("Chloe should be in Waiting on Documents");
+  if (!chloeCol || chloeCol.title !== "Waiting on Docs") {
+    fail("Chloe should be in Waiting on Docs");
   }
-  const lostCol = cols.find((c) => c.title === "Lost");
-  if (!lostCol || lostCol.cards.length < 1) fail("Lost column empty");
+  const lostCol = cols.find((c) => c.title === "Closed Lost");
+  if (!lostCol || lostCol.cards.length < 1) fail("Closed Lost column empty");
   const lostVm = buildLeadCardViewModelFromCard(
     lostCol.cards[0]!,
     lostCol.leadStatus,

@@ -1,7 +1,8 @@
 /** SRS §7.2 Calls */
 
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
-import type { TaskReminder } from "@/lib/tasks/types";
+import type { TaskActionItem, TaskReminder } from "@/lib/tasks/types";
+import type { ReminderRepeatRule } from "@/lib/tasks/repeat-reminder";
 
 export const CALL_TYPES = [
   "Inbound",
@@ -23,6 +24,27 @@ export const CALL_STATUSES = [
 ] as const;
 export type CallStatus = (typeof CALL_STATUSES)[number];
 
+/** Kanban stage names — use these in status pickers, not every outcome. */
+export const CALL_STAGES = [
+  "Scheduled",
+  "Completed",
+  "No Answer",
+  "Voicemail Left",
+  "Cancelled",
+] as const satisfies readonly CallStatus[];
+export type CallStage = (typeof CALL_STAGES)[number];
+
+export const CALL_PURPOSES = [
+  "Prospecting",
+  "Administrative",
+  "Negotiation",
+  "Demo",
+  "Project",
+  "Support",
+  "Follow-up",
+] as const;
+export type CallPurpose = (typeof CALL_PURPOSES)[number];
+
 export interface NextStepTask {
   enabled: boolean;
   title: string;
@@ -42,6 +64,13 @@ export interface CallRecording {
   audioUrl?: string;
 }
 
+export interface CallAttachment {
+  name: string;
+  sizeLabel?: string;
+  storageUrl?: string;
+  contentType?: string;
+}
+
 export interface Call {
   id: string;
   subject: string;
@@ -57,10 +86,22 @@ export interface Call {
   agenda?: string;
   purpose?: string;
   assignedTo: string;
+  /** Team member who placed or answered the call — may differ from the owner. */
+  calledBy?: string;
   recording?: CallRecording;
   nextStep?: NextStepTask;
   nextSteps?: CallFollowUp[];
   reminders?: TaskReminder[];
+  reminderDate?: string;
+  reminderRepeat?: ReminderRepeatRule;
+  repeatRule?: ReminderRepeatRule;
+  actionItems?: TaskActionItem[];
+  createdBy?: string;
+  createdOn?: string;
+  modifiedBy?: string;
+  modifiedOn?: string;
+  attachments?: CallAttachment[];
+  attachmentsCount?: number;
   outcome?: string;
 }
 
@@ -93,11 +134,9 @@ export const callColumns: CallColumn[] = [
         callType: "Outbound",
         status: "Scheduled",
         date: "22/07/2026 10:00 AM",
-        duration: "3:42",
         assignedTo: "John Smith",
         agenda: "Confirm remaining documents, rate-lock deadline, and next drawdown date.",
-        purpose: "Keep the refinance on track before the current rate lock expires.",
-        recording: { durationSeconds: 222 },
+        purpose: "Follow-up",
         reminders: [
           {
             id: "cr-c1-1",
@@ -157,7 +196,7 @@ export const callColumns: CallColumn[] = [
   {
     id: "completed",
     title: "Completed",
-    count: 3,
+    count: 4,
     badgeColorClass: "bg-emerald-500 text-white",
     calls: [
       {
@@ -172,7 +211,23 @@ export const callColumns: CallColumn[] = [
         fromNumber: "+1 (628) 555-0177",
         notes: "Resolved billing question.",
         assignedTo: "Tejas Gokhe",
+        calledBy: "Tejas Gokhe",
         recording: { durationSeconds: 1080 },
+      },
+      {
+        id: "c10",
+        subject: "Billing follow-up: Contoso",
+        relatedTo: "Company: Contoso Ltd.",
+        contact: "Marcus Lin",
+        callType: "Outbound",
+        status: "Completed",
+        date: "12/07/2026 03:15 PM",
+        duration: "9 min",
+        fromNumber: "+1 (628) 555-0177",
+        notes: "Confirmed last invoice and payment date.",
+        assignedTo: "Tejas Gokhe",
+        calledBy: "John Smith",
+        recording: { durationSeconds: 540 },
       },
       {
         id: "c4",
@@ -184,6 +239,7 @@ export const callColumns: CallColumn[] = [
         duration: "32 min",
         fromNumber: "+1 (415) 555-0142",
         assignedTo: "Roshna Abraham",
+        calledBy: "Roshna Abraham",
         recording: { durationSeconds: 1920 },
       },
       {
@@ -199,6 +255,7 @@ export const callColumns: CallColumn[] = [
         fromNumber: "+1 (415) 555-0142",
         notes: "Interested; follow up next week.",
         assignedTo: "Roshna Abraham",
+        calledBy: "John Smith",
         recording: { durationSeconds: 1320 },
       },
     ],
@@ -238,6 +295,7 @@ export const callColumns: CallColumn[] = [
         duration: "0:42",
         fromNumber: "+1 (415) 555-0142",
         assignedTo: "Shiva Kadhka",
+        calledBy: "Shiva Kadhka",
         recording: { durationSeconds: 42 },
       },
     ],

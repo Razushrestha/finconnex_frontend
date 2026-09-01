@@ -87,8 +87,8 @@ export function AssignConsultantsStep({
   }
 
   return (
-    <div className="mx-auto w-full max-w-[720px] pb-8">
-      <div className="mb-4 flex items-center gap-3 rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+    <div className="mx-auto flex max-h-full min-h-0 w-full max-w-[720px] flex-1 flex-col overflow-hidden">
+      <div className="mb-4 flex shrink-0 items-center gap-3 rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
         <span
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-white"
           style={{ backgroundColor: BRAND }}
@@ -103,8 +103,8 @@ export function AssignConsultantsStep({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-        <div className="px-5 pt-6 pb-4 sm:px-7">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+        <div className="shrink-0 px-5 pt-6 pb-4 sm:px-7">
           <div className="mb-5 flex items-center gap-2.5">
             <span
               className="h-5 w-[3px] rounded-full"
@@ -137,7 +137,7 @@ export function AssignConsultantsStep({
           </div>
         </div>
 
-        <ul className="divide-y divide-[#F3F4F6] border-t border-[#F3F4F6]">
+        <ul className="min-h-0 flex-1 divide-y divide-[#F3F4F6] overflow-y-auto border-t border-[#F3F4F6] [overflow-anchor:none]">
           {names.map((name) => {
             const checked = selected.includes(name);
             return (
@@ -189,8 +189,8 @@ export function AssignConsultantsStep({
           ) : null}
         </ul>
 
-        <div className="border-t border-[#E5E7EB] bg-gradient-to-b from-[#F3ECFB] to-white px-5 py-4 sm:px-7">
-          <p className="text-[13px] font-semibold text-slate-700">
+        <div className="shrink-0 border-t border-[#E5E7EB] bg-gradient-to-b from-[#F3ECFB] to-white px-5 py-3 sm:px-7">
+          <p className="truncate text-[13px] font-semibold text-slate-700">
             Consultants Assigned:
             {selected.length ? (
               <span className="ml-1.5 font-medium text-[#5A32A3]">
@@ -211,7 +211,7 @@ export function AssignConsultantsStep({
         </p>
       ) : null}
 
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+      <div className="mt-4 flex shrink-0 flex-wrap items-center justify-center gap-3 pb-1">
         <button
           type="button"
           onClick={onBack}
@@ -230,10 +230,10 @@ export function AssignConsultantsStep({
             for (const name of selected) next[name] = priorityOf(name);
             onCreate(selected, next);
           }}
-          className="h-10 rounded-lg px-5 text-[13px] font-semibold text-white hover:brightness-110"
+          className="h-10 min-w-[96px] rounded-lg px-6 text-[13px] font-semibold text-white hover:brightness-110"
           style={{ backgroundColor: BRAND }}
         >
-          Create Consultation
+          Next
         </button>
       </div>
     </div>

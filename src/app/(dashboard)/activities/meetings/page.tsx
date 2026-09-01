@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Video, Phone, Users, MapPin } from "lucide-react";
+import { Video, Phone, Users, MapPin, Search, X } from "lucide-react";
 import {
   MEETING_STATUSES,
   MEETING_TYPES,
@@ -11,7 +11,13 @@ import {
   type MeetingStatus,
   type MeetingType,
 } from "@/lib/meetings/types";
-import { listMeetingColumns, saveMeetingColumns, deleteMeeting } from "@/lib/meetings/store";
+import {
+  listMeetingColumns,
+  saveMeetingColumns,
+  deleteMeeting,
+  meetingMatchesScope,
+  type MeetingScope,
+} from "@/lib/meetings/store";
 import { MeetingsListTable } from "@/components/activities/meetings/MeetingsListTable";
 import { MeetingsKanbanColumn } from "@/components/activities/meetings/MeetingsKanbanColumn";
 import {
@@ -24,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
 import { activityExportMenuItem } from "@/lib/activities/export";
 import { DropTargetPos } from "@/components/activities/meetings/MeetingsKanbanBoard";
+import { onRulesChange } from "@/lib/rules/storage";
 
 const TYPE_ICON: Record<MeetingType, React.ElementType> = {
   "Video Call": Video,
@@ -35,7 +42,7 @@ const TYPE_ICON: Record<MeetingType, React.ElementType> = {
 export default function MeetingsPage() {
   const router = useRouter();
   const [view, setView] = useState<ActivityView>("kanban");
-  const [statusTab, setStatusTab] = useState<"All" | MeetingStatus>("All");
+  const [statusFilters, setStatusFilters] = useState<MeetingStatus[]>([]);
   const [typeFilter, setTypeFilter] = useState<MeetingType | "All">("All");
   const [search, setSearch] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -50,9 +57,18 @@ export default function MeetingsPage() {
   );
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
+  const [scopeTab, setScopeTab] = useState("All Meetings");
+
+  const scope: MeetingScope =
+    scopeTab === "My Meetings"
+      ? "mine"
+      : scopeTab === "My Overdue Meetings"
+        ? "my-overdue"
+        : "all";
 
   useEffect(() => {
     setColumns(listMeetingColumns());
+    return onRulesChange(() => setColumns(listMeetingColumns()));
   }, []);
 
   useEffect(() => {
@@ -68,17 +84,11 @@ export default function MeetingsPage() {
     [columns],
   );
 
-  const statusCounts = useMemo(() => {
-    const map = Object.fromEntries(
-      MEETING_STATUSES.map((s) => [s, 0]),
-    ) as Record<MeetingStatus, number>;
-    for (const m of allMeetings) map[m.status] += 1;
-    return map;
-  }, [allMeetings]);
-
   const filteredMeetings = useMemo(() => {
     let data: Meeting[] = allMeetings;
-    if (statusTab !== "All") data = data.filter((m) => m.status === statusTab);
+    if (statusFilters.length) {
+      data = data.filter((m) => statusFilters.includes(m.status));
+    }
     if (typeFilter !== "All") data = data.filter((m) => m.type === typeFilter);
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -91,13 +101,24 @@ export default function MeetingsPage() {
           (m.agenda?.toLowerCase().includes(q) ?? false),
       );
     }
+    data = data.filter((m) => meetingMatchesScope(m, scope));
     return data;
-  }, [allMeetings, statusTab, typeFilter, search]);
+  }, [allMeetings, statusFilters, typeFilter, search, scope]);
 
   const visibleColumns = useMemo(() => {
-    if (statusTab === "All") return columns;
-    return columns.filter((c) => c.title === statusTab);
-  }, [columns, statusTab]);
+    if (!statusFilters.length) return columns;
+    return columns.filter((c) =>
+      statusFilters.includes(c.title as MeetingStatus),
+    );
+  }, [columns, statusFilters]);
+
+  function toggleStatus(status: MeetingStatus) {
+    setStatusFilters((prev) =>
+      prev.includes(status)
+        ? prev.filter((item) => item !== status)
+        : [...prev, status],
+    );
+  }
 
   function handleDragStartMeeting(
     e: React.DragEvent<HTMLDivElement>,
@@ -169,20 +190,17 @@ export default function MeetingsPage() {
         <ActivityToolbar
           entityLabel="Meeting"
           createRoute="/activities/meetings/create?layoutid=standard&redirect=false"
-          tabs={["All", ...MEETING_STATUSES]}
-          activeTab={statusTab}
-          onTabChange={(tab) => setStatusTab(tab as "All" | MeetingStatus)}
-          tabCounts={{
-            All: allMeetings.length,
-            ...statusCounts,
+          tabs={["My Overdue Meetings"]}
+          leadingTabMenu={{
+            items: ["All Meetings", "My Meetings"],
           }}
+          activeTab={scopeTab}
+          onTabChange={setScopeTab}
           view={view}
           onViewChange={setView}
           filterOpen={filterOpen}
           onToggleFilter={() => setFilterOpen((v) => !v)}
           onClearSort={() => setSortActive(false)}
-          search={search}
-          onSearchChange={setSearch}
           moreMenuItems={[activityExportMenuItem("meetings")]}
         />
 
@@ -205,9 +223,50 @@ export default function MeetingsPage() {
         {filterOpen && (
           <div className="absolute inset-y-0 left-0 z-30 flex sm:relative">
             <div className="flex w-64 flex-col rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Filter by Type
-              </h3>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-xs font-semibold tracking-wider text-slate-500 uppercase">
+                  Filters
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setFilterOpen(false)}
+                  className="rounded-md p-0.5 text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+                  aria-label="Close filters"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <label className="mb-4 flex h-9 items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[#5A32A3]">
+                <Search className="h-3.5 w-3.5 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search meetings…"
+                  className="min-w-0 flex-1 bg-transparent text-[12px] outline-none"
+                />
+              </label>
+              <h4 className="mb-2 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
+                Status
+              </h4>
+              <div className="mb-4 space-y-1">
+                {MEETING_STATUSES.map((status) => (
+                  <label
+                    key={status}
+                    className="flex cursor-pointer items-center gap-2 rounded-lg px-1.5 py-1 text-xs text-slate-600 hover:bg-slate-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={statusFilters.includes(status)}
+                      onChange={() => toggleStatus(status)}
+                      className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-300"
+                    />
+                    {status}
+                  </label>
+                ))}
+              </div>
+              <h4 className="mb-2 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
+                Type
+              </h4>
               <div className="space-y-1">
                 {MEETING_TYPES.map((t) => {
                   const Icon = TYPE_ICON[t];
@@ -239,15 +298,16 @@ export default function MeetingsPage() {
           {view === "list" ? (
             <MeetingsListTable
               data={filteredMeetings}
-              statusLabel={statusTab === "All" ? "All Meetings" : statusTab}
+              statusLabel="All Meetings"
               embedded
               selectedIds={selectedIds}
               onSelectedIdsChange={setSelectedIds}
             />
           ) : (
-            <div className="flex h-full min-h-[420px] items-stretch gap-3 overflow-x-auto p-1">
+            <div className="flex h-full w-full min-h-[420px] min-w-0 items-stretch gap-3 overflow-x-auto p-1 pr-3">
               {visibleColumns.map((column) => {
                 const meetings = column.meetings.filter((m) => {
+                  if (!meetingMatchesScope(m, scope)) return false;
                   if (typeFilter !== "All" && m.type !== typeFilter)
                     return false;
                   if (!search.trim()) return true;
@@ -272,7 +332,6 @@ export default function MeetingsPage() {
                       setDropTargetPos(null);
                     }}
                     onDropMeeting={handleDropMeeting}
-                    embedded
                     selectedIds={selectedIds}
                     onToggleSelect={toggleSelected}
                   />

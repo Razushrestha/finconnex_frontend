@@ -6,10 +6,10 @@ import {
   ChevronLeft,
   ChevronRight,
   MoreHorizontal,
-  Tag,
 } from "lucide-react";
 import type { DetailHeaderAction } from "./types";
 import { cn } from "@/lib/utils";
+import { RecordTagsRow } from "@/components/shared/tags/RecordTags";
 
 interface EntityDetailHeaderProps {
   avatarUrl?: string;
@@ -21,7 +21,8 @@ interface EntityDetailHeaderProps {
   relatedLabel?: string;
   onRelatedClick?: () => void;
   tags?: string[];
-  onAddTag?: () => void;
+  relatedTo?: string;
+  onTagsChange?: (tags: string[]) => void;
   actions?: DetailHeaderAction[];
   moreMenuItems?: {
     label: string;
@@ -41,7 +42,8 @@ export function EntityDetailHeader({
   relatedLabel,
   onRelatedClick,
   tags = [],
-  onAddTag,
+  relatedTo,
+  onTagsChange,
   actions = [],
   moreMenuItems = [],
   onBack,
@@ -98,14 +100,13 @@ export function EntityDetailHeader({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={onAddTag}
-            className="mt-1 flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-slate-600"
-          >
-            <Tag className="h-3 w-3" />
-            {tags.length > 0 ? tags.join(", ") : "Add Tags"}
-          </button>
+          <div className="mt-1">
+            <RecordTagsRow
+              tags={tags}
+              relatedTo={relatedTo}
+              onChange={onTagsChange}
+            />
+          </div>
         </div>
       </div>
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronRight, MoreHorizontal, Pencil } from "lucide-react";
 import type { EntityDetailHeaderProps } from "./types";
 import { Panel, cn, toneClasses } from "./shared";
+import { RecordTagsRow } from "@/components/shared/tags/RecordTags";
 
 export function EntityDetailHeader({
   breadcrumb,
@@ -15,6 +16,8 @@ export function EntityDetailHeader({
   subtitleParts,
   status,
   tags = [],
+  relatedTo,
+  onTagsChange,
   primaryAction,
   quickActions = [],
   onEditDetails,
@@ -91,19 +94,13 @@ export function EntityDetailHeader({
                 </p>
               )}
 
-              {tags.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                  {tags.map((tag) => (
-                    <span
-                      key={tag.label}
-                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600"
-                    >
-                      {tag.icon && <tag.icon className="h-3 w-3 text-slate-400" />}
-                      {tag.label}
-                    </span>
-                  ))}
-                </div>
-              )}
+              <div className="pt-0.5">
+                <RecordTagsRow
+                  tags={tags}
+                  relatedTo={relatedTo}
+                  onChange={onTagsChange}
+                />
+              </div>
             </div>
           </div>
 

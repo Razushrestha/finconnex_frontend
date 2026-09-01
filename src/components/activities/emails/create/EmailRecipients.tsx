@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { ArrowLeft, Minus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface EmailRecipientsProps {
@@ -11,6 +11,8 @@ interface EmailRecipientsProps {
   showBcc: boolean;
   onToggleCc: () => void;
   onToggleBcc: () => void;
+  onHideCc: () => void;
+  onHideBcc: () => void;
   cc: string[];
   ccDraft: string;
   onCcDraftChange: (val: string) => void;
@@ -23,6 +25,7 @@ interface EmailRecipientsProps {
   onRemoveBcc: (val: string) => void;
   error?: string;
   submitted?: boolean;
+  onBack?: () => void;
 }
 
 function RecipientChips({
@@ -43,7 +46,7 @@ function RecipientChips({
   placeholder: string;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
       <span className="mr-1 shrink-0 text-sm text-muted-foreground">
         {label}
       </span>
@@ -79,6 +82,28 @@ function RecipientChips({
   );
 }
 
+function HideFieldButton({
+  label,
+  visible,
+  onHide,
+}: {
+  label: string;
+  visible: boolean;
+  onHide: () => void;
+}) {
+  if (!visible) return null;
+  return (
+    <button
+      type="button"
+      onClick={onHide}
+      aria-label={`Remove ${label} field`}
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-white hover:text-slate-700"
+    >
+      <Minus className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
 export function EmailRecipients({
   to,
   recipientDraft,
@@ -89,6 +114,8 @@ export function EmailRecipients({
   showBcc,
   onToggleCc,
   onToggleBcc,
+  onHideCc,
+  onHideBcc,
   cc,
   ccDraft,
   onCcDraftChange,
@@ -101,10 +128,21 @@ export function EmailRecipients({
   onRemoveBcc,
   error,
   submitted,
+  onBack,
 }: EmailRecipientsProps) {
   return (
-    <div className="divide-y divide-border">
-      <div className="flex items-start justify-between gap-3 px-5 py-4">
+    <div className="divide-y divide-slate-200">
+      <div className="flex items-start justify-between gap-3 px-5 py-3">
+        {onBack ? (
+          <button
+            type="button"
+            title="Back to mail"
+            onClick={onBack}
+            className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+        ) : null}
         <div className="flex-1">
           <RecipientChips
             label="To:"
@@ -125,9 +163,7 @@ export function EmailRecipients({
             onClick={onToggleCc}
             className={cn(
               "text-sm hover:text-foreground",
-              showCc
-                ? "font-semibold text-violet-700"
-                : "text-muted-foreground",
+              showCc ? "font-semibold text-violet-700" : "text-muted-foreground",
             )}
           >
             Cc{cc.length ? ` (${cc.length})` : ""}
@@ -137,9 +173,7 @@ export function EmailRecipients({
             onClick={onToggleBcc}
             className={cn(
               "text-sm hover:text-foreground",
-              showBcc
-                ? "font-semibold text-violet-700"
-                : "text-muted-foreground",
+              showBcc ? "font-semibold text-violet-700" : "text-muted-foreground",
             )}
           >
             Bcc{bcc.length ? ` (${bcc.length})` : ""}
@@ -148,28 +182,42 @@ export function EmailRecipients({
       </div>
 
       {showCc || showBcc ? (
-        <div className="space-y-3 bg-muted/20 px-5 py-4">
+        <div className="divide-y divide-slate-200 bg-slate-50/70">
           {showCc ? (
-            <RecipientChips
-              label="Cc:"
-              values={cc}
-              draft={ccDraft}
-              onDraftChange={onCcDraftChange}
-              onAdd={onAddCc}
-              onRemove={onRemoveCc}
-              placeholder="Add Cc emails…"
-            />
+            <div className="flex items-center gap-2 px-5 py-3">
+              <RecipientChips
+                label="Cc:"
+                values={cc}
+                draft={ccDraft}
+                onDraftChange={onCcDraftChange}
+                onAdd={onAddCc}
+                onRemove={onRemoveCc}
+                placeholder="Add Cc emails…"
+              />
+              <HideFieldButton
+                label="Cc"
+                visible={cc.length === 0 && !ccDraft.trim()}
+                onHide={onHideCc}
+              />
+            </div>
           ) : null}
           {showBcc ? (
-            <RecipientChips
-              label="Bcc:"
-              values={bcc}
-              draft={bccDraft}
-              onDraftChange={onBccDraftChange}
-              onAdd={onAddBcc}
-              onRemove={onRemoveBcc}
-              placeholder="Add Bcc emails…"
-            />
+            <div className="flex items-center gap-2 px-5 py-3">
+              <RecipientChips
+                label="Bcc:"
+                values={bcc}
+                draft={bccDraft}
+                onDraftChange={onBccDraftChange}
+                onAdd={onAddBcc}
+                onRemove={onRemoveBcc}
+                placeholder="Add Bcc emails…"
+              />
+              <HideFieldButton
+                label="Bcc"
+                visible={bcc.length === 0 && !bccDraft.trim()}
+                onHide={onHideBcc}
+              />
+            </div>
           ) : null}
         </div>
       ) : null}

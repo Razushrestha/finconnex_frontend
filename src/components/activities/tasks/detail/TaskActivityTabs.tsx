@@ -96,8 +96,8 @@ export function TaskActivityTabs({
       {activeTab === "notes" && (
         <div className="mt-5 space-y-5">
           {notes.length === 0 ? (
-            <p className="py-2 text-xs text-slate-400">
-              No notes yet. Add the first note below.
+            <p className="py-2 text-2xl font-light leading-none text-slate-300">
+              —
             </p>
           ) : (
             notes.map((note) => (

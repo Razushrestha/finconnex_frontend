@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { type CallColumn } from "@/lib/calls/types";
-import { listCallColumns, saveCallColumns } from "@/lib/calls/store";
+import { type CallColumn, type CallStatus } from "@/lib/calls/types";
+import {
+  callMatchesScope,
+  listCallColumns,
+  saveCallColumns,
+  type CallScope,
+} from "@/lib/calls/store";
 import { onRulesChange } from "@/lib/rules/storage";
 import { CallsKanbanColumn } from "./CallsKanbanColumn";
-import type { Priority, TaskStatus } from "@/lib/tasks/types";
+import type { Priority } from "@/lib/tasks/types";
 
 interface DragInfo {
   callId: string;
@@ -18,9 +23,11 @@ export interface DropTargetPos {
 }
 
 export function CallsKanbanBoard({
+  scope = "all",
   selectedIds,
   onSelectedIdsChange,
 }: {
+  scope?: CallScope;
   selectedIds?: string[];
   onSelectedIdsChange?: (ids: string[]) => void;
 }) {
@@ -67,7 +74,7 @@ export function CallsKanbanBoard({
     );
   }
 
-  function handleChangeStatus(callId: string, status: TaskStatus) {
+  function handleChangeStatus(callId: string, status: CallStatus) {
     setColumns((prev) => {
       let movedCall: any = null;
       let sourceColId = "";
@@ -216,9 +223,14 @@ export function CallsKanbanBoard({
     handleDragEndCall();
   }
 
+  const visibleColumns = columns.map((column) => {
+    const calls = column.calls.filter((call) => callMatchesScope(call, scope));
+    return { ...column, calls, count: calls.length };
+  });
+
   return (
-    <div className="flex h-full min-h-0 items-stretch gap-4 overflow-x-auto p-1">
-      {columns.map((column) => (
+    <div className="flex h-full w-full min-h-0 min-w-0 items-stretch gap-4 overflow-x-auto p-1">
+      {visibleColumns.map((column) => (
         <CallsKanbanColumn
           key={column.id}
           column={column}

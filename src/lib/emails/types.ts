@@ -7,6 +7,8 @@ export type EmailStatus =
   | "Bounced"
   | "Failed";
 
+export type EmailImportance = "high" | "normal" | "low";
+
 export interface Email {
   id: string;
   subject: string;
@@ -20,6 +22,7 @@ export interface Email {
   status: EmailStatus;
   sentDate?: string;
   openedDate?: string;
+  importance?: EmailImportance;
 }
 
 export interface EmailColumn {
@@ -83,6 +86,98 @@ export const emails: Email[] = [
     relatedTo: "Marcus Lin",
     status: "Scheduled",
     sentDate: "20/08/2026 11:00 AM",
+  },
+  {
+    id: "e6",
+    subject: "Re: Documents still outstanding",
+    body: "Hi, I've uploaded the latest payslips and licence. Can you confirm you received them?",
+    from: "olivia.bennett@example.com",
+    to: ["shiva.kadhka@finconnex.com"],
+    relatedTo: "Olivia Bennett",
+    status: "Delivered",
+    sentDate: "31/08/2026 12:12 AM",
+  },
+  {
+    id: "e7",
+    subject: "Can you send me the file",
+    body: "Hi, can you please send me the rate lock confirmation file when you have a moment?",
+    from: "william.anderson@example.com",
+    to: ["john.smith@finconnex.com"],
+    relatedTo: "William Anderson",
+    status: "Delivered",
+    sentDate: "31/08/2026 08:16 AM",
+  },
+  {
+    id: "e8",
+    subject: "Thanks again for the intro",
+    body: "Really appreciate the introduction last week — happy to stay in touch.",
+    from: "chloe.ramirez@example.com",
+    to: ["roshna@finconnex.com"],
+    relatedTo: "Chloe Ramirez",
+    status: "Delivered",
+    sentDate: "30/08/2026 06:45 AM",
+  },
+  {
+    id: "e9",
+    subject: "Proposal pack for Greystone",
+    body: "Sharing the updated proposal and comparison of the two lenders we discussed.",
+    from: "john.smith@finconnex.com",
+    to: ["william.anderson@example.com"],
+    relatedTo: "William Anderson",
+    templateUsed: "Proposal Follow-up",
+    status: "Sent",
+    sentDate: "28/08/2026 03:20 PM",
+  },
+  {
+    id: "e10",
+    subject: "Home loan meeting notes",
+    body: "Notes from yesterday's home loan catch-up. Next step is to compare the two packages.",
+    from: "tejas@finconnex.com",
+    to: ["marcus.lin@contoso.com"],
+    relatedTo: "Marcus Lin",
+    status: "Opened",
+    sentDate: "27/08/2026 11:04 AM",
+    openedDate: "27/08/2026 01:12 PM",
+  },
+  {
+    id: "e11",
+    subject: "Payslips uploaded",
+    body: "Hi team, the remaining documents are now in the portal.",
+    from: "katherina.brooks@example.com",
+    to: ["roshna@finconnex.com"],
+    relatedTo: "Katherina Brooks",
+    status: "Delivered",
+    sentDate: "26/08/2026 09:30 AM",
+  },
+  {
+    id: "e12",
+    subject: "Draft: welcome email",
+    body: "Hi Chloe, welcome to FinConnex. I'll send through a checklist shortly.",
+    from: "bishnu@nepatronix.com",
+    to: ["chloe.ramirez@example.com"],
+    relatedTo: "Chloe Ramirez",
+    status: "Draft",
+    sentDate: "25/08/2026 04:00 PM",
+  },
+  {
+    id: "e13",
+    subject: "This week's refinance promotions",
+    body: "Unlock a limited flash deal on refinance rates. Unsubscribe anytime from this newsletter.",
+    from: "deals@homeloans-weekly.com",
+    to: ["john.smith@finconnex.com"],
+    relatedTo: "Home Loans Weekly",
+    status: "Delivered",
+    sentDate: "31/08/2026 07:05 AM",
+  },
+  {
+    id: "e14",
+    subject: "Olivia Bennett viewed your profile",
+    body: "LinkedIn social notification: Olivia Bennett and 3 others viewed your profile this week.",
+    from: "notifications@linkedin.com",
+    to: ["roshna@finconnex.com"],
+    relatedTo: "LinkedIn",
+    status: "Delivered",
+    sentDate: "30/08/2026 02:18 PM",
   },
 ];
 

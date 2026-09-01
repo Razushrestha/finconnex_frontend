@@ -1,10 +1,9 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import {
   Package,
   BadgePercent,
@@ -39,8 +38,6 @@ type NavItem = {
   label: string;
   href?: string;
   icon?: React.ElementType;
-  swatch?: string;
-  badge?: string;
   children?: NavChildItem[];
 };
 
@@ -162,13 +159,6 @@ const dashboardItems: NavItem[] = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
-const workItems: NavItem[] = [
-  { label: "Tasks & Projects", href: "/tasks", swatch: "bg-red-500" },
-  { label: "User Management", href: "/users", swatch: "bg-violet-600" },
-  { label: "Activities", href: "/activities", swatch: "bg-amber-500" },
-  { label: "Deals", href: "/deals", swatch: "bg-indigo-500", badge: "+24%" },
-];
-
 interface SidebarProps {
   collapsed?: boolean;
   tenantName?: string;
@@ -282,7 +272,7 @@ export function Sidebar({
           // Elevated rail: stronger depth + right edge
           "border-r border-slate-200/90 shadow-[8px_0_40px_-2px_rgba(15,23,42,0.22),2px_0_12px_-2px_rgba(15,23,42,0.10)] dark:border-zinc-800 dark:shadow-[8px_0_44px_-4px_rgba(0,0,0,0.65),2px_0_14px_-2px_rgba(0,0,0,0.4)]",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
-          "md:sticky md:top-0 md:z-20 md:w-64 md:max-w-none md:translate-x-0 md:rounded-tr-[18px] md:rounded-br-[18px] md:transition-[width,box-shadow,border-radius]",
+          "md:sticky md:top-0 md:z-20 md:w-64 md:max-w-none md:translate-x-0 md:rounded-tr-[18px] md:rounded-br-[18px] md:transition-[width,box-shadow,border-radius] md:pb-10",
           collapsed && "md:w-[72px] md:px-3",
         )}
       >
@@ -445,43 +435,6 @@ export function Sidebar({
                     </div>
                   )}
                 </div>
-              );
-            })}
-          </nav>
-
-          <div className="my-4 border-t border-border" />
-
-          <nav className={cn("flex flex-col gap-0.5", collapsed && "md:hidden")}>
-            {workItems.map((item) => {
-              const isActive = item.href ? isNavActive(pathname, item.href) : false;
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href!}
-                  title={collapsed ? item.label : undefined}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm transition-colors md:py-2",
-                    iconOnly,
-                    isActive
-                      ? "text-violet-600 dark:text-violet-400 font-medium"
-                      : "text-foreground/80 hover:bg-accent",
-                  )}
-                >
-                  <span
-                    className={cn("h-4 w-4 shrink-0 rounded-[5px]", item.swatch)}
-                  />
-                  <span className={cn("flex-1", hideLabel)}>{item.label}</span>
-                  {item.badge && (
-                    <Badge
-                      className={cn(
-                        "bg-emerald-500 px-2 py-0 text-[11px] font-medium text-white hover:bg-emerald-500",
-                        hideLabel,
-                      )}
-                    >
-                      {item.badge}
-                    </Badge>
-                  )}
-                </Link>
               );
             })}
           </nav>

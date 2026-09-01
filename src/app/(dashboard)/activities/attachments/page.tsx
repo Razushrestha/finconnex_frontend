@@ -10,6 +10,9 @@ import {
   Search,
   X,
 } from "lucide-react";
+import { ActivityTimelineButton } from "@/components/activities/ActivityTimelineButton";
+import { RecordTimeline } from "@/components/activities/RecordTimeline";
+import { listAttachmentsTimeline } from "@/lib/activities/record-timeline";
 import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import Link from "next/link";
 import {
@@ -81,6 +84,7 @@ export default function AttachmentsPage() {
     bootstrap.folder,
   );
   const [composeOpen, setComposeOpen] = useState(bootstrap.composeOpen);
+  const [view, setView] = useState<"folders" | "timeline">("folders");
   const [fileName, setFileName] = useState("");
   const [kind, setKind] = useState<AttachmentKind>("Document");
   const [clientName, setClientName] = useState(
@@ -154,6 +158,18 @@ export default function AttachmentsPage() {
     );
   }, [openFolder, q]);
 
+  const timelineFiles = useMemo(() => {
+    const source = openFolder ? folderFiles : items.filter((a) => {
+      if (!q) return true;
+      return (
+        a.fileName.toLowerCase().includes(q) ||
+        a.uploadedBy.toLowerCase().includes(q) ||
+        clientNameFromRelatedTo(a.relatedTo).toLowerCase().includes(q)
+      );
+    });
+    return source;
+  }, [openFolder, folderFiles, items, q]);
+
   function openUpload(forFolder?: string | null) {
     const folder = forFolder ?? activeFolder;
     if (folder && folder !== "Unassigned") {
@@ -209,6 +225,14 @@ export default function AttachmentsPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
+          <ActivityTimelineButton
+            active={view === "timeline"}
+            onClick={() =>
+              setView((current) =>
+                current === "timeline" ? "folders" : "timeline",
+              )
+            }
+          />
           {activeFolder && (
             <button
               type="button"
@@ -244,7 +268,16 @@ export default function AttachmentsPage() {
         />
       </div>
 
-      {!activeFolder ? (
+      {view === "timeline" ? (
+        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-slate-100 bg-white px-4 pt-4">
+          <RecordTimeline
+            eyebrow="Attachment timeline"
+            title={activeFolder ? activeFolder : "All attachments"}
+            description="Upload history for files in this view."
+            events={listAttachmentsTimeline(timelineFiles)}
+          />
+        </div>
+      ) : !activeFolder ? (
         <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
           <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {visibleFolders.map((folder) => (

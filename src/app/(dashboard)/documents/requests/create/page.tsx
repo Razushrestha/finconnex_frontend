@@ -1,7 +1,15 @@
 import { CreateDocumentRequestForm } from "@/components/documents/requests/CreateDocumentRequestForm";
+import { parseDocumentRequestPeople } from "@/lib/leads/convert-actions";
 
 interface PageProps {
-  searchParams: Promise<{ layoutid?: string; redirect?: string }>;
+  searchParams: Promise<{
+    layoutid?: string;
+    redirect?: string;
+    relatedId?: string;
+    relatedKind?: string;
+    relatedName?: string;
+    applicants?: string;
+  }>;
 }
 
 export default async function CreateDocumentRequestPage({
@@ -12,6 +20,10 @@ export default async function CreateDocumentRequestPage({
     <CreateDocumentRequestForm
       layoutId={params.layoutid ?? "standard"}
       redirect={params.redirect !== "true"}
+      relatedId={params.relatedId}
+      relatedKind={params.relatedKind}
+      relatedName={params.relatedName}
+      seedApplicants={parseDocumentRequestPeople(params.applicants)}
     />
   );
 }

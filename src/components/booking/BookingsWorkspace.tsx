@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarDays,
   ChevronLeft,
@@ -20,6 +20,7 @@ import {
   CalendarClock,
   TrendingUp,
   UsersRound,
+  Plus,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -30,15 +31,20 @@ import {
   type BookingPage,
 } from "@/lib/booking/types";
 import { ConsultationsBoard } from "@/components/booking/ConsultationsBoard";
+import { NewBookingModal } from "@/components/booking/NewBookingModal";
 import {
-  DASHBOARD_APPOINTMENTS,
   DASHBOARD_CONSULTANTS,
   appointmentDateKey,
+  appointmentMatchesKpi,
+  bookingKpiStats,
   consultantById,
+  dateKeyFromDate,
   formatApptDate,
   formatApptTime,
+  listDashboardAppointments,
   type AppointmentChannel,
   type AppointmentStatus,
+  type BookingKpiKey,
   type DashboardAppointment,
   type RelatedKind,
 } from "@/lib/booking/dashboard";
@@ -70,11 +76,17 @@ const CHANNEL_ICON: Record<AppointmentChannel, typeof MapPin> = {
   "Video Call": Video,
 };
 
-const STATS = [
+const STATS: {
+  key: BookingKpiKey;
+  label: string;
+  unit: string;
+  icon: typeof CalendarClock;
+  iconBg: string;
+  bar: string;
+}[] = [
   {
     key: "upcoming",
     label: "Upcoming",
-    value: "06",
     unit: "Appointments",
     icon: CalendarClock,
     iconBg: "bg-[#F3ECFB] text-[#5A32A3]",
@@ -83,7 +95,6 @@ const STATS = [
   {
     key: "confirmed",
     label: "Confirmed",
-    value: "04",
     unit: "Appointments",
     icon: CheckCircle2,
     iconBg: "bg-[#D1FAE5] text-[#059669]",
@@ -92,7 +103,6 @@ const STATS = [
   {
     key: "pending",
     label: "Pending",
-    value: "01",
     unit: "Appointments",
     icon: Clock,
     iconBg: "bg-[#FEF3C7] text-[#D97706]",
@@ -101,7 +111,6 @@ const STATS = [
   {
     key: "today",
     label: "Today",
-    value: "02",
     unit: "Appointments",
     icon: Phone,
     iconBg: "bg-[#DBEAFE] text-[#2563EB]",
@@ -110,7 +119,6 @@ const STATS = [
   {
     key: "week",
     label: "This Week",
-    value: "08",
     unit: "Appointments",
     icon: TrendingUp,
     iconBg: "bg-[#E0E7FF] text-[#4F46E5]",
@@ -119,13 +127,21 @@ const STATS = [
   {
     key: "month",
     label: "This Month",
-    value: "23",
     unit: "Appointments",
     icon: UsersRound,
     iconBg: "bg-[#CCFBF1] text-[#0F766E]",
     bar: "bg-[#14B8A6]",
   },
-] as const;
+];
+
+const KPI_TITLES: Record<BookingKpiKey, string> = {
+  upcoming: "Upcoming Appointments",
+  confirmed: "Confirmed Appointments",
+  pending: "Pending Appointments",
+  today: "Today's Appointments",
+  week: "This Week's Appointments",
+  month: "This Month's Appointments",
+};
 
 export function BookingsWorkspace({
   section = "home",
@@ -133,20 +149,38 @@ export function BookingsWorkspace({
   section?: BookingSection;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [pages] = useState<BookingPage[]>(() =>
     typeof window === "undefined" ? [] : listBookingPages(),
   );
+  const [bookOpen, setBookOpen] = useState(false);
+  const [homeTick, setHomeTick] = useState(0);
+
+  useEffect(() => {
+    if (searchParams.get("book") === "1") setBookOpen(true);
+  }, [searchParams]);
+
+  function closeBook() {
+    setBookOpen(false);
+    if (searchParams.get("book") === "1") router.replace("/booking");
+  }
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden bg-[#F8F9FB]">
-      <div className="min-h-0 min-w-0 flex-1 overflow-auto">
-        <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-5 sm:py-5 lg:px-7">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto bg-[#F8F9FB] xl:h-full xl:overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col xl:overflow-hidden">
+        <div className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col px-3 pt-4 pb-4 sm:px-5 sm:pt-5 sm:pb-5 lg:px-7 xl:pb-5">
           {section === "home" ? (
             <HomeView
+              tick={homeTick}
+              onNewBooking={() => setBookOpen(true)}
               onViewConsultants={() => router.push("/booking/consultants")}
             />
           ) : null}
-          {section === "consultations" ? <ConsultationsBoard /> : null}
+          {section === "consultations" ? (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <ConsultationsBoard />
+            </div>
+          ) : null}
           {section === "schedules" ? (
             <PagesPanel
               title="Schedules"
@@ -157,45 +191,117 @@ export function BookingsWorkspace({
           {section === "consultants" ? <ConsultantsPanel /> : null}
         </div>
       </div>
+      <NewBookingModal
+        open={bookOpen}
+        onClose={closeBook}
+        onCreated={() => setHomeTick((n) => n + 1)}
+      />
     </div>
   );
 }
 
+function NewBookingButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#5A32A3] px-3 text-[12px] font-semibold text-white hover:opacity-90"
+    >
+      <Plus className="h-3.5 w-3.5" />
+      New Booking
+    </button>
+  );
+}
+
 function HomeView({
+  tick,
+  onNewBooking,
   onViewConsultants,
 }: {
+  tick: number;
+  onNewBooking: () => void;
   onViewConsultants: () => void;
 }) {
+  const now = useMemo(() => new Date(), [tick]);
   const [consultantFilter, setConsultantFilter] = useState("all");
-  const [selectedDate, setSelectedDate] = useState("2026-08-15");
-  const [month, setMonth] = useState(new Date(2026, 7, 1));
+  const [kpiFilter, setKpiFilter] = useState<BookingKpiKey | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() => dateKeyFromDate(new Date()));
+  const [month, setMonth] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<DashboardAppointment | null>(null);
   const pageSize = 6;
 
+  const appointments = useMemo(() => {
+    void tick;
+    return listDashboardAppointments();
+  }, [tick]);
+
+  const kpi = useMemo(
+    () => bookingKpiStats(appointments, now),
+    [appointments, now],
+  );
+
   const rows = useMemo(() => {
-    let data = DASHBOARD_APPOINTMENTS.slice(0, 6);
+    let data = [...appointments];
     if (consultantFilter !== "all") {
       data = data.filter((a) => a.consultantId === consultantFilter);
     }
+    const today = dateKeyFromDate(now);
+    data.sort((a, b) => {
+      if (kpiFilter) {
+        const am = appointmentMatchesKpi(a, kpiFilter, now) ? 0 : 1;
+        const bm = appointmentMatchesKpi(b, kpiFilter, now) ? 0 : 1;
+        if (am !== bm) return am - bm;
+      } else {
+        const aUpcoming = a.start.slice(0, 10) >= today ? 0 : 1;
+        const bUpcoming = b.start.slice(0, 10) >= today ? 0 : 1;
+        if (aUpcoming !== bUpcoming) return aUpcoming - bUpcoming;
+      }
+      return a.start.localeCompare(b.start);
+    });
     return data;
-  }, [consultantFilter]);
+  }, [appointments, consultantFilter, kpiFilter, now]);
 
-  const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
+  const pageRows = kpiFilter
+    ? rows
+    : rows.slice((page - 1) * pageSize, page * pageSize);
+  const shownFrom = kpiFilter ? (rows.length ? 1 : 0) : (page - 1) * pageSize + 1;
+  const shownTo = kpiFilter ? rows.length : Math.min(page * pageSize, rows.length);
   const busyDays = useMemo(
-    () => new Set(DASHBOARD_APPOINTMENTS.map((a) => appointmentDateKey(a.start))),
-    [],
+    () => new Set(appointments.map((a) => appointmentDateKey(a.start))),
+    [appointments],
   );
+  const todayKey = dateKeyFromDate(now);
 
   return (
-    <>
-      <div className="mb-4 grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3 xl:mb-5 xl:grid-cols-6">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mb-3 flex shrink-0 justify-end">
+        <NewBookingButton onClick={onNewBooking} />
+      </div>
+      <div className="mb-4 grid shrink-0 grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3 xl:mb-4 xl:grid-cols-6">
         {STATS.map((s) => {
           const Icon = s.icon;
+          const stat = kpi[s.key];
+          const active = kpiFilter === s.key;
+          const trend =
+            stat.delta > 0 ? "up" : stat.delta < 0 ? "down" : "flat";
           return (
-            <div
+            <button
               key={s.key}
-              className="overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]"
+              type="button"
+              onClick={() => {
+                setKpiFilter((current) => (current === s.key ? null : s.key));
+                setPage(1);
+              }}
+              className={cn(
+                "overflow-hidden rounded-xl border bg-white text-left shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition-shadow",
+                active
+                  ? "border-[#5A32A3] ring-2 ring-[#5A32A3]/20"
+                  : "border-[#E5E7EB] hover:border-slate-300",
+              )}
             >
               <div className={cn("h-[3px] w-full", s.bar)} />
               <div className="px-4 pt-3 pb-3.5">
@@ -213,23 +319,34 @@ function HomeView({
                   </p>
                 </div>
                 <p className="text-[26px] font-bold tabular-nums leading-none text-slate-900">
-                  {s.value}
+                  {String(stat.current).padStart(2, "0")}
                 </p>
                 <p className="mt-1.5 text-[12px] font-medium text-slate-400">
                   {s.unit}
                 </p>
+                <p
+                  className={cn(
+                    "mt-1.5 text-[11px] font-semibold",
+                    trend === "up" && "text-emerald-600",
+                    trend === "down" && "text-rose-500",
+                    trend === "flat" && "text-slate-500",
+                  )}
+                >
+                  {stat.delta > 0 ? "+" : ""}
+                  {stat.delta} vs last month
+                </p>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
-        <section className="min-w-0 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
+        <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
           <div className="flex flex-col gap-3 border-b border-[#E5E7EB] px-3 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
             <h2 className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
               <CalendarDays className="h-4 w-4 shrink-0" style={{ color: BRAND }} />
-              Upcoming Appointments
+              {kpiFilter ? KPI_TITLES[kpiFilter] : "Upcoming Appointments"}
             </h2>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <select
@@ -264,11 +381,15 @@ function HomeView({
             </div>
           </div>
 
+          <div className="min-h-0 flex-1 overflow-auto">
           <div className="divide-y divide-[#F3F4F6] lg:hidden">
             {pageRows.map((row) => (
               <AppointmentCard
                 key={row.id}
                 row={row}
+                dimmed={
+                  !!kpiFilter && !appointmentMatchesKpi(row, kpiFilter, now)
+                }
                 onView={() => setDetail(row)}
               />
             ))}
@@ -292,23 +413,25 @@ function HomeView({
                   <AppointmentRow
                     key={row.id}
                     row={row}
+                    dimmed={
+                      !!kpiFilter && !appointmentMatchesKpi(row, kpiFilter, now)
+                    }
                     onView={() => setDetail(row)}
                   />
                 ))}
               </tbody>
             </table>
           </div>
+          </div>
 
-          <div className="flex flex-col gap-2 border-t border-[#E5E7EB] px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
+          <div className="flex shrink-0 flex-col gap-2 border-t border-[#E5E7EB] px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
             <p className="text-[12px] text-slate-500">
-              Showing {(page - 1) * pageSize + 1} to{" "}
-              {Math.min(page * pageSize, rows.length)} of {rows.length}{" "}
-              appointments
+              Showing {shownFrom} to {shownTo} of {rows.length} appointments
             </p>
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                disabled={page === 1}
+                disabled={kpiFilter != null || page === 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 className="flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] text-slate-500 hover:bg-slate-50 disabled:opacity-40"
               >
@@ -322,7 +445,7 @@ function HomeView({
               </span>
               <button
                 type="button"
-                disabled={page * pageSize >= rows.length}
+                disabled={kpiFilter != null || page * pageSize >= rows.length}
                 onClick={() => setPage((p) => p + 1)}
                 className="flex h-8 w-8 items-center justify-center rounded-md border border-[#E5E7EB] text-slate-500 hover:bg-slate-50 disabled:opacity-40"
               >
@@ -338,8 +461,8 @@ function HomeView({
           </div>
         </section>
 
-        <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-1">
-          <section className="rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+        <div className="grid min-h-0 min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-1 xl:grid-rows-[auto_minmax(0,1fr)] xl:gap-4">
+          <section className="shrink-0 rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-[14px] font-bold text-slate-900">
                 Top Consultants
@@ -380,6 +503,7 @@ function HomeView({
           <MiniCalendar
             month={month}
             selected={selectedDate}
+            today={todayKey}
             busyDays={busyDays}
             onPrev={() =>
               setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))
@@ -398,15 +522,17 @@ function HomeView({
           onClose={() => setDetail(null)}
         />
       ) : null}
-    </>
+    </div>
   );
 }
 
 function AppointmentCard({
   row,
+  dimmed = false,
   onView,
 }: {
   row: DashboardAppointment;
+  dimmed?: boolean;
   onView: () => void;
 }) {
   const consultant = consultantById(row.consultantId);
@@ -414,7 +540,12 @@ function AppointmentCard({
   const ChannelIcon = CHANNEL_ICON[row.channel];
 
   return (
-    <article className="px-3 py-3.5 sm:px-4">
+    <article
+      className={cn(
+        "px-3 py-3.5 sm:px-4",
+        dimmed && "pointer-events-none opacity-40 blur-[2px]",
+      )}
+    >
       <div className="flex items-start gap-2.5">
         <span
           className={cn(
@@ -499,9 +630,11 @@ function AppointmentCard({
 
 function AppointmentRow({
   row,
+  dimmed = false,
   onView,
 }: {
   row: DashboardAppointment;
+  dimmed?: boolean;
   onView: () => void;
 }) {
   const consultant = consultantById(row.consultantId);
@@ -509,7 +642,12 @@ function AppointmentRow({
   const ChannelIcon = CHANNEL_ICON[row.channel];
 
   return (
-    <tr className="border-b border-[#F3F4F6] last:border-0 hover:bg-slate-50/80">
+    <tr
+      className={cn(
+        "border-b border-[#F3F4F6] last:border-0 hover:bg-slate-50/80",
+        dimmed && "pointer-events-none opacity-40 blur-[2px]",
+      )}
+    >
       <td className="px-5 py-3.5">
         <div className="flex items-center gap-2.5">
           <span
@@ -610,6 +748,7 @@ function AppointmentRow({
 function MiniCalendar({
   month,
   selected,
+  today,
   busyDays,
   onPrev,
   onNext,
@@ -617,6 +756,7 @@ function MiniCalendar({
 }: {
   month: Date;
   selected: string;
+  today: string;
   busyDays: Set<string>;
   onPrev: () => void;
   onNext: () => void;
@@ -638,8 +778,8 @@ function MiniCalendar({
   });
 
   return (
-    <section className="rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-      <div className="mb-3 flex items-center justify-between">
+    <section className="flex min-h-0 flex-1 flex-col rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+      <div className="mb-3 flex shrink-0 items-center justify-between">
         <h3 className="text-[14px] font-bold text-slate-900">{label}</h3>
         <div className="flex gap-1">
           <button
@@ -658,32 +798,35 @@ function MiniCalendar({
           </button>
         </div>
       </div>
-      <div className="grid grid-cols-7 text-center text-[10px] font-semibold tracking-wide text-slate-400">
+      <div className="grid shrink-0 grid-cols-7 text-center text-[10px] font-semibold tracking-wide text-slate-400">
         {["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].map((d) => (
           <div key={d} className="py-1">
             {d}
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 text-center">
+      <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-7 text-center">
         {cells.map((day, i) => {
-          if (!day) return <div key={`e-${i}`} className="h-9" />;
+          if (!day) return <div key={`e-${i}`} className="min-h-9" />;
           const iso = `${year}-${String(mo + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           const isSelected = iso === selected;
+          const isToday = iso === today;
           const busy = busyDays.has(iso);
           return (
             <button
               key={iso}
               type="button"
               onClick={() => onSelect(iso)}
-              className="relative flex h-9 items-center justify-center"
+              className="relative flex h-full min-h-9 items-center justify-center"
             >
               <span
                 className={cn(
                   "flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-medium",
                   isSelected
                     ? "text-white"
-                    : "text-slate-700 hover:bg-slate-100",
+                    : isToday
+                      ? "font-bold text-[#5A32A3] ring-2 ring-[#5A32A3]/40"
+                      : "text-slate-700 hover:bg-slate-100",
                 )}
                 style={isSelected ? { backgroundColor: BRAND } : undefined}
               >
@@ -691,7 +834,7 @@ function MiniCalendar({
               </span>
               {busy && !isSelected ? (
                 <span
-                  className="absolute bottom-0.5 h-1 w-1 rounded-full"
+                  className="absolute bottom-1 h-1 w-1 rounded-full"
                   style={{ backgroundColor: BRAND }}
                 />
               ) : null}

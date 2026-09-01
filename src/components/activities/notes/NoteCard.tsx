@@ -9,34 +9,26 @@ import { cardDragging, cardMotion, cardSubject, entityCardBox } from "@/lib/moti
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
 
-const TYPE_META: Record<
-  NoteType,
-  { soft: string; text: string; border: string }
-> = {
+const TYPE_META: Record<NoteType, { soft: string; text: string }> = {
   General: {
     soft: "bg-slate-100",
     text: "text-slate-600",
-    border: "border-l-slate-400",
   },
   "Call Summary": {
     soft: "bg-sky-50",
     text: "text-sky-700",
-    border: "border-l-sky-500",
   },
   "Meeting Notes": {
     soft: "bg-violet-50",
     text: "text-violet-700",
-    border: "border-l-violet-500",
   },
   "Follow-up": {
     soft: "bg-amber-50",
     text: "text-amber-800",
-    border: "border-l-amber-500",
   },
   Other: {
     soft: "bg-emerald-50",
     text: "text-emerald-700",
-    border: "border-l-emerald-500",
   },
 };
 
@@ -98,8 +90,7 @@ export function NoteCard({
       data-column-id={columnId}
       className={cn(
         entityCardBox,
-        "group/card cursor-pointer border-l-[3px]",
-        meta.border,
+        "group/card cursor-pointer",
         cardMotion,
         isDragging && cardDragging,
         isSelected

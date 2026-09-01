@@ -15,7 +15,7 @@ import {
   EMPTY_LEAD_FILTERS,
   type LeadFilters,
 } from "@/components/sales/leads/FilterLeadsPanel";
-import { listLeadColumns, deleteLeads, updateLeadOwner } from "@/lib/leads/store";
+import { listLeadColumns, deleteLeads, updateLeadOwner, findLeadById, updateLead } from "@/lib/leads/store";
 import {
   bulkCrmLeads,
   refreshCrmLeadsBoard,
@@ -43,6 +43,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
+import { uniqueTags } from "@/lib/tags";
 import {
   DEFAULT_SINGLE_HEADER_COLOR,
   KANBAN_HEADER_PALETTE,
@@ -566,7 +567,16 @@ export default function LeadsPage() {
             selectedCount={selectedIds.length}
             onClear={() => setSelectedIds([])}
             onSendMail={() => console.log("send mail clicked")}
-            onAddTag={() => console.log("add tag clicked")}
+            onAddTag={(tag) => {
+              let n = 0;
+              for (const id of selectedIds) {
+                const found = findLeadById(id);
+                if (!found) continue;
+                const next = uniqueTags([...(found.card.tags ?? []), tag]);
+                if (updateLead(id, { tags: next })) n += 1;
+              }
+              setBulkFlash(`Tagged ${n} lead${n === 1 ? "" : "s"} with #${tag}`);
+            }}
             onRemoveTag={() => console.log("remove tag clicked")}
             onRunMacro={() => console.log("run macro clicked")}
             onCreateTask={() => console.log("create task clicked")}

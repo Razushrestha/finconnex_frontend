@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { X } from "lucide-react";
 
 interface MeetingHeaderProps {
   onCancel: () => void;
@@ -12,31 +13,23 @@ export const MeetingHeader: React.FC<MeetingHeaderProps> = ({
   onSendInvites,
 }) => {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-border gap-4">
-      <div className="flex items-start space-x-3">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">
-            Schedule Meeting
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Coordinate with clients and internal stakeholders to push deals
-            forward.
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-center space-x-3">
+    <div className="flex items-center justify-between px-4 py-2">
+      <h1 className="text-base font-semibold text-foreground">
+        Schedule Meeting
+      </h1>
+      <div className="flex shrink-0 items-center gap-2">
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-xs font-semibold text-secondary-foreground bg-secondary hover:bg-secondary/80 rounded-lg transition-colors border border-border"
+          className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
         >
+          <X className="h-4 w-4" />
           Cancel
         </button>
         <button
           type="button"
           onClick={onSendInvites}
-          className="px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors shadow-sm"
+          className="rounded-md bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800"
         >
           Send Invites
         </button>

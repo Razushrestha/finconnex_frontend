@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import { useRouter } from "next/navigation";
 import { WorkQueueSidebar } from "@/components/work-queue/WorkQueueSidebar";
 import { useWorkQueueScope } from "@/components/work-queue/WorkQueuePersonBar";
@@ -10,6 +9,7 @@ import {
   type QueueTableFilters,
 } from "@/components/work-queue/WorkQueueTable";
 import { ManageQueueModal } from "@/components/work-queue/ManageQueueModal";
+import { WorkQueueNotesDrawer } from "@/components/work-queue/WorkQueueNotesDrawer";
 import {
   CATEGORIES_DEFAULT,
   QUEUE_STORAGE_KEY,
@@ -36,8 +36,6 @@ import { onLeadActivityChange } from "@/lib/leads/lead-extras-store";
 import { onPipelineSlaChange } from "@/lib/pipeline-sla/settings";
 import { onRulesChange } from "@/lib/rules";
 import { completeTask, deleteTask, findTaskById } from "@/lib/tasks/store";
-import { createNote } from "@/lib/notes/store";
-import { getRulesActor } from "@/lib/rules/actor";
 import { viewEnter } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
@@ -82,7 +80,6 @@ export function WorkQueueView() {
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
 
   const [noteRow, setNoteRow] = React.useState<QueueRow | null>(null);
-  const [noteBody, setNoteBody] = React.useState("");
   const [toast, setToast] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -204,22 +201,6 @@ export function WorkQueueView() {
 
   function handleAddNote(row: QueueRow) {
     setNoteRow(row);
-    setNoteBody("");
-  }
-
-  function saveNote() {
-    if (!noteRow || !noteBody.trim()) return;
-    const actor = getRulesActor().name;
-    createNote({
-      title: `Note · ${noteRow.subject}`,
-      body: noteBody.trim(),
-      relatedTo: noteRow.related || noteRow.subject,
-      createdBy: actor || scope || "Me",
-    });
-    setNoteRow(null);
-    setNoteBody("");
-    refresh();
-    showToast("Note added");
   }
 
   function saveCategories(next: WorkqueueCategoryDef[]) {
@@ -321,47 +302,14 @@ export function WorkQueueView() {
       />
 
       {noteRow ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/35 px-4 backdrop-blur-[1px]"
-          onClick={() => setNoteRow(null)}
-        >
-          <div
-            className="w-full max-w-md bg-white p-5 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-[15px] font-semibold text-slate-900">
-              Add note
-            </h2>
-            <p className="mt-1 truncate text-[12.5px] text-slate-500">
-              {noteRow.subject}
-            </p>
-            <MentionTextarea
-              autoFocus
-              value={noteBody}
-              onChange={setNoteBody}
-              rows={4}
-              placeholder="Write a short note… Type @ to assign someone."
-              className="mt-4 w-full resize-none border-b border-slate-200 bg-transparent px-0 py-2 text-[13px] text-slate-800 outline-none focus:border-[var(--wq-accent)]"
-            />
-            <div className="mt-5 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setNoteRow(null)}
-                className="px-2 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-800"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!noteBody.trim()}
-                onClick={saveNote}
-                className="bg-[var(--wq-accent)] px-3.5 py-1.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-              >
-                Save note
-              </button>
-            </div>
-          </div>
-        </div>
+        <WorkQueueNotesDrawer
+          row={noteRow}
+          onClose={() => setNoteRow(null)}
+          onChanged={(message) => {
+            refresh();
+            showToast(message);
+          }}
+        />
       ) : null}
 
       {toast ? (

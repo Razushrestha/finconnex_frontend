@@ -117,17 +117,27 @@ function parseMoney(value: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** Parse due dates like 22/07/2026 or ISO. */
+/** Parse due dates like 22/07/2026, 22/07/2026 09:00 AM, or ISO. */
 export function parseTaskDueDate(raw: string): Date | null {
-  const iso = Date.parse(raw);
+  const trimmed = raw.trim();
+  const m = trimmed.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP]M)?)?/i,
+  );
+  if (m) {
+    const d = Number(m[1]);
+    const mo = Number(m[2]) - 1;
+    const y = Number(m[3]);
+    let hours = m[4] != null ? Number(m[4]) : 0;
+    const minutes = m[5] != null ? Number(m[5]) : 0;
+    const ap = m[7]?.toUpperCase();
+    if (ap === "PM" && hours < 12) hours += 12;
+    if (ap === "AM" && hours === 12) hours = 0;
+    const dt = new Date(y, mo, d, hours, minutes, 0);
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  }
+  const iso = Date.parse(trimmed);
   if (!Number.isNaN(iso)) return new Date(iso);
-  const m = raw.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!m) return null;
-  const d = Number(m[1]);
-  const mo = Number(m[2]) - 1;
-  const y = Number(m[3]);
-  const dt = new Date(y, mo, d);
-  return Number.isNaN(dt.getTime()) ? null : dt;
+  return null;
 }
 
 function rangeStart(range: DashboardDateRange): Date | null {

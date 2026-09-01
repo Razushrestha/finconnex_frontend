@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { DocumentRequest } from "@/lib/documents/requests/types";
 import { cn } from "@/lib/utils";
+import { RecordTagChip } from "@/components/shared/tags/RecordTags";
 
 type Kind = "insight" | "flag";
 type Category =
@@ -286,12 +287,7 @@ export function RequestOverviewPanel({ request }: { request: DocumentRequest }) 
                   </p>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {item.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600"
-                      >
-                        {tag}
-                      </span>
+                      <RecordTagChip key={tag} tag={tag} compact />
                     ))}
                   </div>
                 </div>
@@ -328,7 +324,7 @@ export function RequestOverviewPanel({ request }: { request: DocumentRequest }) 
         </h3>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <FinanceCard
-            label="Annual income pre-tax"
+            label="Annual income Before Tax"
             value={formatMoney(finances.income)}
             href={`/documents/requests/${request.id}`}
             icon={<Coins className="h-6 w-6 text-amber-500" />}

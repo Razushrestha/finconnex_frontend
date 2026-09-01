@@ -13,6 +13,9 @@ const WAVE = [
 interface CallAudioPlayerSectionProps {
   durationSeconds: number;
   hasRecording: boolean;
+  recordingId?: string;
+  label?: string;
+  calledBy?: string;
 }
 
 function formatClock(total: number) {
@@ -25,6 +28,9 @@ function formatClock(total: number) {
 export function CallAudioPlayerSection({
   durationSeconds,
   hasRecording,
+  recordingId,
+  label = "Recording",
+  calledBy,
 }: CallAudioPlayerSectionProps) {
   const duration = Math.max(0, durationSeconds);
   const [playing, setPlaying] = useState(false);
@@ -33,7 +39,6 @@ export function CallAudioPlayerSection({
   const [volume, setVolume] = useState(0.8);
 
   const progress = duration > 0 ? Math.min(1, current / duration) : 0;
-
   const bars = useMemo(
     () => WAVE.map((h, i) => ({ h, i, filled: i / WAVE.length <= progress })),
     [progress],
@@ -42,7 +47,7 @@ export function CallAudioPlayerSection({
   useEffect(() => {
     setPlaying(false);
     setCurrent(0);
-  }, [durationSeconds]);
+  }, [durationSeconds, recordingId]);
 
   useEffect(() => {
     if (!playing || duration <= 0) return;
@@ -76,36 +81,30 @@ export function CallAudioPlayerSection({
   }
 
   if (!hasRecording || duration <= 0) {
-    return (
-      <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-[#5A32A3]/20 bg-[#F3ECFB]/50 px-4 py-4">
-        <div>
-          <p className="text-sm font-semibold text-slate-800">No recording yet</p>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Playback appears here after the call is captured.
-          </p>
-        </div>
-      </div>
-    );
+    return <p className="text-2xl font-light leading-none text-slate-300">—</p>;
   }
 
   return (
-    <div className="rounded-xl border border-[#5A32A3]/12 bg-gradient-to-b from-[#F3ECFB] to-white p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-[10px] font-bold tracking-wider text-[#5A32A3] uppercase">
-          Recording
-        </p>
-        <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-500">
+    <div>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-slate-800">{label}</p>
+          {calledBy ? (
+            <p className="mt-0.5 text-[11px] text-slate-400">{calledBy}</p>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2 text-[11px] font-medium text-slate-400">
           <button
             type="button"
             onClick={() => skip(-15)}
-            className="rounded-md px-1.5 py-0.5 hover:bg-white hover:text-[#5A32A3]"
+            className="hover:text-[#5A32A3]"
           >
             −15s
           </button>
           <button
             type="button"
             onClick={() => skip(15)}
-            className="rounded-md px-1.5 py-0.5 hover:bg-white hover:text-[#5A32A3]"
+            className="hover:text-[#5A32A3]"
           >
             +15s
           </button>
@@ -116,19 +115,19 @@ export function CallAudioPlayerSection({
         <button
           type="button"
           onClick={togglePlay}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#5A32A3] text-white shadow-md shadow-[#5A32A3]/25 hover:opacity-90"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#5A32A3] text-white hover:opacity-90"
           aria-label={playing ? "Pause" : "Play"}
         >
           {playing ? (
-            <Pause className="h-4 w-4 fill-current" />
+            <Pause className="h-3.5 w-3.5 fill-current" />
           ) : (
-            <Play className="ml-0.5 h-4 w-4 fill-current" />
+            <Play className="ml-0.5 h-3.5 w-3.5 fill-current" />
           )}
         </button>
 
         <button
           type="button"
-          className="flex h-10 min-w-0 flex-1 items-end gap-[3px]"
+          className="flex h-8 min-w-0 flex-1 items-end gap-[3px]"
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             seekTo((e.clientX - rect.left) / rect.width);
@@ -140,15 +139,15 @@ export function CallAudioPlayerSection({
               key={bar.i}
               style={{ height: `${bar.h}%` }}
               className={cn(
-                "w-[3px] flex-1 rounded-full transition-colors",
-                bar.filled ? "bg-[#5A32A3]" : "bg-[#5A32A3]/20",
+                "w-[3px] flex-1 rounded-full",
+                bar.filled ? "bg-[#5A32A3]" : "bg-slate-200",
               )}
             />
           ))}
         </button>
 
-        <div className="flex w-[118px] shrink-0 flex-col items-end gap-1">
-          <p className="font-mono text-[11px] font-medium tabular-nums text-slate-600">
+        <div className="flex w-[110px] shrink-0 flex-col items-end gap-1">
+          <p className="font-mono text-[11px] tabular-nums text-slate-500">
             {formatClock(current)}
             <span className="text-slate-400"> / {formatClock(duration)}</span>
           </p>

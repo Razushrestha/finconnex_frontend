@@ -26,6 +26,7 @@ export interface CompanyCardData {
   owner: string;
   annualRevenue?: string;
   city?: string;
+  tags?: string[];
   accentColorClass: string;
   avatarBgClass: string;
 }
@@ -74,6 +75,7 @@ export const COMPANY_GROUPS: CompanyGroup[] = [
         owner: "John Smith",
         annualRevenue: "$4.2M",
         city: "Sydney",
+        tags: ["wholesale", "commercial"],
         accentColorClass: "bg-sky-500",
         avatarIndex: 0,
       }),

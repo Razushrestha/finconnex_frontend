@@ -27,8 +27,8 @@ export const cardSubject =
 
 /** Kanban / draggable record cards — quiet hover, no lift cascade */
 export const cardMotion = [
-  "transition-[opacity,box-shadow,border-color] duration-150 ease-out",
-  "hover:border-slate-300 hover:shadow-sm",
+  "transition-[opacity,box-shadow,border-color,background-color] duration-150 ease-out",
+  "hover:border-slate-300 hover:shadow-sm hover:bg-violet-50/40",
   reduce,
 ].join(" ");
 

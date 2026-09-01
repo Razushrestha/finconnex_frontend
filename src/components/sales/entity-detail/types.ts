@@ -7,11 +7,6 @@ export interface StatusBadgeData {
   tone: BadgeTone;
 }
 
-export interface HeaderTag {
-  label: string;
-  icon?: LucideIcon;
-}
-
 export interface HeaderAction {
   label: string;
   icon?: LucideIcon;
@@ -30,7 +25,9 @@ export interface EntityDetailHeaderProps {
   /** e.g. "VP of Marketing · CloudScale Solutions" — pass pre-joined or use subtitleParts. */
   subtitleParts: string[];
   status: StatusBadgeData;
-  tags?: HeaderTag[];
+  tags?: string[];
+  relatedTo?: string;
+  onTagsChange?: (next: string[]) => void;
   /** The single emphasized action, e.g. "Convert to Deal". */
   primaryAction?: HeaderAction;
   /** Icon-only actions next to the primary action, e.g. mail / call. */

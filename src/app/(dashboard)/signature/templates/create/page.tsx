@@ -13,6 +13,7 @@ import mammoth from "mammoth";
 import { AdvancedOptionsSection } from "@/components/documents/signature/create/AdvancedOptionsSection";
 import {
   DocumentDetailsSection,
+  renamedStoredFileName,
   type AdditionalDocument,
 } from "@/components/documents/signature/create/DocumentDetailsSection";
 import { EmailMessageSection } from "@/components/documents/signature/create/EmailMessageSection";
@@ -232,6 +233,10 @@ function CreateTemplateForm() {
     additionalPreviews,
   ]);
 
+  const storedFileName = documentFile
+    ? renamedStoredFileName(documentName, documentFile.name)
+    : "";
+
   const [recipients, setRecipients] = useState<SignatureSigner[]>([
     {
       id: "",
@@ -281,7 +286,7 @@ function CreateTemplateForm() {
       id: ids.id,
       signatureRequestId: ids.signatureRequestId,
       documentName,
-      documentFile: documentFile?.name || "",
+      documentFile: storedFileName,
       signer: recipients[0]?.name || "",
       signerEmail: recipients[0]?.email || "",
       signers: recipients,
@@ -308,7 +313,7 @@ function CreateTemplateForm() {
       id: ids.id,
       signatureRequestId: ids.signatureRequestId,
       documentName,
-      documentFile: documentFile?.name || "",
+      documentFile: storedFileName,
       signer: recipients[0]?.name || "",
       signerEmail: recipients[0]?.email || "",
       signers: recipients,
@@ -343,7 +348,7 @@ function CreateTemplateForm() {
       id: ids.id,
       signatureRequestId: ids.signatureRequestId,
       documentName,
-      documentFile: documentFile?.name || "",
+      documentFile: storedFileName,
       signer: recipients[0]?.name || "",
       signerEmail: recipients[0]?.email || "",
       signers: recipients,

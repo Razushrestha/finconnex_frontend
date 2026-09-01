@@ -4,6 +4,7 @@ import {
   taskColumns as SEED_COLUMNS,
   formatReminderDateLabel,
   formatTaskTimestamp,
+  createTaskReminder,
   remindersFromLegacyDate,
   type Priority,
   type Task,
@@ -22,6 +23,37 @@ import {
 import { createBoardStore } from "@/lib/rules/module-store";
 import { newRulesId } from "@/lib/rules/storage";
 import { getRulesActor } from "@/lib/rules/actor";
+import { appendAuditEvent, fieldDiff, logEdit } from "@/lib/rules/audit";
+import { emitLeadActivityChange } from "@/lib/leads/lead-extras-store";
+import {
+  canSpawnAfterCompletion,
+  formatNextScheduled,
+  nextAfterCompletionAt,
+  type ReminderRepeatRule,
+} from "@/lib/tasks/repeat-reminder";
+import {
+  nextReminderOccurrence,
+  parseReminderDateTime,
+  reminderSameSlot,
+  stopPendingReminders,
+} from "@/lib/tasks/reminder-series";
+import { parseTaskDueDate } from "@/lib/dashboard/layout";
+
+function taskLeadLabel(task: Task) {
+  return task.relatedTo?.kind === "Lead" ? task.relatedTo.name : task.title;
+}
+
+function recordTaskEdit(task: Task, changes: { field: string; from: unknown; to: unknown }[]) {
+  if (!changes.length) return;
+  logEdit(
+    "activities.tasks",
+    currentActor(task),
+    task.taskId,
+    taskLeadLabel(task),
+    changes,
+  );
+  emitLeadActivityChange();
+}
 
 function currentActor(task?: Task): string {
   return (
@@ -48,6 +80,7 @@ function withCompletion(task: Task, status: TaskStatus): Task {
       ...task,
       status,
       overdue: false,
+      reminders: stopPendingReminders(task.reminders),
       completedBy: alreadyClosed ? task.completedBy : currentActor(task),
       completedDate:
         alreadyClosed && task.completedDate
@@ -72,7 +105,12 @@ function cloneSeed(): TaskColumn[] {
       relatedTo: t.relatedTo ? { ...t.relatedTo } : undefined,
       collaborators: t.collaborators ? [...t.collaborators] : undefined,
       activityNotes: t.activityNotes?.map((note) => ({ ...note })),
-      reminders: t.reminders?.map((reminder) => ({ ...reminder })),
+      reminders: t.reminders?.map((reminder) => ({
+        ...reminder,
+        repeatRule: reminder.repeatRule
+          ? { ...reminder.repeatRule, weekdays: [...reminder.repeatRule.weekdays] }
+          : undefined,
+      })),
     })),
   }));
 }
@@ -102,7 +140,12 @@ function normalize(cols: TaskColumn[]): TaskColumn[] {
             ? t.modifiedOn || createdOn
             : undefined),
         reminders: Array.isArray(t.reminders)
-          ? t.reminders.map((r) => ({ ...r }))
+          ? t.reminders.map((r) => ({
+              ...r,
+              repeatRule: r.repeatRule
+                ? { ...r.repeatRule, weekdays: [...r.repeatRule.weekdays] }
+                : undefined,
+            }))
           : remindersFromLegacyDate(t.reminderDate),
       };
     }),
@@ -135,6 +178,7 @@ export function createTask(input: {
   notes?: string;
   reminderDate?: string;
   reminders?: TaskReminder[];
+  repeatRule?: ReminderRepeatRule;
   actionItems?: TaskActionItem[];
   collaborators?: string[];
   notifyBy?: Task["notifyBy"];
@@ -160,6 +204,13 @@ export function createTask(input: {
     description: input.description,
     notes: input.notes,
     reminderDate: input.reminderDate,
+    repeatRule:
+      input.repeatRule && input.repeatRule.preset !== "none"
+        ? {
+            ...input.repeatRule,
+            weekdays: [...input.repeatRule.weekdays],
+          }
+        : undefined,
     reminders: input.reminders?.length
       ? input.reminders.map((reminder) => ({ ...reminder }))
       : remindersFromLegacyDate(input.reminderDate),
@@ -239,6 +290,9 @@ export function completeTask(taskId: string): Task | null {
   } else {
     saveTaskColumns(without);
   }
+  recordTaskEdit(updated, [
+    { field: "status", from: found.task.status, to: "Completed" },
+  ]);
   return updated;
 }
 
@@ -336,6 +390,9 @@ export function updateTaskStatus(
       })),
     );
   }
+  recordTaskEdit(updated, [
+    { field: "status", from: found.task.status, to: status },
+  ]);
   return updated;
 }
 
@@ -362,7 +419,7 @@ function formatDueDate(d: Date): string {
 }
 
 function isDueDateOverdue(dueDate: string): boolean {
-  const m = dueDate.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const m = dueDate.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (!m) return false;
   const due = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
   const today = new Date();
@@ -376,6 +433,7 @@ export function updateTaskDueDate(taskId: string, date: Date): Task | null {
   if (!found) return null;
 
   const nextDue = formatDueDate(date);
+  const previousDue = found.task.dueDate;
   let updated: Task | null = null;
   saveTaskColumns(
     listTaskColumns().map((col) => ({
@@ -391,13 +449,36 @@ export function updateTaskDueDate(taskId: string, date: Date): Task | null {
       }),
     })),
   );
+  if (updated) {
+    recordTaskEdit(updated, [{ field: "dueDate", from: previousDue, to: nextDue }]);
+  }
   return updated;
 }
 
 export function patchTask(
   taskId: string,
-  patch: Partial<Pick<Task, "title" | "dueDate" | "assignedTo" | "priority">>,
+  patch: Partial<
+    Pick<
+      Task,
+      | "title"
+      | "dueDate"
+      | "assignedTo"
+      | "priority"
+      | "description"
+      | "notes"
+      | "collaborators"
+      | "actionItems"
+      | "reminderDate"
+      | "reminders"
+      | "taskType"
+      | "relatedTo"
+      | "notifyBy"
+    >
+  >,
 ): Task | null {
+  const found = findTaskById(taskId);
+  if (!found) return null;
+  const before = found.task;
   let updated: Task | null = null;
   saveTaskColumns(
     listTaskColumns().map((col) => ({
@@ -421,6 +502,16 @@ export function patchTask(
       }),
     })),
   );
+  if (updated) {
+    const keys = Object.keys(patch);
+    recordTaskEdit(
+      updated,
+      fieldDiff(
+        Object.fromEntries(keys.map((key) => [key, before[key as keyof Task]])),
+        Object.fromEntries(keys.map((key) => [key, updated![key as keyof Task]])),
+      ),
+    );
+  }
   return updated;
 }
 
@@ -428,6 +519,8 @@ export function updateTaskReminders(
   taskId: string,
   reminders: TaskReminder[],
 ): Task | null {
+  const found = findTaskById(taskId);
+  if (!found) return null;
   let updated: Task | null = null;
   const nextReminders = reminders.map((reminder) => ({ ...reminder }));
   saveTaskColumns(
@@ -444,13 +537,136 @@ export function updateTaskReminders(
       }),
     })),
   );
+  if (updated) {
+    recordTaskEdit(updated, [
+      {
+        field: "reminders",
+        from: `${found.task.reminders?.length ?? 0} reminder(s)`,
+        to: `${nextReminders.length} reminder(s)`,
+      },
+    ]);
+  }
   return updated;
+}
+
+function reminderDateParts(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    date: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+    time: `${pad(date.getHours())}:${pad(date.getMinutes())}`,
+  };
+}
+
+/** Complete a reminder. After-completion rules spawn exactly one next pending reminder. */
+export function completeTaskReminder(
+  taskId: string,
+  reminderId: string,
+  completedAt = new Date(),
+): Task | null {
+  const found = findTaskById(taskId);
+  if (!found) return null;
+  const current = found.task.reminders?.find((item) => item.id === reminderId);
+  if (!current) return null;
+  if (current.status === "Completed" || current.status === "Stopped") {
+    return found.task;
+  }
+  if (current.spawnedNextId) return found.task;
+
+  const occurrence = current.occurrenceIndex ?? 1;
+  const rule = current.repeatRule;
+  let nextReminder: TaskReminder | null = null;
+  let nextLabel: string | undefined;
+
+  if (found.task.status !== "Completed" && rule?.preset === "afterCompletion") {
+    const nextAt = nextAfterCompletionAt(completedAt, rule);
+    if (canSpawnAfterCompletion(rule, occurrence, nextAt)) {
+      const parts = reminderDateParts(nextAt);
+      nextReminder = createTaskReminder({
+        type: current.type,
+        date: parts.date,
+        time: parts.time,
+        leadTime: current.leadTime,
+        notificationMethod: current.notificationMethod,
+        notify: current.notify,
+        scheduleMode: "onDate",
+        repeatType: current.repeatType,
+        repeatRule: rule
+          ? { ...rule, weekdays: [...rule.weekdays] }
+          : undefined,
+        status: "Pending",
+        sequenceId: current.sequenceId ?? current.id,
+        occurrenceIndex: occurrence + 1,
+      });
+      nextLabel = formatNextScheduled(nextAt);
+    }
+  } else if (
+    found.task.status !== "Completed" &&
+    rule &&
+    rule.preset !== "none"
+  ) {
+    const currentAt = parseReminderDateTime(current.date, current.time);
+    const due = found.task.dueDate
+      ? parseTaskDueDate(found.task.dueDate)
+      : null;
+    const nextAt = currentAt
+      ? nextReminderOccurrence(currentAt, due, rule)
+      : null;
+    if (nextAt) {
+      const parts = reminderDateParts(nextAt);
+      const alreadyQueued = (found.task.reminders ?? []).some(
+        (item) =>
+          (item.sequenceId ?? item.id) ===
+            (current.sequenceId ?? current.id) &&
+          reminderSameSlot(item, parts) &&
+          (item.status ?? "Pending") === "Pending",
+      );
+      if (!alreadyQueued) {
+        nextReminder = createTaskReminder({
+          type: current.type,
+          date: parts.date,
+          time: parts.time,
+          leadTime: current.leadTime,
+          notificationMethod: current.notificationMethod,
+          notify: current.notify,
+          scheduleMode: "onDate",
+          repeatType: current.repeatType,
+          repeatRule: {
+            ...rule,
+            weekdays: [...rule.weekdays],
+          },
+          status: "Pending",
+          sequenceId: current.sequenceId ?? current.id,
+          occurrenceIndex: occurrence + 1,
+        });
+        nextLabel = formatNextScheduled(nextAt);
+      }
+    }
+  }
+
+  const completed: TaskReminder = {
+    ...current,
+    status: "Completed",
+    completedAt: formatTaskTimestamp(completedAt),
+    spawnedNextId: nextReminder?.id,
+    nextScheduledLabel: nextLabel,
+  };
+
+  const withoutCurrent = (found.task.reminders ?? []).map((item) =>
+    item.id === reminderId ? completed : item,
+  );
+  const nextList = nextReminder
+    ? [...withoutCurrent, nextReminder]
+    : withoutCurrent;
+
+  return updateTaskReminders(taskId, nextList);
 }
 
 export function updateTaskActionItems(
   taskId: string,
   actionItems: TaskActionItem[],
 ): Task | null {
+  const found = findTaskById(taskId);
+  if (!found) return null;
   let updated: Task | null = null;
   saveTaskColumns(
     listTaskColumns().map((col) => ({
@@ -465,6 +681,15 @@ export function updateTaskActionItems(
       }),
     })),
   );
+  if (updated) {
+    recordTaskEdit(updated, [
+      {
+        field: "actionItems",
+        from: `${found.task.actionItems?.length ?? 0} item(s)`,
+        to: `${actionItems.length} item(s)`,
+      },
+    ]);
+  }
   return updated;
 }
 
@@ -472,6 +697,8 @@ export function updateTaskDescription(
   taskId: string,
   description: string,
 ): Task | null {
+  const found = findTaskById(taskId);
+  if (!found) return null;
   let updated: Task | null = null;
   saveTaskColumns(
     listTaskColumns().map((col) => ({
@@ -486,6 +713,11 @@ export function updateTaskDescription(
       }),
     })),
   );
+  if (updated) {
+    recordTaskEdit(updated, [
+      { field: "description", from: found.task.description ?? "", to: description },
+    ]);
+  }
   return updated;
 }
 
@@ -518,6 +750,19 @@ export function addTaskActivityNote(
       }),
     })),
   );
+  if (updated) {
+    appendAuditEvent({
+      action: "edit",
+      module: "activities.tasks",
+      recordId: taskId,
+      recordLabel: updated.title,
+      actor,
+      summary: "Added note",
+      changes: [{ field: "note", from: "", to: trimmed }],
+      meta: { kind: "note" },
+    });
+    emitLeadActivityChange();
+  }
   return updated;
 }
 

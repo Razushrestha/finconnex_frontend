@@ -31,6 +31,8 @@ export interface ClientPortal {
   modules: PortalModule[];
   primaryContactName: string;
   primaryContactEmail: string;
+  /** CRM lead this portal was created from (Send Client Portal). */
+  leadId?: string;
   inviteSentAt?: string;
   lastLoginAt?: string;
   createdBy: string;
@@ -124,6 +126,15 @@ export function slugifyPortalName(name: string) {
 
 export function portalPublicPath(slug: string) {
   return `/p/${slug}`;
+}
+
+export function portalLoginPath(slug: string) {
+  return `${portalPublicPath(slug)}/login`;
+}
+
+export function portalAbsoluteUrl(path: string) {
+  if (typeof window === "undefined") return path;
+  return `${window.location.origin}${path}`;
 }
 
 /** Modules visible in public nav: intersection of configured modules only */
@@ -229,8 +240,14 @@ export const clientPortals: ClientPortal[] = [
 function readStore(): ClientPortal[] | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(STORE_KEY);
-    return raw ? (JSON.parse(raw) as ClientPortal[]) : null;
+    const local = window.localStorage.getItem(STORE_KEY);
+    if (local) return JSON.parse(local) as ClientPortal[];
+    const session = window.sessionStorage.getItem(STORE_KEY);
+    if (session) {
+      window.localStorage.setItem(STORE_KEY, session);
+      return JSON.parse(session) as ClientPortal[];
+    }
+    return null;
   } catch {
     return null;
   }
@@ -238,7 +255,9 @@ function readStore(): ClientPortal[] | null {
 
 function writeStore(list: ClientPortal[]) {
   if (typeof window === "undefined") return;
-  sessionStorage.setItem(STORE_KEY, JSON.stringify(list));
+  const raw = JSON.stringify(list);
+  window.localStorage.setItem(STORE_KEY, raw);
+  window.sessionStorage.setItem(STORE_KEY, raw);
 }
 
 export function listPortals(): ClientPortal[] {
@@ -272,6 +291,10 @@ export function getPortalById(id: string) {
 
 export function getPortalBySlug(slug: string) {
   return listPortals().find((p) => p.slug === slug);
+}
+
+export function getPortalByLeadId(leadId: string) {
+  return listPortals().find((p) => p.leadId === leadId);
 }
 
 export function nextPortalIds() {

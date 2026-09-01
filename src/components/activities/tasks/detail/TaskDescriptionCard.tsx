@@ -93,7 +93,7 @@ export function TaskDescriptionCard({
           {renderPlainDescriptionWithMentions(description)}
         </p>
       ) : (
-        <p className="text-sm text-slate-400">No description added yet.</p>
+        <p className="text-2xl font-light leading-none text-slate-300">—</p>
       )}
     </section>
   );

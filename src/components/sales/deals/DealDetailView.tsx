@@ -30,6 +30,7 @@ import {
 } from "@/lib/deals/store";
 import { listAllContacts, findContactById } from "@/lib/contacts/store";
 import { useRouter } from "next/navigation";
+import { useModuleBack } from "@/hooks/useModuleBack";
 import {
   EntityDetailHeader,
   ScoreGaugeCard,
@@ -42,6 +43,8 @@ import {
   RelatedContactsCard,
 } from "@/components/sales/entity-detail";
 import { useParentActivityTimeline } from "@/lib/activity-timeline";
+import { RelatedInternalNotes } from "@/components/shared/RelatedInternalNotes";
+import { relatedToLabel } from "@/lib/related-entity";
 import { EditDealModal, type EditDealFormValues } from "./EditDealModal";
 import { ComposeEmailModal } from "../ComposeEmailModal";
 import { sendEmailDemoLive } from "@/lib/comms/send-gateway";
@@ -71,6 +74,7 @@ export function DealDetailView({
   const [flash, setFlash] = useState<string | null>(null);
   const [linkContactId, setLinkContactId] = useState("");
   const router = useRouter();
+  const back = useModuleBack("/sales/deals", "All Deals");
 
   function refresh() {
     const loc = findDealById(deal.id);
@@ -169,7 +173,7 @@ export function DealDetailView({
 
       <EntityDetailHeader
         breadcrumb={[
-          { label: "All Deals", href: "/sales/deals" },
+          { label: back.label, href: back.href },
           { label: deal.account, href: "#" },
         ]}
         initials={deal.initials}
@@ -184,7 +188,12 @@ export function DealDetailView({
                 ? "danger"
                 : "info",
         }}
-        tags={[{ label: pipeline }]}
+        tags={deal.tags ?? []}
+        relatedTo={relatedToLabel("Deal", deal.name)}
+        onTagsChange={(tags) => {
+          const loc = updateDeal(deal.id, { tags });
+          if (loc) setDeal(loc.deal);
+        }}
         primaryAction={
           !isClosed
             ? {
@@ -247,7 +256,9 @@ export function DealDetailView({
         </div>
 
         <div className="space-y-3">
-          <ActivityComposer onSubmit={(text) => notify(`Posted: ${text.slice(0, 40)}`)} />
+          {activeTab === "notes" ? null : (
+            <ActivityComposer onSubmit={(text) => notify(`Posted: ${text.slice(0, 40)}`)} />
+          )}
           <ActivityTabs
             tabs={[
               { key: "timeline", label: "Timeline", icon: ClockIcon },
@@ -258,17 +269,26 @@ export function DealDetailView({
             activeKey={activeTab}
             onChange={setActiveTab}
           />
-          <TimelineFeed items={timelineItems} />
-          {timelineLoading ? (
-            <p className="text-center text-[12px] text-slate-400">
-              Refreshing timeline…
-            </p>
-          ) : null}
-          {!timelineLoading && timelineError && timelineItems.length === 0 ? (
-            <p className="text-center text-[12px] text-slate-400">
-              {timelineError}
-            </p>
-          ) : null}
+          {activeTab === "notes" ? (
+            <RelatedInternalNotes
+              relatedTo={`Deal: ${deal.name}`}
+              onNotify={notify}
+            />
+          ) : (
+            <>
+              <TimelineFeed items={timelineItems} />
+              {timelineLoading ? (
+                <p className="text-center text-[12px] text-slate-400">
+                  Refreshing timeline…
+                </p>
+              ) : null}
+              {!timelineLoading && timelineError && timelineItems.length === 0 ? (
+                <p className="text-center text-[12px] text-slate-400">
+                  {timelineError}
+                </p>
+              ) : null}
+            </>
+          )}
         </div>
 
         <div className="space-y-4">
@@ -411,9 +431,14 @@ export function DealDetailView({
           defaultGreeting={`Hi ${deal.contact.split(" ")[0]},`}
           onSend={(values) => {
             void (async () => {
-              const email = `${deal.contact!.toLowerCase().replace(/\s+/g, ".")}@example.com`;
+              const fallback = `${deal.contact!.toLowerCase().replace(/\s+/g, ".")}@example.com`;
+              const to = values.toList?.length
+                ? values.toList
+                : values.to
+                  ? values.to.split(/[,;]+/).map((part) => part.trim()).filter(Boolean)
+                  : [fallback];
               const result = await sendEmailDemoLive({
-                email,
+                email: to[0],
                 subject: values.subject,
                 body: values.body,
               });
@@ -425,13 +450,19 @@ export function DealDetailView({
                 subject: values.subject || "(no subject)",
                 body: values.body || "",
                 from: "noreply@finconnex.demo",
-                to: [email],
+                to,
+                cc: values.ccList,
+                bcc: values.bccList,
                 status: "Sent",
                 sentDate: formatRulesAt(),
                 relatedTo: `Deal: ${deal.name}`,
               });
               setIsComposeOpen(false);
-              notify("Email sent via demo gateway");
+              notify(
+                to.length > 1
+                  ? `Email sent to ${to.length} recipients`
+                  : "Email sent via demo gateway",
+              );
             })();
           }}
         />

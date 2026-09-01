@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import type { Task, TaskStatus, Priority } from "@/lib/tasks/types";
 import { TASK_STATUSES, TASK_PRIORITIES, TASK_OWNERS } from "@/lib/tasks/types";
+import { RelatedToLink } from "@/components/activities/RelatedToLink";
 import { useRouter } from "next/navigation";
 
 interface TaskCardProps {
@@ -55,9 +56,9 @@ const priorityIcon: Record<string, React.ElementType> = {
 };
 
 function parseDueDate(dueDate: string): Date | null {
-  const [day, month, year] = dueDate.split("/").map(Number);
-  if (!day || !month || !year) return null;
-  return new Date(year, month - 1, day);
+  const m = dueDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return null;
+  return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
 }
 
 function overdueDays(dueDate: string): number | null {
@@ -287,12 +288,10 @@ export function TaskCard({
         {task.relatedTo ? (
           <div className="mb-1.5 flex items-center gap-1.5 text-[11px] text-slate-600">
             <Building2 className="h-3 w-3 shrink-0 text-slate-400" />
-            <span className="truncate">
-              {task.relatedTo.kind}:{" "}
-              <span className="font-medium text-sky-600">
-                {task.relatedTo.name}
-              </span>
-            </span>
+            <RelatedToLink
+              relatedTo={task.relatedTo}
+              className="font-medium text-sky-600"
+            />
           </div>
         ) : null}
 

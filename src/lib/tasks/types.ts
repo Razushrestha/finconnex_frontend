@@ -11,6 +11,7 @@ import {
   type ReminderLeadTime,
   type ReminderType,
 } from "@/lib/reminders/types";
+import type { ReminderRepeatRule } from "@/lib/tasks/repeat-reminder";
 
 export const TASK_TYPES = [
   "Call",
@@ -37,16 +38,20 @@ export const TASK_STATUSES = [
 ] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
+export type TaskScope = "all" | "mine" | "my-overdue";
+
 export interface TaskFilters {
   statuses: TaskStatus[];
   priorities: Priority[];
   types: TaskType[];
+  scope?: TaskScope;
 }
 
 export const EMPTY_TASK_FILTERS: TaskFilters = {
   statuses: [],
   priorities: [],
   types: [],
+  scope: "all",
 };
 
 export interface TaskActionItem {
@@ -77,8 +82,26 @@ export const REMINDER_REPEAT_OPTIONS = [
   "Weekly",
   "Monthly",
   "Yearly",
+  "Custom",
 ] as const;
 export type ReminderRepeatType = (typeof REMINDER_REPEAT_OPTIONS)[number];
+
+/** Reminder frequency labels. Stored value `None` is shown as Once. */
+export const REMINDER_FREQUENCY_OPTIONS: {
+  value: ReminderRepeatType;
+  label: string;
+}[] = [
+  { value: "None", label: "Once" },
+  { value: "Daily", label: "Daily" },
+  { value: "Weekly", label: "Weekly" },
+  { value: "Monthly", label: "Monthly" },
+  { value: "Custom", label: "Custom" },
+];
+
+export function reminderFrequencyLabel(type?: ReminderRepeatType) {
+  if (!type || type === "None") return "Once";
+  return REMINDER_FREQUENCY_OPTIONS.find((item) => item.value === type)?.label ?? type;
+}
 
 export interface TaskReminder {
   id: string;
@@ -92,7 +115,14 @@ export interface TaskReminder {
   relativeWhen?: ReminderRelativeWhen;
   relativeOf?: "Due Date";
   repeatType?: ReminderRepeatType;
+  repeatRule?: ReminderRepeatRule;
   notify?: ReminderNotifyOption;
+  status?: "Pending" | "Completed" | "Stopped";
+  completedAt?: string;
+  sequenceId?: string;
+  occurrenceIndex?: number;
+  spawnedNextId?: string;
+  nextScheduledLabel?: string;
 }
 
 export function reminderNotify(reminder: TaskReminder): ReminderNotifyOption {
@@ -109,8 +139,9 @@ export function notifyToMethod(
 export function createTaskReminder(
   patch: Partial<TaskReminder> = {},
 ): TaskReminder {
+  const id = patch.id ?? `tr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   return {
-    id: `tr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id,
     type: REMINDER_TYPES[0],
     date: "",
     time: "13:00",
@@ -122,7 +153,12 @@ export function createTaskReminder(
     relativeOf: "Due Date",
     repeatType: "None",
     notify: "Email",
+    status: "Pending",
+    occurrenceIndex: 1,
+    sequenceId: id,
     ...patch,
+    id,
+    sequenceId: patch.sequenceId ?? id,
   };
 }
 
@@ -205,7 +241,10 @@ function formatReminderTime(time?: string): string {
 export function formatReminderDateLabel(
   reminders: TaskReminder[],
 ): string | undefined {
-  const first = reminders.find((reminder) => reminder.date);
+  const first =
+    reminders.find(
+      (reminder) => reminder.date && (reminder.status ?? "Pending") === "Pending",
+    ) ?? reminders.find((reminder) => reminder.date);
   return first ? formatTaskReminderWhen(first) : undefined;
 }
 
@@ -219,6 +258,7 @@ export interface Task {
   assignedTo: string;
   relatedTo?: RelatedTo;
   reminderDate?: string;
+  repeatRule?: ReminderRepeatRule;
   createdBy?: string;
   createdOn?: string;
   modifiedBy?: string;

@@ -18,6 +18,12 @@ export type LeadActivityKind =
   | "stage_change"
   | "document"
   | "workflow"
+  | "created"
+  | "assigned"
+  | "owner_change"
+  | "converted"
+  | "deal"
+  | "client"
   | "other";
 
 /** Spec §10 urgency: red broken · amber today · green future. */
@@ -36,6 +42,12 @@ export interface LeadActivityCandidate {
   /** Record creation timestamp (tie-breaker #6). */
   createdAt: Date | null;
   bucket: "broken" | "scheduled" | "completed";
+  /** CRM priority when the source record has one. */
+  priority?: "high" | "normal" | "low";
+  /** Who performed the action, when known. */
+  actor?: string;
+  /** Extra change detail (field diffs, snippets). */
+  body?: string;
   isMissed?: boolean;
   isUnreplied?: boolean;
   /** Optional module deep-link id (same as source record id). */

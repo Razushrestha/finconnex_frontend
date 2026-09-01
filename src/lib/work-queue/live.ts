@@ -34,6 +34,7 @@ import {
   type WorkqueueItemId,
   type WorkQueueNavId,
 } from "@/lib/work-queue/config";
+import { workQueueRecordHref } from "@/lib/work-queue/navigation";
 
 export type WorkQueueTimeFilter =
   | "today-overdue"
@@ -300,14 +301,8 @@ function emailOwnedBy(e: Email, scope: WorkQueueScope) {
   return getRulesActor().name === scope && !e.relatedTo;
 }
 
-function hrefFor(module: keyof typeof HREF, id: string, q?: string) {
-  if (module === "notes") return `/activities/notes/detail/${id}`;
-  if (module === "meetings") return `/activities/meetings/detail/${id}`;
-  const base = HREF[module];
-  const params = new URLSearchParams();
-  params.set("focus", id);
-  if (q) params.set("q", q);
-  return `${base}?${params.toString()}`;
+function hrefFor(module: keyof typeof HREF, id: string, _q?: string) {
+  return workQueueRecordHref(module, id);
 }
 
 function toRow(

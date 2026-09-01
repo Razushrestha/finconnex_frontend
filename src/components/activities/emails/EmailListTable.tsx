@@ -4,54 +4,54 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Archive,
+  CalendarPlus,
   Clock,
+  Flag,
+  FolderInput,
+  Forward,
   Mail,
   MailOpen,
+  MoreHorizontal,
   Paperclip,
+  Pin,
+  Reply,
+  ReplyAll,
+  RotateCcw,
   Star,
   Trash2,
 } from "lucide-react";
 import type { Email, EmailStatus } from "@/lib/emails/types";
 import { deleteEmail, listEmails, updateEmail } from "@/lib/emails/store";
 import { onRulesChange } from "@/lib/rules";
-import { cardSubject } from "@/lib/motion";
 import { cn } from "@/lib/utils";
-
-const STARRED_KEY = "finconnex.emails.starred";
-
-function loadStarred(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = localStorage.getItem(STARRED_KEY);
-    const ids = raw ? (JSON.parse(raw) as string[]) : [];
-    return new Set(Array.isArray(ids) ? ids : []);
-  } catch {
-    return new Set();
-  }
-}
-
-function persistStarred(ids: Set<string>) {
-  try {
-    localStorage.setItem(STARRED_KEY, JSON.stringify([...ids]));
-  } catch {
-    /* ignore */
-  }
-}
-
-function displayName(email: Email): string {
-  if (email.relatedTo) {
-    return email.relatedTo.replace(/^(Lead|Contact|Deal|Company):\s*/i, "");
-  }
-  const source = email.from || email.to[0] || "Unknown";
-  if (!source.includes("@")) return source;
-  const local = source.split("@")[0] ?? source;
-  return local
-    .replace(/[._-]+/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
+import { avatarColor, initials } from "@/lib/activities/shared";
+import {
+  contactName,
+  flagsFor,
+  labelTone,
+  moveToCustomFolder,
+  onMailboxChange,
+  restoreToInbox,
+  setFocusOverride,
+  setMailboxFlag,
+  clearLabels,
+  toggleLabel,
+  toggleMailboxFlag,
+  type MailFolder,
+  type MailLabel,
+  MAIL_LABELS,
+} from "@/lib/emails/mailbox";
+import { listUserFolders, type MailUserFolder } from "@/lib/emails/folders";
+import {
+  draftFromEmail,
+  meetingHref,
+  sortMailboxRows,
+  stashCompose,
+  type ComposeMode,
+} from "@/lib/emails/outlook";
 
 function snippetOf(email: Email): string {
-  return email.body.replace(/\s+/g, " ").trim();
+  return email.body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function isUnread(status: EmailStatus): boolean {
@@ -74,7 +74,16 @@ function inboxDate(sentDate?: string): string {
     parsed.getMonth() === now.getMonth() &&
     parsed.getDate() === now.getDate();
   if (sameDay && match[4] && match[6]) {
-    return `${Number(match[4])}:${match[5]} ${match[6].toUpperCase()}`;
+    return `${Number(match[4])}:${match[5]}${match[6].toUpperCase()}`;
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    parsed.getFullYear() === yesterday.getFullYear() &&
+    parsed.getMonth() === yesterday.getMonth() &&
+    parsed.getDate() === yesterday.getDate();
+  if (isYesterday && match[4] && match[6]) {
+    return `Yesterday, ${Number(match[4])}:${match[5]}${match[6].toUpperCase()}`;
   }
   if (parsed.getFullYear() === now.getFullYear()) {
     return parsed.toLocaleDateString("en-AU", { day: "numeric", month: "short" });
@@ -86,16 +95,47 @@ function inboxDate(sentDate?: string): string {
   });
 }
 
-interface EmailListTableProps {
-  data?: Email[];
+function tomorrowMorning() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(9, 0, 0, 0);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const h = d.getHours() % 12 || 12;
+  const ap = d.getHours() >= 12 ? "PM" : "AM";
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(h)}:00 ${ap}`;
 }
 
-export function EmailListTable({ data }: EmailListTableProps) {
+const iconBtn =
+  "inline-flex h-8 items-center gap-1 rounded-lg px-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40";
+
+interface EmailListTableProps {
+  data?: Email[];
+  folderLabel?: string;
+  folder?: MailFolder;
+  customFolderId?: string | null;
+  onCompose?: () => void;
+}
+
+export function EmailListTable({
+  data,
+  folderLabel = "Inbox",
+  folder = "inbox",
+  customFolderId = null,
+  onCompose,
+}: EmailListTableProps) {
   const router = useRouter();
   const [emails, setEmails] = useState(() => data ?? listEmails());
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [starred, setStarred] = useState<Set<string>>(loadStarred);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [labelMenuFor, setLabelMenuFor] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
+  const userFolders = useMemo(() => {
+    void tick;
+    return listUserFolders();
+  }, [tick]);
+  const canRestore = folder === "trash" || folder === "spam" || folder === "archive";
 
   useEffect(() => {
     if (data) {
@@ -105,8 +145,23 @@ export function EmailListTable({ data }: EmailListTableProps) {
     return onRulesChange(() => setEmails(listEmails()));
   }, [data]);
 
+  useEffect(() => onMailboxChange(() => setTick((n) => n + 1)), []);
+
+  useEffect(() => {
+    setSelectedIds((ids) => ids.filter((id) => emails.some((email) => email.id === id)));
+  }, [emails]);
+
   const allSelected =
     emails.length > 0 && selectedIds.length === emails.length;
+  const selectedEmail =
+    selectedIds.length === 1
+      ? emails.find((email) => email.id === selectedIds[0])
+      : undefined;
+
+  function refresh() {
+    if (!data) setEmails(listEmails());
+    setTick((n) => n + 1);
+  }
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) =>
@@ -118,21 +173,11 @@ export function EmailListTable({ data }: EmailListTableProps) {
     setSelectedIds(allSelected ? [] : emails.map((e) => e.id));
   }
 
-  function toggleStar(id: string) {
-    setStarred((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      persistStarred(next);
-      return next;
-    });
-  }
-
   function openEmail(id: string) {
     const email = emails.find((e) => e.id === id);
     if (email && isUnread(email.status)) {
       updateEmail(id, { status: "Opened" });
-      setEmails(listEmails());
+      if (!data) setEmails(listEmails());
     }
     router.push(`/activities/emails/detail/${id}`);
   }
@@ -141,50 +186,207 @@ export function EmailListTable({ data }: EmailListTableProps) {
     for (const id of ids) {
       updateEmail(id, { status: read ? "Opened" : "Delivered" });
     }
-    setEmails(listEmails());
+    refresh();
   }
 
   function removeEmails(ids: string[]) {
-    for (const id of ids) deleteEmail(id);
+    if (folder === "trash") {
+      for (const id of ids) deleteEmail(id);
+    } else {
+      for (const id of ids) setMailboxFlag(id, "trash", true);
+    }
     setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
-    setEmails(listEmails());
+    refresh();
   }
 
-  const rows = useMemo(() => emails, [emails]);
+  function restoreEmails(ids: string[]) {
+    for (const id of ids) restoreToInbox(id);
+    setSelectedIds([]);
+    refresh();
+  }
+
+  function move(ids: string[], key: "archived" | "spam" | "important" | "starred" | "pinned") {
+    for (const id of ids) {
+      if (key === "starred" || key === "important" || key === "pinned") {
+        toggleMailboxFlag(id, key);
+      } else {
+        setMailboxFlag(id, key, true);
+      }
+    }
+    if (key === "archived" || key === "spam") setSelectedIds([]);
+    refresh();
+  }
+
+  function snooze(ids: string[]) {
+    for (const id of ids) {
+      updateEmail(id, { status: "Scheduled", sentDate: tomorrowMorning() });
+    }
+    setSelectedIds([]);
+    refresh();
+  }
+
+  function composeFrom(mode: ComposeMode, email = selectedEmail) {
+    if (!email) return;
+    stashCompose(draftFromEmail(email, mode));
+    router.push("/activities/emails/create");
+  }
+
+  function startMeeting(email = selectedEmail) {
+    if (!email) return;
+    router.push(meetingHref(email));
+  }
+
+  function moveSelectedTo(folder: MailUserFolder | null) {
+    for (const id of selectedIds) moveToCustomFolder(id, folder?.id ?? null);
+    setSelectedIds([]);
+    setMoveOpen(false);
+    refresh();
+  }
+
+  const rows = useMemo(() => sortMailboxRows(emails), [emails, tick]);
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-slate-100 px-2">
+      <div className="flex min-h-11 shrink-0 flex-wrap items-center gap-1 border-b border-slate-100 px-2 py-1.5">
         <label className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-slate-100">
           <input
             type="checkbox"
             checked={allSelected}
             onChange={toggleSelectAll}
             aria-label="Select all emails"
-            className="h-4 w-4 rounded border-slate-300 text-[#5A32A3] accent-[#5A32A3] focus:ring-[#5A32A3]/30"
+            className="h-4 w-4 rounded border-slate-300 text-[#5A32A3] accent-[#5A32A3]"
           />
         </label>
+        <span className="mr-auto text-[13px] font-semibold text-slate-700">
+          {selectedIds.length > 0 ? `${selectedIds.length} selected` : folderLabel}
+        </span>
         {selectedIds.length > 0 ? (
           <>
-            <span className="mr-1 text-[12px] text-slate-500">
-              {selectedIds.length} selected
-            </span>
             <button
               type="button"
-              title="Mark as read"
-              onClick={() => markReadState(selectedIds, true)}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-[#5A32A3]"
+              disabled={!selectedEmail}
+              onClick={() => composeFrom("reply")}
+              className={iconBtn}
             >
-              <MailOpen className="h-4 w-4" />
+              <Reply className="h-3.5 w-3.5" />
+              Reply
             </button>
             <button
               type="button"
-              title="Mark as unread"
-              onClick={() => markReadState(selectedIds, false)}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-[#5A32A3]"
+              disabled={!selectedEmail}
+              onClick={() => composeFrom("replyAll")}
+              className={iconBtn}
             >
-              <Mail className="h-4 w-4" />
+              <ReplyAll className="h-3.5 w-3.5" />
+              Reply all
             </button>
+            <button
+              type="button"
+              disabled={!selectedEmail}
+              onClick={() => composeFrom("forward")}
+              className={iconBtn}
+            >
+              <Forward className="h-3.5 w-3.5" />
+              Forward
+            </button>
+            <button
+              type="button"
+              disabled={!selectedEmail}
+              onClick={() => composeFrom("forwardAttach")}
+              className={iconBtn}
+            >
+              <Paperclip className="h-3.5 w-3.5" />
+              Forward as attachment
+            </button>
+            <button
+              type="button"
+              disabled={!selectedEmail}
+              onClick={() => startMeeting()}
+              className={iconBtn}
+            >
+              <CalendarPlus className="h-3.5 w-3.5" />
+              Meeting
+            </button>
+            <button
+              type="button"
+              onClick={() => move(selectedIds, "important")}
+              className={iconBtn}
+            >
+              <Flag className="h-3.5 w-3.5" />
+              Flag
+            </button>
+            <button
+              type="button"
+              onClick={() => move(selectedIds, "pinned")}
+              className={iconBtn}
+            >
+              <Pin className="h-3.5 w-3.5" />
+              Pin
+            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMoveOpen((v) => !v)}
+                className={iconBtn}
+              >
+                <FolderInput className="h-3.5 w-3.5" />
+                Move
+              </button>
+              {moveOpen ? (
+                <div className="absolute top-9 right-0 z-30 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => moveSelectedTo(null)}
+                    className="flex w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-slate-50"
+                  >
+                    Inbox
+                  </button>
+                  {userFolders.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => moveSelectedTo(item)}
+                      className="flex w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-slate-50"
+                    >
+                      {item.name}
+                    </button>
+                  ))}
+                  {userFolders.length === 0 ? (
+                    <p className="px-3 py-2 text-[11px] text-slate-400">
+                      Create a folder in the left sidebar
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+            {canRestore ? (
+              <button
+                type="button"
+                onClick={() => restoreEmails(selectedIds)}
+                className={iconBtn}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Restore
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => move(selectedIds, "archived")}
+                  className={iconBtn}
+                >
+                  <Archive className="h-3.5 w-3.5" />
+                  Archive
+                </button>
+                <button
+                  type="button"
+                  onClick={() => move(selectedIds, "spam")}
+                  className={iconBtn}
+                >
+                  Spam
+                </button>
+              </>
+            )}
             <button
               type="button"
               title="Delete"
@@ -193,9 +395,114 @@ export function EmailListTable({ data }: EmailListTableProps) {
             >
               <Trash2 className="h-4 w-4" />
             </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
+                aria-label="More actions"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+              {menuOpen ? (
+                <div className="absolute top-9 right-0 z-30 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      markReadState(selectedIds, true);
+                      setMenuOpen(false);
+                    }}
+                    className="flex w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-slate-50"
+                  >
+                    Mark as read
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      markReadState(selectedIds, false);
+                      setMenuOpen(false);
+                    }}
+                    className="flex w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-slate-50"
+                  >
+                    Mark as unread
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      snooze(selectedIds);
+                      setMenuOpen(false);
+                    }}
+                    className="flex w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-slate-50"
+                  >
+                    Snooze until tomorrow
+                  </button>
+                  {selectedEmail ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFocusOverride(selectedEmail.id, "focused");
+                          setMenuOpen(false);
+                          refresh();
+                        }}
+                        className="flex w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-slate-50"
+                      >
+                        Move to Focused
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFocusOverride(selectedEmail.id, "other");
+                          setMenuOpen(false);
+                          refresh();
+                        }}
+                        className="flex w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-slate-50"
+                      >
+                        Move to Other
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </>
         ) : (
-          <span className="text-[12px] text-slate-400">Inbox</span>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              aria-label="More actions"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+            {menuOpen ? (
+              <div className="absolute top-9 right-0 z-20 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    markReadState(emails.map((e) => e.id), true);
+                    setMenuOpen(false);
+                  }}
+                  className="flex w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-slate-50"
+                >
+                  Mark all as read
+                </button>
+                {onCompose ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onCompose();
+                    }}
+                    className="flex w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-slate-50"
+                  >
+                    Compose mail
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         )}
       </div>
 
@@ -203,9 +510,10 @@ export function EmailListTable({ data }: EmailListTableProps) {
         {rows.map((email) => {
           const unread = isUnread(email.status);
           const selected = selectedIds.includes(email.id);
-          const starredRow = starred.has(email.id);
+          const flags = flagsFor(email.id, email);
           const hovering = hoveredId === email.id;
-          const who = displayName(email);
+          const who = contactName(email);
+          const labels = flags.labels ?? [];
 
           return (
             <div
@@ -213,15 +521,18 @@ export function EmailListTable({ data }: EmailListTableProps) {
               data-focus-id={email.id}
               data-email-id={email.id}
               onMouseEnter={() => setHoveredId(email.id)}
-              onMouseLeave={() => setHoveredId((id) => (id === email.id ? null : id))}
+              onMouseLeave={() => {
+                setHoveredId((id) => (id === email.id ? null : id));
+                setLabelMenuFor((id) => (id === email.id ? null : id));
+              }}
               onClick={() => openEmail(email.id)}
               className={cn(
-                "group grid cursor-pointer grid-cols-[32px_32px_minmax(140px,180px)_minmax(0,1fr)_auto] items-center gap-1 border-b border-slate-100 px-2 py-[7px] transition-colors",
+                "group flex cursor-pointer items-start gap-1.5 border-b border-slate-100 px-2 py-2.5 transition-colors",
                 selected
                   ? "bg-[#F3ECFB]"
                   : unread
-                    ? "bg-white hover:shadow-[inset_1px_0_0_#dadce0,inset_-1px_0_0_#dadce0,0_1px_2px_0_rgba(60,64,67,.15)]"
-                    : "bg-[#f8f9fa] hover:shadow-[inset_1px_0_0_#dadce0,inset_-1px_0_0_#dadce0,0_1px_2px_0_rgba(60,64,67,.15)]",
+                    ? "bg-white hover:bg-slate-50"
+                    : "bg-[#f8f9fa] hover:bg-slate-50",
               )}
             >
               <button
@@ -231,7 +542,7 @@ export function EmailListTable({ data }: EmailListTableProps) {
                   e.stopPropagation();
                   toggleSelect(email.id);
                 }}
-                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"
+                className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-black/5"
               >
                 <input
                   type="checkbox"
@@ -243,116 +554,238 @@ export function EmailListTable({ data }: EmailListTableProps) {
 
               <button
                 type="button"
-                aria-label={starredRow ? "Unstar" : "Star"}
+                title={flags.important ? "Unflag" : "Flag"}
                 onClick={(e) => {
                   e.stopPropagation();
-                  toggleStar(email.id);
+                  move([email.id], "important");
                 }}
-                className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-black/5"
+                className="mt-1 flex h-8 w-6 shrink-0 items-center justify-center"
               >
-                <Star
+                <Flag
                   className={cn(
                     "h-4 w-4",
-                    starredRow
-                      ? "fill-[#f4b400] text-[#f4b400]"
-                      : "text-slate-300 group-hover:text-slate-400",
+                    flags.important
+                      ? "fill-[#e11d48] text-[#e11d48]"
+                      : "text-slate-300",
                   )}
                 />
               </button>
 
-              <p
+              {flags.pinned ? (
+                <span className="mt-2 flex h-6 w-4 shrink-0 items-center justify-center" title="Pinned">
+                  <Pin className="h-3.5 w-3.5 fill-[#5A32A3] text-[#5A32A3]" />
+                </span>
+              ) : (
+                <span className="w-0 shrink-0" />
+              )}
+
+              <span
                 className={cn(
-                  "min-w-0 truncate pr-2 text-[13.5px] tracking-tight",
-                  unread ? "font-bold text-slate-900" : "font-medium text-slate-700",
+                  "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+                  avatarColor(who),
                 )}
-                title={who}
               >
-                {who}
-              </p>
+                {initials(who)}
+              </span>
 
-              <div className="flex min-w-0 items-baseline gap-2">
-                <p className="min-w-0 truncate text-[13.5px]">
-                  {email.status === "Draft" ? (
-                    <>
-                      <span className="font-bold text-rose-600">Draft</span>
-                      <span className={cn("text-slate-400", cardSubject)}>
-                        {" "}
-                        {email.subject || "(no subject)"}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span
-                        className={cn(
-                          unread ? "font-bold text-slate-900" : "font-medium text-slate-800",
-                          cardSubject,
-                        )}
-                      >
-                        {email.subject}
-                      </span>
-                      <span className="text-slate-400">
-                        {" "}
-                        – {snippetOf(email)}
-                      </span>
-                    </>
-                  )}
-                </p>
-                {email.templateUsed ? (
-                  <Paperclip className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                ) : null}
-              </div>
-
-              <div className="flex h-8 min-w-[7.5rem] items-center justify-end pl-2">
-                {hovering ? (
-                  <div
-                    className="flex items-center"
-                    onClick={(e) => e.stopPropagation()}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p
+                    className={cn(
+                      "truncate text-[13.5px] tracking-tight",
+                      unread ? "font-bold text-slate-900" : "font-medium text-slate-700",
+                    )}
+                    title={who}
                   >
+                    {who}
+                  </p>
+                  {labels.map((label) => (
                     <button
+                      key={label}
                       type="button"
-                      title="Archive"
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-[#5A32A3]"
-                    >
-                      <Archive className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      title="Delete"
-                      onClick={() => removeEmails([email.id])}
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-rose-600"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      title={unread ? "Mark as read" : "Mark as unread"}
-                      onClick={() => markReadState([email.id], unread)}
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-[#5A32A3]"
-                    >
-                      {unread ? (
-                        <MailOpen className="h-4 w-4" />
-                      ) : (
-                        <Mail className="h-4 w-4" />
+                      title={`Remove ${label}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleLabel(email.id, label, email);
+                        refresh();
+                      }}
+                      className={cn(
+                        "shrink-0 rounded-full px-1.5 py-px text-[9px] font-semibold hover:opacity-70",
+                        labelTone(label),
                       )}
-                    </button>
-                    <button
-                      type="button"
-                      title="Snooze"
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-[#5A32A3]"
                     >
-                      <Clock className="h-4 w-4" />
+                      {label} ×
                     </button>
-                  </div>
-                ) : (
+                  ))}
                   <span
                     className={cn(
-                      "whitespace-nowrap pr-2 text-[12px] tabular-nums",
-                      unread ? "font-bold text-slate-800" : "text-slate-500",
+                      "ml-auto shrink-0 text-[11px] tabular-nums",
+                      unread ? "font-bold text-slate-700" : "text-slate-400",
                     )}
                   >
                     {inboxDate(email.sentDate)}
                   </span>
-                )}
+                </div>
+
+                <div className="mt-0.5 flex items-start gap-2">
+                  <p className="min-w-0 flex-1 truncate text-[13px]">
+                    {email.status === "Draft" ? (
+                      <>
+                        <span className="font-bold text-rose-600">Draft</span>
+                        <span className="text-slate-500">
+                          {" "}
+                          {email.subject || "(no subject)"}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span
+                          className={
+                            unread
+                              ? "font-bold text-slate-900"
+                              : "font-semibold text-slate-800"
+                          }
+                        >
+                          {email.subject}
+                        </span>
+                        <span className="text-slate-400"> – {snippetOf(email)}</span>
+                      </>
+                    )}
+                  </p>
+                  {email.templateUsed ? (
+                    <Paperclip className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  ) : null}
+                  <div
+                    className="flex shrink-0 items-center"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {hovering ? (
+                      <div className="relative flex items-center">
+                        <button
+                          type="button"
+                          title={flags.pinned ? "Unpin" : "Pin"}
+                          onClick={() => move([email.id], "pinned")}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[#5A32A3]"
+                        >
+                          <Pin
+                            className={cn(
+                              "h-3.5 w-3.5",
+                              flags.pinned && "fill-[#5A32A3] text-[#5A32A3]",
+                            )}
+                          />
+                        </button>
+                        {canRestore ? (
+                          <button
+                            type="button"
+                            title="Restore"
+                            onClick={() => restoreEmails([email.id])}
+                            className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[#5A32A3]"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            title="Archive"
+                            onClick={() => move([email.id], "archived")}
+                            className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[#5A32A3]"
+                          >
+                            <Archive className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          title="Delete"
+                          onClick={() => removeEmails([email.id])}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-rose-600"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          title={unread ? "Mark as read" : "Mark as unread"}
+                          onClick={() => markReadState([email.id], unread)}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[#5A32A3]"
+                        >
+                          {unread ? (
+                            <MailOpen className="h-3.5 w-3.5" />
+                          ) : (
+                            <Mail className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          title="Labels"
+                          onClick={() =>
+                            setLabelMenuFor((id) => (id === email.id ? null : email.id))
+                          }
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[#5A32A3]"
+                        >
+                          <MoreHorizontal className="h-3.5 w-3.5" />
+                        </button>
+                        {labelMenuFor === email.id ? (
+                          <div className="absolute top-8 right-0 z-20 w-40 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                            <p className="px-3 py-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+                              Labels
+                            </p>
+                            {MAIL_LABELS.map((item) => {
+                              const on = labels.includes(item.id);
+                              return (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onClick={() => {
+                                    toggleLabel(email.id, item.id as MailLabel, email);
+                                    refresh();
+                                  }}
+                                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-slate-50"
+                                >
+                                  <span
+                                    className={cn(
+                                      "flex h-3.5 w-3.5 items-center justify-center rounded border",
+                                      on
+                                        ? "border-[#5A32A3] bg-[#5A32A3] text-white"
+                                        : "border-slate-300",
+                                    )}
+                                  >
+                                    {on ? "✓" : ""}
+                                  </span>
+                                  <span className={cn("h-2 w-2 rounded-full", item.dot)} />
+                                  {item.id}
+                                </button>
+                              );
+                            })}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                clearLabels(email.id);
+                                refresh();
+                              }}
+                              className="flex w-full px-3 py-1.5 text-left text-[12px] text-slate-500 hover:bg-slate-50"
+                            >
+                              No label
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <button
+                      type="button"
+                      title={flags.starred ? "Unstar" : "Star"}
+                      onClick={() => move([email.id], "starred")}
+                      className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-white"
+                    >
+                      <Star
+                        className={cn(
+                          "h-4 w-4",
+                          flags.starred
+                            ? "fill-[#f4b400] text-[#f4b400]"
+                            : "text-slate-300",
+                        )}
+                      />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           );
@@ -360,7 +793,8 @@ export function EmailListTable({ data }: EmailListTableProps) {
 
         {rows.length === 0 ? (
           <p className="px-4 py-16 text-center text-sm text-slate-400">
-            No emails in this inbox
+            No emails in {folderLabel.toLowerCase()}
+            {customFolderId ? " folder" : ""}
           </p>
         ) : null}
       </div>

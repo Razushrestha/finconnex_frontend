@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, Trophy, XCircle } from "lucide-react";
+import { Trophy, XCircle } from "lucide-react";
 import { type KanbanColumn, type LeadPipelineStage } from "@/lib/leads/types";
 import { listLeadColumns, saveLeadColumns } from "@/lib/leads/store";
 import { isUuid } from "@/lib/activity-timeline/auth";
@@ -21,7 +21,6 @@ import type { QuickActionKind } from "@/lib/leads/panel-actions";
 import {
   applyPipelineStageMove,
   assertPipelineStageChange,
-  isMortgagePipelineStage,
 } from "@/lib/pipeline-sla/board";
 import { onPipelineSlaChange } from "@/lib/pipeline-sla/settings";
 import { logStatusChange, notifyStatusChanged } from "@/lib/rules";
@@ -33,12 +32,18 @@ import {
 } from "./panels/LeadCardPanelHost";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
+import { KanbanEmptyStage } from "@/components/common/KanbanEmptyStage";
+import { KanbanStageScroll } from "@/components/common/KanbanStageScroll";
+import { KanbanCollapsedRail } from "@/components/common/KanbanCollapsedRail";
 import { cn } from "@/lib/utils";
 import {
-  KANBAN_CARD_SLOT,
+  KANBAN_BOARD_ROW,
   KANBAN_COL,
   KANBAN_COL_COLLAPSED,
+  KANBAN_DROP_GHOST,
+  KANBAN_HEADER_COUNT,
   KANBAN_HEADER_TITLE,
+  KANBAN_WELL,
 } from "@/lib/layout";
 import { useRouter } from "next/navigation";
 import {
@@ -203,7 +208,7 @@ export function LeadKanbanBoard({
   }, [columns, filters, visibleColumnIds]);
 
   const wonColumn = useMemo(
-    () => columns.find((c) => /settled/i.test(c.title)),
+    () => columns.find((c) => /closed won|settled/i.test(c.title)),
     [columns],
   );
   const lostColumn = useMemo(
@@ -423,7 +428,7 @@ export function LeadKanbanBoard({
       ref={boardRef}
       className="relative h-full w-full overflow-x-auto overflow-y-hidden bg-slate-50"
     >
-      <div className="flex h-full items-stretch gap-3 p-1">
+      <div className={KANBAN_BOARD_ROW}>
         {visibleColumns.map((column) => {
           const isOver = overColumnId === column.id;
           const isCollapsed = collapsedColumns.has(column.id);
@@ -432,24 +437,22 @@ export function LeadKanbanBoard({
             <div
               key={column.id}
               className={cn(
-                "group relative flex h-full min-h-0 flex-col gap-2 transition-all duration-200",
+                "group/stage relative flex h-full min-h-0 flex-col gap-2 transition-all duration-200",
                 BOARD_HEIGHT,
                 isCollapsed ? KANBAN_COL_COLLAPSED : KANBAN_COL,
               )}
             >
               {isCollapsed ? (
-                <div
-                  className={cn(
-                    "flex h-full flex-col rounded-sm border p-2",
-                    dropTargetIdle,
-                    isOver ? dropTargetActive : "border-slate-200/60 bg-slate-100/60",
-                  )}
-                >
-                  <CollapsedColumn
-                    column={column}
-                    onExpand={() => toggleCollapsed(column.id)}
-                  />
-                </div>
+                <KanbanCollapsedRail
+                  title={column.title}
+                  count={column.cards.length}
+                  onExpand={() => toggleCollapsed(column.id)}
+                  extra={
+                    <span className="text-[10px] font-medium text-slate-500 [writing-mode:vertical-rl]">
+                      {column.totalAmount}
+                    </span>
+                  }
+                />
               ) : (
                 <>
                   {/* Header box — driven by Kanban View → Header Style */}
@@ -476,7 +479,7 @@ export function LeadKanbanBoard({
                             <h2 className={KANBAN_HEADER_TITLE} title={column.title}>
                               {column.title}
                             </h2>
-                            <span className="rounded-full border border-slate-200/80 bg-background px-2 py-0.5 text-xs font-semibold text-foreground">
+                            <span className={KANBAN_HEADER_COUNT}>
                               {column.cards.length}
                             </span>
                           </div>
@@ -488,7 +491,23 @@ export function LeadKanbanBoard({
                     );
                   })()}
 
-                  {/* Card list box — cards scroll; Create lead stays pinned */}
+                  <KanbanStageScroll
+                    footer={
+                      <KanbanColumnFooter
+                        createLabel="Create lead"
+                        createAriaLabel={`Create lead in ${column.title}`}
+                        onCreate={() =>
+                          onAddLead
+                            ? onAddLead(column.id)
+                            : router.push(
+                                `/sales/leads/create?stage=${encodeURIComponent(column.title)}`,
+                              )
+                        }
+                        onCollapse={() => toggleCollapsed(column.id)}
+                        collapseLabel={`Collapse ${column.title}`}
+                      />
+                    }
+                  >
                   <div
                     onDragOver={(e) => {
                       e.preventDefault();
@@ -504,9 +523,9 @@ export function LeadKanbanBoard({
                       handleDrop(column.id);
                     }}
                     className={cn(
-                      "group relative flex min-h-0 flex-1 flex-col rounded-sm border p-1",
+                      "relative flex min-h-full flex-col rounded-sm border p-1",
                       dropTargetIdle,
-                      isOver ? dropTargetActive : "border-slate-200/60 bg-slate-100/60",
+                      isOver ? dropTargetActive : KANBAN_WELL,
                     )}
                   >
                     <div
@@ -530,7 +549,7 @@ export function LeadKanbanBoard({
                         e.stopPropagation();
                         handleDrop(column.id, dropTargetPos?.targetIndex);
                       }}
-                      className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-2 no-scrollbar"
+                      className="flex min-h-[180px] flex-1 flex-col gap-3 pb-2"
                     >
                       {(() => {
                         let visibleIndex = 0;
@@ -549,7 +568,7 @@ export function LeadKanbanBoard({
                             rendered.push(
                               <div
                                 key={`placeholder-${card.id}`}
-                                className={cn(KANBAN_CARD_SLOT, "shrink-0 rounded-md border-2 border-dashed border-violet-300 bg-violet-50/50 transition-all duration-150 ease-out")}
+                                className={KANBAN_DROP_GHOST}
                               />,
                             );
                           }
@@ -626,7 +645,7 @@ export function LeadKanbanBoard({
                           rendered.push(
                             <div
                               key="placeholder-end"
-                              className={cn(KANBAN_CARD_SLOT, "shrink-0 rounded-md border-2 border-dashed border-violet-300 bg-violet-50/50 transition-all duration-150 ease-out")}
+                              className={KANBAN_DROP_GHOST}
                             />,
                           );
                         }
@@ -634,30 +653,15 @@ export function LeadKanbanBoard({
                         return (
                           <>
                             {rendered}
-                            {column.cards.length === 0 && (
-                              <div className="rounded-md border border-dashed border-slate-200 bg-background py-4 text-center text-xs text-slate-400">
-                                No Lead found
-                              </div>
-                            )}
+                            {column.cards.length === 0 ? (
+                              <KanbanEmptyStage entity="Leads" />
+                            ) : null}
                           </>
                         );
                       })()}
                     </div>
-
-                    <KanbanColumnFooter
-                      createLabel="Create lead"
-                      createAriaLabel={`Create lead in ${column.title}`}
-                      onCreate={() =>
-                        onAddLead
-                          ? onAddLead(column.id)
-                          : router.push(
-                              `/sales/leads/create?stage=${encodeURIComponent(column.title)}`,
-                            )
-                      }
-                      onCollapse={() => toggleCollapsed(column.id)}
-                      collapseLabel={`Collapse ${column.title}`}
-                    />
                   </div>
+                  </KanbanStageScroll>
                 </>
               )}
             </div>
@@ -743,44 +747,6 @@ export function LeadKanbanBoard({
           {toast}
         </div>
       )}
-    </div>
-  );
-}
-
-function CollapsedColumn({
-  column,
-  onExpand,
-}: {
-  column: KanbanColumn;
-  onExpand: () => void;
-}) {
-  return (
-    <div className="flex h-full flex-col items-center justify-between py-2">
-      <div className="flex flex-col items-center gap-2">
-        <span className={`h-2.5 w-2.5 rounded-full ${column.dotColorClass}`} />
-        <span className="rounded-full border border-slate-200/80 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
-          {column.cards.length}
-        </span>
-      </div>
-      <div className="flex flex-col items-center gap-3 flex-1 py-3">
-        <p
-          className="text-xs font-semibold text-foreground [writing-mode:vertical-rl]"
-          title={column.title}
-        >
-          {column.title}
-        </p>
-        <div className="text-[10px] font-medium text-foreground/70 [writing-mode:vertical-rl]">
-          {column.totalAmount} total
-        </div>
-      </div>
-      <button
-        type="button"
-        onClick={onExpand}
-        aria-label={`Expand ${column.title}`}
-        className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50"
-      >
-        <ChevronRight className="h-3.5 w-3.5" />
-      </button>
     </div>
   );
 }

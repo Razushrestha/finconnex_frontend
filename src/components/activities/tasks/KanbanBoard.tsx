@@ -17,7 +17,7 @@ import {
   reassignTask,
 } from "@/lib/tasks/store";
 import { onRulesChange } from "@/lib/rules";
-import { taskMatchesSearch } from "@/lib/tasks/search";
+import { taskMatchesFilters, taskMatchesSearch } from "@/lib/tasks/search";
 import { KanbanColumn } from "./KanbanColumn";
 import type { Priority, TaskStatus } from "@/lib/tasks/types";
 
@@ -83,12 +83,11 @@ export function KanbanBoard({
 
   const visibleColumns = useMemo(() => {
     const hasStatusFilter = !!filters?.statuses.length;
-    const hasPriorityFilter = !!filters?.priorities.length;
-    const hasTypeFilter = !!filters?.types.length;
+    const hasScope = Boolean(filters?.scope && filters.scope !== "all");
     const query = search.trim();
 
     let sourceColumns = columns;
-    if (hasStatusFilter || hasPriorityFilter || hasTypeFilter || query) {
+    if (hasStatusFilter || hasScope || query || filters) {
       sourceColumns = columns
         .filter(
           (col) => !hasStatusFilter || filters!.statuses.includes(col.title),
@@ -97,9 +96,7 @@ export function KanbanBoard({
           ...col,
           tasks: col.tasks.filter(
             (task) =>
-              (!hasPriorityFilter ||
-                filters!.priorities.includes(task.priority)) &&
-              (!hasTypeFilter || filters!.types.includes(task.taskType)) &&
+              taskMatchesFilters(task, filters) &&
               taskMatchesSearch(task, query),
           ),
         }));
@@ -205,7 +202,7 @@ export function KanbanBoard({
   }
 
   return (
-    <div className="flex h-full min-w-0 items-stretch gap-4 overflow-x-auto overflow-y-hidden [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400">
+    <div className="flex h-full w-full min-w-0 items-stretch gap-3 overflow-x-auto overflow-y-hidden bg-slate-50 [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400">
       {visibleColumns.map((column) => (
         <KanbanColumn
           key={column.id}

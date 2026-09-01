@@ -30,7 +30,13 @@ const KIND_RANK: Record<LeadActivityKind, number> = {
   stage_change: 9,
   document: 10,
   workflow: 11,
-  other: 12,
+  created: 12,
+  assigned: 13,
+  owner_change: 14,
+  converted: 15,
+  deal: 16,
+  client: 17,
+  other: 18,
 };
 
 function dayBucket(dueAt: Date | null, now: Date): number {
@@ -160,8 +166,14 @@ const LAST_ACTIVITY_LABEL: Partial<Record<LeadActivityKind, string>> = {
   document: "Document requested",
   status_change: "Status changed",
   stage_change: "Stage changed",
-  workflow: "Workflow completed",
-  other: "Activity completed",
+  workflow: "Automation ran",
+  created: "Lead created",
+  assigned: "Lead assigned",
+  owner_change: "Owner changed",
+  converted: "Lead converted",
+  deal: "Deal activity",
+  client: "Client activity",
+  other: "Lead updated",
   reminder: "Reminder completed",
 };
 

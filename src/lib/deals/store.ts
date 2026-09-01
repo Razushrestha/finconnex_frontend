@@ -191,6 +191,7 @@ export function updateDeal(
       | "probability"
       | "owner"
       | "closeDate"
+      | "tags"
     >
   > & { stageTitle?: string },
 ): DealLocation | null {

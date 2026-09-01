@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronRight } from "lucide-react";
 import { type CompanyGroup } from "@/lib/companies/types";
 import {
   listCompanyGroups,
@@ -11,14 +10,20 @@ import { onRulesChange } from "@/lib/rules";
 import type { CompanyFilters } from "./FilterCompaniesPanel";
 import { CompanyCard } from "./CompanyCard";
 import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
+import { KanbanEmptyStage } from "@/components/common/KanbanEmptyStage";
+import { KanbanStageScroll } from "@/components/common/KanbanStageScroll";
+import { KanbanCollapsedRail } from "@/components/common/KanbanCollapsedRail";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
-  KANBAN_CARD_SLOT,
+  KANBAN_BOARD_ROW,
   KANBAN_COL,
   KANBAN_COL_COLLAPSED,
+  KANBAN_DROP_GHOST,
   KANBAN_HEADER,
+  KANBAN_HEADER_COUNT,
   KANBAN_HEADER_TITLE,
+  KANBAN_WELL,
 } from "@/lib/layout";
 import { useRouter } from "next/navigation";
 import type { CompanyCardCustomizationSettings } from "@/components/sales/companies/CustomizeCompanyCardDrawer";
@@ -43,8 +48,6 @@ interface CompaniesKanbanBoardProps {
   onAddLead?: (columnId: string) => void;
   onQuickAction?: (kind: any, company: CompanyRecord) => void;
 }
-
-const BOARD_HEIGHT = "h-[calc(100vh-5rem)]";
 
 export function CompaniesKanbanBoard({
   filters,
@@ -190,8 +193,8 @@ export function CompaniesKanbanBoard({
   }
 
   return (
-    <div className="relative w-full overflow-x-auto bg-slate-50/50">
-      <div className="flex items-start gap-3 p-1">
+    <div className="relative h-full w-full overflow-x-auto overflow-y-hidden bg-slate-50">
+      <div className={KANBAN_BOARD_ROW}>
         {visibleGroups.map((group) => {
           const isOver = overGroupId === group.id;
           const isCollapsed = collapsedGroups.has(group.id);
@@ -211,26 +214,16 @@ export function CompaniesKanbanBoard({
                 handleDrop(group.id);
               }}
               className={cn(
-                "group relative flex flex-col gap-2 transition-all duration-200",
-                BOARD_HEIGHT,
+                "group/stage relative flex h-full min-h-0 flex-col gap-2 transition-all duration-200",
                 isCollapsed ? KANBAN_COL_COLLAPSED : KANBAN_COL,
               )}
             >
               {isCollapsed ? (
-                <div
-                  className={cn(
-                    "flex h-full flex-col rounded-sm border p-2",
-                    dropTargetIdle,
-                    isOver
-                      ? dropTargetActive
-                      : "border-slate-200/60 bg-slate-100/60",
-                  )}
-                >
-                  <CollapsedColumn
-                    group={group}
-                    onExpand={() => toggleCollapsed(group.id)}
-                  />
-                </div>
+                <KanbanCollapsedRail
+                  title={group.title}
+                  count={group.companies.length}
+                  onExpand={() => toggleCollapsed(group.id)}
+                />
               ) : (
                 <>
                   <div className={KANBAN_HEADER}>
@@ -239,20 +232,30 @@ export function CompaniesKanbanBoard({
                         <h2 className={KANBAN_HEADER_TITLE} title={group.title}>
                           {group.title}
                         </h2>
-                        <span className="rounded-full border border-slate-200/80 bg-white px-2 py-0.5 text-xs font-semibold text-slate-500">
+                        <span className={KANBAN_HEADER_COUNT}>
                           {group.companies.length}
                         </span>
                       </div>
                     </div>
                   </div>
 
+                  <KanbanStageScroll
+                    footer={
+                      <KanbanColumnFooter
+                        createLabel="Create Company"
+                        onCreate={() => router.push("/sales/companies/create")}
+                        onCollapse={() => toggleCollapsed(group.id)}
+                        collapseLabel={`Collapse ${group.title}`}
+                      />
+                    }
+                  >
                   <div
                     className={cn(
-                      "relative flex min-h-0 flex-1 flex-col rounded-sm border p-1",
+                      "relative flex min-h-full flex-col rounded-sm border p-1",
                       dropTargetIdle,
                       isOver
                         ? dropTargetActive
-                        : "border-slate-200/60 bg-slate-100/60",
+                        : KANBAN_WELL,
                     )}
                   >
                     <div
@@ -276,7 +279,7 @@ export function CompaniesKanbanBoard({
                         e.stopPropagation();
                         handleDrop(group.id, dropTargetPos?.targetIndex);
                       }}
-                      className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-8 no-scrollbar"
+                      className="flex min-h-[180px] flex-1 flex-col gap-3 pb-8"
                     >
                       {(() => {
                         let visibleIndex = 0;
@@ -296,7 +299,7 @@ export function CompaniesKanbanBoard({
                             rendered.push(
                               <div
                                 key={`placeholder-${company.id}`}
-                                className={cn(KANBAN_CARD_SLOT, "rounded-md border-2 border-dashed border-indigo-300 bg-indigo-50/60 transition-all duration-150 ease-out")}
+                                className={KANBAN_DROP_GHOST}
                               />,
                             );
                           }
@@ -349,7 +352,7 @@ export function CompaniesKanbanBoard({
                           rendered.push(
                             <div
                               key="placeholder-end"
-                              className={cn(KANBAN_CARD_SLOT, "rounded-md border-2 border-dashed border-indigo-300 bg-indigo-50/60 transition-all duration-150 ease-out")}
+                              className={KANBAN_DROP_GHOST}
                             />,
                           );
                         }
@@ -357,23 +360,15 @@ export function CompaniesKanbanBoard({
                         return (
                           <>
                             {rendered}
-                            {group.companies.length === 0 && (
-                              <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 py-8 text-center text-xs text-slate-400">
-                                Drop a company here
-                              </div>
-                            )}
+                            {group.companies.length === 0 ? (
+                              <KanbanEmptyStage entity="Companies" />
+                            ) : null}
                           </>
                         );
                       })()}
                     </div>
-
-                    <KanbanColumnFooter
-                      createLabel="Create Company"
-                      onCreate={() => router.push("/sales/companies/create")}
-                      onCollapse={() => toggleCollapsed(group.id)}
-                      collapseLabel={`Collapse ${group.title}`}
-                    />
                   </div>
+                  </KanbanStageScroll>
                 </>
               )}
             </div>
@@ -386,39 +381,6 @@ export function CompaniesKanbanBoard({
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-function CollapsedColumn({
-  group,
-  onExpand,
-}: {
-  group: CompanyGroup;
-  onExpand: () => void;
-}) {
-  return (
-    <div className="flex h-full flex-col items-center justify-between py-2">
-      <div className="flex flex-col items-center gap-2">
-        <span className={`h-2.5 w-2.5 rounded-full ${group.dotColorClass}`} />
-        <span className="rounded-full border border-slate-200/80 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
-          {group.companies.length}
-        </span>
-      </div>
-      <p
-        className="flex-1 py-3 text-xs font-semibold text-slate-600 [writing-mode:vertical-rl]"
-        title={group.title}
-      >
-        {group.title}
-      </p>
-      <button
-        type="button"
-        onClick={onExpand}
-        aria-label={`Expand ${group.title}`}
-        className="flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-slate-50"
-      >
-        <ChevronRight className="h-3.5 w-3.5" />
-      </button>
     </div>
   );
 }

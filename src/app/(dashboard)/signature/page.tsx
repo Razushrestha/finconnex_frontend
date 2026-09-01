@@ -328,6 +328,7 @@ import {
   listSignatureRequests,
   type SignatureRequest,
 } from "@/lib/documents/signature/types";
+import { onRecordsChange } from "@/lib/records-sync";
 import { RecentTabsHeader } from "@/components/documents/signature/overview/RecentTabsHeader";
 import SignatureStatsGrid from "@/components/documents/signature/overview/SignatureStatsGrid";
 import {
@@ -452,7 +453,9 @@ export default function ESignatureOverviewPage() {
   });
 
   useEffect(() => {
-    documentsTable.setItems(listSignatureRequests());
+    const refresh = () => documentsTable.setItems(listSignatureRequests());
+    refresh();
+    return onRecordsChange(refresh);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -467,20 +470,26 @@ export default function ESignatureOverviewPage() {
   if (!documentsTable.isMounted || !templatesTable.isMounted) return null;
 
   return (
-    <div className="relative mx-auto flex w-full flex-col p-4 space-y-6">
-      <ESignatureHeader />
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4 pb-3">
+      <div className="shrink-0">
+        <ESignatureHeader />
+      </div>
 
-      <SignatureStatsGrid />
+      <div className="mt-4 shrink-0">
+        <SignatureStatsGrid />
+      </div>
 
       {/* Main Content Table Section */}
-      <div className="flex flex-col rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)] dark:border-zinc-800 dark:bg-zinc-950 overflow-hidden">
-        <RecentTabsHeader
-          onTabChange={(tab) => {
-            setActiveTab(tab);
-            documentsTable.setPage(1);
-            templatesTable.setPage(1);
-          }}
-        />
+      <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.05)] dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="shrink-0">
+          <RecentTabsHeader
+            onTabChange={(tab) => {
+              setActiveTab(tab);
+              documentsTable.setPage(1);
+              templatesTable.setPage(1);
+            }}
+          />
+        </div>
 
         {/* Table View */}
         <div
@@ -489,7 +498,7 @@ export default function ESignatureOverviewPage() {
               ? activeDocs.containerRef
               : activeTpls.containerRef
           }
-          className="overflow-x-auto relative"
+          className="relative min-h-0 flex-1 overflow-auto"
         >
           {/* Active Resize Indicator Line */}
           {(activeTab === "documents"
@@ -784,18 +793,19 @@ export default function ESignatureOverviewPage() {
           )}
         </div>
 
-        {/* Reusable Pagination Bar Component */}
-        <PaginationBar
-          page={activeTab === "documents" ? activeDocs.page : activeTpls.page}
-          pageSize={5}
-          total={totalItems}
-          onPageChange={(p) =>
-            activeTab === "documents"
-              ? activeDocs.setPage(p)
-              : activeTpls.setPage(p)
-          }
-          entriesLabel={activeTab === "documents" ? "documents" : "templates"}
-        />
+        <div className="shrink-0">
+          <PaginationBar
+            page={activeTab === "documents" ? activeDocs.page : activeTpls.page}
+            pageSize={5}
+            total={totalItems}
+            onPageChange={(p) =>
+              activeTab === "documents"
+                ? activeDocs.setPage(p)
+                : activeTpls.setPage(p)
+            }
+            entriesLabel={activeTab === "documents" ? "documents" : "templates"}
+          />
+        </div>
       </div>
     </div>
   );

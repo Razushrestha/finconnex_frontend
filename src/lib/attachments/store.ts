@@ -6,6 +6,7 @@ import {
   type AttachmentKind,
 } from "@/lib/attachments/types";
 import { createBoardStore } from "@/lib/rules/module-store";
+import { logCreate } from "@/lib/rules/audit";
 import { formatRulesAt, newRulesId } from "@/lib/rules/storage";
 import { emitLeadActivityChange } from "@/lib/leads/lead-extras-store";
 
@@ -52,6 +53,9 @@ export function createAttachment(input: {
     byteSize: input.byteSize,
   };
   saveAttachments([row, ...listAttachments()]);
+  const leadLabel =
+    row.relatedTo?.match(/^Lead:\s*(.+)$/i)?.[1]?.trim() || row.fileName;
+  logCreate("activities.attachments", row.uploadedBy, row.id, leadLabel);
   emitLeadActivityChange();
   return row;
 }

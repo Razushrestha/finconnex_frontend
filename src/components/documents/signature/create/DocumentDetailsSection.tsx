@@ -26,11 +26,34 @@ const ACCEPTED_TYPES =
   ".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 /** Splits "Engagement Letter.pdf" into { base: "Engagement Letter", ext: "pdf" } */
-const splitFileName = (fileName: string) => {
+export const splitFileName = (fileName: string) => {
   const lastDot = fileName.lastIndexOf(".");
   if (lastDot <= 0) return { base: fileName, ext: "" };
   return { base: fileName.slice(0, lastDot), ext: fileName.slice(lastDot + 1) };
 };
+
+/** Strip path characters and a trailing extension so the stored title stays clean. */
+export function sanitizeDocumentBaseName(raw: string, extension = ""): string {
+  let name = raw.trim();
+  if (extension) {
+    const suffix = `.${extension}`;
+    if (name.toLowerCase().endsWith(suffix.toLowerCase())) {
+      name = name.slice(0, -suffix.length).trim();
+    }
+  }
+  return name.replace(/[\\/:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/** Display + download name the client receives, e.g. Mohit_TEST_File.pdf */
+export function renamedStoredFileName(
+  base: string,
+  originalFileName: string,
+): string {
+  const { base: originalBase, ext } = splitFileName(originalFileName);
+  const clean = sanitizeDocumentBaseName(base || originalBase, ext);
+  const fallback = clean || originalBase || "document";
+  return ext ? `${fallback}.${ext}` : fallback;
+}
 
 let additionalDocIdCounter = 0;
 const nextAdditionalDocId = () =>
@@ -46,6 +69,8 @@ export const DocumentDetailsSection: React.FC<DocumentDetailsSectionProps> = ({
   onChangeAdditionalFiles,
 }) => {
   const [fileExtension, setFileExtension] = useState("");
+  const fileExt =
+    fileExtension || (documentFile ? splitFileName(documentFile.name).ext : "");
 
   const [selectedDocId, setSelectedDocId] = useState<string>("primary");
 
@@ -124,9 +149,18 @@ export const DocumentDetailsSection: React.FC<DocumentDetailsSectionProps> = ({
     }
   };
 
-  const handleRenameAdditionalFile = (id: string, name: string) => {
+  const handleRenamePrimary = (next: string) => {
+    const clean = sanitizeDocumentBaseName(next, fileExt);
+    if (clean) onChangeName(clean);
+  };
+
+  const handleRenameAdditionalFile = (id: string, next: string) => {
     setAdditionalFiles(
-      additionalFiles.map((doc) => (doc.id === id ? { ...doc, name } : doc)),
+      additionalFiles.map((doc) => {
+        if (doc.id !== id) return doc;
+        const clean = sanitizeDocumentBaseName(next, doc.extension);
+        return clean ? { ...doc, name: clean } : doc;
+      }),
     );
   };
 
@@ -142,50 +176,11 @@ export const DocumentDetailsSection: React.FC<DocumentDetailsSectionProps> = ({
     console.warn("OneDrive import not yet wired up.");
   };
 
-  const selectedAdditionalDoc =
-    selectedDocId !== "primary"
-      ? additionalFiles.find((doc) => doc.id === selectedDocId)
-      : undefined;
-
-  const nameFieldValue =
-    selectedDocId === "primary"
-      ? documentName
-      : (selectedAdditionalDoc?.name ?? "");
-
-  const handleNameFieldChange = (value: string) => {
-    if (selectedDocId === "primary") {
-      onChangeName(value);
-    } else if (selectedAdditionalDoc) {
-      handleRenameAdditionalFile(selectedAdditionalDoc.id, value);
-    }
-  };
-
   return (
     <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-5">
       <div className="flex items-center gap-2 text-slate-800 font-semibold">
         <FileText className="w-5 h-5 text-indigo-600" />
         <h2>Document Details</h2>
-      </div>
-
-      <div className="space-y-1.5">
-        <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
-          Document Name <span className="text-rose-500">*</span>
-          {documentFile && additionalFiles.length > 0 && (
-            <span className="ml-2 normal-case font-medium text-slate-400 tracking-normal">
-              — editing{" "}
-              {selectedDocId === "primary"
-                ? "primary document"
-                : `"${selectedAdditionalDoc?.name ?? ""}"`}
-            </span>
-          )}
-        </label>
-        <input
-          type="text"
-          value={nameFieldValue}
-          onChange={(e) => handleNameFieldChange(e.target.value)}
-          placeholder="e.g. Enter the title"
-          className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 text-sm text-slate-800 bg-slate-50/50"
-        />
       </div>
 
       <div className="space-y-1.5">
@@ -196,9 +191,10 @@ export const DocumentDetailsSection: React.FC<DocumentDetailsSectionProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {documentFile && (
             <DocumentCard
-              name={documentName || documentFile.name}
-              extension={fileExtension}
+              name={documentName || splitFileName(documentFile.name).base}
+              extension={fileExt}
               onRemove={handleRemovePrimary}
+              onRename={handleRenamePrimary}
               isSelected={selectedDocId === "primary"}
               onSelect={() => setSelectedDocId("primary")}
             />
@@ -210,6 +206,7 @@ export const DocumentDetailsSection: React.FC<DocumentDetailsSectionProps> = ({
               name={doc.name}
               extension={doc.extension}
               onRemove={() => handleRemoveAdditionalFile(doc.id)}
+              onRename={(next) => handleRenameAdditionalFile(doc.id, next)}
               isSelected={selectedDocId === doc.id}
               onSelect={() => setSelectedDocId(doc.id)}
             />

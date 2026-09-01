@@ -24,7 +24,7 @@ import {
   type ContactFilters,
 } from "@/components/sales/contacts/FilterContactsPanel";
 import { CONTACT_GROUPS, CONTACT_SOURCES, CONTACT_STATUSES } from "@/lib/contacts/types";
-import { listContactGroups } from "@/lib/contacts/store";
+import { listContactGroups, updateContact, findContactById } from "@/lib/contacts/store";
 import {
   applyContactImport,
   CONTACT_IMPORT_FIELDS,
@@ -45,6 +45,7 @@ import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
 import { SORT_OPTIONS } from "../leads/page";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
+import { uniqueTags } from "@/lib/tags";
 import type { ContactSource, ContactStatus } from "@/lib/contacts/types";
 
 const CONTACT_VIEW_MODE_KEY = "finconnex.contacts.view-mode";
@@ -268,7 +269,18 @@ export default function ContactsPage() {
           selectedCount={selectedIds.length}
           onClear={() => setSelectedIds([])}
           onSendMail={() => console.log("send mail clicked")}
-          onAddTag={() => console.log("add tag clicked")}
+          onAddTag={(tag) => {
+            let n = 0;
+            for (const id of selectedIds) {
+              const found = findContactById(id);
+              if (!found) continue;
+              updateContact(id, {
+                tags: uniqueTags([...(found.contact.tags ?? []), tag]),
+              });
+              n += 1;
+            }
+            setBulkFlash(`Tagged ${n} contact${n === 1 ? "" : "s"} with #${tag}`);
+          }}
           onRemoveTag={() => console.log("remove tag clicked")}
           onRunMacro={() => console.log("run macro clicked")}
           onCreateTask={() => console.log("create task clicked")}

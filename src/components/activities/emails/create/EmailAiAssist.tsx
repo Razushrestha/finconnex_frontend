@@ -1,15 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  ChevronDown,
-  Loader2,
-  Mic,
-  Sparkles,
-} from "lucide-react";
+import { Loader2, Mic, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  EMAIL_AI_ACTIONS,
+  draftEmailFromPrompt,
   EMAIL_TONES,
   rewriteEmailWithAi,
   type EmailTone,
@@ -42,11 +37,13 @@ function getSpeechRecognition(): (new () => SpeechRec) | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-const PRIMARY_TONES: EmailTone[] = [
-  "friendly",
-  "professional",
-  "emotional",
-  "loving",
+const TONES: EmailTone[] = ["friendly", "professional", "emotional", "loving"];
+
+const READY_PROMPTS = [
+  "Write a concise follow-up on the outstanding documents",
+  "Draft a professional reply confirming next steps",
+  "Write a polite request to book a 20-minute call",
+  "Summarise the proposal and ask for a decision",
 ];
 
 export function EmailAiAssist({
@@ -58,20 +55,10 @@ export function EmailAiAssist({
   const [tone, setTone] = useState<EmailTone>("professional");
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [prompt, setPrompt] = useState("");
   const [flash, setFlash] = useState<string | null>(null);
   const recRef = useRef<SpeechRec | null>(null);
-  const moreRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function onDoc(e: MouseEvent) {
-      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
-        setMoreOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -84,29 +71,40 @@ export function EmailAiAssist({
     window.setTimeout(() => setFlash(null), 2200);
   }
 
-  function run(opts: { nextTone?: EmailTone; action?: (typeof EMAIL_AI_ACTIONS)[number]["id"]; voiceNotes?: string }) {
-    const nextTone = opts.nextTone ?? tone;
-    setTone(nextTone);
+  function writeFromPrompt(text: string) {
+    const next = text.trim();
+    if (!next) return;
     setBusy(true);
     window.setTimeout(() => {
-      const next = rewriteEmailWithAi({
-        html,
-        tone: nextTone,
-        action: opts.action,
-        recipientName,
-        subject,
-        voiceNotes: opts.voiceNotes,
-      });
-      onChange(next);
-      setBusy(false);
-      notice(
-        opts.voiceNotes
-          ? "Drafted from your voice"
-          : opts.action === "brief"
-            ? "Shortened with AI"
-            : `Rewritten · ${EMAIL_TONES.find((t) => t.id === nextTone)?.label}`,
+      onChange(
+        draftEmailFromPrompt({
+          prompt: next,
+          tone,
+          recipientName,
+          subject,
+        }),
       );
-    }, 420);
+      setBusy(false);
+      setOpen(false);
+      notice("Draft written");
+    }, 380);
+  }
+
+  function shorten() {
+    setBusy(true);
+    window.setTimeout(() => {
+      onChange(
+        rewriteEmailWithAi({
+          html,
+          tone,
+          action: "brief",
+          recipientName,
+          subject,
+        }),
+      );
+      setBusy(false);
+      notice("Shortened");
+    }, 380);
   }
 
   function toggleVoice() {
@@ -126,131 +124,138 @@ export function EmailAiAssist({
     rec.lang = "en-AU";
     rec.onresult = (event) => {
       const said = event.results[0]?.[0]?.transcript?.trim();
-      if (said) run({ voiceNotes: said });
+      if (said) writeFromPrompt(said);
     };
     rec.onerror = () => setListening(false);
     rec.onend = () => setListening(false);
     recRef.current = rec;
     rec.start();
     setListening(true);
-    notice("Listening… speak your email");
+    notice("Listening…");
   }
 
   return (
-    <div className="mt-3 rounded-xl border border-violet-100 bg-violet-50/40 px-3 py-2.5">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-violet-800 uppercase">
-          <Sparkles className="h-3 w-3" />
-          Write with AI
-        </p>
-        {flash ? (
-          <span className="text-[11px] font-medium text-violet-700">{flash}</span>
-        ) : (
-          <span className="text-[11px] text-violet-600/80">
-            Voice, tone, and advanced rewrite
-          </span>
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-1.5">
+    <>
+      <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold text-white"
+          style={{ backgroundColor: "#5A32A3" }}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          AI
+        </button>
         <button
           type="button"
           onClick={toggleVoice}
           className={cn(
-            "inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-semibold",
+            "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-semibold",
             listening
               ? "border-rose-200 bg-rose-50 text-rose-700"
-              : "border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-700",
+              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
           )}
         >
           <Mic className={cn("h-3.5 w-3.5", listening && "animate-pulse")} />
           {listening ? "Listening…" : "Voice"}
         </button>
-
-        {PRIMARY_TONES.map((id) => {
-          const item = EMAIL_TONES.find((t) => t.id === id)!;
-          return (
-            <button
-              key={id}
-              type="button"
-              disabled={busy}
-              onClick={() => run({ nextTone: id })}
-              className={cn(
-                "h-8 rounded-full border px-2.5 text-[11px] font-semibold disabled:opacity-50",
-                tone === id
-                  ? "border-violet-300 bg-violet-100 text-violet-800"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-violet-200 hover:text-violet-700",
-              )}
-            >
-              {item.label}
-            </button>
-          );
-        })}
-
-        <div className="relative" ref={moreRef}>
-          <button
-            type="button"
-            onClick={() => setMoreOpen((v) => !v)}
-            className="inline-flex h-8 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:border-violet-200 hover:text-violet-700"
-          >
-            More
-            <ChevronDown className="h-3 w-3" />
-          </button>
-          {moreOpen ? (
-            <div className="absolute bottom-9 left-0 z-30 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-              <p className="px-3 py-1.5 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                Advanced tones
-              </p>
-              {EMAIL_TONES.filter((t) => !PRIMARY_TONES.includes(t.id)).map(
-                (t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    className="flex w-full items-center justify-between px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-violet-50"
-                    onClick={() => {
-                      setMoreOpen(false);
-                      run({ nextTone: t.id });
-                    }}
-                  >
-                    <span className="font-medium">{t.label}</span>
-                    <span className="text-[10px] text-slate-400">{t.hint}</span>
-                  </button>
-                ),
-              )}
-              <div className="my-1 border-t border-slate-100" />
-              <p className="px-3 py-1.5 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                Rewrite
-              </p>
-              {EMAIL_AI_ACTIONS.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  className="flex w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-violet-50"
-                  onClick={() => {
-                    setMoreOpen(false);
-                    run({ action: a.id });
-                  }}
-                >
-                  {a.label}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
         <button
           type="button"
           disabled={busy}
-          onClick={() => run({ action: "brief" })}
-          className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-full border border-violet-200 bg-white px-3 text-[11px] font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-50"
+          onClick={shorten}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
         >
-          {busy ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <Sparkles className="h-3 w-3" />
-          )}
-          Optimize for brevity
+          {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+          Shorten
         </button>
+        {flash ? (
+          <span className="text-[11px] font-medium text-[#5A32A3]">{flash}</span>
+        ) : null}
       </div>
-    </div>
+
+      {open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 px-4">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <p className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#5A32A3]">
+                <Sparkles className="h-3.5 w-3.5" />
+                Write with AI
+              </p>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-3 px-4 py-4">
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Describe the email you want… e.g. Ask Olivia for the latest payslips and confirm we can lodge this week."
+                className="min-h-[110px] w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-[#5A32A3]/20"
+              />
+              <div>
+                <p className="mb-1.5 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+                  Tone
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {TONES.map((id) => {
+                    const item = EMAIL_TONES.find((t) => t.id === id)!;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setTone(id)}
+                        className={cn(
+                          "h-8 rounded-lg border px-2.5 text-[11px] font-semibold",
+                          tone === id
+                            ? "border-violet-200 bg-violet-50 text-[#5A32A3]"
+                            : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                        )}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                {READY_PROMPTS.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setPrompt(item)}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-left text-[11px] text-slate-600 hover:border-violet-200 hover:bg-[#F8F4FC]"
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="h-9 rounded-lg px-3 text-[12px] font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={busy || !prompt.trim()}
+                onClick={() => writeFromPrompt(prompt)}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold text-white disabled:opacity-40"
+                style={{ backgroundColor: "#5A32A3" }}
+              >
+                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                Write email
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }

@@ -20,9 +20,9 @@ import {
 import {
   ACTIVITY_OWNERS,
   RELATED_ENTITY_KINDS,
-  RELATED_RECORD_OPTIONS,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
+import { liveRelatedRecords } from "@/lib/activities/related-records";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { createMeeting } from "@/lib/meetings/store";
 import {
@@ -95,9 +95,12 @@ export function CreateMeetingForm({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  const relatedOptions = form.relatedKind
-    ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === form.relatedKind)
-    : RELATED_RECORD_OPTIONS;
+  const relatedOptions = liveRelatedRecords(
+    form.relatedKind,
+    form.relatedKind && form.relatedName
+      ? { kind: form.relatedKind as RelatedEntityKind, name: form.relatedName }
+      : undefined,
+  );
 
   function validate() {
     const next: Partial<Record<keyof FormState, string>> = {};

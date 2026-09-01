@@ -1,42 +1,100 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-    Bell,
-  Plus,
+  Bell,
   Clock,
   Link2,
-  List,
-  LayoutGrid,
   Mail,
   Smartphone,
   Monitor,
   BellRing,
   AlarmClock,
   X,
-  Download,
+  ChevronDown,
 } from "lucide-react";
 import {
+  EMPTY_REMINDER_FILTERS,
   reminderColumns as initialColumns,
+  reminderMatchesFilters,
   type Reminder,
   type ReminderColumn,
+  type ReminderFilters,
   type ReminderStatus,
+  type ReminderType,
   type NotificationMethod,
 } from "@/lib/reminders/types";
-import { exportRemindersCsv } from "@/lib/activities/export";
+import { activityExportMenuItem } from "@/lib/activities/export";
+import {
+  ActivityToolbar,
+  TIMELINE_VIEW_TOGGLE,
+  type ActivityView,
+} from "@/components/activities/ActivityToolbar";
+import { RemindersFilterPanel } from "@/components/activities/reminders/RemindersFilterPanel";
+import { RemindersTimelineView } from "@/components/activities/reminders/RemindersTimelineView";
+import { printViewItems } from "../tasks/page";
 import {
   CardInitialsAvatar,
   CardOwnerRow,
 } from "@/components/shared/CardInitialsAvatar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
-import { BOARD_PAGE, KANBAN_CARD, KANBAN_COL, KANBAN_HEADER, KANBAN_HEADER_COUNT, KANBAN_WELL } from "@/lib/layout";
-import { dropTargetActive, cardSubject } from "@/lib/motion";
+import {
+  BOARD_PAGE,
+  KANBAN_BOARD_ROW,
+  KANBAN_CARD,
+  KANBAN_COL,
+  KANBAN_DROP_GHOST,
+  KANBAN_HEADER,
+  KANBAN_HEADER_COUNT,
+  KANBAN_WELL,
+} from "@/lib/layout";
+import {
+  dropTargetActive,
+  dropTargetIdle,
+  cardSubject,
+  cardMotion,
+  cardDragging,
+} from "@/lib/motion";
+import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
+import { KanbanEmptyStage } from "@/components/common/KanbanEmptyStage";
+import { KanbanStageScroll } from "@/components/common/KanbanStageScroll";
+import { KanbanCollapsedRail } from "@/components/common/KanbanCollapsedRail";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
+import { parseTaskDueDate } from "@/lib/dashboard/layout";
 
-type ViewMode = "kanban" | "list";
+const reminderSortOptions = [
+  { key: "dateTime", label: "When" },
+  { key: "title", label: "Reminder" },
+  { key: "type", label: "Type" },
+  { key: "status", label: "Status" },
+  { key: "owner", label: "Owner" },
+  { key: "relatedTo", label: "Related To" },
+];
+
+function sortReminders(
+  items: Reminder[],
+  field?: string,
+  direction: "asc" | "desc" = "asc",
+): Reminder[] {
+  if (!field) return items;
+  const dir = direction === "asc" ? 1 : -1;
+  return [...items].sort((a, b) => {
+    if (field === "dateTime") {
+      const ta = parseTaskDueDate(a.dateTime)?.getTime() ?? 0;
+      const tb = parseTaskDueDate(b.dateTime)?.getTime() ?? 0;
+      return (ta - tb) * dir;
+    }
+    const left = String(
+      field === "relatedTo" ? (a.relatedTo ?? "") : a[field as keyof Reminder] ?? "",
+    ).toLowerCase();
+    const right = String(
+      field === "relatedTo" ? (b.relatedTo ?? "") : b[field as keyof Reminder] ?? "",
+    ).toLowerCase();
+    return left.localeCompare(right) * dir;
+  });
+}
 
 const STATUS_META: Record<
   ReminderStatus,
@@ -77,20 +135,17 @@ const METHOD_ICON: Record<NotificationMethod, React.ElementType> = {
 
 export default function RemindersPage() {
   const router = useRouter();
-  const [view, setView] = useState<ViewMode>("kanban");
+  const [view, setView] = useState<ActivityView>("kanban");
   const [columns, setColumns] = useState<ReminderColumn[]>(initialColumns);
-  const [tab, setTab] = useState<"all" | "pending">("all");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filters, setFilters] = useState<ReminderFilters>(EMPTY_REMINDER_FILTERS);
+  const [sortField, setSortField] = useState<string | undefined>();
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
-
-  const visibleColumns = useMemo(() => {
-    if (tab === "pending") {
-      return columns.filter((c) => c.title === "Pending");
-    }
-    return columns;
-  }, [columns, tab]);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const allReminders = useMemo(
     () =>
@@ -100,19 +155,90 @@ export default function RemindersPage() {
     [columns],
   );
 
+  const filterCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const reminder of allReminders) {
+      counts[reminder.status] = (counts[reminder.status] ?? 0) + 1;
+      counts[reminder.type] = (counts[reminder.type] ?? 0) + 1;
+      counts[reminder.notificationMethod] =
+        (counts[reminder.notificationMethod] ?? 0) + 1;
+      counts[reminder.owner] = (counts[reminder.owner] ?? 0) + 1;
+    }
+    return counts;
+  }, [allReminders]);
+
+  const visibleColumns = useMemo(() => {
+    return columns
+      .filter(
+        (col) =>
+          filters.statuses.length === 0 || filters.statuses.includes(col.title),
+      )
+      .map((col) => {
+        const reminders = sortReminders(
+          col.reminders.filter((r) =>
+            reminderMatchesFilters(
+              { ...r, status: col.title },
+              { ...filters, statuses: [] },
+            ),
+          ),
+          sortField,
+          sortDirection,
+        );
+        return { ...col, reminders, count: reminders.length };
+      });
+  }, [columns, filters, sortField, sortDirection]);
+
   const visibleReminders = useMemo(
     () =>
-      tab === "pending"
-        ? allReminders.filter((r) => r.status === "Pending")
-        : allReminders,
-    [allReminders, tab],
+      sortReminders(
+        allReminders.filter((r) => reminderMatchesFilters(r, filters)),
+        sortField,
+        sortDirection,
+      ),
+    [allReminders, filters, sortField, sortDirection],
   );
+
+  function toggleFilterField(
+    sectionId: "status" | "type" | "method" | "owner",
+    field: string,
+  ) {
+    setFilters((prev) => {
+      if (sectionId === "status") {
+        const selected = field as ReminderStatus;
+        const next = prev.statuses.includes(selected)
+          ? prev.statuses.filter((value) => value !== selected)
+          : [...prev.statuses, selected];
+        return { ...prev, statuses: next };
+      }
+      if (sectionId === "type") {
+        const selected = field as ReminderType;
+        const next = prev.types.includes(selected)
+          ? prev.types.filter((value) => value !== selected)
+          : [...prev.types, selected];
+        return { ...prev, types: next };
+      }
+      if (sectionId === "method") {
+        const selected = field as NotificationMethod;
+        const next = prev.methods.includes(selected)
+          ? prev.methods.filter((value) => value !== selected)
+          : [...prev.methods, selected];
+        return { ...prev, methods: next };
+      }
+      const next = prev.owners.includes(field)
+        ? prev.owners.filter((value) => value !== field)
+        : [...prev.owners, field];
+      return { ...prev, owners: next };
+    });
+  }
+
+  function handleSortChange(field: string, direction: "asc" | "desc") {
+    setSortField(field);
+    setSortDirection(direction);
+  }
 
   const allVisibleSelected =
     visibleReminders.length > 0 &&
     visibleReminders.every((r) => selectedIds.includes(r.id));
-
-  const pendingCount = columns.find((c) => c.title === "Pending")?.count ?? 0;
 
   function moveReminder(id: string, status: ReminderStatus) {
     setColumns((prev) => {
@@ -175,146 +301,113 @@ export default function RemindersPage() {
     <div className={BOARD_PAGE}>
       <FocusHighlight />
 
-      <div className="relative flex min-h-0 flex-1 flex-col">
-        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
-              Reminders
-            </h1>
-          </div>
+      <div className="shrink-0">
+        <ActivityToolbar
+          entityLabel="Reminder"
+          createRoute="/activities/reminders/create"
+          view={view}
+          onViewChange={setView}
+          filterOpen={filterOpen}
+          onToggleFilter={() => setFilterOpen((v) => !v)}
+          sortOptions={reminderSortOptions}
+          sortField={sortField}
+          sortDirection={sortDirection}
+          onSortChange={handleSortChange}
+          onClearSort={() => setSortField(undefined)}
+          extraViewIcons={[TIMELINE_VIEW_TOGGLE]}
+          moreMenuItems={[activityExportMenuItem("reminders")]}
+          printViewItems={printViewItems}
+        />
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                const n = exportRemindersCsv();
-                void n;
-              }}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Export
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                router.push(
-                  "/activities/reminders/create?layoutid=standard&redirect=false",
-                )
-              }
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-md shadow-violet-600/20 transition-all hover:bg-violet-700"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add Reminders
-            </button>
-          </div>
-        </div>
+        {bulkFlash ? (
+          <p className="mt-1 text-[12px] font-medium text-violet-700">
+            {bulkFlash}
+          </p>
+        ) : null}
 
-        {/* ONE surface: toolbar + content */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-0.5 rounded-lg bg-slate-50 p-0.5">
-              <TabBtn
-                active={tab === "all"}
-                onClick={() => setTab("all")}
-                label="All Reminders"
-                count={allReminders.length}
-              />
-              <TabBtn
-                active={tab === "pending"}
-                onClick={() => setTab("pending")}
-                label="Pending"
-                count={pendingCount}
-              />
-            </div>
+        {selectedIds.length > 0 ? (
+          <EntitySelectionToolbar
+            selectedCount={selectedIds.length}
+            onClear={() => setSelectedIds([])}
+            onDelete={runBulkDelete}
+          />
+        ) : null}
+      </div>
 
-            <div className="flex items-center gap-1.5">
-              <div className="flex flex-wrap items-center gap-1">
-                {columns.map((col) => {
-                  const meta = STATUS_META[col.title];
-                  return (
-                    <span
-                      key={col.id}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-semibold text-slate-600"
-                    >
-                      <span
-                        className={cn("h-1.5 w-1.5 rounded-full", meta.dot)}
-                      />
-                      {col.title}
-                      <span className="tabular-nums text-slate-400">
-                        {col.count}
-                      </span>
-                    </span>
-                  );
-                })}
-              </div>
+      <div className="mt-2 flex min-h-0 flex-1 items-stretch gap-4 overflow-hidden">
+        {filterOpen ? (
+          <RemindersFilterPanel
+            filters={filters}
+            counts={filterCounts}
+            onToggleField={toggleFilterField}
+            onClose={() => setFilterOpen(false)}
+          />
+        ) : null}
 
-              <div className="flex items-center rounded-lg bg-slate-50 p-0.5">
-                <button
-                  type="button"
-                  aria-label="List view"
-                  onClick={() => setView("list")}
-                  className={cn(
-                    "flex h-7 w-7 items-center justify-center rounded-md transition-all",
-                    view === "list"
-                      ? "bg-violet-600 text-white shadow-sm"
-                      : "text-slate-400 hover:text-slate-700",
-                  )}
-                >
-                  <List className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Board view"
-                  onClick={() => setView("kanban")}
-                  className={cn(
-                    "flex h-7 w-7 items-center justify-center rounded-md transition-all",
-                    view === "kanban"
-                      ? "bg-violet-600 text-white shadow-sm"
-                      : "text-slate-400 hover:text-slate-700",
-                  )}
-                >
-                  <LayoutGrid className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {bulkFlash ? (
-            <p className="mb-2 text-[12px] font-medium text-violet-700">
-              {bulkFlash}
-            </p>
-          ) : null}
-
-          {selectedIds.length > 0 ? (
-            <EntitySelectionToolbar
-              selectedCount={selectedIds.length}
-              onClear={() => setSelectedIds([])}
-              onDelete={runBulkDelete}
-            />
-          ) : null}
-
-          <div className="min-h-0 flex-1 overflow-auto">
-            {view === "kanban" ? (
-              <div className="flex h-full min-h-[420px] items-stretch gap-3 overflow-x-auto p-1">
+        <div className="min-h-0 min-w-0 flex-1 overflow-auto">
+            {view === "timeline" ? (
+              <RemindersTimelineView reminders={visibleReminders} />
+            ) : view === "kanban" ? (
+              <div className={cn(KANBAN_BOARD_ROW, "min-h-[420px]")}>
                 {visibleColumns.map((col) => {
                   const isOver = overCol === col.id;
+                  const isCollapsed = collapsed.has(col.id);
+                  if (isCollapsed) {
+                    return (
+                      <KanbanCollapsedRail
+                        key={col.id}
+                        title={col.title}
+                        count={col.reminders.length}
+                        onExpand={() =>
+                          setCollapsed((prev) => {
+                            const next = new Set(prev);
+                            next.delete(col.id);
+                            return next;
+                          })
+                        }
+                      />
+                    );
+                  }
                   return (
                     <div
                       key={col.id}
-                      className={cn("flex min-h-[420px] flex-col gap-2", KANBAN_COL)}
+                      className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}
                     >
-                      <div className={KANBAN_HEADER}>
-                        <div className="flex items-center justify-between px-1">
-                          <h3 className="text-xs font-semibold text-slate-800 xl:text-sm">
-                            {col.title}
-                          </h3>
+                      <div className={cn("mb-2 shrink-0", KANBAN_HEADER)}>
+                        <div className="flex items-center justify-between gap-4">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCollapsed((prev) => new Set(prev).add(col.id))
+                            }
+                            title="Collapse"
+                            className="flex items-center gap-1.5 rounded-sm hover:opacity-70"
+                          >
+                            <ChevronDown className="h-4 w-4 shrink-0 text-slate-700" />
+                            <h3 className="text-sm font-semibold text-slate-900">
+                              {col.title}
+                            </h3>
+                          </button>
                           <span className={KANBAN_HEADER_COUNT}>
-                            {col.count}
+                            {col.reminders.length}
                           </span>
                         </div>
                       </div>
 
+                      <KanbanStageScroll
+                        footer={
+                          <KanbanColumnFooter
+                            createLabel="Create reminder"
+                            onCreate={() =>
+                              router.push("/activities/reminders/create")
+                            }
+                            onCollapse={() =>
+                              setCollapsed((prev) => new Set(prev).add(col.id))
+                            }
+                            collapseLabel={`Collapse ${col.title}`}
+                          />
+                        }
+                      >
                       <div
                         onDragOver={(e) => {
                           e.preventDefault();
@@ -328,36 +421,40 @@ export default function RemindersPage() {
                           handleDrop(col.title);
                         }}
                         className={cn(
-                          "flex min-h-0 flex-1 flex-col gap-2 rounded-sm border p-2",
+                          "flex min-h-full flex-col rounded-sm border border-transparent p-2",
+                          dropTargetIdle,
                           isOver ? dropTargetActive : KANBAN_WELL,
                         )}
                       >
-                        {col.reminders.map((r) => (
-                          <ReminderCard
-                            key={r.id}
-                            reminder={r}
-                            status={col.title}
-                            isDragging={dragId === r.id}
-                            isSelected={selectedIds.includes(r.id)}
-                            onSelect={() => toggleSelected(r.id)}
-                            onDragStart={() => setDragId(r.id)}
-                            onDragEnd={() => {
-                              setDragId(null);
-                              setOverCol(null);
-                            }}
-                            onSnooze={() => moveReminder(r.id, "Snoozed")}
-                            onDismiss={() => moveReminder(r.id, "Dismissed")}
-                            onActivate={() => moveReminder(r.id, "Pending")}
-                          />
-                        ))}
+                        <div className="flex min-h-[180px] flex-1 flex-col space-y-3 pb-4">
+                          {isOver && dragId ? (
+                            <div className={KANBAN_DROP_GHOST} />
+                          ) : null}
+                          {col.reminders.map((r) => (
+                            <ReminderCard
+                              key={r.id}
+                              reminder={r}
+                              status={col.title}
+                              isDragging={dragId === r.id}
+                              isSelected={selectedIds.includes(r.id)}
+                              onSelect={() => toggleSelected(r.id)}
+                              onDragStart={() => setDragId(r.id)}
+                              onDragEnd={() => {
+                                setDragId(null);
+                                setOverCol(null);
+                              }}
+                              onSnooze={() => moveReminder(r.id, "Snoozed")}
+                              onDismiss={() => moveReminder(r.id, "Dismissed")}
+                              onActivate={() => moveReminder(r.id, "Pending")}
+                            />
+                          ))}
 
-                        {col.reminders.length === 0 ? (
-                          <div className="flex flex-1 flex-col items-center justify-center py-10 text-center">
-                            <AlarmClock className="mb-1.5 h-4 w-4 text-slate-300" />
-                            <p className="text-[11px] text-slate-300">Empty</p>
-                          </div>
-                        ) : null}
+                          {col.reminders.length === 0 && !isOver ? (
+                            <KanbanEmptyStage entity="Reminders" />
+                          ) : null}
+                        </div>
                       </div>
+                      </KanbanStageScroll>
                     </div>
                   );
                 })}
@@ -485,47 +582,9 @@ export default function RemindersPage() {
                 </tbody>
               </table>
             )}
-          </div>
         </div>
       </div>
     </div>
-  );
-}
-
-function TabBtn({
-  active,
-  onClick,
-  label,
-  count,
-}: {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  count: number;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all",
-        active
-          ? "bg-white text-violet-700 shadow-sm"
-          : "text-slate-500 hover:text-slate-800",
-      )}
-    >
-      {label}
-      <span
-        className={cn(
-          "rounded-full px-1.5 py-px text-[9px] tabular-nums",
-          active
-            ? "bg-violet-100 text-violet-700"
-            : "bg-slate-200/80 text-slate-600",
-        )}
-      >
-        {count}
-      </span>
-    </button>
   );
 }
 
@@ -567,14 +626,15 @@ function ReminderCard({
       data-focus-id={reminder.id}
       data-reminder-id={reminder.id}
       className={cn(
-        "group/card cursor-grab rounded-md border border-slate-100 border-l-[3px] !bg-white p-3.5 shadow-sm transition-all active:cursor-grabbing",
+        "group/card cursor-grab rounded-md border border-slate-100 border-l-[3px] !bg-white p-3.5 shadow-sm active:cursor-grabbing",
         KANBAN_CARD,
+        cardMotion,
         meta.border,
         isDragging
-          ? "opacity-40"
+          ? cardDragging
           : isSelected
             ? "border-indigo-500 ring-1 ring-indigo-500"
-            : "hover:border-slate-200 hover:shadow-md",
+            : "",
       )}
     >
       <div className="mb-2.5 flex items-start gap-2.5">

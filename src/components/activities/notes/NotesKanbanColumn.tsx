@@ -1,11 +1,23 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type { NoteColumn } from "@/lib/notes/types";
 import { NoteCard } from "./NoteCard";
+import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
+import { KanbanEmptyStage } from "@/components/common/KanbanEmptyStage";
+import { KanbanStageScroll } from "@/components/common/KanbanStageScroll";
+import { KanbanCollapsedRail } from "@/components/common/KanbanCollapsedRail";
 import { cn } from "@/lib/utils";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
-import { KANBAN_COL, KANBAN_HEADER, KANBAN_HEADER_COUNT, KANBAN_WELL } from "@/lib/layout";
+import {
+  KANBAN_COL,
+  KANBAN_DROP_GHOST,
+  KANBAN_HEADER,
+  KANBAN_HEADER_COUNT,
+  KANBAN_WELL,
+} from "@/lib/layout";
 
 interface NotesKanbanColumnProps {
   column: NoteColumn;
@@ -32,26 +44,51 @@ export function NotesKanbanColumn({
   selectedIds = [],
   onToggleSelect,
 }: NotesKanbanColumnProps) {
+  const router = useRouter();
   const [isOver, setIsOver] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  if (isCollapsed) {
+    return (
+      <KanbanCollapsedRail
+        title={column.title}
+        count={column.notes.length}
+        onExpand={() => setIsCollapsed(false)}
+      />
+    );
+  }
 
   return (
-    <div
-      className={cn(
-        "flex h-full flex-col gap-2",
-        embedded ? "min-w-[220px] flex-1" : KANBAN_COL,
-      )}
-    >
-      <div className={KANBAN_HEADER}>
-        <div className="flex items-center justify-between px-1">
-          <h3 className="text-xs font-semibold text-slate-800 xl:text-sm">
-            {column.title}
-          </h3>
-          <span className={KANBAN_HEADER_COUNT}>
-            {column.notes.length}
-          </span>
+    <div className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}>
+      <div className={cn("mb-2 shrink-0", KANBAN_HEADER)}>
+        <div className="flex items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={() => setIsCollapsed(true)}
+            title="Collapse"
+            className="flex items-center gap-1.5 rounded-sm hover:opacity-70"
+            aria-expanded
+            aria-label={`Collapse ${column.title}`}
+          >
+            <ChevronDown className="h-4 w-4 shrink-0 text-slate-700" />
+            <h3 className="text-sm font-semibold text-slate-900">
+              {column.title}
+            </h3>
+          </button>
+          <span className={KANBAN_HEADER_COUNT}>{column.notes.length}</span>
         </div>
       </div>
 
+      <KanbanStageScroll
+        footer={
+          <KanbanColumnFooter
+            createLabel="Create note"
+            onCreate={() => router.push("/activities/notes/create")}
+            onCollapse={() => setIsCollapsed(true)}
+            collapseLabel={`Collapse ${column.title}`}
+          />
+        }
+      >
       <div
         onDragOver={(e) => {
           e.preventDefault();
@@ -64,12 +101,15 @@ export function NotesKanbanColumn({
           onDropNote(column.id);
         }}
         className={cn(
-          "flex min-h-0 flex-1 flex-col rounded-sm border p-2",
+          "flex min-h-full flex-col rounded-sm border border-transparent p-2",
           dropTargetIdle,
           isOver ? dropTargetActive : KANBAN_WELL,
         )}
       >
-        <div className="flex-1 space-y-2 overflow-y-auto [scrollbar-width:thin]">
+        <div className="flex min-h-[180px] flex-1 flex-col space-y-3 pb-4">
+          {isOver && draggingNoteId ? (
+            <div className={KANBAN_DROP_GHOST} />
+          ) : null}
           {column.notes.map((note) => (
             <NoteCard
               key={note.id}
@@ -86,12 +126,11 @@ export function NotesKanbanColumn({
           ))}
 
           {column.notes.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 bg-white/70 py-10 text-center text-[11px] text-slate-400">
-              Drop a note here
-            </div>
+            <KanbanEmptyStage entity="Notes" />
           ) : null}
         </div>
       </div>
+      </KanbanStageScroll>
     </div>
   );
 }

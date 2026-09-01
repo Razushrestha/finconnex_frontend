@@ -624,12 +624,14 @@ import mammoth from "mammoth";
 import { AdvancedOptionsSection } from "@/components/documents/signature/create/AdvancedOptionsSection";
 import {
   DocumentDetailsSection,
+  renamedStoredFileName,
   type AdditionalDocument,
 } from "@/components/documents/signature/create/DocumentDetailsSection";
 import { EmailMessageSection } from "@/components/documents/signature/create/EmailMessageSection";
 import {
   CcRecipient,
   RecipientsSection,
+  firstRecipientMobileError,
 } from "@/components/documents/signature/create/RecipientsSection";
 import {
   PlaceFieldsView,
@@ -640,6 +642,7 @@ import {
   nextSignatureIds,
   upsertSignatureRequest,
   markRequestSent,
+  makeSigner,
   type SignatureField,
   type SignatureSigner,
   type SignatureDocument,
@@ -708,6 +711,33 @@ function toSignatureFields(placed: PlacedField[]): SignatureField[] {
     }));
 }
 
+function recipientsFromSearch(params: URLSearchParams): SignatureSigner[] {
+  const raw = params.get("signers");
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((row, index) => {
+      if (!row || typeof row !== "object") return [];
+      const name = String((row as { name?: unknown }).name ?? "").trim();
+      const email = String((row as { email?: unknown }).email ?? "").trim();
+      if (!name && !email) return [];
+      return [
+        makeSigner({
+          id: `sg-lead-${index + 1}`,
+          name,
+          email,
+          order: index + 1,
+          token: `sig-lead-${index + 1}-${Date.now()}`,
+          colorIndex: index,
+        }),
+      ];
+    });
+  } catch {
+    return [];
+  }
+}
+
 function CreateSignatureRequestForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -715,8 +745,9 @@ function CreateSignatureRequestForm() {
   const isPlacingFields = step === "place-fields";
 
   const [ids] = useState(() => nextSignatureIds());
+  const prefillDocumentName = searchParams.get("documentName")?.trim() || "";
 
-  const [documentName, setDocumentName] = useState("");
+  const [documentName, setDocumentName] = useState(prefillDocumentName);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [persistentFileUrl, setPersistentFileUrl] = useState<string>("");
 
@@ -933,7 +964,7 @@ function CreateSignatureRequestForm() {
       list.push({
         id: "primary",
         name: documentName || documentFile.name,
-        fileName: documentFile.name,
+        fileName: renamedStoredFileName(documentName, documentFile.name),
         fileUrl: persistentFileUrl,
       });
     }
@@ -942,7 +973,7 @@ function CreateSignatureRequestForm() {
       list.push({
         id: doc.id,
         name: doc.name,
-        fileName: doc.file.name,
+        fileName: renamedStoredFileName(doc.name, doc.file.name),
         fileUrl: preview?.persistentFileUrl || "",
       });
     });
@@ -955,7 +986,18 @@ function CreateSignatureRequestForm() {
     additionalPreviews,
   ]);
 
-  const [recipients, setRecipients] = useState<SignatureSigner[]>([]);
+  const storedFileName = documentFile
+    ? renamedStoredFileName(documentName, documentFile.name)
+    : "";
+
+  const [recipients, setRecipients] = useState<SignatureSigner[]>(() =>
+    recipientsFromSearch(searchParams),
+  );
+  const [relatedTo] = useState(() => {
+    const kind = searchParams.get("relatedKind")?.trim();
+    const name = searchParams.get("relatedName")?.trim();
+    return kind && name ? `${kind}: ${name}` : undefined;
+  });
   const [signingOrder, setSigningOrder] = useState<"sequential" | "parallel">(
     "sequential",
   );
@@ -966,10 +1008,21 @@ function CreateSignatureRequestForm() {
   const [expiryTime, setExpiryTime] = useState("");
   const [ccRecipients, setCcRecipients] = useState<CcRecipient[]>([]);
 
-  const [emailTitle, setEmailTitle] = useState(`Please sign: ${documentName}`);
-  const [emailMessage, setEmailMessage] = useState("");
+  const [emailTitle, setEmailTitle] = useState(
+    prefillDocumentName ? `Please sign: ${prefillDocumentName}` : "Please sign:",
+  );
+  const [emailMessage, setEmailMessage] = useState(() => {
+    const names = recipientsFromSearch(searchParams)
+      .map((signer) => signer.name)
+      .filter(Boolean);
+    if (!names.length) return "";
+    const greeting =
+      names.length === 1 ? names[0] : `${names[0]} and ${names[1]}`;
+    return `Hi ${greeting},\n\nPlease review and sign this document.`;
+  });
 
   const [fileError, setFileError] = useState("");
+  const [showRecipientErrors, setShowRecipientErrors] = useState(false);
 
   // Field placement state
   const [placedFields, setPlacedFields] = useState<PlacedField[]>([]);
@@ -981,6 +1034,16 @@ function CreateSignatureRequestForm() {
     setFileError("");
   };
 
+  const assertRecipientsReady = () => {
+    const mobileError = firstRecipientMobileError(recipients, ccRecipients);
+    if (mobileError) {
+      setShowRecipientErrors(true);
+      toast.error(mobileError);
+      return false;
+    }
+    return true;
+  };
+
   const handleResizeField = (id: string, width: number, height: number) => {
     setPlacedFields((prev) =>
       prev.map((f) => (f.id === id ? { ...f, width, height } : f)),
@@ -989,11 +1052,12 @@ function CreateSignatureRequestForm() {
 
   const handleSaveDraft = () => {
     if (!documentName.trim()) return;
+    if (!assertRecipientsReady()) return;
     upsertSignatureRequest({
       id: ids.id,
       signatureRequestId: ids.signatureRequestId,
       documentName,
-      documentFile: documentFile?.name || "",
+      documentFile: storedFileName,
       documentFileUrl: persistentFileUrl || fileUrl,
       documents: signatureDocuments,
       signer: recipients[0]?.name || "",
@@ -1003,6 +1067,7 @@ function CreateSignatureRequestForm() {
       signingOrder,
       status: "Draft",
       expiryDate: expiryDate || "31/10/2026",
+      relatedTo,
       createdBy: "Current User",
       manageToken: ids.manageToken,
       audit: [
@@ -1022,12 +1087,13 @@ function CreateSignatureRequestForm() {
       setFileError("Document file is required");
       return;
     }
+    if (!assertRecipientsReady()) return;
 
     upsertSignatureRequest({
       id: ids.id,
       signatureRequestId: ids.signatureRequestId,
       documentName,
-      documentFile: documentFile?.name || "",
+      documentFile: storedFileName,
       documentFileUrl: persistentFileUrl || fileUrl,
       documents: signatureDocuments,
       signer: recipients[0]?.name || "",
@@ -1037,6 +1103,7 @@ function CreateSignatureRequestForm() {
       signingOrder,
       status: "Draft",
       expiryDate: expiryDate || "31/10/2026",
+      relatedTo,
       createdBy: "Current User",
       manageToken: ids.manageToken,
       audit: [
@@ -1049,11 +1116,16 @@ function CreateSignatureRequestForm() {
       ],
     });
 
-    router.push("/signature/create?step=place-fields");
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("step", "place-fields");
+    router.push(`/signature/create?${next.toString()}`);
   };
 
   const handleBackToForm = () => {
-    router.push("/signature/create");
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("step");
+    const query = next.toString();
+    router.push(query ? `/signature/create?${query}` : "/signature/create");
   };
 
   const handleSidebarDragStart = (
@@ -1117,13 +1189,14 @@ function CreateSignatureRequestForm() {
   // notifications, and resolves with whoever was just notified so the test
   // links modal can be shown before navigating away.
   const handleSendForSignature = async (): Promise<SignatureSigner[]> => {
+    if (!assertRecipientsReady()) return [];
     const fields = toSignatureFields(placedFields);
 
     const draft = upsertSignatureRequest({
       id: ids.id,
       signatureRequestId: ids.signatureRequestId,
       documentName,
-      documentFile: documentFile?.name || "",
+      documentFile: storedFileName,
       documentFileUrl: persistentFileUrl || fileUrl,
       documents: signatureDocuments,
       signer: recipients[0]?.name || "",
@@ -1133,6 +1206,7 @@ function CreateSignatureRequestForm() {
       signingOrder,
       status: "Draft",
       expiryDate: expiryDate || "31/10/2026",
+      relatedTo,
       createdBy: "Current User",
       manageToken: ids.manageToken,
       audit: [
@@ -1208,6 +1282,7 @@ function CreateSignatureRequestForm() {
           onToggleOrder={setSigningOrder}
           ccRecipients={ccRecipients}
           setCcRecipients={setCcRecipients}
+          showValidationErrors={showRecipientErrors}
         />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

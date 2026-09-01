@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileText, User, Building2, Calendar } from "lucide-react";
 import {
@@ -11,45 +11,65 @@ import {
   type QuotationStatus,
 } from "@/lib/finance/quotations/types";
 import {
-  FINANCE_CLIENTS,
-  FINANCE_DEALS,
   FINANCE_OWNERS,
   formatFinanceDate,
   newLineItem,
   type FinanceLineItem,
 } from "@/lib/finance/shared";
+import {
+  defaultFinanceDealName,
+  defaultFinanceTitle,
+  defaultFinanceValidUntil,
+  financeClientsWithRelated,
+  financeDealOptions,
+  financeRelatedTo,
+  type RelatedFinancePrefill,
+} from "@/lib/finance/related-prefill";
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import {
   CreateEntityFormShell,
   Field,
   InputShell,
-  TextAreaShell,
   elevatedInputClass,
   elevatedSelectClass,
-  elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
 
-interface Props {
+interface Props extends RelatedFinancePrefill {
   layoutId: string;
   redirect: boolean;
 }
 
-export function CreateQuotationForm({ layoutId: _l, redirect: _r }: Props) {
+export function CreateQuotationForm({
+  layoutId: _l,
+  redirect: _r,
+  relatedKind,
+  relatedName,
+  relatedId,
+  email,
+}: Props) {
   const router = useRouter();
-  const [title, setTitle] = useState("");
+  const prefill = useMemo(
+    () => ({ relatedKind, relatedName, relatedId, email }),
+    [relatedKind, relatedName, relatedId, email],
+  );
+  const clients = useMemo(() => financeClientsWithRelated(prefill), [prefill]);
+  const dealOptions = useMemo(() => financeDealOptions(prefill), [prefill]);
+  const relatedTo = financeRelatedTo(prefill);
+  const [title, setTitle] = useState(defaultFinanceTitle("quote", prefill));
   const [status, setStatus] = useState<QuotationStatus>("Draft");
-  const [clientId, setClientId] = useState<string>(FINANCE_CLIENTS[0].id);
-  const [dealName, setDealName] = useState<string>(FINANCE_DEALS[0]);
+  const [clientId, setClientId] = useState<string>(clients[0]?.id ?? "");
+  const [dealName, setDealName] = useState<string>(
+    defaultFinanceDealName(prefill),
+  );
   const [owner, setOwner] = useState<string>(FINANCE_OWNERS[0]);
-  const [validUntil, setValidUntil] = useState("");
+  const [validUntil, setValidUntil] = useState(defaultFinanceValidUntil());
   const [notes, setNotes] = useState("");
   const [lineItems, setLineItems] = useState<FinanceLineItem[]>([
     newLineItem({ name: "Home loan packaging", unitPrice: 2200, taxRate: 10 }),
   ]);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const client =
-    FINANCE_CLIENTS.find((c) => c.id === clientId) ?? FINANCE_CLIENTS[0];
+  const client = clients.find((c) => c.id === clientId) ?? clients[0];
 
   function validate() {
     const next: Record<string, string> = {};
@@ -62,7 +82,7 @@ export function CreateQuotationForm({ layoutId: _l, redirect: _r }: Props) {
   }
 
   function onSave(createAnother: boolean) {
-    if (!validate()) return;
+    if (!validate() || !client) return;
     const ids = nextQuotationIds();
     const created = upsertQuotation(
       appendQuotationAudit(
@@ -75,7 +95,8 @@ export function CreateQuotationForm({ layoutId: _l, redirect: _r }: Props) {
           clientName: client.name,
           contactName: client.contact,
           contactEmail: client.email,
-          dealName,
+          dealName: dealName || undefined,
+          relatedTo,
           owner,
           validUntil: validUntil.trim(),
           notes: notes.trim() || undefined,
@@ -116,6 +137,17 @@ export function CreateQuotationForm({ layoutId: _l, redirect: _r }: Props) {
       saveLabel="Save quotation"
       onSave={onSave}
     >
+      {relatedTo ? (
+        <Field label="Related to" className="sm:col-span-2">
+          <InputShell icon={Building2}>
+            <input
+              readOnly
+              className={elevatedInputClass(true)}
+              value={relatedTo}
+            />
+          </InputShell>
+        </Field>
+      ) : null}
       <Field label="Title" required error={errors.title} className="sm:col-span-2">
         <InputShell icon={FileText} error={!!errors.title}>
           <input
@@ -133,7 +165,7 @@ export function CreateQuotationForm({ layoutId: _l, redirect: _r }: Props) {
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
           >
-            {FINANCE_CLIENTS.map((c) => (
+            {clients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -163,9 +195,9 @@ export function CreateQuotationForm({ layoutId: _l, redirect: _r }: Props) {
             value={dealName}
             onChange={(e) => setDealName(e.target.value)}
           >
-            {FINANCE_DEALS.map((d) => (
-              <option key={d} value={d}>
-                {d}
+            {dealOptions.map((d) => (
+              <option key={d || "none"} value={d}>
+                {d || "None"}
               </option>
             ))}
           </select>

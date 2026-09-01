@@ -229,7 +229,7 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EntityHeader } from "@/components/finance/EntityHeader";
 import { EntityCards } from "@/components/finance/EntityCards";
@@ -237,9 +237,11 @@ import { EntityTable } from "@/components/finance/EntityTable";
 import { MetricCardConfig, TableColumn } from "@/components/finance/types";
 import {
   estimates,
+  listEstimates,
   Estimate,
   EstimateStatus,
 } from "@/lib/finance/estimates/types";
+import { onRecordsChange } from "@/lib/records-sync";
 import { EntityFilters } from "@/components/finance/EntityFilters";
 
 interface EstimateRow {
@@ -260,6 +262,12 @@ export const EstimatesPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [dateFilter, setDateFilter] = useState("30d");
   const [data, setData] = useState<Estimate[]>(estimates);
+
+  useEffect(() => {
+    const refresh = () => setData(listEstimates());
+    refresh();
+    return onRecordsChange(refresh);
+  }, []);
 
   // Filter based on search input and status dropdown
   const filteredData = data.filter((item) => {
@@ -283,7 +291,8 @@ export const EstimatesPage: React.FC = () => {
     searchValue: "",
     onSearchChange: () => {},
     actionLabel: "Create Estimate",
-    onActionClick: () => console.log("Open Create Estimate Modal"),
+    onActionClick: () =>
+      router.push("/finance/estimates/create?layoutid=standard&redirect=false"),
   };
 
   // 2. Configure Cards Data

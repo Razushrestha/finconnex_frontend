@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Search, ChevronDown, ChevronUp } from "lucide-react";
-import { CALL_STATUSES, CALL_TYPES } from "@/lib/calls/types";
+import { CALL_STAGES, CALL_TYPES } from "@/lib/calls/types";
 import { cn } from "@/lib/utils";
 import { filterEnter } from "@/lib/motion";
 
@@ -13,7 +13,7 @@ interface FilterSection {
 }
 
 const filterSections: FilterSection[] = [
-  { id: "status", title: "Status", fields: CALL_STATUSES },
+  { id: "status", title: "Status", fields: CALL_STAGES },
   { id: "type", title: "Call Type", fields: CALL_TYPES },
 ];
 

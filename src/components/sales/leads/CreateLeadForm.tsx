@@ -27,7 +27,6 @@ import {
   pipelineStageToLeadStatus,
 } from "@/lib/pipeline-sla/board";
 import {
-  logCreate,
   notifyOwnerAssigned,
   requireAction,
   requiredFieldErrors,
@@ -205,7 +204,6 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
     }
     const card = result.data;
     const label = card.name;
-    logCreate("sales.leads", form.owner, card.id, label);
     notifyOwnerAssigned({
       owner: form.owner,
       entityLabel: `Lead ${label}`,

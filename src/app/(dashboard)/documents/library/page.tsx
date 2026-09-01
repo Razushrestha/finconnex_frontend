@@ -41,6 +41,7 @@ import {
   elevatedSelectClass,
 } from "@/components/sales/CreateEntityForm";
 import { cn } from "@/lib/utils";
+import { RecordTagChip } from "@/components/shared/tags/RecordTags";
 import { BOARD_PAGE } from "@/lib/layout";
 import { softDeleteRecord } from "@/lib/rules";
 
@@ -365,12 +366,7 @@ export default function DocumentLibraryPage() {
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
                           {doc.tags.map((t) => (
-                            <span
-                              key={t}
-                              className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600"
-                            >
-                              {t}
-                            </span>
+                            <RecordTagChip key={t} tag={t} compact />
                           ))}
                         </div>
                       </td>

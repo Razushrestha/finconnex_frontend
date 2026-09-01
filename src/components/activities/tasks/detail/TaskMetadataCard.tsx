@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Clock, Flag, User } from "lucide-react";
 import type { Priority, Task, TaskStatus } from "@/lib/tasks/types";
 import { TASK_OWNERS, TASK_PRIORITIES } from "@/lib/tasks/types";
-import { formatRelatedTo } from "@/lib/activities/shared";
+import { avatarColor, formatRelatedTo } from "@/lib/activities/shared";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
 import { useTaskSectionEdit } from "./TaskEditContext";
 import { cn } from "@/lib/utils";
@@ -35,7 +35,7 @@ interface TaskMetadataCardProps {
 }
 
 function toDateInput(value: string): string {
-  const m = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const m = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (!m) return "";
   return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
 }
@@ -192,7 +192,10 @@ export function TaskMetadataCard({
           ) : (
             <div className="mt-1.5 flex items-center gap-2">
               <span
-                className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white ${task.assignee.colorClass}`}
+                className={cn(
+                  "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold",
+                  avatarColor(task.assignedTo),
+                )}
               >
                 {task.assignee.initials}
               </span>

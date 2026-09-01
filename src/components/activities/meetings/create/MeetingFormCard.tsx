@@ -1,314 +1,524 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { ChevronDown, Link2, MapPin, LocateFixed } from "lucide-react";
+import type { MeetingType } from "@/lib/meetings/types";
+import { DateTimeSection } from "@/components/booking/DateTimeSection";
+import RelatedRecordCombobox from "@/components/activities/tasks/RelatedRecordComboBox";
+import { TaskRepeatBlock } from "@/components/activities/tasks/ReminderSettingsCard";
 import {
-  Clock,
-  Calendar,
-  Video,
-  Users,
-  Link2,
-  Building,
-  Monitor,
-  Search,
-  Plus,
-} from "lucide-react";
-import { MeetingType, MEETING_TYPES, Attendee } from "@/lib/meetings/types";
+  defaultReminderRepeatRule,
+  type ReminderRepeatRule,
+} from "@/lib/tasks/repeat-reminder";
+import { formatSlotRange } from "@/lib/booking/types";
+import { liveRelatedRecords } from "@/lib/activities/related-records";
+import {
+  RELATED_ENTITY_KINDS,
+  type RelatedEntityKind,
+} from "@/lib/activities/shared";
+import { createQuickContact } from "@/lib/contacts/store";
+import {
+  availableCustomLocationKinds,
+  isOnlineLocationKind,
+  type MeetingLocationKind,
+} from "@/lib/booking/meeting-platforms";
+import { SearchablePersonSelect } from "@/components/shared/SearchablePersonSelect";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
+import { cn } from "@/lib/utils";
 
-// Sample global directory of users to search from
-const ALL_AVAILABLE_USERS: Attendee[] = [
-  { id: "u1", name: "Sarah Jenkins", email: "sarah@example.com" },
-  { id: "u2", name: "Michael Torres", email: "michael@example.com" },
-  { id: "u3", name: "Shiva Khadka", email: "shiva.khadka@example.com" },
-  { id: "u4", name: "Tejas Gokhe", email: "tejas@example.com" },
-  { id: "u5", name: "Roshna Abraham", email: "roshna@example.com" },
-];
+export type { MeetingLocationKind };
+export type MeetingLocationMode = "default" | "custom";
+
+const FALLBACK_DURATIONS = ["15 min", "30 min", "45 min", "60 min", "90 min"];
+
+const labelClass =
+  "text-[11px] font-medium uppercase tracking-wide text-gray-500";
+const inputClass =
+  "w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground/90 placeholder:text-foreground/50 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100";
+const selectClass = inputClass + " appearance-none";
 
 interface MeetingFormCardProps {
+  calendars: { id: string; title: string }[];
+  calendarId: string;
+  onCalendarChange: (id: string) => void;
+  teamMembers: string[];
+  timeSlots: string[];
+  defaultLocationLabel?: string;
   title: string;
   onTitleChange: (val: string) => void;
+  teamMember: string;
+  onTeamMemberChange: (val: string) => void;
   date: string;
   onDateChange: (val: string) => void;
   time: string;
   onTimeChange: (val: string) => void;
   duration: string;
   onDurationChange: (val: string) => void;
+  whenMode?: "default" | "custom";
+  onWhenModeChange?: (mode: "default" | "custom") => void;
   meetingType: MeetingType;
   onMeetingTypeChange: (type: MeetingType) => void;
   meetingLink: string;
   onMeetingLinkChange: (val: string) => void;
-  attendees: Attendee[];
-  onRemoveAttendee: (id: string) => void;
-  onAddAttendee: (attendee: Attendee) => void;
+  locationMode: MeetingLocationMode;
+  onLocationModeChange: (mode: MeetingLocationMode) => void;
+  locationKind: MeetingLocationKind;
+  onLocationKindChange: (kind: MeetingLocationKind) => void;
+  locationDetail: string;
+  onLocationDetailChange: (val: string) => void;
   agenda: string;
   onAgendaChange: (val: string) => void;
+  timezone?: string;
+  onTimezoneChange?: (val: string) => void;
+  relatedKind: RelatedEntityKind | "";
+  onRelatedKindChange: (kind: RelatedEntityKind | "") => void;
+  relatedName: string;
+  onRelatedNameChange: (name: string) => void;
+  recurring?: boolean;
+  onRecurringChange?: (on: boolean) => void;
+  repeatRule?: ReminderRepeatRule;
+  onRepeatRuleChange?: (rule: ReminderRepeatRule) => void;
+  compact?: boolean;
+  hideRelated?: boolean;
+  hideAgenda?: boolean;
+  titleError?: string;
+  dateTimeError?: string;
+}
+
+export function MeetingRelatedFields({
+  relatedKind,
+  onRelatedKindChange,
+  relatedName,
+  onRelatedNameChange,
+}: {
+  relatedKind: RelatedEntityKind | "";
+  onRelatedKindChange: (kind: RelatedEntityKind | "") => void;
+  relatedName: string;
+  onRelatedNameChange: (name: string) => void;
+}) {
+  const [recordTick, setRecordTick] = useState(0);
+  const relatedOptions = useMemo(
+    () =>
+      liveRelatedRecords(
+        relatedKind,
+        relatedKind && relatedName
+          ? { kind: relatedKind, name: relatedName }
+          : undefined,
+      ),
+    [relatedKind, relatedName, recordTick],
+  );
+
+  return (
+    <div className="grid grid-cols-1 gap-4">
+      <div>
+        <label className={cn(labelClass, "mb-1.5 block")}>
+          Related Entity <span className="text-red-500">*</span>
+        </label>
+        <select
+          className={selectClass}
+          value={relatedKind}
+          onChange={(e) => {
+            onRelatedKindChange(e.target.value as RelatedEntityKind | "");
+            onRelatedNameChange("");
+          }}
+        >
+          <option value="" disabled>
+            Select entity
+          </option>
+          {RELATED_ENTITY_KINDS.map((kind) => (
+            <option key={kind} value={kind}>
+              {kind}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label className={cn(labelClass, "mb-1.5 block")}>
+          Related Record <span className="text-red-500">*</span>
+        </label>
+        <RelatedRecordCombobox
+          value={relatedName}
+          onChange={onRelatedNameChange}
+          options={relatedOptions}
+          disabled={!relatedKind}
+          allowCustom={relatedKind === "Contact"}
+          createLabel={(name) => `Add contact “${name}”`}
+          onCreateOption={(name) => {
+            const created = createQuickContact(name);
+            onRelatedNameChange(created.name);
+            setRecordTick((tick) => tick + 1);
+          }}
+        />
+      </div>
+    </div>
+  );
 }
 
 export const MeetingFormCard: React.FC<MeetingFormCardProps> = ({
+  calendars,
+  calendarId,
+  onCalendarChange,
+  teamMembers,
+  timeSlots,
+  defaultLocationLabel,
   title,
   onTitleChange,
+  teamMember,
+  onTeamMemberChange,
   date,
   onDateChange,
   time,
   onTimeChange,
   duration,
   onDurationChange,
-  meetingType,
+  whenMode = "default",
+  onWhenModeChange,
   onMeetingTypeChange,
   meetingLink,
   onMeetingLinkChange,
-  attendees,
-  onRemoveAttendee,
-  onAddAttendee,
+  locationMode,
+  onLocationModeChange,
+  locationKind,
+  onLocationKindChange,
+  locationDetail,
+  onLocationDetailChange,
   agenda,
   onAgendaChange,
+  timezone,
+  onTimezoneChange,
+  relatedKind,
+  onRelatedKindChange,
+  relatedName,
+  onRelatedNameChange,
+  recurring = false,
+  onRecurringChange,
+  repeatRule = defaultReminderRepeatRule,
+  onRepeatRuleChange,
+  compact = false,
+  hideRelated = false,
+  hideAgenda = false,
+  titleError,
+  dateTimeError,
 }) => {
-  const [query, setQuery] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const locationKinds = useMemo(() => availableCustomLocationKinds(), []);
+  const [locating, setLocating] = useState(false);
+  const [geoError, setGeoError] = useState("");
 
-  // Close dropdown and reset state when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-        setQuery("");
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Automatically focus search input when opened
-  useEffect(() => {
-    if (isOpen) {
-      searchInputRef.current?.focus();
+    if (!locationKinds.includes(locationKind)) {
+      applyLocationKind(locationKinds[0] ?? "Custom");
     }
-  }, [isOpen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationKind, locationKinds]);
 
-  // Filter out already selected attendees and match search query
-  const filteredUsers = ALL_AVAILABLE_USERS.filter(
-    (user) =>
-      !attendees.some((a) => a.id === user.id) &&
-      (user.name.toLowerCase().includes(query.toLowerCase()) ||
-        user.email.toLowerCase().includes(query.toLowerCase())),
-  );
-
-  const getTypeIcon = (type: MeetingType) => {
-    switch (type) {
-      case "Video Call":
-        return <Video className="h-3.5 w-3.5" />;
-      case "Conference":
-        return <Monitor className="h-3.5 w-3.5" />;
-      case "In-person":
-        return <Building className="h-3.5 w-3.5" />;
-      default:
-        return <Clock className="h-3.5 w-3.5" />;
+  function applyLocationKind(kind: MeetingLocationKind) {
+    onLocationKindChange(kind);
+    if (kind === "Office address" || kind === "Custom") {
+      onMeetingTypeChange("In-person");
+    } else {
+      onMeetingTypeChange("Video Call");
     }
-  };
+  }
+
+  function useCurrentLocation() {
+    if (!navigator.geolocation) {
+      setGeoError("Geolocation is not supported in this browser");
+      return;
+    }
+    setLocating(true);
+    setGeoError("");
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+          );
+          if (!response.ok) throw new Error("lookup failed");
+          const data = (await response.json()) as { display_name?: string };
+          onLocationDetailChange(
+            data.display_name || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+          );
+        } catch {
+          onLocationDetailChange(
+            `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+          );
+        } finally {
+          setLocating(false);
+        }
+      },
+      () => {
+        setLocating(false);
+        setGeoError("Could not read your location. Allow access and try again.");
+      },
+    );
+  }
+
+  const showLink =
+    locationMode === "custom" && isOnlineLocationKind(locationKind);
 
   return (
-    <div className="bg-white text-card-foreground rounded-md border border-border p-4 shadow-sm space-y-5">
-      {/* Meeting Title */}
-      <div className="space-y-1.5">
-        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Meeting Title
+    <div
+      className={cn(
+        compact ? "space-y-5" : "space-y-5 rounded-xl border border-border bg-white p-6 shadow-sm",
+      )}
+    >
+      <div>
+        <label className={labelClass}>Calendar</label>
+        <select
+          value={calendarId}
+          onChange={(e) => onCalendarChange(e.target.value)}
+          className={selectClass}
+        >
+          {calendars.length === 0 ? (
+            <option value="">No active consultations</option>
+          ) : (
+            calendars.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.title}
+              </option>
+            ))
+          )}
+        </select>
+      </div>
+
+      <div>
+        <label className={labelClass}>
+          Appointment title <span className="text-red-500">*</span>
         </label>
         <input
           type="text"
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
           placeholder="e.g., Q3 Strategy Review with Acme Corp"
-          className="w-full bg-input/50 border border-border rounded-lg px-3.5 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-ring"
+          aria-required
+          aria-invalid={Boolean(titleError) || undefined}
+          className={cn(inputClass, titleError && "border-rose-400 focus:border-rose-500 focus:ring-rose-200")}
+        />
+        {titleError ? (
+          <p className="mt-1.5 text-[12px] font-medium text-rose-500">{titleError}</p>
+        ) : null}
+      </div>
+
+      <div>
+        <label className={labelClass}>Team members</label>
+        <SearchablePersonSelect
+          value={teamMember}
+          onChange={onTeamMemberChange}
+          options={["Calendar Default", ...teamMembers]}
+          placeholder="Search team member…"
         />
       </div>
 
-      {/* Date, Time, Duration Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Date
-          </label>
-          <div className="flex items-center bg-input/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground">
-            <Calendar className="h-4 w-4 text-muted-foreground mr-2 shrink-0" />
-            <input
-              type="text"
-              value={date}
-              onChange={(e) => onDateChange(e.target.value)}
-              className="bg-transparent focus:outline-none w-full"
-            />
-          </div>
-        </div>
+      {hideRelated ? null : (
+        <MeetingRelatedFields
+          relatedKind={relatedKind}
+          onRelatedKindChange={onRelatedKindChange}
+          relatedName={relatedName}
+          onRelatedNameChange={onRelatedNameChange}
+        />
+      )}
 
-        <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Time
-          </label>
-          <div className="flex items-center bg-input/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground">
-            <Clock className="h-4 w-4 text-muted-foreground mr-2 shrink-0" />
-            <input
-              type="text"
-              value={time}
-              onChange={(e) => onTimeChange(e.target.value)}
-              className="bg-transparent focus:outline-none w-full"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Duration
-          </label>
-          <input
-            type="text"
-            value={duration}
-            onChange={(e) => onDurationChange(e.target.value)}
-            className="w-full bg-input/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:outline-none"
-          />
-        </div>
-      </div>
-
-      {/* Location / Meeting Type selector */}
-      <div className="space-y-1.5">
-        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Location / Type
-        </label>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {MEETING_TYPES.map((type) => {
-            const isSelected = meetingType === type;
-            return (
-              <button
-                key={type}
-                type="button"
-                onClick={() => onMeetingTypeChange(type)}
-                className={`flex items-center justify-center space-x-2 py-2 px-3 rounded-lg border text-xs font-medium transition-all ${
-                  isSelected
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "bg-secondary text-secondary-foreground border-border hover:bg-secondary/80"
-                }`}
+      <DateTimeSection
+        timezone={timezone}
+        onTimezoneChange={onTimezoneChange}
+        whenMode={whenMode}
+        onWhenModeChange={onWhenModeChange}
+        date={date}
+        onDateChange={onDateChange}
+        slot={time}
+        onSlotChange={onTimeChange}
+        slots={timeSlots.map((slot) => ({
+          value: slot,
+          label: formatSlotRange(slot, Number.parseInt(duration, 10) || 30),
+        }))}
+        fieldsLayout={compact ? "stacked" : "row"}
+        durationMinutes={Number.parseInt(duration, 10) || 30}
+        onDurationMinutesChange={(minutes) =>
+          onDurationChange(`${minutes} min`)
+        }
+        required
+        error={dateTimeError}
+        duration={
+          <div>
+            <label className="mb-1 block text-[13px] font-medium text-slate-600">
+              Duration
+            </label>
+            <div className="relative">
+              <select
+                value={duration}
+                onChange={(e) => onDurationChange(e.target.value)}
+                className="h-10 w-full appearance-none rounded-md border border-gray-200 bg-white px-3 pr-8 text-sm text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
               >
-                {getTypeIcon(type)}
-                <span>{type}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Meeting Link */}
-      <div className="space-y-1.5">
-        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Meeting Link
-        </label>
-        <div className="flex items-center bg-input/50 border border-border rounded-lg px-3 py-2 text-sm text-foreground">
-          <Link2 className="h-4 w-4 text-muted-foreground mr-2 shrink-0" />
-          <input
-            type="text"
-            value={meetingLink}
-            onChange={(e) => onMeetingLinkChange(e.target.value)}
-            placeholder="https://zoom.us/j/..."
-            className="bg-transparent focus:outline-none w-full text-primary font-mono text-xs"
-          />
-        </div>
-      </div>
-
-      {/* Participants with Plus Button & Search Popup */}
-      <div className="space-y-1.5 relative" ref={containerRef}>
-        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Participants
-        </label>
-
-        <div className="flex flex-wrap items-center gap-2 bg-input/50 border border-border rounded-lg p-2 min-h-[44px]">
-          {/* Selected Participant Chips */}
-          {attendees.map((attendee) => (
-            <span
-              key={attendee.id}
-              className="inline-flex items-center bg-secondary text-secondary-foreground px-2.5 py-1 rounded-md text-xs font-medium border border-border space-x-1.5"
-            >
-              <Users className="h-3 w-3 text-muted-foreground" />
-              <span>{attendee.name}</span>
-              <button
-                type="button"
-                onClick={() => onRemoveAttendee(attendee.id)}
-                className="text-muted-foreground hover:text-destructive font-bold ml-1"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-
-          {/* Plus Add Button / Trigger */}
-          {!isOpen ? (
-            <button
-              type="button"
-              onClick={() => setIsOpen(true)}
-              className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg border border-dashed border-border text-xs font-medium text-muted-foreground hover:text-foreground hover:border-primary transition-colors bg-white"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              <span>Add participant</span>
-            </button>
-          ) : (
-            <div className="flex items-center flex-1 min-w-[140px] px-1 bg-input/80 rounded border border-border">
-              <Search className="h-3 w-3 text-muted-foreground mr-1.5 shrink-0" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search user..."
-                className="bg-transparent text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none w-full py-1"
-              />
+                {FALLBACK_DURATIONS.includes(duration) ? null : (
+                  <option value={duration}>{duration}</option>
+                )}
+                {FALLBACK_DURATIONS.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
             </div>
-          )}
-        </div>
-
-        {/* Dropdown Options List */}
-        {isOpen && (
-          <div className="absolute left-0 right-0 mt-1 bg-popover text-popover-foreground border border-border rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto">
-            {filteredUsers.length > 0 ? (
-              filteredUsers.map((user) => (
-                <div
-                  key={user.id}
-                  onClick={() => {
-                    onAddAttendee(user);
-                    setQuery("");
-                    setIsOpen(false);
-                  }}
-                  className="px-3 py-2.5 text-xs hover:bg-accent hover:text-accent-foreground cursor-pointer flex flex-col border-b border-border/50 last:border-none"
-                >
-                  <span className="font-semibold text-foreground">
-                    {user.name}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {user.email}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div className="px-3 py-3 text-xs text-muted-foreground text-center">
-                No matching participants found
-              </div>
-            )}
           </div>
-        )}
+        }
+      />
+
+      {onRecurringChange && onRepeatRuleChange ? (
+        <TaskRepeatBlock
+          enabled={recurring}
+          onEnabledChange={(on) => {
+            onRecurringChange(on);
+            if (!on) onRepeatRuleChange({ ...defaultReminderRepeatRule });
+          }}
+          value={repeatRule}
+          onChange={onRepeatRuleChange}
+          due={null}
+          label="Recurring meeting"
+          subtitle="Repeat this meeting on a schedule"
+          fieldDescription="How often this meeting repeats at the selected time."
+          allowAfterCompletion={false}
+          compact
+        />
+      ) : null}
+
+      <div className="space-y-4">
+        <label className={labelClass}>Location</label>
+        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+          <label className="flex items-start gap-2 text-sm text-gray-800">
+            <input
+              type="radio"
+              checked={locationMode === "default"}
+              onChange={() => onLocationModeChange("default")}
+              className="mt-0.5 h-4 w-4 accent-[#5A32A3]"
+            />
+            <span>
+              Calendar default
+              <span className="block text-[11px] text-gray-500">
+                {defaultLocationLabel || "As configured in the calendar"}
+              </span>
+            </span>
+          </label>
+          <div className="space-y-3">
+            <label className="flex items-start gap-2 text-sm text-gray-800">
+              <input
+                type="radio"
+                checked={locationMode === "custom"}
+                onChange={() => onLocationModeChange("custom")}
+                className="mt-0.5 h-4 w-4 accent-[#5A32A3]"
+              />
+              <span>
+                Custom
+                <span className="block text-[11px] text-gray-500">
+                  Set specific to this appointment
+                </span>
+              </span>
+            </label>
+            {locationMode === "custom" ? (
+              <div className="space-y-2">
+                <div className="relative">
+                  <select
+                    value={
+                      locationKinds.includes(locationKind)
+                        ? locationKind
+                        : (locationKinds[0] ?? "Office address")
+                    }
+                    onChange={(e) =>
+                      applyLocationKind(e.target.value as MeetingLocationKind)
+                    }
+                    className={selectClass + " pr-8"}
+                  >
+                    {locationKinds.map((kind) => (
+                      <option key={kind} value={kind}>
+                        {kind}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                </div>
+                {showLink ? (
+                  <div className="relative">
+                    <Link2 className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={meetingLink}
+                      onChange={(e) => onMeetingLinkChange(e.target.value)}
+                      placeholder={
+                        locationKind === "Zoom"
+                          ? "https://zoom.us/j/..."
+                          : locationKind === "Microsoft Teams"
+                            ? "https://teams.microsoft.com/..."
+                            : "https://meet.google.com/..."
+                      }
+                      className={inputClass + " pl-9 font-mono text-xs text-violet-700"}
+                    />
+                  </div>
+                ) : null}
+                {locationKind === "Office address" ? (
+                  <div className="relative">
+                    <MapPin className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={locationDetail}
+                      onChange={(e) => onLocationDetailChange(e.target.value)}
+                      placeholder="Office street, suburb, state"
+                      className={inputClass + " pl-9"}
+                    />
+                  </div>
+                ) : null}
+                {locationKind === "Custom" ? (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <MapPin className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        value={locationDetail}
+                        onChange={(e) => onLocationDetailChange(e.target.value)}
+                        placeholder="Search or enter an address"
+                        className={inputClass + " pl-9"}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={useCurrentLocation}
+                      disabled={locating}
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-700 hover:text-violet-800 disabled:opacity-60"
+                    >
+                      <LocateFixed className="h-3.5 w-3.5" />
+                      {locating ? "Finding location…" : "Use current location"}
+                    </button>
+                    {geoError ? (
+                      <p className="text-[11px] font-medium text-rose-500">
+                        {geoError}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </div>
       </div>
 
-      {/* Agenda & Notes */}
-      <div className="space-y-1.5">
-        <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          Agenda & Notes
-        </label>
-        <textarea
-          rows={4}
-          value={agenda}
-          onChange={(e) => onAgendaChange(e.target.value)}
-          placeholder="Outline the key topics to be discussed..."
-          className="w-full bg-input/50 border border-border rounded-lg p-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none resize-none"
-        />
-      </div>
+      {hideAgenda ? null : (
+        <div>
+          <label className={labelClass}>Internal note</label>
+          <div className="mt-1.5">
+            <MentionNotesTextarea
+              rows={4}
+              value={agenda}
+              onChange={onAgendaChange}
+              placeholder="Internal notes… Type @ to mention someone."
+              className={
+                compact
+                  ? "min-h-[88px] w-full resize-y rounded-lg bg-transparent px-3 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400"
+                  : "min-h-[110px] w-full resize-y rounded-lg bg-transparent px-3 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400"
+              }
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

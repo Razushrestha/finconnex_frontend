@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { MessagesFilterPanel } from "@/components/activities/messages/MessagesFilterPanel";
 import { MessagesListTable } from "@/components/activities/messages/MessagesListTable";
+import { MessagesTimelineView } from "@/components/activities/messages/MessagesTimelineView";
 import {
   ActivityToolbar,
+  TIMELINE_VIEW_TOGGLE,
   type ActivityView,
 } from "@/components/activities/ActivityToolbar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
@@ -46,6 +48,7 @@ export default function MessagesPage() {
           filterOpen={filterOpen}
           onToggleFilter={() => setFilterOpen((v) => !v)}
           onClearSort={() => setSortActive(false)}
+          extraViewIcons={[TIMELINE_VIEW_TOGGLE]}
           moreMenuItems={moreMenuItems}
           printViewItems={printViewItems}
         />
@@ -59,7 +62,11 @@ export default function MessagesPage() {
         )}
 
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl">
-          {view === "list" && <MessagesListTable />}
+          {view === "timeline" ? (
+            <MessagesTimelineView />
+          ) : (
+            <MessagesListTable />
+          )}
         </div>
       </div>
     </div>

@@ -2,16 +2,24 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, Check, CheckCircle2, Pencil, X } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Check, CheckCircle2, History, Pencil, X } from "lucide-react";
 import type { TaskStatus } from "@/lib/tasks/types";
 import { useTaskPageEditing } from "./TaskEditContext";
 
 interface TaskHeaderProps {
+  taskId?: string;
   onBack: () => void;
+  backLabel?: string;
   onUpdateStatus: (status: TaskStatus) => void;
 }
 
-export function TaskHeader({ onBack, onUpdateStatus }: TaskHeaderProps) {
+export function TaskHeader({
+  taskId,
+  onBack,
+  backLabel = "Back to Tasks",
+  onUpdateStatus,
+}: TaskHeaderProps) {
   const { editing, beginEdit, saveAll, cancelAll } = useTaskPageEditing();
   const [confirmClose, setConfirmClose] = useState(false);
 
@@ -30,7 +38,7 @@ export function TaskHeader({ onBack, onUpdateStatus }: TaskHeaderProps) {
           className="flex items-center gap-1.5 text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Tasks
+          {backLabel}
         </button>
       </div>
       <div className="flex items-center gap-3">
@@ -54,14 +62,25 @@ export function TaskHeader({ onBack, onUpdateStatus }: TaskHeaderProps) {
             </button>
           </>
         ) : (
-          <button
-            type="button"
-            onClick={beginEdit}
-            className="inline-flex items-center gap-1.5 border border-slate-200 px-3.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-violet-300 hover:text-violet-700"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-            Edit
-          </button>
+          <>
+            {taskId ? (
+              <Link
+                href={`/activities/tasks/detail/${encodeURIComponent(taskId)}/timeline`}
+                className="inline-flex items-center gap-1.5 border border-slate-200 px-3.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-violet-300 hover:text-violet-700"
+              >
+                <History className="h-3.5 w-3.5" />
+                Timeline
+              </Link>
+            ) : null}
+            <button
+              type="button"
+              onClick={beginEdit}
+              className="inline-flex items-center gap-1.5 border border-slate-200 px-3.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-violet-300 hover:text-violet-700"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Edit
+            </button>
+          </>
         )}
         <button
           type="button"

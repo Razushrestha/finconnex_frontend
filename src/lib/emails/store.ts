@@ -24,8 +24,22 @@ const store = createBoardStore({
   seed: cloneSeed,
 });
 
+function withMissingSeeds(items: Email[]): Email[] {
+  const have = new Set(items.map((email) => email.id));
+  const extras = SEED_EMAILS.filter((email) => !have.has(email.id)).map((email) => ({
+    ...email,
+    to: [...email.to],
+    cc: email.cc ? [...email.cc] : undefined,
+    bcc: email.bcc ? [...email.bcc] : undefined,
+  }));
+  return extras.length ? [...items, ...extras] : items;
+}
+
 export function listEmails(): Email[] {
-  return store.list();
+  const items = store.list();
+  const merged = withMissingSeeds(items);
+  if (merged.length !== items.length) store.save(merged);
+  return merged;
 }
 
 export function saveEmails(items: Email[]) {
@@ -82,6 +96,7 @@ export function createEmail(input: {
   status: EmailStatus;
   sentDate?: string;
   templateUsed?: string;
+  importance?: Email["importance"];
 }): Email {
   const email: Email = {
     id: newRulesId("email"),
@@ -95,6 +110,7 @@ export function createEmail(input: {
     status: input.status,
     sentDate: input.sentDate ?? formatRulesAt(new Date()),
     templateUsed: input.templateUsed,
+    importance: input.importance,
   };
   saveEmails([email, ...listEmails()]);
   emitLeadActivityChange();

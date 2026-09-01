@@ -1,6 +1,10 @@
 /** SRS §13.2 / §20.2 Quotations */
 
 import {
+  readJsonArrayStore,
+  writeJsonArrayStore,
+} from "@/lib/browser-json-store";
+import {
   type FinanceAuditEvent,
   type FinanceLineItem,
   formatFinanceAt,
@@ -34,6 +38,7 @@ export interface Quotation {
   contactName: string;
   contactEmail: string;
   dealName?: string;
+  relatedTo?: string;
   owner: string;
   validUntil: string;
   notes?: string;
@@ -185,18 +190,11 @@ export const quotations: Quotation[] = [
 ];
 
 function readStore(): Quotation[] | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = sessionStorage.getItem(STORE_KEY);
-    return raw ? (JSON.parse(raw) as Quotation[]) : null;
-  } catch {
-    return null;
-  }
+  return readJsonArrayStore<Quotation>(STORE_KEY);
 }
 
 function writeStore(list: Quotation[]) {
-  if (typeof window === "undefined") return;
-  sessionStorage.setItem(STORE_KEY, JSON.stringify(list));
+  writeJsonArrayStore(STORE_KEY, list);
 }
 
 export function listQuotations(): Quotation[] {

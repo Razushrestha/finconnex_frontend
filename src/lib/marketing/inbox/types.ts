@@ -15,6 +15,17 @@ export const INBOX_CHANNELS: InboxChannel[] = [
   "SMS",
 ];
 
+export const INBOX_CHANNEL_LABELS: Record<InboxChannel, string> = {
+  "Facebook Messenger": "Facebook/Messenger",
+  "Instagram DM": "Instagram",
+  WhatsApp: "Whatsapp",
+  SMS: "SMS",
+};
+
+export function inboxChannelLabel(channel: InboxChannel) {
+  return INBOX_CHANNEL_LABELS[channel];
+}
+
 export const INBOX_STATUSES: InboxStatus[] = ["Open", "Pending", "Resolved"];
 
 export const INBOX_AGENTS = [
@@ -23,13 +34,6 @@ export const INBOX_AGENTS = [
   "Tejas Gokhe",
   "Shiva Kadhka",
   "Roshna Abraham",
-] as const;
-
-export const QUICK_REPLIES = [
-  "Thanks: we'll get back to you shortly.",
-  "Happy to help. Can you share a bit more detail?",
-  "I've linked this to your CRM record. A broker will follow up today.",
-  "Please upload the requested docs in the portal when you can.",
 ] as const;
 
 export interface InboxAttachment {
@@ -55,6 +59,7 @@ export interface InboxMessage {
   kind?: "text" | "voice";
   voiceDurationSec?: number;
   attachments?: InboxAttachment[];
+  scheduledFor?: string;
 }
 
 export interface InboxConversation {
@@ -63,6 +68,10 @@ export interface InboxConversation {
   channel: InboxChannel;
   contactName: string;
   contactEmail?: string;
+  contactPhone?: string;
+  contactLocation?: string;
+  /** Linked CRM contact id when this chat is attached to a contact. */
+  contactId?: string;
   relatedTo?: string;
   assignedAgent: string;
   status: InboxStatus;
@@ -75,6 +84,10 @@ export interface InboxConversation {
   notes: string;
   messages: InboxMessage[];
   archived?: boolean;
+  starred?: boolean;
+  flagged?: boolean;
+  pinned?: boolean;
+  followers?: string[];
 }
 
 export interface InboxChannelConnection {
@@ -84,7 +97,7 @@ export interface InboxChannelConnection {
   via: string;
 }
 
-const STORE_KEY = "marketing:inbox:v2";
+const STORE_KEY = "marketing:inbox:v6";
 const CONNECTIONS_KEY = "marketing:inbox:connections";
 
 export const inboxChannelConnections: InboxChannelConnection[] = [
@@ -121,12 +134,17 @@ export const inboxConversations: InboxConversation[] = [
     channel: "WhatsApp",
     contactName: "William Anderson",
     contactEmail: "william@example.com",
+    contactPhone: "+61 412 880 221",
+    contactLocation: "Sydney, NSW",
     relatedTo: "Lead: William Anderson",
     assignedAgent: "John Smith",
     status: "Open",
     lastMessage: "Can we lock the rate this week?",
     unreadCount: 2,
     online: true,
+    starred: true,
+    pinned: true,
+    followers: ["Tejas Gokhe"],
     timestamp: "20/07/2026 16:42",
     tags: ["hot"],
     notes: "Pre-approval in progress. Wants rate lock before Friday.",
@@ -160,12 +178,16 @@ export const inboxConversations: InboxConversation[] = [
     channel: "Facebook Messenger",
     contactName: "Olivia Bennett",
     contactEmail: "olivia@northwind.com",
+    contactPhone: "+61 400 112 334",
+    contactLocation: "Melbourne, VIC",
     relatedTo: "Deal: Greystone Realty",
     assignedAgent: "Tejas Gokhe",
     status: "Pending",
     lastMessage: "Thanks: reviewing the proposal tonight.",
     unreadCount: 0,
     online: true,
+    starred: true,
+    followers: ["John Smith"],
     timestamp: "20/07/2026 14:10",
     tags: ["proposal"],
     notes: "",
@@ -191,6 +213,9 @@ export const inboxConversations: InboxConversation[] = [
     conversationId: "IN-9003",
     channel: "Instagram DM",
     contactName: "Chloe Ramirez",
+    contactEmail: "chloe.ramirez@email.com",
+    contactPhone: "+61 423 556 019",
+    contactLocation: "Brisbane, QLD",
     relatedTo: "Lead: Chloe Ramirez",
     assignedAgent: "Unassigned",
     status: "Open",
@@ -222,6 +247,9 @@ export const inboxConversations: InboxConversation[] = [
     conversationId: "IN-9004",
     channel: "SMS",
     contactName: "Marcus Lin",
+    contactEmail: "marcus.lin@email.com",
+    contactPhone: "+61 411 902 441",
+    contactLocation: "Sydney, NSW",
     relatedTo: "Deal: Vendor Management",
     assignedAgent: "Shiva Kadhka",
     status: "Resolved",
@@ -253,12 +281,16 @@ export const inboxConversations: InboxConversation[] = [
     conversationId: "IN-9005",
     channel: "Facebook Messenger",
     contactName: "Northwind Traders",
+    contactEmail: "hello@northwind.com",
+    contactPhone: "+61 2 8000 1200",
+    contactLocation: "Sydney, NSW",
     relatedTo: "Company: Northwind Traders",
     assignedAgent: "Roshna Abraham",
     status: "Open",
     lastMessage: "Can someone call about commercial lending?",
     unreadCount: 3,
     online: true,
+    flagged: true,
     timestamp: "20/07/2026 15:01",
     tags: ["commercial"],
     notes: "",

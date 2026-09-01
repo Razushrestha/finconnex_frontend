@@ -28,8 +28,89 @@ export interface CcRecipient {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   entityType: CrmEntityType;
   deliveryMethod: DeliveryMethod;
+}
+
+export function isEmailSmsDelivery(method?: string): boolean {
+  return method === "sms" || method === "email_sms";
+}
+
+export function requiresDirectEmailMobile(row: {
+  entityType?: CrmEntityType;
+  deliveryMethod?: string;
+}): boolean {
+  return (row.entityType || "email") === "email" && isEmailSmsDelivery(row.deliveryMethod);
+}
+
+export function mobileNumberError(row: {
+  entityType?: CrmEntityType;
+  deliveryMethod?: string;
+  phone?: string;
+}): string | null {
+  if (!requiresDirectEmailMobile(row)) return null;
+  const phone = row.phone?.trim() ?? "";
+  if (!phone) return "Mobile number is required for Email + SMS";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 8) return "Enter a valid mobile number";
+  return null;
+}
+
+export function firstRecipientMobileError(
+  signers: Array<{
+    entityType?: CrmEntityType;
+    deliveryMethod?: string;
+    phone?: string;
+  }>,
+  ccRecipients: Array<{
+    entityType?: CrmEntityType;
+    deliveryMethod?: string;
+    phone?: string;
+  }> = [],
+): string | null {
+  for (const row of [...signers, ...ccRecipients]) {
+    const error = mobileNumberError(row);
+    if (error) return error;
+  }
+  return null;
+}
+
+function MobileNumberField({
+  value,
+  error,
+  showError,
+  onChange,
+}: {
+  value: string;
+  error: string | null;
+  showError: boolean;
+  onChange: (value: string) => void;
+}) {
+  const invalid = Boolean(showError && error);
+  return (
+    <div className="w-48 space-y-1">
+      <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
+        Mobile Number <span className="text-rose-500">*</span>
+      </label>
+      <input
+        type="tel"
+        inputMode="tel"
+        autoComplete="tel"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="e.g. 0412 345 678"
+        className={`w-full bg-white rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all ${
+          invalid
+            ? "border border-rose-400 focus:ring-rose-500/20 focus:border-rose-500"
+            : "border border-gray-200 focus:ring-violet-500/20 focus:border-violet-500"
+        }`}
+      />
+      {invalid ? (
+        <p className="text-[11px] font-medium text-rose-500">{error}</p>
+      ) : null}
+    </div>
+  );
 }
 
 interface SignersSectionProps {
@@ -44,6 +125,7 @@ interface SignersSectionProps {
     type: CrmEntityType,
     query: string,
   ) => Promise<CrmEntityOption[]> | CrmEntityOption[];
+  showValidationErrors?: boolean;
 }
 
 export function RecipientsSection({
@@ -55,6 +137,7 @@ export function RecipientsSection({
   ccRecipients = [],
   setCcRecipients,
   searchCrmEntities,
+  showValidationErrors = false,
 }: SignersSectionProps) {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -491,14 +574,6 @@ export function RecipientsSection({
               Anyone can sign
             </button>
           </div>
-          <button
-            type="button"
-            onClick={handleAddSigner}
-            className="flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
-          >
-            <UserPlus className="w-4 h-4 text-gray-500" />
-            <span>Add bulk signer</span>
-          </button>
         </div>
       </div>
 
@@ -512,6 +587,15 @@ export function RecipientsSection({
           const currentEntityType = signer.entityType || "email";
           const hasSelectedCrmEntity =
             currentEntityType !== "email" && Boolean(signer.name);
+          const needsMobile = requiresDirectEmailMobile({
+            entityType: currentEntityType,
+            deliveryMethod: signer.deliveryMethod,
+          });
+          const signerMobileError = mobileNumberError({
+            entityType: currentEntityType,
+            deliveryMethod: signer.deliveryMethod,
+            phone: signer.phone,
+          });
 
           return (
             <div
@@ -522,7 +606,7 @@ export function RecipientsSection({
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, signer.id)}
               onDragEnd={handleDragEnd}
-              className={`flex items-center space-x-3 bg-slate-50/70 border rounded-xl p-3.5 transition-all relative ${
+              className={`flex flex-wrap items-start gap-x-3 gap-y-3 bg-slate-50/70 border rounded-xl p-3.5 transition-all relative ${
                 isDragOver
                   ? "border-violet-400 ring-2 ring-violet-200"
                   : "border-slate-200/80 hover:border-slate-300"
@@ -668,7 +752,11 @@ export function RecipientsSection({
                   Deliver via
                 </label>
                 <select
-                  value={signer.deliveryMethod}
+                  value={
+                    isEmailSmsDelivery(signer.deliveryMethod)
+                      ? "email_sms"
+                      : "email"
+                  }
                   onChange={(e) =>
                     handleUpdateSigner(
                       signer.id,
@@ -679,9 +767,20 @@ export function RecipientsSection({
                   className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
                 >
                   <option value="email">Email</option>
-                  <option value="sms">Email + SMS</option>
+                  <option value="email_sms">Email + SMS</option>
                 </select>
               </div>
+
+              {needsMobile && (
+                <MobileNumberField
+                  value={signer.phone ?? ""}
+                  error={signerMobileError}
+                  showError={showValidationErrors}
+                  onChange={(value) =>
+                    handleUpdateSigner(signer.id, "phone", value)
+                  }
+                />
+              )}
 
               <div className="pt-5">
                 <button
@@ -730,11 +829,20 @@ export function RecipientsSection({
               const currentCcEntityType = cc.entityType || "email";
               const hasSelectedCcCrmEntity =
                 currentCcEntityType !== "email" && Boolean(cc.name);
+              const ccNeedsMobile = requiresDirectEmailMobile({
+                entityType: currentCcEntityType,
+                deliveryMethod: cc.deliveryMethod,
+              });
+              const ccMobileError = mobileNumberError({
+                entityType: currentCcEntityType,
+                deliveryMethod: cc.deliveryMethod,
+                phone: cc.phone,
+              });
 
               return (
                 <div
                   key={cc.id}
-                  className="flex items-center space-x-3 bg-slate-50/70 border border-slate-200/80 rounded-xl p-3.5 transition-all relative"
+                  className="flex flex-wrap items-start gap-x-3 gap-y-3 bg-slate-50/70 border border-slate-200/80 rounded-xl p-3.5 transition-all relative"
                 >
                   <div className="w-32 space-y-1">
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
@@ -847,7 +955,11 @@ export function RecipientsSection({
                       Deliver via
                     </label>
                     <select
-                      value={cc.deliveryMethod}
+                      value={
+                        isEmailSmsDelivery(cc.deliveryMethod)
+                          ? "email_sms"
+                          : "email"
+                      }
                       onChange={(e) =>
                         handleUpdateCc(
                           cc.id,
@@ -858,9 +970,20 @@ export function RecipientsSection({
                       className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
                     >
                       <option value="email">Email</option>
-                      <option value="sms">Email + SMS</option>
+                      <option value="email_sms">Email + SMS</option>
                     </select>
                   </div>
+
+                  {ccNeedsMobile && (
+                    <MobileNumberField
+                      value={cc.phone ?? ""}
+                      error={ccMobileError}
+                      showError={showValidationErrors}
+                      onChange={(value) =>
+                        handleUpdateCc(cc.id, "phone", value)
+                      }
+                    />
+                  )}
 
                   <div className="pt-5">
                     <button

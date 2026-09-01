@@ -56,6 +56,7 @@ export interface DealRecord {
   probability: number;
   owner: string;
   closeDate: string;
+  tags?: string[];
   accentColorClass: string;
   avatarBgClass: string;
 }

@@ -159,14 +159,22 @@ export function ManageColumnsModal({
               className={cn(
                 "group flex items-center gap-2 rounded-md py-1.5",
                 col.pinned && "bg-blue-50/70",
+                dragIndex !== null &&
+                  working[dragIndex]?.id === col.id &&
+                  "opacity-50",
               )}
             >
-              <GripVertical
-                className={cn(
-                  "h-3.5 w-3.5 shrink-0 text-gray-300 opacity-0 transition-opacity",
-                  !col.required && "cursor-grab group-hover:opacity-100",
-                )}
-              />
+              {col.required ? (
+                <span className="flex h-6 w-6 shrink-0" aria-hidden />
+              ) : (
+                <span
+                  title="Drag to reorder"
+                  aria-label={`Drag ${col.label} to reorder`}
+                  className="flex h-6 w-6 shrink-0 cursor-grab items-center justify-center rounded text-slate-500 active:cursor-grabbing hover:bg-slate-100 hover:text-slate-700"
+                >
+                  <GripVertical className="h-4 w-4" strokeWidth={2.25} />
+                </span>
+              )}
 
               <button
                 type="button"

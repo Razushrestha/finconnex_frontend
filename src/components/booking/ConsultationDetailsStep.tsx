@@ -1,20 +1,17 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { Camera, ChevronDown, Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { ImagePlus, ChevronDown, LocateFixed, MapPin, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConsultationMode } from "@/lib/booking/types";
+import {
+  defaultOfficeAddress,
+  integratedMeetingPlatforms,
+  type OnlineMeetingPlatform,
+} from "@/lib/booking/meeting-platforms";
 
 const BRAND = "#5A32A3";
-
-const PLATFORMS = [
-  "Zoho Meeting",
-  "Google Meet",
-  "Zoom",
-  "Microsoft Teams",
-  "Phone",
-  "Custom",
-] as const;
 
 export type CalendarTypeChoice = {
   mode: ConsultationMode;
@@ -35,6 +32,8 @@ export type ConsultationDetailsValues = {
   phoneDetail: string;
   coverImageUrl?: string;
 };
+
+type OfflineKind = "office" | "custom";
 
 export function modeSubtitle(choice: CalendarTypeChoice) {
   if (choice.mode === "group") return "Class booking";
@@ -63,15 +62,30 @@ export function ConsultationDetailsStep({
   );
   const [isFree, setIsFree] = useState(initial?.isFree ?? true);
   const [price, setPrice] = useState(initial?.price ?? 0);
-  const [meetingPlace, setMeetingPlace] = useState<MeetingPlace>(
-    initial?.meetingPlace ?? (initial?.online === false ? "offline" : "online"),
-  );
-  const [platform, setPlatform] = useState<(typeof PLATFORMS)[number]>(
-    (initial?.platform as (typeof PLATFORMS)[number]) ?? "Zoho Meeting",
-  );
+  const [meetingPlace, setMeetingPlace] = useState<MeetingPlace>(() => {
+    const place =
+      initial?.meetingPlace ??
+      (initial?.online === false ? "offline" : "online");
+    return place === "phone" ? "online" : place;
+  });
+  const [connectedPlatforms, setConnectedPlatforms] = useState<
+    OnlineMeetingPlatform[]
+  >(() => integratedMeetingPlatforms());
+  const [platform, setPlatform] = useState(() => {
+    const list = integratedMeetingPlatforms();
+    const preferred = initial?.platform;
+    if (preferred && list.includes(preferred as OnlineMeetingPlatform)) {
+      return preferred;
+    }
+    return list[0] ?? "";
+  });
   const [locationDetail, setLocationDetail] = useState(
     initial?.locationDetail ?? "",
   );
+  const [offlineKind, setOfflineKind] = useState<OfflineKind>("office");
+  const [locating, setLocating] = useState(false);
+  const [geoError, setGeoError] = useState("");
+  const officeAddress = defaultOfficeAddress();
   const [phoneDetail, setPhoneDetail] = useState(initial?.phoneDetail ?? "");
   const [coverImageUrl, setCoverImageUrl] = useState(
     initial?.coverImageUrl ?? "",
@@ -83,9 +97,26 @@ export function ConsultationDetailsStep({
 
   const platforms = useMemo(() => {
     const q = platformQuery.trim().toLowerCase();
-    if (!q) return PLATFORMS;
-    return PLATFORMS.filter((p) => p.toLowerCase().includes(q));
-  }, [platformQuery]);
+    if (!q) return connectedPlatforms;
+    return connectedPlatforms.filter((item) =>
+      item.toLowerCase().includes(q),
+    );
+  }, [connectedPlatforms, platformQuery]);
+
+  useEffect(() => {
+    refreshConnectedPlatforms(initial?.platform);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function refreshConnectedPlatforms(preferred?: string) {
+    const list = integratedMeetingPlatforms();
+    setConnectedPlatforms(list);
+    setPlatform((current) => {
+      const pick = preferred || current;
+      if (list.includes(pick as OnlineMeetingPlatform)) return pick;
+      return list[0] ?? "";
+    });
+  }
 
   const heading = name.trim() || "Consultation title";
   const subtitle = modeSubtitle(choice);
@@ -112,6 +143,51 @@ export function ConsultationDetailsStep({
     reader.readAsDataURL(file);
   }
 
+  function applyOfflineKind(kind: OfflineKind) {
+    setOfflineKind(kind);
+    setGeoError("");
+    if (kind === "office") {
+      setLocationDetail(officeAddress);
+    } else if (!locationDetail || locationDetail === officeAddress) {
+      setLocationDetail("");
+    }
+  }
+
+  function useCurrentLocation() {
+    if (!navigator.geolocation) {
+      setGeoError("Geolocation is not supported in this browser");
+      return;
+    }
+    setLocating(true);
+    setGeoError("");
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+          );
+          if (!response.ok) throw new Error("lookup failed");
+          const data = (await response.json()) as { display_name?: string };
+          setLocationDetail(
+            data.display_name ||
+              `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+          );
+        } catch {
+          setLocationDetail(
+            `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`,
+          );
+        } finally {
+          setLocating(false);
+        }
+      },
+      () => {
+        setLocating(false);
+        setGeoError("Could not read your location. Allow access and try again.");
+      },
+    );
+  }
+
   function submit() {
     if (!name.trim()) {
       setError("Consultation name is required");
@@ -126,9 +202,27 @@ export function ConsultationDetailsStep({
       setError("Enter a price for paid consultations");
       return;
     }
-    if (meetingPlace === "phone" && !phoneDetail.trim()) {
-      setError("Enter a phone number");
+    if (meetingPlace === "online" && connectedPlatforms.length === 0) {
+      setError(
+        "You don’t have a meeting integration yet. Connect Zoom, Google Meet, or Microsoft Teams in Settings.",
+      );
       return;
+    }
+    if (meetingPlace === "online" && !platform) {
+      setError("Choose a connected meeting platform");
+      return;
+    }
+    if (meetingPlace === "offline") {
+      const address =
+        offlineKind === "office" ? officeAddress : locationDetail.trim();
+      if (!address) {
+        setError(
+          offlineKind === "custom"
+            ? "Enter a custom address or use your current location"
+            : "Default office address is missing",
+        );
+        return;
+      }
     }
     onNext({
       name: name.trim(),
@@ -138,7 +232,10 @@ export function ConsultationDetailsStep({
       online: meetingPlace === "online",
       meetingPlace,
       platform,
-      locationDetail: locationDetail.trim(),
+      locationDetail:
+        meetingPlace === "offline" && offlineKind === "office"
+          ? officeAddress
+          : locationDetail.trim(),
       phoneDetail: phoneDetail.trim(),
       coverImageUrl: coverImageUrl || undefined,
     });
@@ -157,23 +254,29 @@ export function ConsultationDetailsStep({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-white transition hover:brightness-110"
+          className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg text-white transition hover:brightness-110"
           style={{ backgroundColor: BRAND }}
           title={
             coverImageUrl
-              ? "Change consultation image"
-              : "Upload consultation image"
+              ? "Change consultation logo"
+              : "Upload consultation logo"
           }
           aria-label={
             coverImageUrl
-              ? "Change consultation image"
-              : "Upload consultation image"
+              ? "Change consultation logo"
+              : "Upload consultation logo"
           }
         >
-          <Camera className="h-5 w-5" strokeWidth={2} />
           {coverImageUrl ? (
-            <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
-          ) : null}
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={coverImageUrl}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <ImagePlus className="h-5 w-5" strokeWidth={2} />
+          )}
         </button>
         <div className="min-w-0">
           <p className="truncate text-[15px] font-bold text-slate-800">
@@ -276,7 +379,10 @@ export function ConsultationDetailsStep({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsFree(false)}
+                  onClick={() => {
+                    setIsFree(false);
+                    setPrice((current) => Math.max(0, current));
+                  }}
                   className={cn(
                     "h-11 min-w-[88px] border-l border-[#E5E7EB] px-5 text-[13px] font-semibold",
                     !isFree
@@ -294,9 +400,23 @@ export function ConsultationDetailsStep({
                 <input
                   type="number"
                   min={0}
+                  step="1"
+                  inputMode="decimal"
                   value={price}
                   disabled={isFree}
-                  onChange={(e) => setPrice(Number(e.target.value) || 0)}
+                  onKeyDown={(e) => {
+                    if (e.key === "-" || e.key === "e" || e.key === "E" || e.key === "+") {
+                      e.preventDefault();
+                    }
+                  }}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    if (!Number.isFinite(next) || next < 0) {
+                      setPrice(0);
+                      return;
+                    }
+                    setPrice(next);
+                  }}
                   className="h-11 w-full rounded-lg border border-[#E5E7EB] bg-white pr-3 pl-7 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/45 disabled:bg-slate-50 disabled:text-slate-400"
                 />
               </div>
@@ -313,7 +433,6 @@ export function ConsultationDetailsStep({
                   [
                     ["online", "Online"],
                     ["offline", "Offline"],
-                    ["phone", "Phone"],
                   ] as const
                 ).map(([value, label], i) => (
                   <button
@@ -322,6 +441,10 @@ export function ConsultationDetailsStep({
                     onClick={() => {
                       setMeetingPlace(value);
                       setPlatformOpen(false);
+                      if (value === "online") refreshConnectedPlatforms();
+                      if (value === "offline" && offlineKind === "office") {
+                        setLocationDetail(officeAddress);
+                      }
                       if (error) setError("");
                     }}
                     className={cn(
@@ -338,85 +461,135 @@ export function ConsultationDetailsStep({
               </div>
 
               {meetingPlace === "online" ? (
-                <div className="relative min-w-0 flex-1">
-                  <button
-                    type="button"
-                    onClick={() => setPlatformOpen((v) => !v)}
-                    className="flex h-11 w-full items-center justify-between rounded-lg border border-[#E5E7EB] bg-white px-3 text-left text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+                connectedPlatforms.length === 0 ? (
+                  <div className="min-w-0 flex-1 rounded-lg border border-dashed border-[#E5E7EB] bg-slate-50 px-3 py-2.5">
+                    <p className="text-[13px] text-slate-600">
+                      You don’t have a meeting integration yet. You’ll need to
+                      connect Zoom, Google Meet, or Microsoft Teams to use
+                      online meetings.
+                    </p>
+                    <Link
+                      href="/settings/integrations"
+                      className="mt-1 inline-block text-[12px] font-semibold text-[#5A32A3] hover:underline"
+                    >
+                      Go to Settings → Integrations
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="relative min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        refreshConnectedPlatforms();
+                        setPlatformOpen((open) => !open);
+                      }}
+                      className="flex h-11 w-full items-center justify-between rounded-lg border border-[#E5E7EB] bg-white px-3 text-left text-[13px] font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      <span>{platform || "Choose a platform"}</span>
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 text-slate-400 transition-transform",
+                          platformOpen && "rotate-180",
+                        )}
+                      />
+                    </button>
+                    {platformOpen ? (
+                      <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-[#E5E7EB] bg-white shadow-lg">
+                        <div className="relative border-b border-slate-100">
+                          <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                          <input
+                            autoFocus
+                            value={platformQuery}
+                            onChange={(e) => setPlatformQuery(e.target.value)}
+                            placeholder="Search"
+                            className="h-10 w-full pr-3 pl-9 text-[13px] outline-none"
+                          />
+                        </div>
+                        <ul className="max-h-48 overflow-auto py-1">
+                          {platforms.map((item) => (
+                            <li key={item}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPlatform(item);
+                                  setPlatformOpen(false);
+                                  setPlatformQuery("");
+                                }}
+                                className={cn(
+                                  "flex w-full px-3 py-2 text-left text-[13px]",
+                                  item === platform
+                                    ? "bg-[#F3ECFB] font-semibold text-[#5A32A3]"
+                                    : "text-slate-700 hover:bg-slate-50",
+                                )}
+                              >
+                                {item}
+                              </button>
+                            </li>
+                          ))}
+                          {platforms.length === 0 ? (
+                            <li className="px-3 py-3 text-[12px] text-slate-400">
+                              No connected platforms match your search
+                            </li>
+                          ) : null}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                )
+              ) : (
+                <div className="min-w-0 flex-1 space-y-2">
+                  <select
+                    value={offlineKind}
+                    onChange={(e) =>
+                      applyOfflineKind(e.target.value as OfflineKind)
+                    }
+                    className="h-11 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] font-medium text-slate-700 outline-none focus:border-[#5A32A3]/45"
                   >
-                    <span>{platform}</span>
-                    <ChevronDown
-                      className={cn(
-                        "h-4 w-4 text-slate-400 transition-transform",
-                        platformOpen && "rotate-180",
-                      )}
-                    />
-                  </button>
-                  {platformOpen ? (
-                    <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-[#E5E7EB] bg-white shadow-lg">
-                      <div className="relative border-b border-slate-100">
-                        <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                    <option value="office">Office address</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                  {offlineKind === "office" ? (
+                    <div className="relative">
+                      <MapPin className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <input
+                        readOnly
+                        value={officeAddress}
+                        className="h-11 w-full rounded-lg border border-[#E5E7EB] bg-slate-50 pr-3 pl-9 text-[13px] text-slate-600"
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <MapPin className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <input
-                          autoFocus
-                          value={platformQuery}
-                          onChange={(e) => setPlatformQuery(e.target.value)}
-                          placeholder="Search"
-                          className="h-10 w-full pr-3 pl-9 text-[13px] outline-none"
+                          value={locationDetail}
+                          onChange={(e) => {
+                            setLocationDetail(e.target.value);
+                            if (error) setError("");
+                          }}
+                          placeholder="Search or enter an address"
+                          className="h-11 w-full rounded-lg border border-[#E5E7EB] bg-white pr-3 pl-9 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/45"
                         />
                       </div>
-                      <ul className="max-h-48 overflow-auto py-1">
-                        {platforms.map((p) => (
-                          <li key={p}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setPlatform(p);
-                                setPlatformOpen(false);
-                                setPlatformQuery("");
-                              }}
-                              className={cn(
-                                "flex w-full px-3 py-2 text-left text-[13px]",
-                                p === platform
-                                  ? "bg-[#F3ECFB] font-semibold text-[#5A32A3]"
-                                  : "text-slate-700 hover:bg-slate-50",
-                              )}
-                            >
-                              {p}
-                            </button>
-                          </li>
-                        ))}
-                        {platforms.length === 0 ? (
-                          <li className="px-3 py-3 text-[12px] text-slate-400">
-                            No platforms
-                          </li>
-                        ) : null}
-                      </ul>
+                      <button
+                        type="button"
+                        onClick={useCurrentLocation}
+                        disabled={locating}
+                        className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#5A32A3] hover:underline disabled:opacity-60"
+                      >
+                        <LocateFixed className="h-3.5 w-3.5" />
+                        {locating
+                          ? "Finding location…"
+                          : "Use current location"}
+                      </button>
+                      {geoError ? (
+                        <p className="text-[12px] font-medium text-rose-600">
+                          {geoError}
+                        </p>
+                      ) : null}
                     </div>
-                  ) : null}
-                </div>
-              ) : meetingPlace === "offline" ? (
-                <input
-                  value={locationDetail}
-                  onChange={(e) => setLocationDetail(e.target.value)}
-                  placeholder="Office address or room"
-                  className="h-11 min-w-0 flex-1 rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/45"
-                />
-              ) : (
-                <input
-                  type="tel"
-                  value={phoneDetail}
-                  onChange={(e) => {
-                    setPhoneDetail(e.target.value);
-                    if (error) setError("");
-                  }}
-                  placeholder="Phone number"
-                  className={cn(
-                    "h-11 min-w-0 flex-1 rounded-lg border bg-white px-3 text-[13px] text-slate-700 outline-none",
-                    error && !phoneDetail.trim()
-                      ? "border-rose-300"
-                      : "border-[#E5E7EB] focus:border-[#5A32A3]/45",
                   )}
-                />
+                </div>
               )}
             </div>
           </div>

@@ -3,19 +3,20 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Phone, X } from "lucide-react";
-import {
-  CALL_OWNERS,
-  CALL_TYPES,
-  type CallType,
-} from "@/lib/calls/types";
+import { CALL_OWNERS, CALL_PURPOSES } from "@/lib/calls/types";
 import { createCall } from "@/lib/calls/store";
+import { getRulesActor } from "@/lib/rules/actor";
 import {
   RELATED_ENTITY_KINDS,
-  RELATED_RECORD_OPTIONS,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
+import { liveRelatedRecords } from "@/lib/activities/related-records";
 import RelatedRecordCombobox from "@/components/activities/tasks/RelatedRecordComboBox";
 import { ScheduleCallForm } from "@/components/activities/calls/ScheduleCallForm";
+import {
+  assignedCallerIds,
+  defaultCallerId,
+} from "@/lib/softphone/assigned-numbers";
 
 interface CreateCallFormProps {
   layoutId: string;
@@ -33,7 +34,6 @@ interface FormState {
   relatedKind: RelatedEntityKind | "";
   relatedName: string;
   fromNumber: string;
-  callType: CallType | "";
   startTime: string;
   duration: string;
   assignedTo: string;
@@ -42,9 +42,14 @@ interface FormState {
   purpose: string;
 }
 
-const CALL_FOR_OPTIONS = RELATED_RECORD_OPTIONS.filter(
-  (r) => r.kind === "Lead" || r.kind === "Contact",
-);
+function contactOptions(extraName?: string) {
+  return liveRelatedRecords(
+    "Contact",
+    extraName?.trim()
+      ? { kind: "Contact", name: extraName.trim() }
+      : undefined,
+  ).map((record) => ({ kind: "Contact" as const, name: record.name }));
+}
 
 const inputClass =
   "w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground/90 placeholder:text-foreground/50 focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100";
@@ -56,8 +61,7 @@ const initialState: FormState = {
   callFor: "",
   relatedKind: "",
   relatedName: "",
-  fromNumber: "",
-  callType: "Outbound",
+  fromNumber: defaultCallerId("John Smith"),
   startTime: "",
   duration: "",
   assignedTo: "John Smith",
@@ -95,27 +99,16 @@ function LogCallForm({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  const relatedOptions = (() => {
-    const base = form.relatedKind
-      ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === form.relatedKind)
-      : RELATED_RECORD_OPTIONS;
-    if (
-      form.relatedKind &&
-      form.relatedName &&
-      !base.some((r) => r.name === form.relatedName)
-    ) {
-      return [
-        ...base,
-        { kind: form.relatedKind as RelatedEntityKind, name: form.relatedName },
-      ];
-    }
-    return base;
-  })();
+  const relatedOptions = liveRelatedRecords(
+    form.relatedKind,
+    form.relatedKind && form.relatedName
+      ? { kind: form.relatedKind as RelatedEntityKind, name: form.relatedName }
+      : undefined,
+  );
 
   function validate() {
     const next: Partial<Record<keyof FormState, string>> = {};
-    if (!form.callFor.trim()) next.callFor = "Call for is required";
-    if (!form.callType) next.callType = "Call type is required";
+    if (!form.callFor.trim()) next.callFor = "Contact is required";
     if (!form.startTime) next.startTime = "Call start time is required";
     if (!form.assignedTo.trim()) next.assignedTo = "Call owner is required";
     if (!form.subject.trim()) next.subject = "Subject is required";
@@ -136,11 +129,12 @@ function LogCallForm({
       contact: form.callFor.trim() || undefined,
       callFor: form.callFor.trim() || undefined,
       fromNumber: form.fromNumber.trim() || undefined,
-      callType: form.callType as CallType,
+      callType: "Outbound",
       status: isLog ? "Completed" : "Scheduled",
       date: form.startTime,
       duration: isLog ? form.duration.trim() || undefined : undefined,
       assignedTo: form.assignedTo.trim(),
+      calledBy: getRulesActor().name || form.assignedTo.trim(),
       agenda: form.agenda.trim() || undefined,
       purpose: form.purpose.trim() || undefined,
       notes: [form.agenda.trim(), form.purpose.trim()]
@@ -186,13 +180,13 @@ function LogCallForm({
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className={labelClass}>
-                Call For <span className="text-red-500">*</span>
+                Call To <span className="text-red-500">*</span>
               </label>
               <RelatedRecordCombobox
                 value={form.callFor}
                 onChange={(v) => update("callFor", v)}
-                options={CALL_FOR_OPTIONS}
-                placeholder="Select lead or contact…"
+                options={contactOptions(form.callFor)}
+                placeholder="Select contact…"
               />
               {submitted && errors.callFor ? (
                 <p className="mt-1 text-xs text-red-500">{errors.callFor}</p>
@@ -232,38 +226,25 @@ function LogCallForm({
 
             <div>
               <label className={labelClass}>From Number</label>
-              <input
-                type="tel"
-                className={inputClass}
-                value={form.fromNumber}
-                onChange={(e) => update("fromNumber", e.target.value)}
-                placeholder="e.g. +1 415 555 0198"
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                Call Type <span className="text-red-500">*</span>
-              </label>
-              <select
-                className={
-                  selectClass +
-                  (submitted && errors.callType ? " border-red-300" : "")
-                }
-                value={form.callType}
-                onChange={(e) =>
-                  update("callType", e.target.value as CallType)
-                }
-              >
-                {CALL_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-              {submitted && errors.callType ? (
-                <p className="mt-1 text-xs text-red-500">{errors.callType}</p>
-              ) : null}
+              {assignedCallerIds(form.assignedTo).length > 1 ? (
+                <select
+                  className={selectClass}
+                  value={form.fromNumber}
+                  onChange={(e) => update("fromNumber", e.target.value)}
+                >
+                  {assignedCallerIds(form.assignedTo).map((number) => (
+                    <option key={number} value={number}>
+                      {number}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  readOnly
+                  className={inputClass}
+                  value={form.fromNumber || "No number assigned"}
+                />
+              )}
             </div>
 
             <div>
@@ -307,7 +288,17 @@ function LogCallForm({
                   (submitted && errors.assignedTo ? " border-red-300" : "")
                 }
                 value={form.assignedTo}
-                onChange={(e) => update("assignedTo", e.target.value)}
+                onChange={(e) => {
+                  const owner = e.target.value;
+                  const numbers = assignedCallerIds(owner);
+                  setForm((prev) => ({
+                    ...prev,
+                    assignedTo: owner,
+                    fromNumber: numbers.includes(prev.fromNumber)
+                      ? prev.fromNumber
+                      : (numbers[0] ?? ""),
+                  }));
+                }}
               >
                 {CALL_OWNERS.map((o) => (
                   <option key={o} value={o}>
@@ -360,18 +351,19 @@ function LogCallForm({
               />
             </div>
             <div className="sm:col-span-2">
-              <label className={labelClass}>Purpose</label>
-              <textarea
-                rows={3}
-                className={inputClass + " resize-none"}
+              <label className={labelClass}>Purpose of outgoing call</label>
+              <select
+                className={selectClass}
                 value={form.purpose}
                 onChange={(e) => update("purpose", e.target.value)}
-                placeholder={
-                  isLog
-                    ? "Outcome, objections, or follow-up needed"
-                    : "Why are you making this call?"
-                }
-              />
+              >
+                <option value="">Select purpose</option>
+                {CALL_PURPOSES.map((purpose) => (
+                  <option key={purpose} value={purpose}>
+                    {purpose}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>

@@ -131,6 +131,22 @@
   }
 }
 
+/* Every native dropdown shows a chevron. Skip .fc-select-caret (already has an overlay arrow). */
+select:not([multiple]):not([size]):not(.fc-select-caret) {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.7rem center !important;
+  background-size: 0.85rem 0.85rem !important;
+  padding-right: 2rem !important;
+}
+
+.dark select:not([multiple]):not([size]):not(.fc-select-caret) {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+}
+
 /* Workqueue deep-link highlight (?focus=id) */
 @keyframes focus-record-pulse {
   0%,
@@ -229,4 +245,154 @@
   display: none !important;
   width: 0 !important;
   height: 0 !important;
+}
+
+.fc-rich-editor ul,
+.fc-rich-editor ol {
+  list-style-position: outside;
+  padding-left: 1.75rem;
+  margin: 0.25rem 0;
+}
+
+.fc-rich-editor li {
+  display: list-item !important;
+}
+
+.fc-rich-editor ul:not([data-list-style]),
+.fc-rich-editor ul[data-list-style="disc"] {
+  list-style-type: disc !important;
+}
+
+.fc-rich-editor ul[data-list-style="circle"] {
+  list-style-type: circle !important;
+}
+
+.fc-rich-editor ul[data-list-style="square"] {
+  list-style-type: square !important;
+}
+
+.fc-rich-editor ul[data-list-style="dash"] {
+  list-style-type: "–  " !important;
+}
+
+.fc-rich-editor ul[data-list-style="dash"] > li::marker {
+  content: "–  ";
+}
+
+.fc-rich-editor ul[data-list-style="arrow-hollow"] {
+  list-style-type: "▹  " !important;
+}
+
+.fc-rich-editor ul[data-list-style="arrow-hollow"] > li::marker {
+  content: "▹  ";
+}
+
+.fc-rich-editor ul[data-list-style="arrow-solid"] {
+  list-style-type: "▸  " !important;
+}
+
+.fc-rich-editor ul[data-list-style="arrow-solid"] > li::marker {
+  content: "▸  ";
+}
+
+.fc-rich-editor ol:not([data-list-style]),
+.fc-rich-editor ol[data-list-style="decimal-dot"] {
+  list-style-type: decimal !important;
+}
+
+.fc-rich-editor ol[data-list-style="lower-alpha-dot"] {
+  list-style-type: lower-alpha !important;
+}
+
+.fc-rich-editor ol[data-list-style="upper-alpha-dot"] {
+  list-style-type: upper-alpha !important;
+}
+
+.fc-rich-editor ol[data-list-style="lower-roman-dot"] {
+  list-style-type: lower-roman !important;
+}
+
+.fc-rich-editor ol[data-list-style="upper-roman-dot"] {
+  list-style-type: upper-roman !important;
+}
+
+.fc-rich-editor ol[data-list-style$="-paren"],
+.fc-rich-editor ol[data-list-style$="-bracket"] {
+  list-style-type: none !important;
+}
+
+.fc-rich-editor ol[data-list-style$="-paren"] > li,
+.fc-rich-editor ol[data-list-style$="-bracket"] > li {
+  list-style-type: none !important;
+}
+
+.fc-rich-editor ol[data-list-style="decimal-paren"] > li::marker {
+  content: counter(list-item) ")\a0";
+}
+
+.fc-rich-editor ol[data-list-style="decimal-bracket"] > li::marker {
+  content: "(" counter(list-item) ")\a0";
+}
+
+.fc-rich-editor ol[data-list-style="lower-alpha-paren"] > li::marker {
+  content: counter(list-item, lower-alpha) ")\a0";
+}
+
+.fc-rich-editor ol[data-list-style="lower-alpha-bracket"] > li::marker {
+  content: "(" counter(list-item, lower-alpha) ")\a0";
+}
+
+.fc-rich-editor ol[data-list-style="upper-alpha-paren"] > li::marker {
+  content: counter(list-item, upper-alpha) ")\a0";
+}
+
+.fc-rich-editor ol[data-list-style="upper-alpha-bracket"] > li::marker {
+  content: "(" counter(list-item, upper-alpha) ")\a0";
+}
+
+.fc-rich-editor ol[data-list-style="lower-roman-paren"] > li::marker {
+  content: counter(list-item, lower-roman) ")\a0";
+}
+
+.fc-rich-editor ol[data-list-style="lower-roman-bracket"] > li::marker {
+  content: "(" counter(list-item, lower-roman) ")\a0";
+}
+
+.fc-rich-editor ol[data-list-style="upper-roman-paren"] > li::marker {
+  content: counter(list-item, upper-roman) ")\a0";
+}
+
+.fc-rich-editor ol[data-list-style="upper-roman-bracket"] > li::marker {
+  content: "(" counter(list-item, upper-roman) ")\a0";
+}
+
+.fc-rich-editor table {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 100%;
+  margin: 0.5rem 0;
+  table-layout: fixed;
+}
+
+.fc-rich-editor td,
+.fc-rich-editor th {
+  border: 1px solid #cbd5e1;
+  padding: 6px 8px;
+  min-width: 36px;
+  vertical-align: top;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.fc-rich-editor blockquote {
+  margin: 0.5rem 0;
+  border-left: 3px solid #cbd5e1;
+  padding-left: 0.75rem;
+  color: #475569;
+}
+
+.fc-rich-editor hr {
+  margin: 0.75rem 0;
+  border: none;
+  border-top: 1px solid #cbd5e1;
 }

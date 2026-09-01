@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarDays,
@@ -45,6 +45,11 @@ import {
   type CalendarTypeChoice,
   type ConsultationDetailsValues,
 } from "@/components/booking/ConsultationDetailsStep";
+import {
+  ConsultationWizardLayout,
+  consultationSetupIndex,
+  type ConsultationSetupStepId,
+} from "@/components/booking/ConsultationWizardLayout";
 import { ShareConsultationModal } from "@/components/booking/ShareConsultationModal";
 import { getRulesActor } from "@/lib/rules/actor";
 import { cn } from "@/lib/utils";
@@ -128,6 +133,47 @@ export function ConsultationsBoard() {
     null,
   );
   const [settingsStep, setSettingsStep] = useState(false);
+  const [wizardFurthest, setWizardFurthest] = useState(0);
+
+  function currentSetupStep(): ConsultationSetupStepId {
+    if (settingsStep) return "settings";
+    if (notifyStep) return "notify";
+    if (formStep) return "form";
+    if (rulesStep) return "rules";
+    if (assignStep) return "consultants";
+    return "details";
+  }
+
+  function goToSetupStep(id: ConsultationSetupStepId, force = false) {
+    const index = consultationSetupIndex(id);
+    if (index < 0) return;
+    if (!force && index > wizardFurthest) return;
+    setAssignStep(index >= 1);
+    setRulesStep(index >= 2);
+    setFormStep(index >= 3);
+    setNotifyStep(index >= 4);
+    setSettingsStep(index >= 5);
+  }
+
+  function reachSetupStep(id: ConsultationSetupStepId) {
+    const index = consultationSetupIndex(id);
+    setWizardFurthest((current) => Math.max(current, index));
+    goToSetupStep(id, true);
+  }
+
+  function wrapSetup(node: ReactNode) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <ConsultationWizardLayout
+          current={currentSetupStep()}
+          furthest={wizardFurthest}
+          onSelect={goToSetupStep}
+        >
+          {node}
+        </ConsultationWizardLayout>
+      </div>
+    );
+  }
 
   function resetWizard() {
     setSettingsStep(false);
@@ -142,6 +188,7 @@ export function ConsultationsBoard() {
     setNotifyValues(null);
     setDetailsValues(null);
     setDetailsChoice(null);
+    setWizardFurthest(0);
   }
 
   function finishConsultation(form: BookingFormValues | null) {
@@ -237,71 +284,71 @@ export function ConsultationsBoard() {
   }, [pages, query, sectionFilter]);
 
   if (detailsChoice && settingsStep && detailsValues) {
-    return (
+    return wrapSetup(
       <BookingAdditionalSettingsStep
-        onBack={() => setSettingsStep(false)}
+        onBack={() => goToSetupStep("notify")}
         onFinish={() => finishConsultation(formValues)}
-      />
+      />,
     );
   }
 
   if (detailsChoice && notifyStep && detailsValues) {
-    return (
+    return wrapSetup(
       <BookingNotificationsStep
         initial={notifyValues ?? undefined}
-        onBack={() => setNotifyStep(false)}
+        onBack={() => goToSetupStep("form")}
         onNext={(rows) => {
           setNotifyValues(rows);
-          setSettingsStep(true);
+          reachSetupStep("settings");
         }}
-      />
+      />,
     );
   }
 
   if (detailsChoice && formStep && detailsValues) {
-    return (
+    return wrapSetup(
       <BookingFormStep
         initial={formValues ?? undefined}
-        onBack={() => setFormStep(false)}
+        onBack={() => goToSetupStep("rules")}
         onNext={(values) => {
           setFormValues(values);
-          setNotifyStep(true);
+          reachSetupStep("notify");
         }}
-      />
+      />,
     );
   }
 
   if (detailsChoice && rulesStep && detailsValues) {
-    return (
+    return wrapSetup(
       <BookingRulesStep
         durationMinutes={detailsValues.durationMinutes}
         initial={rulesValues}
-        onBack={() => setRulesStep(false)}
+        onBack={() => goToSetupStep("consultants")}
         onSave={(rules) => {
           setRulesValues(rules);
-          setFormStep(true);
+          reachSetupStep("form");
         }}
-      />
+      />,
     );
   }
 
   if (detailsChoice && assignStep && detailsValues) {
-    return (
+    return wrapSetup(
       <AssignConsultantsStep
         choice={detailsChoice}
         consultationName={detailsValues.name}
-        onBack={() => setAssignStep(false)}
+        onBack={() => goToSetupStep("details")}
         onCreate={(consultants, priorities) => {
           setAssignedConsultants(consultants);
           setAssignedPriorities(priorities);
-          setRulesStep(true);
+          reachSetupStep("rules");
         }}
-      />
+      />,
     );
   }
 
   if (detailsChoice) {
-    return (
+    return wrapSetup(
       <ConsultationDetailsStep
         choice={detailsChoice}
         initial={detailsValues ?? undefined}
@@ -309,17 +356,18 @@ export function ConsultationsBoard() {
           setDetailsChoice(null);
           setDetailsValues(null);
           setChooseType(true);
+          setWizardFurthest(0);
         }}
         onNext={(values) => {
           setDetailsValues(values);
-          setAssignStep(true);
+          reachSetupStep("consultants");
         }}
-      />
+      />,
     );
   }
 
   return (
-    <div className="min-w-0">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
       <div className="mb-5 flex flex-wrap items-center justify-end gap-2 sm:mb-6">
         <label className="relative min-w-0 w-full sm:w-72 lg:w-80">
           <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -456,6 +504,12 @@ export function ConsultationsBoard() {
           onClose={() => setChooseType(false)}
           onSelect={(choice) => {
             setChooseType(false);
+            setAssignStep(false);
+            setRulesStep(false);
+            setFormStep(false);
+            setNotifyStep(false);
+            setSettingsStep(false);
+            setWizardFurthest(0);
             setDetailsChoice(choice);
           }}
         />

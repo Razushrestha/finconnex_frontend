@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RELATED_RECORD_OPTIONS } from "@/lib/activities/shared";
 import { listContactGroups } from "@/lib/contacts/store";
 import { cn } from "@/lib/utils";
@@ -96,12 +96,16 @@ export function RequestApplicantsSection({
   error?: string;
 }) {
   const [count, setCount] = useState<1 | 2>(
-    applicants.length === 2 ? 2 : 1,
+    applicants.length >= 2 ? 2 : 1,
   );
   const [activeId, setActiveId] = useState<string | null>(null);
   const [results, setResults] = useState<CrmOption[]>([]);
   const [addingForId, setAddingForId] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    setCount(applicants.length >= 2 ? 2 : 1);
+  }, [applicants.length]);
 
   const allOptions = useMemo(() => {
     const merged = [...relatedOptions(), ...storedContactOptions()];

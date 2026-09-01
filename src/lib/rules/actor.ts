@@ -21,6 +21,7 @@ const FALLBACK_ACTOR: RulesActor = {
 export function setRulesActor(actor: RulesActor) {
   writeJsonStore(ACTOR_KEY, {
     name: actor.name,
+    email: actor.email,
     role: actor.role,
     id: actor.id,
   });

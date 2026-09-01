@@ -684,6 +684,7 @@ import {
   computeOverallStatus,
   SignatureRequest,
 } from "@/lib/documents/signature/types";
+import { onRecordsChange } from "@/lib/records-sync";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -805,7 +806,9 @@ export default function DocumentsList() {
   });
 
   useEffect(() => {
-    setItems(listSignatureRequests());
+    const refresh = () => setItems(listSignatureRequests());
+    refresh();
+    return onRecordsChange(refresh);
   }, [setItems]);
 
   async function handleConfirmDelete() {

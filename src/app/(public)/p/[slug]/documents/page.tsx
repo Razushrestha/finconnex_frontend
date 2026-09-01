@@ -1,6 +1,5 @@
 import { PortalShell } from "@/components/portals/public/PortalShell";
-import { PortalModuleGuard } from "@/components/portals/public/PortalModuleGuard";
-import { PortalDocumentsPane } from "@/components/portals/public/PortalModulePanes";
+import { PortalMortgageDocumentsClient } from "@/components/portals/public/mortgage/PortalMortgageDocumentsClient";
 
 export default async function PortalDocumentsPage({
   params,
@@ -10,9 +9,7 @@ export default async function PortalDocumentsPage({
   const { slug } = await params;
   return (
     <PortalShell slug={slug}>
-      <PortalModuleGuard slug={slug} module="Documents">
-        <PortalDocumentsPane slug={slug} />
-      </PortalModuleGuard>
+      <PortalMortgageDocumentsClient slug={slug} />
     </PortalShell>
   );
 }

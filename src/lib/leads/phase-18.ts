@@ -9,7 +9,7 @@ export const SESSION_18_ID = "lead-card-session-18";
 export const PHASE_18_DELIVERED = [
   "listSlaAttentionLeads ranks Overdue → Milestone Overdue → Due Today → At Risk",
   "Work Queue sidebar category Pipeline SLA with band filters",
-  "Rows deep-link to /sales/leads?focus=…",
+  "Rows open /sales/leads/detail/… and return to Workqueue",
   "Scoped by Work Queue user tab (owner)",
   "Live refresh when leads move or SLA settings change",
   "smoke-session18 + Vitest",

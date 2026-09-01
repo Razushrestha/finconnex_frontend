@@ -28,10 +28,18 @@ export const MEETING_STATUSES: MeetingStatus[] = [
   "Rescheduled",
 ];
 
+export const MEETING_ATTENDEE_ROLES = [
+  "Host",
+  "Guest",
+  "Main Applicant",
+] as const;
+export type MeetingAttendeeRole = (typeof MEETING_ATTENDEE_ROLES)[number];
+
 export interface Attendee {
   id: string;
   name: string;
   email: string;
+  role?: MeetingAttendeeRole;
 }
 
 export interface Meeting {
@@ -68,11 +76,26 @@ export const meetings: Meeting[] = [
     endDateTime: "17/07/2026 03:00 PM",
     meetingLink: "https://meet.google.com/abc-xyz",
     attendees: [
-      { id: "u1", name: "Shiva Khadka", email: "shiva.khadka@example.com" },
-      { id: "u2", name: "Shiva Rai", email: "shiva.rai@example.com" },
-      { id: "u3", name: "John Cena", email: "john.cena@example.com" },
+      {
+        id: "u0",
+        name: "John Smith",
+        email: "admin@finconnex.com",
+        role: "Host",
+      },
+      {
+        id: "u1",
+        name: "Shiva Khadka",
+        email: "shiva.khadka@example.com",
+        role: "Main Applicant",
+      },
+      {
+        id: "u2",
+        name: "Shiva Rai",
+        email: "shiva.rai@example.com",
+        role: "Guest",
+      },
     ],
-    organizer: "bishnu@nepatronix.com",
+    organizer: "John Smith",
     status: "Scheduled",
     agenda: "Review project milestones and timelines.",
   },
@@ -117,8 +140,18 @@ export const meetings: Meeting[] = [
     endDateTime: "15/07/2026 12:00 PM",
     location: "Northwind HQ, Floor 4",
     attendees: [
-      { id: "u1", name: "Shiva Khadka", email: "shiva.khadka@example.com" },
-      { id: "u6", name: "Olivia Bennett", email: "olivia@northwind.com" },
+      {
+        id: "u1",
+        name: "Shiva Khadka",
+        email: "shiva.khadka@example.com",
+        role: "Host",
+      },
+      {
+        id: "u6",
+        name: "Olivia Bennett",
+        email: "olivia@northwind.com",
+        role: "Main Applicant",
+      },
     ],
     organizer: "shiva@nepatronix.com",
     status: "Completed",
@@ -149,9 +182,20 @@ export const meetings: Meeting[] = [
     startDateTime: "19/07/2026 11:00 AM",
     endDateTime: "19/07/2026 11:30 AM",
     attendees: [
-      { id: "u5", name: "Roshna Abraham", email: "roshna@example.com" },
+      {
+        id: "u0",
+        name: "John Smith",
+        email: "admin@finconnex.com",
+        role: "Host",
+      },
+      {
+        id: "u5",
+        name: "Roshna Abraham",
+        email: "roshna@example.com",
+        role: "Guest",
+      },
     ],
-    organizer: "roshna@nepatronix.com",
+    organizer: "John Smith",
     status: "Scheduled",
     agenda: "Review open tickets and SLA breaches.",
   },
@@ -165,8 +209,18 @@ export const meetings: Meeting[] = [
     endDateTime: "24/07/2026 11:00 AM",
     meetingLink: "https://meet.google.com/arjun-discovery",
     attendees: [
-      { id: "u4", name: "Tejas Gokhe", email: "tejas@example.com" },
-      { id: "u7", name: "Arjun Mehta", email: "arjun.m@example.com" },
+      {
+        id: "u4",
+        name: "Tejas Gokhe",
+        email: "tejas@example.com",
+        role: "Host",
+      },
+      {
+        id: "u7",
+        name: "Arjun Mehta",
+        email: "arjun.m@example.com",
+        role: "Main Applicant",
+      },
     ],
     organizer: "tejas@nepatronix.com",
     status: "Scheduled",

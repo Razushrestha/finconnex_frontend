@@ -2,9 +2,7 @@
 
 import { useState } from "react";
 import {
-  ChevronDown,
   MoreHorizontal,
-  Plus,
   Minus,
   Zap,
   CheckSquare,
@@ -21,12 +19,13 @@ import {
   Copy,
   CheckCircle2,
 } from "lucide-react";
+import { RecordTagPicker } from "@/components/shared/tags/RecordTags";
 
 interface EntitySelectionToolbarProps {
   selectedCount: number;
   onClear: () => void;
   onSendMail?: () => void;
-  onAddTag?: () => void;
+  onAddTag?: (tag: string) => void;
   onRemoveTag?: () => void;
   onClick?: () => void;
   onRunMacro?: () => void;
@@ -67,7 +66,6 @@ export function EntitySelectionToolbar({
   onCompleteSelected,
   onCloneSelected,
 }: EntitySelectionToolbarProps) {
-  const [isTagsOpen, setIsTagsOpen] = useState(false);
   const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   const moreMenuItems: {
@@ -120,49 +118,19 @@ export function EntitySelectionToolbar({
         >
           Send Mail
         </button>
-        <div className="relative">
+        {onAddTag ? (
+          <RecordTagPicker selected={[]} onAdd={onAddTag} />
+        ) : null}
+        {onRemoveTag ? (
           <button
             type="button"
-            onClick={() => setIsTagsOpen((v) => !v)}
-            className="flex items-center gap-1 rounded-md border bg-white hover:bg-white px-3 py-1"
+            onClick={onRemoveTag}
+            className="flex items-center gap-1 rounded-md border bg-white px-3 py-1 text-sm text-slate-600 hover:bg-slate-50"
           >
-            Tags
-            <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+            <Minus className="h-3.5 w-3.5 text-slate-400" />
+            Remove tag
           </button>
-
-          {isTagsOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-20"
-                onClick={() => setIsTagsOpen(false)}
-              />
-              <div className="absolute left-0 top-full z-30 mt-1 w-36 overflow-hidden rounded-md border border-slate-200 bg-white py-1 text-left shadow-lg dark:border-zinc-800 dark:bg-zinc-900">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsTagsOpen(false);
-                    onAddTag?.();
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                >
-                  <Plus className="h-3.5 w-3.5 text-slate-400" />
-                  Add tag
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsTagsOpen(false);
-                    onRemoveTag?.();
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                >
-                  <Minus className="h-3.5 w-3.5 text-slate-400" />
-                  Remove tag
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+        ) : null}
         {onDelete ? (
           <button
             type="button"

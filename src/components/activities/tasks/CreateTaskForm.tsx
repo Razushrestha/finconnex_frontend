@@ -3,15 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Bell,
   Calendar,
   ChevronLeft,
   ListChecks,
-  Mail,
-  MessageSquare,
-  MonitorSmartphone,
   Plus,
-  Repeat,
   Search,
   User,
   X,
@@ -21,16 +16,19 @@ import {
   TASK_PRIORITIES,
   TASK_STATUSES,
   TASK_TYPES,
+  formatTaskTimestamp,
+  notifyToMethod,
   type Priority,
+  type ReminderNotifyOption,
   type TaskActionItem,
   type TaskStatus,
   type TaskType,
 } from "@/lib/tasks/types";
 import {
   RELATED_ENTITY_KINDS,
-  RELATED_RECORD_OPTIONS,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
+import { liveRelatedRecords } from "@/lib/activities/related-records";
 import { api } from "@/lib/api";
 import {
   logCreate,
@@ -40,9 +38,12 @@ import {
   requiredFieldErrors,
 } from "@/lib/rules";
 import { getRulesActor } from "@/lib/rules/actor";
-import { formatTaskTimestamp } from "@/lib/tasks/types";
 import RelatedRecordCombobox from "./RelatedRecordComboBox";
-import RepeatModal, { defaultRepeatConfig, RepeatConfig } from "./RepeatModal";
+import {
+  ReminderSettingsCard,
+  TaskRepeatBlock,
+  turnOffReminderRepeat,
+} from "./ReminderSettingsCard";
 import { TaskAuditCard } from "@/components/activities/tasks/TaskAuditCard";
 import {
   elevatedTextareaClass,
@@ -51,10 +52,13 @@ import {
 } from "@/components/sales/CreateEntityForm";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import AttachmentUpload from "./AttachmentUpload";
-import { TaskDescriptionEditor } from "./TaskDescriptionEditor";
 import { getUploadAdapter } from "@/lib/attachments/upload";
 import { type NotificationMethod } from "@/lib/reminders/types";
-import { cn } from "@/lib/utils";
+import {
+  defaultReminderRepeatRule,
+  type ReminderRepeatRule,
+} from "@/lib/tasks/repeat-reminder";
+import { buildRemindersFromSchedule } from "@/lib/tasks/reminder-series";
 
 interface CreateTaskFormProps {
   layoutId: string;
@@ -62,6 +66,7 @@ interface CreateTaskFormProps {
   defaults?: {
     relatedKind?: RelatedEntityKind;
     relatedName?: string;
+    dueDate?: string;
   };
 }
 
@@ -79,10 +84,10 @@ interface FormState {
   attachments: File[];
   collaborators: string[];
   actionItems: TaskActionItem[];
-  repeatEnabled: boolean;
-  repeat: RepeatConfig;
   notifyBy: NotificationMethod[];
   notes: string;
+  taskRepeat: ReminderRepeatRule;
+  reminderRepeat: ReminderRepeatRule;
 }
 
 const initialState: FormState = {
@@ -99,22 +104,11 @@ const initialState: FormState = {
   attachments: [],
   collaborators: [],
   actionItems: [],
-  repeatEnabled: false,
-  repeat: defaultRepeatConfig,
   notifyBy: ["Email"],
   notes: "",
+  taskRepeat: defaultReminderRepeatRule,
+  reminderRepeat: defaultReminderRepeatRule,
 };
-
-const NOTIFY_BY_OPTIONS: {
-  id: NotificationMethod;
-  label: string;
-  icon: typeof Mail;
-}[] = [
-  { id: "Email", label: "Email", icon: Mail },
-  { id: "SMS", label: "SMS", icon: MessageSquare },
-  { id: "In-app", label: "In App", icon: Bell },
-  { id: "Web Push", label: "Web push", icon: MonitorSmartphone },
-];
 
 // Fields required before the task can be saved.
 const REQUIRED_FIELDS = [
@@ -171,6 +165,38 @@ function formatStoredTaskDateTime(value: string): string {
   });
 }
 
+function reminderNotifyFromMethods(
+  methods: NotificationMethod[],
+): ReminderNotifyOption {
+  const hasEmail = methods.includes("Email");
+  const hasPopup =
+    methods.includes("In-app") ||
+    methods.includes("Web Push") ||
+    methods.includes("SMS");
+  if (hasEmail && hasPopup) return "Both";
+  if (hasEmail) return "Email";
+  return "Pop Up";
+}
+
+function remindersFromForm(
+  reminderDate: string,
+  notifyBy: NotificationMethod[],
+  rule: ReminderRepeatRule,
+  dueDate: string,
+) {
+  const parsed = parseDatetimeLocal(reminderDate);
+  if (!parsed) return undefined;
+  const notify = reminderNotifyFromMethods(notifyBy);
+  return buildRemindersFromSchedule({
+    first: parsed,
+    due: parseDatetimeLocal(dueDate),
+    rule,
+    notify,
+    notificationMethod: notifyToMethod(notify),
+    type: "Task Due",
+  });
+}
+
 function validateTaskDates(
   dueDate: string,
   reminderDate: string,
@@ -219,12 +245,14 @@ export function CreateTaskForm({
     ...initialState,
     relatedKind: defaults?.relatedKind ?? "",
     relatedName: defaults?.relatedName ?? "",
+    dueDate: defaults?.dueDate ?? "",
   });
   const [errors, setErrors] = useState<
     Partial<Record<keyof FormState, string>>
   >({});
   const [submitted, setSubmitted] = useState(false);
-  const [repeatModalOpen, setRepeatModalOpen] = useState(false);
+  const [repeatOn, setRepeatOn] = useState(false);
+  const [reminderOn, setReminderOn] = useState(false);
   const [newActionItem, setNewActionItem] = useState("");
   const [addingCollaborator, setAddingCollaborator] = useState(false);
   const [collaboratorSearch, setCollaboratorSearch] = useState("");
@@ -257,6 +285,8 @@ export function CreateTaskForm({
     let nextReminder = form.reminderDate;
     if (!value.trim()) {
       nextReminder = "";
+      setReminderOn(false);
+      setRepeatOn(false);
     } else {
       const due = parseDatetimeLocal(value);
       const reminder = parseDatetimeLocal(nextReminder);
@@ -268,12 +298,24 @@ export function CreateTaskForm({
       ...prev,
       dueDate: value,
       reminderDate: nextReminder,
+      reminderRepeat:
+        nextReminder.trim() || prev.reminderRepeat.preset !== "afterCompletion"
+          ? prev.reminderRepeat
+          : defaultReminderRepeatRule,
+      taskRepeat: value.trim() ? prev.taskRepeat : defaultReminderRepeatRule,
     }));
     syncDateErrors(value, nextReminder);
   }
 
   function handleReminderDateChange(value: string) {
-    update("reminderDate", value);
+    setForm((prev) => ({
+      ...prev,
+      reminderDate: value,
+      reminderRepeat:
+        value.trim() || prev.reminderRepeat.preset !== "afterCompletion"
+          ? prev.reminderRepeat
+          : defaultReminderRepeatRule,
+    }));
     syncDateErrors(form.dueDate, value);
   }
 
@@ -293,20 +335,15 @@ export function CreateTaskForm({
   const minReminderDate = minDueDate;
   const hasDueDate = Boolean(form.dueDate.trim());
 
-  const relatedOptions = form.relatedKind
-    ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === form.relatedKind)
-    : RELATED_RECORD_OPTIONS;
+  const relatedOptions = liveRelatedRecords(
+    form.relatedKind,
+    form.relatedKind && form.relatedName
+      ? { kind: form.relatedKind as RelatedEntityKind, name: form.relatedName }
+      : undefined,
+  );
 
   const actor = getRulesActor().name || form.assignedTo || "Admin";
   const auditPreviewOn = formatTaskTimestamp(new Date());
-
-  const canEnableRepeat = Boolean(form.taskType) && Boolean(form.dueDate);
-
-  useEffect(() => {
-    if (!canEnableRepeat && form.repeatEnabled) {
-      update("repeatEnabled", false);
-    }
-  }, [canEnableRepeat, form.repeatEnabled]);
 
   useEffect(() => {
     if (!addingCollaborator) return;
@@ -453,16 +490,33 @@ export function CreateTaskForm({
       priority: form.priority as Priority,
       status: form.status as TaskStatus,
       dueDate: formatStoredTaskDateTime(form.dueDate),
-      reminderDate: form.reminderDate.trim()
-        ? formatStoredTaskDateTime(form.reminderDate)
-        : undefined,
+      reminderDate:
+        reminderOn && form.reminderDate.trim()
+          ? formatStoredTaskDateTime(form.reminderDate)
+          : undefined,
+      reminders:
+        reminderOn && form.reminderDate.trim()
+          ? remindersFromForm(
+              form.reminderDate,
+              form.notifyBy,
+              form.reminderRepeat,
+              form.dueDate,
+            )
+          : undefined,
       assignedTo: form.assignedTo,
       relatedTo: related,
       description: form.description || undefined,
       notes: form.notes.trim() || undefined,
       collaborators: form.collaborators.length ? form.collaborators : undefined,
       actionItems: form.actionItems.length ? form.actionItems : undefined,
-      notifyBy: form.notifyBy.length ? form.notifyBy : undefined,
+      notifyBy:
+        reminderOn && form.reminderDate.trim() && form.notifyBy.length
+          ? form.notifyBy
+          : undefined,
+      repeatRule:
+        repeatOn && form.taskRepeat.preset !== "none"
+          ? form.taskRepeat
+          : undefined,
       attachmentsCount: attachmentsCount || undefined,
       createdBy: actor,
     });
@@ -490,6 +544,8 @@ export function CreateTaskForm({
       setErrors({});
       setSubmitted(false);
       setNewActionItem("");
+      setRepeatOn(false);
+      setReminderOn(false);
       return;
     }
     void layoutId;
@@ -603,10 +659,15 @@ export function CreateTaskForm({
             <div className="mt-5 w-full">
               <label className={labelClass}>Task Description</label>
               <div className="mt-1 w-full">
-                <TaskDescriptionEditor
-                  value={form.description}
-                  onChange={(description) => update("description", description)}
-                />
+                <TextAreaShell>
+                  <textarea
+                    value={form.description}
+                    onChange={(e) => update("description", e.target.value)}
+                    placeholder="Provide detailed context or instructions…"
+                    rows={5}
+                    className={elevatedTextareaClass}
+                  />
+                </TextAreaShell>
               </div>
             </div>
           </div>
@@ -729,194 +790,6 @@ export function CreateTaskForm({
 
         {/* Right column */}
         <div className="space-y-6">
-          {/* Status / scheduling card */}
-          <div className="space-y-4 rounded-xl border border-border bg-white p-4 shadow-sm">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelClass}>
-                  Status <span className="text-red-500">*</span>
-                </label>
-          <select
-                  className={
-                    selectClass +
-                    (submitted && errors.status ? " border-red-300" : "")
-                  }
-            value={form.status}
-                  onChange={(e) =>
-                    update("status", e.target.value as TaskStatus)
-                  }
-                >
-                  {TASK_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-          </select>
-              </div>
-              <div>
-                <label className={labelClass}>
-                  Priority <span className="text-red-500">*</span>
-                </label>
-          <select
-                  className={
-                    selectClass +
-                    (submitted && errors.priority ? " border-red-300" : "")
-                  }
-            value={form.priority}
-                  onChange={(e) =>
-                    update("priority", e.target.value as Priority)
-                  }
-                >
-                  {TASK_PRIORITIES.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-          </select>
-              </div>
-            </div>
-
-            <div>
-              <label className={labelClass}>
-                Due Date <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="datetime-local"
-                  min={minDueDate}
-                  className={
-                    inputClass +
-                    " pl-9" +
-                    (submitted && errors.dueDate ? " border-red-300" : "")
-                  }
-                  value={form.dueDate}
-                  onChange={(e) => handleDueDateChange(e.target.value)}
-                />
-              </div>
-              {(submitted || form.dueDate) && errors.dueDate ? (
-                <p className="mt-1 text-xs text-red-600">{errors.dueDate}</p>
-              ) : null}
-            </div>
-
-            {hasDueDate ? (
-              <div>
-                <label className={labelClass}>Reminder Date</label>
-                <div className="relative">
-                  <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
-                    type="datetime-local"
-                    min={minReminderDate}
-                    max={form.dueDate}
-                    className={
-                      inputClass +
-                      " pl-9" +
-                      (submitted && errors.reminderDate ? " border-red-300" : "")
-                    }
-                    value={form.reminderDate}
-                    onChange={(e) => handleReminderDateChange(e.target.value)}
-                  />
-                </div>
-                {(submitted || form.reminderDate) && errors.reminderDate ? (
-                  <p className="mt-1 text-xs text-red-600">
-                    {errors.reminderDate}
-                  </p>
-                ) : (
-                  <p className="mt-1 text-xs text-gray-500">
-                    Choose a time after now and no later than the due date.
-                  </p>
-                )}
-              </div>
-            ) : null}
-
-            <div>
-              <label className={labelClass}>Repeat</label>
-              <div
-                className={`mt-1 flex items-center justify-between rounded-md border px-3 py-2 ${
-                  canEnableRepeat
-                    ? "border-blue-100 bg-blue-50/40"
-                    : "border-gray-100 bg-gray-50"
-                }`}
-              >
-                <button
-                  type="button"
-                  disabled={!canEnableRepeat}
-                  onClick={() => {
-                    const next = !form.repeatEnabled;
-                    update("repeatEnabled", next);
-                    if (next) setRepeatModalOpen(true);
-                  }}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                    form.repeatEnabled ? "bg-green-500" : "bg-gray-300"
-                  } ${!canEnableRepeat ? "cursor-not-allowed opacity-50" : ""}`}
-                >
-                  <span
-                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                      form.repeatEnabled ? "translate-x-5" : "translate-x-1"
-                    }`}
-                  />
-                </button>
-                {form.repeatEnabled && canEnableRepeat ? (
-                  <button
-                    type="button"
-                    onClick={() => setRepeatModalOpen(true)}
-                    className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900"
-                  >
-                    <Repeat className="h-3.5 w-3.5" />
-                    {form.repeat.type}
-                  </button>
-                ) : (
-                  <span className="text-sm text-gray-400">Off</span>
-                )}
-              </div>
-              {!canEnableRepeat && (
-                <p className="mt-1 text-xs text-gray-400">
-                  Set Task Type and Due Date to enable repeat.
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className={labelClass}>Notify by</label>
-              <div className="mt-1.5 grid grid-cols-2 gap-2">
-                {NOTIFY_BY_OPTIONS.map((option) => {
-                  const active = form.notifyBy.includes(option.id);
-                  const Icon = option.icon;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => toggleNotifyBy(option.id)}
-                      aria-pressed={active}
-                      className={cn(
-                        "inline-flex items-center gap-2 rounded-md border px-3 py-2 text-left text-sm font-medium transition-colors",
-                        active
-                          ? "border-[#5A32A3] bg-[#F3ECFB] text-[#5A32A3]"
-                          : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
-                      )}
-                    >
-                      <Icon className="h-3.5 w-3.5 shrink-0" />
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="mt-1 text-xs text-gray-500">
-                Choose how the owner is notified for this task.
-              </p>
-            </div>
-
-            <RepeatModal
-              open={repeatModalOpen}
-              value={form.repeat}
-              onCancel={() => setRepeatModalOpen(false)}
-              onDone={(config) => {
-                update("repeat", config);
-                setRepeatModalOpen(false);
-              }}
-            />
-          </div>
-
           {/* Owner + collaborators — same card, separate sections */}
           <div className="space-y-4 rounded-xl border border-border bg-white p-4 shadow-sm">
             <div>
@@ -1051,6 +924,120 @@ export function CreateTaskForm({
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Status / scheduling card */}
+          <div className="space-y-4 rounded-xl border border-border bg-white p-4 shadow-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>
+                  Status <span className="text-red-500">*</span>
+                </label>
+          <select
+                  className={
+                    selectClass +
+                    (submitted && errors.status ? " border-red-300" : "")
+                  }
+            value={form.status}
+                  onChange={(e) =>
+                    update("status", e.target.value as TaskStatus)
+                  }
+                >
+                  {TASK_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+          </select>
+              </div>
+              <div>
+                <label className={labelClass}>
+                  Priority <span className="text-red-500">*</span>
+                </label>
+          <select
+                  className={
+                    selectClass +
+                    (submitted && errors.priority ? " border-red-300" : "")
+                  }
+            value={form.priority}
+                  onChange={(e) =>
+                    update("priority", e.target.value as Priority)
+                  }
+                >
+                  {TASK_PRIORITIES.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+          </select>
+              </div>
+            </div>
+
+            <div>
+              <label className={labelClass}>
+                Due Date <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="datetime-local"
+                  min={minDueDate}
+                  className={
+                    inputClass +
+                    " pl-9" +
+                    (submitted && errors.dueDate ? " border-red-300" : "")
+                  }
+                  value={form.dueDate}
+                  onChange={(e) => handleDueDateChange(e.target.value)}
+                />
+              </div>
+              {(submitted || form.dueDate) && errors.dueDate ? (
+                <p className="mt-1 text-xs text-red-600">{errors.dueDate}</p>
+              ) : null}
+            </div>
+
+            {hasDueDate ? (
+              <TaskRepeatBlock
+                enabled={repeatOn}
+                onEnabledChange={(on) => {
+                  setRepeatOn(on);
+                  if (!on) update("taskRepeat", turnOffReminderRepeat());
+                }}
+                value={form.taskRepeat}
+                onChange={(taskRepeat) => update("taskRepeat", taskRepeat)}
+                due={parseDatetimeLocal(form.dueDate)}
+              />
+            ) : null}
+
+            {hasDueDate ? (
+              <ReminderSettingsCard
+                enabled={reminderOn}
+                onEnabledChange={(on) => {
+                  setReminderOn(on);
+                  if (!on) {
+                    handleReminderDateChange("");
+                    update("reminderRepeat", turnOffReminderRepeat());
+                  }
+                }}
+                reminderDate={form.reminderDate}
+                onReminderDateChange={handleReminderDateChange}
+                min={minReminderDate}
+                max={form.dueDate}
+                error={
+                  submitted || form.reminderDate
+                    ? errors.reminderDate
+                    : undefined
+                }
+                notifyBy={form.notifyBy}
+                onToggleNotify={toggleNotifyBy}
+                repeat={form.reminderRepeat}
+                onRepeatChange={(reminderRepeat) =>
+                  update("reminderRepeat", reminderRepeat)
+                }
+                due={parseDatetimeLocal(form.dueDate)}
+              />
+            ) : null}
+
           </div>
 
           <TaskAuditCard

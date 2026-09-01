@@ -9,7 +9,6 @@ import {
   ShieldCheck,
   Download,
   CalendarDays,
-  GanttChart,
 } from "lucide-react";
 import { FilterPanel } from "@/components/activities/tasks/Filterpanel";
 import { KanbanBoard } from "@/components/activities/tasks/KanbanBoard";
@@ -18,6 +17,7 @@ import { TaskCalendarView } from "@/components/activities/tasks/TaskCalendarView
 import { TaskTimelineView } from "@/components/activities/tasks/TaskTimelineView";
 import {
   ActivityToolbar,
+  TIMELINE_VIEW_TOGGLE,
   type ActivityView,
 } from "@/components/activities/ActivityToolbar";
 import {
@@ -81,6 +81,7 @@ function exportTasksCsv() {
         "Status",
         "Due Date",
         "Assigned To",
+        "Related To",
         "Reminder",
       ],
       rows.map((t) => [
@@ -91,6 +92,7 @@ function exportTasksCsv() {
         t.status,
         t.dueDate,
         t.assignedTo,
+        t.relatedTo ? `${t.relatedTo.kind}: ${t.relatedTo.name}` : "",
         t.reminderDate ?? "",
       ]),
     ),
@@ -135,6 +137,17 @@ export default function TasksPage() {
   const [search, setSearch] = useState("");
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
+  const [scopeTab, setScopeTab] = useState("All Tasks");
+
+  const scopedFilters: TaskFilters = {
+    ...filters,
+    scope:
+      scopeTab === "My Tasks"
+        ? "mine"
+        : scopeTab === "My Overdue Tasks"
+          ? "my-overdue"
+          : "all",
+  };
 
   useEffect(() => {
     setView(loadTaskViewMode());
@@ -246,7 +259,12 @@ export default function TasksPage() {
         <ActivityToolbar
           entityLabel="Task"
           createRoute="/activities/tasks/create"
-          tabs={["All Tasks", "My Overdue Tasks"]}
+          tabs={["My Overdue Tasks"]}
+          leadingTabMenu={{
+            items: ["All Tasks", "My Tasks"],
+          }}
+          activeTab={scopeTab}
+          onTabChange={setScopeTab}
           view={view}
           onViewChange={handleViewChange}
           filterOpen={filterOpen}
@@ -256,15 +274,12 @@ export default function TasksPage() {
           sortDirection={sortDirection}
           onSortChange={handleSortChange}
           onClearSort={handleClearSort}
-          search={search}
-          onSearchChange={setSearch}
-          searchPlaceholder="Search tasks..."
           showRefresh
           moreMenuItems={moreMenuItems}
           printViewItems={printViewItems}
           extraViewIcons={[
             { key: "calendar", icon: CalendarDays, label: "Calendar view" },
-            { key: "timeline", icon: GanttChart, label: "Timeline view" },
+            TIMELINE_VIEW_TOGGLE,
           ]}
         />
 
@@ -297,25 +312,25 @@ export default function TasksPage() {
 
         <div
           className={`min-h-0 min-w-0 flex-1 ${
-            view === "list" || view === "kanban"
+            view === "list" || view === "kanban" || view === "calendar"
               ? "overflow-hidden"
               : "overflow-auto [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin]"
           }`}
         >
           {view === "kanban" ? (
             <KanbanBoard
-              filters={filters}
+              filters={scopedFilters}
               search={search}
               selectedIds={selectedTaskIds}
               onSelectedIdsChange={setSelectedTaskIds}
             />
           ) : view === "calendar" ? (
-            <TaskCalendarView filters={filters} search={search} />
+            <TaskCalendarView filters={scopedFilters} search={search} />
           ) : view === "timeline" ? (
-            <TaskTimelineView filters={filters} search={search} />
+            <TaskTimelineView filters={scopedFilters} search={search} />
           ) : (
             <TaskListView
-              filters={filters}
+              filters={scopedFilters}
               search={search}
               sortField={sortField}
               sortDirection={sortDirection}

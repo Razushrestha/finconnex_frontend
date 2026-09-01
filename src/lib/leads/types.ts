@@ -97,6 +97,7 @@ export interface LeadCardData {
   convertedContactId?: string;
   convertedDealId?: string;
   convertedCompanyId?: string;
+  archived?: boolean;
   accentColorClass: string;
   avatarBgClass: string;
 }
@@ -208,6 +209,7 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
     ],
   },
   emptyStageColumn("Appointment Booked"),
+  emptyStageColumn("Appointment Missed"),
   {
     ...emptyStageColumn("In Conversation", "$11,10,000"),
     leadCount: 4,
@@ -258,8 +260,10 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
       }),
     ],
   },
+  emptyStageColumn("Hold"),
+  emptyStageColumn("No Answer"),
   {
-    ...emptyStageColumn("Waiting on Documents", "$9,80,000"),
+    ...emptyStageColumn("Waiting on Docs", "$9,80,000"),
     leadCount: 3,
     cards: [
       toCard({
@@ -276,14 +280,14 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         createdDate: "13/07/2026",
         estimatedValue: "$2,10,000",
         tags: ["Partner", "Priority"],
-        pipelineStage: "Waiting on Documents",
+        pipelineStage: "Waiting on Docs",
         stageEnteredAt: "20/07/2026 10:00 AM",
         pipelineStartedAt: "13/07/2026 12:00 PM",
         custom: {
           leadScore: "72",
           referralSource: "Partner",
         },
-        accentColorClass: PIPELINE_STAGE_DOT["Waiting on Documents"],
+        accentColorClass: PIPELINE_STAGE_DOT["Waiting on Docs"],
         avatarIndex: 1,
       }),
       toCard({
@@ -299,16 +303,16 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         owner: "John Smith",
         createdDate: "16/07/2026",
         estimatedValue: "$3,50,000",
-        pipelineStage: "Waiting on Documents",
+        pipelineStage: "Waiting on Docs",
         stageEnteredAt: "01/07/2026 10:00 AM",
         pipelineStartedAt: "20/06/2026 10:00 AM",
-        accentColorClass: PIPELINE_STAGE_DOT["Waiting on Documents"],
+        accentColorClass: PIPELINE_STAGE_DOT["Waiting on Docs"],
         avatarIndex: 4,
       }),
     ],
   },
   {
-    ...emptyStageColumn("Documents Received", "$2,80,000"),
+    ...emptyStageColumn("Document Received", "$2,80,000"),
     leadCount: 1,
     cards: [
       toCard({
@@ -324,17 +328,21 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         owner: "John Smith",
         createdDate: "13/07/2026",
         estimatedValue: "$2,80,000",
-        pipelineStage: "Documents Received",
+        pipelineStage: "Document Received",
         stageEnteredAt: "22/07/2026 09:00 AM",
         pipelineStartedAt: "13/07/2026 09:00 AM",
-        accentColorClass: PIPELINE_STAGE_DOT["Documents Received"],
+        accentColorClass: PIPELINE_STAGE_DOT["Document Received"],
         avatarIndex: 7,
       }),
     ],
   },
-  emptyStageColumn("Processing"),
+  emptyStageColumn("Findings"),
+  emptyStageColumn("Research & Servicing"),
+  emptyStageColumn("Servicing Completed"),
+  emptyStageColumn("Loan Proposal Presented"),
+  emptyStageColumn("Future Potential Clients"),
   {
-    ...emptyStageColumn("Settled", "$5,70,000"),
+    ...emptyStageColumn("Closed Won", "$5,70,000"),
     leadCount: 2,
     cards: [
       toCard({
@@ -350,10 +358,10 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         owner: "John Smith",
         createdDate: "05/07/2026",
         estimatedValue: "$1,50,000",
-        pipelineStage: "Settled",
+        pipelineStage: "Closed Won",
         stageEnteredAt: "20/07/2026 10:00 AM",
         pipelineStartedAt: "01/06/2026 10:00 AM",
-        accentColorClass: PIPELINE_STAGE_DOT.Settled,
+        accentColorClass: PIPELINE_STAGE_DOT["Closed Won"],
         avatarIndex: 2,
       }),
       toCard({
@@ -369,16 +377,16 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         owner: "Tejas Gokhe",
         createdDate: "06/07/2026",
         estimatedValue: "$4,20,000",
-        pipelineStage: "Settled",
+        pipelineStage: "Closed Won",
         stageEnteredAt: "18/07/2026 10:00 AM",
         pipelineStartedAt: "01/06/2026 10:00 AM",
-        accentColorClass: PIPELINE_STAGE_DOT.Settled,
+        accentColorClass: PIPELINE_STAGE_DOT["Closed Won"],
         avatarIndex: 3,
       }),
     ],
   },
   {
-    ...emptyStageColumn("Lost", "$3,70,000"),
+    ...emptyStageColumn("Closed Lost", "$3,70,000"),
     leadCount: 2,
     cards: [
       toCard({
@@ -394,10 +402,10 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         owner: "Roshna Abraham",
         createdDate: "10/07/2026",
         estimatedValue: "$2,20,000",
-        pipelineStage: "Lost",
+        pipelineStage: "Closed Lost",
         stageEnteredAt: "10/07/2026 12:00 PM",
         pipelineStartedAt: "08/07/2026 12:00 PM",
-        accentColorClass: PIPELINE_STAGE_DOT.Lost,
+        accentColorClass: PIPELINE_STAGE_DOT["Closed Lost"],
         avatarIndex: 0,
       }),
       toCard({
@@ -413,10 +421,10 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         owner: "Shiva Kadhka",
         createdDate: "11/07/2026",
         estimatedValue: "$1,50,000",
-        pipelineStage: "Lost",
+        pipelineStage: "Closed Lost",
         stageEnteredAt: "11/07/2026 12:00 PM",
         pipelineStartedAt: "09/07/2026 12:00 PM",
-        accentColorClass: PIPELINE_STAGE_DOT.Lost,
+        accentColorClass: PIPELINE_STAGE_DOT["Closed Lost"],
         avatarIndex: 1,
       }),
     ],

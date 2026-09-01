@@ -6,12 +6,15 @@ import {
   type DocumentRequest,
 } from "@/lib/documents/requests/types";
 import { AllDocumentRequestsPage } from "@/components/documents/requests/AllDocumentRequestsPage";
+import { onRecordsChange } from "@/lib/records-sync";
 
 export default function AllRequestsRoute() {
   const [rows, setRows] = useState<DocumentRequest[]>([]);
 
   useEffect(() => {
-    setRows(listDocumentRequests());
+    const refresh = () => setRows(listDocumentRequests());
+    refresh();
+    return onRecordsChange(refresh);
   }, []);
 
   return (

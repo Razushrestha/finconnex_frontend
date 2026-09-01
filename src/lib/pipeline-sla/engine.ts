@@ -45,11 +45,11 @@ export function leadStatusToPipelineStage(
     case "Contacted":
       return "In Conversation";
     case "Qualified":
-      return "Waiting on Documents";
+      return "Waiting on Docs";
     case "Unqualified":
-      return "Lost";
+      return "Closed Lost";
     case "Converted":
-      return "Settled";
+      return "Closed Won";
     default:
       return "New Lead";
   }
@@ -61,8 +61,8 @@ export function stageReachedOrPassed(
 ): boolean {
   const a = STAGE_INDEX.get(current) ?? 0;
   const b = STAGE_INDEX.get(target) ?? 0;
-  // Lost never "reaches" forward milestones
-  if (current === "Lost") return false;
+  // Closed Lost never "reaches" forward milestones
+  if (current === "Closed Lost") return false;
   return a >= b;
 }
 
@@ -144,7 +144,7 @@ export function computeLeadSla(input: ComputeLeadSlaInput): LeadSlaViewModel {
   const now = input.now ?? new Date();
   const { stage, config } = input;
 
-  if (stage === "Lost") {
+  if (stage === "Closed Lost") {
     return {
       stage,
       badgeBand: "on_track",

@@ -9,23 +9,30 @@ export type SlaDuration = {
   unit: SlaDurationUnit;
 };
 
-/** Mortgage pipeline stages from the SLA infographic. */
+/** Lead pipeline stages (Kanban, list, filters, and lead detail). */
 export const MORTGAGE_PIPELINE_STAGES = [
   "New Lead",
   "Appointment Booked",
+  "Appointment Missed",
   "In Conversation",
-  "Waiting on Documents",
-  "Documents Received",
-  "Processing",
-  "Settled",
-  "Lost",
+  "Hold",
+  "No Answer",
+  "Waiting on Docs",
+  "Document Received",
+  "Findings",
+  "Research & Servicing",
+  "Servicing Completed",
+  "Loan Proposal Presented",
+  "Future Potential Clients",
+  "Closed Won",
+  "Closed Lost",
 ] as const;
 
 export type MortgagePipelineStage = (typeof MORTGAGE_PIPELINE_STAGES)[number];
 
 export type StageSlaRow = {
   stage: MortgagePipelineStage;
-  /** null = no stage SLA (e.g. Settled / Lost). */
+  /** null = no stage SLA (e.g. Closed Won / Closed Lost). */
   duration: SlaDuration | null;
 };
 

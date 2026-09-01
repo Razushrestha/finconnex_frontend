@@ -447,7 +447,7 @@ export function BookingPageForm({
       if (!meetingMode) next.meetingMode = "Choose One Time or Recurring";
       if (!isFree && (!price || price <= 0))
         next.price = "Enter a price or mark as Free";
-      if (!meetingViaDetail.trim())
+      if (meetingVia !== "phone" && !meetingViaDetail.trim())
         next.meetingViaDetail = "Add how guests will join";
       if (consultationMode === "group" && maxAttendees < 2)
         next.maxAttendees = "Group needs at least 2 attendees";

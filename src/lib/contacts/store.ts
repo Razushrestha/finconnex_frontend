@@ -2,6 +2,7 @@
 
 import {
   CONTACT_GROUPS,
+  OWNERS,
   type ContactCardData,
   type ContactGroup,
   type ContactSource,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/contacts/types";
 import { createBoardStore } from "@/lib/rules/module-store";
 import { formatRulesAt, newRulesId } from "@/lib/rules/storage";
+import { getRulesActor } from "@/lib/rules/actor";
 
 const AVATAR_COLORS = [
   "bg-amber-50 text-amber-600",
@@ -74,6 +76,14 @@ export function findContactByName(name: string): ContactCardData | null {
   return listAllContacts().find((c) => c.name.trim().toLowerCase() === q) ?? null;
 }
 
+export function findContactByEmail(email: string): ContactCardData | null {
+  const q = email.trim().toLowerCase();
+  if (!q) return null;
+  return (
+    listAllContacts().find((c) => c.email.trim().toLowerCase() === q) ?? null
+  );
+}
+
 export function updateContact(
   id: string,
   patch: Partial<
@@ -87,6 +97,7 @@ export function updateContact(
       | "owner"
       | "source"
       | "dealIds"
+      | "tags"
     >
   >,
 ): ContactCardData | null {
@@ -177,6 +188,31 @@ export function createContact(input: {
     ),
   );
   return contact;
+}
+
+export function createQuickContact(fullName: string): ContactCardData {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  const firstName = parts[0] || "Contact";
+  const lastName = parts.slice(1).join(" ");
+  const slug =
+    fullName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ".")
+      .replace(/^\.+|\.+$/g, "") || "contact";
+  const created = createContact({
+    firstName,
+    lastName: lastName || firstName,
+    email: `${slug}@added.finconnex.local`,
+    status: "Active",
+    owner: getRulesActor().name || OWNERS[0],
+    source: "Other",
+  });
+  const label = fullName.trim() || created.name;
+  if (created.name !== label) {
+    return updateContact(created.id, { name: label }) ?? created;
+  }
+  return created;
 }
 
 export function deleteContact(id: string): ContactCardData | null {

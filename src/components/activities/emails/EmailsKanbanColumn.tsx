@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import type { EmailColumn } from "@/lib/emails/types";
 import { EmailCard } from "./EmailCard";
 import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
+import { KanbanEmptyStage } from "@/components/common/KanbanEmptyStage";
+import { KanbanStageScroll } from "@/components/common/KanbanStageScroll";
+import { KanbanCollapsedRail } from "@/components/common/KanbanCollapsedRail";
 import { cn } from "@/lib/utils";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
-import { KANBAN_COL, KANBAN_HEADER, KANBAN_HEADER_COUNT, KANBAN_HEADER_RAIL, KANBAN_WELL } from "@/lib/layout";
+import { KANBAN_COL, KANBAN_DROP_GHOST, KANBAN_HEADER, KANBAN_HEADER_COUNT, KANBAN_WELL } from "@/lib/layout";
 import { useRouter } from "next/navigation";
 import type { DropTargetPos } from "./EmailsKanbanBoard";
 
@@ -64,38 +67,16 @@ export function EmailsKanbanColumn({
 
   if (isCollapsed) {
     return (
-      <div className="mb-4 flex h-full w-10 shrink-0 flex-col rounded-sm">
-        <div
-          className={cn(
-            "flex h-full flex-col items-center gap-3 p-2",
-            KANBAN_HEADER_RAIL,
-          )}
-        >
-          <button
-            type="button"
-            onClick={() => setIsCollapsed(false)}
-            className="shrink-0 rounded-sm hover:opacity-70"
-            title="Expand"
-            aria-expanded={false}
-            aria-label={`Expand ${column.title}`}
-          >
-            <ChevronRight className="h-4 w-4 text-slate-700" />
-          </button>
-
-          <span className={KANBAN_HEADER_COUNT}>
-            {column.count}
-          </span>
-
-          <span className="mt-1 flex-1 [writing-mode:vertical-rl] text-sm font-semibold text-slate-900">
-            {column.title}
-          </span>
-        </div>
-      </div>
+      <KanbanCollapsedRail
+        title={column.title}
+        count={column.count}
+        onExpand={() => setIsCollapsed(false)}
+      />
     );
   }
 
   return (
-    <div className={cn("group mb-4 flex h-full flex-col", KANBAN_COL)}>
+    <div className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}>
       {/* Separate Header Box */}
       <div
         className={cn("mb-2 shrink-0", KANBAN_HEADER)}
@@ -120,7 +101,16 @@ export function EmailsKanbanColumn({
         </div>
       </div>
 
-      {/* Email List / Drop Zone Container */}
+      <KanbanStageScroll
+        footer={
+          <KanbanColumnFooter
+            createLabel="Create email"
+            onCreate={() => router.push("/activities/emails/create")}
+            onCollapse={() => setIsCollapsed(true)}
+            collapseLabel={`Collapse ${column.title}`}
+          />
+        }
+      >
       <div
         onDragOver={handleDragOverContainer}
         onDragLeave={() => {
@@ -135,12 +125,12 @@ export function EmailsKanbanColumn({
           onDropEmail(column.id, dropTargetPos?.targetIndex);
         }}
         className={cn(
-          "flex min-h-0 flex-1 flex-col rounded-sm border border-transparent p-2",
+          "flex min-h-full flex-col rounded-sm border border-transparent p-2",
           dropTargetIdle,
           isOver ? dropTargetActive : KANBAN_WELL,
         )}
       >
-        <div className="flex-1 space-y-3 overflow-y-auto pb-4 pr-1 [scrollbar-color:#94a3b8_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300">
+        <div className="flex min-h-[180px] flex-1 flex-col space-y-3 pb-4">
           {column.emails.map((email, index) => {
             const showPlaceholderBefore =
               dropTargetPos?.columnId === column.id &&
@@ -156,7 +146,7 @@ export function EmailsKanbanColumn({
             return (
               <div key={email.id} className="space-y-3">
                 {showPlaceholderBefore && (
-                  <div className="h-20 w-full animate-pulse rounded-xl border-2 border-dashed border-indigo-400 bg-indigo-50/50 transition-all" />
+                  <div className={KANBAN_DROP_GHOST} />
                 )}
 
                 <div data-email-card>
@@ -172,26 +162,18 @@ export function EmailsKanbanColumn({
                 </div>
 
                 {showPlaceholderAfter && (
-                  <div className="h-20 w-full animate-pulse rounded-xl border-2 border-dashed border-indigo-400 bg-indigo-50/50 transition-all" />
+                  <div className={KANBAN_DROP_GHOST} />
                 )}
               </div>
             );
           })}
 
-          {column.emails.length === 0 && (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 py-8 text-center text-xs text-slate-400">
-              Drop an email here
-            </div>
-          )}
+          {column.emails.length === 0 ? (
+            <KanbanEmptyStage entity="Emails" />
+          ) : null}
         </div>
-
-        <KanbanColumnFooter
-          createLabel="Create email"
-          onCreate={() => router.push("/activities/emails/create")}
-          onCollapse={() => setIsCollapsed(true)}
-          collapseLabel={`Collapse ${column.title}`}
-        />
       </div>
+      </KanbanStageScroll>
     </div>
   );
 }

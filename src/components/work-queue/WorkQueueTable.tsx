@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ArrowUpDown,
   Check,
@@ -235,7 +235,6 @@ export function WorkQueueTable({
   onAddNote,
   onCompleteRow,
 }: WorkQueueTableProps) {
-  const router = useRouter();
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [sortOpen, setSortOpen] = React.useState(false);
   const sortRef = React.useRef<HTMLDivElement>(null);
@@ -735,17 +734,9 @@ export function WorkQueueTable({
               const isMenuOpen = activeMenuId === row.id;
 
               return (
-                <li
-                  key={row.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => router.push(row.href)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      router.push(row.href);
-                    }
-                  }}
+                <li key={row.id} className="block">
+                <Link
+                  href={row.href}
                   style={gridStyle}
                   className={cn(
                     "group/row grid w-full cursor-pointer items-center gap-x-3 border-b border-slate-100 px-5 py-2 text-left transition-colors last:border-b-0 hover:bg-slate-50/80 sm:px-6",
@@ -814,8 +805,8 @@ export function WorkQueueTable({
 
                     <button
                       type="button"
-                      aria-label="Add note"
-                      title="Add note"
+                      aria-label="Notes"
+                      title="Notes"
                       onClick={(e) => {
                         e.stopPropagation();
                         onAddNote?.(row);
@@ -885,6 +876,7 @@ export function WorkQueueTable({
                   })}
 
                   <span aria-hidden />
+                </Link>
                 </li>
               );
             })}

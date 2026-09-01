@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useModuleBack } from "@/hooks/useModuleBack";
 import type { Priority, Task, TaskStatus } from "@/lib/tasks/types";
 import { findTaskById, addTaskActivityNote, patchTask, updateTaskDescription, updateTaskStatus } from "@/lib/tasks/store";
 import { TaskDetailsView } from "@/components/activities/tasks/detail/TaskDetailsView";
@@ -14,6 +15,7 @@ interface PageProps {
 export default function TaskDetailPage({ params }: PageProps) {
   const { id } = use(params);
   const router = useRouter();
+  const back = useModuleBack("/activities/tasks", "Back to Tasks");
   const [task, setTask] = useState<Task | null>(null);
 
   useEffect(() => {
@@ -64,10 +66,10 @@ export default function TaskDetailPage({ params }: PageProps) {
           <p className="text-sm font-medium text-slate-700">Task not found</p>
           <button
             type="button"
-            onClick={() => router.push("/activities/tasks")}
+            onClick={() => router.push(back.href)}
             className="mt-3 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700"
           >
-            Back to Tasks
+            {back.label}
           </button>
         </div>
       </div>
@@ -77,7 +79,8 @@ export default function TaskDetailPage({ params }: PageProps) {
   return (
     <TaskDetailsView
       task={task}
-      onBack={() => router.push("/activities/tasks")}
+      onBack={() => router.push(back.href)}
+      backLabel={back.label}
       onUpdateStatus={handleUpdateStatus}
       onUpdateDescription={handleUpdateDescription}
       onAddNote={handleAddNote}

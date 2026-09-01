@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pin, Lock, StickyNote } from "lucide-react";
+import { Pin, Lock } from "lucide-react";
 import {
   NOTE_TYPES,
   type Note,
@@ -12,8 +12,10 @@ import {
 import { listNoteColumns, saveNotes, deleteNote } from "@/lib/notes/store";
 import { NotesListView } from "@/components/activities/notes/NotesListView";
 import { NotesKanbanColumn } from "@/components/activities/notes/NotesKanbanColumn";
+import { NotesTimelineView } from "@/components/activities/notes/NotesTimelineView";
 import {
   ActivityToolbar,
+  TIMELINE_VIEW_TOGGLE,
   type ActivityView,
 } from "@/components/activities/ActivityToolbar";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
@@ -28,7 +30,6 @@ export default function NotesPage() {
   const router = useRouter();
   const [view, setView] = useState<ActivityView>("kanban");
   const [typeTab, setTypeTab] = useState<TypeTab>("All");
-  const [search, setSearch] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [privateOnly, setPrivateOnly] = useState(false);
@@ -72,18 +73,8 @@ export default function NotesPage() {
     if (typeTab !== "All") data = data.filter((n) => n.noteType === typeTab);
     if (pinnedOnly) data = data.filter((n) => n.isPinned);
     if (privateOnly) data = data.filter((n) => n.isPrivate);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      data = data.filter(
-        (n) =>
-          n.title.toLowerCase().includes(q) ||
-          n.body.toLowerCase().includes(q) ||
-          n.relatedTo.toLowerCase().includes(q) ||
-          n.createdBy.toLowerCase().includes(q),
-      );
-    }
     return data;
-  }, [allNotes, typeTab, pinnedOnly, privateOnly, search]);
+  }, [allNotes, typeTab, pinnedOnly, privateOnly]);
 
   const visibleColumns = useMemo(() => {
     if (typeTab === "All") return columns;
@@ -153,7 +144,8 @@ export default function NotesPage() {
     window.setTimeout(() => setBulkFlash(null), 2800);
   }
 
-  const activeFilters = Number(pinnedOnly) + Number(privateOnly);
+  const activeFilters =
+    Number(pinnedOnly) + Number(privateOnly) + Number(typeTab !== "All");
 
   return (
     <div className={BOARD_PAGE}>
@@ -162,20 +154,12 @@ export default function NotesPage() {
         <ActivityToolbar
           entityLabel="Note"
           createRoute="/activities/notes/create?layoutid=standard&redirect=false"
-          tabs={["All", ...NOTE_TYPES]}
-          activeTab={typeTab}
-          onTabChange={(tab) => setTypeTab(tab as TypeTab)}
-          tabCounts={{
-            All: allNotes.length,
-            ...typeCounts,
-          }}
           view={view}
           onViewChange={setView}
-          filterOpen={filterOpen}
+          filterOpen={filterOpen || activeFilters > 0}
           onToggleFilter={() => setFilterOpen((v) => !v)}
           onClearSort={() => setSortActive(false)}
-          search={search}
-          onSearchChange={setSearch}
+          extraViewIcons={[TIMELINE_VIEW_TOGGLE]}
           moreMenuItems={moreMenuItems}
           printViewItems={printViewItems}
         />
@@ -201,33 +185,77 @@ export default function NotesPage() {
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
               Filter Options
             </h3>
-            <div className="space-y-1">
-              <button
-                type="button"
-                onClick={() => setPinnedOnly((v) => !v)}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  pinnedOnly
-                    ? "bg-violet-50 text-violet-700"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-                )}
-              >
-                <Pin className="h-3.5 w-3.5" />
-                Pinned Notes
-              </button>
-              <button
-                type="button"
-                onClick={() => setPrivateOnly((v) => !v)}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  privateOnly
-                    ? "bg-violet-50 text-violet-700"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-                )}
-              >
-                <Lock className="h-3.5 w-3.5" />
-                Private Notes
-              </button>
+            <div className="space-y-3">
+              <div>
+                <p className="mb-1.5 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+                  Note type
+                </p>
+                <div className="space-y-1">
+                  {(["All", ...NOTE_TYPES] as TypeTab[]).map((type) => {
+                    const count =
+                      type === "All" ? allNotes.length : typeCounts[type];
+                    const active = typeTab === type;
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setTypeTab(type)}
+                        className={cn(
+                          "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
+                          active
+                            ? "bg-violet-50 text-violet-700"
+                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                        )}
+                      >
+                        <span>{type}</span>
+                        <span
+                          className={cn(
+                            "rounded-full px-1.5 text-[10px]",
+                            active
+                              ? "bg-violet-100 text-violet-800"
+                              : "bg-slate-100 text-slate-500",
+                          )}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <p className="mb-1.5 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+                  Flags
+                </p>
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => setPinnedOnly((v) => !v)}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
+                      pinnedOnly
+                        ? "bg-violet-50 text-violet-700"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                    )}
+                  >
+                    <Pin className="h-3.5 w-3.5" />
+                    Pinned Notes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrivateOnly((v) => !v)}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
+                      privateOnly
+                        ? "bg-violet-50 text-violet-700"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
+                    )}
+                  >
+                    <Lock className="h-3.5 w-3.5" />
+                    Private Notes
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -236,27 +264,20 @@ export default function NotesPage() {
           {view === "list" ? (
             <NotesListView
               typeFilter={typeTab}
-              search={search}
-              onSearchChange={setSearch}
               notesOverride={filteredNotes}
               embedded
               selectedIds={selectedIds}
               onSelectedIdsChange={setSelectedIds}
             />
+          ) : view === "timeline" ? (
+            <NotesTimelineView notes={filteredNotes} />
           ) : (
             <div className="flex h-full min-h-[420px] items-stretch gap-3 overflow-x-auto p-1">
               {visibleColumns.map((column) => {
                 const notes = column.notes.filter((n) => {
                   if (pinnedOnly && !n.isPinned) return false;
                   if (privateOnly && !n.isPrivate) return false;
-                  if (!search.trim()) return true;
-                  const q = search.toLowerCase();
-                  return (
-                    n.title.toLowerCase().includes(q) ||
-                    n.body.toLowerCase().includes(q) ||
-                    n.relatedTo.toLowerCase().includes(q) ||
-                    n.createdBy.toLowerCase().includes(q)
-                  );
+                  return true;
                 });
                 return (
                   <NotesKanbanColumn

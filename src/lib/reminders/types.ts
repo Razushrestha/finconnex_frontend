@@ -67,6 +67,42 @@ export interface Reminder {
 
 export const REMINDER_OWNERS = ACTIVITY_OWNERS;
 
+export interface ReminderFilters {
+  statuses: ReminderStatus[];
+  types: ReminderType[];
+  methods: NotificationMethod[];
+  owners: string[];
+}
+
+export const EMPTY_REMINDER_FILTERS: ReminderFilters = {
+  statuses: [],
+  types: [],
+  methods: [],
+  owners: [],
+};
+
+export function reminderMatchesFilters(
+  reminder: Reminder,
+  filters: ReminderFilters,
+): boolean {
+  if (filters.statuses.length && !filters.statuses.includes(reminder.status)) {
+    return false;
+  }
+  if (filters.types.length && !filters.types.includes(reminder.type)) {
+    return false;
+  }
+  if (
+    filters.methods.length &&
+    !filters.methods.includes(reminder.notificationMethod)
+  ) {
+    return false;
+  }
+  if (filters.owners.length && !filters.owners.includes(reminder.owner)) {
+    return false;
+  }
+  return true;
+}
+
 export const reminders: Reminder[] = [
   {
     id: "r1",

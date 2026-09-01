@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Filter,
   ArrowUpDown,
   X,
+  History,
   List,
   LayoutGrid,
   RotateCw,
@@ -48,7 +49,7 @@ export interface ActivityToolbarProps {
   entityLabel: string;
   createRoute: string;
   activeTab?: string;
-  tabs: string[];
+  tabs?: string[];
   onTabChange?: (tab: string) => void;
   tabCounts?: Record<string, number>;
 
@@ -80,9 +81,25 @@ export interface ActivityToolbarProps {
   savedView?: string;
   onSavedViewChange?: (view: string) => void;
 
-  extraViewIcons?: { key: ActivityView; icon: LucideIcon; label: string }[];
+  extraViewIcons?: {
+    key: ActivityView;
+    icon: LucideIcon;
+    label: string;
+    labeled?: boolean;
+  }[];
   createMenuItems?: CreateMenuItem[];
+  /** Dropdown shown before the regular tabs (e.g. All Tasks ▾). */
+  leadingTabMenu?: {
+    items: string[];
+  };
 }
+
+export const TIMELINE_VIEW_TOGGLE = {
+  key: "timeline" as const,
+  icon: History,
+  label: "Timeline",
+  labeled: true,
+};
 
 const DEFAULT_LAYOUT_ID = "standard";
 
@@ -90,7 +107,7 @@ export function ActivityToolbar({
   entityLabel,
   createRoute,
   activeTab: externalActiveTab,
-  tabs,
+  tabs = [],
   onTabChange,
   tabCounts,
   view,
@@ -115,9 +132,12 @@ export function ActivityToolbar({
   onSavedViewChange,
   extraViewIcons = [],
   createMenuItems = [],
+  leadingTabMenu,
 }: ActivityToolbarProps) {
   const router = useRouter();
-  const [internalActiveTab, setInternalActiveTab] = useState(tabs[0]);
+  const [internalActiveTab, setInternalActiveTab] = useState(
+    tabs[0] ?? leadingTabMenu?.items[0],
+  );
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [savedViewMenuOpen, setSavedViewMenuOpen] = useState(false);
@@ -125,6 +145,19 @@ export function ActivityToolbar({
   const [internalSavedView, setInternalSavedView] = useState(
     defaultSavedView ?? savedViews?.[0],
   );
+  const [tabMenuOpen, setTabMenuOpen] = useState(false);
+  const tabMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!tabMenuOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (tabMenuRef.current && !tabMenuRef.current.contains(e.target as Node)) {
+        setTabMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [tabMenuOpen]);
 
   const savedView = controlledSavedView ?? internalSavedView;
 
@@ -173,6 +206,8 @@ export function ActivityToolbar({
   const sortActive = Boolean(sortField);
   const showSortClear = sortActive && Boolean(onClearSort);
   const activeSortLabel = sortOptions?.find((o) => o.key === sortField)?.label;
+  const labeledViewIcons = extraViewIcons.filter((item) => item.labeled);
+  const iconViewIcons = extraViewIcons.filter((item) => !item.labeled);
 
   function handleSortSelect(key: string) {
     if (!onSortChange) return;
@@ -185,6 +220,45 @@ export function ActivityToolbar({
     <div className="mb-1.5">
       <div className="flex flex-wrap items-center gap-x-1 gap-y-1.5 border-b border-slate-200  py-1.5 dark:border-zinc-800">
         <div className="flex min-w-0 items-center gap-0.5 overflow-x-auto scrollbar-none">
+          {leadingTabMenu ? (
+            <div className="relative" ref={tabMenuRef}>
+              <button
+                type="button"
+                onClick={() => setTabMenuOpen((open) => !open)}
+                className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors ${
+                  leadingTabMenu.items.includes(activeTab)
+                    ? "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                }`}
+              >
+                {leadingTabMenu.items.includes(activeTab)
+                  ? activeTab
+                  : leadingTabMenu.items[0]}
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+              {tabMenuOpen ? (
+                <div className="absolute top-full left-0 z-30 mt-1 min-w-[180px] overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                  {leadingTabMenu.items.map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => {
+                        handleTabClick(item);
+                        setTabMenuOpen(false);
+                      }}
+                      className={`flex w-full px-3 py-1.5 text-left text-[12px] font-medium ${
+                        activeTab === item
+                          ? "bg-violet-50 text-violet-700"
+                          : "text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {tabs.map((tab) => {
             const count = tabCounts?.[tab];
             return (
@@ -349,7 +423,7 @@ export function ActivityToolbar({
                   <LayoutGrid className="h-3.5 w-3.5" />
                 </button>
 
-                {extraViewIcons.map(({ key, icon: Icon, label }) => (
+                {iconViewIcons.map(({ key, icon: Icon, label }) => (
                   <button
                     key={key}
                     type="button"
@@ -367,9 +441,9 @@ export function ActivityToolbar({
                 ))}
               </div>
             </>
-          ) : extraViewIcons.length > 0 ? (
+          ) : iconViewIcons.length > 0 ? (
             <div className="flex items-center gap-0.5">
-              {extraViewIcons.map(({ key, icon: Icon, label }) => (
+              {iconViewIcons.map(({ key, icon: Icon, label }) => (
                 <button
                   key={key}
                   type="button"
@@ -387,6 +461,23 @@ export function ActivityToolbar({
               ))}
             </div>
           ) : null}
+
+          {labeledViewIcons.map(({ key, icon: Icon, label }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onViewChange(key)}
+              aria-pressed={view === key}
+              className={`inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium transition-colors ${
+                view === key
+                  ? "border-violet-300 bg-violet-50 text-violet-700"
+                  : "border-slate-200 text-slate-700 hover:border-violet-300 hover:text-violet-700"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          ))}
 
           {showRefresh && (
             <button

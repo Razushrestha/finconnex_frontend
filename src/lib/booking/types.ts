@@ -594,6 +594,107 @@ export function listConsultationPages(): BookingPage[] {
     });
 }
 
+export function listActiveConsultations(): BookingPage[] {
+  return listConsultationPages().filter((page) => page.status === "Live");
+}
+
+export function assignedCalendarMembers(page?: BookingPage | null): string[] {
+  if (!page) return [];
+  const names: string[] = [];
+  for (const name of page.consultants ?? []) {
+    if (name && !names.includes(name)) names.push(name);
+  }
+  if (page.owner && !names.includes(page.owner)) names.push(page.owner);
+  return names;
+}
+
+export function calendarDefaultHost(page?: BookingPage | null): string {
+  return page?.consultants?.[0] || page?.owner || "Host";
+}
+
+export { timezoneLabelFromIana as calendarTimezoneOption } from "@/lib/booking/timezones";
+
+export function availabilityRuleForDate(
+  page: BookingPage,
+  dateIso: string,
+): AvailabilityRule | undefined {
+  const date = new Date(`${dateIso}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return undefined;
+  const dayName = WEEKDAYS[(date.getDay() + 6) % 7];
+  return page.availability.find((rule) => rule.day === dayName);
+}
+
+/** Slots from the calendar hours (internal scheduling, no public notice window). */
+export function internalSlotsForDate(
+  page: BookingPage,
+  dateIso: string,
+): string[] {
+  const rule = availabilityRuleForDate(page, dateIso);
+  if (!rule?.enabled) return [];
+  const [startHour, startMinute] = rule.start.split(":").map(Number);
+  const [endHour, endMinute] = rule.end.split(":").map(Number);
+  const startMins = startHour * 60 + startMinute;
+  const endMins = endHour * 60 + endMinute;
+  const duration = page.durationMinutes || 30;
+  const step = duration;
+  const slots: string[] = [];
+  for (let mins = startMins; mins + duration <= endMins; mins += step) {
+    const hh = String(Math.floor(mins / 60)).padStart(2, "0");
+    const mm = String(mins % 60).padStart(2, "0");
+    slots.push(`${hh}:${mm}`);
+  }
+  return slots;
+}
+
+export function formatSlotRange(start: string, durationMinutes: number): string {
+  const [hour, minute] = start.split(":").map(Number);
+  const startTotal = (hour || 0) * 60 + (minute || 0);
+  const endTotal = startTotal + durationMinutes;
+  const toLabel = (mins: number) => {
+    const h = Math.floor(mins / 60) % 24;
+    const m = mins % 60;
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+  };
+  return `${toLabel(startTotal)} – ${toLabel(endTotal)}`;
+}
+
+export function prettyAppointmentDate(iso: string) {
+  const date = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return iso;
+  const weekday = date.toLocaleDateString("en-US", { weekday: "short" });
+  const month = date.toLocaleDateString("en-US", { month: "short" });
+  const day = date.getDate();
+  const year = date.getFullYear();
+  const ones = day % 10;
+  const tens = day % 100;
+  const suffix =
+    ones === 1 && tens !== 11
+      ? "st"
+      : ones === 2 && tens !== 12
+        ? "nd"
+        : ones === 3 && tens !== 13
+          ? "rd"
+          : "th";
+  return `${weekday}, ${month} ${day}${suffix}, ${year}`;
+}
+
+/** Full-day slots when Date & time is Custom (not limited to calendar hours). */
+export function customDaySlots(
+  durationMinutes: number,
+  stepMinutes = 15,
+): string[] {
+  const duration = durationMinutes || 30;
+  const slots: string[] = [];
+  for (let mins = 6 * 60; mins + duration <= 22 * 60; mins += stepMinutes) {
+    const hh = String(Math.floor(mins / 60)).padStart(2, "0");
+    const mm = String(mins % 60).padStart(2, "0");
+    slots.push(`${hh}:${mm}`);
+  }
+  return slots;
+}
+
 export function deleteBookingPage(id: string) {
   const list = listBookingPages().filter((p) => p.id !== id);
   writeStore(list);

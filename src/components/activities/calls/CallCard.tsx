@@ -12,9 +12,11 @@ import {
   Paperclip,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Call } from "@/lib/calls/types";
-import type { Priority, TaskStatus } from "@/lib/tasks/types";
-import { TASK_PRIORITIES, TASK_STATUSES } from "@/lib/tasks/types";
+import type { Call, CallStatus } from "@/lib/calls/types";
+import { CALL_STAGES } from "@/lib/calls/types";
+import { isCallOverdue, parseCallWhen } from "@/lib/calls/store";
+import type { Priority } from "@/lib/tasks/types";
+import { TASK_PRIORITIES } from "@/lib/tasks/types";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion, cardSubject, entityCardBox } from "@/lib/motion";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
@@ -27,7 +29,7 @@ interface CallCardProps {
   onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
   isDragging: boolean;
-  onChangeStatus?: (callId: string, status: TaskStatus) => void;
+  onChangeStatus?: (callId: string, status: CallStatus) => void;
   onChangePriority?: (callId: string, priority: Priority) => void;
   onAssignUser?: (callId: string, user: string) => void;
   onAddComment?: (callId: string, comment: string) => void;
@@ -97,6 +99,16 @@ export function CallCard({
   const currentPriority = (call as any).priority || "Medium";
   const currentStatus = (call as any).status || columnId;
   const isCompleted = currentStatus === "Completed";
+  const overdue = isCallOverdue(call);
+  const overdueDays = (() => {
+    const at = parseCallWhen(call.date);
+    if (!at || !overdue) return null;
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const due = new Date(at);
+    due.setHours(0, 0, 0, 0);
+    return Math.max(1, Math.round((start.getTime() - due.getTime()) / 86400000));
+  })();
 
   const markComplete = () => {
     if (isCompleted) return;
@@ -104,7 +116,7 @@ export function CallCard({
     toast.success(`"${call.subject}" marked as completed`);
   };
 
-  const selectStatus = (status: TaskStatus) => {
+  const selectStatus = (status: CallStatus) => {
     onChangeStatus?.(call.id, status);
     toast.success(`Status changed to "${status}"`);
     setOpenMenu(null);
@@ -141,7 +153,7 @@ export function CallCard({
   };
 
   const hasCommentsOrAttachments = Boolean(
-    (call as any).commentsCount || (call as any).attachmentsCount,
+    (call as any).commentsCount || call.attachmentsCount,
   );
 
   function goToCall() {
@@ -245,8 +257,19 @@ export function CallCard({
 
           <div className="space-y-1.5 text-[11px] text-slate-500">
             <div className="flex items-center gap-1.5">
-              <Clock className="h-3 w-3 shrink-0 text-slate-400" />
-              <span>{call.date}</span>
+              <Clock
+                className={cn(
+                  "h-3 w-3 shrink-0",
+                  overdue ? "text-rose-500" : "text-slate-400",
+                )}
+              />
+              {overdue ? (
+                <span className="font-medium text-rose-600">
+                  Overdue {overdueDays} {overdueDays === 1 ? "day" : "days"}
+                </span>
+              ) : (
+                <span>{call.date}</span>
+              )}
               {call.duration ? (
                 <span className="text-slate-400">· {call.duration}</span>
               ) : null}
@@ -263,10 +286,10 @@ export function CallCard({
                   {(call as any).commentsCount}
                 </span>
               ) : null}
-              {(call as any).attachmentsCount ? (
+              {call.attachmentsCount ? (
                 <span className="flex items-center gap-1">
                   <Paperclip className="h-3.5 w-3.5" />
-                  {(call as any).attachmentsCount}
+                  {call.attachmentsCount}
                 </span>
               ) : null}
             </div>
@@ -310,7 +333,7 @@ export function CallCard({
             </button>
             {openMenu === "status" ? (
               <div className="absolute bottom-9 left-1/2 z-20 w-36 -translate-x-1/2 rounded-lg border border-slate-100 bg-white py-1 shadow-lg">
-                {TASK_STATUSES.map((status) => (
+                {CALL_STAGES.map((status) => (
                   <button
                     key={status}
                     type="button"

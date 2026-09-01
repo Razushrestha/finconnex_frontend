@@ -126,15 +126,15 @@ export function Navbar({
         <button
           type="button"
           onClick={() => setSearchOpen(true)}
-          aria-label="Search keywords (Ctrl+K)"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/80 sm:w-[14.5rem] sm:justify-start sm:gap-2 sm:px-3"
+          aria-label="Search keywords (⌘K or Ctrl+K)"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/80 sm:w-[16.5rem] sm:justify-start sm:gap-2 sm:px-3"
         >
           <Search className="h-4 w-4 shrink-0" strokeWidth={1.75} />
           <span className="hidden min-w-0 flex-1 truncate text-left text-sm sm:inline">
             Search keywords
           </span>
-          <kbd className="ml-auto hidden rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium sm:inline">
-            ⌘K
+          <kbd className="ml-auto hidden rounded-md border border-border bg-background px-1.5 py-0.5 text-[10px] font-medium tracking-tight sm:inline">
+            ⌘/Ctrl K
           </kbd>
         </button>
 
@@ -174,6 +174,7 @@ export function Navbar({
         >
           <Calendar className="h-[18px] w-[18px]" />
         </Link>
+
       </div>
 
       <div className="relative" ref={menuRef}>

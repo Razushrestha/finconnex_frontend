@@ -84,7 +84,7 @@ export function NotesKanbanBoard({
   }
 
   return (
-    <div className="flex h-full min-h-[420px] items-stretch gap-3 overflow-x-auto p-1">
+    <div className="flex h-full w-full min-h-[420px] min-w-0 items-stretch gap-3 overflow-x-auto p-1">
       {columns.map((column) => (
         <NotesKanbanColumn
           key={column.id}

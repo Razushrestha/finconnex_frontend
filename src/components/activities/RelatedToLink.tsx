@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { hrefForRelatedTo } from "@/lib/activities/related-href";
+import { formatRelatedTo, type RelatedTo } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
 
 interface RelatedToLinkProps {
-  relatedTo?: string;
+  relatedTo?: string | RelatedTo;
   className?: string;
 }
 
 export function RelatedToLink({ relatedTo, className }: RelatedToLinkProps) {
-  const label = relatedTo?.trim() || "Unrelated";
-  const href = hrefForRelatedTo(relatedTo);
+  const label = formatRelatedTo(relatedTo).trim() || "Unrelated";
+  const href = hrefForRelatedTo(label);
 
   if (!href) {
     return <span className={cn("truncate", className)}>{label}</span>;

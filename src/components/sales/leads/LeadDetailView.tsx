@@ -2,14 +2,22 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useModuleBack } from "@/hooks/useModuleBack";
 import { LeadCardData, type LeadStatus } from "@/lib/leads/types";
 import { logCreate, logEdit } from "@/lib/rules";
 import { emitRulesChange } from "@/lib/rules/storage";
-import { updateLead } from "@/lib/leads/store";
+import {
+  cloneLead,
+  deleteLead,
+  updateLead,
+  upsertLeadFromCard,
+} from "@/lib/leads/store";
 import { convertCrmLead, createCrmDeal, syncLeadStatus, updateCrmLead } from "@/lib/leads/api";
 import { mapCrmLeadToCard } from "@/lib/leads/api/map";
 import { isUuid } from "@/lib/activity-timeline/auth";
-import { upsertLeadFromCard } from "@/lib/leads/store";
+import { leadSendHref } from "@/lib/leads/convert-actions";
+import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
+import type { LeadMoreAction } from "@/components/sales/leads/LeadMoreMenu";
 import { createDeal } from "@/lib/deals/store";
 import { sendEmailDemoLive } from "@/lib/comms/send-gateway";
 import { createEmail } from "@/lib/emails/store";
@@ -41,10 +49,12 @@ const DEAL_STAGES = [
 
 export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
   const router = useRouter();
+  const back = useModuleBack("/sales/leads", "Back to Leads");
   const [card, setCard] = useState(initial);
   const [isConvertOpen, setIsConvertOpen] = useState(false);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
 
   function notify(msg: string) {
@@ -83,6 +93,81 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
         return;
       }
     }
+    convertLocally(values);
+  }
+
+  function handleMoreAction(action: LeadMoreAction) {
+    if (action === "clone") {
+      const copy = cloneLead(card.id);
+      if (!copy) return;
+      emitRulesChange("all");
+      notify(`Cloned ${copy.name}`);
+      router.push(`/sales/leads/detail/${encodeURIComponent(copy.id)}`);
+      return;
+    }
+    if (action === "share") {
+      void navigator.clipboard.writeText(window.location.href);
+      notify("Lead link copied");
+      return;
+    }
+    if (action === "print") {
+      window.print();
+      return;
+    }
+    if (action === "export") {
+      const rows = [
+        ["Name", "Email", "Phone", "Company", "Owner", "Source", "Stage", "Tags"],
+        [
+          card.name,
+          card.email,
+          card.phone,
+          card.company,
+          card.owner,
+          card.source,
+          card.pipelineStage ?? "",
+          (card.tags ?? []).join("; "),
+        ],
+      ];
+      const csv = rows
+        .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${card.name.replace(/\s+/g, "-").toLowerCase()}-lead.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      notify("Lead exported");
+      return;
+    }
+    if (action === "meet-now") {
+      router.push(
+        leadSendHref("/activities/meetings/create", card),
+      );
+      return;
+    }
+    if (action === "delete") {
+      if (!window.confirm(`Delete ${card.name}? This cannot be undone.`)) return;
+      deleteLead(card.id);
+      emitRulesChange("all");
+      notify("Lead deleted");
+      router.push(back.href);
+      return;
+    }
+    if (action === "archive") {
+      const updated = updateLead(card.id, { archived: true });
+      if (updated) setCard(updated);
+      emitRulesChange("all");
+      notify("Lead archived");
+      return;
+    }
+    if (action === "history") {
+      setHistoryOpen(true);
+    }
+  }
+
+  function convertLocally(values: ConvertToDealFormValues) {
     const deal = createDeal({
       dealName: values.dealName,
       account: card.company || card.name,
@@ -113,7 +198,7 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
   }
 
   return (
-    <div className="relative mx-auto w-full max-w-[1920px] p-3 lg:p-5 2xl:px-8">
+    <div className="relative mx-auto flex h-full min-h-0 w-full max-w-[1920px] flex-col overflow-hidden px-3 py-3 lg:px-5">
       {flash ? (
         <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-semibold text-white shadow-lg">
           {flash}
@@ -122,11 +207,17 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
 
       <LeadMortgageDetail
         card={card}
-        onCall={() => notify("Starting call…")}
+        backHref={back.href}
+        backLabel={back.label}
+        onCall={() => undefined}
         onEmail={() => setIsComposeOpen(true)}
         onConvert={() => setIsConvertOpen(true)}
         onEdit={() => setIsEditOpen(true)}
-        onMore={() => notify("More actions…")}
+        onMoreAction={handleMoreAction}
+        onTagsChange={(tags) => {
+          const updated = updateLead(card.id, { tags });
+          if (updated) setCard(updated);
+        }}
         onStatusChange={(pipelineStage) => {
           void (async () => {
             if (isUuid(card.id)) {
@@ -144,8 +235,22 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
             }
           })();
         }}
-        onStartCall={() => notify("Starting call…")}
+        onLeadPatch={(patch) => {
+          const updated = updateLead(card.id, patch);
+          if (updated) {
+            setCard(updated);
+            notify("Lead field saved");
+            return;
+          }
+          setCard((current) => ({
+            ...current,
+            ...patch,
+            custom: { ...(current.custom ?? {}), ...(patch.custom ?? {}) },
+          }));
+        }}
+        onStartCall={() => undefined}
         onReschedule={() => notify("Reschedule next action…")}
+        onComplete={() => notify("Next action marked completed")}
       />
 
       <ConvertToDealModal
@@ -173,8 +278,29 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
         defaultGreeting={`Hi ${card.name.split(" ")[0]},`}
         onSend={(values) => {
           void (async () => {
+            const to = values.toList?.length
+              ? values.toList
+              : values.to
+                ? values.to.split(/[,;]+/).map((part) => part.trim()).filter(Boolean)
+                : [card.email];
+            if (values.sendAt) {
+              createEmail({
+                subject: values.subject || "(no subject)",
+                body: values.body || "",
+                from: "noreply@finconnex.demo",
+                to,
+                cc: values.ccList,
+                bcc: values.bccList,
+                status: "Scheduled",
+                sentDate: values.sendAt,
+                relatedTo: `Lead: ${card.name}`,
+              });
+              setIsComposeOpen(false);
+              notify("Email scheduled");
+              return;
+            }
             const result = await sendEmailDemoLive({
-              email: card.email,
+              email: to[0],
               subject: values.subject,
               body: values.body,
             });
@@ -186,16 +312,42 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
               subject: values.subject || "(no subject)",
               body: values.body || "",
               from: "noreply@finconnex.demo",
-              to: [card.email],
+              to,
+              cc: values.ccList,
+              bcc: values.bccList,
               status: "Sent",
               sentDate: formatRulesAt(),
               relatedTo: `Lead: ${card.name}`,
             });
             setIsComposeOpen(false);
-            notify("Email sent via demo gateway");
+            notify(
+              to.length > 1
+                ? `Email sent to ${to.length} recipients`
+                : "Email sent via demo gateway",
+            );
           })();
         }}
       />
+
+      {historyOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-4 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-[15px] font-semibold text-slate-900">
+                Change history
+              </h2>
+              <button
+                type="button"
+                onClick={() => setHistoryOpen(false)}
+                className="rounded-md px-2 py-1 text-[12px] font-medium text-slate-500 hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+            <RecordAuditHistory module="sales.leads" recordId={card.id} />
+          </div>
+        </div>
+      ) : null}
 
       <EditLeadModal
         isOpen={isEditOpen}

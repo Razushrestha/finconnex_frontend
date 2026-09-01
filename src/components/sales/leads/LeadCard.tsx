@@ -2,6 +2,7 @@
 
 import { useId, useMemo, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   Phone,
   MessageSquare,
@@ -11,14 +12,7 @@ import {
   StickyNote,
   Paperclip,
   Send,
-  Plus,
-  Minus,
-  Bell,
   FileText,
-  UserCog,
-  MoreHorizontal,
-  Speaker,
-  Trash2,
   Settings,
 } from "lucide-react";
 import type { LeadCardData, LeadStatus } from "@/lib/leads/types";
@@ -51,6 +45,8 @@ import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion, cardSubject, entityCardShell } from "@/lib/motion";
 import { KANBAN_CARD } from "@/lib/layout";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
+import { LEAD_SEND_ACTIONS, leadSendHref } from "@/lib/leads/convert-actions";
+import { sendClientPortalForLead } from "@/lib/portals/send-from-lead";
 
 interface LeadCardProps {
   card: LeadCardData;
@@ -247,6 +243,7 @@ export function LeadCard({
 
             {selected && (
               <LeadCardActionsMenu
+                card={card}
                 onClose={() => setSelected(false)}
                 onCustomizeCard={() => {
                   setSelected(false);
@@ -370,12 +367,15 @@ export function LeadCard({
 
 /** Bulk-action dropdown shown once a card is selected via its checkbox. */
 function LeadCardActionsMenu({
+  card,
   onClose,
   onCustomizeCard,
 }: {
+  card: LeadCardData;
   onClose: () => void;
   onCustomizeCard: () => void;
 }) {
+  const router = useRouter();
   return (
     <>
       <div
@@ -389,28 +389,42 @@ function LeadCardActionsMenu({
       <div
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
-        className="absolute right-0 top-full z-30 mt-1 w-48 overflow-hidden rounded-md border border-slate-200 bg-white py-1.5 text-left shadow-lg"
+        className="absolute right-0 top-full z-30 mt-1 w-56 overflow-hidden rounded-md border border-slate-200 bg-white py-1.5 text-left shadow-lg"
       >
-        <MenuItem icon={Send} label="Send mail" />
-
+        <MenuItem
+          icon={Send}
+          label="Convert to Deal"
+          onClick={() => {
+            onClose();
+            router.push(`/sales/leads/detail/${encodeURIComponent(card.id)}`);
+          }}
+        />
         <MenuDivider />
-        <MenuSectionLabel>Tags</MenuSectionLabel>
-        <MenuItem icon={Plus} label="Add tag" />
-        <MenuItem icon={Minus} label="Remove tag" />
-
+        {LEAD_SEND_ACTIONS.map((item) => (
+          <MenuItem
+            key={item.id}
+            icon={FileText}
+            label={item.label}
+            onClick={() => {
+              onClose();
+              if (item.id === "portal") {
+                void sendClientPortalForLead(card).then((result) => {
+                  if (!result.ok) {
+                    toast.error(result.message);
+                    return;
+                  }
+                  toast.success(`Portal link sent to ${card.email}`, {
+                    description: result.url,
+                  });
+                });
+                return;
+              }
+              const href = leadSendHref(item.href, card);
+              router.push(href);
+            }}
+          />
+        ))}
         <MenuDivider />
-        <div className="flex items-center justify-between px-3 pb-0.5 pt-1">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-            More
-          </span>
-          <MoreHorizontal className="h-3 w-3 text-slate-300" />
-        </div>
-        <MenuItem icon={CheckSquare} label="Create task" />
-        <MenuItem icon={Bell} label="Set reminder" />
-        <MenuItem icon={FileText} label="Mass update" />
-        <MenuItem icon={UserCog} label="Change owner" />
-        <MenuItem icon={Speaker} label="Add to campaign" />
-        <MenuItem icon={Trash2} label="Delete" />
         <MenuItem
           icon={Settings}
           label="Customize Card"
@@ -418,14 +432,6 @@ function LeadCardActionsMenu({
         />
       </div>
     </>
-  );
-}
-
-function MenuSectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="px-3 pb-0.5 pt-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-      {children}
-    </p>
   );
 }
 

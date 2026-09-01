@@ -48,5 +48,9 @@ export default function LeadDetailPage() {
     );
   }
 
-  return <LeadDetailView card={card} />;
+  return (
+    <div className="h-full min-h-0 overflow-hidden">
+      <LeadDetailView card={card} />
+    </div>
+  );
 }

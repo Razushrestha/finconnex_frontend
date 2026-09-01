@@ -15,6 +15,7 @@ import { TaskSidebarTimeline } from "./TaskSidebarTimeline";
 interface TaskDetailsViewProps {
   task: Task;
   onBack: () => void;
+  backLabel?: string;
   onUpdateStatus: (status: TaskStatus) => void;
   onUpdateDescription?: (description: string) => void;
   onAddNote?: (body: string) => void;
@@ -29,6 +30,7 @@ interface TaskDetailsViewProps {
 export function TaskDetailsView({
   task,
   onBack,
+  backLabel,
   onUpdateStatus,
   onUpdateDescription,
   onAddNote,
@@ -38,7 +40,12 @@ export function TaskDetailsView({
     <TaskEditProvider>
       <div className="min-h-screen bg-white">
         <div className="px-6 lg:px-10">
-          <TaskHeader onBack={onBack} onUpdateStatus={onUpdateStatus} />
+          <TaskHeader
+            taskId={task.taskId}
+            onBack={onBack}
+            backLabel={backLabel}
+            onUpdateStatus={onUpdateStatus}
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -47,11 +54,6 @@ export function TaskDetailsView({
               task={task}
               onUpdateStatus={onUpdateStatus}
               onSaveDetails={onSaveDetails}
-            />
-            <TaskRemindersCard
-              taskId={task.taskId}
-              reminders={task.reminders}
-              dueDate={task.dueDate}
             />
             <TaskDescriptionCard
               description={task.description}
@@ -72,7 +74,12 @@ export function TaskDetailsView({
               owner={task.assignedTo}
               collaborators={task.collaborators}
             />
-            <TaskSidebarTimeline />
+            <TaskRemindersCard
+              taskId={task.taskId}
+              reminders={task.reminders}
+              dueDate={task.dueDate}
+            />
+            <TaskSidebarTimeline task={task} />
           </aside>
         </div>
       </div>

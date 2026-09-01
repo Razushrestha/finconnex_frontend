@@ -15,6 +15,7 @@ export function fail(code: string, message: string): RuleFail {
 export type RulesActor = {
   id?: string;
   name: string;
+  email?: string;
   role?: string;
 };
 

@@ -29,9 +29,11 @@ import type {
   Task,
   TaskActionItem,
   TaskColumn,
+  TaskReminder,
   TaskStatus,
   TaskType,
 } from "@/lib/tasks/types";
+import type { ReminderRepeatRule } from "@/lib/tasks/repeat-reminder";
 import type { RelatedTo } from "@/lib/activities/shared";
 import type { NotificationMethod } from "@/lib/reminders/types";
 import type { SupportTicket, TicketPriority, TicketStatus } from "@/lib/support/types";
@@ -200,6 +202,8 @@ export interface TaskCreateInput {
   description?: string;
   notes?: string;
   reminderDate?: string;
+  reminders?: TaskReminder[];
+  repeatRule?: ReminderRepeatRule;
   actionItems?: TaskActionItem[];
   collaborators?: string[];
   notifyBy?: NotificationMethod[];

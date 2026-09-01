@@ -9,13 +9,11 @@ import type {
   LeadSlaViewModel,
   MortgagePipelineStage,
 } from "@/lib/pipeline-sla/types";
-import { MORTGAGE_PIPELINE_STAGES } from "@/lib/pipeline-sla/types";
+import { resolvePipelineStage } from "@/lib/pipeline-sla/board";
 
 function asStage(raw?: string): MortgagePipelineStage | null {
   if (!raw) return null;
-  return (MORTGAGE_PIPELINE_STAGES as readonly string[]).includes(raw)
-    ? (raw as MortgagePipelineStage)
-    : null;
+  return resolvePipelineStage(raw);
 }
 
 /** Resolve SLA view for a Kanban card. */

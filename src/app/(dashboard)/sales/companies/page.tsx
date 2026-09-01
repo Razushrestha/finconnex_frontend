@@ -19,7 +19,7 @@ import {
   type CompanyGroup,
   type CompanyStatus,
 } from "@/lib/companies/types";
-import { listCompanyGroups } from "@/lib/companies/store";
+import { listCompanyGroups, findCompanyById, updateCompany } from "@/lib/companies/store";
 import {
   applyCompanyImport,
   COMPANY_IMPORT_FIELDS,
@@ -50,6 +50,7 @@ import {
 import { SORT_OPTIONS } from "../leads/page";
 import type { CompanyQuickActionKind } from "@/components/sales/companies/CompanyCard";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
+import { uniqueTags } from "@/lib/tags";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { MergeRecordsModal } from "@/components/sales/merge/MergeRecordsModal";
 
@@ -246,7 +247,18 @@ export default function CompaniesPage() {
           selectedCount={selectedIds.length}
           onClear={() => setSelectedIds([])}
           onSendMail={() => console.log("send mail clicked")}
-          onAddTag={() => console.log("add tag clicked")}
+          onAddTag={(tag) => {
+            let n = 0;
+            for (const id of selectedIds) {
+              const found = findCompanyById(id);
+              if (!found) continue;
+              updateCompany(found.company.id, {
+                tags: uniqueTags([...(found.company.tags ?? []), tag]),
+              });
+              n += 1;
+            }
+            setBulkFlash(`Tagged ${n} compan${n === 1 ? "y" : "ies"} with #${tag}`);
+          }}
           onRemoveTag={() => console.log("remove tag clicked")}
           onRunMacro={() => console.log("run macro clicked")}
           onCreateTask={() => console.log("create task clicked")}

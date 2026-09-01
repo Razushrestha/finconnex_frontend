@@ -87,7 +87,7 @@ export function EmailsKanbanBoard() {
   }
 
   return (
-    <div className="flex h-full items-stretch gap-4 overflow-x-auto p-1">
+    <div className="flex h-full w-full min-w-0 items-stretch gap-4 overflow-x-auto p-1">
       {columns.map((column) => (
         <EmailsKanbanColumn
           key={column.id}

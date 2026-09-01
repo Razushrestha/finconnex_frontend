@@ -4,12 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import { Phone, ChevronLeft, ChevronRight } from "lucide-react";
 import { cardSubject } from "@/lib/motion";
 import { cn } from "@/lib/utils";
-import { listCalls } from "@/lib/calls/store";
+import {
+  callMatchesScope,
+  isCallOverdue,
+  listCalls,
+  type CallScope,
+} from "@/lib/calls/store";
 import { onRulesChange } from "@/lib/rules/storage";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
 import { useRouter } from "next/navigation";
 
 interface CallsListTableProps {
+  scope?: CallScope;
   sortActive: boolean;
   filterOpen?: boolean;
   selectedIds?: string[];
@@ -17,6 +23,7 @@ interface CallsListTableProps {
 }
 
 export function CallsListTable({
+  scope = "all",
   sortActive,
   filterOpen = false,
   selectedIds: controlledSelectedIds,
@@ -40,17 +47,21 @@ export function CallsListTable({
   }, []);
 
   useEffect(() => {
+    setPage(1);
+  }, [scope]);
+
+  useEffect(() => {
     return onRulesChange(() => setTick((n) => n + 1));
   }, []);
 
   const sorted = useMemo(() => {
-    const data = [...listCalls()];
+    const data = listCalls().filter((call) => callMatchesScope(call, scope));
     if (sortActive) {
       data.sort((a, b) => a.date.localeCompare(b.date));
     }
     return data;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sortActive, tick]);
+  }, [scope, sortActive, tick]);
 
   useEffect(() => {
     const focus = new URLSearchParams(window.location.search).get("focus");
@@ -159,8 +170,15 @@ export function CallsListTable({
                 </td>
                 <td className="px-3 py-2 text-slate-600">{call.callType}</td>
                 <td className="px-3 py-2 text-slate-600">{call.status}</td>
-                <td className="px-3 py-2 whitespace-nowrap text-slate-500">
-                  {call.date}
+                <td
+                  className={cn(
+                    "px-3 py-2 whitespace-nowrap",
+                    isCallOverdue(call)
+                      ? "font-medium text-rose-600"
+                      : "text-slate-500",
+                  )}
+                >
+                  {isCallOverdue(call) ? `Overdue · ${call.date}` : call.date}
                 </td>
                 <td className="px-3 py-2 text-slate-500">
                   {call.duration || ""}

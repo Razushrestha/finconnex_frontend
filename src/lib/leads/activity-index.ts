@@ -21,8 +21,24 @@ import { reminders } from "@/lib/reminders/types";
 import { extrasToCandidates } from "@/lib/leads/lead-extras-store";
 import { statusHistoryToCandidates } from "@/lib/leads/lead-status-history";
 import { listTaskColumns } from "@/lib/tasks/store";
+import { listWorkflowLogs } from "@/lib/workflows/runner";
+import {
+  pickNextBestAction,
+  type NextBestPriority,
+} from "@/lib/leads/next-best-action";
+import {
+  namesEqual,
+  parseRelatedRef,
+  relatedMatchesEntity,
+} from "@/lib/related-entity";
 
-const OPEN_TASK = new Set(["Not Started", "In Progress", "Deferred"]);
+const OPEN_TASK = new Set([
+  "Not Started",
+  "In Progress",
+  "Waiting",
+  "Review",
+  "Deferred",
+]);
 const OPEN_CALL = new Set(["Scheduled", "No Answer", "Voicemail Left"]);
 const OPEN_MEETING = new Set(["Scheduled", "In Progress", "Rescheduled"]);
 const OPEN_REMINDER = new Set(["Pending", "Snoozed"]);
@@ -31,20 +47,19 @@ const OWNER_SET = new Set(
   ACTIVITY_OWNERS.map((o) => o.toLowerCase()),
 );
 
-function namesEqual(a: string, b: string) {
-  return a.trim().toLowerCase() === b.trim().toLowerCase();
+function snippet(text?: string) {
+  const clean = (text ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  if (!clean) return "";
+  return clean.length <= 180 ? clean : `${clean.slice(0, 179).trimEnd()}…`;
 }
 
 /** Parse "Lead: Name" / RelatedTo / bare name → lead name if kind is Lead. */
 export function leadNameFromRelated(
   related?: string | { kind: string; name: string } | null,
 ): string | null {
-  if (!related) return null;
-  if (typeof related === "object") {
-    return related.kind === "Lead" ? related.name : null;
-  }
-  const m = related.match(/^Lead:\s*(.+)$/i);
-  if (m) return m[1].trim();
+  const parsed = parseRelatedRef(related);
+  if (!parsed?.name) return null;
+  if (!parsed.kind || parsed.kind === "Lead") return parsed.name;
   return null;
 }
 
@@ -52,8 +67,7 @@ export function relatedMatchesLead(
   related: string | { kind: string; name: string } | undefined,
   leadName: string,
 ): boolean {
-  const name = leadNameFromRelated(related);
-  return !!name && namesEqual(name, leadName);
+  return relatedMatchesEntity(related, { kind: "Lead", name: leadName });
 }
 
 function classifySchedule(
@@ -72,13 +86,20 @@ function isOwnerName(name: string) {
   return OWNER_SET.has(name.trim().toLowerCase());
 }
 
+function taskPriority(priority?: string): "high" | "normal" | "low" {
+  if (priority === "Critical" || priority === "High") return "high";
+  if (priority === "Low") return "low";
+  return "normal";
+}
+
 function fromTasks(leadName: string, now: Date): LeadActivityCandidate[] {
   const out: LeadActivityCandidate[] = [];
   for (const col of listTaskColumns()) {
     for (const t of col.tasks) {
       if (!relatedMatchesLead(t.relatedTo, leadName)) continue;
       const dueAt = parseFlexibleDate(t.dueDate);
-      const createdAt = parseFlexibleDate(t.reminderDate) ?? dueAt;
+      const createdAt = parseFlexibleDate(t.createdOn) ?? dueAt;
+      const priority = taskPriority(t.priority);
 
       if (t.status === "Completed") {
         out.push({
@@ -88,6 +109,9 @@ function fromTasks(leadName: string, now: Date): LeadActivityCandidate[] {
           dueAt: parseFlexibleDate(t.completedDate) ?? dueAt,
           createdAt,
           bucket: "completed",
+          priority,
+          actor: t.completedBy || t.modifiedBy || t.assignedTo,
+          body: t.description || t.notes,
           sourceModule: "tasks",
         });
         continue;
@@ -102,6 +126,9 @@ function fromTasks(leadName: string, now: Date): LeadActivityCandidate[] {
         dueAt,
         createdAt,
         bucket: classifySchedule(dueAt, now),
+        priority,
+        actor: t.assignedTo,
+        body: t.description || t.notes,
         sourceModule: "tasks",
       });
     }
@@ -134,6 +161,8 @@ function fromCalls(leadName: string, now: Date): LeadActivityCandidate[] {
         dueAt,
         createdAt,
         bucket: "completed",
+        actor: c.assignedTo,
+        body: c.notes || c.subject,
         sourceModule: "calls",
       });
       continue;
@@ -151,6 +180,8 @@ function fromCalls(leadName: string, now: Date): LeadActivityCandidate[] {
         createdAt,
         bucket: "broken",
         isMissed: true,
+        actor: c.assignedTo,
+        body: c.notes || c.subject,
         sourceModule: "calls",
       });
       continue;
@@ -164,6 +195,8 @@ function fromCalls(leadName: string, now: Date): LeadActivityCandidate[] {
       dueAt,
       createdAt,
       bucket: classifySchedule(dueAt, now),
+      actor: c.assignedTo,
+      body: c.notes || c.subject,
       sourceModule: "calls",
     });
   }
@@ -185,6 +218,8 @@ function fromMeetings(leadName: string, now: Date): LeadActivityCandidate[] {
         dueAt: parseFlexibleDate(m.endDateTime) ?? dueAt,
         createdAt,
         bucket: "completed",
+        actor: m.organizer,
+        body: m.notes || m.agenda,
         sourceModule: "meetings",
       });
       continue;
@@ -200,6 +235,8 @@ function fromMeetings(leadName: string, now: Date): LeadActivityCandidate[] {
       dueAt,
       createdAt,
       bucket: classifySchedule(dueAt, now),
+      actor: m.organizer,
+      body: m.notes || m.agenda,
       sourceModule: "meetings",
     });
   }
@@ -363,6 +400,8 @@ function fromNotes(leadName: string): LeadActivityCandidate[] {
       dueAt: at,
       createdAt: at,
       bucket: "completed",
+      actor: n.createdBy,
+      body: snippet(n.body) || n.title,
       sourceModule: "notes",
     });
   }
@@ -381,6 +420,8 @@ function fromAttachments(leadName: string): LeadActivityCandidate[] {
       dueAt: at,
       createdAt: at,
       bucket: "completed",
+      actor: a.uploadedBy,
+      body: a.notes || a.fileName,
       sourceModule: "attachments",
     });
   }
@@ -393,6 +434,22 @@ function fromDocumentRequests(leadName: string): LeadActivityCandidate[] {
   for (const r of listDocumentRequests()) {
     if (!relatedMatchesLead(r.relatedTo, leadName)) continue;
     const at = parseFlexibleDate(r.requestedDate);
+    if (r.timeline?.length) {
+      for (const event of r.timeline) {
+        out.push({
+          id: event.id,
+          kind: "document",
+          title: event.label,
+          dueAt: parseFlexibleDate(event.at) ?? at,
+          createdAt: parseFlexibleDate(event.at) ?? at,
+          bucket: "completed",
+          actor: event.by,
+          body: event.detail || r.title,
+          sourceModule: "documents",
+        });
+      }
+      continue;
+    }
     out.push({
       id: r.id,
       kind: "document",
@@ -400,7 +457,32 @@ function fromDocumentRequests(leadName: string): LeadActivityCandidate[] {
       dueAt: at,
       createdAt: at,
       bucket: "completed",
+      actor: r.requestedBy,
+      body: r.notes || r.title,
       sourceModule: "documents",
+    });
+  }
+  return out;
+}
+
+function fromWorkflows(leadName: string): LeadActivityCandidate[] {
+  const key = leadName.trim().toLowerCase();
+  if (!key) return [];
+  const out: LeadActivityCandidate[] = [];
+  for (const log of listWorkflowLogs()) {
+    const blob = `${log.journeyName} ${log.message}`.toLowerCase();
+    if (!blob.includes(key)) continue;
+    const at = parseFlexibleDate(log.at);
+    out.push({
+      id: log.id,
+      kind: "workflow",
+      title: log.message || log.journeyName,
+      dueAt: at,
+      createdAt: at,
+      bucket: "completed",
+      actor: "Automation",
+      body: log.journeyName,
+      sourceModule: "leads",
     });
   }
   return out;
@@ -423,6 +505,7 @@ export function listLeadActivityCandidates(
     ...fromDocumentRequests(leadName),
     ...statusHistoryToCandidates(leadName),
     ...extrasToCandidates(leadName),
+    ...fromWorkflows(leadName),
   ];
 }
 
@@ -452,4 +535,57 @@ export function hrefForLeadActivity(c: LeadActivityCandidate): string | null {
   params.set("focus", c.id);
   params.set("q", c.title);
   return `${path}?${params.toString()}`;
+}
+
+export type LeadNextBestKind = "call" | "meeting" | "task";
+
+export type LeadNextBestActivity = {
+  id: string;
+  kind: LeadNextBestKind;
+  title: string;
+  subtitle: string;
+  at: Date;
+  createdAt: Date;
+  priority: NextBestPriority;
+  actor?: string;
+  actionable: true;
+};
+
+function asNextBestKind(kind: LeadActivityCandidate["kind"]): LeadNextBestKind | null {
+  if (kind === "call" || kind === "meeting" || kind === "task") return kind;
+  return null;
+}
+
+export function hrefForLeadNextBest(kind: LeadNextBestKind, id: string) {
+  if (kind === "task") return `/activities/tasks/detail/${id}`;
+  if (kind === "call") return `/activities/calls/detail/${id}`;
+  return `/activities/meetings/detail/${id}`;
+}
+
+/** Same ranking as the lead Activities tab: overdue → today → upcoming calls, meetings, and tasks. */
+export function leadNextBestActivity(
+  leadName: string,
+  now = new Date(),
+): LeadNextBestActivity | null {
+  const rows = listLeadActivityCandidates(leadName, now).flatMap((item) => {
+    const kind = asNextBestKind(item.kind);
+    if (!kind || item.bucket === "completed") return [];
+    const at = item.dueAt ?? item.createdAt;
+    if (!at) return [];
+    return [
+      {
+        id: item.id,
+        kind,
+        title: item.title,
+        subtitle: item.body?.trim() ?? "",
+        at,
+        createdAt: item.createdAt ?? at,
+        priority:
+          item.priority ?? (kind === "call" || item.bucket === "broken" ? "high" : "normal"),
+        actor: item.actor,
+        actionable: true as const,
+      },
+    ];
+  });
+  return pickNextBestAction(rows, now);
 }

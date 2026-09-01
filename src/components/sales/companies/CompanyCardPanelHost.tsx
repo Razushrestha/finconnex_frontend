@@ -1,6 +1,7 @@
 "use client";
 
 import { MentionTextarea } from "@/components/shared/MentionTextarea";
+import { RelatedInternalNotes } from "@/components/shared/RelatedInternalNotes";
 import { useState } from "react";
 import { X } from "lucide-react";
 import type { CompanyQuickActionKind } from "@/components/sales/companies/CompanyCard";
@@ -65,14 +66,23 @@ export function CompanyCardPanelHost({
           </button>
         </div>
 
-        <QuickActionForm
-          panel={panel}
-          onCancel={onClose}
-          onSubmit={(message) => {
-            onQuickActionSuccess(message);
-            onClose();
-          }}
-        />
+        {panel.kind === "note" ? (
+          <div className="flex-1 overflow-y-auto px-5 py-5">
+            <RelatedInternalNotes
+              relatedTo={`Company: ${panel.companyName}`}
+              onNotify={(message) => onQuickActionSuccess(message)}
+            />
+          </div>
+        ) : (
+          <QuickActionForm
+            panel={panel}
+            onCancel={onClose}
+            onSubmit={(message) => {
+              onQuickActionSuccess(message);
+              onClose();
+            }}
+          />
+        )}
       </div>
     </div>
   );

@@ -33,6 +33,17 @@ export const BOARD_PAGE =
 /** Record / content cards — always white so boards match Contacts. */
 export const CARD_SURFACE = "bg-white dark:bg-zinc-900";
 
+/** Horizontal strip that holds every kanban stage (Tasks reference). */
+export const KANBAN_BOARD_ROW =
+  "flex h-full w-full min-w-0 items-stretch gap-3 overflow-x-auto overflow-y-hidden bg-slate-50 p-1 pr-3";
+
+/**
+ * Full-height stage scrollbar in the gutter to the right of the well —
+ * not inset inside the cards. Only appears when the column overflows.
+ */
+export const KANBAN_STAGE_SCROLL =
+  "min-h-0 flex-1 overflow-y-auto overflow-x-hidden -mr-2.5 [scrollbar-width:thin] [scrollbar-color:#94a3b8_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300";
+
 /** Kanban column well behind cards. */
 export const KANBAN_WELL = "border-slate-200/60 bg-slate-100/60";
 
@@ -48,13 +59,17 @@ export const KANBAN_HEADER_RAIL =
 export const KANBAN_HEADER_COUNT =
   "inline-flex shrink-0 items-center rounded-full bg-[#5A32A3]/15 px-2.5 py-0.5 text-xs font-medium text-[#5A32A3]";
 
-/** Expanded kanban column — identical size on every board. */
+/**
+ * Expanded kanban column. Stays at least 272px; grows equally to fill
+ * leftover page width when there are few stages. Extra stages keep the
+ * minimum width and the row scrolls.
+ */
 export const KANBAN_COL =
-  "w-[272px] min-w-[272px] max-w-[272px] flex-shrink-0";
+  "min-w-[272px] min-h-0 flex-1 overflow-visible";
 
 /** Collapsed kanban rail. */
 export const KANBAN_COL_COLLAPSED =
-  "w-14 min-w-[3.5rem] max-w-[3.5rem] flex-shrink-0";
+  "w-10 min-w-[2.5rem] max-w-[2.5rem] flex-shrink-0";
 
 /** Title row inside a kanban header. */
 export const KANBAN_HEADER_TITLE =
@@ -67,5 +82,13 @@ export const KANBAN_CARD =
 /** Drop ghost matching kanban card height. */
 export const KANBAN_CARD_SLOT = "h-[252px]";
 
+/** Card-move placeholder — same on every board (Tasks reference). */
+export const KANBAN_DROP_GHOST =
+  "h-20 w-full shrink-0 rounded-xl border-2 border-dashed border-indigo-400 bg-indigo-50/50 transition-all animate-pulse";
+
 /** Page canvas behind cards. */
 export const PAGE_CANVAS = "bg-slate-50";
+
+/** Persistent Zoho-style utility bar at the bottom of the dashboard. */
+export const BOTTOM_BAR_H = "h-10";
+export const BOTTOM_BAR_OFFSET = "pb-10";

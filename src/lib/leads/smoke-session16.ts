@@ -94,7 +94,7 @@ function assertPdfTimeline() {
 
   // Day 10 — Waiting on Documents; Processing milestone due 11 Jul → At Risk / Due Tomorrow
   const day10 = computeLeadSla({
-    stage: "Waiting on Documents",
+    stage: "Waiting on Docs",
     stageEnteredAt: new Date("2026-07-10T10:00:00"),
     pipelineStartedAt: started,
     config,
@@ -105,15 +105,15 @@ function assertPdfTimeline() {
       `PDF Day10 expected At Risk (due tomorrow), got ${day10.badgeLabel} (${day10.badgeBand})`,
     );
   }
-  if (day10.milestoneClock?.targetStage !== "Processing") {
+  if (day10.milestoneClock?.targetStage !== "Research & Servicing") {
     fail(
-      `PDF Day10 primary milestone should be Processing, got ${day10.milestoneClock?.targetStage}`,
+      `PDF Day10 primary milestone should be Research & Servicing, got ${day10.milestoneClock?.targetStage}`,
     );
   }
 
   // Day 11 — milestone past due, stage still OK → Milestone Overdue
   const day11 = computeLeadSla({
-    stage: "Waiting on Documents",
+    stage: "Waiting on Docs",
     stageEnteredAt: new Date("2026-07-10T10:00:00"),
     pipelineStartedAt: started,
     config,
@@ -125,7 +125,7 @@ function assertPdfTimeline() {
 
   // Day 16 — still milestone overdue (PDF “OVERDUE 6 Days” style)
   const day16 = computeLeadSla({
-    stage: "Waiting on Documents",
+    stage: "Waiting on Docs",
     stageEnteredAt: new Date("2026-07-10T10:00:00"),
     pipelineStartedAt: started,
     config,
@@ -161,9 +161,9 @@ function assertPdfTimeline() {
       `PDF milestone missing duration label, got ${sarah.milestoneClock?.durationLabel}`,
     );
   }
-  if (sarah.milestoneClock.targetStage !== "Processing") {
+  if (sarah.milestoneClock.targetStage !== "Research & Servicing") {
     fail(
-      `PDF Sarah-style primary milestone expected Processing, got ${sarah.milestoneClock.targetStage}`,
+      `PDF Sarah-style primary milestone expected Research & Servicing, got ${sarah.milestoneClock.targetStage}`,
     );
   }
 }
@@ -178,22 +178,22 @@ function assertPdfSeedDefaults() {
   }
   if (byStage["Appointment Booked"]?.amount !== 2) fail("PDF seed: Appt 2 days");
   if (byStage["In Conversation"]?.amount !== 7) fail("PDF seed: Convo 7 days");
-  if (byStage["Waiting on Documents"]?.amount !== 14) {
-    fail("PDF seed: Waiting on Documents 14 days");
+  if (byStage["Waiting on Docs"]?.amount !== 14) {
+    fail("PDF seed: Waiting on Docs 14 days");
   }
-  if (byStage["Documents Received"]?.amount !== 2) fail("PDF seed: Docs Received 2");
-  if (byStage["Processing"]?.amount !== 21) fail("PDF seed: Processing 21 days");
-  if (byStage["Settled"] !== null) fail("PDF seed: Settled no stage SLA");
-  if (byStage["Lost"] !== null) fail("PDF seed: Lost no stage SLA");
+  if (byStage["Document Received"]?.amount !== 2) fail("PDF seed: Document Received 2");
+  if (byStage["Research & Servicing"]?.amount !== 14) fail("PDF seed: Research 14 days");
+  if (byStage["Closed Won"] !== null) fail("PDF seed: Closed Won no stage SLA");
+  if (byStage["Closed Lost"] !== null) fail("PDF seed: Closed Lost no stage SLA");
 
   const ms = Object.fromEntries(
     cfg.milestones.map((m) => [m.targetStage, m.duration.amount]),
   );
   if (ms["Appointment Booked"] !== 1) fail("PDF milestone Appt 1 day");
   if (ms["In Conversation"] !== 5) fail("PDF milestone Convo 5 days");
-  if (ms["Waiting on Documents"] !== 12) fail("PDF milestone Docs 12 days");
-  if (ms["Processing"] !== 10) fail("PDF milestone Processing 10 days");
-  if (ms["Settled"] !== 60) fail("PDF milestone Settled 60 days");
+  if (ms["Waiting on Docs"] !== 12) fail("PDF milestone Docs 12 days");
+  if (ms["Research & Servicing"] !== 10) fail("PDF milestone Research 10 days");
+  if (ms["Closed Won"] !== 60) fail("PDF milestone Closed Won 60 days");
 }
 
 export function runSmokeSession16() {
@@ -216,11 +216,11 @@ export function runSmokeSession16() {
   if (leadStatusToPipelineStage("Contacted") !== "In Conversation") {
     fail("Contacted map");
   }
-  if (leadStatusToPipelineStage("Qualified") !== "Waiting on Documents") {
+  if (leadStatusToPipelineStage("Qualified") !== "Waiting on Docs") {
     fail("Qualified map");
   }
-  if (leadStatusToPipelineStage("Unqualified") !== "Lost") fail("Lost map");
-  if (leadStatusToPipelineStage("Converted") !== "Settled") fail("Settled map");
+  if (leadStatusToPipelineStage("Unqualified") !== "Closed Lost") fail("Lost map");
+  if (leadStatusToPipelineStage("Converted") !== "Closed Won") fail("Won map");
 
   const dueSoon = new Date(now.getTime() + 2 * 60 * 60 * 1000);
   if (bandForDue(dueSoon, now, { amount: 1, unit: "days" }) !== "due_today") {
@@ -244,7 +244,7 @@ export function runSmokeSession16() {
   }
 
   const lost = computeLeadSla({
-    stage: "Lost",
+    stage: "Closed Lost",
     stageEnteredAt: now,
     pipelineStartedAt: now,
     config: DEFAULT_MORTGAGE_PIPELINE_SLA,

@@ -6,7 +6,7 @@ import {
   UserRound,
   UsersRound,
   Monitor,
-  Camera,
+  ImagePlus,
   Video,
   Phone,
   MapPin,
@@ -209,15 +209,21 @@ export function ConsultationSetup({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white hover:brightness-110"
+              className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg text-white hover:brightness-110"
               style={{ backgroundColor: BRAND }}
-              aria-label="Upload title image"
-              title="Upload title image"
+              aria-label="Upload title logo"
+              title="Upload title logo"
             >
-              <Camera className="h-4 w-4" strokeWidth={2} />
               {value.coverImageUrl ? (
-                <span className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
-              ) : null}
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={value.coverImageUrl}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <ImagePlus className="h-4 w-4" strokeWidth={2} />
+              )}
             </button>
             <div className="min-w-0 flex-1">
               <InputShell error={!!errors.coverImageUrl}>
@@ -344,14 +350,23 @@ export function ConsultationSetup({
                     </select>
                     <input
                       type="number"
-                      min={1}
+                      min={0}
+                      step="1"
+                      inputMode="decimal"
                       value={value.price || ""}
-                      onChange={(e) =>
+                      onKeyDown={(e) => {
+                        if (e.key === "-" || e.key === "e" || e.key === "E" || e.key === "+") {
+                          e.preventDefault();
+                        }
+                      }}
+                      onChange={(e) => {
+                        const next = Number(e.target.value);
                         onChange({
-                          price: Number(e.target.value) || 0,
+                          price:
+                            !Number.isFinite(next) || next < 0 ? 0 : next,
                           isFree: false,
-                        })
-                      }
+                        });
+                      }}
                       placeholder="150"
                       className="h-10 min-w-0 flex-1 rounded-lg border border-[#E5E7EB] px-2.5 text-[13px] outline-none focus:border-[#5A32A3]/45"
                     />
@@ -384,16 +399,18 @@ export function ConsultationSetup({
                   </select>
                 </InputShell>
               </Field>
-              <InputShell icon={ViaIcon} error={!!errors.meetingViaDetail}>
-                <input
-                  value={value.meetingViaDetail}
-                  onChange={(e) =>
-                    onChange({ meetingViaDetail: e.target.value })
-                  }
-                  placeholder={VIA_META[value.meetingVia].placeholder}
-                  className={elevatedInputClass(true)}
-                />
-              </InputShell>
+              {value.meetingVia !== "phone" ? (
+                <InputShell icon={ViaIcon} error={!!errors.meetingViaDetail}>
+                  <input
+                    value={value.meetingViaDetail}
+                    onChange={(e) =>
+                      onChange({ meetingViaDetail: e.target.value })
+                    }
+                    placeholder={VIA_META[value.meetingVia].placeholder}
+                    className={elevatedInputClass(true)}
+                  />
+                </InputShell>
+              ) : null}
             </div>
 
             <div>

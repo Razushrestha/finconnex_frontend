@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Bell, Check, ChevronDown, Mail, X } from "lucide-react";
 import {
   REMINDER_NOTIFY_OPTIONS,
-  REMINDER_RELATIVE_WHEN,
-  REMINDER_REPEAT_OPTIONS,
   notifyToMethod,
+  reminderFrequencyLabel,
   reminderNotify,
   type ReminderNotifyOption,
   type ReminderRelativeWhen,
@@ -14,16 +13,17 @@ import {
   type ReminderScheduleMode,
   type TaskReminder,
 } from "@/lib/tasks/types";
+import {
+  availableReminderFrequencies,
+  defaultReminderRepeatRule,
+  type ReminderRepeatRule,
+} from "@/lib/tasks/repeat-reminder";
+import { ReminderCustomFrequencyFields } from "@/components/activities/tasks/ReminderCustomFrequencyFields";
+import { ReminderWhenPicker } from "@/components/activities/tasks/ReminderWhenPicker";
 import { cn } from "@/lib/utils";
-
-const RELATIVE_COUNTS = Array.from({ length: 31 }, (_, i) => i);
-const ANCHORS = ["Due Date"] as const;
 
 const fieldClass =
   "h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm text-slate-800 outline-none transition-colors focus:border-[#5A32A3]/45 focus:ring-2 focus:ring-[#5A32A3]/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400";
-
-const radioClass =
-  "h-4 w-4 border-slate-300 text-[#5A32A3] accent-[#5A32A3] focus:ring-[#5A32A3]";
 
 interface ReminderModalProps {
   open: boolean;
@@ -38,6 +38,45 @@ function dueDateToInput(value?: string): string {
   const match = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (!match) return "";
   return `${match[3]}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`;
+}
+
+function ruleFromRepeatType(
+  type: ReminderRepeatType,
+  previous?: ReminderRepeatRule,
+): ReminderRepeatRule | undefined {
+  const base = previous ?? { ...defaultReminderRepeatRule };
+  switch (type) {
+    case "Daily":
+      return { ...base, preset: "daily", weekdays: [] };
+    case "Weekly":
+      return { ...base, preset: "weekly", unit: "weeks", interval: 1 };
+    case "Monthly":
+      return { ...base, preset: "monthly", weekdays: [] };
+    case "Yearly":
+      return { ...base, preset: "yearly", weekdays: [] };
+    case "Custom":
+      return {
+        ...base,
+        preset: "custom",
+        interval: Math.max(1, base.interval || 2),
+        unit: base.unit === "years" ? "days" : base.unit || "days",
+        ends:
+          base.preset === "custom" &&
+          (base.ends === "on" || base.ends === "never" || base.ends === "due")
+            ? base.ends
+            : "due",
+        weekdays: [],
+      };
+    default:
+      return undefined;
+  }
+}
+
+function parseDueDateValue(dueDate?: string): Date | null {
+  const input = dueDateToInput(dueDate);
+  if (!input) return null;
+  const date = new Date(`${input}T23:59:59`);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function shiftFromDueDate(
@@ -72,7 +111,6 @@ export default function ReminderModal({
   onCancel,
   onDone,
 }: ReminderModalProps) {
-  const radioName = useId();
   const listboxId = useId();
   const [draft, setDraft] = useState<TaskReminder>(value);
   const [notifyOpen, setNotifyOpen] = useState(false);
@@ -90,6 +128,11 @@ export default function ReminderModal({
       relativeWhen: value.relativeWhen ?? "Before",
       relativeOf: value.relativeOf ?? "Due Date",
       repeatType: value.repeatType ?? "None",
+      repeatRule:
+        value.repeatType === "None" || !value.repeatType
+          ? undefined
+          : value.repeatRule ??
+            ruleFromRepeatType(value.repeatType ?? "None"),
       notify: reminderNotify(value),
     });
     setNotifyOpen(false);
@@ -115,6 +158,27 @@ export default function ReminderModal({
       document.removeEventListener("keydown", handleKey);
     };
   }, [notifyOpen]);
+
+  const firstReminder = useMemo(() => {
+    if (!draft.date) return null;
+    const parsed = new Date(`${draft.date}T${draft.time || "00:00"}`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }, [draft.date, draft.time]);
+  const dueValue = useMemo(() => parseDueDateValue(dueDate), [dueDate]);
+  const frequencyOptions = useMemo(
+    () => availableReminderFrequencies(firstReminder, dueValue),
+    [firstReminder, dueValue],
+  );
+
+  useEffect(() => {
+    const current = draft.repeatType ?? "None";
+    if (frequencyOptions.includes(current)) return;
+    setDraft((prev) => ({
+      ...prev,
+      repeatType: "None",
+      repeatRule: undefined,
+    }));
+  }, [draft.repeatType, frequencyOptions]);
 
   if (!open) return null;
 
@@ -176,12 +240,17 @@ export default function ReminderModal({
       relativeWhen,
       relativeOf: draft.relativeOf ?? "Due Date",
       repeatType: draft.repeatType ?? "None",
+      repeatRule:
+        (draft.repeatType ?? "None") === "None"
+          ? undefined
+          : draft.repeatRule ??
+            ruleFromRepeatType(draft.repeatType ?? "None"),
     });
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/25 px-4 pt-24 backdrop-blur-[2px]">
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.16)]">
+      <div className="w-full max-w-lg overflow-visible rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.16)]">
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
           <div>
             <p className="text-sm font-semibold text-slate-900">Reminder</p>
@@ -200,114 +269,61 @@ export default function ReminderModal({
         </div>
 
         <div className="space-y-5 px-5 py-4">
-          <div className="space-y-3">
-            <label className="flex flex-wrap items-center gap-2 text-sm text-slate-800">
-              <input
-                type="radio"
-                name={radioName}
-                className={radioClass}
-                checked={mode === "onDate"}
-                onChange={() => update("scheduleMode", "onDate")}
-              />
-              <span className="font-medium">On</span>
-              <input
-                type="date"
-                disabled={mode !== "onDate"}
-                value={draft.date}
-                onChange={(e) => update("date", e.target.value)}
-                className={fieldClass}
-              />
-              <span className="text-slate-500">at</span>
-              <input
-                type="time"
-                disabled={mode !== "onDate"}
-                value={draft.time}
-                onChange={(e) => update("time", e.target.value)}
-                className={fieldClass}
-              />
-            </label>
+          <ReminderWhenPicker
+            mode={mode}
+            onModeChange={(next) => update("scheduleMode", next)}
+            date={draft.date}
+            time={draft.time}
+            onDateChange={(value) => update("date", value)}
+            onTimeChange={(value) => update("time", value)}
+            relativeCount={draft.relativeCount ?? 1}
+            relativeWhen={draft.relativeWhen ?? "Before"}
+            onRelativeCountChange={(value) => update("relativeCount", value)}
+            onRelativeWhenChange={(value) => update("relativeWhen", value)}
+            due={parseDueDateValue(dueDate)}
+            anchorLabel="due date"
+          />
 
-            <label className="flex flex-wrap items-center gap-2 text-sm text-slate-800">
-              <input
-                type="radio"
-                name={radioName}
-                className={radioClass}
-                checked={mode === "relative"}
-                onChange={() => update("scheduleMode", "relative")}
-              />
-              <span className="font-medium">On</span>
+          <div className="space-y-3 border-t border-slate-100 pt-4">
+            <div className="flex items-center justify-between gap-4">
+              <label className="text-sm font-medium text-slate-700">
+                Reminder frequency
+              </label>
               <select
-                disabled={mode !== "relative"}
-                value={draft.relativeCount ?? 1}
-                onChange={(e) =>
-                  update("relativeCount", Number(e.target.value))
-                }
-                className={fieldClass}
+                value={draft.repeatType ?? "None"}
+                onChange={(e) => {
+                  const next = e.target.value as ReminderRepeatType;
+                  setDraft((prev) => ({
+                    ...prev,
+                    repeatType: next,
+                    repeatRule: ruleFromRepeatType(next, prev.repeatRule),
+                  }));
+                }}
+                className={`${fieldClass} min-w-[148px]`}
               >
-                {RELATIVE_COUNTS.map((count) => (
-                  <option key={count} value={count}>
-                    {count}
-                  </option>
-                ))}
-              </select>
-              <span className="text-slate-500">Day(s)</span>
-              <select
-                disabled={mode !== "relative"}
-                value={draft.relativeWhen ?? "Before"}
-                onChange={(e) =>
-                  update("relativeWhen", e.target.value as ReminderRelativeWhen)
-                }
-                className={fieldClass}
-              >
-                {REMINDER_RELATIVE_WHEN.map((option) => (
+                {frequencyOptions.map((option) => (
                   <option key={option} value={option}>
-                    {option}
+                    {reminderFrequencyLabel(option)}
                   </option>
                 ))}
               </select>
-              <span className="text-slate-500">of</span>
-              <select
-                disabled={mode !== "relative"}
-                value={draft.relativeOf ?? "Due Date"}
-                onChange={(e) =>
-                  update("relativeOf", e.target.value as "Due Date")
-                }
-                className={fieldClass}
-              >
-                {ANCHORS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-              <span className="text-slate-500">at</span>
-              <input
-                type="time"
-                disabled={mode !== "relative"}
-                value={draft.time}
-                onChange={(e) => update("time", e.target.value)}
-                className={fieldClass}
-              />
-            </label>
-          </div>
-
-          <div className="flex items-center justify-between gap-4 border-t border-slate-100 pt-4">
-            <label className="text-sm font-medium text-slate-700">
-              Repeat type
-            </label>
-            <select
-              value={draft.repeatType ?? "None"}
-              onChange={(e) =>
-                update("repeatType", e.target.value as ReminderRepeatType)
-              }
-              className={`${fieldClass} min-w-[148px]`}
-            >
-              {REMINDER_REPEAT_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
+            </div>
+            {draft.repeatType === "Custom" && draft.repeatRule ? (
+              <div className="rounded-xl border border-[#5A32A3]/15 bg-[#F3ECFB]/40 p-3">
+                <ReminderCustomFrequencyFields
+                  value={draft.repeatRule}
+                  start={firstReminder}
+                  due={dueValue}
+                  onChange={(repeatRule) =>
+                    setDraft((prev) => ({
+                      ...prev,
+                      repeatType: "Custom",
+                      repeatRule,
+                    }))
+                  }
+                />
+              </div>
+            ) : null}
           </div>
 
           <div className="flex items-center justify-between gap-4">
@@ -350,7 +366,7 @@ export default function ReminderModal({
                   id={listboxId}
                   role="listbox"
                   aria-label="Notify"
-                  className="absolute right-0 z-20 mt-1.5 w-[220px] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_12px_32px_rgba(15,23,42,0.14)]"
+                  className="absolute right-0 bottom-full z-30 mb-1.5 w-[220px] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-[0_12px_32px_rgba(15,23,42,0.14)]"
                 >
                   {REMINDER_NOTIFY_OPTIONS.map((option, index) => {
                     const selected = option === notify;

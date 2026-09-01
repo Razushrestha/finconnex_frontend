@@ -15,6 +15,9 @@ interface RelatedRecordComboboxProps {
   options: RelatedRecordOption[];
   disabled?: boolean;
   placeholder?: string;
+  allowCustom?: boolean;
+  createLabel?: (name: string) => string;
+  onCreateOption?: (name: string) => void;
 }
 
 export default function RelatedRecordCombobox({
@@ -23,6 +26,9 @@ export default function RelatedRecordCombobox({
   options,
   disabled = false,
   placeholder = "Search record…",
+  allowCustom = false,
+  createLabel,
+  onCreateOption,
 }: RelatedRecordComboboxProps) {
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
@@ -58,11 +64,29 @@ export default function RelatedRecordCombobox({
 
   const MAX_RESULTS = 50;
   const visible = filtered.slice(0, MAX_RESULTS);
+  const customName = query.trim();
+  const canAddCustom =
+    allowCustom &&
+    customName.length > 0 &&
+    !options.some(
+      (record) => record.name.toLowerCase() === customName.toLowerCase(),
+    );
 
   function selectRecord(name: string) {
     onChange(name);
     setQuery(name);
     setOpen(false);
+  }
+
+  function addCustomRecord() {
+    if (!customName) return;
+    if (onCreateOption) {
+      onCreateOption(customName);
+      setQuery(customName);
+      setOpen(false);
+      return;
+    }
+    selectRecord(customName);
   }
 
   function clearSelection() {
@@ -132,8 +156,21 @@ export default function RelatedRecordCombobox({
         </div>
       </div>
 
-      {open && !disabled && visible.length > 0 ? (
+      {open && !disabled && (visible.length > 0 || canAddCustom) ? (
         <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-slate-100 bg-white py-1 shadow-lg">
+          {canAddCustom ? (
+            <li>
+              <button
+                type="button"
+                onClick={addCustomRecord}
+                className="flex w-full px-3 py-2 text-left text-sm text-[#5A32A3] hover:bg-violet-50"
+              >
+                {createLabel
+                  ? createLabel(customName)
+                  : `Add “${customName}”`}
+              </button>
+            </li>
+          ) : null}
           {visible.map((record) => {
             const selected = record.name === value;
             return (
@@ -171,7 +208,7 @@ export default function RelatedRecordCombobox({
         </ul>
       ) : null}
 
-      {open && !disabled && query.trim() !== "" && visible.length === 0 ? (
+      {open && !disabled && query.trim() !== "" && visible.length === 0 && !canAddCustom ? (
         <div className="absolute z-20 mt-1 w-full rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm text-slate-500 shadow-lg">
           No records match your search
         </div>
@@ -179,7 +216,9 @@ export default function RelatedRecordCombobox({
 
       {open && !disabled && query.trim() === "" && options.length === 0 ? (
         <div className="absolute z-20 mt-1 w-full rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm text-slate-500 shadow-lg">
-          No related records available
+          {allowCustom
+            ? "Type a name to add a new record"
+            : "No related records available"}
         </div>
       ) : null}
     </div>

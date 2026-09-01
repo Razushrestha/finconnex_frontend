@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Plus, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { initials } from "@/lib/activities/shared";
 import { USER_TAB_COLORS } from "@/lib/work-queue/config";
@@ -10,6 +11,7 @@ import {
   getWorkQueueTabState,
   hydrateWorkQueueTabs,
   mergeWorkQueueTabs,
+  removeWorkQueueTab,
   setWorkQueueScope,
   setWorkQueueTabs,
   subscribeWorkQueueTabs,
@@ -25,6 +27,8 @@ export function WorkQueuePersonBar() {
   );
   const [isAddUserOpen, setIsAddUserOpen] = React.useState(false);
   const [userQuery, setUserQuery] = React.useState("");
+  const [pendingRemove, setPendingRemove] =
+    React.useState<WorkQueueUserTab | null>(null);
   const userSearchRef = React.useRef<HTMLDivElement>(null);
   const userSearchInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -57,7 +61,10 @@ export function WorkQueuePersonBar() {
 
   React.useEffect(() => {
     if (!isAddUserOpen) return;
-    window.setTimeout(() => userSearchInputRef.current?.focus(), 0);
+    window.setTimeout(
+      () => userSearchInputRef.current?.focus({ preventScroll: true }),
+      0,
+    );
     function onDoc(e: MouseEvent) {
       if (
         userSearchRef.current &&
@@ -76,6 +83,15 @@ export function WorkQueuePersonBar() {
       document.removeEventListener("keydown", onKey);
     };
   }, [isAddUserOpen]);
+
+  React.useEffect(() => {
+    if (!pendingRemove) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setPendingRemove(null);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [pendingRemove]);
 
   function selectSearchedUser(user: {
     id: string;
@@ -98,50 +114,80 @@ export function WorkQueuePersonBar() {
     setIsAddUserOpen(false);
   }
 
+  function confirmRemove() {
+    if (!pendingRemove) return;
+    removeWorkQueueTab(pendingRemove.id);
+    setPendingRemove(null);
+  }
+
   return (
     <div className="flex w-full items-end gap-0 px-3 sm:px-4">
       <div className="flex min-w-0 flex-1 items-end overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {tabs.map((u) => {
         const active = u.id === scope;
         return (
-          <button
+          <div
             key={u.id}
-            type="button"
-            onClick={() => setWorkQueueScope(u.id)}
             className={cn(
-              "group relative flex shrink-0 items-center gap-2 px-3 py-2.5 transition-colors",
-              active ? "text-slate-900" : "text-slate-500 hover:text-slate-800",
+              "group relative flex shrink-0 items-center gap-1.5 px-3 py-2.5",
+              active ? "text-slate-900" : "text-slate-500",
             )}
           >
-            <span
+            <button
+              type="button"
+              onClick={() => setWorkQueueScope(u.id)}
               className={cn(
-                "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white transition-opacity",
-                active ? "opacity-100" : "opacity-70 group-hover:opacity-90",
+                "flex min-w-0 items-center gap-2 transition-colors",
+                active ? "text-slate-900" : "text-slate-500 hover:text-slate-800",
               )}
-              style={{ backgroundColor: u.color || "#64748B" }}
             >
-              {u.initials}
-            </span>
-            <span className="hidden min-w-0 flex-col leading-tight sm:flex">
               <span
                 className={cn(
-                  "truncate text-[13px] transition-colors",
-                  active ? "font-semibold" : "font-medium",
+                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white transition-opacity",
+                  active ? "opacity-100" : "opacity-70 group-hover:opacity-90",
                 )}
+                style={{ backgroundColor: u.color || "#64748B" }}
               >
-                {u.name}
+                {u.initials}
               </span>
-              <span className="truncate text-[11px] text-slate-400">
-                {u.role}
+              <span className="hidden min-w-0 flex-col leading-tight sm:flex">
+                <span
+                  className={cn(
+                    "truncate text-[13px] transition-colors",
+                    active ? "font-semibold" : "font-medium",
+                  )}
+                >
+                  {u.name}
+                </span>
+                <span className="truncate text-[11px] text-slate-400">
+                  {u.role}
+                </span>
               </span>
-            </span>
+            </button>
+            <button
+              type="button"
+              aria-label={`Remove ${u.name}`}
+              title={`Remove ${u.name}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsAddUserOpen(false);
+                setPendingRemove(u);
+              }}
+              className={cn(
+                "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-300 transition-colors hover:bg-slate-100 hover:text-slate-600",
+                "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100",
+                active && "sm:opacity-70",
+              )}
+            >
+              <X className="h-3 w-3" strokeWidth={2.25} />
+            </button>
             <span
               className={cn(
                 "absolute inset-x-2 bottom-0 h-[2px] rounded-full transition-colors",
                 active ? "bg-[#4F46E5]" : "bg-transparent",
               )}
             />
-          </button>
+          </div>
         );
       })}
       </div>
@@ -151,7 +197,9 @@ export function WorkQueuePersonBar() {
           aria-label="Search users"
           title="Search users"
           aria-expanded={isAddUserOpen}
-          onClick={() => {
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.stopPropagation();
             setIsAddUserOpen((v) => !v);
             setUserQuery("");
           }}
@@ -160,7 +208,10 @@ export function WorkQueuePersonBar() {
           <Plus className="h-3.5 w-3.5" strokeWidth={2} />
         </button>
         {isAddUserOpen ? (
-          <div className="absolute top-9 left-0 z-40 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+          <div
+            className="absolute top-9 right-0 z-40 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2">
               <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
               <input
@@ -205,6 +256,52 @@ export function WorkQueuePersonBar() {
           </div>
         ) : null}
       </div>
+
+      {pendingRemove && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-[2px]"
+              onClick={() => setPendingRemove(null)}
+              role="presentation"
+            >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="wq-remove-person-title"
+                className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h2
+                  id="wq-remove-person-title"
+                  className="text-[15px] font-semibold text-slate-900"
+                >
+                  Remove {pendingRemove.name}?
+                </h2>
+                <p className="mt-1.5 text-[13px] leading-5 text-slate-500">
+                  They will be taken off this Workqueue bar. You can add them
+                  again with +.
+                </p>
+                <div className="mt-5 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPendingRemove(null)}
+                    className="px-2 py-1.5 text-[13px] font-medium text-slate-500 hover:text-slate-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmRemove}
+                    className="rounded-md bg-red-600 px-3.5 py-1.5 text-[13px] font-semibold text-white transition-opacity hover:bg-red-700"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
