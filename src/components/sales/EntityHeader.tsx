@@ -305,7 +305,7 @@ export function EntityHeader({
                       aria-label="Sort field"
                       className="h-8 flex-1 rounded-md border border-slate-200 bg-white px-2 text-[12px] text-slate-700 focus:border-violet-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-slate-200"
                     >
-                      <option value="">--None--</option>
+                      <option value="">None</option>
                       {sortOptions.map((opt) => (
                         <option key={opt.value} value={opt.value}>
                           {opt.label}
