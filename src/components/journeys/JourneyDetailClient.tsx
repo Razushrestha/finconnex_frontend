@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -20,7 +20,6 @@ import {
   JOURNEY_STATUS_STYLE,
   JOURNEY_TRIGGERS,
   activeEnrollmentCount,
-  cloneJourney,
   enrollmentsForStep,
   exitEnrollment,
   formatJourneyAt,
@@ -34,6 +33,14 @@ import {
   type JourneyTrigger,
   type LifecycleJourney,
 } from "@/lib/journeys/types";
+import {
+  cloneCrmJourney,
+  exitCrmEnrollment,
+  getCrmJourney,
+  setCrmJourneyStatus,
+  testCrmJourney,
+  updateCrmJourneySteps,
+} from "@/lib/journeys/api";
 import { runJourneyWorkflow } from "@/lib/workflows/runner";
 import {
   JourneyCanvas,
@@ -52,11 +59,37 @@ export function JourneyDetailClient({ id }: { id: string }) {
   const [toast, setToast] = useState<string | null>(null);
   const [stepFilter, setStepFilter] = useState<string>("all");
 
+  const stepPushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    const j = getJourneyById(id) ?? null;
-    setRow(j);
-    if (j?.steps[0]) setSelectedId(j.steps[0].id);
+    let cancelled = false;
+    const local = getJourneyById(id) ?? null;
+    setRow(local);
+    if (local?.steps[0]) setSelectedId(local.steps[0].id);
+
+    void (async () => {
+      const remote = await getCrmJourney(id);
+      if (cancelled || !remote) return;
+      const merged = { ...remote, exitConditions: local?.exitConditions ?? remote.exitConditions };
+      upsertJourney(merged);
+      setRow(merged);
+      setSelectedId((current) => current ?? merged.steps[0]?.id ?? null);
+    })();
+
+    return () => {
+      cancelled = true;
+      if (stepPushTimer.current) clearTimeout(stepPushTimer.current);
+    };
   }, [id]);
+
+  function pushStepsToCrm(steps: JourneyStep[]) {
+    if (stepPushTimer.current) clearTimeout(stepPushTimer.current);
+    stepPushTimer.current = setTimeout(() => {
+      void updateCrmJourneySteps(id, steps).catch(() => {
+        // remote unavailable — local edit stands (demo mode)
+      });
+    }, 600);
+  }
 
   function flash(msg: string) {
     setToast(msg);
@@ -108,6 +141,7 @@ export function JourneyDetailClient({ id }: { id: string }) {
         updatedAt: formatJourneyAt(),
       };
       upsertJourney(next);
+      pushStepsToCrm(steps);
       return next;
     });
   }
@@ -115,12 +149,10 @@ export function JourneyDetailClient({ id }: { id: string }) {
   function updateSelected(step: JourneyStep) {
     setRow((current) => {
       if (!current) return current;
-      const next = {
-        ...current,
-        steps: current.steps.map((s) => (s.id === step.id ? step : s)),
-        updatedAt: formatJourneyAt(),
-      };
+      const steps = current.steps.map((s) => (s.id === step.id ? step : s));
+      const next = { ...current, steps, updatedAt: formatJourneyAt() };
       upsertJourney(next);
+      pushStepsToCrm(steps);
       return next;
     });
   }
@@ -133,15 +165,28 @@ export function JourneyDetailClient({ id }: { id: string }) {
       const next = { ...current, status, updatedAt: formatJourneyAt() };
       upsertJourney(next);
       flash(`Status → ${status}`);
+      void setCrmJourneyStatus(current.id, status, current.status as "Draft" | "Active" | "Paused").catch(
+        () => {
+          // remote unavailable — local optimistic update stands (demo mode)
+        },
+      );
       return next;
     });
   }
 
-  function onClone() {
+  async function onClone() {
     if (!row) return;
-    const copy = upsertJourney(cloneJourney(row));
-    flash(`Cloned as ${copy.journeyId}`);
-    router.push(`/journeys/${copy.id}`);
+    try {
+      const copy = await cloneCrmJourney(row.id);
+      upsertJourney(copy);
+      flash(`Cloned as ${copy.journeyId}`);
+      router.push(`/journeys/${copy.id}`);
+    } catch {
+      const { cloneJourney } = await import("@/lib/journeys/types");
+      const copy = upsertJourney(cloneJourney(row));
+      flash(`Cloned as ${copy.journeyId}`);
+      router.push(`/journeys/${copy.id}`);
+    }
   }
 
   async function onTest() {
@@ -149,16 +194,24 @@ export function JourneyDetailClient({ id }: { id: string }) {
     const stamped = runTestJourney(row);
     persist(stamped, "Running workflow…");
     const { run } = await runJourneyWorkflow(stamped);
+    let remoteNote = "";
+    try {
+      const remote = await testCrmJourney(row.id);
+      remoteNote = ` · ${remote.note}`;
+    } catch {
+      remoteNote = " · CRM test-run unavailable (demo mode)";
+    }
     flash(
       `Test run ${run.status.toLowerCase()} · ${run.stepsOk} ok` +
         (run.stepsFailed ? ` · ${run.stepsFailed} failed` : "") +
-        " · see Settings → Automation Logs",
+        remoteNote,
     );
   }
 
   function onExitContact(enrollmentId: string) {
     if (!row) return;
     persist(exitEnrollment(row, enrollmentId), "Contact exited");
+    void exitCrmEnrollment(enrollmentId);
   }
 
   function toggleExit(cond: string) {
@@ -242,7 +295,7 @@ export function JourneyDetailClient({ id }: { id: string }) {
             </button>
             <button
               type="button"
-              onClick={onClone}
+              onClick={() => void onClone()}
               className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
             >
               <Copy className="h-3.5 w-3.5" />

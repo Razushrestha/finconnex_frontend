@@ -27,6 +27,7 @@ import {
   Scale,
   ChevronsLeft,
   Link2,
+  Zap,
 } from "lucide-react";
 
 type NavChildItem = {
@@ -164,6 +165,7 @@ const dashboardItems: NavItem[] = [
   { label: "Resources", href: "/resources", icon: LibraryBig },
   { label: "Calculator", href: "/calculator", icon: Calculator },
   { label: "Journeys", href: "/journeys", icon: Route },
+  { label: "Automations", href: "/automations", icon: Zap },
   { label: "Rules", href: "/rules", icon: Scale },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
