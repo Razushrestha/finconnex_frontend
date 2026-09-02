@@ -7,6 +7,8 @@ import { FormPageCard } from "./FormPageCard";
 
 interface FormCanvasProps {
   pages: FormPage[];
+  activePageId: string;
+  onActivatePage: (pageId: string) => void;
   onDropFieldType: (pageId: string, fieldType: string, index: number) => void;
   onReorderField: (pageId: string, fieldId: string, index: number) => void;
   onRemoveField: (pageId: string, id: string) => void;
@@ -31,6 +33,8 @@ interface FormCanvasProps {
 
 export function FormCanvas({
   pages,
+  activePageId,
+  onActivatePage,
   onDropFieldType,
   onReorderField,
   onRemoveField,
@@ -47,19 +51,26 @@ export function FormCanvas({
     pageId: string;
     index: number;
   } | null>(null);
+  const [draggingFieldId, setDraggingFieldId] = useState<string | null>(null);
 
   const handleDragOverSlot =
     (pageId: string, index: number) => (e: React.DragEvent) => {
       e.preventDefault();
-      e.stopPropagation();
-      e.dataTransfer.dropEffect = "move";
-      setDropTarget({ pageId, index });
+      e.dataTransfer.dropEffect = e.dataTransfer.types.includes(
+        "application/x-field-id",
+      )
+        ? "move"
+        : "copy";
+      setDropTarget((prev) =>
+        prev?.pageId === pageId && prev.index === index
+          ? prev
+          : { pageId, index },
+      );
     };
 
   const handleDrop =
     (pageId: string, index: number) => (e: React.DragEvent) => {
       e.preventDefault();
-      e.stopPropagation();
 
       const fieldType = e.dataTransfer.getData("application/x-field-type");
       const fieldId = e.dataTransfer.getData("application/x-field-id");
@@ -70,7 +81,13 @@ export function FormCanvas({
         onReorderField(pageId, fieldId, index);
       }
       setDropTarget(null);
+      setDraggingFieldId(null);
     };
+
+  const handleDragEnd = () => {
+    setDropTarget(null);
+    setDraggingFieldId(null);
+  };
 
   return (
     <div className="mx-auto w-[680px] py-8 flex flex-col items-center">
@@ -89,9 +106,14 @@ export function FormCanvas({
             page={page}
             pageIndex={index}
             totalPages={pages.length}
+            isActive={page.id === activePageId}
+            onActivate={() => onActivatePage(page.id)}
             dropIndex={dropTarget?.pageId === page.id ? dropTarget.index : null}
+            draggingFieldId={draggingFieldId}
             onDragOverSlot={(i) => handleDragOverSlot(page.id, i)}
             onDrop={(i) => handleDrop(page.id, i)}
+            onFieldDragStart={setDraggingFieldId}
+            onDragEnd={handleDragEnd}
             onRemoveField={(id) => onRemoveField(page.id, id)}
             onSelectField={onSelectField}
             onDropIntoColumn={(layoutFieldId, colIndex, fieldType) =>

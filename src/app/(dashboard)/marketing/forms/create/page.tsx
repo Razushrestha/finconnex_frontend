@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { FileText, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   updateFieldById,
   insertFieldInColumn,
 } from "@/lib/form-builder/field-tree";
+import { DEFAULT_THEME_ID } from "@/lib/form-builder/themes";
 import type {
   FieldDefinition,
   FieldSettings,
@@ -28,12 +29,55 @@ export default function FormBuilderPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const formName = searchParams.get("name") ?? "Untitled Form";
+  const slugParam = searchParams.get("slug");
 
-  const [pages, setPages] = useState<FormPage[]>([
-    { id: crypto.randomUUID(), title: formName || "Untitled Form", fields: [] },
-  ]);
+  // Determine the correct storage key based on slug or name fallback
+  const formSlug =
+    slugParam || formName.toLowerCase().trim().replace(/\s+/g, "-");
+
+  // Initialize pages and theme from localStorage if they exist
+  const initialData = (() => {
+    if (typeof window === "undefined") return null;
+    const saved = localStorage.getItem(`form_schema_${formSlug}`);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse form schema", e);
+      }
+    }
+    return null;
+  })();
+
+  const [pages, setPages] = useState<FormPage[]>(
+    initialData?.pages ?? [
+      {
+        id: crypto.randomUUID(),
+        title: formName || "Untitled Form",
+        fields: [],
+      },
+    ],
+  );
+  const [activePageId, setActivePageId] = useState<string>(pages[0]?.id || "");
   const [selectedField, setSelectedField] = useState<FormField | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [appliedThemeId, setAppliedThemeId] = useState<string>(
+    initialData?.themeId ?? DEFAULT_THEME_ID,
+  );
+
+  // Auto-persist form schema to localStorage and sessionStorage on every change
+  useEffect(() => {
+    if (!formName) return;
+    const payload = JSON.stringify({
+      title: formName,
+      pages,
+      themeId: appliedThemeId,
+    });
+
+    localStorage.setItem(`form_schema_${formSlug}`, payload);
+    sessionStorage.setItem(`preview_form_${formSlug}`, payload);
+    sessionStorage.setItem(`latest_preview_form`, payload);
+  }, [pages, appliedThemeId, formName, formSlug]);
 
   const updatePageFields = (
     pageId: string,
@@ -59,8 +103,10 @@ export default function FormBuilderPage() {
   };
 
   const handleAddField = (defn: FieldDefinition) => {
-    const firstPage = pages[0];
-    addFieldAt(firstPage.id, defn, firstPage.fields.length);
+    const targetPage = pages.find((p) => p.id === activePageId) ?? pages[0];
+    if (targetPage) {
+      addFieldAt(targetPage.id, defn, targetPage.fields.length);
+    }
   };
 
   const handleDropFieldType = (
@@ -76,7 +122,6 @@ export default function FormBuilderPage() {
     updatePageFields(pageId, (fields) => removeFieldById(fields, id));
   };
 
-  // Reorder existing field when dragged and dropped onto a slot index
   const handleReorderField = (
     pageId: string,
     fieldId: string,
@@ -89,14 +134,11 @@ export default function FormBuilderPage() {
       const next = [...fields];
       const [moved] = next.splice(oldIndex, 1);
 
-      // If moving downwards, splice index adjusts because of the removed item.
-      // If moving upwards (like to index 0), it inserts precisely at targetIndex.
       let insertAtIndex = targetIndex;
       if (oldIndex < targetIndex) {
         insertAtIndex = targetIndex - 1;
       }
 
-      // Ensure boundaries are respected
       insertAtIndex = Math.max(0, Math.min(insertAtIndex, next.length));
 
       next.splice(insertAtIndex, 0, moved);
@@ -168,7 +210,8 @@ export default function FormBuilderPage() {
   };
 
   const handleGoToPage = (index: number) => {
-    console.log("go to page", index);
+    const target = pages[index];
+    if (target) setActivePageId(target.id);
   };
 
   const handleUpdatePageTitle = (pageId: string, title: string) => {
@@ -191,10 +234,8 @@ export default function FormBuilderPage() {
           </Button>
           <Button
             onClick={() => {
-              const formSlug = encodeURIComponent(
-                formName.toLowerCase().replace(/\s+/g, "-"),
-              );
-              window.open(`/forms/view/${formSlug}`, "_blank");
+              const formSlugEncoded = encodeURIComponent(formSlug);
+              window.open(`/forms/view/${formSlugEncoded}`, "_blank");
             }}
           >
             Access Form
@@ -207,6 +248,8 @@ export default function FormBuilderPage() {
         <div className="flex-1 overflow-y-auto bg-muted/30 flex flex-col">
           <FormCanvas
             pages={pages}
+            activePageId={activePageId}
+            onActivatePage={setActivePageId}
             onDropFieldType={handleDropFieldType}
             onReorderField={handleReorderField}
             onRemoveField={handleRemoveField}
@@ -233,6 +276,7 @@ export default function FormBuilderPage() {
         onClose={() => setPreviewOpen(false)}
         formName={formName}
         pages={pages}
+        onThemeApplied={setAppliedThemeId}
       />
     </div>
   );

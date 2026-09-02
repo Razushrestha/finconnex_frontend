@@ -47,13 +47,66 @@ const EMBED_LIKE: Record<string, { icon: typeof Music; label: string }> = {
   "image-slider": { icon: ImageIcon, label: "Image slider" },
 };
 
-export function FieldRenderer({
-  field,
-  disabled = true,
-}: {
+type NameValue = Record<string, string>;
+
+interface FieldRendererProps {
   field: FormField;
   disabled?: boolean;
-}) {
+  value?: unknown;
+  onChange?: (value: unknown) => void;
+}
+
+// Only returns {value, onChange} when a real onChange is supplied — otherwise
+// the field stays fully uncontrolled. Passing a defined `value` with no
+// `onChange` is what triggers React's "you provided a value prop without an
+// onChange handler" warning, so builder-preview calls (no onChange) must
+// never receive a `value` prop at all.
+function controlledText(
+  value: unknown,
+  onChange: ((v: unknown) => void) | undefined,
+) {
+  if (!onChange) return {};
+  return {
+    value: typeof value === "string" ? value : "",
+    onChange: (
+      e: React.ChangeEvent<
+        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      >,
+    ) => onChange(e.target.value),
+  };
+}
+
+function controlledRange(
+  value: unknown,
+  onChange: ((v: unknown) => void) | undefined,
+) {
+  if (!onChange) return {};
+  return {
+    value: typeof value === "number" ? value : 50,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+      onChange(Number(e.target.value)),
+  };
+}
+
+function controlledCheckbox(
+  checked: boolean,
+  onCheckedChange: ((c: boolean) => void) | undefined,
+) {
+  if (!onCheckedChange) return {};
+  return { checked, onCheckedChange };
+}
+
+function controlledRadio(checked: boolean, onSelect: (() => void) | undefined) {
+  if (!onSelect) return {};
+  return { checked, onChange: onSelect };
+}
+
+export function FieldRenderer({
+  field,
+  disabled = false,
+  value,
+  onChange,
+}: FieldRendererProps) {
   const { type, label, options } = field;
 
   return (
@@ -74,6 +127,8 @@ export function FieldRenderer({
                 ? "grid-cols-1 sm:grid-cols-2"
                 : "grid-cols-1";
 
+          const nameValue = (value as NameValue) ?? {};
+
           return (
             <div className={`grid gap-3 ${gridColsClass}`}>
               {visibleElements.map((el) => (
@@ -83,7 +138,16 @@ export function FieldRenderer({
                       <User className="h-4 w-4 text-muted-foreground" />
                     }
                   >
-                    <Input placeholder={el.label} disabled={disabled} />
+                    <Input
+                      placeholder={el.label}
+                      disabled={disabled}
+                      {...controlledText(
+                        nameValue[el.id],
+                        onChange
+                          ? (v) => onChange({ ...nameValue, [el.id]: v })
+                          : undefined,
+                      )}
+                    />
                   </FieldShell>
                   {field.settings?.showElementsLabel !== false && (
                     <span className="text-xs text-muted-foreground">
@@ -104,6 +168,7 @@ export function FieldRenderer({
                 type === "description" ? "Enter descriptive text…" : ""
               }
               rows={3}
+              {...controlledText(value, onChange)}
             />
           );
         }
@@ -114,6 +179,7 @@ export function FieldRenderer({
               type="email"
               placeholder="name@example.com"
               disabled={disabled}
+              {...controlledText(value, onChange)}
             />
           );
         if (type === "phone")
@@ -122,11 +188,18 @@ export function FieldRenderer({
               type="tel"
               placeholder="+977 98XXXXXXXX"
               disabled={disabled}
+              {...controlledText(value, onChange)}
             />
           );
 
         if (TEXT_LIKE.has(type))
-          return <Input disabled={disabled} placeholder="Enter text" />;
+          return (
+            <Input
+              disabled={disabled}
+              placeholder="Enter text"
+              {...controlledText(value, onChange)}
+            />
+          );
 
         if (NUMBER_LIKE.has(type)) {
           const prefix =
@@ -136,7 +209,12 @@ export function FieldRenderer({
               {prefix && (
                 <span className="text-sm text-muted-foreground">{prefix}</span>
               )}
-              <Input type="number" disabled={disabled} placeholder="0" />
+              <Input
+                type="number"
+                disabled={disabled}
+                placeholder="0"
+                {...controlledText(value, onChange)}
+              />
             </div>
           );
         }
@@ -150,10 +228,16 @@ export function FieldRenderer({
             return (
               <select
                 disabled={disabled}
+                {...controlledText(value, onChange)}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground"
               >
+                <option value="" disabled hidden>
+                  Select an option
+                </option>
                 {(options ?? []).map((o) => (
-                  <option key={o}>{o}</option>
+                  <option key={o} value={o}>
+                    {o}
+                  </option>
                 ))}
               </select>
             );
@@ -173,7 +257,36 @@ export function FieldRenderer({
               </div>
             );
           }
-          // radio, checkbox, multiple-choice
+          if (type === "checkbox" || type === "multiple-choice") {
+            const selected = new Set((value as string[]) ?? []);
+            return (
+              <div className="space-y-2">
+                {(options ?? []).map((o) => (
+                  <label
+                    key={o}
+                    className="flex items-center gap-2 text-sm text-muted-foreground"
+                  >
+                    <Checkbox
+                      disabled={disabled}
+                      {...controlledCheckbox(
+                        selected.has(o),
+                        onChange
+                          ? (checked) => {
+                              const next = new Set(selected);
+                              if (checked) next.add(o);
+                              else next.delete(o);
+                              onChange(Array.from(next));
+                            }
+                          : undefined,
+                      )}
+                    />
+                    {o}
+                  </label>
+                ))}
+              </div>
+            );
+          }
+          // radio
           return (
             <div className="space-y-2">
               {(options ?? []).map((o) => (
@@ -181,15 +294,16 @@ export function FieldRenderer({
                   key={o}
                   className="flex items-center gap-2 text-sm text-muted-foreground"
                 >
-                  {type === "checkbox" || type === "multiple-choice" ? (
-                    <Checkbox disabled={disabled} />
-                  ) : (
-                    <input
-                      type="radio"
-                      disabled={disabled}
-                      className="h-4 w-4"
-                    />
-                  )}
+                  <input
+                    type="radio"
+                    name={field.id}
+                    disabled={disabled}
+                    {...controlledRadio(
+                      value === o,
+                      onChange ? () => onChange(o) : undefined,
+                    )}
+                    className="h-4 w-4"
+                  />
                   {o}
                 </label>
               ))}
@@ -212,6 +326,7 @@ export function FieldRenderer({
               type={DATE_LIKE[type]}
               disabled={disabled}
               className="w-full"
+              {...controlledText(value, onChange)}
             />
           );
         }
@@ -232,17 +347,43 @@ export function FieldRenderer({
         }
 
         if (type === "rating") {
+          const rating = (value as number) ?? 0;
           return (
             <div className="flex gap-1">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} className="h-5 w-5 text-muted-foreground" />
-              ))}
+              {Array.from({ length: 5 }).map((_, i) => {
+                const filled = i < rating;
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    disabled={disabled}
+                    onClick={onChange ? () => onChange(i + 1) : undefined}
+                    className={disabled ? "cursor-default" : "cursor-pointer"}
+                    aria-label={`Rate ${i + 1} out of 5`}
+                  >
+                    <Star
+                      className={
+                        filled
+                          ? "h-5 w-5 fill-amber-400 text-amber-400"
+                          : "h-5 w-5 text-muted-foreground"
+                      }
+                    />
+                  </button>
+                );
+              })}
             </div>
           );
         }
 
         if (type === "slider") {
-          return <input type="range" disabled={disabled} className="w-full" />;
+          return (
+            <input
+              type="range"
+              disabled={disabled}
+              className="w-full"
+              {...controlledRange(value, onChange)}
+            />
+          );
         }
 
         if (type in EMBED_LIKE) {
@@ -258,7 +399,7 @@ export function FieldRenderer({
         if (type === "unique-id" || type === "random-id") {
           return (
             <Input
-              disabled={disabled}
+              disabled
               placeholder={type === "unique-id" ? "1001" : "ZF-8F3K2A"}
             />
           );
@@ -271,7 +412,13 @@ export function FieldRenderer({
         ) {
           return (
             <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Checkbox disabled={disabled} />
+              <Checkbox
+                disabled={disabled}
+                {...controlledCheckbox(
+                  (value as boolean) ?? false,
+                  onChange ? (checked) => onChange(!!checked) : undefined,
+                )}
+              />
               {type === "terms"
                 ? "I agree to the Terms and Conditions"
                 : type === "yes-no"
