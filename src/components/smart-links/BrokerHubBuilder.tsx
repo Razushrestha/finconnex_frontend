@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Eye, Link2, Loader2, Check } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Eye, Link2, Loader2, Check, Copy, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   saveHubConfigToLocalStorage,
@@ -22,12 +22,36 @@ export function BrokerHubBuilder({
   const [config, setConfig] = useState<BrokerHubConfig>(initialConfig);
   const [saving, setSaving] = useState(false);
   const [published, setPublished] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const hubUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/${config.profile.slug || ""}`
+      : `/${config.profile.slug || ""}`;
+
+  // Hide toast when clicking anywhere on the document
+  useEffect(() => {
+    if (!published) return;
+
+    const timer = setTimeout(() => {
+      const handleDocumentClick = () => {
+        setPublished(false);
+      };
+
+      document.addEventListener("click", handleDocumentClick);
+
+      return () => {
+        document.removeEventListener("click", handleDocumentClick);
+      };
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [published]);
 
   const handlePublish = async () => {
     setSaving(true);
     setPublished(false);
     try {
-      // Force published: true so the public route doesn't throw a 404
       const publishedConfig = { ...config, published: true };
 
       saveHubConfigToLocalStorage(publishedConfig);
@@ -37,17 +61,21 @@ export function BrokerHubBuilder({
         await onSave(publishedConfig);
       }
 
-      // Simulate a brief network delay for the spinner
       await new Promise((resolve) => setTimeout(resolve, 800));
 
-      // Show success state
       setPublished(true);
-      setTimeout(() => setPublished(false), 2500); // Revert after 2.5 seconds
     } catch (error) {
       console.error("Failed to publish hub", error);
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleCopyLink = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(hubUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -86,6 +114,52 @@ export function BrokerHubBuilder({
           </button>
         </div>
       </header>
+
+      {/* Success Toast with URL */}
+      {published && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-emerald-900 dark:text-emerald-200 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-2 text-xs sm:text-sm">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white shrink-0">
+              <Check className="h-3.5 w-3.5" />
+            </div>
+            <span>
+              <strong>Successfully published!</strong> Your hub is live at:
+            </span>
+          </div>
+
+          <div
+            className="flex items-center gap-2 w-full sm:w-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="rounded bg-background/80 px-2 py-1 text-xs font-mono text-foreground border border-border truncate max-w-[220px] sm:max-w-xs">
+              {hubUrl}
+            </span>
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="flex items-center gap-1 rounded bg-background px-2.5 py-1 text-xs font-medium border border-border hover:bg-muted shrink-0"
+              title="Copy URL"
+            >
+              {copied ? (
+                <Check className="h-3.5 w-3.5 text-emerald-600" />
+              ) : (
+                <Copy className="h-3.5 w-3.5" />
+              )}
+              <span>{copied ? "Copied" : "Copy"}</span>
+            </button>
+            <a
+              href={`/${config.profile.slug}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1 rounded bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 shrink-0"
+              title="Open link in new tab"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              <span>Visit</span>
+            </a>
+          </div>
+        </div>
+      )}
 
       <div className="grid w-full gap-8 lg:grid-cols-[420px_1fr]">
         <div className="min-w-0 max-w-[420px]">

@@ -42,9 +42,20 @@ export interface BrokerHubProfile {
 export interface BrokerHubConfig {
   brokerId: string;
   hubName: string;
-  profile: BrokerHubProfile;
+  profile: {
+    slug: string;
+    avatarUrl: string | null;
+    title: string;
+    bio: string;
+  };
   links: BrokerHubLink[];
   socials: BrokerHubSocial[];
+  customization?: {
+    theme: string;
+    fontStyle: string;
+    headerStyle?: string;
+    footerStyle?: string;
+  };
   published: boolean;
 }
 
