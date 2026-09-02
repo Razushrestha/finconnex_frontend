@@ -14,6 +14,7 @@ import {
   Play,
   Camera,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 const CATEGORIES = [
   "All Templates",
@@ -67,6 +68,7 @@ const TEMPLATES = [
 ];
 
 export default function TemplateLibrary() {
+  const router = useRouter();
   const [activeCategory, setActiveCategory] = useState("All Templates");
 
   const visibleTemplates =
@@ -123,7 +125,13 @@ export default function TemplateLibrary() {
         {/* Template grid */}
         <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {visibleTemplates.map((template) => (
-            <TemplateCard key={template.id} template={template} />
+            <TemplateCard
+              key={template.id}
+              template={template}
+              onSelect={() =>
+                router.push(`/smart-link/templates/${template.id}`)
+              }
+            />
           ))}
         </div>
       </div>
@@ -141,10 +149,17 @@ interface Template {
   heroClass: string;
 }
 
-function TemplateCard({ template }: { template: Template }) {
+function TemplateCard({
+  template,
+  onSelect,
+}: {
+  template: Template;
+  onSelect: () => void;
+}) {
   return (
     <button
       type="button"
+      onClick={onSelect}
       className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/60"
     >
       <div

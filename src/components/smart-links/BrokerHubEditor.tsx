@@ -35,8 +35,20 @@ export function BrokerHubEditor({ config, onChange }: BrokerHubEditorProps) {
   const dragIndex = useRef<number | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
-  const patchProfile = (fields: Partial<BrokerHubConfig["profile"]>) =>
-    onChange({ ...config, profile: { ...config.profile, ...fields } });
+  const patchProfile = (fields: Partial<BrokerHubConfig["profile"]>) => {
+    const updatedProfile = { ...config.profile, ...fields };
+
+    // Auto-generate slug from title if title is being changed and slug wasn't manually customized yet
+    if (fields.title !== undefined) {
+      updatedProfile.slug = fields.title
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\s-]/g, "")
+        .replace(/\s+/g, "-");
+    }
+
+    onChange({ ...config, profile: updatedProfile });
+  };
 
   const updateLink = (updated: BrokerHubLink) =>
     onChange({
@@ -60,7 +72,6 @@ export function BrokerHubEditor({ config, onChange }: BrokerHubEditorProps) {
       ],
     });
 
-  // Socials management handlers
   const addSocial = () => {
     const newSocial = {
       id: crypto.randomUUID(),
@@ -161,9 +172,31 @@ export function BrokerHubEditor({ config, onChange }: BrokerHubEditorProps) {
               <input
                 value={config.profile.title}
                 onChange={(e) => patchProfile({ title: e.target.value })}
-                placeholder="Alex Rivera | Wealth Advisor"
+                placeholder="Enter your name"
                 className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-primary"
               />
+            </label>
+
+            {/* Added Visible Slug Input Field */}
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">
+                Profile Slug (URL path)
+              </span>
+              <div className="flex items-center rounded-md border border-border bg-background px-2.5 py-1.5 text-sm focus-within:ring-1 focus-within:ring-primary">
+                <span className="text-muted-foreground text-xs mr-0.5">/</span>
+                <input
+                  value={config.profile.slug}
+                  onChange={(e) =>
+                    patchProfile({
+                      slug: e.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9-]/g, ""),
+                    })
+                  }
+                  placeholder=""
+                  className="w-full bg-transparent text-sm outline-none font-mono text-xs"
+                />
+              </div>
             </label>
 
             <label className="block">
@@ -173,7 +206,7 @@ export function BrokerHubEditor({ config, onChange }: BrokerHubEditorProps) {
               <textarea
                 value={config.profile.bio}
                 onChange={(e) => patchProfile({ bio: e.target.value })}
-                placeholder="Helping tech professionals navigate wealth building."
+                placeholder=""
                 rows={3}
                 className="w-full resize-none rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:ring-1 focus:ring-primary"
               />
