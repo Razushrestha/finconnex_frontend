@@ -9,6 +9,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FORM_THEMES, DEFAULT_THEME_ID } from "@/lib/form-builder/themes";
@@ -20,6 +21,7 @@ interface FormPreviewOverlayProps {
   onClose: () => void;
   formName: string;
   pages: FormPage[];
+  onThemeApplied?: (themeId: string) => void;
 }
 
 const DEVICE_OPTIONS: {
@@ -37,16 +39,16 @@ export function FormPreviewOverlay({
   onClose,
   formName,
   pages,
+  onThemeApplied,
 }: FormPreviewOverlayProps) {
   const [device, setDevice] = useState<PreviewDevice>("desktop");
   const [themeId, setThemeId] = useState(DEFAULT_THEME_ID);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [themeApplied, setThemeApplied] = useState(DEFAULT_THEME_ID);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
-  // lock background scroll while the overlay is open
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -59,10 +61,31 @@ export function FormPreviewOverlay({
   if (!open || !mounted) return null;
 
   const theme = FORM_THEMES.find((t) => t.id === themeId) ?? FORM_THEMES[0];
+  const hasUnappliedChange = themeId !== themeApplied;
+
+  const handleApplyTheme = () => {
+    setThemeApplied(themeId);
+    onThemeApplied?.(themeId);
+
+    const formSlug = encodeURIComponent(
+      formName.toLowerCase().replace(/\s+/g, "-"),
+    );
+    const existingData = sessionStorage.getItem(`preview_form_${formSlug}`);
+    if (existingData) {
+      try {
+        const parsed = JSON.parse(existingData);
+        sessionStorage.setItem(
+          `preview_form_${formSlug}`,
+          JSON.stringify({ ...parsed, themeId }),
+        );
+      } catch (e) {
+        console.error("Failed to update theme in cache", e);
+      }
+    }
+  };
 
   const overlay = (
     <div className="fixed inset-0 z-[100] flex flex-col bg-slate-800">
-      {/* Top bar */}
       <div className="flex shrink-0 items-center justify-between bg-slate-900 px-4 py-3">
         <div className="flex items-baseline gap-2 text-white">
           <span className="text-base font-semibold">
@@ -90,15 +113,21 @@ export function FormPreviewOverlay({
           ))}
         </div>
 
-        <div className="flex items-center gap-4">
-          <span
-            className={cn(
-              "text-sm font-medium",
-              themeId === themeApplied ? "text-slate-500" : "text-slate-300",
-            )}
-          >
-            {themeId === themeApplied ? "Applied" : "Not applied"}
-          </span>
+        <div className="flex items-center gap-3">
+          {hasUnappliedChange ? (
+            <button
+              type="button"
+              onClick={handleApplyTheme}
+              className="flex items-center gap-1.5 rounded-md bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-400"
+            >
+              Apply theme
+            </button>
+          ) : (
+            <span className="flex items-center gap-1 text-sm font-medium text-slate-500">
+              <Check className="h-4 w-4" />
+              Applied
+            </span>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -110,7 +139,6 @@ export function FormPreviewOverlay({
         </div>
       </div>
 
-      {/* Body */}
       <div className="relative flex flex-1 overflow-hidden">
         <div className="flex-1 overflow-y-auto p-10">
           <DevicePreviewFrame
@@ -159,11 +187,7 @@ export function FormPreviewOverlay({
                 <button
                   key={t.id}
                   type="button"
-                  onClick={() => {
-                    setThemeId(t.id);
-                    // TODO(api): persist theme selection to the form record
-                    setThemeApplied(t.id);
-                  }}
+                  onClick={() => setThemeId(t.id)}
                   className="flex flex-col items-center gap-1.5"
                 >
                   <span
@@ -175,7 +199,12 @@ export function FormPreviewOverlay({
                     )}
                     style={{ background: t.gradient }}
                   />
-                  <span className="text-xs text-slate-300">{t.name}</span>
+                  <span className="text-xs text-slate-300">
+                    {t.name}
+                    {t.id === themeApplied && (
+                      <span className="ml-1 text-emerald-400">•</span>
+                    )}
+                  </span>
                 </button>
               ))}
             </div>

@@ -1,196 +1,19 @@
-// "use client";
-
-// import { useEffect, useMemo, useState } from "react";
-// import Link from "next/link";
-// import { useRouter } from "next/navigation";
-// import { Home, ClipboardList, Plus, Search, ExternalLink } from "lucide-react";
-// import {
-//   FORM_STATUSES,
-//   listMarketingForms,
-//   marketingForms as seed,
-//   type FormStatus,
-//   type MarketingForm,
-// } from "@/lib/marketing/forms/types";
-// import { cn } from "@/lib/utils";
-
-// const STATUS_STYLE: Record<FormStatus, string> = {
-//   Draft: "bg-slate-100 text-slate-600",
-//   Published: "bg-emerald-50 text-emerald-700",
-//   Paused: "bg-amber-50 text-amber-800",
-//   Archived: "bg-slate-100 text-slate-500",
-// };
-
-// export default function MarketingFormsPage() {
-//   const router = useRouter();
-//   const [rows, setRows] = useState<MarketingForm[]>(seed);
-//   const [statusTab, setStatusTab] = useState<FormStatus | "All">("All");
-//   const [search, setSearch] = useState("");
-
-//   useEffect(() => {
-//     setRows(listMarketingForms());
-//   }, []);
-
-//   const filtered = useMemo(() => {
-//     let data = rows;
-//     if (statusTab !== "All") data = data.filter((r) => r.status === statusTab);
-//     if (search.trim()) {
-//       const q = search.toLowerCase();
-//       data = data.filter(
-//         (r) =>
-//           r.name.toLowerCase().includes(q) ||
-//           r.formId.toLowerCase().includes(q) ||
-//           r.embedSlug.toLowerCase().includes(q),
-//       );
-//     }
-//     return data;
-//   }, [rows, statusTab, search]);
-
-//   return (
-//     <div className="relative min-h-full overflow-hidden bg-slate-50">
-//       <div className="relative mx-auto flex max-w-[1920px] flex-col p-2.5 sm:p-3 lg:p-4">
-//         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-//           <div className="flex min-w-0 flex-wrap items-center gap-2">
-//             //             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
-//               Forms
-//             </h1>
-//             <span className="inline-flex items-center gap-1 rounded-full bg-violet-100/80 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-violet-700 uppercase">
-//               <ClipboardList className="h-2.5 w-2.5" />
-//               §21
-//             </span>
-//           </div>
-//           <button
-//             type="button"
-//             onClick={() =>
-//               router.push(
-//                 "/marketing/forms/create?layoutid=standard&redirect=false",
-//               )
-//             }
-//             className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-md shadow-violet-600/20 hover:bg-violet-700"
-//           >
-//             <Plus className="h-3.5 w-3.5" />
-//             New form
-//           </button>
-//         </div>
-
-//         <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-//           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-3 py-2 sm:px-4">
-//             <div className="flex flex-wrap gap-0.5 rounded-lg bg-slate-50 p-0.5">
-//               {(["All", ...FORM_STATUSES] as const).map((s) => (
-//                 <button
-//                   key={s}
-//                   type="button"
-//                   onClick={() => setStatusTab(s)}
-//                   className={cn(
-//                     "rounded-md px-2.5 py-1 text-[11px] font-semibold",
-//                     statusTab === s
-//                       ? "bg-white text-violet-700 shadow-sm"
-//                       : "text-slate-500",
-//                   )}
-//                 >
-//                   {s}
-//                 </button>
-//               ))}
-//             </div>
-//             <div className="relative">
-//               <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-//               <input
-//                 value={search}
-//                 onChange={(e) => setSearch(e.target.value)}
-//                 placeholder="Search…"
-//                 className="h-8 w-44 rounded-lg border border-slate-200/90 bg-white pr-2.5 pl-8 text-[11px] outline-none focus:border-violet-500 focus:shadow-[0_0_0_3px_rgba(139,92,246,0.12)]"
-//               />
-//             </div>
-//           </div>
-
-//           <div className="min-h-0 flex-1 overflow-auto">
-//             <table className="w-full min-w-[800px] text-left text-[12px]">
-//               <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
-//                 <tr>
-//                   <th className="px-4 py-2.5">Form</th>
-//                   <th className="px-4 py-2.5">Public URL</th>
-//                   <th className="px-4 py-2.5">Routes to</th>
-//                   <th className="px-4 py-2.5">Status</th>
-//                   <th className="px-4 py-2.5">Fields</th>
-//                   <th className="px-4 py-2.5">Submissions</th>
-//                   <th className="px-4 py-2.5">Updated</th>
-//                 </tr>
-//               </thead>
-//               <tbody className="divide-y divide-slate-50">
-//                 {filtered.map((f) => (
-//                   <tr
-//                     key={f.id}
-//                     className="cursor-pointer hover:bg-violet-50/40"
-//                     onClick={() => router.push(`/marketing/forms/${f.id}`)}
-//                   >
-//                     <td className="px-4 py-3">
-//                       <p className="font-semibold text-slate-900">{f.name}</p>
-//                       <p className="text-[11px] text-slate-400">{f.formId}</p>
-//                     </td>
-//                     <td className="px-4 py-3">
-//                       <Link
-//                         href={`/f/${f.embedSlug}`}
-//                         target="_blank"
-//                         onClick={(e) => e.stopPropagation()}
-//                         className="inline-flex items-center gap-1 font-mono text-[11px] text-violet-700 hover:underline"
-//                       >
-//                         /f/{f.embedSlug}
-//                         <ExternalLink className="h-3 w-3" />
-//                       </Link>
-//                     </td>
-//                     <td className="px-4 py-3">
-//                       <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
-//                         {f.destination ?? "Lead"}
-//                       </span>
-//                       {f.journeyId ? (
-//                         <span className="mt-0.5 block text-[10px] text-slate-400">
-//                           + journey
-//                         </span>
-//                       ) : null}
-//                     </td>
-//                     <td className="px-4 py-3">
-//                       <span
-//                         className={cn(
-//                           "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-//                           STATUS_STYLE[f.status],
-//                         )}
-//                       >
-//                         {f.status}
-//                       </span>
-//                     </td>
-//                     <td className="px-4 py-3 tabular-nums">{f.fields}</td>
-//                     <td className="px-4 py-3 tabular-nums">{f.submissions}</td>
-//                     <td className="px-4 py-3 text-slate-500">{f.updatedAt}</td>
-//                   </tr>
-//                 ))}
-//                 {filtered.length === 0 ? (
-//                   <tr>
-//                     <td
-//                       colSpan={7}
-//                       className="px-4 py-16 text-center text-sm text-slate-400"
-//                     >
-//                       No forms match.
-//                     </td>
-//                   </tr>
-//                 ) : null}
-//               </tbody>
-//             </table>
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ClipboardList, ExternalLink } from "lucide-react";
+import {
+  ClipboardList,
+  ExternalLink,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Copy,
+  Check,
+} from "lucide-react";
 import {
   FORM_STATUSES,
-  listMarketingForms,
-  marketingForms as seed,
   type FormStatus,
   type MarketingForm,
 } from "@/lib/marketing/forms/types";
@@ -199,104 +22,41 @@ import {
   MarketingListShell,
   StatusDropdown,
   DataTable,
-  StatusBadge,
   type DataTableColumn,
 } from "@/components/marketing/index";
 import { SearchInput } from "@/components/ui/search-input";
 import { CreateFormModal } from "@/components/marketing/forms/CreateFormModal";
 import { NameFormModal } from "@/components/marketing/forms/NameFormModal";
-
-const STATUS_STYLE: Record<FormStatus, string> = {
-  Draft: "bg-slate-100 text-slate-600",
-  Published: "bg-emerald-50 text-emerald-700",
-  Paused: "bg-amber-50 text-amber-800",
-  Archived: "bg-slate-100 text-slate-500",
-};
-
-const columns: DataTableColumn<MarketingForm>[] = [
-  {
-    key: "name",
-    header: "Form",
-    className: "max-w-[220px]",
-    render: (f) => (
-      <>
-        <p className="truncate text-[13px] font-semibold text-slate-900">
-          {f.name}
-        </p>
-      </>
-    ),
-  },
-  {
-    key: "embedSlug",
-    header: "Public URL",
-    render: (f) => (
-      <Link
-        href={`/f/${f.embedSlug}`}
-        target="_blank"
-        onClick={(e) => e.stopPropagation()}
-        className="inline-flex items-center gap-1 font-mono text-[13px] text-violet-700 hover:underline"
-      >
-        /f/{f.embedSlug}
-        <ExternalLink className="h-3.5 w-3.5" />
-      </Link>
-    ),
-  },
-  {
-    key: "destination",
-    header: "Routes to",
-    render: (f) => (
-      <>
-        <span className="rounded-full bg-violet-50 px-3 py-1 text-[12px] font-semibold text-violet-700">
-          {f.destination ?? "Lead"}
-        </span>
-        {f.journeyId ? (
-          <span className="mt-0.5 block text-[12px] text-slate-400">
-            + journey
-          </span>
-        ) : null}
-      </>
-    ),
-  },
-  {
-    key: "status",
-    header: "Status",
-    render: (f) => (
-      <StatusBadge label={f.status} colorClassName={STATUS_STYLE[f.status]} />
-    ),
-  },
-  {
-    key: "fields",
-    header: "Fields",
-    className: "tabular-nums",
-    render: (f) => f.fields,
-  },
-  {
-    key: "submissions",
-    header: "Submissions",
-    className: "tabular-nums",
-    render: (f) => f.submissions,
-  },
-  {
-    key: "updatedAt",
-    header: "Updated",
-    className: "text-slate-500",
-    render: (f) => f.updatedAt,
-  },
-];
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function MarketingFormsPage() {
   const router = useRouter();
-  const [rows, setRows] = useState<MarketingForm[]>(seed);
+  const [rows, setRows] = useState<MarketingForm[]>([]);
   const [statusTab, setStatusTab] = useState<FormStatus | "All">("All");
   const [search, setSearch] = useState("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [nameModalOpen, setNameModalOpen] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const [page, setPage] = useState(1);
   const pageSize = 8;
 
+  // Load stored forms from localStorage on mount
   useEffect(() => {
-    setRows(listMarketingForms());
+    const savedForms = localStorage.getItem("marketing_forms_storage");
+    if (savedForms) {
+      try {
+        setRows(JSON.parse(savedForms));
+      } catch (e) {
+        console.error("Failed to parse saved forms", e);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -334,11 +94,192 @@ export default function MarketingFormsPage() {
     safePage * pageSize,
   );
 
-  const handleConfirmName = (name: string) => {
-    // TODO(api): create the form record with `name`, then navigate using the returned id
-    console.log("create blank form:", name);
+  const handleDeleteForm = (
+    formId: string,
+    embedSlug: string,
+    e: React.MouseEvent,
+  ) => {
+    e.stopPropagation();
+    if (!confirm("Are you sure you want to delete this form?")) return;
+
+    setRows((prev) => {
+      const updated = prev.filter((r) => r.id !== formId);
+      localStorage.setItem("marketing_forms_storage", JSON.stringify(updated));
+      return updated;
+    });
+
+    // Clean up schema storage
+    localStorage.removeItem(`form_schema_${embedSlug}`);
+  };
+
+  const handleEditForm = (form: MarketingForm, e: React.MouseEvent) => {
+    e.stopPropagation();
     router.push(
-      `/marketing/forms/create?layoutid=standard&redirect=false&name=${encodeURIComponent(name)}`,
+      `/marketing/forms/create?layoutid=standard&redirect=false&slug=${encodeURIComponent(
+        form.embedSlug,
+      )}&name=${encodeURIComponent(form.name)}`,
+    );
+  };
+
+  const handleCopyUrl = (
+    embedSlug: string,
+    formId: string,
+    e: React.MouseEvent,
+  ) => {
+    e.stopPropagation();
+    const fullUrl = `${window.location.origin}/forms/view/${embedSlug}`;
+    navigator.clipboard.writeText(fullUrl);
+    setCopiedId(formId);
+    setTimeout(() => {
+      setCopiedId((curr) => (curr === formId ? null : curr));
+    }, 2000);
+  };
+
+  const columns: DataTableColumn<MarketingForm>[] = [
+    {
+      key: "name",
+      header: "Form",
+      className: "max-w-[220px]",
+      render: (f) => (
+        <>
+          <p className="truncate text-[13px] font-semibold text-slate-900">
+            {f.name}
+          </p>
+        </>
+      ),
+    },
+    {
+      key: "embedSlug",
+      header: "Public URL",
+      render: (f) => {
+        const fullUrl =
+          typeof window !== "undefined"
+            ? `${window.location.origin}/forms/view/${f.embedSlug}`
+            : `/forms/view/${f.embedSlug}`;
+
+        return (
+          <Link
+            href={`/forms/view/${f.embedSlug}`}
+            target="_blank"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-1 font-mono text-[13px] text-violet-700 hover:underline"
+          >
+            {fullUrl}
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Link>
+        );
+      },
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      className: "text-right w-[100px]",
+      render: (f) => (
+        <div
+          className="flex items-center justify-end"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-slate-500 hover:text-slate-900"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem
+                onClick={(e) => handleCopyUrl(f.embedSlug, f.id, e)}
+              >
+                {copiedId === f.id ? (
+                  <>
+                    <Check className="mr-2 h-3.5 w-3.5 text-emerald-600" />
+                    <span className="text-emerald-600 font-medium">
+                      Copied!
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="mr-2 h-3.5 w-3.5" />
+                    Copy URL
+                  </>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => handleEditForm(f, e)}>
+                <Pencil className="mr-2 h-3.5 w-3.5" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-red-600 focus:text-red-600"
+                onClick={(e) => handleDeleteForm(f.id, f.embedSlug, e)}
+              >
+                <Trash2 className="mr-2 h-3.5 w-3.5" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ),
+    },
+  ];
+
+  const handleConfirmName = (name: string) => {
+    const newFormId = crypto.randomUUID();
+    const slug = name.toLowerCase().trim().replace(/\s+/g, "-");
+
+    const newEntry: MarketingForm = {
+      id: newFormId,
+      formId: newFormId.slice(0, 8),
+      name,
+      embedSlug: slug,
+      destination: "Lead",
+      status: "Draft",
+      fields: 1,
+      submissions: 0,
+      updatedAt: "Just now",
+      fieldDefs: [],
+      createdBy: "User",
+    };
+
+    // 1. Save list metadata
+    setRows((prev) => {
+      const updated = [newEntry, ...prev];
+      localStorage.setItem("marketing_forms_storage", JSON.stringify(updated));
+      return updated;
+    });
+
+    // 2. Initialize default schema immediately so public link works right away
+    const initialFormSchema = {
+      title: name,
+      themeId: "default",
+      pages: [
+        {
+          id: crypto.randomUUID(),
+          title: "General Information",
+          hidden: false,
+          fields: [
+            {
+              id: crypto.randomUUID(),
+              type: "text",
+              label: "Full Name",
+              required: true,
+            },
+          ],
+        },
+      ],
+    };
+    localStorage.setItem(
+      `form_schema_${slug}`,
+      JSON.stringify(initialFormSchema),
+    );
+
+    // Navigate to the builder page
+    router.push(
+      `/marketing/forms/create?layoutid=standard&redirect=false&slug=${encodeURIComponent(
+        slug,
+      )}&name=${encodeURIComponent(name)}`,
     );
   };
 
@@ -402,7 +343,7 @@ export default function MarketingFormsPage() {
         emptyState={
           <>
             <ClipboardList className="mx-auto mb-3 h-8 w-8 text-slate-300" />
-            No forms match.
+            No forms found.
           </>
         }
       />

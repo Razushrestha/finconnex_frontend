@@ -15,6 +15,28 @@ interface FieldPaletteProps {
   onAddField: (defn: FieldDefinition) => void;
 }
 
+function setFieldDragPreview(e: React.DragEvent, label: string) {
+  const el = document.createElement("div");
+  el.textContent = label;
+  Object.assign(el.style, {
+    position: "absolute",
+    top: "-9999px",
+    left: "-9999px",
+    padding: "6px 12px",
+    background: "white",
+    border: "1px dashed rgb(52 211 153)",
+    borderRadius: "6px",
+    fontSize: "13px",
+    fontWeight: "500",
+    color: "rgb(17 24 39)",
+    boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+    whiteSpace: "nowrap",
+  } as CSSStyleDeclaration);
+  document.body.appendChild(el);
+  e.dataTransfer.setDragImage(el, -12, 14);
+  requestAnimationFrame(() => document.body.removeChild(el));
+}
+
 export function FieldPalette({ onAddField }: FieldPaletteProps) {
   const [query, setQuery] = useState("");
 
@@ -63,6 +85,7 @@ export function FieldPalette({ onAddField }: FieldPaletteProps) {
                       defn.type,
                     );
                     e.dataTransfer.effectAllowed = "copy";
+                    setFieldDragPreview(e, defn.label);
                   }}
                   onClick={() => onAddField(defn)}
                   className={cn(

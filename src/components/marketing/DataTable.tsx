@@ -1,8 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PaginationBar } from "@/components/ui/pagination-bar";
 
 export interface DataTableColumn<T> {
   key: string;
@@ -24,6 +24,7 @@ interface DataTableProps<T> {
   totalCount: number;
   onPageChange: (page: number) => void;
   className?: string;
+  entriesLabel?: string;
 }
 
 /**
@@ -40,6 +41,7 @@ export function DataTable<T>({
   totalCount,
   onPageChange,
   className,
+  entriesLabel = "forms",
 }: DataTableProps<T>) {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -56,7 +58,10 @@ export function DataTable<T>({
           <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
             <tr>
               {columns.map((c) => (
-                <th key={c.key} className={cn("px-3 py-2.5 sm:px-4", c.className)}>
+                <th
+                  key={c.key}
+                  className={cn("px-3 py-2.5 sm:px-4", c.className)}
+                >
                   {c.header}
                 </th>
               ))}
@@ -73,7 +78,10 @@ export function DataTable<T>({
                 )}
               >
                 {columns.map((c) => (
-                  <td key={c.key} className={cn("px-3 py-2.5 sm:px-4", c.className)}>
+                  <td
+                    key={c.key}
+                    className={cn("px-3 py-2.5 sm:px-4", c.className)}
+                  >
                     {c.render(row)}
                   </td>
                 ))}
@@ -92,37 +100,15 @@ export function DataTable<T>({
           </tbody>
         </table>
       </div>
-      {totalCount > 0 ? (
-        <div className="flex shrink-0 items-center justify-between border-t border-slate-100 px-3 py-2.5 text-[12px] text-slate-500 sm:px-4">
-          <span>
-            Showing {(safePage - 1) * pageSize + 1}–
-            {Math.min(safePage * pageSize, totalCount)} of {totalCount}
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              disabled={safePage === 1}
-              onClick={() => onPageChange(Math.max(1, safePage - 1))}
-              aria-label="Previous page"
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 disabled:opacity-40"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-            <span className="px-1.5 tabular-nums">
-              {safePage} / {totalPages}
-            </span>
-            <button
-              type="button"
-              disabled={safePage === totalPages}
-              onClick={() => onPageChange(Math.min(totalPages, safePage + 1))}
-              aria-label="Next page"
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 disabled:opacity-40"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      ) : null}
+
+      {/* Replaced old simple footer with the rich PaginationBar */}
+      <PaginationBar
+        page={safePage}
+        pageSize={pageSize}
+        total={totalCount}
+        onPageChange={onPageChange}
+        entriesLabel={entriesLabel}
+      />
     </div>
   );
 }

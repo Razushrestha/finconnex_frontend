@@ -68,6 +68,7 @@ export function ColumnLayoutField({
 
   const handleDragOverColumn = (index: number) => (e: React.DragEvent) => {
     if (readOnly) return;
+    if (!e.dataTransfer.types.includes("application/x-field-type")) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
     setDropColumn(index);
@@ -75,6 +76,7 @@ export function ColumnLayoutField({
 
   const handleDropOnColumn = (index: number) => (e: React.DragEvent) => {
     if (readOnly) return;
+    if (!e.dataTransfer.types.includes("application/x-field-type")) return;
     e.preventDefault();
     const fieldType = e.dataTransfer.getData("application/x-field-type");
     if (fieldType) onDropFieldType(index, fieldType);
