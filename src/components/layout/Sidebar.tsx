@@ -26,6 +26,7 @@ import {
   Timer,
   Scale,
   ChevronsLeft,
+  Link2,
 } from "lucide-react";
 
 type NavChildItem = {
@@ -134,7 +135,16 @@ const dashboardItems: NavItem[] = [
     ],
   },
   {
-    label: "Sales Ops",
+    label: "Smart Link",
+    icon: Link2,
+    children: [
+      { label: "Templates", href: "/smart-link/templates" },
+      { label: "Builder", href: "/smart-link/builder" },
+      { label: "Shortner", href: "/smart-link/shortner" },
+    ],
+  },
+  {
+    label: "Finance",
     icon: LineChart,
     children: [
       { label: "Hub", href: "/finance" },
@@ -278,7 +288,9 @@ export function Sidebar({
         <div
           className={cn(
             "mb-2 flex items-center px-1",
-            collapsed ? "justify-between md:flex-col md:gap-2" : "justify-between",
+            collapsed
+              ? "justify-between md:flex-col md:gap-2"
+              : "justify-between",
           )}
         >
           <Link
