@@ -29,6 +29,8 @@ export type CrmTaskQuery = {
   limit?: number;
   search?: string;
   status?: string;
+  relatedType?: string;
+  relatedId?: string;
 };
 
 function pickStr(...values: unknown[]): string {
@@ -308,6 +310,8 @@ export async function listCrmTasks(query: CrmTaskQuery = {}): Promise<Task[]> {
         limit: query.limit ?? 100,
         search: query.search,
         status: query.status,
+        relatedType: query.relatedType,
+        relatedId: query.relatedId,
       }),
     ),
   );

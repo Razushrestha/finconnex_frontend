@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { LeadCardData } from "@/lib/leads/types";
 import { leadApplicants } from "@/lib/leads/detail-snapshot";
 import { cn } from "@/lib/utils";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import { fetchLeadCreditReport } from "@/lib/leads/api";
 import { ApplicantCreditCard } from "@/components/sales/leads/detail/ApplicantCreditCard";
 import {
   buildCreditReport,
   CreditReportBody,
+  type CreditReport,
 } from "@/components/sales/leads/detail/CreditReportDrawer";
 import { PortalFactFindAssets } from "@/components/portals/public/mortgage/PortalFactFindAssets";
 import { PortalFactFindEmployment } from "@/components/portals/public/mortgage/PortalFactFindEmployment";
@@ -157,7 +160,41 @@ function ApplicantFinanceColumn({
     onLeadPatch,
     role,
   );
-  const report = buildCreditReport(`${card.id}:${role}:${name}`, name, true);
+  const [report, setReport] = useState<CreditReport>(() =>
+    buildCreditReport(`${card.id}:${role}:${name}`, name, true),
+  );
+
+  useEffect(() => {
+    const generated = buildCreditReport(
+      `${card.id}:${role}:${name}`,
+      name,
+      true,
+    );
+    setReport(generated);
+    if (!isUuid(card.id)) return;
+    let cancelled = false;
+    void fetchLeadCreditReport(card.id).then((raw) => {
+      if (cancelled || !raw || typeof raw !== "object") return;
+      const next = raw as Partial<CreditReport>;
+      if (next.accounts && !Array.isArray(next.accounts)) {
+        setReport({
+          generatedAt:
+            typeof next.generatedAt === "string"
+              ? next.generatedAt
+              : generated.generatedAt,
+          accounts: next.accounts,
+          enquiries: next.enquiries ?? generated.enquiries,
+          defaults: next.defaults ?? generated.defaults,
+          insolvencies: next.insolvencies ?? generated.insolvencies,
+          business: next.business ?? generated.business,
+          identity: next.identity ?? generated.identity,
+        });
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [card.id, name, role]);
 
   return (
     <div className="min-w-0 [&_.mt-6]:mt-0 [&_.mt-7]:mt-0">

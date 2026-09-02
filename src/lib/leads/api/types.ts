@@ -77,6 +77,24 @@ export type CrmLead = {
   convertedDealId?: string | null;
   convertedCompanyId?: string | null;
   ownerId?: string | null;
+  pipelineStage?: string;
+  pipelineStageLabel?: string;
+  tags?: string[];
+  followerIds?: string[];
+  sla?: {
+    badgeBand?: string;
+    badgeLabel?: string;
+    stageDueAt?: string;
+    detail?: string;
+  } | null;
+  nextBest?: {
+    kind: string;
+    id: string;
+    title: string;
+    at: string;
+    priority?: string;
+  } | null;
+  redFlags?: Array<{ code: string; label: string }>;
   createdAt?: string;
   updatedAt?: string;
 };

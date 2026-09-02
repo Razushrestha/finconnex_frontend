@@ -167,6 +167,12 @@ export const ENDPOINT_CATALOG = [
   { method: "PATCH", path: "/leads/:id/score", module: "leads" },
   { method: "POST", path: "/leads/bulk", module: "leads" },
   { method: "POST", path: "/leads/import", module: "leads", notes: "JSON rows, max 100" },
+  { method: "POST", path: "/leads/import/ads", module: "leads", notes: "Mapped ads rows until network pull exists" },
+  { method: "POST", path: "/leads/import/sheets", module: "leads", notes: "Mapped sheet rows until Google OAuth exists" },
+  { method: "GET", path: "/leads/:id/conversations", module: "leads" },
+  { method: "POST", path: "/leads/:id/conversations", module: "leads", notes: "SMS/WhatsApp via Twilio when configured" },
+  { method: "GET", path: "/leads/:id/credit-report", module: "leads" },
+  { method: "POST", path: "/leads/:id/credit-report/refresh", module: "leads" },
   { method: "POST", path: "/leads/:id/convert", module: "leads", notes: "Requires existing contact/deal/company UUID" },
   { method: "DELETE", path: "/leads/:id", module: "leads", notes: "Soft-delete → recycle bin" },
 
@@ -180,6 +186,9 @@ export const ENDPOINT_CATALOG = [
   { method: "POST", path: "/contacts/import", module: "contacts", notes: "CSV / Excel / Sheets" },
   { method: "POST", path: "/contacts/bulk", module: "contacts", notes: "Assign, status, or soft-delete" },
   { method: "POST", path: "/contacts/:id/merge", module: "contacts", notes: "Merge source into survivor" },
+  { method: "PUT", path: "/contacts/:id/tags", module: "contacts" },
+  { method: "GET", path: "/contacts/:id/deals", module: "contacts" },
+  { method: "GET", path: "/contacts/:id/tickets", module: "contacts" },
 
   // Companies (JWT; workspace via token claim)
   { method: "GET", path: "/companies", module: "companies", notes: "List workspace companies" },

@@ -232,7 +232,11 @@ function opt(value: string | null | undefined): string | undefined {
 }
 
 export function mapCrmLeadToCard(lead: CrmLead): LeadCardData {
-  const stage = crmStatusToPipelineStage(lead.status);
+  const stage = (MORTGAGE_PIPELINE_STAGES as readonly string[]).includes(
+    lead.pipelineStageLabel ?? "",
+  )
+    ? (lead.pipelineStageLabel as MortgagePipelineStage)
+    : crmStatusToPipelineStage(lead.status);
   const first = lead.firstName?.trim() || "";
   const last = lead.lastName?.trim() || "";
   const name = `${first} ${last}`.trim() || lead.email;
@@ -283,6 +287,10 @@ export function mapCrmLeadToCard(lead: CrmLead): LeadCardData {
     convertedContactId: lead.convertedContactId ?? undefined,
     convertedDealId: lead.convertedDealId ?? undefined,
     convertedCompanyId: lead.convertedCompanyId ?? undefined,
+    nextBest: lead.nextBest ?? null,
+    redFlags: lead.redFlags ?? [],
+    sla: lead.sla ?? null,
+    tags: lead.tags,
     accentColorClass: PIPELINE_STAGE_DOT[stage],
     avatarBgClass: AVATAR_COLORS[hashIndex(lead.id)],
   };

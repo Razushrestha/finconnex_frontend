@@ -13,6 +13,10 @@ export type CrmDocumentQuery = {
   page?: number;
   limit?: number;
   search?: string;
+  contactId?: string;
+  leadId?: string;
+  companyId?: string;
+  dealId?: string;
 };
 
 export type CrmDocumentDownload = {
@@ -221,6 +225,10 @@ export async function listCrmDocuments(
         page: query.page,
         limit: query.limit ?? 100,
         search: query.search,
+        contactId: query.contactId,
+        leadId: query.leadId,
+        companyId: query.companyId,
+        dealId: query.dealId,
       }),
     ),
   );

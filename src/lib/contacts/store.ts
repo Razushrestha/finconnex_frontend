@@ -98,6 +98,14 @@ export function updateContact(
       | "source"
       | "dealIds"
       | "tags"
+      | "firstName"
+      | "lastName"
+      | "jobTitle"
+      | "department"
+      | "linkedinUrl"
+      | "lifecycleStage"
+      | "doNotContact"
+      | "notes"
     >
   > & { status?: ContactStatus },
 ): ContactCardData | null {
@@ -136,6 +144,8 @@ export function updateContact(
     void tryCrmContact(() =>
       updateCrmContact(id, {
         name: patch.name,
+        firstName: patch.firstName,
+        lastName: patch.lastName,
         email: patch.email,
         phone: patch.phone,
         mobile: patch.mobile,
@@ -143,6 +153,12 @@ export function updateContact(
         owner: patch.owner,
         source: patch.source,
         status: nextStatus,
+        jobTitle: patch.jobTitle,
+        department: patch.department,
+        linkedinUrl: patch.linkedinUrl,
+        lifecycleStage: patch.lifecycleStage,
+        doNotContact: patch.doNotContact,
+        notes: patch.notes,
       }),
     );
   });

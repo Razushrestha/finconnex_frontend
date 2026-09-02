@@ -41,6 +41,16 @@ export interface ContactCardData {
   /** Linked deal record ids (SRS contact ↔ deal). */
   dealIds?: string[];
   tags?: string[];
+  firstName?: string;
+  lastName?: string;
+  ownerId?: string;
+  companyId?: string;
+  jobTitle?: string;
+  department?: string;
+  linkedinUrl?: string;
+  lifecycleStage?: string;
+  doNotContact?: boolean;
+  notes?: string;
 }
 
 export interface ContactGroup {

@@ -68,6 +68,36 @@ export const CRM_LEAD_ENDPOINTS = [
     path: "/v1/leads/{id}",
     client: "softDeleteCrmLead",
   },
+  {
+    key: "importAds",
+    method: "POST",
+    path: "/v1/leads/import/ads",
+    client: "importCrmLeadsFromAds",
+  },
+  {
+    key: "importSheets",
+    method: "POST",
+    path: "/v1/leads/import/sheets",
+    client: "importCrmLeadsFromSheets",
+  },
+  {
+    key: "conversations",
+    method: "GET",
+    path: "/v1/leads/{id}/conversations",
+    client: "fetchLeadConversations",
+  },
+  {
+    key: "postConversation",
+    method: "POST",
+    path: "/v1/leads/{id}/conversations",
+    client: "postLeadConversation",
+  },
+  {
+    key: "creditReport",
+    method: "GET",
+    path: "/v1/leads/{id}/credit-report",
+    client: "fetchLeadCreditReport",
+  },
 ] as const;
 
 export type CrmLeadEndpoint = (typeof CRM_LEAD_ENDPOINTS)[number];

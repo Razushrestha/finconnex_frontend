@@ -384,6 +384,131 @@ export async function importCrmLeads(input: {
   });
 }
 
+export async function importCrmLeadsFromAds(input: {
+  platform: "meta" | "google" | "linkedin" | "tiktok";
+  rows: CrmCreateLeadInput[];
+  duplicateHandling: "SKIP" | "UPDATE";
+  campaignId?: string;
+}): Promise<CrmImportResult | null> {
+  if (!input.rows.length) return { created: 0, updated: 0, skipped: 0, errors: [] };
+  const session = await resolveSession();
+  if (!session) return null;
+  return crmRequest<CrmImportResult>(session, "/v1/leads/import/ads", {
+    method: "POST",
+    body: JSON.stringify({
+      platform: input.platform,
+      campaignId: input.campaignId,
+      duplicateHandling: input.duplicateHandling,
+      defaultOwnerId: currentCrmUserId(session.accessToken),
+      rows: input.rows.slice(0, 100),
+    }),
+  });
+}
+
+export async function importCrmLeadsFromSheets(input: {
+  spreadsheetId: string;
+  mapping: Record<string, string>;
+  duplicateHandling: "SKIP" | "UPDATE";
+  sheetName?: string;
+  rows?: CrmCreateLeadInput[];
+  records?: Array<Record<string, string>>;
+}): Promise<CrmImportResult | null> {
+  const session = await resolveSession();
+  if (!session) return null;
+  return crmRequest<CrmImportResult>(session, "/v1/leads/import/sheets", {
+    method: "POST",
+    body: JSON.stringify({
+      spreadsheetId: input.spreadsheetId,
+      sheetName: input.sheetName,
+      mapping: input.mapping,
+      duplicateHandling: input.duplicateHandling,
+      defaultOwnerId: currentCrmUserId(session.accessToken),
+      rows: input.rows?.slice(0, 100),
+      records: input.records?.slice(0, 100),
+    }),
+  });
+}
+
+export type CrmLeadConversationItem = {
+  id: string;
+  channel: string;
+  kind?: string;
+  direction?: string;
+  fromName?: string;
+  body: string;
+  subject?: string;
+  at: string;
+  status?: string;
+  durationSeconds?: number;
+};
+
+export async function fetchLeadConversations(
+  id: string,
+  query: { channel?: string; page?: number; limit?: number } = {},
+): Promise<{ records: CrmLeadConversationItem[]; total: number } | null> {
+  if (!isUuid(id)) return null;
+  const session = await resolveSession();
+  if (!session) return null;
+  const params = new URLSearchParams();
+  if (query.channel) params.set("channel", query.channel);
+  if (query.page) params.set("page", String(query.page));
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const data = await crmRequest<{
+    records?: CrmLeadConversationItem[];
+    total?: number;
+  }>(session, `/v1/leads/${id}/conversations${qs ? `?${qs}` : ""}`);
+  return {
+    records: Array.isArray(data?.records) ? data.records : [],
+    total: data?.total ?? 0,
+  };
+}
+
+export async function postLeadConversation(
+  id: string,
+  input: {
+    channel: "whatsapp" | "sms" | "email" | "call";
+    body: string;
+    subject?: string;
+    send?: boolean;
+  },
+): Promise<CrmLeadConversationItem | null> {
+  if (!isUuid(id)) return null;
+  const session = await resolveSession();
+  if (!session) return null;
+  return crmRequest<CrmLeadConversationItem>(
+    session,
+    `/v1/leads/${id}/conversations`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export async function fetchLeadCreditReport(id: string): Promise<unknown | null> {
+  if (!isUuid(id)) return null;
+  const session = await resolveSession();
+  if (!session) return null;
+  return crmRequest<unknown>(session, `/v1/leads/${id}/credit-report`);
+}
+
+export async function refreshLeadCreditReport(id: string): Promise<unknown | null> {
+  if (!isUuid(id)) return null;
+  const session = await resolveSession();
+  if (!session) return null;
+  return crmRequest<unknown>(session, `/v1/leads/${id}/credit-report/refresh`, {
+    method: "POST",
+  });
+}
+
+export async function fetchLeadMortgage(id: string): Promise<{ payload: Record<string, unknown> } | null> {
+  if (!isUuid(id)) return null;
+  const session = await resolveSession();
+  if (!session) return null;
+  return crmRequest<{ payload: Record<string, unknown> }>(
+    session,
+    `/v1/leads/${id}/mortgage`,
+  );
+}
+
 export async function convertCrmLead(
   id: string,
   targets: {

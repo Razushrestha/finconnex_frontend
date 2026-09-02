@@ -120,6 +120,19 @@ export interface LeadCardData {
   convertedDealId?: string;
   convertedCompanyId?: string;
   archived?: boolean;
+  nextBest?: {
+    kind: string;
+    id: string;
+    title: string;
+    at: string;
+    priority?: string;
+  } | null;
+  redFlags?: Array<{ code: string; label: string }>;
+  sla?: {
+    badgeBand?: string;
+    badgeLabel?: string;
+    detail?: string;
+  } | null;
   accentColorClass: string;
   avatarBgClass: string;
 }

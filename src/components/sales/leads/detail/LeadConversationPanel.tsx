@@ -33,6 +33,11 @@ import {
   X,
 } from "lucide-react";
 import { avatarColor, initials } from "@/lib/activities/shared";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import {
+  fetchLeadConversations,
+  postLeadConversation,
+} from "@/lib/leads/api";
 import {
   addLeadConversationItem,
   formatDuration,
@@ -139,6 +144,9 @@ function summarize(items: ConversationItem[], first: string) {
 export function LeadConversationPanel({ card }: { card: LeadCardData }) {
   const first = card.name.split(" ")[0] ?? card.name;
   const [revision, setRevision] = useState(0);
+  const [remoteItems, setRemoteItems] = useState<ConversationItem[] | null>(
+    null,
+  );
   const [channelFilters, setChannelFilters] = useState<ConversationChannel[]>(
     [],
   );
@@ -168,6 +176,49 @@ export function LeadConversationPanel({ card }: { card: LeadCardData }) {
   useEffect(() => onLeadActivityChange(() => setRevision((n) => n + 1)), []);
 
   useEffect(() => {
+    if (!isUuid(card.id)) {
+      setRemoteItems(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchLeadConversations(card.id, { limit: 50 }).then((page) => {
+      if (cancelled || !page) return;
+      setRemoteItems(
+        page.records.map((row) => ({
+          id: row.id,
+          leadId: card.id,
+          channel: (["whatsapp", "sms", "email", "call"].includes(row.channel)
+            ? row.channel
+            : "sms") as ConversationChannel,
+          kind:
+            row.kind === "call"
+              ? "call"
+              : row.kind === "email"
+                ? "email"
+                : "text",
+          direction:
+            String(row.direction).toLowerCase() === "inbound" ||
+            String(row.direction).toLowerCase() === "in"
+              ? "in"
+              : "out",
+          fromName: row.fromName || card.owner,
+          body: row.body,
+          subject: row.subject,
+          at:
+            typeof row.at === "string"
+              ? row.at
+              : new Date(row.at).toISOString(),
+          status: "sent",
+          durationSeconds: row.durationSeconds,
+        })),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [card.id, card.owner, revision]);
+
+  useEffect(() => {
     if (!plusOpen && !emojiOpen) return;
     function onDoc(event: MouseEvent) {
       const target = event.target as Node;
@@ -194,8 +245,9 @@ export function LeadConversationPanel({ card }: { card: LeadCardData }) {
 
   const items = useMemo(() => {
     void revision;
+    if (remoteItems) return remoteItems;
     return listLeadConversation(card);
-  }, [card, revision]);
+  }, [card, revision, remoteItems]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -283,16 +335,32 @@ export function LeadConversationPanel({ card }: { card: LeadCardData }) {
       template: composerChannel === "whatsapp" ? "WhatsApp" : undefined,
     });
 
-    addLeadConversationItem({
-      leadId: card.id,
-      channel: composerChannel,
-      kind: "text",
-      direction: "out",
-      fromName: card.owner,
-      body: body || attachment?.name || "",
-      status: "read",
-      attachment: attachment ?? undefined,
-    });
+    if (isUuid(card.id)) {
+      void postLeadConversation(card.id, {
+        channel: composerChannel,
+        body: body || attachment?.name || "",
+        subject:
+          composerChannel === "whatsapp"
+            ? `WhatsApp: ${card.name}`
+            : undefined,
+        send: true,
+      })
+        .then(() => setRevision((n) => n + 1))
+        .catch((err) =>
+          notify(err instanceof Error ? err.message : "Send failed"),
+        );
+    } else {
+      addLeadConversationItem({
+        leadId: card.id,
+        channel: composerChannel,
+        kind: "text",
+        direction: "out",
+        fromName: card.owner,
+        body: body || attachment?.name || "",
+        status: "read",
+        attachment: attachment ?? undefined,
+      });
+    }
     setDraft("");
     setSubject("");
     setAttachment(null);

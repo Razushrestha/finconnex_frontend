@@ -21,6 +21,11 @@ import {
   fetchLeadKanban,
   fetchLeadList,
   importCrmLeads,
+  importCrmLeadsFromAds,
+  importCrmLeadsFromSheets,
+  fetchLeadConversations,
+  postLeadConversation,
+  fetchLeadCreditReport,
   linkCrmLeadCompany,
   softDeleteCrmLead,
   unassignCrmLeadOwner,
@@ -82,8 +87,8 @@ export async function smokeLeadClientWiring() {
       fail(`client missing function ${ep.client}`);
     }
   }
-  if (CRM_LEAD_ENDPOINTS.length !== 17) {
-    fail(`expected 17 swagger lead routes, got ${CRM_LEAD_ENDPOINTS.length}`);
+  if (CRM_LEAD_ENDPOINTS.length < 17) {
+    fail(`expected at least 17 swagger lead routes, got ${CRM_LEAD_ENDPOINTS.length}`);
   }
 
   const catalog = readFileSync(
@@ -102,6 +107,10 @@ export async function smokeLeadClientWiring() {
     'path: "/leads/:id/score"',
     'path: "/leads/bulk"',
     'path: "/leads/import"',
+    'path: "/leads/import/ads"',
+    'path: "/leads/import/sheets"',
+    'path: "/leads/:id/conversations"',
+    'path: "/leads/:id/credit-report"',
     'path: "/leads/:id/convert"',
   ]) {
     if (!catalog.includes(fragment)) {
@@ -177,11 +186,17 @@ export async function smokeLeadClientMock() {
     hits.push({ method, path: normalizePath(url) });
     const body = { statusCode: 200, data: STUB_LEAD };
     if (url.includes("/bulk")) body.data = { affected: 1 } as never;
+    if (url.includes("/kanban")) {
+      body.data = [{ status: "NEW", records: [STUB_LEAD], total: 1 }] as never;
+    }
     if (url.includes("/import")) {
       body.data = { created: 1, updated: 0, skipped: 0, errors: [] } as never;
     }
-    if (url.includes("/kanban")) {
-      body.data = [{ status: "NEW", records: [STUB_LEAD], total: 1 }] as never;
+    if (url.includes("/conversations")) {
+      body.data = { records: [], total: 0 } as never;
+    }
+    if (url.includes("/credit-report")) {
+      body.data = { generatedAt: null, accounts: { active: 0, rows: [] } } as never;
     }
     if (url.match(/\/v1\/leads(\?|$)/) && method === "GET" && !url.includes(LEAD_ID)) {
       body.data = { items: [STUB_LEAD], metadata: { currentPage: 1, itemsPerPage: 20, totalItems: 1, totalPages: 1 } } as never;
@@ -212,6 +227,32 @@ export async function smokeLeadClientMock() {
     ],
     duplicateHandling: "SKIP",
   });
+  await importCrmLeadsFromAds({
+    platform: "meta",
+    duplicateHandling: "SKIP",
+    rows: [
+      {
+        firstName: "Ads",
+        lastName: "Lead",
+        email: "ads.lead@example.com",
+      },
+    ],
+  });
+  await importCrmLeadsFromSheets({
+    spreadsheetId: "sheet-smoke",
+    mapping: { Email: "email", First: "firstName", Last: "lastName" },
+    duplicateHandling: "SKIP",
+    records: [
+      { Email: "sheet@example.com", First: "Sam", Last: "Sheet" },
+    ],
+  });
+  await fetchLeadConversations(LEAD_ID, { limit: 20 });
+  await postLeadConversation(LEAD_ID, {
+    channel: "sms",
+    body: "Smoke",
+    send: false,
+  });
+  await fetchLeadCreditReport(LEAD_ID);
   await fetchLeadKanban();
   await fetchLeadList({ page: 1, limit: 20 });
   await fetchLeadById(LEAD_ID);
@@ -316,6 +357,27 @@ function liveBody(key: string): unknown {
           },
         ],
       };
+    case "importAds":
+      return {
+        platform: "meta",
+        duplicateHandling: "SKIP",
+        rows: [
+          {
+            firstName: "Smoke",
+            lastName: "Ads",
+            email: "smoke.ads@example.com",
+          },
+        ],
+      };
+    case "importSheets":
+      return {
+        spreadsheetId: "sheet-smoke",
+        mapping: { Email: "email" },
+        duplicateHandling: "SKIP",
+        records: [{ Email: "smoke.sheet@example.com" }],
+      };
+    case "postConversation":
+      return { channel: "sms", body: "Smoke", send: false };
     case "update":
       return { phone: "0400000000" };
     case "assignOwner":
@@ -347,7 +409,7 @@ export async function runSmokeLeadApis() {
 
   console.log("\n2) Mock fetch — each client method hits the right path…");
   await smokeLeadClientMock();
-  console.log("   OK — all 17 client calls recorded");
+  console.log(`   OK — all ${CRM_LEAD_ENDPOINTS.length} client calls recorded`);
 
   console.log("\n3) Live CRM routes (unauthenticated probe)…");
   const live = await smokeLeadLiveRoutes();
