@@ -165,7 +165,7 @@ export async function fetchLeadKanban(): Promise<CrmLeadKanbanColumn[] | null> {
   if (!session) return null;
   const data = await crmRequest<CrmLeadKanbanColumn[]>(
     session,
-    "/v1/leads/kanban?limitPerStatus=50",
+    "/v1/leads/kanban?groupBy=pipelineStage&limitPerStatus=50",
   );
   return Array.isArray(data) ? data : [];
 }
@@ -509,6 +509,102 @@ export async function fetchLeadMortgage(id: string): Promise<{ payload: Record<s
   );
 }
 
+export async function putLeadMortgage(
+  id: string,
+  input: { payload: Record<string, unknown>; merge?: boolean },
+): Promise<{ payload: Record<string, unknown> } | null> {
+  if (!isUuid(id)) return null;
+  const session = await resolveSession();
+  if (!session) return null;
+  return crmRequest<{ payload: Record<string, unknown> }>(
+    session,
+    `/v1/leads/${id}/mortgage`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        payload: input.payload,
+        merge: input.merge ?? true,
+      }),
+    },
+  );
+}
+
+export async function changeCrmLeadPipelineStage(
+  id: string,
+  pipelineStage: string,
+): Promise<CrmLead | null> {
+  if (!isUuid(id)) return null;
+  const session = await resolveSession();
+  if (!session) return null;
+  return crmRequest<CrmLead>(session, `/v1/leads/${id}/pipeline-stage`, {
+    method: "PATCH",
+    body: JSON.stringify({ pipelineStage }),
+  });
+}
+
+export async function replaceCrmLeadTags(
+  id: string,
+  tags: string[],
+): Promise<string[] | CrmLead | null> {
+  if (!isUuid(id)) return null;
+  const session = await resolveSession();
+  if (!session) return null;
+  return crmRequest<string[] | CrmLead>(session, `/v1/leads/${id}/tags`, {
+    method: "PUT",
+    body: JSON.stringify({ tags }),
+  });
+}
+
+export async function replaceCrmLeadFollowers(
+  id: string,
+  followerIds: string[],
+): Promise<CrmLead | string[] | null> {
+  if (!isUuid(id)) return null;
+  const session = await resolveSession();
+  if (!session) return null;
+  return crmRequest<CrmLead | string[]>(session, `/v1/leads/${id}/followers`, {
+    method: "PUT",
+    body: JSON.stringify({ followerIds: followerIds.filter(isUuid) }),
+  });
+}
+
+export async function addCrmLeadFollower(
+  id: string,
+  userId: string,
+): Promise<CrmLead | null> {
+  if (!isUuid(id) || !isUuid(userId)) return null;
+  const session = await resolveSession();
+  if (!session) return null;
+  return crmRequest<CrmLead>(session, `/v1/leads/${id}/followers`, {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export async function addCrmLeadFollowerById(
+  id: string,
+  userId: string,
+): Promise<CrmLead | null> {
+  if (!isUuid(id) || !isUuid(userId)) return null;
+  const session = await resolveSession();
+  if (!session) return null;
+  return crmRequest<CrmLead>(session, `/v1/leads/${id}/followers/${userId}`, {
+    method: "POST",
+  });
+}
+
+export async function removeCrmLeadFollower(
+  id: string,
+  userId: string,
+): Promise<CrmLead | null> {
+  if (!isUuid(id) || !isUuid(userId)) return null;
+  const session = await resolveSession();
+  if (!session) return null;
+  return crmRequest<CrmLead>(session, `/v1/leads/${id}/followers/${userId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function convertCrmLead(
   id: string,
   targets: {
@@ -624,12 +720,18 @@ export async function syncCreatedLead(input: {
   if (!created) return null;
   let lead = created;
   if (input.pipelineStage) {
-    const desired = pipelineStageToCrmStatus(input.pipelineStage);
-    if (desired !== "NEW") {
-      try {
-        lead = (await changeCrmLeadStatus(created.id, desired)) ?? created;
-      } catch {
-        lead = created;
+    try {
+      lead =
+        (await changeCrmLeadPipelineStage(created.id, input.pipelineStage)) ??
+        created;
+    } catch {
+      const desired = pipelineStageToCrmStatus(input.pipelineStage);
+      if (desired !== "NEW") {
+        try {
+          lead = (await changeCrmLeadStatus(created.id, desired)) ?? created;
+        } catch {
+          lead = created;
+        }
       }
     }
   }
@@ -647,10 +749,15 @@ export async function syncLeadStatus(
   pipelineStage: string,
 ): Promise<LeadCardData | null> {
   try {
-    const updated = await changeCrmLeadStatus(
-      id,
-      pipelineStageToCrmStatus(pipelineStage),
-    );
+    let updated: CrmLead | null = null;
+    try {
+      updated = await changeCrmLeadPipelineStage(id, pipelineStage);
+    } catch {
+      updated = await changeCrmLeadStatus(
+        id,
+        pipelineStageToCrmStatus(pipelineStage),
+      );
+    }
     if (!updated) return null;
     const card = mapCrmLeadToCard(updated);
     upsertLeadFromCard(card);

@@ -494,7 +494,7 @@ export function TaskListView({
   const processedData = useMemo(() => {
     let data = [...allTasks];
 
-    data = data.filter(
+      data = data.filter(
       (t) => taskMatchesFilters(t, filters) && taskMatchesSearch(t, search),
     )
 

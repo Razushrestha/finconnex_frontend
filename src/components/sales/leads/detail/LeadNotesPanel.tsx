@@ -19,8 +19,17 @@ import {
   Users,
 } from "lucide-react";
 import { ACTIVITY_OWNERS, initials } from "@/lib/activities/shared";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { relatedMatchesLead } from "@/lib/leads/activity-index";
 import { emitLeadActivityChange, onLeadActivityChange } from "@/lib/leads/lead-extras-store";
+import {
+  createCrmNote,
+  deleteCrmNote,
+  isCrmNoteId,
+  persistRemoteNote,
+  tryCrmNote,
+  updateCrmNote,
+} from "@/lib/notes/api";
 import {
   createNote,
   deleteNote,
@@ -215,6 +224,7 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (isUuid(card.id)) return;
     const key = seedKey(card.id);
     if (window.sessionStorage.getItem(key)) return;
     const liveNotes = listNotes();
@@ -230,9 +240,13 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
   const notes = useMemo(() => {
     void revision;
     return listNotes()
-      .filter((note) => relatedMatchesLead(note.relatedTo, card.name))
+      .filter((note) =>
+        isUuid(card.id) && note.relatedId === card.id
+          ? true
+          : relatedMatchesLead(note.relatedTo, card.name),
+      )
       .sort((a, b) => Number(b.isPinned) - Number(a.isPinned));
-  }, [card.name, revision]);
+  }, [card.id, card.name, revision]);
 
   const visible = notes.filter((note) => {
     if (!matchesTab(note, tab)) return false;
@@ -340,7 +354,7 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
     }
   }
 
-  function save() {
+  async function save() {
     const el = areaRef.current;
     const html = el?.innerHTML ?? body;
     const text = (el?.innerText ?? body).replace(/\u00a0/g, " ").trim();
@@ -350,6 +364,7 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
       "Note";
     if (!text) return;
     const mapped = composeToStore(composeType);
+    const relatedTo = `Lead: ${card.name}`;
     if (editingId) {
       updateNote(editingId, {
         title: heading,
@@ -357,13 +372,57 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
         isPinned: pin,
         isPrivate: mapped.isPrivate,
       });
+      if (isCrmNoteId(editingId)) {
+        await tryCrmNote(() =>
+          updateCrmNote(editingId, {
+            title: heading,
+            body: html,
+            isPinned: pin,
+            isPrivate: mapped.isPrivate,
+            noteType: mapped.noteType,
+          }),
+        );
+      }
       setEditingId(null);
       notify("Note updated");
+    } else if (isUuid(card.id)) {
+      const remote = await tryCrmNote(() =>
+        createCrmNote({
+          title: heading,
+          body: html,
+          relatedTo,
+          relatedType: "LEAD",
+          relatedId: card.id,
+          noteType: mapped.noteType,
+          createdBy: card.owner,
+          isPrivate: mapped.isPrivate,
+          isPinned: pin,
+        }),
+      );
+      if (remote) {
+        persistRemoteNote({
+          ...remote,
+          relatedTo,
+          relatedType: "LEAD",
+          relatedId: card.id,
+        });
+      } else {
+        createNote({
+          title: heading,
+          body: html,
+          relatedTo,
+          noteType: mapped.noteType,
+          createdBy: card.owner,
+          isPrivate: mapped.isPrivate,
+          isPinned: pin,
+        });
+      }
+      notify("Note saved");
     } else {
       createNote({
         title: heading,
         body: html,
-        relatedTo: `Lead: ${card.name}`,
+        relatedTo,
         noteType: mapped.noteType,
         createdBy: card.owner,
         isPrivate: mapped.isPrivate,
@@ -376,6 +435,7 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
     if (el) el.innerHTML = "";
     setPin(false);
     setPage(1);
+    emitLeadActivityChange();
   }
 
   function plainBody(note: Note) {
@@ -403,6 +463,11 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
 
   function togglePin(note: Note) {
     updateNote(note.id, { isPinned: !note.isPinned });
+    if (isCrmNoteId(note.id)) {
+      void tryCrmNote(() =>
+        updateCrmNote(note.id, { isPinned: !note.isPinned }),
+      );
+    }
     setMenuId(null);
     notify(note.isPinned ? "Note unpinned" : "Note pinned");
   }
@@ -419,15 +484,51 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
   }
 
   function duplicateNote(note: Note) {
-    createNote({
-      title: `${note.title} (copy)`,
-      body: note.body,
-      relatedTo: note.relatedTo,
-      noteType: note.noteType,
-      createdBy: card.owner,
-      isPrivate: note.isPrivate,
-      isPinned: false,
-    });
+    if (isUuid(card.id)) {
+      void tryCrmNote(() =>
+        createCrmNote({
+          title: `${note.title} (copy)`,
+          body: note.body,
+          relatedTo: note.relatedTo,
+          relatedType: "LEAD",
+          relatedId: card.id,
+          noteType: note.noteType,
+          createdBy: card.owner,
+          isPrivate: note.isPrivate,
+          isPinned: false,
+        }),
+      ).then((remote) => {
+        if (remote) {
+          persistRemoteNote({
+            ...remote,
+            relatedTo: `Lead: ${card.name}`,
+            relatedType: "LEAD",
+            relatedId: card.id,
+          });
+        } else {
+          createNote({
+            title: `${note.title} (copy)`,
+            body: note.body,
+            relatedTo: note.relatedTo,
+            noteType: note.noteType,
+            createdBy: card.owner,
+            isPrivate: note.isPrivate,
+            isPinned: false,
+          });
+        }
+        emitLeadActivityChange();
+      });
+    } else {
+      createNote({
+        title: `${note.title} (copy)`,
+        body: note.body,
+        relatedTo: note.relatedTo,
+        noteType: note.noteType,
+        createdBy: card.owner,
+        isPrivate: note.isPrivate,
+        isPinned: false,
+      });
+    }
     setMenuId(null);
     notify("Note duplicated");
   }
@@ -435,6 +536,9 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
   function removeNote(note: Note) {
     if (!window.confirm(`Delete “${note.title}”? This cannot be undone.`)) return;
     deleteNote(note.id);
+    if (isCrmNoteId(note.id)) {
+      void tryCrmNote(() => deleteCrmNote(note.id));
+    }
     if (editingId === note.id) cancelEdit();
     if (expanded === note.id) setExpanded(null);
     setMenuId(null);

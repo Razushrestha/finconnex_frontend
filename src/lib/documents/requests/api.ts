@@ -18,6 +18,10 @@ export type CrmDocumentRequestQuery = {
   limit?: number;
   search?: string;
   status?: string;
+  leadId?: string;
+  contactId?: string;
+  companyId?: string;
+  dealId?: string;
 };
 
 function pickStr(...values: unknown[]): string {
@@ -299,6 +303,10 @@ export async function listCrmDocumentRequests(
         limit: query.limit ?? 100,
         search: query.search,
         status: query.status,
+        leadId: query.leadId,
+        contactId: query.contactId,
+        companyId: query.companyId,
+        dealId: query.dealId,
       }),
     ),
   );

@@ -15,7 +15,6 @@ import {
 import {
   LEAD_PIPELINE_STAGES,
   LEAD_SOURCES,
-  OWNERS,
   type LeadPipelineStage,
   type LeadSource,
 } from "@/lib/leads/types";
@@ -26,7 +25,12 @@ import {
   syncCreatedLead,
 } from "@/lib/leads/api";
 import { isUuid } from "@/lib/activity-timeline/auth";
-import { listCrmWorkspaceMembers } from "@/lib/workspace-members/api";
+import {
+  assignableOwnerLabel,
+  defaultAssignableOwnerId,
+  listAssignableOwnersLocal,
+  loadAssignableOwners,
+} from "@/lib/users/assignable";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import {
   isMortgagePipelineStage,
@@ -92,7 +96,7 @@ function makeInitialState(stage?: string): LeadFormState {
     jobTitle: "",
     leadSource: "",
     pipelineStage: resolveInitialStage(stage),
-    owner: "John Smith",
+    owner: "",
     notes: "",
     productInterest: "",
     budgetRange: "",
@@ -104,40 +108,36 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
   void props.layoutId;
   void props.redirect;
   const router = useRouter();
-  const [form, setForm] = useState<LeadFormState>(() =>
-    makeInitialState(props.stage),
-  );
+  const [form, setForm] = useState<LeadFormState>(() => {
+    const initial = makeInitialState(props.stage);
+    const owners = listAssignableOwnersLocal();
+    return {
+      ...initial,
+      owner: defaultAssignableOwnerId(owners, initial.owner),
+    };
+  });
   const [errors, setErrors] = useState<
     Partial<Record<keyof LeadFormState, string>>
   >({});
   const [submitted, setSubmitted] = useState(false);
-  const [ownerOptions, setOwnerOptions] = useState<
-    Array<{ id: string; name: string }>
-  >(() => OWNERS.map((name) => ({ id: name, name })));
+  const [ownerOptions, setOwnerOptions] = useState(() =>
+    listAssignableOwnersLocal(),
+  );
 
   useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      owner: defaultAssignableOwnerId(ownerOptions, prev.owner),
+    }));
     let cancelled = false;
-    void listCrmWorkspaceMembers()
-      .then((members) => {
-        const live = members.filter(
-          (m) => m.status !== "Inactive" && (isUuid(m.userId) || isUuid(m.id)),
-        );
-        if (cancelled || !live.length) return;
-        const options = live.map((m) => ({
-          id: isUuid(m.userId) ? m.userId : m.id,
-          name: m.name,
-        }));
-        setOwnerOptions(options);
-        setForm((prev) => {
-          const match = options.find(
-            (o) => o.id === prev.owner || o.name === prev.owner,
-          );
-          return { ...prev, owner: match?.id ?? options[0]?.id ?? prev.owner };
-        });
-      })
-      .catch(() => {
-        /* keep demo owner names */
-      });
+    void loadAssignableOwners().then((options) => {
+      if (cancelled || !options.length) return;
+      setOwnerOptions(options);
+      setForm((prev) => ({
+        ...prev,
+        owner: defaultAssignableOwnerId(options, prev.owner),
+      }));
+    });
     return () => {
       cancelled = true;
     };
@@ -236,7 +236,7 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
       source: form.leadSource || "Website",
       status: pipelineStageToLeadStatus(pipelineStage),
       pipelineStage,
-      owner: form.owner,
+      owner: ownerLabel,
       estimatedValue: form.estimatedValue || undefined,
     });
     if (!result.ok) {
@@ -444,7 +444,7 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
           >
             {ownerOptions.map((o) => (
               <option key={o.id} value={o.id}>
-                {o.name}
+                {assignableOwnerLabel(o)}
               </option>
             ))}
           </select>

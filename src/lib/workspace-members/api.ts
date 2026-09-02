@@ -126,12 +126,17 @@ export function apiWorkspaceMemberRole(role: HierarchyLevel): string {
   }
 }
 
-export function mapWorkspaceMemberStatus(raw: string): WorkspaceMemberStatus {
+export function mapWorkspaceMemberStatus(
+  raw: string,
+  extras?: { isActive?: unknown; joinedAt?: unknown },
+): WorkspaceMemberStatus {
+  if (extras?.isActive === false) return "Inactive";
   const value = raw.toLowerCase().replace(/[_-]/g, " ");
   if (value.includes("pend") || value.includes("invite")) return "Invited";
   if (value.includes("inactive") || value.includes("disable")) {
     return "Inactive";
   }
+  if (!raw && extras?.joinedAt == null) return "Invited";
   return "Active";
 }
 
@@ -163,15 +168,20 @@ export function normalizeWorkspaceMember(
     [first, last].filter(Boolean).join(" ") ||
     pickStr(row.email, user.email) ||
     "Member";
+  const joinedAt = pickStr(row.joinedAt, user.joinedAt) || undefined;
   return {
     id,
     userId: pickStr(row.userId, user.id, id),
     name,
     email: pickStr(row.email, user.email),
     role: isOwner ? "System Admin" : mapWorkspaceMemberRole(roleRaw),
-    status: mapWorkspaceMemberStatus(statusRaw),
+    status: mapWorkspaceMemberStatus(statusRaw, {
+      isActive: row.isActive,
+      joinedAt: joinedAt || row.joinedAt,
+    }),
     isOwner,
     team: pickStr(row.team, row.teamName) || undefined,
+    joinedAt,
   };
 }
 
@@ -201,7 +211,12 @@ export function normalizeWorkspaceMembersSummary(
   }
   return {
     joined: pickNum(nested.joined ?? nested.active ?? nested.accepted),
-    pending: pickNum(nested.pending ?? nested.invited),
+    pending: pickNum(
+      nested.pending ??
+        nested.invited ??
+        nested.pendingInvitations ??
+        nested.pendingInvites,
+    ),
     byRole,
   };
 }
@@ -248,6 +263,8 @@ export async function inviteCrmWorkspaceMember(input: {
   email: string;
   name?: string;
   role: HierarchyLevel;
+  team?: string;
+  joinImmediately?: boolean;
 }): Promise<WorkspaceMember | null> {
   const session = await requireSession();
   const role = apiWorkspaceMemberRole(input.role);
@@ -259,6 +276,9 @@ export async function inviteCrmWorkspaceMember(input: {
         name: input.name?.trim() || undefined,
         role,
         workspaceRole: role,
+        team: input.team?.trim() || undefined,
+        joinImmediately: input.joinImmediately === true,
+        status: input.joinImmediately ? "ACTIVE" : "INVITED",
       }),
     }),
   );
@@ -266,7 +286,7 @@ export async function inviteCrmWorkspaceMember(input: {
 
 export async function updateCrmWorkspaceMember(
   memberId: string,
-  patch: { role?: HierarchyLevel; accept?: boolean },
+  patch: { role?: HierarchyLevel; team?: string; accept?: boolean },
 ): Promise<WorkspaceMember | null> {
   const session = await requireSession();
   const body: Record<string, unknown> = {};
@@ -275,6 +295,7 @@ export async function updateCrmWorkspaceMember(
     body.role = role;
     body.workspaceRole = role;
   }
+  if (patch.team !== undefined) body.team = patch.team.trim();
   if (patch.accept) {
     body.accept = true;
     body.status = "JOINED";
@@ -293,7 +314,7 @@ export async function deleteCrmWorkspaceMember(memberId: string): Promise<void> 
   await crmFetch(
     session,
     workspaceMembersPath(session.workspaceId, `/${memberId}`),
-    { method: "DELETE" },
+    { method: "DELETE", body: JSON.stringify({}) },
   );
 }
 
@@ -335,9 +356,61 @@ export async function transferCrmWorkspaceOwnership(
         memberId,
         userId: memberId,
         targetMemberId: memberId,
+        newOwnerMemberId: memberId,
       }),
     }),
   );
+}
+
+export async function importCrmWorkspaceMembers(
+  items: Array<{
+    email: string;
+    name?: string;
+    role: HierarchyLevel;
+    team?: string;
+    joinImmediately?: boolean;
+  }>,
+): Promise<{ invited: number; added: number; failed: Array<{ email: string; error: string }> }> {
+  const session = await requireSession();
+  const data = await crmFetch(
+    session,
+    workspaceMembersPath(session.workspaceId, "/import"),
+    {
+      method: "POST",
+      body: JSON.stringify({
+        items: items.map((item) => {
+          const role = apiWorkspaceMemberRole(item.role);
+          return {
+            email: item.email.trim().toLowerCase(),
+            name: item.name?.trim() || undefined,
+            role,
+            workspaceRole: role,
+            team: item.team?.trim() || undefined,
+            joinImmediately: item.joinImmediately === true,
+          };
+        }),
+      }),
+    },
+  );
+  const rec =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : {};
+  const nested =
+    rec.data && typeof rec.data === "object" && !Array.isArray(rec.data)
+      ? (rec.data as Record<string, unknown>)
+      : rec;
+  const failedRaw = Array.isArray(nested.failed) ? nested.failed : [];
+  return {
+    invited: pickNum(nested.invited),
+    added: pickNum(nested.added),
+    failed: failedRaw
+      .filter((row): row is Record<string, unknown> => !!row && typeof row === "object")
+      .map((row) => ({
+        email: pickStr(row.email),
+        error: pickStr(row.error) || "Import failed",
+      })),
+  };
 }
 
 export async function tryCrmWorkspaceMembers<T>(

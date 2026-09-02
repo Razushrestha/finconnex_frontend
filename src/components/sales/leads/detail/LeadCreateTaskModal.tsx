@@ -38,7 +38,15 @@ import {
   requireAction,
 } from "@/lib/rules";
 import { getRulesActor } from "@/lib/rules/actor";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { createTask, findTaskById, patchTask, updateTaskStatus } from "@/lib/tasks/store";
+import {
+  createCrmTask,
+  isCrmTaskId,
+  persistRemoteTask,
+  tryCrmTask,
+  updateCrmTask,
+} from "@/lib/tasks/api";
 import {
   TASK_OWNERS,
   TASK_PRIORITIES,
@@ -533,10 +541,67 @@ export function LeadCreateTaskModal({
           notifyBy: reminderOn ? ["Email", "In-app"] : undefined,
         });
         if (status !== "Completed") updateTaskStatus(editTaskId, status);
+        if (isCrmTaskId(editTaskId)) {
+          await tryCrmTask(() =>
+            updateCrmTask(editTaskId, {
+              title: title.trim(),
+              taskType,
+              priority,
+              status,
+              dueDate: formatStoredTaskDateTime(dueDate),
+              assignedTo,
+              relatedTo: related,
+              description: description.trim() || undefined,
+              notes: combinedNotes || undefined,
+            }),
+          );
+        }
         emitLeadActivityChange();
         onSaved?.();
         onClose();
         return;
+      }
+
+      if (isUuid(card.id)) {
+        const remote = await tryCrmTask(() =>
+          createCrmTask({
+            title: title.trim(),
+            taskType,
+            priority,
+            status,
+            dueDate: formatStoredTaskDateTime(dueDate),
+            assignedTo,
+            relatedTo: related,
+            relatedId: card.id,
+            description: description.trim() || undefined,
+            notes: combinedNotes || undefined,
+            collaborators: collaborators.length ? collaborators : undefined,
+          }),
+        );
+        if (remote) {
+          persistRemoteTask({
+            ...remote,
+            relatedTo: related,
+          });
+          logCreate("activities.tasks", assignedTo, remote.taskId, title.trim());
+          notifyOwnerAssigned({
+            owner: assignedTo,
+            entityLabel: `Task ${title.trim()}`,
+            relatedTo: `Lead: ${card.name}`,
+            relatedHref: `/activities/tasks`,
+            type: "Task Assigned",
+          });
+          notifyTaskDue({
+            recipient: assignedTo,
+            taskTitle: title.trim(),
+            relatedTo: `Lead: ${card.name}`,
+            relatedHref: "/activities/tasks",
+          });
+          emitLeadActivityChange();
+          onSaved?.(draft?.id);
+          onClose();
+          return;
+        }
       }
 
       const task = createTask({

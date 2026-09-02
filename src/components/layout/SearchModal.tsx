@@ -56,6 +56,7 @@ const DESTINATIONS: SearchItem[] = [
   { label: "Support", href: "/support", icon: LifeBuoy, keywords: ["support", "ticket"] },
   { label: "Notifications", href: "/notifications", icon: Bell, keywords: ["notifications"] },
   { label: "Rules", href: "/rules", icon: Scale, keywords: ["rules"] },
+  { label: "Users", href: "/users", icon: Users, keywords: ["users", "invite", "role", "members"] },
   { label: "Settings", href: "/settings", icon: Settings, keywords: ["settings"] },
   { label: "My Preferences", href: "/settings/my-preferences", icon: Settings, keywords: ["preferences", "theme"] },
 ];

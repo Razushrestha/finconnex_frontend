@@ -20,6 +20,7 @@ const PUBLIC_PREFIXES = [
   "/sign/", // E-signature
   "/book/", // Public booking
   "/s/", // Short / one-time booking links
+  "/go/", // Smart-link URL shortener
   "/f/", // Marketing forms
   "/l/", // Linktree
   "/j/", // Proposal-to-payment journey (client link)

@@ -23,6 +23,7 @@ import { parseFlexibleDate } from "@/lib/leads/activity-dates";
 import { leadSendHref } from "@/lib/leads/convert-actions";
 import { financeMatchesEntity, namesEqual } from "@/lib/related-entity";
 import { onRecordsChange } from "@/lib/records-sync";
+import { onLeadActivityChange } from "@/lib/leads/lead-extras-store";
 import { createAttachment, listAttachments } from "@/lib/attachments/store";
 import { DocumentRequestsList } from "@/components/documents/requests/DocumentRequestsList";
 import {
@@ -45,6 +46,7 @@ import {
   QUOTATION_STATUS_STYLE,
 } from "@/lib/finance/statusStyles";
 import type { LeadCardData } from "@/lib/leads/types";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { cn } from "@/lib/utils";
 
 const FILE_PAGE_SIZE = 10;
@@ -501,6 +503,14 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
   const [requestFilterOpen, setRequestFilterOpen] = useState(false);
 
   useEffect(() => onRecordsChange(() => setRecordsTick((n) => n + 1)), []);
+  useEffect(
+    () =>
+      onLeadActivityChange(() => {
+        setFileTick((n) => n + 1);
+        setRequestTick((n) => n + 1);
+      }),
+    [],
+  );
 
   const esignRows = useMemo(() => {
     void recordsTick;
@@ -514,7 +524,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
     const live = listDocumentRequests().filter((req) =>
       requestMatchesLead(req, card),
     );
-    if (live.length) return live;
+    if (live.length || isUuid(card.id)) return live;
     return seedLeadRequests(card, now);
   }, [card, now, requestTick, recordsTick]);
 
@@ -555,9 +565,11 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
       uploadedOn: parseFlexibleDate(file.uploadedAt) ?? now,
       size: file.sizeLabel ?? "—",
     }));
-    const extras = seedFiles(card, now).filter(
-      (row) => !live.some((item) => item.name === row.name),
-    );
+    const extras = isUuid(card.id)
+      ? []
+      : seedFiles(card, now).filter(
+          (row) => !live.some((item) => item.name === row.name),
+        );
     return [...live, ...extras];
   }, [card, files, now]);
 

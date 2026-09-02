@@ -20,12 +20,21 @@ import {
   fetchLeadById,
   fetchLeadKanban,
   fetchLeadList,
+  fetchLeadMortgage,
   importCrmLeads,
   importCrmLeadsFromAds,
   importCrmLeadsFromSheets,
   fetchLeadConversations,
   postLeadConversation,
   fetchLeadCreditReport,
+  refreshLeadCreditReport,
+  putLeadMortgage,
+  changeCrmLeadPipelineStage,
+  replaceCrmLeadTags,
+  replaceCrmLeadFollowers,
+  addCrmLeadFollower,
+  addCrmLeadFollowerById,
+  removeCrmLeadFollower,
   linkCrmLeadCompany,
   softDeleteCrmLead,
   unassignCrmLeadOwner,
@@ -64,7 +73,9 @@ function normalizePath(url: string) {
 }
 
 function pathMatches(template: string, actual: string) {
-  const expected = template.replace("{id}", LEAD_ID);
+  const expected = template
+    .replace("{id}", LEAD_ID)
+    .replace("{userId}", OWNER_ID);
   if (actual === expected) return true;
   if (template === "/v1/leads" && actual === "/v1/leads") return true;
   if (template === "/v1/leads/kanban" && actual.startsWith("/v1/leads/kanban")) {
@@ -79,7 +90,9 @@ export async function smokeLeadClientWiring() {
     "utf8",
   );
   for (const ep of CRM_LEAD_ENDPOINTS) {
-    const needle = ep.path.replace("{id}", "${id}");
+    const needle = ep.path
+      .replace("{id}", "${id}")
+      .replace("{userId}", "${userId}");
     if (!clientSrc.includes(needle) && !clientSrc.includes(ep.path)) {
       fail(`client missing ${ep.method} ${ep.path}`);
     }
@@ -111,6 +124,10 @@ export async function smokeLeadClientWiring() {
     'path: "/leads/import/sheets"',
     'path: "/leads/:id/conversations"',
     'path: "/leads/:id/credit-report"',
+    'path: "/leads/:id/pipeline-stage"',
+    'path: "/leads/:id/tags"',
+    'path: "/leads/:id/followers"',
+    'path: "/leads/:id/mortgage"',
     'path: "/leads/:id/convert"',
   ]) {
     if (!catalog.includes(fragment)) {
@@ -195,8 +212,14 @@ export async function smokeLeadClientMock() {
     if (url.includes("/conversations")) {
       body.data = { records: [], total: 0 } as never;
     }
-    if (url.includes("/credit-report")) {
-      body.data = { generatedAt: null, accounts: { active: 0, rows: [] } } as never;
+    if (url.includes("/mortgage")) {
+      body.data = { payload: {} } as never;
+    }
+    if (url.includes("/tags")) {
+      body.data = ["vip"] as never;
+    }
+    if (url.includes("/followers")) {
+      body.data = STUB_LEAD as never;
     }
     if (url.match(/\/v1\/leads(\?|$)/) && method === "GET" && !url.includes(LEAD_ID)) {
       body.data = { items: [STUB_LEAD], metadata: { currentPage: 1, itemsPerPage: 20, totalItems: 1, totalPages: 1 } } as never;
@@ -253,6 +276,15 @@ export async function smokeLeadClientMock() {
     send: false,
   });
   await fetchLeadCreditReport(LEAD_ID);
+  await refreshLeadCreditReport(LEAD_ID);
+  await fetchLeadMortgage(LEAD_ID);
+  await putLeadMortgage(LEAD_ID, { payload: { purpose: "purchase" }, merge: true });
+  await changeCrmLeadPipelineStage(LEAD_ID, "New Lead");
+  await replaceCrmLeadTags(LEAD_ID, ["vip"]);
+  await replaceCrmLeadFollowers(LEAD_ID, [OWNER_ID]);
+  await addCrmLeadFollower(LEAD_ID, OWNER_ID);
+  await addCrmLeadFollowerById(LEAD_ID, OWNER_ID);
+  await removeCrmLeadFollower(LEAD_ID, OWNER_ID);
   await fetchLeadKanban();
   await fetchLeadList({ page: 1, limit: 20 });
   await fetchLeadById(LEAD_ID);
@@ -297,7 +329,9 @@ export async function smokeLeadLiveRoutes(): Promise<LiveRow[]> {
 
   const rows: LiveRow[] = [];
   for (const ep of CRM_LEAD_ENDPOINTS) {
-    const pathWithId = ep.path.replace("{id}", LEAD_ID);
+    const pathWithId = ep.path
+      .replace("{id}", LEAD_ID)
+      .replace("{userId}", OWNER_ID);
     const init: RequestInit = {
       method: ep.method,
       headers: { Accept: "application/json", "Content-Type": "application/json" },
@@ -392,6 +426,15 @@ function liveBody(key: string): unknown {
       return { rating: "HOT" };
     case "changeScore":
       return { score: 50 };
+    case "changePipelineStage":
+      return { pipelineStage: "New Lead" };
+    case "replaceTags":
+      return { tags: ["vip"] };
+    case "replaceFollowers":
+    case "addFollower":
+      return { followerIds: [OWNER_ID], userId: OWNER_ID };
+    case "putMortgage":
+      return { payload: { purpose: "purchase" }, merge: true };
     case "convert":
       return { convertedDealId: DEAL_ID };
     default:

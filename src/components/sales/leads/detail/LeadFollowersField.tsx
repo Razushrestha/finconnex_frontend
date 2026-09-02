@@ -5,6 +5,8 @@ import { Plus, Search, X } from "lucide-react";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { OWNERS } from "@/lib/leads/types";
 import { listCrmUsers } from "@/lib/settings/users-store";
+import { listCrmWorkspaceMembers } from "@/lib/workspace-members/api";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { cn } from "@/lib/utils";
 
 const FOLLOWERS_KEY = "followersJson";
@@ -25,14 +27,13 @@ function parseFollowers(raw?: string): string[] {
   }
 }
 
-function teamMemberNames(): string[] {
+function teamMemberNames(extra: string[] = []): string[] {
   const users = listCrmUsers().filter(
     (user) => user.status !== "Inactive" && user.name.trim(),
   );
-  if (users.length) {
-    return [...new Set(users.map((user) => user.name.trim()))];
-  }
-  return [...OWNERS];
+  const fromUsers = users.map((user) => user.name.trim());
+  const names = [...fromUsers, ...extra, ...OWNERS].filter(Boolean);
+  return [...new Set(names)];
 }
 
 export function LeadFollowersField({
@@ -49,6 +50,24 @@ export function LeadFollowersField({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [followers, setFollowers] = useState(() => parseFollowers(value));
+  const [memberNames, setMemberNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void listCrmWorkspaceMembers()
+      .then((members) => {
+        if (cancelled) return;
+        setMemberNames(
+          members
+            .filter((m) => isUuid(m.userId) && m.name.trim())
+            .map((m) => m.name.trim()),
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const parsed = parseFollowers(value);
@@ -63,12 +82,12 @@ export function LeadFollowersField({
     const taken = new Set(followers.map((name) => name.toLowerCase()));
     if (owner?.trim()) taken.add(owner.trim().toLowerCase());
     const q = query.trim().toLowerCase();
-    return teamMemberNames().filter((name) => {
+    return teamMemberNames(memberNames).filter((name) => {
       if (taken.has(name.toLowerCase())) return false;
       if (!q) return true;
       return name.toLowerCase().includes(q);
     });
-  }, [followers, owner, query]);
+  }, [followers, owner, query, memberNames]);
 
   useEffect(() => {
     function onDoc(event: MouseEvent) {

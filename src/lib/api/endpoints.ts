@@ -80,6 +80,12 @@ export const ENDPOINT_CATALOG = [
     module: "workspace-members",
     notes: "Transfer workspace ownership to a joined member",
   },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/members/import",
+    module: "workspace-members",
+    notes: "Bulk invite or add workspace users",
+  },
 
   // Workspace operations (JWT; workspace-scoped)
   {
@@ -173,6 +179,14 @@ export const ENDPOINT_CATALOG = [
   { method: "POST", path: "/leads/:id/conversations", module: "leads", notes: "SMS/WhatsApp via Twilio when configured" },
   { method: "GET", path: "/leads/:id/credit-report", module: "leads" },
   { method: "POST", path: "/leads/:id/credit-report/refresh", module: "leads" },
+  { method: "PATCH", path: "/leads/:id/pipeline-stage", module: "leads" },
+  { method: "PUT", path: "/leads/:id/tags", module: "leads" },
+  { method: "PUT", path: "/leads/:id/followers", module: "leads" },
+  { method: "POST", path: "/leads/:id/followers", module: "leads" },
+  { method: "POST", path: "/leads/:id/followers/:userId", module: "leads" },
+  { method: "DELETE", path: "/leads/:id/followers/:userId", module: "leads" },
+  { method: "GET", path: "/leads/:id/mortgage", module: "leads" },
+  { method: "PUT", path: "/leads/:id/mortgage", module: "leads" },
   { method: "POST", path: "/leads/:id/convert", module: "leads", notes: "Requires existing contact/deal/company UUID" },
   { method: "DELETE", path: "/leads/:id", module: "leads", notes: "Soft-delete → recycle bin" },
 

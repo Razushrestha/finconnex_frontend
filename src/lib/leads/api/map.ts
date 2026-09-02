@@ -291,6 +291,7 @@ export function mapCrmLeadToCard(lead: CrmLead): LeadCardData {
     redFlags: lead.redFlags ?? [],
     sla: lead.sla ?? null,
     tags: lead.tags,
+    followerIds: lead.followerIds,
     accentColorClass: PIPELINE_STAGE_DOT[stage],
     avatarBgClass: AVATAR_COLORS[hashIndex(lead.id)],
   };
@@ -301,7 +302,10 @@ export function kanbanColumnsToBoard(
 ): KanbanColumn[] {
   const byStage = new Map<MortgagePipelineStage, LeadCardData[]>();
   for (const col of columns) {
-    const stage = crmStatusToPipelineStage(col.status);
+    const label = col.pipelineStage ?? col.pipelineStageCode ?? "";
+    const stage = (MORTGAGE_PIPELINE_STAGES as readonly string[]).includes(label)
+      ? (label as MortgagePipelineStage)
+      : crmStatusToPipelineStage(String(col.status ?? "NEW"));
     const cards = (col.records ?? []).map(mapCrmLeadToCard);
     byStage.set(stage, [...(byStage.get(stage) ?? []), ...cards]);
   }

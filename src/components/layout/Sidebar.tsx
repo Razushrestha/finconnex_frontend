@@ -21,6 +21,7 @@ import {
   Calculator,
   Route,
   Settings,
+  Users,
   X,
   CalendarClock,
   Timer,
@@ -165,6 +166,7 @@ const dashboardItems: NavItem[] = [
   { label: "Calculator", href: "/calculator", icon: Calculator },
   { label: "Journeys", href: "/journeys", icon: Route },
   { label: "Rules", href: "/rules", icon: Scale },
+  { label: "Users", href: "/users", icon: Users },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 

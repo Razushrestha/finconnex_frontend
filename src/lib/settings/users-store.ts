@@ -21,6 +21,7 @@ export type CrmUser = {
   status: CrmUserStatus;
   team?: string;
   lastLoginAt?: string;
+  joinedAt?: string;
 };
 
 const SEED: CrmUser[] = [
@@ -32,6 +33,7 @@ const SEED: CrmUser[] = [
     status: "Active",
     team: "Sales",
     lastLoginAt: new Date().toISOString(),
+    joinedAt: "2024-05-12",
   },
   {
     id: "user_shiva",
@@ -40,6 +42,7 @@ const SEED: CrmUser[] = [
     role: "Team Lead",
     status: "Active",
     team: "Sales",
+    joinedAt: "2024-06-03",
   },
   {
     id: "user_tejas",
@@ -48,6 +51,7 @@ const SEED: CrmUser[] = [
     role: "User",
     status: "Active",
     team: "Support",
+    joinedAt: "2024-07-18",
   },
   {
     id: "user_roshna",
@@ -56,6 +60,7 @@ const SEED: CrmUser[] = [
     role: "User",
     status: "Invited",
     team: "Marketing",
+    joinedAt: "2024-08-01",
   },
 ];
 
@@ -78,6 +83,7 @@ export function createCrmUser(input: {
   email: string;
   role: HierarchyLevel;
   team?: string;
+  status?: CrmUserStatus;
 }): CrmUser {
   const users = load();
   const user: CrmUser = {
@@ -85,8 +91,9 @@ export function createCrmUser(input: {
     name: input.name.trim(),
     email: input.email.trim().toLowerCase(),
     role: input.role,
-    status: "Invited",
+    status: input.status ?? "Invited",
     team: input.team?.trim() || undefined,
+    joinedAt: new Date().toISOString().slice(0, 10),
   };
   return save([user, ...users])[0]!;
 }

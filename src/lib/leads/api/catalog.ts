@@ -98,6 +98,60 @@ export const CRM_LEAD_ENDPOINTS = [
     path: "/v1/leads/{id}/credit-report",
     client: "fetchLeadCreditReport",
   },
+  {
+    key: "refreshCreditReport",
+    method: "POST",
+    path: "/v1/leads/{id}/credit-report/refresh",
+    client: "refreshLeadCreditReport",
+  },
+  {
+    key: "changePipelineStage",
+    method: "PATCH",
+    path: "/v1/leads/{id}/pipeline-stage",
+    client: "changeCrmLeadPipelineStage",
+  },
+  {
+    key: "replaceTags",
+    method: "PUT",
+    path: "/v1/leads/{id}/tags",
+    client: "replaceCrmLeadTags",
+  },
+  {
+    key: "replaceFollowers",
+    method: "PUT",
+    path: "/v1/leads/{id}/followers",
+    client: "replaceCrmLeadFollowers",
+  },
+  {
+    key: "addFollower",
+    method: "POST",
+    path: "/v1/leads/{id}/followers",
+    client: "addCrmLeadFollower",
+  },
+  {
+    key: "addFollowerById",
+    method: "POST",
+    path: "/v1/leads/{id}/followers/{userId}",
+    client: "addCrmLeadFollowerById",
+  },
+  {
+    key: "removeFollower",
+    method: "DELETE",
+    path: "/v1/leads/{id}/followers/{userId}",
+    client: "removeCrmLeadFollower",
+  },
+  {
+    key: "getMortgage",
+    method: "GET",
+    path: "/v1/leads/{id}/mortgage",
+    client: "fetchLeadMortgage",
+  },
+  {
+    key: "putMortgage",
+    method: "PUT",
+    path: "/v1/leads/{id}/mortgage",
+    client: "putLeadMortgage",
+  },
 ] as const;
 
 export type CrmLeadEndpoint = (typeof CRM_LEAD_ENDPOINTS)[number];

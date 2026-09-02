@@ -131,7 +131,9 @@ export type CrmCreateLeadInput = {
 };
 
 export type CrmLeadKanbanColumn = {
-  status: CrmLeadStatus | string;
+  status?: CrmLeadStatus | string;
+  pipelineStage?: string;
+  pipelineStageCode?: string;
   records: CrmLead[];
   total: number;
 };

@@ -6,7 +6,7 @@ import type { LeadCardData } from "@/lib/leads/types";
 import { leadApplicants } from "@/lib/leads/detail-snapshot";
 import { cn } from "@/lib/utils";
 import { isUuid } from "@/lib/activity-timeline/auth";
-import { fetchLeadCreditReport } from "@/lib/leads/api";
+import { fetchLeadCreditReport, refreshLeadCreditReport } from "@/lib/leads/api";
 import { ApplicantCreditCard } from "@/components/sales/leads/detail/ApplicantCreditCard";
 import {
   buildCreditReport,
@@ -163,6 +163,8 @@ function ApplicantFinanceColumn({
   const [report, setReport] = useState<CreditReport>(() =>
     buildCreditReport(`${card.id}:${role}:${name}`, name, true),
   );
+  const [refreshing, setRefreshing] = useState(false);
+  const [creditNote, setCreditNote] = useState<string | null>(null);
 
   useEffect(() => {
     const generated = buildCreditReport(
@@ -250,12 +252,63 @@ function ApplicantFinanceColumn({
 
       {section === "credit" ? (
         <div>
-          <h2 className="text-[16px] font-semibold text-slate-900">
-            Credit Score
-          </h2>
-          <p className="mt-1 mb-4 text-[13px] text-slate-500">
-            Equifax Apply Score and file summary.
-          </p>
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-[16px] font-semibold text-slate-900">
+                Credit Score
+              </h2>
+              <p className="mt-1 text-[13px] text-slate-500">
+                Equifax Apply Score and file summary.
+              </p>
+              {creditNote ? (
+                <p className="mt-1 text-[12px] text-slate-500">{creditNote}</p>
+              ) : null}
+            </div>
+            {isUuid(card.id) ? (
+              <button
+                type="button"
+                disabled={refreshing}
+                onClick={() => {
+                  setRefreshing(true);
+                  setCreditNote(null);
+                  void refreshLeadCreditReport(card.id)
+                    .then((raw) => {
+                      if (raw && typeof raw === "object") {
+                        const next = raw as Partial<CreditReport>;
+                        if (next.accounts && !Array.isArray(next.accounts)) {
+                          setReport((current) => ({
+                            ...current,
+                            generatedAt:
+                              typeof next.generatedAt === "string"
+                                ? next.generatedAt
+                                : current.generatedAt,
+                            accounts: next.accounts ?? current.accounts,
+                            enquiries: next.enquiries ?? current.enquiries,
+                            defaults: next.defaults ?? current.defaults,
+                            insolvencies:
+                              next.insolvencies ?? current.insolvencies,
+                            business: next.business ?? current.business,
+                            identity: next.identity ?? current.identity,
+                          }));
+                        }
+                      }
+                      setCreditNote("Credit report refreshed from CRM.");
+                    })
+                    .catch((err) =>
+                      setCreditNote(
+                        err instanceof Error
+                          ? err.message
+                          : "Could not refresh credit report",
+                      ),
+                    )
+                    .finally(() => setRefreshing(false));
+                }}
+                className="h-8 shrink-0 rounded-lg border border-slate-200 px-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {refreshing ? "Refreshing…" : "Refresh report"}
+              </button>
+            ) : null}
+          </div>
           <ApplicantCreditCard
             role={role}
             roleLabel={

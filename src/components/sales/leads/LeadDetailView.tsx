@@ -20,6 +20,9 @@ import {
   convertCrmLead,
   createCrmDeal,
   linkCrmLeadCompany,
+  putLeadMortgage,
+  replaceCrmLeadFollowers,
+  replaceCrmLeadTags,
   softDeleteCrmLead,
   syncLeadStatus,
   unassignCrmLeadOwner,
@@ -36,6 +39,8 @@ import { sendEmailDemoLive } from "@/lib/comms/send-gateway";
 import { createEmail } from "@/lib/emails/store";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import { formatRulesAt } from "@/lib/rules/storage";
+import { listCrmWorkspaceMembers } from "@/lib/workspace-members/api";
+import { FOLLOWERS_KEY } from "@/components/sales/leads/detail/LeadFollowersField";
 import {
   ConvertToDealFormValues,
   ConvertToDealModal,
@@ -248,6 +253,11 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
         onTagsChange={(tags) => {
           const updated = updateLead(card.id, { tags });
           if (updated) setCard(updated);
+          if (isUuid(card.id)) {
+            void replaceCrmLeadTags(card.id, tags).catch((err) =>
+              notify(err instanceof Error ? err.message : "Could not save tags"),
+            );
+          }
         }}
         onStatusChange={(pipelineStage) => {
           void (async () => {
@@ -268,16 +278,71 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
         }}
         onLeadPatch={(patch) => {
           const updated = updateLead(card.id, patch);
-          if (updated) {
-            setCard(updated);
-            notify("Lead field saved");
-            return;
+          if (updated) setCard(updated);
+          else {
+            setCard((current) => ({
+              ...current,
+              ...patch,
+              custom: { ...(current.custom ?? {}), ...(patch.custom ?? {}) },
+            }));
           }
-          setCard((current) => ({
-            ...current,
-            ...patch,
-            custom: { ...(current.custom ?? {}), ...(patch.custom ?? {}) },
-          }));
+          notify("Lead field saved");
+          if (!isUuid(card.id)) return;
+          void (async () => {
+            try {
+              if (patch.custom && Object.keys(patch.custom).length) {
+                const { [FOLLOWERS_KEY]: _followers, ...mortgageCustom } =
+                  patch.custom;
+                if (Object.keys(mortgageCustom).length) {
+                  await putLeadMortgage(card.id, {
+                    payload: mortgageCustom,
+                    merge: true,
+                  });
+                }
+                if (patch.custom[FOLLOWERS_KEY]) {
+                  const names = JSON.parse(
+                    patch.custom[FOLLOWERS_KEY] || "[]",
+                  ) as unknown;
+                  const list = Array.isArray(names)
+                    ? names.filter(
+                        (name): name is string => typeof name === "string",
+                      )
+                    : [];
+                  const members = await listCrmWorkspaceMembers();
+                  const ids = list
+                    .map((name) => {
+                      const match = members.find(
+                        (m) =>
+                          m.name.trim().toLowerCase() === name.trim().toLowerCase(),
+                      );
+                      return match?.userId;
+                    })
+                    .filter((id): id is string => Boolean(id) && isUuid(id));
+                  await replaceCrmLeadFollowers(card.id, ids);
+                }
+              }
+              const scalar: Parameters<typeof updateCrmLead>[1] = {};
+              if (patch.email) {
+                const parts = (patch.name ?? card.name).trim().split(/\s+/);
+                scalar.firstName = parts[0];
+                scalar.lastName = parts.slice(1).join(" ") || parts[0];
+                scalar.email = patch.email;
+              } else if (patch.name) {
+                const parts = patch.name.trim().split(/\s+/);
+                scalar.firstName = parts[0];
+                scalar.lastName = parts.slice(1).join(" ") || parts[0];
+                scalar.email = card.email;
+              }
+              if (patch.phone) scalar.phone = patch.phone;
+              if (Object.keys(scalar).length) {
+                await updateCrmLead(card.id, scalar);
+              }
+            } catch (err) {
+              notify(
+                err instanceof Error ? err.message : "Could not sync lead to CRM",
+              );
+            }
+          })();
         }}
         onStartCall={() => undefined}
         onReschedule={() => notify("Reschedule next action…")}
@@ -297,7 +362,7 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
             >
               Close
             </button>
-          </div>
+        </div>
           <p className="mb-3 text-[11px] text-slate-500">
             {card.lifecycleStage ? `Lifecycle ${card.lifecycleStage}` : "No lifecycle"}
             {card.rating ? ` · ${card.rating}` : ""}
@@ -485,7 +550,7 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
             >
               Delete lead
             </button>
-          </div>
+        </div>
         </div>
       ) : null}
 
@@ -555,7 +620,7 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
               sentDate: formatRulesAt(),
               relatedTo: `Lead: ${card.name}`,
             });
-            setIsComposeOpen(false);
+          setIsComposeOpen(false);
             notify(
               to.length > 1
                 ? `Email sent to ${to.length} recipients`
@@ -670,7 +735,7 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
               emitRulesChange("all");
               notify("Lead saved");
             }
-            setIsEditOpen(false);
+          setIsEditOpen(false);
           })();
         }}
       />

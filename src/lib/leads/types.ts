@@ -102,6 +102,7 @@ export interface LeadCardData {
   estimatedValue?: string;
   /** Spec §4 example field — shown when selected in Lead Card settings. */
   tags?: string[];
+  followerIds?: string[];
   /**
    * Session 16 — mortgage pipeline stage for SLA (optional override).
    * When omitted, derived from Kanban LeadStatus.

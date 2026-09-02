@@ -2,6 +2,7 @@ import { createEmptyLink } from "@/lib/broker-hub/types";
 import type { BrokerHubConfig, LinkIconType } from "@/lib/broker-hub/types";
 
 export type BrokerHubTemplateId =
+  | "blank"
   | "executive-portrait"
   | "webinar-landing"
   | "client-documents"
@@ -31,6 +32,16 @@ export const BROKER_HUB_TEMPLATES: Record<
   BrokerHubTemplateId,
   BrokerHubTemplatePreset
 > = {
+  blank: {
+    label: "Blank hub",
+    profile: {
+      slug: "",
+      avatarUrl: null,
+      title: "",
+      bio: "",
+    },
+    links: [],
+  },
   "executive-portrait": {
     label: "Executive Portrait",
     profile: {
@@ -112,4 +123,19 @@ export function getBrokerHubTemplate(
 ): BrokerHubTemplatePreset | null {
   if (!id) return null;
   return BROKER_HUB_TEMPLATES[id as BrokerHubTemplateId] ?? null;
+}
+
+export function getHubConfigForTemplate(
+  templateId: string | null | undefined,
+): BrokerHubConfig {
+  const template = getBrokerHubTemplate(templateId) ?? BROKER_HUB_TEMPLATES.blank;
+  return {
+    brokerId: "me",
+    hubName: template.label,
+    profile: { ...template.profile },
+    links: template.links.map((link) => ({ ...link })),
+    socials: [],
+    customization: { theme: "default", fontStyle: "sans" },
+    published: false,
+  };
 }

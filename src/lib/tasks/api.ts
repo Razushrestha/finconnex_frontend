@@ -349,6 +349,7 @@ export type CreateCrmTaskInput = {
   dueDate: string;
   assignedTo: string;
   relatedTo?: RelatedTo;
+  relatedId?: string;
   description?: string;
   notes?: string;
   collaborators?: string[];
@@ -369,6 +370,7 @@ export function toCreateTaskBody(input: CreateCrmTaskInput): Record<string, unkn
     assigneeName: input.assignedTo,
     relatedType: input.relatedTo?.kind?.toUpperCase(),
     relatedName: input.relatedTo?.name,
+    relatedId: input.relatedId,
     relatedTo: input.relatedTo,
     description: input.description,
     notes: input.notes,

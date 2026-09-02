@@ -1,28 +1,30 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { BrokerHubBuilder } from "@/components/smart-links/BrokerHubBuilder";
-import { type BrokerHubConfig } from "@/lib/broker-hub/types";
-import { getBrokerHubTemplate } from "@/lib/broker-hub/templates";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { BrokerHubBuilder } from "@/components/smart-links/BrokerHubBuilder";
+import {
+  getBrokerHubTemplate,
+  getHubConfigForTemplate,
+} from "@/lib/broker-hub/templates";
+import type { BrokerHubConfig } from "@/lib/broker-hub/types";
 
 const DRAFT_STORAGE_KEY = "broker-hub-draft";
 
-export default function LinktreePage() {
+function BuilderWorkspace() {
   const searchParams = useSearchParams();
   const templateId = searchParams.get("template");
-
   const [initialConfig, setInitialConfig] = useState<BrokerHubConfig | null>(
     null,
   );
 
   useEffect(() => {
-    // 1. Check if a customized draft exists in sessionStorage (from "Use This Template")
-    // 1. Check if a customized draft exists in sessionStorage
     const savedDraft = sessionStorage.getItem(DRAFT_STORAGE_KEY);
     if (savedDraft) {
       try {
-        const parsed = JSON.parse(savedDraft);
+        const parsed = JSON.parse(savedDraft) as BrokerHubConfig & {
+          templateId?: string;
+        };
         if (!templateId || parsed.templateId === templateId) {
           setInitialConfig({
             ...parsed,
@@ -40,7 +42,6 @@ export default function LinktreePage() {
       }
     }
 
-    // 2. If a template was clicked via query param directly
     if (templateId) {
       const template = getBrokerHubTemplate(templateId);
       if (template) {
@@ -50,38 +51,45 @@ export default function LinktreePage() {
           profile: template.profile,
           links: template.links || [],
           socials: [],
-          customization: { theme: "default", fontStyle: "sans" }, // <-- Default theme styling for templates
+          customization: { theme: "default", fontStyle: "sans" },
           published: false,
         });
         return;
       }
+      setInitialConfig(getHubConfigForTemplate(templateId));
+      return;
     }
 
-    // 3. Fallback: Existing default configuration if no template was selected
-    setInitialConfig({
-      brokerId: "me",
-      hubName: "Alex's Hub",
-      profile: {
-        slug: "",
-        avatarUrl: null,
-        title: "",
-        bio: "",
-      },
-      links: [],
-      socials: [],
-      published: false,
-    });
+    setInitialConfig(getHubConfigForTemplate("blank"));
   }, [templateId]);
 
   const handleSave = async (config: BrokerHubConfig) => {
-    // TODO(api): PATCH /brokers/me/hub
     console.log("Saving hub config", config);
   };
 
-  // Prevent hydration/render mismatch until config is determined from storage
   if (!initialConfig) {
     return null;
   }
 
-  return <BrokerHubBuilder initialConfig={initialConfig} onSave={handleSave} />;
+  return (
+    <BrokerHubBuilder
+      key={templateId ?? "blank"}
+      initialConfig={initialConfig}
+      onSave={handleSave}
+    />
+  );
+}
+
+export default function SmartLinkBuilderPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-full items-center justify-center bg-slate-50 text-[13px] text-slate-500">
+          Loading builder…
+        </div>
+      }
+    >
+      <BuilderWorkspace />
+    </Suspense>
+  );
 }

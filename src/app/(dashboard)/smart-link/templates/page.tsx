@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import {
   Filter,
@@ -7,7 +8,6 @@ import {
   User,
   CalendarDays,
   FileText,
-  Grid3x3,
   Mic,
   Receipt,
   ShieldCheck,
@@ -91,13 +91,13 @@ export default function TemplateLibrary() {
               <Filter className="h-4 w-4" />
               Filter
             </button>
-            <button
-              type="button"
+            <Link
+              href="/smart-link/builder?template=blank"
               className="inline-flex items-center gap-2 rounded-lg bg-indigo-700 px-2 py-1.5 text-xs font-medium text-white hover:bg-indigo-800"
             >
               <Plus className="h-4 w-4" />
               Create blank
-            </button>
+            </Link>
           </div>
         </div>
 
