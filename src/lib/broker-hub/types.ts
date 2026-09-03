@@ -40,6 +40,7 @@ export interface BrokerHubProfile {
 }
 
 export interface BrokerHubConfig {
+  id?: string;
   brokerId: string;
   hubName: string;
   profile: {
@@ -57,6 +58,7 @@ export interface BrokerHubConfig {
     footerStyle?: string;
   };
   published: boolean;
+  templateId?: string;
 }
 
 export const createEmptyLink = (
@@ -72,6 +74,105 @@ export const createEmptyLink = (
   animation: "none",
   order,
 });
+
+export function slugifyHub(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 64);
+}
+
+export function prepareHubForSave(config: BrokerHubConfig): BrokerHubConfig {
+  const title =
+    config.profile.title.trim() || config.hubName.trim() || "Broker Hub";
+  const hubName = config.hubName.trim() || title;
+  const slug =
+    slugifyHub(config.profile.slug) || slugifyHub(title) || "broker-hub";
+  return {
+    ...config,
+    brokerId: config.brokerId || "me",
+    hubName,
+    published: Boolean(config.published),
+    profile: {
+      ...config.profile,
+      title,
+      slug,
+      bio: config.profile.bio ?? "",
+      avatarUrl: config.profile.avatarUrl || null,
+    },
+    links: Array.isArray(config.links) ? config.links : [],
+    socials: Array.isArray(config.socials) ? config.socials : [],
+    customization: config.customization ?? {
+      theme: "default",
+      fontStyle: "sans",
+    },
+  };
+}
+
+function asHubLinks(raw: unknown): BrokerHubLink[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item, index) => {
+    const row =
+      item && typeof item === "object"
+        ? (item as Record<string, unknown>)
+        : {};
+    const iconRaw = String(row.icon || "standard");
+    const icon: LinkIconType =
+      iconRaw === "file" || iconRaw === "video" || iconRaw === "social"
+        ? iconRaw
+        : "standard";
+    return {
+      id: String(row.id || `link_${index}`),
+      title: String(row.title || ""),
+      url: String(row.url || ""),
+      icon,
+      active: row.active !== false,
+      highlight: Boolean(row.highlight),
+      animation: row.animation === "pulse" ? "pulse" : "none",
+      subtitle: typeof row.subtitle === "string" ? row.subtitle : undefined,
+      order: typeof row.order === "number" ? row.order : index,
+    };
+  });
+}
+
+export function normalizeHubDraft(raw: unknown): BrokerHubConfig | null {
+  if (!raw || typeof raw !== "object") return null;
+  const parsed = raw as Record<string, unknown>;
+  const profileRaw =
+    parsed.profile && typeof parsed.profile === "object"
+      ? (parsed.profile as Record<string, unknown>)
+      : {};
+  const title = String(
+    profileRaw.title || parsed.currentTitle || parsed.hubName || "",
+  ).trim();
+  const socials = Array.isArray(parsed.socials)
+    ? (parsed.socials as BrokerHubConfig["socials"])
+    : [];
+  return prepareHubForSave({
+    id: typeof parsed.id === "string" ? parsed.id : undefined,
+    brokerId: String(parsed.brokerId || "me"),
+    hubName: String(parsed.hubName || title || "Broker Hub"),
+    profile: {
+      slug: String(profileRaw.slug || ""),
+      avatarUrl:
+        typeof profileRaw.avatarUrl === "string" ? profileRaw.avatarUrl : null,
+      title,
+      bio: String(profileRaw.bio || ""),
+    },
+    links: asHubLinks(parsed.links),
+    socials,
+    customization:
+      parsed.customization && typeof parsed.customization === "object"
+        ? (parsed.customization as BrokerHubConfig["customization"])
+        : { theme: "default", fontStyle: "sans" },
+    published: Boolean(parsed.published),
+    templateId:
+      typeof parsed.templateId === "string" ? parsed.templateId : undefined,
+  });
+}
 
 const STORAGE_KEY_PREFIX = "finconnex_broker_hub_";
 
@@ -90,21 +191,8 @@ export async function getPublishedHubBySlug(
     const storedData = localStorage.getItem(storageKey);
 
     if (storedData) {
-      return JSON.parse(storedData) as BrokerHubConfig;
-    }
-
-    // If looking up a slug that hasn't been explicitly saved yet,
-    // search localStorage for ANY saved hub so you don't hit hardcoded defaults
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
-        const data = localStorage.getItem(key);
-        if (data) {
-          const parsed = JSON.parse(data) as BrokerHubConfig;
-          // Return the most recent custom saved hub if found
-          return parsed;
-        }
-      }
+      const parsed = JSON.parse(storedData) as BrokerHubConfig;
+      if (parsed?.profile?.slug === slug) return parsed;
     }
 
     return null;
@@ -120,8 +208,10 @@ export async function getPublishedHubBySlug(
  */
 export function saveHubConfigToLocalStorage(config: BrokerHubConfig): void {
   if (typeof window === "undefined") return;
+  const slug = config.profile.slug?.trim();
+  if (!slug) return;
   try {
-    const storageKey = `${STORAGE_KEY_PREFIX}${config.profile.slug}`;
+    const storageKey = `${STORAGE_KEY_PREFIX}${slug}`;
     localStorage.setItem(storageKey, JSON.stringify(config));
   } catch (error) {
     console.error("Failed to save hub to localStorage", error);

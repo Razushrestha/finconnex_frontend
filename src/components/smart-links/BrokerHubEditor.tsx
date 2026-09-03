@@ -103,13 +103,12 @@ export function BrokerHubEditor({ config, onChange }: BrokerHubEditorProps) {
   const patchProfile = (fields: Partial<BrokerHubConfig["profile"]>) => {
     const updatedProfile = { ...config.profile, ...fields };
 
-    // Auto-generate slug from title if title is being changed and slug wasn't manually customized yet
+    // Keep an auto slug in sync until the user types their own
     if (fields.title !== undefined) {
-      updatedProfile.slug = fields.title
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9\s-]/g, "")
-        .replace(/\s+/g, "-");
+      const previousAuto = sanitizeSlug(config.profile.title);
+      if (!config.profile.slug || config.profile.slug === previousAuto) {
+        updatedProfile.slug = sanitizeSlug(fields.title);
+      }
     }
 
     onChange({ ...config, profile: updatedProfile });
@@ -266,7 +265,7 @@ export function BrokerHubEditor({ config, onChange }: BrokerHubEditorProps) {
             <span className="relative flex h-11 overflow-hidden rounded-xl border border-slate-200 bg-white focus-within:border-violet-400 focus-within:ring-2 focus-within:ring-violet-100">
               <span className="flex items-center gap-1.5 border-r border-slate-100 bg-slate-50 px-3 text-[13px] text-slate-500">
                 <Link2 className="h-4 w-4 text-slate-400" />
-                /
+                /h/
               </span>
               <input
                 value={config.profile.slug}

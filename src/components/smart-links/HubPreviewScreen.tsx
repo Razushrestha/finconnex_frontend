@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Camera, User2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LinkIcon } from "@/components/smart-links/LinkIcon";
@@ -10,6 +10,69 @@ import {
   readImageFileAsDataUrl,
 } from "@/lib/broker-hub/avatar";
 import type { BrokerHubConfig } from "@/lib/broker-hub/types";
+
+const BIO_LINE_COUNT = 6;
+
+function HubBio({ bio }: { bio: string }) {
+  const measureRef = useRef<HTMLParagraphElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(true);
+
+  useEffect(() => {
+    setExpanded(false);
+  }, [bio]);
+
+  useLayoutEffect(() => {
+    const el = measureRef.current;
+    if (!el) return;
+
+    const measure = () => {
+      const styles = window.getComputedStyle(el);
+      const parsed = Number.parseFloat(styles.lineHeight);
+      const lineHeight =
+        Number.isFinite(parsed) && parsed > 0
+          ? parsed
+          : Number.parseFloat(styles.fontSize) * 1.625;
+      setOverflows(el.scrollHeight > lineHeight * BIO_LINE_COUNT + 2);
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [bio]);
+
+  const forceToggle = bio.trim().length > 180;
+
+  return (
+    <div className="relative mt-2 w-full">
+      <p
+        ref={measureRef}
+        aria-hidden
+        className="pointer-events-none invisible absolute inset-x-0 top-0 w-full text-center text-[14px] font-normal leading-relaxed break-words"
+      >
+        {bio}
+      </p>
+      <p
+        className={cn(
+          "w-full text-center text-[14px] font-normal leading-relaxed text-pretty text-white/75 break-words",
+          !expanded && "line-clamp-6",
+        )}
+      >
+        {bio}
+      </p>
+      {forceToggle || overflows || expanded ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((open) => !open)}
+          className="relative z-10 mt-2 inline-flex items-center rounded-full bg-white/20 px-3 py-1 text-[11px] font-semibold tracking-wide text-white hover:bg-white/30"
+        >
+          {expanded ? "See less" : "See more"}
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 interface HubPreviewScreenProps {
   config: BrokerHubConfig;
@@ -40,7 +103,7 @@ export function HubPreviewScreen({
     >
       <div className="absolute inset-0 bg-gradient-to-b from-[#6d5efc] via-[#4f46e5] to-[#312e81]" />
       <svg
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-[42%] w-full"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[34%] w-full"
         viewBox="0 0 375 220"
         preserveAspectRatio="none"
         aria-hidden
@@ -57,7 +120,7 @@ export function HubPreviewScreen({
         />
       </svg>
 
-      <div className="relative z-10 flex h-full flex-col items-center px-7 pb-8 pt-12">
+      <div className="relative z-10 flex h-full min-h-0 flex-col items-center overflow-y-auto px-6 pb-7 pt-14">
         <div className="relative shrink-0">
           {editable ? (
             <button
@@ -123,17 +186,17 @@ export function HubPreviewScreen({
           ) : null}
         </div>
 
-        <h2 className="mt-5 w-full px-1 text-[64px] font-semibold leading-[1.05] break-words text-white">
-          {config.profile.title.trim() || "Your name here"}
-        </h2>
-        {config.profile.bio.trim() ? (
-          <p className="mt-3 max-h-64 w-full overflow-y-auto px-1 text-[64px] leading-[1.05] break-words text-white/80">
-            {config.profile.bio}
-          </p>
-        ) : null}
+        <div className="mt-6 flex w-full max-w-[240px] flex-col items-center">
+          <h2 className="w-full text-center text-[26px] font-semibold leading-snug tracking-tight text-pretty text-white [overflow-wrap:normal] [word-break:keep-all]">
+            {config.profile.title.trim() || "Your name here"}
+          </h2>
+          {config.profile.bio.trim() ? (
+            <HubBio bio={config.profile.bio} />
+          ) : null}
+        </div>
 
         {activeLinks.length > 0 ? (
-          <div className="mt-8 w-full space-y-2.5">
+          <div className="mt-7 w-full space-y-2.5">
             {activeLinks.map((link) => {
               const className = cn(
                 "flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-[13px] font-semibold",
@@ -169,7 +232,7 @@ export function HubPreviewScreen({
         ) : null}
 
         {socials.length > 0 ? (
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-5 text-white">
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-4 text-white">
             {socials.map((social) => {
               const meta = SOCIAL_PLATFORM_META[social.platform];
               if (!meta) return null;
@@ -196,7 +259,7 @@ export function HubPreviewScreen({
           </div>
         ) : null}
 
-        <p className="mt-auto pt-10 text-[10px] font-semibold tracking-[0.18em] text-white/55">
+        <p className="mt-auto pt-8 text-[10px] font-semibold tracking-[0.18em] text-white/55">
           POWERED BY FINCONNEX
         </p>
       </div>

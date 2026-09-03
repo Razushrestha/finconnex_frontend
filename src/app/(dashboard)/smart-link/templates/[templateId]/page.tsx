@@ -186,8 +186,15 @@ export default function TemplateConfigurePage() {
   const handleUseTemplate = () => {
     const draft = {
       templateId,
+      brokerId: "me",
+      hubName: profileName || template?.label || "Broker Hub",
       profile: {
-        slug: "",
+        slug: profileName
+          .toLowerCase()
+          .trim()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/-+/g, "-")
+          .replace(/^-|-$/g, ""),
         avatarUrl: null,
         title: profileName,
         bio,
@@ -195,6 +202,8 @@ export default function TemplateConfigurePage() {
       currentTitle,
       accounts: accounts.filter((a) => a.value.trim().length > 0),
       links,
+      socials: [],
+      published: false,
       customization: {
         theme,
         fontStyle,

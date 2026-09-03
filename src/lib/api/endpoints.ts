@@ -638,6 +638,18 @@ export const ENDPOINT_CATALOG = [
   { method: "GET", path: "/calculations/:id", module: "calculations" },
   { method: "DELETE", path: "/calculations/:id", module: "calculations", notes: "Soft-delete" },
 
+  // Smart Link hubs and short URLs (JWT)
+  { method: "GET", path: "/smart-hubs", module: "smart-links", notes: "List Smart Link hubs" },
+  { method: "POST", path: "/smart-hubs", module: "smart-links", notes: "Create a Smart Link hub" },
+  { method: "GET", path: "/smart-hubs/:id", module: "smart-links" },
+  { method: "PATCH", path: "/smart-hubs/:id", module: "smart-links" },
+  { method: "DELETE", path: "/smart-hubs/:id", module: "smart-links", notes: "Soft-delete" },
+  { method: "GET", path: "/smart-short-links", module: "smart-links", notes: "List shortened links" },
+  { method: "POST", path: "/smart-short-links", module: "smart-links", notes: "Create a shortened link" },
+  { method: "DELETE", path: "/smart-short-links/:id", module: "smart-links", notes: "Soft-delete" },
+  { method: "GET", path: "/public/smart-hubs/:slug", module: "public-smart-links", notes: "View a published hub" },
+  { method: "GET", path: "/public/smart-short-links/:alias", module: "public-smart-links", notes: "Resolve a short link" },
+
   // Resources (JWT)
   { method: "GET", path: "/resources", module: "resources", notes: "List resources" },
   { method: "POST", path: "/resources", module: "resources", notes: "Create a resource" },

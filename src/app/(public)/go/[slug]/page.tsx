@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { recordSmartShortClick } from "@/lib/smart-links/short-links";
+import { resolvePublicShortLink, trySmartLink } from "@/lib/smart-links/api";
 
 export default function SmartShortLinkPage({
   params,
@@ -12,12 +13,23 @@ export default function SmartShortLinkPage({
   const [missing, setMissing] = useState(false);
 
   useEffect(() => {
-    const target = recordSmartShortClick(slug);
-    if (!target) {
-      setMissing(true);
-      return;
+    let cancelled = false;
+
+    async function open() {
+      const remote = await trySmartLink(() => resolvePublicShortLink(slug));
+      const target = remote ?? recordSmartShortClick(slug);
+      if (cancelled) return;
+      if (!target) {
+        setMissing(true);
+        return;
+      }
+      window.location.replace(target);
     }
-    window.location.replace(target);
+
+    void open();
+    return () => {
+      cancelled = true;
+    };
   }, [slug]);
 
   if (missing) {

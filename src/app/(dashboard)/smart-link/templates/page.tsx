@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Filter,
   Plus,
@@ -15,6 +15,12 @@ import {
   Camera,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import {
+  hubPublicPath,
+  listCrmSmartHubs,
+  trySmartLink,
+  type CrmSmartHub,
+} from "@/lib/smart-links/api";
 
 const CATEGORIES = [
   "All Templates",
@@ -70,6 +76,13 @@ const TEMPLATES = [
 export default function TemplateLibrary() {
   const router = useRouter();
   const [activeCategory, setActiveCategory] = useState("All Templates");
+  const [hubs, setHubs] = useState<CrmSmartHub[]>([]);
+
+  useEffect(() => {
+    void trySmartLink(() => listCrmSmartHubs()).then((rows) => {
+      if (rows) setHubs(rows);
+    });
+  }, []);
 
   const visibleTemplates =
     activeCategory === "All Templates"
@@ -100,6 +113,48 @@ export default function TemplateLibrary() {
             </Link>
           </div>
         </div>
+
+        {hubs.length > 0 ? (
+          <div className="mt-8">
+            <h2 className="text-sm font-semibold text-slate-900">Your pages</h2>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {hubs.map((hub) => (
+                <div
+                  key={hub.id}
+                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium text-slate-900">
+                      {hub.hubName}
+                    </div>
+                    <div className="truncate text-xs text-slate-500">
+                      /h/{hub.profile.slug}
+                      {hub.published ? " · Live" : " · Draft"}
+                    </div>
+                  </div>
+                  <div className="ml-3 flex shrink-0 items-center gap-2">
+                    {hub.published ? (
+                      <a
+                        href={hubPublicPath(hub.profile.slug)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                      >
+                        View
+                      </a>
+                    ) : null}
+                    <Link
+                      href={`/smart-link/builder?hub=${hub.id}`}
+                      className="text-xs font-medium text-slate-700 hover:text-slate-900"
+                    >
+                      Edit
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {/* Category filter pills */}
         <div className="mt-6 flex flex-wrap gap-2">

@@ -21,6 +21,7 @@ const PUBLIC_PREFIXES = [
   "/book/", // Public booking
   "/s/", // Short / one-time booking links
   "/go/", // Smart-link URL shortener
+  "/h/", // Published Smart Link hubs
   "/f/", // Marketing forms
   "/l/", // Linktree
   "/j/", // Proposal-to-payment journey (client link)

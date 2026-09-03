@@ -12,14 +12,16 @@ import {
 import { cn } from "@/lib/utils";
 import {
   saveHubConfigToLocalStorage,
+  prepareHubForSave,
   type BrokerHubConfig,
 } from "@/lib/broker-hub/types";
+import { hubPublicPath, hubPublicUrl } from "@/lib/smart-links/api";
 import { BrokerHubEditor } from "./BrokerHubEditor";
 import { BrokerHubPreview } from "./BrokerHubPreview";
 
 interface BrokerHubBuilderProps {
   initialConfig: BrokerHubConfig;
-  onSave?: (config: BrokerHubConfig) => Promise<void>;
+  onSave?: (config: BrokerHubConfig) => Promise<BrokerHubConfig | void>;
 }
 
 export function BrokerHubBuilder({
@@ -30,11 +32,9 @@ export function BrokerHubBuilder({
   const [saving, setSaving] = useState(false);
   const [published, setPublished] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
-  const hubUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/${config.profile.slug || ""}`
-      : `/${config.profile.slug || ""}`;
+  const hubUrl = hubPublicUrl(config.profile.slug || "");
 
   useEffect(() => {
     if (!published) return;
@@ -57,20 +57,21 @@ export function BrokerHubBuilder({
   const handlePublish = async () => {
     setSaving(true);
     setPublished(false);
+    setPublishError(null);
     try {
-      const publishedConfig = { ...config, published: true };
+      const publishedConfig = prepareHubForSave({ ...config, published: true });
 
       saveHubConfigToLocalStorage(publishedConfig);
-      setConfig(publishedConfig);
 
-      if (onSave) {
-        await onSave(publishedConfig);
-      }
+      const saved = onSave ? await onSave(publishedConfig) : publishedConfig;
+      setConfig(saved ?? publishedConfig);
 
-      await new Promise((resolve) => setTimeout(resolve, 800));
       setPublished(true);
     } catch (error) {
       console.error("Failed to publish hub", error);
+      setPublishError(
+        error instanceof Error ? error.message : "Could not publish this hub",
+      );
     } finally {
       setSaving(false);
     }
@@ -89,7 +90,7 @@ export function BrokerHubBuilder({
         <header className="flex items-center justify-end">
           <div className="flex items-center gap-2">
             <a
-              href={`/${config.profile.slug}`}
+              href={hubPublicPath(config.profile.slug)}
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
@@ -119,6 +120,12 @@ export function BrokerHubBuilder({
             </button>
           </div>
         </header>
+
+        {publishError ? (
+          <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-xs text-rose-800">
+            {publishError}
+          </div>
+        ) : null}
 
         {published ? (
           <div className="flex flex-col items-start justify-between gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-emerald-900 animate-in fade-in slide-in-from-top-2 duration-300 sm:flex-row sm:items-center">
@@ -152,7 +159,7 @@ export function BrokerHubBuilder({
                 <span>{copied ? "Copied" : "Copy"}</span>
               </button>
               <a
-                href={`/${config.profile.slug}`}
+                href={hubPublicPath(config.profile.slug)}
                 target="_blank"
                 rel="noreferrer"
                 className="flex shrink-0 items-center gap-1 rounded bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90"

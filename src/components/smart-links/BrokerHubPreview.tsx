@@ -65,7 +65,7 @@ export function BrokerHubPreview({
 
       <div className="flex justify-center bg-slate-50/80 py-6">
         {device === "mobile" ? (
-          <div className="relative h-[620px] w-[300px] overflow-hidden rounded-[2.4rem] border-[7px] border-slate-950 bg-slate-950 shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
+          <div className="relative h-[640px] w-[320px] overflow-hidden rounded-[2.4rem] border-[7px] border-slate-950 bg-slate-950 shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
             <div className="absolute left-1/2 top-2 z-20 h-[18px] w-[88px] -translate-x-1/2 rounded-full bg-slate-950" />
             <HubPreviewScreen
               config={config}
