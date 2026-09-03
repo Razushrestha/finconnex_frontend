@@ -8,6 +8,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 
 const DUMMY_DATA = [
   {
@@ -188,7 +189,10 @@ export function RecentTransactionsTable() {
       </div>
 
       {/* Scrollable table */}
-      <div className="overflow-x-auto pb-2 [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100">
+      <ResizableColumns
+        storageKey="recent-transactions-list"
+        className="overflow-x-auto pb-2 [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100"
+      >
         <table className="w-full min-w-[720px] border-collapse text-left text-xs sm:text-sm">
           <thead>
             <tr className="rounded-lg bg-slate-50 text-slate-500">
@@ -251,7 +255,7 @@ export function RecentTransactionsTable() {
             )}
           </tbody>
         </table>
-      </div>
+      </ResizableColumns>
 
       {/* Footer */}
       <div className="mt-3 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">

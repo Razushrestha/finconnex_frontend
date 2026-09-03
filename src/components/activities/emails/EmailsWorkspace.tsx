@@ -28,6 +28,7 @@ import {
   EmailsFilterPanel,
   type MailListFilters,
 } from "@/components/activities/emails/EmailsFilterPanel";
+import { emailMatchesFilters } from "@/lib/filters/records";
 import {
   contactName,
   emailMatchesCustomFolder,
@@ -69,10 +70,6 @@ function folderEmails(emails: Email[], folder: MailFolder) {
   return emails.filter((email) =>
     emailMatchesFolder(email, folder, flagsFor(email.id, email)),
   );
-}
-
-function isUnread(email: Email) {
-  return email.status !== "Opened";
 }
 
 export function EmailsWorkspace() {
@@ -170,11 +167,7 @@ export function EmailsWorkspace() {
     return source.filter((email) => {
       const flags = flagsFor(email.id, email);
       if (labelFilter && !flags.labels?.includes(labelFilter)) return false;
-      if (filters.unreadOnly && !isUnread(email)) return false;
-      if (filters.hasAttachment && !email.templateUsed) return false;
-      if (filters.statuses.length && !filters.statuses.includes(email.status)) {
-        return false;
-      }
+      if (!emailMatchesFilters(email, filters)) return false;
       if (!q) return true;
       return `${contactName(email)} ${email.subject} ${email.body} ${email.from} ${email.to.join(" ")}`
         .toLowerCase()
@@ -194,7 +187,9 @@ export function EmailsWorkspace() {
   const filterCount =
     Number(filters.unreadOnly) +
     Number(filters.hasAttachment) +
-    filters.statuses.length;
+    filters.statuses.length +
+    filters.systemDefined.length +
+    filters.clauses.length;
 
   function compose() {
     router.push("/activities/emails/create");

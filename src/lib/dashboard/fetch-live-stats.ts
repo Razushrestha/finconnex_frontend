@@ -20,6 +20,7 @@ import {
 import {
   computeDashboardStats,
   parseMoney,
+  rangeStart,
   type DashboardFilters,
   type DashboardLiveStats,
 } from "@/lib/dashboard/layout";
@@ -62,16 +63,6 @@ function inDateRange(iso: string | undefined, start: Date | null): boolean {
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return true;
   return t >= start.getTime();
-}
-
-function rangeStart(range: DashboardFilters["dateRange"]): Date | null {
-  const now = new Date();
-  if (range === "all") return null;
-  if (range === "ytd") return new Date(now.getFullYear(), 0, 1);
-  const days = range === "7d" ? 7 : range === "30d" ? 30 : 90;
-  const start = new Date(now);
-  start.setDate(start.getDate() - days);
-  return start;
 }
 
 function todayIsoRange(): { from: string; to: string } {

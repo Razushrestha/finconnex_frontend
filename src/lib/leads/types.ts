@@ -8,13 +8,44 @@ import {
 
 export const LEAD_SOURCES = [
   "Website",
-  "Referral",
-  "Social Media",
-  "Email Campaign",
-  "Cold Call",
+  "Google Ads",
+  "Facebook",
+  "Instagram",
+  "TikTok",
+  "Google",
+  "Existing Client Referral",
+  "Referral Partner",
+  "Employee Referral",
+  "Phone",
+  "Event / Seminar",
+  "Imported / Manual",
   "Other",
 ] as const;
 export type LeadSource = (typeof LEAD_SOURCES)[number];
+
+const LEGACY_LEAD_SOURCES: Record<string, LeadSource> = {
+  referral: "Existing Client Referral",
+  "social media": "Facebook",
+  "email campaign": "Other",
+  "cold call": "Phone",
+};
+
+export function coerceLeadSource(
+  value: string | null | undefined,
+): LeadSource {
+  const raw = value?.trim() ?? "";
+  if (!raw) return "Website";
+  const hit = LEAD_SOURCES.find((s) => s.toLowerCase() === raw.toLowerCase());
+  if (hit) return hit;
+  return LEGACY_LEAD_SOURCES[raw.toLowerCase()] ?? "Other";
+}
+
+export const LOAN_PURPOSES = [
+  "Purchase",
+  "Refinance",
+  "Investment",
+] as const;
+export type LoanPurpose = (typeof LOAN_PURPOSES)[number];
 
 /** SRS §6.1 Status* — still used as CRM bridge; Kanban columns are mortgage stages (Session 17). */
 export const LEAD_STATUSES = [
@@ -269,7 +300,7 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         email: "arjun.m@example.com",
         phone: "+61 400 111 003",
         company: "Mehta Advisors",
-        source: "Cold Call",
+        source: "Phone",
         status: "Contacted",
         owner: "Tejas Gokhe",
         createdDate: "10/07/2026",
@@ -296,7 +327,7 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         email: "chloe.r@example.com",
         phone: "+61 400 111 002",
         company: "Riverstone Capital",
-        source: "Referral",
+        source: "Existing Client Referral",
         status: "Qualified",
         owner: "Shiva Kadhka",
         createdDate: "13/07/2026",
@@ -320,7 +351,7 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         email: "j.adams@example.com",
         phone: "+61 400 222 002",
         company: "Adams Group",
-        source: "Social Media",
+        source: "Facebook",
         status: "Qualified",
         owner: "John Smith",
         createdDate: "16/07/2026",
@@ -375,7 +406,7 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         email: "j.mitchell@example.com",
         phone: "+61 400 555 001",
         company: "Mitchell Partners",
-        source: "Referral",
+        source: "Existing Client Referral",
         status: "Converted",
         owner: "John Smith",
         createdDate: "05/07/2026",
@@ -438,7 +469,7 @@ export const LEAD_COLUMNS: KanbanColumn[] = [
         email: "m.kapoor@example.com",
         phone: "+61 400 444 002",
         company: "Harborview Supply",
-        source: "Cold Call",
+        source: "Phone",
         status: "Unqualified",
         owner: "Shiva Kadhka",
         createdDate: "11/07/2026",

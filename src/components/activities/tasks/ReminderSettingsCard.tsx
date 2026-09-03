@@ -379,6 +379,10 @@ export function ReminderSettingsCard({
   onRepeatChange,
   due,
   anchorLabel = "due date",
+  autoOpen = false,
+  variant = "row",
+  onApply,
+  onDismiss,
 }: {
   enabled: boolean;
   onEnabledChange: (on: boolean) => void;
@@ -394,6 +398,14 @@ export function ReminderSettingsCard({
   onRepeatChange: (next: ReminderRepeatRule) => void;
   due: Date | null;
   anchorLabel?: string;
+  autoOpen?: boolean;
+  variant?: "row" | "modal";
+  onApply?: (next: {
+    reminderDate: string;
+    notifyBy: NotificationMethod[];
+    repeat: ReminderRepeatRule;
+  }) => void;
+  onDismiss?: () => void;
 }) {
   const configured = Boolean(reminderDate.trim());
   const summary = configured
@@ -406,8 +418,13 @@ export function ReminderSettingsCard({
       })
     : "";
 
-  const [open, setOpen] = useState(false);
-  const [draftDate, setDraftDate] = useState(reminderDate);
+  const [open, setOpen] = useState(autoOpen);
+  const [draftDate, setDraftDate] = useState(
+    reminderDate.trim() ||
+      (autoOpen && due
+        ? toDatetimeLocal(relativeFromDue(due, 1, "Before", toTimePart(due)))
+        : reminderDate),
+  );
   const [draftNotify, setDraftNotify] = useState<NotificationMethod[]>(notifyBy);
   const [draftRepeat, setDraftRepeat] = useState(repeat);
   const [mode, setMode] = useState<ReminderScheduleMode>("relative");
@@ -476,6 +493,7 @@ export function ReminderSettingsCard({
   function handleCancel() {
     setOpen(false);
     if (!configured) onEnabledChange(false);
+    onDismiss?.();
   }
 
   function emitDate(
@@ -506,6 +524,12 @@ export function ReminderSettingsCard({
     setDraftRepeat(ruleFromLegacyRepeatType("None"));
   }, [frequencyOptions, open, repeatType]);
 
+  useEffect(() => {
+    if (!autoOpen) return;
+    openEditor();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpen]);
+
   function handleDone() {
     const nextDate = draftDate.trim() || defaultReminderDate();
     if (!nextDate) {
@@ -521,18 +545,25 @@ export function ReminderSettingsCard({
     });
     onEnabledChange(true);
     setOpen(false);
+    onApply?.({
+      reminderDate: nextDate,
+      notifyBy: draftNotify,
+      repeat: draftRepeat,
+    });
   }
 
   return (
     <>
-      <CompactSettingRow
-        label="Reminder"
-        enabled={enabled}
-        summary={summary}
-        error={error}
-        onToggle={handleToggle}
-        onEdit={openEditor}
-      />
+      {variant === "row" ? (
+        <CompactSettingRow
+          label="Reminder"
+          enabled={enabled}
+          summary={summary}
+          error={error}
+          onToggle={handleToggle}
+          onEdit={openEditor}
+        />
+      ) : null}
       {open ? (
         <SettingsPopup
           title="Reminder"

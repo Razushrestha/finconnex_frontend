@@ -15,6 +15,7 @@ import {
   Route,
   LayoutGrid,
 } from "lucide-react";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
   EXIT_CONDITION_PRESETS,
   JOURNEY_STATUS_STYLE,
@@ -360,6 +361,7 @@ export function JourneyDetailClient({ id }: { id: string }) {
               </span>
             </div>
             <div className="overflow-hidden rounded-2xl border border-slate-100/80 bg-white shadow-sm">
+              <ResizableColumns storageKey="journey-enrollments-list" className="overflow-x-auto">
               <table className="w-full text-left text-[12px]">
                 <thead className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
                   <tr>
@@ -435,12 +437,14 @@ export function JourneyDetailClient({ id }: { id: string }) {
                   ) : null}
                 </tbody>
               </table>
+              </ResizableColumns>
             </div>
           </div>
         ) : null}
 
         {tab === "analytics" ? (
           <div className="overflow-hidden rounded-2xl border border-slate-100/80 bg-white shadow-sm">
+            <ResizableColumns storageKey="journey-analytics-list" className="overflow-x-auto">
             <table className="w-full text-left text-[12px]">
               <thead className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
                 <tr>
@@ -484,6 +488,7 @@ export function JourneyDetailClient({ id }: { id: string }) {
                 })}
               </tbody>
             </table>
+            </ResizableColumns>
             <div className="border-t border-slate-100 px-4 py-3 text-[11px] text-slate-500">
               Overall journey conversion:{" "}
               <strong className="text-slate-800">

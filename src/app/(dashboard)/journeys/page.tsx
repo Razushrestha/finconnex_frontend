@@ -10,6 +10,7 @@ import {
   Play,
   Pause,
 } from "lucide-react";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
   JOURNEY_STATUS_STYLE,
   JOURNEY_STATUSES,
@@ -164,6 +165,7 @@ export default function JourneysPage() {
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-slate-100/80 bg-white shadow-sm">
+          <ResizableColumns storageKey="journeys-list" className="overflow-x-auto">
           <table className="w-full text-left text-[12px]">
             <thead className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
               <tr>
@@ -247,6 +249,7 @@ export default function JourneysPage() {
               ) : null}
             </tbody>
           </table>
+          </ResizableColumns>
         </div>
       </div>
     </div>

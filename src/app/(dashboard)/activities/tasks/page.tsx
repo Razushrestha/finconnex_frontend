@@ -14,17 +14,13 @@ import { FilterPanel } from "@/components/activities/tasks/Filterpanel";
 import { KanbanBoard } from "@/components/activities/tasks/KanbanBoard";
 import { TaskListView } from "@/components/activities/tasks/TaskListView";
 import { TaskCalendarView } from "@/components/activities/tasks/TaskCalendarView";
-import { TaskTimelineView } from "@/components/activities/tasks/TaskTimelineView";
 import {
   ActivityToolbar,
-  TIMELINE_VIEW_TOGGLE,
   type ActivityView,
 } from "@/components/activities/ActivityToolbar";
 import {
   EMPTY_TASK_FILTERS,
-  type Priority,
   type TaskFilters,
-  type TaskStatus,
 } from "@/lib/tasks/types";
 import {
   cloneTask,
@@ -59,8 +55,7 @@ function loadTaskViewMode(): ActivityView {
     if (
       raw === "list" ||
       raw === "kanban" ||
-      raw === "calendar" ||
-      raw === "timeline"
+      raw === "calendar"
     ) {
       return raw;
     }
@@ -153,11 +148,7 @@ export default function TasksPage() {
   const scopedFilters: TaskFilters = {
     ...filters,
     scope:
-      scopeTab === "My Tasks"
-        ? "mine"
-        : scopeTab === "My Overdue Tasks"
-          ? "my-overdue"
-          : "all",
+      scopeTab === "My Overdue Tasks" ? "my-overdue" : "all",
   };
 
   useEffect(() => {
@@ -167,35 +158,6 @@ export default function TasksPage() {
   function handleViewChange(mode: ActivityView) {
     setView(mode);
     persistTaskViewMode(mode);
-  }
-
-  function toggleField(
-    sectionId: "status" | "priority" | "type",
-    field: string,
-  ) {
-    setFilters((prev) => {
-      if (sectionId === "priority") {
-        const selected = field as Priority;
-        const next = prev.priorities.includes(selected)
-          ? prev.priorities.filter((value) => value !== selected)
-          : [...prev.priorities, selected];
-        return { ...prev, priorities: next };
-      }
-
-      if (sectionId === "status") {
-        const selected = field as TaskStatus;
-        const next = prev.statuses.includes(selected)
-          ? prev.statuses.filter((value) => value !== selected)
-          : [...prev.statuses, selected];
-        return { ...prev, statuses: next };
-      }
-
-      const current = prev.types;
-      const next = current.includes(field as (typeof current)[number])
-        ? current.filter((f) => f !== field)
-        : [...current, field as (typeof current)[number]];
-      return { ...prev, types: next };
-    });
   }
 
   function handleSortChange(field: string, direction: "asc" | "desc") {
@@ -290,10 +252,7 @@ export default function TasksPage() {
         <ActivityToolbar
           entityLabel="Task"
           createRoute="/activities/tasks/create"
-          tabs={["My Overdue Tasks"]}
-          leadingTabMenu={{
-            items: ["All Tasks", "My Tasks"],
-          }}
+          tabs={["All Tasks", "My Overdue Tasks"]}
           activeTab={scopeTab}
           onTabChange={setScopeTab}
           view={view}
@@ -310,7 +269,6 @@ export default function TasksPage() {
           printViewItems={printViewItems}
           extraViewIcons={[
             { key: "calendar", icon: CalendarDays, label: "Calendar view" },
-            TIMELINE_VIEW_TOGGLE,
           ]}
         />
 
@@ -336,17 +294,13 @@ export default function TasksPage() {
         {filterOpen && (
           <FilterPanel
             filters={filters}
-            onToggleField={toggleField}
+            onChange={setFilters}
             onClose={() => setFilterOpen(false)}
           />
         )}
 
         <div
-          className={`min-h-0 min-w-0 flex-1 ${
-            view === "list" || view === "kanban" || view === "calendar"
-              ? "overflow-hidden"
-              : "overflow-auto [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin]"
-          }`}
+          className="min-h-0 min-w-0 flex-1 overflow-hidden"
         >
           {view === "kanban" ? (
             <KanbanBoard
@@ -357,8 +311,6 @@ export default function TasksPage() {
             />
           ) : view === "calendar" ? (
             <TaskCalendarView filters={scopedFilters} search={search} />
-          ) : view === "timeline" ? (
-            <TaskTimelineView filters={scopedFilters} search={search} />
           ) : (
             <TaskListView
               filters={scopedFilters}

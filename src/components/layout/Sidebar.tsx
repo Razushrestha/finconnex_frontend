@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   Package,
@@ -68,7 +68,7 @@ const childNavClass = (active: boolean) =>
 
 const dashboardItems: NavItem[] = [
   { label: "Dashboard", href: "/", icon: Package },
-  { label: "Work Queue", href: "/work-queue", icon: Rows4 },
+  { label: "Work Queue", href: "/?view=work-queue", icon: Rows4 },
   {
     label: "Sales",
     icon: BadgePercent,

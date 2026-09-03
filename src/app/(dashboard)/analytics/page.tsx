@@ -1,5 +1,5 @@
-import { AnalyticsDashboardClient } from "@/components/analytics/AnalyticsDashboardClient";
+import { AnalyticsLibrary } from "@/components/analytics/AnalyticsLibrary";
 
 export default function AnalyticsPage() {
-  return <AnalyticsDashboardClient />;
+  return <AnalyticsLibrary />;
 }

@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 import { initials } from "@/lib/activities/shared";
 import {
   listBookingPages,
@@ -398,7 +399,7 @@ function HomeView({
           <div className="hidden min-w-0 overflow-x-auto lg:block">
             <table className="w-full min-w-[860px] text-left">
               <thead>
-                <tr className="border-b border-[#E5E7EB] text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+                <tr className="border-b border-[#E5E7EB] text-[11px] font-bold tracking-wide text-slate-500 uppercase">
                   <th className="px-5 py-3">Appointment</th>
                   <th className="px-3 py-3">Related To</th>
                   <th className="px-3 py-3">Consultant</th>
@@ -935,7 +936,10 @@ function PagesPanel({
       <div className="border-b border-slate-100 px-4 py-3.5 sm:px-5">
         <h2 className="text-[15px] font-bold text-slate-900">{title}</h2>
       </div>
-      <div className="min-w-0 overflow-x-auto">
+      <ResizableColumns
+        storageKey="bookings-pages-list"
+        className="min-w-0 overflow-x-auto"
+      >
       <table className="w-full min-w-[640px] text-left text-[13px]">
         <thead>
           <tr className="border-b border-slate-100 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
@@ -990,7 +994,7 @@ function PagesPanel({
           ) : null}
         </tbody>
       </table>
-      </div>
+      </ResizableColumns>
     </section>
   );
 }

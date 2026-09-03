@@ -8,6 +8,8 @@ import {
   updateCall,
   type CallScope,
 } from "@/lib/calls/store";
+import { callMatchesFilters } from "@/lib/filters/records";
+import type { CallFilters } from "@/lib/filters/module-filters";
 import { onRulesChange } from "@/lib/rules/storage";
 import { CallsKanbanColumn } from "./CallsKanbanColumn";
 import type { Priority } from "@/lib/tasks/types";
@@ -24,10 +26,12 @@ export interface DropTargetPos {
 
 export function CallsKanbanBoard({
   scope = "all",
+  filters,
   selectedIds,
   onSelectedIdsChange,
 }: {
   scope?: CallScope;
+  filters?: CallFilters;
   selectedIds?: string[];
   onSelectedIdsChange?: (ids: string[]) => void;
 }) {
@@ -123,7 +127,9 @@ export function CallsKanbanBoard({
   }
 
   const visibleColumns = columns.map((column) => {
-    const calls = column.calls.filter((call) => callMatchesScope(call, scope));
+    const calls = column.calls.filter(
+      (call) => callMatchesScope(call, scope) && callMatchesFilters(call, filters),
+    );
     return { ...column, calls, count: calls.length };
   });
 

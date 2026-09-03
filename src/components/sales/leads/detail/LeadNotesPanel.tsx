@@ -558,8 +558,8 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
                             {meta.label}
                           </span>
                           {note.isPinned ? (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-slate-400">
-                              <Pin className="h-3 w-3" />
+                            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-red-600">
+                              <Pin className="h-3 w-3 fill-red-600" />
                               Pinned
                             </span>
                           ) : null}

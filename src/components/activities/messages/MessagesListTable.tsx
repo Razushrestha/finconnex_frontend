@@ -21,6 +21,7 @@ import {
 } from "@/lib/messages/api";
 import { RecordDetailModal } from "@/components/shared/RecordDetailModal";
 import { onRulesChange } from "@/lib/rules";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 
 const statusStyles: Record<MessageStatus, string> = {
   Draft: "bg-slate-100 text-slate-600",
@@ -158,7 +159,10 @@ export function MessagesListTable({ data }: MessagesListTableProps) {
           {toast}
         </div>
       ) : null}
-      <div className="min-h-0 flex-1 overflow-auto">
+      <ResizableColumns
+        storageKey="messages-list"
+        className="min-h-0 flex-1 overflow-auto"
+      >
         <table className="w-full min-w-[900px] border-separate border-spacing-0 text-[12px]">
           <thead className="sticky top-0 z-10 bg-white">
             <tr>
@@ -174,6 +178,7 @@ export function MessagesListTable({ data }: MessagesListTableProps) {
               ].map((heading) => (
                 <th
                   key={heading}
+                  data-col-id={heading}
                   className="border-b border-slate-200 bg-slate-50/90 px-3 py-2.5 text-left text-[11px] font-medium tracking-wide text-slate-400 uppercase"
                 >
                   {heading}
@@ -199,7 +204,7 @@ export function MessagesListTable({ data }: MessagesListTableProps) {
                 </td>
                 <td
                   className={cn(
-                    "border-b border-slate-100 px-3 py-2.5 font-semibold text-slate-900",
+                    "border-b border-slate-100 px-3 py-2.5 font-normal text-slate-900",
                     cardSubject,
                   )}
                 >
@@ -231,7 +236,7 @@ export function MessagesListTable({ data }: MessagesListTableProps) {
             ))}
           </tbody>
         </table>
-      </div>
+      </ResizableColumns>
 
       <RecordDetailModal
         open={!!detail}

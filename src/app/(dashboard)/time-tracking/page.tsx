@@ -12,6 +12,7 @@ import {
   FileText,
   CheckCheck,
 } from "lucide-react";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
   RELATED_KINDS,
   TIME_STATUSES,
@@ -386,7 +387,7 @@ export default function TimeTrackingPage() {
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-          <div className="overflow-x-auto">
+          <ResizableColumns storageKey="time-tracking-list" className="overflow-x-auto">
             <table className="w-full min-w-[960px] text-left">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/80 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
@@ -491,7 +492,7 @@ export default function TimeTrackingPage() {
                 )}
               </tbody>
             </table>
-          </div>
+          </ResizableColumns>
           <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2 text-[11px] text-slate-500">
             <span>
               {filtered.length} entr{filtered.length === 1 ? "y" : "ies"}

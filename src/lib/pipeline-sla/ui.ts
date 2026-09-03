@@ -10,10 +10,17 @@ export const SLA_BAND_SURFACE: Record<SlaBand, string> = {
 
 /** Compact top-right badge on the Lead Card (PDF card examples). */
 export const SLA_BADGE_PILL: Record<SlaBand, string> = {
-  on_track: "bg-emerald-100 text-emerald-800",
-  due_today: "bg-amber-100 text-amber-900",
-  at_risk: "bg-orange-100 text-orange-900",
-  overdue: "bg-rose-100 text-rose-900",
+  on_track: "bg-emerald-500",
+  due_today: "bg-amber-500",
+  at_risk: "bg-orange-500",
+  overdue: "bg-red-500",
+};
+
+export const SLA_BADGE_HEX: Record<SlaBand, string> = {
+  on_track: "#22C55E",
+  due_today: "#F59E0B",
+  at_risk: "#F97316",
+  overdue: "#EF4444",
 };
 
 export const SLA_BAND_WORDS: Record<SlaBand, string> = {

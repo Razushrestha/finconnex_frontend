@@ -52,7 +52,28 @@ export function resolveSoftphoneRecord(input: {
 
   for (const col of listLeadColumns()) {
     const lead = col.cards.find(
-      (c) => phonesMatch(c.phone, phone) || namesMatch(c.name, name),
+      (c) =>
+        phonesMatch(c.phone, phone) ||
+        phonesMatch(c.mobilePhone, phone) ||
+        phonesMatch(c.custom?.mobile, phone) ||
+        phonesMatch(c.custom?.["secondary.mobile"], phone) ||
+        phonesMatch(c.custom?.["secondary.phone"], phone) ||
+        namesMatch(c.name, name) ||
+        namesMatch(
+          [c.custom?.firstName, c.custom?.surname || c.custom?.lastName]
+            .filter(Boolean)
+            .join(" "),
+          name,
+        ) ||
+        namesMatch(
+          [
+            c.custom?.["secondary.firstName"],
+            c.custom?.["secondary.surname"] || c.custom?.["secondary.lastName"],
+          ]
+            .filter(Boolean)
+            .join(" "),
+          name,
+        ),
     );
     if (lead) {
       return {

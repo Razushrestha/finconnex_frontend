@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { GripVertical, Pin, Search } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, Pin, Search } from "lucide-react";
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 
@@ -88,6 +88,18 @@ export function ManageColumnsModal({
     );
   }
 
+  function move(id: string, direction: -1 | 1) {
+    setWorking((prev) => {
+      const fromIndex = prev.findIndex((c) => c.id === id);
+      const toIndex = fromIndex + direction;
+      if (fromIndex === -1 || toIndex < 0 || toIndex >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }
+
   function reorder(fromId: string, toId: string) {
     setWorking((prev) => {
       const next = [...prev];
@@ -144,7 +156,7 @@ export function ManageColumnsModal({
           {filtered.map((col) => (
             <div
               key={col.id}
-              draggable={!col.required}
+              draggable
               onDragStart={() => setDragIndex(working.indexOf(col))}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
@@ -164,17 +176,13 @@ export function ManageColumnsModal({
                   "opacity-50",
               )}
             >
-              {col.required ? (
-                <span className="flex h-6 w-6 shrink-0" aria-hidden />
-              ) : (
-                <span
-                  title="Drag to reorder"
-                  aria-label={`Drag ${col.label} to reorder`}
-                  className="flex h-6 w-6 shrink-0 cursor-grab items-center justify-center rounded text-slate-500 active:cursor-grabbing hover:bg-slate-100 hover:text-slate-700"
-                >
-                  <GripVertical className="h-4 w-4" strokeWidth={2.25} />
-                </span>
-              )}
+              <span
+                title="Drag to reorder"
+                aria-label={`Drag ${col.label} to reorder`}
+                className="flex h-6 w-6 shrink-0 cursor-grab items-center justify-center rounded text-slate-500 active:cursor-grabbing hover:bg-slate-100 hover:text-slate-700"
+              >
+                <GripVertical className="h-4 w-4" strokeWidth={2.25} />
+              </span>
 
               <button
                 type="button"
@@ -210,25 +218,43 @@ export function ManageColumnsModal({
                 ) : null}
               </span>
 
-              {!col.required ? (
+              <div className="flex shrink-0 items-center gap-0.5">
                 <button
                   type="button"
-                  onClick={() => togglePinned(col.id)}
-                  aria-label={`${col.pinned ? "Unpin" : "Pin"} ${col.label}`}
-                  className={cn(
-                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition-opacity hover:bg-gray-100 hover:text-gray-600",
-                    col.pinned
-                      ? "opacity-100"
-                      : "opacity-0 group-hover:opacity-100",
-                  )}
+                  disabled={working[0]?.id === col.id}
+                  onClick={() => move(col.id, -1)}
+                  aria-label={`Move ${col.label} up`}
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30"
                 >
-                  <Pin
-                    className={cn("h-3.5 w-3.5", col.pinned && "fill-current")}
-                  />
+                  <ChevronUp className="h-3.5 w-3.5" />
                 </button>
-              ) : (
-                <span className="h-6 w-6 shrink-0" />
-              )}
+                <button
+                  type="button"
+                  disabled={working[working.length - 1]?.id === col.id}
+                  onClick={() => move(col.id, 1)}
+                  aria-label={`Move ${col.label} down`}
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30"
+                >
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+                {!col.required ? (
+                  <button
+                    type="button"
+                    onClick={() => togglePinned(col.id)}
+                    aria-label={`${col.pinned ? "Unpin" : "Pin"} ${col.label}`}
+                    className={cn(
+                      "flex h-6 w-6 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600",
+                      col.pinned ? "text-gray-600" : "",
+                    )}
+                  >
+                    <Pin
+                      className={cn("h-3.5 w-3.5", col.pinned && "fill-current")}
+                    />
+                  </button>
+                ) : (
+                  <span className="h-6 w-6" />
+                )}
+              </div>
             </div>
           ))}
 

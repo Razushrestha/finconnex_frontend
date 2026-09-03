@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { RELATED_RECORD_OPTIONS } from "@/lib/activities/shared";
 import { listContactGroups } from "@/lib/contacts/store";
-import { cn } from "@/lib/utils";
 import {
   AddApplicantContactModal,
   AddClientButton,
@@ -95,17 +94,10 @@ export function RequestApplicantsSection({
   onChange: (next: RequestApplicant[]) => void;
   error?: string;
 }) {
-  const [count, setCount] = useState<1 | 2>(
-    applicants.length >= 2 ? 2 : 1,
-  );
   const [activeId, setActiveId] = useState<string | null>(null);
   const [results, setResults] = useState<CrmOption[]>([]);
   const [addingForId, setAddingForId] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    setCount(applicants.length >= 2 ? 2 : 1);
-  }, [applicants.length]);
 
   const allOptions = useMemo(() => {
     const merged = [...relatedOptions(), ...storedContactOptions()];
@@ -120,20 +112,6 @@ export function RequestApplicantsSection({
 
   function update(id: string, patch: Partial<RequestApplicant>) {
     onChange(applicants.map((a) => (a.id === id ? { ...a, ...patch } : a)));
-  }
-
-  function chooseCount(next: 1 | 2) {
-    setCount(next);
-    if (next === 1) {
-      onChange(applicants.length ? [applicants[0]!] : [emptyApplicant()]);
-      return;
-    }
-    if (applicants.length >= 2) {
-      onChange(applicants.slice(0, 2));
-      return;
-    }
-    const first = applicants[0] ?? emptyApplicant();
-    onChange([first, emptyApplicant()]);
   }
 
   function searchCrm(id: string, source: ApplicantSource, query: string) {
@@ -162,41 +140,12 @@ export function RequestApplicantsSection({
     <div className="space-y-3">
       <h3 className="text-[15px] font-bold text-slate-900">Applicants</h3>
 
-      <div>
-        <label className="mb-1.5 block text-[13px] font-medium text-slate-700">
-          Number of applicants
-        </label>
-        <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-          {([1, 2] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => chooseCount(value)}
-              className={cn(
-                "h-11 text-[14px] font-semibold",
-                count === value
-                  ? "bg-[#F3ECFB] text-[#5A32A3]"
-                  : "bg-transparent text-slate-600 hover:bg-white",
-              )}
-            >
-              {value}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="space-y-3">
-          {applicants.map((row, index) => (
+          {applicants.map((row) => (
             <div
               key={row.id}
               className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5"
             >
-              <div className="flex items-center text-gray-400">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#EDE4FB] text-[12px] font-bold text-[#5A32A3]">
-                  {index + 1}
-                </span>
-              </div>
-
               <div className="w-36 space-y-1">
                 <label className="block text-[10px] font-bold tracking-wider text-gray-400 uppercase">
                   Recipient Source

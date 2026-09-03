@@ -21,10 +21,11 @@ import {
   type ReminderColumn,
   type ReminderFilters,
   type ReminderStatus,
-  type ReminderType,
   type NotificationMethod,
 } from "@/lib/reminders/types";
+import { reminderMatchesDeepFilters } from "@/lib/filters/records";
 import { activityExportMenuItem } from "@/lib/activities/export";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
   ActivityToolbar,
   TIMELINE_VIEW_TOGGLE,
@@ -111,25 +112,25 @@ const STATUS_META: Record<
   { soft: string; text: string; border: string; dot: string }
 > = {
   Pending: {
-    soft: "bg-sky-50",
-    text: "text-sky-700",
+    soft: "bg-sky-100",
+    text: "text-sky-800",
     border: "border-l-sky-500",
     dot: "bg-sky-500",
   },
   Dismissed: {
     soft: "bg-slate-100",
-    text: "text-slate-600",
+    text: "text-slate-700",
     border: "border-l-slate-400",
     dot: "bg-slate-400",
   },
   Snoozed: {
-    soft: "bg-amber-50",
-    text: "text-amber-800",
+    soft: "bg-amber-100",
+    text: "text-amber-900",
     border: "border-l-amber-500",
     dot: "bg-amber-500",
   },
   Triggered: {
-    soft: "bg-emerald-50",
+    soft: "bg-emerald-100",
     text: "text-emerald-800",
     border: "border-l-emerald-500",
     dot: "bg-emerald-500",
@@ -191,11 +192,16 @@ export default function RemindersPage() {
       )
       .map((col) => {
         const reminders = sortReminders(
-          col.reminders.filter((r) =>
-            reminderMatchesFilters(
-              { ...r, status: col.title },
-              { ...filters, statuses: [] },
-            ),
+          col.reminders.filter(
+            (r) =>
+              reminderMatchesFilters(
+                { ...r, status: col.title },
+                { ...filters, statuses: [] },
+              ) &&
+              reminderMatchesDeepFilters(
+                { ...r, status: col.title },
+                { ...filters, statuses: [] },
+              ),
           ),
           sortField,
           sortDirection,
@@ -207,45 +213,16 @@ export default function RemindersPage() {
   const visibleReminders = useMemo(
     () =>
       sortReminders(
-        allReminders.filter((r) => reminderMatchesFilters(r, filters)),
+        allReminders.filter(
+          (r) =>
+            reminderMatchesFilters(r, filters) &&
+            reminderMatchesDeepFilters(r, filters),
+        ),
         sortField,
         sortDirection,
       ),
     [allReminders, filters, sortField, sortDirection],
   );
-
-  function toggleFilterField(
-    sectionId: "status" | "type" | "method" | "owner",
-    field: string,
-  ) {
-    setFilters((prev) => {
-      if (sectionId === "status") {
-        const selected = field as ReminderStatus;
-        const next = prev.statuses.includes(selected)
-          ? prev.statuses.filter((value) => value !== selected)
-          : [...prev.statuses, selected];
-        return { ...prev, statuses: next };
-      }
-      if (sectionId === "type") {
-        const selected = field as ReminderType;
-        const next = prev.types.includes(selected)
-          ? prev.types.filter((value) => value !== selected)
-          : [...prev.types, selected];
-        return { ...prev, types: next };
-      }
-      if (sectionId === "method") {
-        const selected = field as NotificationMethod;
-        const next = prev.methods.includes(selected)
-          ? prev.methods.filter((value) => value !== selected)
-          : [...prev.methods, selected];
-        return { ...prev, methods: next };
-      }
-      const next = prev.owners.includes(field)
-        ? prev.owners.filter((value) => value !== field)
-        : [...prev.owners, field];
-      return { ...prev, owners: next };
-    });
-  }
 
   function handleSortChange(field: string, direction: "asc" | "desc") {
     setSortField(field);
@@ -412,7 +389,7 @@ export default function RemindersPage() {
           <RemindersFilterPanel
             filters={filters}
             counts={filterCounts}
-            onToggleField={toggleFilterField}
+            onChange={setFilters}
             onClose={() => setFilterOpen(false)}
           />
         ) : null}
@@ -538,10 +515,11 @@ export default function RemindersPage() {
                 })}
               </div>
             ) : (
+              <ResizableColumns storageKey="reminders-list">
               <table className="w-full min-w-[960px] text-left text-[12px]">
                 <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
                   <tr>
-                    <th className="w-10 px-4 py-2.5">
+                    <th data-col-id="select" className="w-10 px-4 py-2.5">
                       <input
                         type="checkbox"
                         className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
@@ -557,14 +535,30 @@ export default function RemindersPage() {
                         aria-label="Select all"
                       />
                     </th>
-                    <th className="px-4 py-2.5">Reminder</th>
-                    <th className="px-4 py-2.5">Type</th>
-                    <th className="px-4 py-2.5">When</th>
-                    <th className="px-4 py-2.5">Method</th>
-                    <th className="px-4 py-2.5">Related To</th>
-                    <th className="px-4 py-2.5">Status</th>
-                    <th className="px-4 py-2.5">Owner</th>
-                    <th className="px-4 py-2.5 text-right">Actions</th>
+                    <th data-col-id="reminder" className="px-4 py-2.5">
+                      Reminder
+                    </th>
+                    <th data-col-id="type" className="px-4 py-2.5">
+                      Type
+                    </th>
+                    <th data-col-id="when" className="px-4 py-2.5">
+                      When
+                    </th>
+                    <th data-col-id="method" className="px-4 py-2.5">
+                      Method
+                    </th>
+                    <th data-col-id="relatedTo" className="px-4 py-2.5">
+                      Related To
+                    </th>
+                    <th data-col-id="status" className="px-4 py-2.5">
+                      Status
+                    </th>
+                    <th data-col-id="owner" className="px-4 py-2.5">
+                      Owner
+                    </th>
+                    <th data-col-id="actions" className="px-4 py-2.5 text-right">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -598,7 +592,7 @@ export default function RemindersPage() {
                             >
                               <Bell className="h-3.5 w-3.5" />
                             </span>
-                            <span className="font-semibold text-slate-900">
+                            <span className="font-normal text-slate-900">
                               {r.title}
                             </span>
                           </div>
@@ -619,7 +613,7 @@ export default function RemindersPage() {
                         <td className="px-4 py-3">
                           <span
                             className={cn(
-                              "rounded-full px-2 py-0.5 text-[10px] font-bold",
+                              "inline-flex items-center rounded-md px-2.5 py-0.5 text-[11px] font-semibold",
                               meta.soft,
                               meta.text,
                             )}
@@ -659,6 +653,7 @@ export default function RemindersPage() {
                   })}
                 </tbody>
               </table>
+              </ResizableColumns>
             )}
         </div>
       </div>

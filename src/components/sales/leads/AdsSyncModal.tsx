@@ -59,7 +59,7 @@ export function AdsSyncModal({
               {ADS_PLATFORM_LABEL[platform]}
             </h2>
             <p className="text-[11px] text-slate-500">
-              Demo sync — fixture leads tagged Social Media
+              Demo sync — fixture leads tagged with the ad platform source
             </p>
           </div>
           <button

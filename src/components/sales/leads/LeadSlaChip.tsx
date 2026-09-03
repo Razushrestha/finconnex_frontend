@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Clock, Crosshair } from "lucide-react";
 import type { LeadSlaViewModel, SlaClockView } from "@/lib/pipeline-sla/types";
 import {
+  SLA_BADGE_HEX,
   SLA_BADGE_PILL,
   SLA_BAND_WORDS,
   SLA_CLOCK_ICON,
@@ -15,6 +16,7 @@ import {
   onPipelineSlaChange,
 } from "@/lib/pipeline-sla/settings";
 import { cn } from "@/lib/utils";
+import { ArrowTag } from "@/components/common/ArrowTag";
 
 type LeadSlaChipProps = {
   sla: LeadSlaViewModel | null;
@@ -97,12 +99,10 @@ export function LeadSlaChip({
 
   if (variant === "badge" || (dense && variant !== "full")) {
     return (
-      <span
-        className={cn(
-          "inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap",
-          SLA_BADGE_PILL[sla.badgeBand],
-          className,
-        )}
+      <ArrowTag
+        compact
+        color={SLA_BADGE_HEX[sla.badgeBand]}
+        className={cn(SLA_BADGE_PILL[sla.badgeBand], className)}
         role="status"
         aria-label={[
           "Pipeline SLA",
@@ -112,7 +112,7 @@ export function LeadSlaChip({
         title={sla.badgeLabel}
       >
         {sla.badgeLabel}
-      </span>
+      </ArrowTag>
     );
   }
 
@@ -145,13 +145,14 @@ export function LeadSlaChip({
     >
       {showBadge && (
         <div className="mb-1 flex items-center justify-between gap-2">
-          <span
-            className={cn(
-              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-              SLA_BADGE_PILL[sla.badgeBand],
-            )}
-          >
-            {sla.badgeLabel}
+          <span>
+            <ArrowTag
+              compact
+              color={SLA_BADGE_HEX[sla.badgeBand]}
+              className={SLA_BADGE_PILL[sla.badgeBand]}
+            >
+              {sla.badgeLabel}
+            </ArrowTag>
           </span>
           <span className="truncate text-[10px] font-medium text-slate-500">
             {sla.stage}

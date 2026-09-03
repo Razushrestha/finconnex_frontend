@@ -1,13 +1,16 @@
 "use client";
 
-import { Calendar, Mail, MessageSquare } from "lucide-react";
+import { Calendar } from "lucide-react";
 import {
-  defaultRepeatConfig,
-  type RepeatConfig,
-} from "@/components/activities/tasks/RepeatModal";
+  defaultReminderRepeatRule,
+  formatTaskRepeatSummary,
+  type ReminderRepeatRule,
+} from "@/lib/tasks/repeat-reminder";
+import { ReminderSettingsCard } from "@/components/activities/tasks/ReminderSettingsCard";
+import type { NotificationMethod } from "@/lib/reminders/types";
 import { cn } from "@/lib/utils";
 
-export type RequestNotifyMethod = "Email" | "SMS";
+export type RequestNotifyMethod = NotificationMethod;
 
 export type ReminderFrequency =
   | "off"
@@ -54,15 +57,6 @@ export function formatCustomReminder(config: CustomReminderConfig): string {
     : "";
   return `Custom · ${every} · ${start} · ${stop}${weekends}`;
 }
-
-const NOTIFY_BY_OPTIONS: {
-  id: RequestNotifyMethod;
-  label: string;
-  icon: typeof Mail;
-}[] = [
-  { id: "Email", label: "Email", icon: Mail },
-  { id: "SMS", label: "SMS", icon: MessageSquare },
-];
 
 const labelClass =
   "text-[11px] font-medium uppercase tracking-wide text-gray-500";
@@ -190,6 +184,62 @@ export function formatRequestDueDate(value: string): string {
   return `${dd}/${mm}/${parsed.getFullYear()}`;
 }
 
+export function parseRequestRepeat(label?: string): ReminderRepeatRule {
+  if (!label || /^off$/i.test(label.trim())) {
+    return { ...defaultReminderRepeatRule };
+  }
+  const lower = label.toLowerCase();
+  if (lower === "every day" || lower.startsWith("every day ")) {
+    return { ...defaultReminderRepeatRule, preset: "daily" };
+  }
+  if (lower === "every week" || lower.startsWith("every week ")) {
+    return { ...defaultReminderRepeatRule, preset: "weekly" };
+  }
+  if (lower.includes("every 2 weeks")) {
+    return { ...defaultReminderRepeatRule, preset: "biweekly" };
+  }
+  if (lower === "every month" || lower.startsWith("every month ")) {
+    return { ...defaultReminderRepeatRule, preset: "monthly" };
+  }
+  if (lower === "every year" || lower.startsWith("every year ")) {
+    return { ...defaultReminderRepeatRule, preset: "yearly" };
+  }
+  const parsed = parseCustomReminderLabel(label);
+  if (!parsed.enabled) return { ...defaultReminderRepeatRule };
+  return {
+    ...defaultReminderRepeatRule,
+    preset: "custom",
+    interval: parsed.config.every,
+    unit: parsed.config.unit === "Weeks" ? "weeks" : "days",
+    ends:
+      parsed.config.stop === "never"
+        ? "never"
+        : parsed.config.stop === "after"
+          ? "after"
+          : "due",
+    afterCount: parsed.config.stopAfterCount,
+    exceptWeekendsAndHolidays: parsed.config.exceptWeekendsAndHolidays,
+  };
+}
+
+export function parseNotifyBy(raw?: string[]): NotificationMethod[] {
+  const allowed = new Set<NotificationMethod>([
+    "Email",
+    "SMS",
+    "In-app",
+    "Web Push",
+  ]);
+  const next = (raw ?? []).filter((item): item is NotificationMethod =>
+    allowed.has(item as NotificationMethod),
+  );
+  return next.length ? next : ["Email"];
+}
+
+export function formatRequestRepeat(rule: ReminderRepeatRule) {
+  if (rule.preset === "none") return "";
+  return formatTaskRepeatSummary(rule);
+}
+
 export function validateRequestSchedule(
   dueDate: string,
   reminderDate: string,
@@ -223,48 +273,32 @@ export function validateRequestSchedule(
 export function RequestScheduleCard({
   dueDate,
   reminderDate,
-  customReminder,
-  repeatEnabled,
+  reminderEnabled,
+  reminderRepeat,
   notifyBy,
   errors,
   onDueDateChange,
   onReminderDateChange,
-  onCustomReminderChange,
-  onRepeatEnabledChange,
-  onNotifyByChange,
+  onReminderEnabledChange,
+  onReminderRepeatChange,
+  onToggleNotify,
   className,
 }: {
   dueDate: string;
   reminderDate: string;
-  customReminder: CustomReminderConfig;
-  repeatEnabled: boolean;
-  notifyBy: RequestNotifyMethod[];
+  reminderEnabled: boolean;
+  reminderRepeat: ReminderRepeatRule;
+  notifyBy: NotificationMethod[];
   errors?: Partial<Record<"dueDate" | "reminderDate", string>>;
   onDueDateChange: (value: string) => void;
   onReminderDateChange: (value: string) => void;
-  onCustomReminderChange: (value: CustomReminderConfig) => void;
-  onRepeatEnabledChange: (enabled: boolean) => void;
-  onNotifyByChange: (value: RequestNotifyMethod[]) => void;
+  onReminderEnabledChange: (on: boolean) => void;
+  onReminderRepeatChange: (next: ReminderRepeatRule) => void;
+  onToggleNotify: (method: NotificationMethod) => void;
   className?: string;
 }) {
   const minDueDate = toDatetimeLocalValue(startOfMinute(new Date()));
   const hasDueDate = Boolean(dueDate.trim());
-  const dueLabel = parseDatetimeLocal(dueDate)?.toLocaleDateString("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-
-  function patchCustom(patch: Partial<CustomReminderConfig>) {
-    onCustomReminderChange({ ...customReminder, ...patch });
-  }
-
-  function toggleNotify(method: RequestNotifyMethod) {
-    const selected = notifyBy.includes(method);
-    onNotifyByChange(
-      selected ? notifyBy.filter((item) => item !== method) : [...notifyBy, method],
-    );
-  }
 
   return (
     <div
@@ -297,215 +331,25 @@ export function RequestScheduleCard({
       </div>
 
       {hasDueDate ? (
-        <div>
-          <label className={labelClass}>Reminder Date</label>
-          <div className="relative mt-1">
-            <Calendar className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              type="datetime-local"
-              min={minDueDate}
-              max={dueDate}
-              className={cn(
-                inputClass,
-                "pl-9",
-                errors?.reminderDate && "border-red-300",
-              )}
-              value={reminderDate}
-              onChange={(e) => onReminderDateChange(e.target.value)}
-            />
-          </div>
-          {errors?.reminderDate ? (
-            <p className="mt-1 text-xs text-red-600">{errors.reminderDate}</p>
-          ) : (
-            <p className="mt-1 text-xs text-gray-500">
-              Choose a time after now and no later than the due date.
-            </p>
-          )}
-        </div>
-      ) : null}
-
-      <div>
-        <label className={labelClass}>Repeat</label>
-        <div
-          className={cn(
-            "mt-1 flex items-center justify-between rounded-md border px-3 py-2",
-            hasDueDate
-              ? "border-violet-100 bg-[#F8F4FC]"
-              : "border-gray-100 bg-gray-50",
-          )}
-        >
-          <button
-            type="button"
-            disabled={!hasDueDate}
-            onClick={() => onRepeatEnabledChange(!repeatEnabled)}
-            className={cn(
-              "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
-              repeatEnabled ? "bg-green-500" : "bg-gray-300",
-              !hasDueDate && "cursor-not-allowed opacity-50",
-            )}
-          >
-            <span
-              className={cn(
-                "inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform",
-                repeatEnabled ? "translate-x-5" : "translate-x-1",
-              )}
-            />
-          </button>
-          <span className={cn("text-sm", repeatEnabled ? "text-slate-700" : "text-gray-400")}>
-            {repeatEnabled ? "On" : "Off"}
-          </span>
-        </div>
-        {!hasDueDate ? (
-          <p className="mt-1 text-xs text-gray-400">
-            Set a due date to enable repeat.
-          </p>
-        ) : null}
-
-        {repeatEnabled && hasDueDate ? (
-          <div className="mt-2 space-y-2.5 rounded-xl bg-[#F3ECFB] px-3 py-3">
-            <div className="flex items-center gap-2">
-              <span className="w-[88px] shrink-0 text-[12px] font-medium text-slate-700">
-                Repeat every
-              </span>
-              <input
-                type="number"
-                min={1}
-                value={customReminder.every}
-                onChange={(e) =>
-                  patchCustom({ every: Math.max(1, Number(e.target.value) || 1) })
-                }
-                className="h-8 w-12 rounded-md border border-violet-200 bg-white text-center text-[13px] outline-none focus:border-[#5A32A3]"
-              />
-              <select
-                value={customReminder.unit}
-                onChange={(e) =>
-                  patchCustom({ unit: e.target.value as ReminderUnit })
-                }
-                className="h-8 rounded-md border border-violet-200 bg-white px-2 text-[13px] outline-none focus:border-[#5A32A3]"
-              >
-                <option value="Days">Days</option>
-                <option value="Weeks">Weeks</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="w-[88px] shrink-0 text-[12px] font-medium text-slate-700">
-                Start reminder
-              </span>
-              <input
-                type="number"
-                min={0}
-                value={customReminder.startAfterDays}
-                onChange={(e) =>
-                  patchCustom({
-                    startAfterDays: Math.max(0, Number(e.target.value) || 0),
-                  })
-                }
-                className="h-8 w-12 rounded-md border border-violet-200 bg-white text-center text-[13px] outline-none focus:border-[#5A32A3]"
-              />
-              <span className="text-[12px] text-slate-600">days after request</span>
-            </div>
-
-            <label className="flex cursor-pointer items-center gap-2 text-[12px] text-slate-800">
-              <input
-                type="checkbox"
-                checked={customReminder.exceptWeekendsAndHolidays}
-                onChange={(e) =>
-                  patchCustom({ exceptWeekendsAndHolidays: e.target.checked })
-                }
-                className="h-3.5 w-3.5 rounded border-slate-300 accent-[#5A32A3]"
-              />
-              Except weekends and holidays
-            </label>
-
-            <div>
-              <p className="mb-1.5 text-[12px] font-medium text-slate-700">
-                Stop reminders
-              </p>
-              <div className="space-y-1.5">
-                {(
-                  [
-                    ["completed", "When documents are completed"],
-                    ["due", `On due date${dueLabel ? ` (${dueLabel})` : ""}`],
-                    ["after", "After"],
-                    ["never", "Never stop"],
-                  ] as const
-                ).map(([id, label]) => (
-                  <label
-                    key={id}
-                    className="flex cursor-pointer items-center gap-2 text-[12px] text-slate-800"
-                  >
-                    <input
-                      type="radio"
-                      name="reminder-stop"
-                      checked={customReminder.stop === id}
-                      onChange={() => patchCustom({ stop: id })}
-                      className="h-3.5 w-3.5 accent-[#5A32A3]"
-                    />
-                    {id === "after" ? (
-                      <>
-                        After
-                        <input
-                          type="number"
-                          min={1}
-                          value={customReminder.stopAfterCount}
-                          onChange={(e) =>
-                            patchCustom({
-                              stop: "after",
-                              stopAfterCount: Math.max(
-                                1,
-                                Number(e.target.value) || 1,
-                              ),
-                            })
-                          }
-                          className="h-7 w-10 rounded-md border border-violet-200 bg-white text-center text-[12px] outline-none focus:border-[#5A32A3]"
-                        />
-                        reminders
-                      </>
-                    ) : (
-                      label
-                    )}
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </div>
-
-      <div>
-        <label className={labelClass}>Notify by</label>
-        <div className="mt-1.5 grid grid-cols-2 gap-2">
-          {NOTIFY_BY_OPTIONS.map((option) => {
-            const active = notifyBy.includes(option.id);
-            const Icon = option.icon;
-            return (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => toggleNotify(option.id)}
-                aria-pressed={active}
-                className={cn(
-                  "inline-flex items-center gap-2 rounded-md border px-3 py-2 text-left text-sm font-medium transition-colors",
-                  active
-                    ? "border-[#5A32A3] bg-[#F3ECFB] text-[#5A32A3]"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300",
-                )}
-              >
-                <Icon className="h-3.5 w-3.5 shrink-0" />
-                {option.label}
-              </button>
-            );
-          })}
-        </div>
-        <p className="mt-1 text-xs text-gray-500">
-          Choose how the owner is notified for this request.
+        <ReminderSettingsCard
+          enabled={reminderEnabled}
+          onEnabledChange={onReminderEnabledChange}
+          reminderDate={reminderDate}
+          onReminderDateChange={onReminderDateChange}
+          min={minDueDate}
+          max={dueDate}
+          error={errors?.reminderDate}
+          notifyBy={notifyBy}
+          onToggleNotify={onToggleNotify}
+          repeat={reminderRepeat}
+          onRepeatChange={onReminderRepeatChange}
+          due={parseDatetimeLocal(dueDate)}
+        />
+      ) : (
+        <p className="text-xs text-gray-400">
+          Set a due date to add a reminder.
         </p>
-      </div>
-
+      )}
     </div>
   );
 }
-
-export { defaultRepeatConfig };
-export type { RepeatConfig };

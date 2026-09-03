@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus, Search, Download } from "lucide-react";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
   TICKET_PRIORITIES,
   TICKET_STATUSES,
@@ -210,6 +211,7 @@ export default function SupportTicketsPage() {
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-slate-100/80 bg-white shadow-sm">
+          <ResizableColumns storageKey="support-list" className="overflow-x-auto">
           <table className="w-full text-left text-[12px]">
             <thead className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
               <tr>
@@ -287,6 +289,7 @@ export default function SupportTicketsPage() {
               ) : null}
             </tbody>
           </table>
+          </ResizableColumns>
           <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2.5 text-[11px] text-slate-500">
             <span>
               {filtered.length} result{filtered.length === 1 ? "" : "s"}

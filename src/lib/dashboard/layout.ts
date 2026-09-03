@@ -16,21 +16,52 @@ export const DASHBOARD_TEAMS = [
   "Support",
 ] as const;
 
-export type DashboardDateRange = "7d" | "30d" | "90d" | "ytd" | "all";
+export const DASHBOARD_LOAN_TYPES = [
+  "All Loan Types",
+  "Purchase",
+  "Refinance",
+  "Investment",
+] as const;
+
+export type DashboardDateRange =
+  | "today"
+  | "yesterday"
+  | "this-week"
+  | "last-week"
+  | "this-month"
+  | "last-month"
+  | "this-quarter"
+  | "last-quarter"
+  | "this-year"
+  | "last-year"
+  | "ytd"
+  | "all"
+  | "custom"
+  | "7d"
+  | "30d"
+  | "month"
+  | "90d";
+export type DashboardLoanType = (typeof DASHBOARD_LOAN_TYPES)[number];
 
 export interface DashboardFilters {
   dateRange: DashboardDateRange;
+  dateFrom?: string;
+  dateTo?: string;
   owner: string; // "All" or ACTIVITY_OWNERS name
   team: (typeof DASHBOARD_TEAMS)[number];
+  loanType: DashboardLoanType;
 }
 
 export const DASHBOARD_WIDGETS = [
-  { id: "kpis", label: "Core KPIs" },
-  { id: "charts", label: "KPI charts" },
-  { id: "industry", label: "Industry widgets" },
+  { id: "kpis", label: "Executive KPIs" },
+  { id: "pipeline", label: "Pipeline at a Glance" },
+  { id: "performance", label: "Performance Snapshot" },
+  { id: "actions", label: "Today's Critical Actions" },
+  { id: "trend", label: "Trend Overview" },
+  { id: "ranking", label: "Top Performing" },
+  { id: "alerts", label: "Alerts & Insights" },
   { id: "activity", label: "Workspace activity" },
   { id: "meetings", label: "Upcoming meetings" },
-  { id: "taskUpdates", label: "Open task updates" },
 ] as const;
 
 export type DashboardWidgetId = (typeof DASHBOARD_WIDGETS)[number]["id"];
@@ -42,26 +73,30 @@ export interface DashboardLayout {
   isDefault: boolean;
 }
 
-const LAYOUT_KEY = "dashboard:layout:v2";
-const DEFAULT_LAYOUT_KEY = "dashboard:default-layout:v2";
-const LEGACY_LAYOUT_KEY = "dashboard:layout:v1";
+const LAYOUT_KEY = "dashboard:layout:v3";
+const DEFAULT_LAYOUT_KEY = "dashboard:default-layout:v3";
+const LEGACY_LAYOUT_KEY = "dashboard:layout:v2";
 
 const WIDGET_ALIASES: Record<string, DashboardWidgetId> = {
   metrics: "kpis",
+  charts: "trend",
+  industry: "performance",
+  taskUpdates: "actions",
 };
 
 export function defaultDashboardFilters(): DashboardFilters {
   return {
-    dateRange: "30d",
+    dateRange: "90d",
     owner: "All",
     team: "All teams",
+    loanType: "All Loan Types",
   };
 }
 
 export function defaultDashboardLayout(): DashboardLayout {
   return {
     order: DASHBOARD_WIDGETS.map((w) => w.id),
-    hidden: [],
+    hidden: ["activity", "meetings"],
     filters: defaultDashboardFilters(),
     isDefault: false,
   };
@@ -146,11 +181,9 @@ export function moveWidgetTo(
   return next;
 }
 
-export function widgetGridSpan(id: DashboardWidgetId): "full" | "third" {
-  if (id === "activity" || id === "meetings" || id === "taskUpdates") {
-    return "third";
-  }
-  return "full";
+export function widgetGridSpan(id: DashboardWidgetId): "full" | "half" | "third" {
+  if (id === "kpis") return "full";
+  return "third";
 }
 
 export function parseMoney(value: string): number {
@@ -181,14 +214,150 @@ export function parseTaskDueDate(raw: string): Date | null {
   return null;
 }
 
-function rangeStart(range: DashboardDateRange): Date | null {
-  const now = new Date();
-  if (range === "all") return null;
-  if (range === "ytd") return new Date(now.getFullYear(), 0, 1);
-  const days = range === "7d" ? 7 : range === "30d" ? 30 : 90;
-  const start = new Date(now);
-  start.setDate(start.getDate() - days);
-  return start;
+function startOfDay(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+function endOfDay(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate(), 23, 59, 59, 999);
+}
+
+function startOfWeek(now: Date) {
+  const day = now.getDay();
+  const offset = day === 0 ? -6 : 1 - day;
+  return startOfDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset));
+}
+
+function parseDateInput(value?: string) {
+  if (!value) return null;
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+export function dateRangeLabel(filters: DashboardFilters) {
+  if (filters.dateRange === "custom" && filters.dateFrom && filters.dateTo) {
+    return `${formatDateInput(filters.dateFrom)} – ${formatDateInput(filters.dateTo)}`;
+  }
+  const preset = DASHBOARD_DATE_RANGE_OPTIONS.find((item) => item.value === filters.dateRange)?.label;
+  if (preset) return preset;
+  if (filters.dateRange === "month") return "This Month";
+  if (filters.dateRange === "7d") return "Last 7 days";
+  if (filters.dateRange === "30d") return "Last 30 days";
+  if (filters.dateRange === "90d") return "Last 90 days";
+  return "Date Range";
+}
+
+export function formatDateInput(value: string) {
+  const parsed = parseDateInput(value);
+  if (!parsed) return value;
+  return parsed.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+export function toDateInput(value: Date) {
+  const y = value.getFullYear();
+  const m = String(value.getMonth() + 1).padStart(2, "0");
+  const d = String(value.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export const DASHBOARD_DATE_RANGE_OPTIONS: { value: DashboardDateRange; label: string }[] = [
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "this-week", label: "This Week" },
+  { value: "last-week", label: "Last Week" },
+  { value: "this-month", label: "This Month" },
+  { value: "last-month", label: "Last Month" },
+  { value: "this-quarter", label: "This Quarter" },
+  { value: "last-quarter", label: "Last Quarter" },
+  { value: "this-year", label: "This Year" },
+  { value: "last-year", label: "Last Year" },
+  { value: "ytd", label: "Year to Date" },
+  { value: "all", label: "All Time" },
+];
+
+export function dateRangeBounds(filters: DashboardFilters, now = new Date()) {
+  const today = startOfDay(now);
+  const endToday = endOfDay(now);
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const quarter = Math.floor(month / 3);
+
+  switch (filters.dateRange) {
+    case "today":
+      return { start: today, end: endToday };
+    case "yesterday": {
+      const start = new Date(today);
+      start.setDate(start.getDate() - 1);
+      return { start, end: endOfDay(start) };
+    }
+    case "this-week":
+      return { start: startOfWeek(now), end: endToday };
+    case "last-week": {
+      const start = startOfWeek(now);
+      start.setDate(start.getDate() - 7);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      return { start, end: endOfDay(end) };
+    }
+    case "this-month":
+    case "month":
+      return { start: new Date(year, month, 1), end: endToday };
+    case "last-month":
+      return {
+        start: new Date(year, month - 1, 1),
+        end: endOfDay(new Date(year, month, 0)),
+      };
+    case "this-quarter":
+      return { start: new Date(year, quarter * 3, 1), end: endToday };
+    case "last-quarter": {
+      const start = new Date(year, (quarter - 1) * 3, 1);
+      return { start, end: endOfDay(new Date(year, quarter * 3, 0)) };
+    }
+    case "this-year":
+      return { start: new Date(year, 0, 1), end: endToday };
+    case "last-year":
+      return { start: new Date(year - 1, 0, 1), end: endOfDay(new Date(year - 1, 11, 31)) };
+    case "ytd":
+      return { start: new Date(year, 0, 1), end: endToday };
+    case "custom": {
+      const start = parseDateInput(filters.dateFrom);
+      const end = parseDateInput(filters.dateTo);
+      return {
+        start,
+        end: end ? endOfDay(end) : endToday,
+      };
+    }
+    case "7d":
+    case "30d":
+    case "90d": {
+      const days = filters.dateRange === "7d" ? 7 : filters.dateRange === "30d" ? 30 : 90;
+      const start = new Date(today);
+      start.setDate(start.getDate() - days);
+      return { start, end: endToday };
+    }
+    case "all":
+    default:
+      return { start: null, end: endToday };
+  }
+}
+
+export function previousDateRangeBounds(filters: DashboardFilters, now = new Date()) {
+  if (filters.dateRange === "all") return null;
+  const { start, end } = dateRangeBounds(filters, now);
+  if (!start) return null;
+  const length = end.getTime() - start.getTime();
+  const prevEnd = new Date(start.getTime() - 1);
+  const prevStart = new Date(prevEnd.getTime() - length);
+  return { start: prevStart, end: prevEnd };
+}
+
+export function dashboardPeriodLabel(filters: DashboardFilters) {
+  return dateRangeLabel(filters);
+}
+
+export function rangeStart(range: DashboardDateRange, now = new Date()): Date | null {
+  return dateRangeBounds({ ...defaultDashboardFilters(), dateRange: range }, now).start;
 }
 
 export interface DashboardLiveStats {
@@ -211,7 +380,7 @@ export function computeDashboardStats(
   filters: DashboardFilters,
 ): DashboardLiveStats {
   const owner = filters.owner === "All" ? null : filters.owner;
-  const start = rangeStart(filters.dateRange);
+  const start = dateRangeBounds(filters).start;
 
   const leads = listLeadColumns().flatMap((c) =>
     c.cards.map((card) => ({ ...card, status: c.leadStatus })),

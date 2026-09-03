@@ -1,4 +1,4 @@
-import { CreateLeadForm } from "@/components/sales/leads/CreateLeadForm";
+import { redirect } from "next/navigation";
 
 interface CreateLeadPageProps {
   searchParams: Promise<{
@@ -12,11 +12,8 @@ export default async function CreateLeadPage({
   searchParams,
 }: CreateLeadPageProps) {
   const params = await searchParams;
-  const layoutId = params.layoutid ?? "standard";
-  const redirect = params.redirect === "true";
-  const stage = params.stage?.trim() || undefined;
-
-  return (
-    <CreateLeadForm layoutId={layoutId} redirect={redirect} stage={stage} />
-  );
+  const qs = new URLSearchParams({ create: "1" });
+  const stage = params.stage?.trim();
+  if (stage) qs.set("stage", stage);
+  redirect(`/sales/leads?${qs.toString()}`);
 }

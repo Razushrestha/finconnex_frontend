@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Search, Tag, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ArrowTag } from "@/components/common/ArrowTag";
 import {
   TAG_TONES,
   NAMED_TAG_TONES,
   hashTagTone,
   listWorkspaceTags,
+  onTagColorsChange,
   relatedRecordTags,
   relatedTagsSectionLabel,
   toneForTag,
@@ -15,60 +17,145 @@ import {
   type TagToneId,
 } from "@/lib/tags";
 
+function TagColorDots({
+  value,
+  onChange,
+}: {
+  value: TagToneId;
+  onChange: (tone: TagToneId) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {TAG_TONES.map((tone) => (
+        <button
+          key={tone.id}
+          type="button"
+          title={tone.id}
+          aria-label={`Use ${tone.id}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onChange(tone.id);
+          }}
+          className={cn(
+            "h-5 w-5 rounded-full",
+            value === tone.id
+              ? "ring-2 ring-[#5A32A3] ring-offset-2"
+              : "hover:scale-110",
+          )}
+          style={{ backgroundColor: tone.color }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function RecordTagChip({
   tag,
   onRemove,
   compact = false,
+  recolorable = true,
 }: {
   tag: string;
   onRemove?: () => void;
   compact?: boolean;
+  recolorable?: boolean;
 }) {
-  const tone = toneForTag(tag);
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const [toneId, setToneId] = useState<TagToneId>(() => toneForTag(tag).id);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    setToneId(toneForTag(tag).id);
+    return onTagColorsChange(() => setToneId(toneForTag(tag).id));
+  }, [tag]);
+
+  useEffect(() => {
+    if (!paletteOpen) return;
+    function onDoc(event: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) {
+        setPaletteOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [paletteOpen]);
+
+  const tone = TAG_TONES.find((item) => item.id === toneId) ?? TAG_TONES[0];
+
   return (
-    <span
-      className={cn(
-        "inline-flex max-w-full items-center font-semibold ring-1",
-        compact
-          ? "h-5 gap-0.5 rounded-md px-1.5 text-[10px]"
-          : "h-6 gap-1 rounded-full px-2 text-[11px]",
-        tone.chip,
-      )}
-    >
-      {compact ? null : <span className="opacity-50">#</span>}
-      <span className="truncate">{tag}</span>
+    <span className="relative inline-flex max-w-full" ref={wrapRef}>
+      <ArrowTag
+        compact={compact}
+        color={tone.color}
+        className={cn(
+          recolorable && "cursor-pointer",
+          onRemove && "fc-arrow-tag-removable",
+        )}
+        title={recolorable ? `Change colour for ${tag}` : tag}
+        onClick={
+          recolorable
+            ? (event) => {
+                event.stopPropagation();
+                setPaletteOpen((open) => !open);
+              }
+            : undefined
+        }
+      >
+        <span className="truncate">{tag}</span>
+      </ArrowTag>
       {onRemove ? (
         <button
           type="button"
           title={`Remove ${tag}`}
           aria-label={`Remove ${tag}`}
-          onClick={onRemove}
-          className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full opacity-60 hover:bg-black/5 hover:opacity-100"
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemove();
+          }}
+          className="absolute top-1/2 right-3 z-10 flex h-3.5 w-3.5 -translate-y-1/2 items-center justify-center rounded-full text-white/80 hover:bg-white/20 hover:text-white"
         >
           <X className="h-3 w-3" />
         </button>
+      ) : null}
+      {paletteOpen ? (
+        <div className="absolute top-[calc(100%+6px)] left-0 z-50 w-44 rounded-xl bg-white p-2 shadow-[0_12px_32px_rgba(15,23,42,0.12)] ring-1 ring-black/5">
+          <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+            Colour
+          </p>
+          <TagColorDots
+            value={toneId}
+            onChange={(next) => {
+              writeTagColor(tag, next);
+              setToneId(next);
+              setPaletteOpen(false);
+            }}
+          />
+        </div>
       ) : null}
     </span>
   );
 }
 
 function TagRow({ tag, onPick }: { tag: string; onPick: () => void }) {
-  const tone = toneForTag(tag);
+  const [toneId, setToneId] = useState<TagToneId>(() => toneForTag(tag).id);
+  useEffect(() => {
+    setToneId(toneForTag(tag).id);
+    return onTagColorsChange(() => setToneId(toneForTag(tag).id));
+  }, [tag]);
+  const tone = TAG_TONES.find((item) => item.id === toneId) ?? TAG_TONES[0];
   return (
     <button
       type="button"
       onClick={onPick}
       className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-50"
     >
-      <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", tone.dot)} />
       <span
-        className={cn(
-          "inline-flex max-w-full items-center truncate rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1",
-          tone.chip,
-        )}
-      >
-        #{tag}
-      </span>
+        className="h-2.5 w-2.5 shrink-0 rounded-full"
+        style={{ backgroundColor: tone.color }}
+      />
+      <ArrowTag compact color={tone.color}>
+        <span className="truncate">{tag}</span>
+      </ArrowTag>
     </button>
   );
 }
@@ -223,23 +310,18 @@ export function RecordTagPicker({
                 <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
                   Colour
                 </p>
-                <div className="mb-2 flex flex-wrap gap-1.5">
-                  {TAG_TONES.map((tone) => (
-                    <button
-                      key={tone.id}
-                      type="button"
-                      title={tone.id}
-                      aria-label={`Use ${tone.id}`}
-                      onClick={() => setCreateTone(tone.id)}
-                      className={cn(
-                        "h-5 w-5 rounded-full",
-                        tone.dot,
-                        createTone === tone.id
-                          ? "ring-2 ring-[#5A32A3] ring-offset-2"
-                          : "hover:scale-110",
-                      )}
-                    />
-                  ))}
+                <div className="mb-2">
+                  <TagColorDots value={createTone} onChange={setCreateTone} />
+                </div>
+                <div className="mb-2">
+                  <ArrowTag
+                    compact
+                    color={
+                      TAG_TONES.find((item) => item.id === createTone)?.color
+                    }
+                  >
+                    {q}
+                  </ArrowTag>
                 </div>
                 <button
                   type="button"

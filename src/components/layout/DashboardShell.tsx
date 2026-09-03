@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Navbar from "@/components/layout/Navbar";
 import { BottomBar } from "@/components/layout/BottomBar";
@@ -57,15 +57,17 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
         />
       </div>
       <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col">
-        <Navbar
-          onOpenMobileMenu={() => setMobileOpen(true)}
-          user={{
-            name: session.name,
-            role: session.role,
-            email: session.email,
-            tenantName: session.tenantName,
-          }}
-        />
+        <Suspense fallback={<div className="h-16 shrink-0 border-b border-border/60" />}>
+          <Navbar
+            onOpenMobileMenu={() => setMobileOpen(true)}
+            user={{
+              name: session.name,
+              role: session.role,
+              email: session.email,
+              tenantName: session.tenantName,
+            }}
+          />
+        </Suspense>
         <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">
           {children}
         </main>

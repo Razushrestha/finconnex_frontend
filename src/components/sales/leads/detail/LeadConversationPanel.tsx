@@ -779,9 +779,6 @@ export function LeadConversationPanel({ card }: { card: LeadCardData }) {
               </div>
             </div>
           </div>
-          <p className="mt-1 text-center text-[9px] text-slate-400">
-            Shift+Enter for new line · Voice notes
-          </p>
         </div>
       </section>
 

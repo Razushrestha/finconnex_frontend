@@ -32,6 +32,7 @@ import {
   URGENCY_WORDS,
 } from "@/lib/leads/a11y-urgency";
 import { LeadSlaChip } from "@/components/sales/leads/LeadSlaChip";
+import { RecordTagChip } from "@/components/shared/tags/RecordTags";
 import {
   CustomizeLeadCardDrawer,
   DEFAULT_LEAD_CARD_SETTINGS,
@@ -46,7 +47,7 @@ import { cardDragging, cardMotion, cardSubject, entityCardShell } from "@/lib/mo
 import { KANBAN_CARD } from "@/lib/layout";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 import { LEAD_SEND_ACTIONS, leadSendHref } from "@/lib/leads/convert-actions";
-import { sendClientPortalForLead } from "@/lib/portals/send-from-lead";
+import { useLeadCallFlow } from "@/components/sales/leads/LeadCallPicker";
 
 interface LeadCardProps {
   card: LeadCardData;
@@ -116,6 +117,7 @@ export function LeadCard({
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customization, setCustomization] =
     useState<LeadCardCustomizationSettings>(DEFAULT_LEAD_CARD_SETTINGS);
+  const callFlow = useLeadCallFlow();
 
   const detailHref = `/sales/leads/detail/${card.id}`;
 
@@ -260,7 +262,24 @@ export function LeadCard({
             {vm.dynamicFields.map((field) => (
               <div key={field.key} className="truncate" title={field.value}>
                 <dt className="sr-only">{field.label}</dt>
-                <dd className="truncate">{field.value}</dd>
+                {field.key === "tags" ? (
+                  <dd className="flex flex-wrap gap-1">
+                    {field.value
+                      .split(",")
+                      .map((tag) => tag.trim())
+                      .filter(Boolean)
+                      .map((tag) => (
+                        <RecordTagChip
+                          key={tag}
+                          tag={tag}
+                          compact
+                          recolorable={false}
+                        />
+                      ))}
+                  </dd>
+                ) : (
+                  <dd className="truncate">{field.value}</dd>
+                )}
               </div>
             ))}
           </dl>
@@ -345,11 +364,18 @@ export function LeadCard({
 
         <QuickActionsBar
           actions={quickActionItems}
-          onAction={onQuickAction}
+          onAction={(kind, event) => {
+            if (kind === "call") {
+              callFlow.onCallClick(card, event.currentTarget);
+              return;
+            }
+            onQuickAction?.(kind);
+          }}
           ariaLabel={`Quick actions for ${vm.name}`}
           className="mt-auto border-t border-slate-100 pt-1.5"
         />
       </article>
+      {callFlow.picker}
 
       <CustomizeLeadCardDrawer
         open={customizeOpen}

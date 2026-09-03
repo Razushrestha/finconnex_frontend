@@ -98,6 +98,9 @@ export function BottomBar() {
     y: number;
   } | null>(null);
   const [phoneNumber, setPhoneNumber] = React.useState("");
+  const [phoneName, setPhoneName] = React.useState("");
+  const [phoneRelatedTo, setPhoneRelatedTo] = React.useState("");
+  const [phoneAutoStart, setPhoneAutoStart] = React.useState(false);
   const [phonePlacement, setPhonePlacement] = React.useState(0);
   const [voiceOpen, setVoiceOpen] = React.useState(false);
   const [noteCount, setNoteCount] = React.useState(0);
@@ -150,6 +153,9 @@ export function BottomBar() {
           : null,
       );
       setPhoneNumber(detail.phone?.trim() ?? "");
+      setPhoneName(detail.name?.trim() ?? "");
+      setPhoneRelatedTo(detail.relatedTo?.trim() ?? "");
+      setPhoneAutoStart(Boolean(detail.autoStart && detail.phone?.trim()));
       setPhonePlacement((key) => key + 1);
       setPhoneOpen(true);
     });
@@ -203,6 +209,9 @@ export function BottomBar() {
     }
     setPhoneAnchor(null);
     setPhoneNumber("");
+    setPhoneName("");
+    setPhoneRelatedTo("");
+    setPhoneAutoStart(false);
     setPhonePlacement((key) => key + 1);
     setPhoneOpen(true);
   }
@@ -508,6 +517,9 @@ export function BottomBar() {
         onClose={() => setPhoneOpen(false)}
         anchor={phoneAnchor}
         presetNumber={phoneNumber}
+        presetName={phoneName}
+        presetRelatedTo={phoneRelatedTo}
+        autoStart={phoneAutoStart}
         placementKey={phonePlacement}
       />
       <StickyNotePad

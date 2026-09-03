@@ -2,6 +2,7 @@
 
 import {
   LEAD_COLUMNS,
+  coerceLeadSource,
   type KanbanColumn,
   type LeadCardData,
   type LeadSource,
@@ -78,7 +79,15 @@ function cloneSeed(): KanbanColumn[] {
 }
 
 function normalize(cols: KanbanColumn[]): KanbanColumn[] {
-  return normalizeMortgageBoard(cols);
+  return normalizeMortgageBoard(
+    cols.map((col) => ({
+      ...col,
+      cards: col.cards.map((card) => ({
+        ...card,
+        source: coerceLeadSource(card.source),
+      })),
+    })),
+  );
 }
 
 const board = createBoardStore({
@@ -121,12 +130,16 @@ export function createLead(input: {
   email: string;
   phone?: string;
   company?: string;
-  source?: LeadSource;
+  source?: LeadSource | string;
   status: LeadStatus;
   /** Prefer mortgage stage when provided (Session 17 create form). */
   pipelineStage?: string;
   owner: string;
   estimatedValue?: string;
+  name?: string;
+  notes?: string;
+  tags?: string[];
+  custom?: Record<string, string>;
 }): LeadCardData {
   const cols = listLeadColumns();
   const stage: MortgagePipelineStage =
@@ -137,21 +150,34 @@ export function createLead(input: {
     cols.find((c) => c.title === stage) ??
     cols.find((c) => c.title === "New Lead") ??
     cols[0]!;
-  const name = `${input.firstName} ${input.lastName}`.trim();
+  const name =
+    input.name?.trim() || `${input.firstName} ${input.lastName}`.trim();
   const initials = `${input.firstName.charAt(0)}${input.lastName.charAt(0)}`.toUpperCase();
   const avatarIndex = cols.reduce((n, c) => n + c.cards.length, 0);
   const enteredAt = formatPipelineTimestamp(new Date());
   const card: LeadCardData = {
     id: newRulesId("l"),
     name,
-    initials,
+    initials:
+      initials ||
+      name
+        .split(" ")
+        .filter(Boolean)
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase() ||
+      "LD",
     company: input.company?.trim() || "",
     email: input.email.trim(),
     phone: input.phone?.trim() || "",
     owner: input.owner,
     createdDate: formatRulesAt().split(",")[0] ?? formatRulesAt(),
-    source: input.source ?? "Website",
+    source: coerceLeadSource(input.source),
     estimatedValue: input.estimatedValue,
+    notes: input.notes?.trim() || undefined,
+    tags: input.tags?.length ? [...input.tags] : undefined,
+    custom: input.custom,
     pipelineStage: target.title,
     stageEnteredAt: enteredAt,
     pipelineStartedAt: enteredAt,
@@ -291,6 +317,7 @@ export function updateLead(
       | "convertedCompanyId"
       | "archived"
       | "custom"
+      | "notes"
     >
   > & { status?: LeadStatus; pipelineStage?: string },
 ): LeadCardData | null {

@@ -1,6 +1,9 @@
+import { analyticsSectionById } from "@/lib/analytics/library";
+import { dashboardViewLabel, isDashboardViewId } from "@/lib/dashboard/views";
+
 /** Longest matching href wins so `/sales/leads/detail/1` → Leads, not Dashboard. */
 const MODULE_TITLES: { href: string; label: string }[] = [
-  { href: "/", label: "Dashboard" },
+  { href: "/", label: "Executive Overview" },
   { href: "/work-queue", label: "Work Queue" },
   { href: "/sales/leads", label: "Leads" },
   { href: "/sales/contacts", label: "Contacts" },
@@ -60,9 +63,17 @@ function titleFromSegment(segment: string): string {
     .join(" ");
 }
 
-export function getModuleTitle(pathname: string): string {
+export function getModuleTitle(pathname: string, search = ""): string {
   const path = pathname.split("?")[0] || "/";
-  if (path === "/") return "Dashboard";
+  if (path === "/") {
+    const view = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search).get("view");
+    return isDashboardViewId(view) ? dashboardViewLabel(view) : "Executive Overview";
+  }
+
+  if (path.startsWith("/analytics/")) {
+    const section = analyticsSectionById(path.split("/")[2] ?? "");
+    if (section) return section.name;
+  }
 
   const match = MODULE_TITLES.filter(
     (item) =>

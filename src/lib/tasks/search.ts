@@ -1,6 +1,7 @@
 import { isAssignedToCurrentUser } from "@/lib/activities/assigned-to-me";
 import { formatRelatedTo } from "@/lib/activities/shared";
 import { parseTaskDueDate } from "@/lib/dashboard/layout";
+import { taskMatchesDeepFilters } from "@/lib/filters/records";
 import type { Task, TaskFilters } from "@/lib/tasks/types";
 
 function isTaskOverdueNow(task: Task) {
@@ -41,5 +42,5 @@ export function taskMatchesFilters(task: Task, filters?: TaskFilters) {
     if (!isAssignedToCurrentUser(task.assignedTo)) return false;
   }
   if (scope === "my-overdue" && !isTaskOverdueNow(task)) return false;
-  return true;
+  return taskMatchesDeepFilters(task, filters);
 }

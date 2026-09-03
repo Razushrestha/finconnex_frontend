@@ -309,8 +309,8 @@ export function CallCard({
             className={cn(
               "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
               isCompleted
-                ? "bg-emerald-500 text-white"
-                : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100",
+                ? "bg-emerald-100 text-emerald-600"
+                : "bg-emerald-500 text-white hover:bg-emerald-600",
             )}
           >
             <Check className="h-3.5 w-3.5" />

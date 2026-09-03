@@ -1,165 +1,57 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Search, ChevronDown, ChevronUp } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { filterEnter } from "@/lib/motion";
+import { DeepFilterPanel } from "@/components/common/DeepFilterPanel";
 import {
-  NOTIFICATION_METHODS,
-  REMINDER_OWNERS,
-  REMINDER_STATUSES,
-  REMINDER_TYPES,
-  type ReminderFilters,
-} from "@/lib/reminders/types";
+  REMINDER_FILTER_FIELDS,
+  REMINDER_SYSTEM_GROUPS,
+} from "@/lib/filters/catalogs";
+import type { DeepFilterValue } from "@/lib/filters/types";
+import type { ReminderFilters } from "@/lib/reminders/types";
 
-type FilterSectionId = "status" | "type" | "method" | "owner";
-
-interface FilterSection {
-  id: FilterSectionId;
-  title: string;
-  fields: readonly string[];
+function toDeep(filters: ReminderFilters): DeepFilterValue {
+  return {
+    groups: {
+      status: filters.statuses,
+      type: filters.types,
+      method: filters.methods,
+      owner: filters.owners,
+      system: filters.systemDefined ?? [],
+    },
+    clauses: filters.clauses ?? [],
+  };
 }
 
-const filterSections: FilterSection[] = [
-  { id: "status", title: "Status", fields: REMINDER_STATUSES },
-  { id: "type", title: "Type", fields: REMINDER_TYPES },
-  { id: "method", title: "Notification", fields: NOTIFICATION_METHODS },
-  { id: "owner", title: "Owner", fields: REMINDER_OWNERS },
-];
-
-const sectionKeyMap: Record<FilterSectionId, keyof ReminderFilters> = {
-  status: "statuses",
-  type: "types",
-  method: "methods",
-  owner: "owners",
-};
-
-const filterControlClass =
-  "h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-violet-500 focus:ring-violet-300";
+function fromDeep(value: DeepFilterValue): ReminderFilters {
+  return {
+    statuses: (value.groups.status ?? []) as ReminderFilters["statuses"],
+    types: (value.groups.type ?? []) as ReminderFilters["types"],
+    methods: (value.groups.method ?? []) as ReminderFilters["methods"],
+    owners: value.groups.owner ?? [],
+    systemDefined: value.groups.system ?? [],
+    clauses: value.clauses,
+  };
+}
 
 interface RemindersFilterPanelProps {
   filters: ReminderFilters;
   counts?: Partial<Record<string, number>>;
-  onToggleField: (sectionId: FilterSectionId, field: string) => void;
+  onChange: (next: ReminderFilters) => void;
   onClose?: () => void;
 }
 
 export function RemindersFilterPanel({
   filters,
-  counts,
-  onToggleField,
+  onChange,
   onClose,
 }: RemindersFilterPanelProps) {
-  const [search, setSearch] = useState("");
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-
-  function isChecked(sectionId: FilterSectionId, field: string) {
-    return (filters[sectionKeyMap[sectionId]] as string[]).includes(field);
-  }
-
-  const visibleSections = useMemo(() => {
-    if (!search.trim()) return filterSections;
-    return filterSections
-      .map((section) => ({
-        ...section,
-        fields: section.fields.filter((field) =>
-          field.toLowerCase().includes(search.toLowerCase()),
-        ),
-      }))
-      .filter((section) => section.fields.length > 0);
-  }, [search]);
-
   return (
-    <div
-      className={cn(
-        "flex h-full w-56 shrink-0 flex-col rounded-2xl border border-slate-100 bg-white shadow-sm",
-        filterEnter,
-      )}
-    >
-      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-900">
-          Filter Reminders
-        </h3>
-        {onClose ? (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close filter panel"
-            className="text-xs font-medium text-slate-400 hover:text-slate-600"
-          >
-            ✕
-          </button>
-        ) : null}
-      </div>
-
-      <div className="border-b border-slate-100 p-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search"
-            className="w-full rounded-lg border border-slate-200 py-1.5 pr-3 pl-8 text-xs text-slate-700 placeholder:text-slate-400 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
-          />
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-3 py-2">
-        {visibleSections.map((section) => {
-          const isCollapsed = collapsed[section.id];
-          return (
-            <div key={section.id} className="mb-3">
-              <button
-                type="button"
-                onClick={() =>
-                  setCollapsed((prev) => ({
-                    ...prev,
-                    [section.id]: !prev[section.id],
-                  }))
-                }
-                className="mb-1.5 flex w-full items-center justify-between py-1 text-xs font-semibold tracking-wide text-slate-500 uppercase hover:text-slate-700"
-              >
-                {section.title}
-                {isCollapsed ? (
-                  <ChevronDown className="h-3.5 w-3.5" />
-                ) : (
-                  <ChevronUp className="h-3.5 w-3.5" />
-                )}
-              </button>
-              {!isCollapsed ? (
-                <div className="space-y-2">
-                  {section.fields.map((field) => (
-                    <label
-                      key={field}
-                      className="flex cursor-pointer items-center gap-2 text-sm text-slate-600"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked(section.id, field)}
-                        onChange={() => onToggleField(section.id, field)}
-                        className={filterControlClass}
-                      />
-                      <span className="min-w-0 flex-1">{field}</span>
-                      {counts?.[field] !== undefined ? (
-                        <span className="text-[10px] tabular-nums text-slate-400">
-                          {counts[field]}
-                        </span>
-                      ) : null}
-                    </label>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
-
-        {visibleSections.length === 0 ? (
-          <p className="py-6 text-center text-xs text-slate-400">
-            No fields match your search.
-          </p>
-        ) : null}
-      </div>
-    </div>
+    <DeepFilterPanel
+      title="Filter Reminders"
+      applied={toDeep(filters)}
+      fields={REMINDER_FILTER_FIELDS}
+      systemGroups={REMINDER_SYSTEM_GROUPS}
+      onApply={(next) => onChange(fromDeep(next))}
+      onClose={onClose}
+    />
   );
 }

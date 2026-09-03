@@ -102,33 +102,56 @@ export function pipelineStageToCrmStatus(stage: string): CrmLeadStatus {
   }
 }
 
-export function uiSourceToCrm(source: LeadSource): CrmLeadSource {
+export function uiSourceToCrm(source: string): CrmLeadSource {
   switch (source) {
-    case "Referral":
-      return "REFERRAL";
+    case "Website":
+      return "WEBSITE";
+    case "Google Ads":
+      return "PAID_AD";
+    case "Facebook":
+    case "Instagram":
+    case "TikTok":
     case "Social Media":
       return "SOCIAL_MEDIA";
-    case "Email Campaign":
-      return "EMAIL_CAMPAIGN";
+    case "Existing Client Referral":
+    case "Employee Referral":
+    case "Referral":
+      return "REFERRAL";
+    case "Referral Partner":
+      return "PARTNER";
+    case "Phone":
     case "Cold Call":
       return "COLD_CALL";
+    case "Event / Seminar":
+      return "EVENT";
+    case "Email Campaign":
+      return "EMAIL_CAMPAIGN";
+    case "Google":
+    case "Imported / Manual":
+    case "Other":
     default:
-      return source === "Website" ? "WEBSITE" : "OTHER";
+      return "OTHER";
   }
 }
 
 export function crmSourceToUi(source: string | null | undefined): LeadSource {
   switch (source) {
-    case "REFERRAL":
-      return "Referral";
-    case "SOCIAL_MEDIA":
-      return "Social Media";
-    case "EMAIL_CAMPAIGN":
-      return "Email Campaign";
-    case "COLD_CALL":
-      return "Cold Call";
     case "WEBSITE":
       return "Website";
+    case "REFERRAL":
+      return "Existing Client Referral";
+    case "COLD_CALL":
+      return "Phone";
+    case "SOCIAL_MEDIA":
+      return "Facebook";
+    case "EMAIL_CAMPAIGN":
+      return "Other";
+    case "PAID_AD":
+      return "Google Ads";
+    case "EVENT":
+      return "Event / Seminar";
+    case "PARTNER":
+      return "Referral Partner";
     default:
       return "Other";
   }

@@ -1,3 +1,5 @@
+"use client";
+
 import { ChevronLeft, ChevronRight, Inbox } from "lucide-react";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
@@ -7,6 +9,7 @@ import {
   type SignatureRequest,
 } from "@/lib/documents/signature/types";
 import { STATUS_STYLE, StatusBadge } from "./StatusBadge";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 
 export function SignatureRequestsTable({
   rows,
@@ -27,7 +30,10 @@ export function SignatureRequestsTable({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 overflow-auto">
+      <ResizableColumns
+        storageKey="signature-requests-list"
+        className="min-h-0 flex-1 overflow-auto"
+      >
         <table className="w-full min-w-[920px] border-separate border-spacing-0 text-left text-[12px]">
           <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-sm">
             <tr>
@@ -42,6 +48,7 @@ export function SignatureRequestsTable({
               ].map((label) => (
                 <th
                   key={label}
+                  data-col-id={label}
                   className="border-b border-slate-200 px-4 py-2.5 text-[11px] font-semibold tracking-wide text-slate-500 uppercase"
                 >
                   {label}
@@ -133,7 +140,7 @@ export function SignatureRequestsTable({
             ) : null}
           </tbody>
         </table>
-      </div>
+      </ResizableColumns>
 
       {total > 0 ? (
         <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/60 px-4 py-2.5 text-[11.5px] text-slate-500">

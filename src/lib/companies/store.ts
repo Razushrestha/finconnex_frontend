@@ -73,30 +73,6 @@ export function findCompanyByName(name: string) {
   return null;
 }
 
-export function updateCompany(
-  id: string,
-  patch: Partial<Pick<CompanyCardData, "name" | "tags">>,
-): CompanyCardData | null {
-  const found = findCompanyById(id);
-  if (!found) return null;
-  let next: CompanyCardData | null = null;
-  saveCompanyGroups(
-    listCompanyGroups().map((g) => ({
-      ...g,
-      companies: g.companies.map((c) => {
-        if (c.id !== id) return c;
-        next = {
-          ...c,
-          ...patch,
-          name: patch.name?.trim() || c.name,
-        };
-        return next;
-      }),
-    })),
-  );
-  return next;
-}
-
 function initialsFromName(name: string) {
   const parts = name.trim().split(/\s+/);
   if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();

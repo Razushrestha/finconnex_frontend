@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { ActivityTimelineButton } from "@/components/activities/ActivityTimelineButton";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 import { RecordTimeline } from "@/components/activities/RecordTimeline";
 import { listAttachmentsTimeline } from "@/lib/activities/record-timeline";
 import { MentionTextarea } from "@/components/shared/MentionTextarea";
@@ -355,13 +356,22 @@ export default function AttachmentsPage() {
               {folderFiles.length === 1 ? "file" : "files"}
             </span>
           </div>
+          <ResizableColumns storageKey="attachments-list" className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-[12px]">
             <thead className="border-b border-slate-100 bg-white text-[11px] font-medium tracking-wide text-slate-400 uppercase">
               <tr>
-                <th className="px-3 py-2.5">File</th>
-                <th className="px-3 py-2.5">Kind</th>
-                <th className="px-3 py-2.5">Uploaded by</th>
-                <th className="px-3 py-2.5">When</th>
+                <th data-col-id="file" className="px-3 py-2.5">
+                  File
+                </th>
+                <th data-col-id="kind" className="px-3 py-2.5">
+                  Kind
+                </th>
+                <th data-col-id="uploadedBy" className="px-3 py-2.5">
+                  Uploaded by
+                </th>
+                <th data-col-id="when" className="px-3 py-2.5">
+                  When
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 text-slate-700">
@@ -415,6 +425,7 @@ export default function AttachmentsPage() {
               )}
             </tbody>
           </table>
+          </ResizableColumns>
         </div>
       )}
 

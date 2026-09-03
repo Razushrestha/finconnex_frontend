@@ -87,7 +87,7 @@ import {
   LeadFollowersField,
 } from "@/components/sales/leads/detail/LeadFollowersField";
 import { listLeadConversation } from "@/lib/leads/conversation-store";
-import { openSoftphoneNear } from "@/lib/softphone/events";
+import { useLeadCallFlow } from "@/components/sales/leads/LeadCallPicker";
 
 export type LeadFieldPatch = {
   name?: string;
@@ -312,6 +312,7 @@ export function LeadMortgageDetail({
   const [tab, setTab] = useState<LeadDetailTabId>("overview");
   const callBtnRef = useRef<HTMLSpanElement>(null);
   const startCallBtnRef = useRef<HTMLButtonElement>(null);
+  const callFlow = useLeadCallFlow();
   const tags = card.tags ?? [];
   const stage =
     resolvePipelineStage(card.pipelineStage ?? "New Lead") ?? "New Lead";
@@ -476,10 +477,7 @@ export function LeadMortgageDetail({
             <span ref={callBtnRef} className="inline-flex">
               <GhostButton
                 onClick={() => {
-                  openSoftphoneNear(callBtnRef.current, {
-                    phone: card.phone,
-                    name: card.name,
-                  });
+                  callFlow.onCallClick(card, callBtnRef.current);
                   onCall();
                 }}
               >
@@ -898,10 +896,7 @@ export function LeadMortgageDetail({
                       type="button"
                       ref={startCallBtnRef}
                       onClick={() => {
-                        openSoftphoneNear(startCallBtnRef.current, {
-                          phone: card.phone,
-                          name: card.name,
-                        });
+                        callFlow.onCallClick(card, startCallBtnRef.current);
                         onStartCall();
                       }}
                       className="inline-flex h-10 items-center justify-center gap-1 rounded-xl bg-orange-500 px-2 text-[12px] font-semibold text-white hover:bg-orange-600"
@@ -1052,6 +1047,7 @@ export function LeadMortgageDetail({
       </div>
       )}
       </div>
+      {callFlow.picker}
     </div>
   );
 }

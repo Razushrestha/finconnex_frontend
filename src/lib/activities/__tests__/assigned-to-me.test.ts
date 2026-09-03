@@ -40,8 +40,8 @@ describe("assigned-to-me scopes", () => {
     setRulesActor({ name: "John Smith", email: "admin@finconnex.com", role: "Manager" });
     const mine = { assignedTo: "John Smith" } as Task;
     const theirs = { assignedTo: "Roshna Abraham" } as Task;
-    expect(taskMatchesFilters(mine, { statuses: [], priorities: [], types: [], scope: "mine" })).toBe(true);
-    expect(taskMatchesFilters(theirs, { statuses: [], priorities: [], types: [], scope: "mine" })).toBe(false);
+    expect(taskMatchesFilters(mine, { statuses: [], priorities: [], types: [], scope: "mine", systemDefined: [], clauses: [] })).toBe(true);
+    expect(taskMatchesFilters(theirs, { statuses: [], priorities: [], types: [], scope: "mine", systemDefined: [], clauses: [] })).toBe(false);
     expect(callMatchesScope({ assignedTo: "John Smith", status: "Scheduled", date: "01/09/2026" }, "mine")).toBe(true);
     expect(callMatchesScope({ assignedTo: "Tejas Gokhe", status: "Scheduled", date: "01/09/2026" }, "mine")).toBe(false);
   });

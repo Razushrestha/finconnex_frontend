@@ -8,6 +8,8 @@ export type SoftphoneOpenDetail = {
   y?: number;
   phone?: string;
   name?: string;
+  relatedTo?: string;
+  autoStart?: boolean;
 };
 
 export function positionSoftphoneNear(rect: DOMRect) {
@@ -32,7 +34,10 @@ export function openSoftphone(detail: SoftphoneOpenDetail = {}) {
 
 export function openSoftphoneNear(
   el: HTMLElement | null,
-  extra: Pick<SoftphoneOpenDetail, "phone" | "name"> = {},
+  extra: Pick<
+    SoftphoneOpenDetail,
+    "phone" | "name" | "relatedTo" | "autoStart"
+  > = {},
 ) {
   const rect = el?.getBoundingClientRect();
   openSoftphone({

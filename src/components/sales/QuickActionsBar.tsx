@@ -20,7 +20,7 @@ export interface QuickActionItem<TKind extends string = string> {
 
 interface QuickActionsBarProps<TKind extends string> {
   actions: QuickActionItem<TKind>[];
-  onAction?: (kind: TKind) => void;
+  onAction?: (kind: TKind, event: React.MouseEvent<HTMLButtonElement>) => void;
   /** Toolbar aria-label, e.g. `Quick actions for ${name}`. */
   ariaLabel?: string;
   /** Applied to any action that doesn't specify its own `colorClassName`. */
@@ -72,7 +72,7 @@ export function QuickActionsBar<TKind extends string>({
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              onAction?.(action.kind);
+              onAction?.(action.kind, e);
             }}
             aria-label={action.ariaLabel ?? action.label}
             title={action.title ?? action.label}

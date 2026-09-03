@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Menu,
@@ -55,6 +55,7 @@ export function Navbar({
 }: NavbarProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -97,7 +98,7 @@ export function Navbar({
   }
 
   const tenantLabel = user.tenantName ?? "FinConnex HQ";
-  const moduleTitle = getModuleTitle(pathname);
+  const moduleTitle = getModuleTitle(pathname, searchParams.toString());
   const isInbox = pathname.startsWith("/marketing/inbox");
   const isCalendar = pathname.startsWith("/activities/calendar");
   const isWorkQueue = pathname.startsWith("/work-queue");

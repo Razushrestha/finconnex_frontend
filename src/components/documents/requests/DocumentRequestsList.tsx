@@ -42,6 +42,7 @@ import {
   uploadedItems,
 } from "@/lib/documents/requests/pack";
 import { cn } from "@/lib/utils";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 import { EditRemindersModal } from "@/components/documents/requests/EditRemindersModal";
 
 const AVATAR_SOLID = [
@@ -414,6 +415,7 @@ interface DocumentRequestsListProps {
   onRefresh?: () => void;
   sort?: DocumentSortKey;
   onSortChange?: (sort: DocumentSortKey) => void;
+  columnChrome?: boolean;
 }
 
 export function DocumentRequestsList({
@@ -430,6 +432,7 @@ export function DocumentRequestsList({
   onRefresh,
   sort: sortProp,
   onSortChange,
+  columnChrome = true,
 }: DocumentRequestsListProps) {
   const router = useRouter();
   const [toast, setToast] = useState<string | null>(null);
@@ -488,15 +491,7 @@ export function DocumentRequestsList({
 
   const colCount = 8 + (showSelect ? 1 : 0) + (showRelatedTo ? 1 : 0);
 
-  return (
-    <div
-      className={cn(
-        "overflow-hidden bg-white",
-        framed && "rounded-xl border border-[#E5E7EB] shadow-[0_1px_3px_rgba(15,23,42,0.04)]",
-        fill && "flex h-full min-h-0 flex-col",
-      )}
-    >
-      <div className={cn("min-w-0", fill && "min-h-0 flex-1 overflow-y-auto overflow-x-hidden")}>
+  const table = (
       <table className="w-full table-fixed border-collapse text-left">
         <colgroup>
           {showSelect ? <col className="w-9" /> : null}
@@ -511,9 +506,14 @@ export function DocumentRequestsList({
           <col className="w-[72px]" />
         </colgroup>
         <thead className="sticky top-0 z-10 bg-[#F8FAFC]">
-          <tr className="border-b border-[#E5E7EB] text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+          <tr
+            className={cn(
+              "border-b border-[#E5E7EB] text-[11px] tracking-wide text-slate-500 uppercase",
+              columnChrome ? "font-semibold text-slate-400" : "font-bold",
+            )}
+          >
             {showSelect ? (
-              <th className="px-3 py-3">
+              <th data-col-id="select" className="px-3 py-3">
                 <input
                   type="checkbox"
                   checked={allSelected}
@@ -523,13 +523,21 @@ export function DocumentRequestsList({
                 />
               </th>
             ) : null}
-            <th className="px-4 py-3 font-semibold">Applicant</th>
-            <th className="px-3 py-3 font-semibold">Requested by</th>
-            <th className="px-3 py-3 font-semibold">Request ID</th>
+            <th data-col-id="applicant" className="px-4 py-3 font-semibold">
+              Applicant
+            </th>
+            <th data-col-id="requestedBy" className="px-3 py-3 font-semibold">
+              Requested by
+            </th>
+            <th data-col-id="requestId" className="px-3 py-3 font-semibold">
+              Request ID
+            </th>
             {showRelatedTo ? (
-              <th className="px-3 py-3 font-semibold">Related to</th>
+              <th data-col-id="relatedTo" className="px-3 py-3 font-semibold">
+                Related to
+              </th>
             ) : null}
-            <th className="px-3 py-3 font-semibold">
+            <th data-col-id="startDate" className="px-3 py-3 font-semibold">
               <SortHeader
                 label="Start date"
                 active={sort === "started-desc" || sort === "started-asc"}
@@ -537,7 +545,7 @@ export function DocumentRequestsList({
                 onClick={() => changeSort(nextDocumentSort(sort, "started"))}
               />
             </th>
-            <th className="px-3 py-3 font-semibold">
+            <th data-col-id="lastUpdated" className="px-3 py-3 font-semibold">
               <SortHeader
                 label="Last updated"
                 active={sort === "updated-desc" || sort === "updated-asc"}
@@ -545,7 +553,7 @@ export function DocumentRequestsList({
                 onClick={() => changeSort(nextDocumentSort(sort, "updated"))}
               />
             </th>
-            <th className="px-3 py-3 font-semibold">
+            <th data-col-id="status" className="px-3 py-3 font-semibold">
               <SortHeader
                 label="Status"
                 active={sort === "status-asc" || sort === "status-desc"}
@@ -553,8 +561,12 @@ export function DocumentRequestsList({
                 onClick={() => changeSort(nextDocumentSort(sort, "status"))}
               />
             </th>
-            <th className="px-2 py-3 text-center font-semibold">Progress</th>
-            <th className="px-3 py-3 text-right font-semibold">Action</th>
+            <th data-col-id="progress" className="px-2 py-3 text-center font-semibold">
+              Progress
+            </th>
+            <th data-col-id="action" className="px-3 py-3 text-right font-semibold">
+              Action
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -665,7 +677,26 @@ export function DocumentRequestsList({
           ) : null}
         </tbody>
       </table>
-      </div>
+  );
+
+  return (
+    <div
+      className={cn(
+        "overflow-hidden bg-white",
+        framed && "rounded-xl border border-[#E5E7EB] shadow-[0_1px_3px_rgba(15,23,42,0.04)]",
+        fill && "flex h-full min-h-0 flex-col",
+      )}
+    >
+      {columnChrome ? (
+        <ResizableColumns
+          storageKey="document-requests-list"
+          className={cn("min-w-0", fill && "min-h-0 flex-1 overflow-auto")}
+        >
+          {table}
+        </ResizableColumns>
+      ) : (
+        table
+      )}
       {toast ? (
         <div className="fixed right-4 bottom-4 z-50 rounded-xl bg-emerald-700 px-4 py-2.5 text-[12px] font-medium text-white shadow-lg">
           {toast}

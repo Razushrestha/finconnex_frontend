@@ -22,6 +22,7 @@ import {
 import type { Task, TaskStatus, Priority } from "@/lib/tasks/types";
 import { TASK_STATUSES, TASK_PRIORITIES, TASK_OWNERS } from "@/lib/tasks/types";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
+import { ArrowTag } from "@/components/common/ArrowTag";
 import { useRouter } from "next/navigation";
 
 interface TaskCardProps {
@@ -42,10 +43,10 @@ interface TaskCardProps {
 }
 
 const priorityClass: Record<string, string> = {
-  Critical: "bg-red-50 text-red-700",
-  High: "bg-rose-50 text-rose-700",
-  Medium: "bg-amber-50 text-amber-700",
-  Low: "bg-slate-100 text-slate-600",
+  Critical: "bg-red-500",
+  High: "bg-orange-500",
+  Medium: "bg-amber-500",
+  Low: "bg-sky-500",
 };
 
 const priorityIcon: Record<string, React.ElementType> = {
@@ -272,12 +273,13 @@ export function TaskCard({
               <span className="truncate">Due {task.dueDate}</span>
             </span>
           )}
-          <span
-            className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${priorityClass[task.priority]}`}
+          <ArrowTag
+            compact
+            className={priorityClass[task.priority] || "bg-slate-500"}
           >
             <PriorityIcon className="h-3 w-3" />
             {task.priority}
-          </span>
+          </ArrowTag>
         </div>
 
         <CardOwnerRow
@@ -349,8 +351,8 @@ export function TaskCard({
             title={isCompleted ? "Completed" : "Mark complete"}
             className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
               isCompleted
-                ? "bg-emerald-500 text-white"
-                : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                ? "bg-emerald-100 text-emerald-600"
+                : "bg-emerald-500 text-white hover:bg-emerald-600"
             }`}
           >
             <Check className="h-3.5 w-3.5" />

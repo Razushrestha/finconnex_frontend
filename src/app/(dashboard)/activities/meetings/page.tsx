@@ -2,14 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Video, Phone, Users, MapPin, Search, X } from "lucide-react";
 import {
-  MEETING_STATUSES,
-  MEETING_TYPES,
-  type Meeting,
   type MeetingColumn,
   type MeetingStatus,
-  type MeetingType,
 } from "@/lib/meetings/types";
 import {
   listMeetingColumns,
@@ -29,6 +24,12 @@ import { useCrmMeetings } from "@/lib/meetings/use-crm-meetings";
 import { MeetingsListTable } from "@/components/activities/meetings/MeetingsListTable";
 import { MeetingsKanbanColumn } from "@/components/activities/meetings/MeetingsKanbanColumn";
 import {
+  EMPTY_MEETING_FILTERS,
+  MeetingsFilterPanel,
+  type MeetingFilters,
+} from "@/components/activities/meetings/MeetingsFilterPanel";
+import { meetingMatchesFilters } from "@/lib/filters/records";
+import {
   ActivityToolbar,
   type ActivityView,
 } from "@/components/activities/ActivityToolbar";
@@ -40,20 +41,11 @@ import { activityExportMenuItem } from "@/lib/activities/export";
 import { DropTargetPos } from "@/components/activities/meetings/MeetingsKanbanBoard";
 import { onRulesChange } from "@/lib/rules/storage";
 
-const TYPE_ICON: Record<MeetingType, React.ElementType> = {
-  "Video Call": Video,
-  "Phone Call": Phone,
-  Conference: Users,
-  "In-person": MapPin,
-};
-
 export default function MeetingsPage() {
   const router = useRouter();
   const crm = useCrmMeetings();
   const [view, setView] = useState<ActivityView>("kanban");
-  const [statusFilters, setStatusFilters] = useState<MeetingStatus[]>([]);
-  const [typeFilter, setTypeFilter] = useState<MeetingType | "All">("All");
-  const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState<MeetingFilters>(EMPTY_MEETING_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortActive, setSortActive] = useState(true);
   const [columns, setColumns] = useState<MeetingColumn[]>([]);
@@ -69,11 +61,7 @@ export default function MeetingsPage() {
   const [scopeTab, setScopeTab] = useState("All Meetings");
 
   const scope: MeetingScope =
-    scopeTab === "My Meetings"
-      ? "mine"
-      : scopeTab === "My Overdue Meetings"
-        ? "my-overdue"
-        : "all";
+    scopeTab === "My Overdue Meetings" ? "my-overdue" : "all";
 
   useEffect(() => {
     if (crm.loading) return;
@@ -95,40 +83,29 @@ export default function MeetingsPage() {
   );
 
   const filteredMeetings = useMemo(() => {
-    let data: Meeting[] = allMeetings;
-    if (statusFilters.length) {
-      data = data.filter((m) => statusFilters.includes(m.status));
-    }
-    if (typeFilter !== "All") data = data.filter((m) => m.type === typeFilter);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      data = data.filter(
-        (m) =>
-          m.title.toLowerCase().includes(q) ||
-          (m.relatedTo?.toLowerCase().includes(q) ?? false) ||
-          m.organizer.toLowerCase().includes(q) ||
-          m.type.toLowerCase().includes(q) ||
-          (m.agenda?.toLowerCase().includes(q) ?? false),
-      );
-    }
-    data = data.filter((m) => meetingMatchesScope(m, scope));
-    return data;
-  }, [allMeetings, statusFilters, typeFilter, search, scope]);
+    return allMeetings.filter(
+      (m) => meetingMatchesFilters(m, filters) && meetingMatchesScope(m, scope),
+    );
+  }, [allMeetings, filters, scope]);
 
   const visibleColumns = useMemo(() => {
-    if (!statusFilters.length) return columns;
-    return columns.filter((c) =>
-      statusFilters.includes(c.title as MeetingStatus),
-    );
-  }, [columns, statusFilters]);
-
-  function toggleStatus(status: MeetingStatus) {
-    setStatusFilters((prev) =>
-      prev.includes(status)
-        ? prev.filter((item) => item !== status)
-        : [...prev, status],
-    );
-  }
+    const cols = filters.statuses.length
+      ? columns.filter((c) =>
+          filters.statuses.includes(c.title as MeetingStatus),
+        )
+      : columns;
+    return cols.map((column) => {
+      const meetings = column.meetings.filter(
+        (m) =>
+          meetingMatchesScope(m, scope) &&
+          meetingMatchesFilters(
+            { ...m, status: column.title as MeetingStatus },
+            filters,
+          ),
+      );
+      return { ...column, meetings, count: meetings.length };
+    });
+  }, [columns, filters, scope]);
 
   function handleDragStartMeeting(
     e: React.DragEvent<HTMLDivElement>,
@@ -233,10 +210,7 @@ export default function MeetingsPage() {
         <ActivityToolbar
           entityLabel="Meeting"
           createRoute="/activities/meetings/create?layoutid=standard&redirect=false"
-          tabs={["My Overdue Meetings"]}
-          leadingTabMenu={{
-            items: ["All Meetings", "My Meetings"],
-          }}
+          tabs={["All Meetings", "My Overdue Meetings"]}
           activeTab={scopeTab}
           onTabChange={setScopeTab}
           view={view}
@@ -264,77 +238,11 @@ export default function MeetingsPage() {
 
       <div className="relative flex min-h-0 flex-1 items-stretch gap-4 overflow-hidden pt-3">
         {filterOpen && (
-          <div className="absolute inset-y-0 left-0 z-30 flex sm:relative">
-            <div className="flex w-64 flex-col rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-xs font-semibold tracking-wider text-slate-500 uppercase">
-                  Filters
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setFilterOpen(false)}
-                  className="rounded-md p-0.5 text-slate-400 hover:bg-slate-50 hover:text-slate-600"
-                  aria-label="Close filters"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <label className="mb-4 flex h-9 items-center gap-1.5 rounded-lg bg-slate-50 px-2.5 ring-1 ring-black/5 focus-within:ring-2 focus-within:ring-[#5A32A3]">
-                <Search className="h-3.5 w-3.5 text-slate-400" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search meetings…"
-                  className="min-w-0 flex-1 bg-transparent text-[12px] outline-none"
-                />
-              </label>
-              <h4 className="mb-2 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
-                Status
-              </h4>
-              <div className="mb-4 space-y-1">
-                {MEETING_STATUSES.map((status) => (
-                  <label
-                    key={status}
-                    className="flex cursor-pointer items-center gap-2 rounded-lg px-1.5 py-1 text-xs text-slate-600 hover:bg-slate-50"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={statusFilters.includes(status)}
-                      onChange={() => toggleStatus(status)}
-                      className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-300"
-                    />
-                    {status}
-                  </label>
-                ))}
-              </div>
-              <h4 className="mb-2 text-[11px] font-semibold tracking-wider text-slate-400 uppercase">
-                Type
-              </h4>
-              <div className="space-y-1">
-                {MEETING_TYPES.map((t) => {
-                  const Icon = TYPE_ICON[t];
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() =>
-                        setTypeFilter(typeFilter === t ? "All" : t)
-                      }
-                      className={cn(
-                        "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors",
-                        typeFilter === t
-                          ? "bg-violet-50 text-violet-700"
-                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900",
-                      )}
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      {t}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+          <MeetingsFilterPanel
+            filters={filters}
+            onChange={setFilters}
+            onClose={() => setFilterOpen(false)}
+          />
         )}
 
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl">
@@ -349,23 +257,10 @@ export default function MeetingsPage() {
           ) : (
             <div className="flex h-full w-full min-h-[420px] min-w-0 items-stretch gap-3 overflow-x-auto p-1 pr-3">
               {visibleColumns.map((column) => {
-                const meetings = column.meetings.filter((m) => {
-                  if (!meetingMatchesScope(m, scope)) return false;
-                  if (typeFilter !== "All" && m.type !== typeFilter)
-                    return false;
-                  if (!search.trim()) return true;
-                  const q = search.toLowerCase();
-                  return (
-                    m.title.toLowerCase().includes(q) ||
-                    (m.relatedTo?.toLowerCase().includes(q) ?? false) ||
-                    m.organizer.toLowerCase().includes(q) ||
-                    (m.agenda?.toLowerCase().includes(q) ?? false)
-                  );
-                });
                 return (
                   <MeetingsKanbanColumn
                     key={column.id}
-                    column={{ ...column, meetings, count: meetings.length }}
+                    column={column}
                     draggingMeetingId={dragInfo?.meetingId ?? null}
                     dropTargetPos={dropTargetPos}
                     setDropTargetPos={setDropTargetPos}

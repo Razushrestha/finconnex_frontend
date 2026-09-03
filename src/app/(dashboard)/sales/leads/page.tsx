@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   EntityHeader,
   ImportOption,
@@ -10,6 +11,7 @@ import {
 } from "@/components/sales/EntityHeader";
 import { LeadKanbanBoard } from "@/components/sales/leads/LeadKanbanBoard";
 import { LeadListView, DEFAULT_LEAD_LIST_COLUMNS } from "@/components/sales/leads/LeadListView";
+import { CreateLeadForm } from "@/components/sales/leads/CreateLeadForm";
 import {
   FilterLeadsPanel,
   EMPTY_LEAD_FILTERS,
@@ -128,6 +130,18 @@ const LIST_SORT_OPTIONS = [
   { value: "name_desc", label: "Name (Z-A)" },
 ];
 
+function withNewLeadListColumns(ids: string[]) {
+  const next = [...ids];
+  const known = new Set(next);
+  const extras = DEFAULT_LEAD_LIST_COLUMNS.filter(
+    (col) => col.checked && !known.has(col.id),
+  ).map((col) => col.id);
+  if (!extras.length) return next;
+  const leadIdx = next.indexOf("lead");
+  next.splice(leadIdx >= 0 ? leadIdx + 1 : 0, 0, ...extras);
+  return next;
+}
+
 function loadListViewConfig(): ListViewConfig {
   if (typeof window === "undefined") return DEFAULT_LIST_VIEW;
   try {
@@ -137,11 +151,12 @@ function loadListViewConfig(): ListViewConfig {
     return {
       ...DEFAULT_LIST_VIEW,
       ...parsed,
-      selectedColumnIds:
+      selectedColumnIds: withNewLeadListColumns(
         Array.isArray(parsed.selectedColumnIds) &&
-        parsed.selectedColumnIds.length
+          parsed.selectedColumnIds.length
           ? parsed.selectedColumnIds
           : DEFAULT_LIST_VIEW.selectedColumnIds,
+      ),
     };
   } catch {
     return DEFAULT_LIST_VIEW;
@@ -236,11 +251,14 @@ export const SORT_OPTIONS = [
 ];
 
 export default function LeadsPage() {
+  const router = useRouter();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [filters, setFilters] = useState<LeadFilters>(EMPTY_LEAD_FILTERS);
   const [totalLeads, setTotalLeads] = useState(0);
   const [columns] = useState(DEFAULT_LEAD_COLUMNS);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createStage, setCreateStage] = useState<string | undefined>();
 
   const [activeScope, setActiveScope] = useState("all");
 
@@ -354,6 +372,20 @@ export default function LeadsPage() {
     setIsKanbanSettingsOpen(true);
   }
 
+  function openCreateLead(stage?: string) {
+    setCreateStage(stage);
+    setCreateOpen(true);
+  }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("create") !== "1") return;
+    const stage = params.get("stage")?.trim() || undefined;
+    setCreateStage(stage);
+    setCreateOpen(true);
+    router.replace("/sales/leads", { scroll: false });
+  }, [router]);
+
   useEffect(() => {
     let cancelled = false;
     setCrmLoading(true);
@@ -451,17 +483,6 @@ export default function LeadsPage() {
       "leads",
       tablePreferenceFromListView("leads", next),
     );
-  }
-
-  function toggleFilterField(section: "source" | "status", field: string) {
-    setFilters((prev) => {
-      const key = section === "source" ? "sources" : "statuses";
-      const current = prev[key];
-      const next = current.includes(field)
-        ? current.filter((f) => f !== field)
-        : [...current, field];
-      return { ...prev, [key]: next };
-    });
   }
 
   function handleToggleSelect(id: string) {
@@ -586,10 +607,12 @@ export default function LeadsPage() {
         <EntityHeader
           entityLabel="Lead"
           createRoute="/sales/leads/create"
+          onCreate={() => openCreateLead()}
           importOptions={importOptions}
           actionOptions={actionOptions}
           footerOptions={footerOptions}
           hideTitle
+          showSearch={false}
           totalCount={totalLeads}
           afterScope={
             <button
@@ -678,7 +701,7 @@ export default function LeadsPage() {
           <div className="shrink-0 overflow-y-auto">
             <FilterLeadsPanel
               filters={filters}
-              onToggleField={toggleFilterField}
+              onChange={setFilters}
               onClose={() => setIsFilterOpen(false)}
             />
           </div>
@@ -699,6 +722,10 @@ export default function LeadsPage() {
               headerStyle={viewConfig.headerStyle}
               singleHeaderColor={viewConfig.singleHeaderColor}
               multiHeaderColors={viewConfig.multiHeaderColors}
+              onAddLead={(columnId) => {
+                const column = columns.find((col) => col.id === columnId);
+                openCreateLead(column?.label);
+              }}
             />
           ) : (
             <div className="h-full overflow-auto">
@@ -775,6 +802,21 @@ export default function LeadsPage() {
           }}
         />
       ) : null}
+
+      <CreateLeadForm
+        variant="modal"
+        open={createOpen}
+        stage={createStage}
+        onOpenChange={(next) => {
+          setCreateOpen(next);
+          if (!next) setCreateStage(undefined);
+        }}
+        onCreated={() => {
+          void refreshCrmLeadsBoard().then((ok) => {
+            setCrmSource(ok ? "api" : "demo");
+          });
+        }}
+      />
 
       <SheetsImportModal
         open={sheetsOpen}

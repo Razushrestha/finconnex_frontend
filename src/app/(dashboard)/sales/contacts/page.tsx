@@ -151,17 +151,6 @@ export default function ContactsPage() {
     setBulkFlash(`Exported ${n} selected contacts`);
   }
 
-  function toggleFilterField(section: "source" | "status", field: string) {
-    setFilters((prev) => {
-      const key = section === "source" ? "sources" : "statuses";
-      const current = prev[key];
-      const next = current.includes(field)
-        ? current.filter((f) => f !== field)
-        : [...current, field];
-      return { ...prev, [key]: next };
-    });
-  }
-
   function runBulkDelete() {
     if (!selectedIds.length) return;
     const count = selectedIds.length;
@@ -365,7 +354,7 @@ export default function ContactsPage() {
           <div className="sticky top-6">
             <FilterContactsPanel
               filters={filters}
-              onToggleField={toggleFilterField}
+              onChange={setFilters}
               onClose={() => setIsFilterOpen(false)}
             />
           </div>

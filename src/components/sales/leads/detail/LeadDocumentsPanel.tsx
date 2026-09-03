@@ -1084,6 +1084,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
               framed={false}
               showSelect={false}
               showRelatedTo={false}
+              columnChrome={false}
               onRefresh={refreshRequests}
             />
           </div>
@@ -1410,6 +1411,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
                 }
               />
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-left text-[12px]">
                 <thead className="sticky top-0 bg-[#FAF9FC] text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
                   <tr>
@@ -1454,6 +1456,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </>

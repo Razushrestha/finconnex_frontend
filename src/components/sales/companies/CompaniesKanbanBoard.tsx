@@ -9,6 +9,7 @@ import {
 } from "@/lib/companies/store";
 import { onRulesChange } from "@/lib/rules";
 import type { CompanyFilters } from "./FilterCompaniesPanel";
+import { companyMatchesFilters } from "@/lib/filters/records";
 import { CompanyCard } from "./CompanyCard";
 import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
 import { KanbanEmptyStage } from "@/components/common/KanbanEmptyStage";
@@ -104,9 +105,14 @@ export function CompaniesKanbanBoard({
           .filter((g): g is CompanyGroup => !!g)
       : groups;
 
-    return result.filter(
-      (g) => !hasStatusFilter || filters!.statuses.includes(g.title),
-    );
+    return result
+      .filter((g) => !hasStatusFilter || filters!.statuses.includes(g.title))
+      .map((g) => ({
+        ...g,
+        companies: g.companies.filter((c) =>
+          companyMatchesFilters({ ...c, statusTitle: g.title }, filters),
+        ),
+      }));
   }, [groups, filters, visibleColumnIds]);
 
   function visibleCompanyCount(group: CompanyGroup) {

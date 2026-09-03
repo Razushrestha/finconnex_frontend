@@ -16,14 +16,14 @@ export const entityCardShell =
 
 /** Drag affordance for board cards */
 export const entityCardInteractive =
-  "cursor-grab select-none active:cursor-grabbing";
+  "cursor-pointer select-none";
 
 /** Full CallCard-equivalent shell (shell + interactive). Pair with cardMotion. */
 export const entityCardBox = `${entityCardShell} ${entityCardInteractive} ${KANBAN_CARD}`;
 
 /** Subject / title on board and list rows — underline on hover, click, or card hover */
 export const cardSubject =
-  "underline-offset-[3px] decoration-current hover:underline active:underline group-hover/card:underline";
+  "cursor-pointer underline-offset-[3px] decoration-current hover:underline active:underline group-hover/card:underline";
 
 /** Kanban / draggable record cards — quiet hover, no lift cascade */
 export const cardMotion = [

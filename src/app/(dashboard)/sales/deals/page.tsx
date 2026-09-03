@@ -351,16 +351,6 @@ export default function DealsPage() {
     },
   ];
 
-  function handleToggleField(field: string) {
-    setFilters((prev) => {
-      const current = prev.stages || [];
-      const next = current.includes(field)
-        ? current.filter((f) => f !== field)
-        : [...current, field];
-      return { ...prev, stages: next };
-    });
-  }
-
   return (
     <div className={BOARD_PAGE}>
       <FocusHighlight />
@@ -504,7 +494,7 @@ export default function DealsPage() {
             <FilterDealsPanel
               stageOptions={stageOptions}
               filters={filters}
-              onToggleField={handleToggleField}
+              onChange={setFilters}
               onClose={() => setIsFilterOpen(false)}
             />
           </div>

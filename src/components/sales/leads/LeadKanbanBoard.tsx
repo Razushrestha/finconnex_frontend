@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Trophy, XCircle } from "lucide-react";
 import { type KanbanColumn, type LeadPipelineStage } from "@/lib/leads/types";
 import { listLeadColumns, saveLeadColumns } from "@/lib/leads/store";
 import { isUuid } from "@/lib/activity-timeline/auth";
@@ -25,6 +24,7 @@ import {
 import { onPipelineSlaChange } from "@/lib/pipeline-sla/settings";
 import { logStatusChange, notifyStatusChanged } from "@/lib/rules";
 import type { LeadFilters } from "./FilterLeadsPanel";
+import { leadMatchesFilters } from "@/lib/filters/records";
 import { LeadCard } from "./LeadCard";
 import {
   LeadCardPanelHost,
@@ -35,6 +35,7 @@ import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
 import { KanbanEmptyStage } from "@/components/common/KanbanEmptyStage";
 import { KanbanStageScroll } from "@/components/common/KanbanStageScroll";
 import { KanbanCollapsedRail } from "@/components/common/KanbanCollapsedRail";
+import { KanbanOutcomeDropBar } from "@/components/common/KanbanOutcomeDropBar";
 import { cn } from "@/lib/utils";
 import {
   KANBAN_BOARD_ROW,
@@ -183,7 +184,6 @@ export function LeadKanbanBoard({
 
   const visibleColumns = useMemo(() => {
     const hasStatusFilter = !!filters?.statuses.length;
-    const hasSourceFilter = !!filters?.sources.length;
     const hasColumnFilter = !!visibleColumnIds;
 
     const result = hasColumnFilter
@@ -201,9 +201,16 @@ export function LeadKanbanBoard({
       )
       .map((col) => ({
         ...col,
-        cards: hasSourceFilter
-          ? col.cards.filter((card) => filters!.sources.includes(card.source))
-          : col.cards,
+        cards: col.cards.filter((card) =>
+          leadMatchesFilters(
+            {
+              ...card,
+              statusTitle: col.leadStatus,
+              stageTitle: col.title,
+            },
+            filters,
+          ),
+        ),
       }));
   }, [columns, filters, visibleColumnIds]);
 
@@ -669,60 +676,28 @@ export function LeadKanbanBoard({
         })}
       </div>
 
-      {/* Win / Lost drop zones — shown only while a card is being dragged */}
       {dragInfo && boardBounds && (
-        <div
-          className="pointer-events-none fixed bottom-6 z-50 flex justify-center px-6"
+        <KanbanOutcomeDropBar
+          over={
+            overOutcome === "settled"
+              ? "won"
+              : overOutcome === "lost"
+                ? "lost"
+                : null
+          }
+          onOver={(outcome) =>
+            setOverOutcome(outcome === "won" ? "settled" : "lost")
+          }
+          onLeave={(outcome) =>
+            setOverOutcome((prev) =>
+              (outcome === "won" ? "settled" : "lost") === prev ? null : prev,
+            )
+          }
+          onDrop={(outcome) =>
+            handleOutcomeDrop(outcome === "won" ? "settled" : "lost")
+          }
           style={{ left: boardBounds.left, width: boardBounds.width }}
-        >
-          <div className="flex w-full gap-4">
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setOverOutcome("settled");
-              }}
-              onDragLeave={() =>
-                setOverOutcome((prev) => (prev === "settled" ? null : prev))
-              }
-              onDrop={(e) => {
-                e.preventDefault();
-                handleOutcomeDrop("settled");
-              }}
-              className={cn(
-                "pointer-events-auto flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-4 text-sm font-semibold shadow-lg backdrop-blur-sm transition-colors",
-                overOutcome === "settled"
-                  ? "border-emerald-500 bg-emerald-50 text-emerald-800"
-                  : "border-emerald-300 bg-white text-emerald-700",
-              )}
-            >
-              <Trophy className="h-4 w-4" />
-              Win
-            </div>
-
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setOverOutcome("lost");
-              }}
-              onDragLeave={() =>
-                setOverOutcome((prev) => (prev === "lost" ? null : prev))
-              }
-              onDrop={(e) => {
-                e.preventDefault();
-                handleOutcomeDrop("lost");
-              }}
-              className={cn(
-                "pointer-events-auto flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-4 text-sm font-semibold shadow-lg backdrop-blur-sm transition-colors",
-                overOutcome === "lost"
-                  ? "border-rose-500 bg-rose-50 text-rose-800"
-                  : "border-rose-300 bg-white text-rose-700",
-              )}
-            >
-              <XCircle className="h-4 w-4" />
-              Lost
-            </div>
-          </div>
-        </div>
+        />
       )}
 
       {pendingLostDrop && (

@@ -18,13 +18,14 @@ import { cardSubject } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 
 const STATUS_META: Record<MeetingStatus, { soft: string; text: string }> = {
-  Scheduled: { soft: "bg-sky-50", text: "text-sky-700" },
-  "In Progress": { soft: "bg-amber-50", text: "text-amber-800" },
-  Completed: { soft: "bg-emerald-50", text: "text-emerald-700" },
-  Cancelled: { soft: "bg-slate-100", text: "text-slate-600" },
-  Rescheduled: { soft: "bg-violet-50", text: "text-violet-700" },
+  Scheduled: { soft: "bg-sky-100", text: "text-sky-800" },
+  "In Progress": { soft: "bg-amber-100", text: "text-amber-900" },
+  Completed: { soft: "bg-emerald-100", text: "text-emerald-800" },
+  Cancelled: { soft: "bg-slate-100", text: "text-slate-700" },
+  Rescheduled: { soft: "bg-violet-100", text: "text-violet-800" },
 };
 
 const TYPE_ICON: Record<MeetingType, React.ElementType> = {
@@ -57,7 +58,7 @@ export function MeetingsListTable({
   const router = useRouter();
   const [localSelectedIds, setLocalSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
-  const pageSize = 8;
+  const [pageSize, setPageSize] = useState(8);
   const selectedIds = controlledSelectedIds ?? localSelectedIds;
 
   function setSelectedIds(ids: string[]) {
@@ -136,11 +137,19 @@ export function MeetingsListTable({
           ) : null}
         </div>
       ) : null}
-      <div className="min-h-0 flex-1 overflow-auto">
+      <ResizableColumns
+        storageKey="meetings-list"
+        className="min-h-0 flex-1 overflow-auto"
+        pageSize={pageSize}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+      >
         <table className="w-full min-w-[980px] text-left text-[12px]">
           <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
             <tr>
-              <th className="w-10 px-4 py-2.5">
+              <th data-col-id="select" className="w-10 px-4 py-2.5">
                 <input
                   type="checkbox"
                   className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
@@ -149,13 +158,27 @@ export function MeetingsListTable({
                   aria-label="Select all"
                 />
               </th>
-              <th className="px-4 py-2.5">Title</th>
-              <th className="px-4 py-2.5">Related To</th>
-              <th className="px-4 py-2.5">Type</th>
-              <th className="px-4 py-2.5">Organizer</th>
-              <th className="px-4 py-2.5">Start</th>
-              <th className="px-4 py-2.5">End</th>
-              <th className="px-4 py-2.5">Status</th>
+              <th data-col-id="title" className="px-4 py-2.5">
+                Title
+              </th>
+              <th data-col-id="relatedTo" className="px-4 py-2.5">
+                Related To
+              </th>
+              <th data-col-id="type" className="px-4 py-2.5">
+                Type
+              </th>
+              <th data-col-id="organizer" className="px-4 py-2.5">
+                Organizer
+              </th>
+              <th data-col-id="start" className="px-4 py-2.5">
+                Start
+              </th>
+              <th data-col-id="end" className="px-4 py-2.5">
+                End
+              </th>
+              <th data-col-id="status" className="px-4 py-2.5">
+                Status
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -186,7 +209,7 @@ export function MeetingsListTable({
                   <td className="max-w-[240px] px-4 py-3">
                     <p
                       className={cn(
-                        "truncate font-semibold text-slate-900 dark:text-slate-100",
+                        "truncate font-normal text-slate-900 dark:text-slate-100",
                         cardSubject,
                       )}
                     >
@@ -237,7 +260,7 @@ export function MeetingsListTable({
                   <td className="px-4 py-3">
                     <span
                       className={cn(
-                        "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                        "inline-flex items-center rounded-md px-2.5 py-0.5 text-[11px] font-semibold",
                         status.soft,
                         status.text,
                       )}
@@ -260,7 +283,7 @@ export function MeetingsListTable({
             ) : null}
           </tbody>
         </table>
-      </div>
+      </ResizableColumns>
 
       <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2.5 text-[11px] text-slate-500">
         <span>

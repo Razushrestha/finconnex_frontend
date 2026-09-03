@@ -7,21 +7,23 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Columns3,
   Edit,
   EllipsisVertical,
   FileText,
   Inbox,
   ListFilter,
   RefreshCw,
-  Rows3,
-  Ruler,
-  Settings2,
   Trash2,
   X,
 } from "lucide-react";
-import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { ColumnResizeHandle } from "@/components/common/ColumnResizeHandle";
+import { TableDisplayOptionsMenu } from "@/components/common/TableDisplayOptionsMenu";
+import {
+  clampColumnWidth,
+  readColumnWidths,
+  writeColumnWidths,
+} from "@/lib/list-columns/widths";
 import type {
   QueueRow,
   QueueSortDirection,
@@ -76,26 +78,7 @@ interface WorkQueueTableProps {
 
 const ACTIONS_COL = "96px";
 const SETTINGS_COL = "40px";
-
-/** Preferred track sizes keyed by Manage Column id. */
-const COL_TRACK: Record<string, string> = {
-  subject: "minmax(200px,2.2fr)",
-  dueDate: "minmax(100px,0.85fr)",
-  status: "minmax(100px,0.85fr)",
-  priority: "minmax(80px,0.7fr)",
-  relatedTo: "minmax(140px,1.2fr)",
-  contactName: "minmax(120px,1fr)",
-  fileHandler: "minmax(110px,0.95fr)",
-  tag: "minmax(90px,0.8fr)",
-  taskOwner: "minmax(110px,0.95fr)",
-  createdTime: "minmax(120px,0.95fr)",
-  modifiedBy: "minmax(110px,0.9fr)",
-  modifiedTime: "minmax(120px,0.95fr)",
-  closedTime: "minmax(120px,0.95fr)",
-  createdBy: "minmax(110px,0.9fr)",
-  description: "minmax(160px,1.4fr)",
-  lastActivityTime: "minmax(130px,1fr)",
-};
+const WIDTHS_KEY = "work-queue";
 
 const COL_MIN_PX: Record<string, number> = {
   subject: 200,
@@ -117,7 +100,7 @@ const COL_MIN_PX: Record<string, number> = {
 };
 
 const STORAGE_KEY = "finconnex.work-queue.manage-columns";
-const PAGE_SIZE_OPTIONS = [10, 20, 50];
+const PAGE_SIZE_OPTIONS = [8, 10, 20, 50];
 
 function loadManageColumns(): ManageColumn[] {
   if (typeof window === "undefined") return DEFAULT_MANAGE_COLUMNS;
@@ -165,18 +148,28 @@ function visibleColumns(columns: ManageColumn[]): ManageColumn[] {
   return [...pinned, ...rest];
 }
 
-function buildGridTemplate(cols: ManageColumn[]): string {
-  const tracks = cols.map((c) => COL_TRACK[c.id] ?? "minmax(110px,1fr)");
+function columnPx(id: string, widths: Record<string, number>) {
+  return clampColumnWidth(widths[id] ?? COL_MIN_PX[id] ?? 110, COL_MIN_PX[id] ?? 64);
+}
+
+function buildGridTemplate(
+  cols: ManageColumn[],
+  widths: Record<string, number>,
+): string {
+  const tracks = cols.map((c) => `${columnPx(c.id, widths)}px`);
   return `${ACTIONS_COL} ${tracks.join(" ")} ${SETTINGS_COL}`;
 }
 
-function buildMinWidth(cols: ManageColumn[]): number {
+function buildMinWidth(
+  cols: ManageColumn[],
+  widths: Record<string, number>,
+): number {
   const gap = 12; // gap-x-3
   const n = cols.length + 2; // actions + settings
   const sum =
     96 +
     40 +
-    cols.reduce((acc, c) => acc + (COL_MIN_PX[c.id] ?? 110), 0) +
+    cols.reduce((acc, c) => acc + columnPx(c.id, widths), 0) +
     gap * (n - 1);
   return sum;
 }
@@ -253,21 +246,16 @@ export function WorkQueueTable({
   const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
-  const [optionsMenuOpen, setOptionsMenuOpen] = React.useState(false);
-  const [pageSizeFlyoutOpen, setPageSizeFlyoutOpen] = React.useState(false);
-  const optionsButtonRef = React.useRef<HTMLButtonElement>(null);
-  const optionsPortalRef = React.useRef<HTMLDivElement>(null);
-  const [menuPos, setMenuPos] = React.useState<{ top: number; right: number }>({
-    top: 0,
-    right: 0,
-  });
-
   const [manageColumnsOpen, setManageColumnsOpen] = React.useState(false);
   const [manageColumns, setManageColumns] = React.useState<ManageColumn[]>(
     DEFAULT_MANAGE_COLUMNS,
   );
+  const [colWidths, setColWidths] = React.useState<Record<string, number>>({});
+  const colWidthsRef = React.useRef(colWidths);
+  colWidthsRef.current = colWidths;
 
   React.useEffect(() => {
+    setColWidths(readColumnWidths(WIDTHS_KEY));
     setManageColumns(loadManageColumns());
     void tryCrmTablePreference(() => getCrmTablePreference("work-queue")).then(
       (pref) => {
@@ -288,12 +276,12 @@ export function WorkQueueTable({
     );
   }, [manageColumns, source]);
   const gridTemplate = React.useMemo(
-    () => buildGridTemplate(visibleCols),
-    [visibleCols],
+    () => buildGridTemplate(visibleCols, colWidths),
+    [visibleCols, colWidths],
   );
   const tableMinWidth = React.useMemo(
-    () => buildMinWidth(visibleCols),
-    [visibleCols],
+    () => buildMinWidth(visibleCols, colWidths),
+    [visibleCols, colWidths],
   );
   const gridStyle = React.useMemo(
     () =>
@@ -318,26 +306,6 @@ export function WorkQueueTable({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [activeMenuId]);
-
-  // Close header options menu when clicking outside
-  React.useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      const target = event.target as Node;
-      if (
-        optionsButtonRef.current?.contains(target) ||
-        optionsPortalRef.current?.contains(target)
-      ) {
-        return;
-      }
-      setOptionsMenuOpen(false);
-    }
-    if (optionsMenuOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [optionsMenuOpen]);
 
   React.useEffect(() => {
     if (!sortOpen) return;
@@ -614,30 +582,46 @@ export function WorkQueueTable({
               const sortable = sortableIds.has(col.id);
               const active = sortField === col.id;
               return (
-                <button
-                  key={col.id}
-                  type="button"
-                  disabled={!sortable}
-                  onClick={() => {
-                    if (!sortable) return;
-                    applySort(col.id as QueueSortField);
-                  }}
-                  className={cn(
-                    "flex min-w-0 items-center gap-1 truncate text-left text-[11px] font-semibold tracking-[0.04em] uppercase",
-                    sortable
-                      ? active
-                        ? "text-[var(--wq-accent)]"
-                        : "text-slate-400 hover:text-slate-700"
-                      : "cursor-default text-slate-400",
-                  )}
-                >
-                  <span className="truncate">{col.label}</span>
-                  {active ? (
-                    <span className="shrink-0 text-[10px] font-bold">
-                      {sortDirection === "asc" ? "↑" : "↓"}
-                    </span>
-                  ) : null}
-                </button>
+                <div key={col.id} className="relative min-w-0 border-r border-slate-200 pr-2">
+                  <button
+                    type="button"
+                    disabled={!sortable}
+                    onClick={() => {
+                      if (!sortable) return;
+                      applySort(col.id as QueueSortField);
+                    }}
+                    className={cn(
+                      "flex min-w-0 items-center gap-1 truncate text-left text-[11px] font-bold tracking-[0.04em] uppercase",
+                      sortable
+                        ? active
+                          ? "text-[var(--wq-accent)]"
+                          : "text-slate-400 hover:text-slate-700"
+                        : "cursor-default text-slate-400",
+                    )}
+                  >
+                    <span className="truncate">{col.label}</span>
+                    {active ? (
+                      <span className="shrink-0 text-[10px] font-bold">
+                        {sortDirection === "asc" ? "↑" : "↓"}
+                      </span>
+                    ) : null}
+                  </button>
+                  <ColumnResizeHandle
+                    label={`Resize ${col.label} column`}
+                    onDelta={(delta) => {
+                      setColWidths((prev) => ({
+                        ...prev,
+                        [col.id]: clampColumnWidth(
+                          (prev[col.id] ?? COL_MIN_PX[col.id] ?? 110) + delta,
+                          COL_MIN_PX[col.id] ?? 64,
+                        ),
+                      }));
+                    }}
+                    onCommit={() =>
+                      writeColumnWidths(WIDTHS_KEY, colWidthsRef.current)
+                    }
+                  />
+                </div>
               );
             })}
 
@@ -646,106 +630,14 @@ export function WorkQueueTable({
                 "sticky right-0 z-20 -mr-5 flex justify-end bg-white pr-5 pl-3 sm:-mr-6 sm:pr-6",
               )}
             >
-              <button
-                ref={optionsButtonRef}
-                type="button"
-                onClick={() => {
-                  if (!optionsMenuOpen && optionsButtonRef.current) {
-                    const rect =
-                      optionsButtonRef.current.getBoundingClientRect();
-                    setMenuPos({
-                      top: rect.bottom + 4,
-                      right: window.innerWidth - rect.right,
-                    });
-                  }
-                  setOptionsMenuOpen((v) => !v);
-                }}
-                aria-label="Table display options"
-                title="Column options"
-                className="flex h-6 w-6 items-center justify-center text-slate-400 transition-colors hover:text-slate-700"
-              >
-                <Settings2 className="h-3.5 w-3.5" />
-              </button>
-
-              {optionsMenuOpen && typeof document !== "undefined"
-                ? createPortal(
-                    <div
-                      ref={optionsPortalRef}
-                      style={{
-                        position: "fixed",
-                        top: menuPos.top,
-                        right: menuPos.right,
-                      }}
-                      className="z-50 w-56 border border-[var(--wq-line)] bg-white py-1 text-[13px] shadow-lg"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setManageColumnsOpen(true);
-                          setOptionsMenuOpen(false);
-                        }}
-                        className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50"
-                      >
-                        <Columns3 className="h-4 w-4 text-slate-400" />
-                        Manage Columns
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled
-                        className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-left text-slate-300"
-                      >
-                        <Ruler className="h-4 w-4 text-slate-300" />
-                        Reset Column Size
-                      </button>
-
-                      <div className="my-1 border-t border-[var(--wq-line)]" />
-
-                      <div
-                        className="relative"
-                        onMouseEnter={() => setPageSizeFlyoutOpen(true)}
-                        onMouseLeave={() => setPageSizeFlyoutOpen(false)}
-                      >
-                        <button
-                          type="button"
-                          className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50"
-                        >
-                          <span className="flex items-center gap-2.5">
-                            <Rows3 className="h-4 w-4 text-slate-400" />
-                            Records per page
-                          </span>
-                          <span className="flex items-center gap-0.5 text-slate-400">
-                            {pageSize}
-                            <ChevronRight className="h-3.5 w-3.5" />
-                          </span>
-                        </button>
-
-                        {pageSizeFlyoutOpen ? (
-                          <div className="absolute right-full top-0 mr-1 w-28 border border-[var(--wq-line)] bg-white py-1 shadow-lg">
-                            {PAGE_SIZE_OPTIONS.map((size) => (
-                              <button
-                                key={size}
-                                type="button"
-                                onClick={() => {
-                                  onPageSizeChange?.(size);
-                                  setOptionsMenuOpen(false);
-                                }}
-                                className={cn(
-                                  "flex w-full items-center justify-between px-3.5 py-1.5 text-left text-slate-700 hover:bg-slate-50",
-                                  pageSize === size &&
-                                    "font-semibold text-slate-900",
-                                )}
-                              >
-                                {size}
-                              </button>
-                            ))}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>,
-                    document.body,
-                  )
-                : null}
+              <TableDisplayOptionsMenu
+                storageKey={WIDTHS_KEY}
+                pageSize={pageSize}
+                onPageSizeChange={onPageSizeChange}
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
+                onManageColumns={() => setManageColumnsOpen(true)}
+                onResetColumnSize={() => setColWidths({})}
+              />
             </div>
           </div>
 
@@ -775,7 +667,7 @@ export function WorkQueueTable({
                   href={row.href}
                   style={gridStyle}
                   className={cn(
-                    "group/row grid w-full cursor-pointer items-center gap-x-3 border-b border-slate-100 px-5 py-2 text-left transition-colors last:border-b-0 hover:bg-slate-50/80 sm:px-6",
+                    "group/row grid w-full cursor-pointer items-center gap-x-3 border-b border-slate-200 px-5 py-2 text-left transition-colors hover:bg-slate-50/80 sm:px-6",
                     overdue && "bg-red-50/40 hover:bg-red-50/70",
                   )}
                 >
@@ -873,7 +765,7 @@ export function WorkQueueTable({
                       return (
                         <span
                           key={col.id}
-                          className="truncate pr-3 text-[13.5px] leading-[18px] font-medium text-slate-900"
+                          className="truncate pr-3 text-[13.5px] leading-[18px] font-normal text-slate-900"
                         >
                           {text}
                         </span>

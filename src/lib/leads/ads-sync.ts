@@ -98,8 +98,11 @@ export const ADS_PLATFORM_LABEL: Record<AdsPlatform, string> = {
 };
 
 /** Map ad platforms onto existing LeadSource enum. */
-export function adsPlatformToSource(_platform: AdsPlatform): LeadSource {
-  return "Social Media";
+export function adsPlatformToSource(platform: AdsPlatform): LeadSource {
+  if (platform === "facebook") return "Facebook";
+  if (platform === "tiktok") return "TikTok";
+  if (platform === "google") return "Google Ads";
+  return "Other";
 }
 
 export function previewAdsSync(platform: AdsPlatform): {

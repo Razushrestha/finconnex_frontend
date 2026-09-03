@@ -16,8 +16,8 @@ import {
 import { importCrmLeads, refreshCrmLeadsBoard } from "@/lib/leads/api";
 import { toCrmCreateBody, uiSourceToCrm, uiStatusToCrm } from "@/lib/leads/api/map";
 import {
-  LEAD_SOURCES,
   LEAD_STATUSES,
+  coerceLeadSource,
   type LeadSource,
   type LeadStatus,
 } from "@/lib/leads/types";
@@ -118,10 +118,8 @@ function cell(
 }
 
 function asSource(value: string, fallback: LeadSource): LeadSource {
-  const hit = LEAD_SOURCES.find(
-    (s) => s.toLowerCase() === value.toLowerCase(),
-  );
-  return hit ?? fallback;
+  if (!value.trim()) return fallback;
+  return coerceLeadSource(value);
 }
 
 function asStatus(value: string, fallback: LeadStatus): LeadStatus {

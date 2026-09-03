@@ -4,7 +4,6 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
-  Check,
   ChevronDown,
   ChevronUp,
   Clock,
@@ -40,7 +39,6 @@ import {
 import { listAllContacts } from "@/lib/contacts/store";
 import { createNote } from "@/lib/notes/store";
 import {
-  labelForRecord,
   resolveSoftphoneRecord,
   type SoftphoneRecord,
 } from "@/lib/softphone/resolve-record";
@@ -49,7 +47,6 @@ import {
   SOFTPHONE_H,
   SOFTPHONE_W,
 } from "@/lib/softphone/events";
-import { assignedCallerIds } from "@/lib/softphone/assigned-numbers";
 
 type Tab = "recents" | "contacts" | "keypad" | "voicemail";
 
@@ -105,12 +102,18 @@ export function SoftphonePad({
   onClose,
   anchor,
   presetNumber,
+  presetName,
+  presetRelatedTo,
+  autoStart = false,
   placementKey = 0,
 }: {
   open: boolean;
   onClose: () => void;
   anchor?: { x: number; y: number } | null;
   presetNumber?: string;
+  presetName?: string;
+  presetRelatedTo?: string;
+  autoStart?: boolean;
   placementKey?: number;
 }) {
   const router = useRouter();
@@ -118,12 +121,8 @@ export function SoftphonePad({
   const [tab, setTab] = React.useState<Tab>("keypad");
   const [dial, setDial] = React.useState("");
   const [calling, setCalling] = React.useState(false);
+  const [contactLabel, setContactLabel] = React.useState("");
   const [activeCallId, setActiveCallId] = React.useState<string | null>(null);
-  const callerIds = assignedCallerIds(OWNER);
-  const [callerId, setCallerId] = React.useState(
-    () => assignedCallerIds(OWNER)[0] ?? "",
-  );
-  const [callerOpen, setCallerOpen] = React.useState(false);
   const [pinned, setPinned] = React.useState(false);
   const [expanded, setExpanded] = React.useState(false);
   const [pos, setPos] = React.useState({ x: 16, y: 80 });
@@ -222,19 +221,26 @@ export function SoftphonePad({
       });
   }, [query, voiceScope, tick]);
 
-  function startCall(number = dial, name?: string) {
+  function startCall(
+    number = dial,
+    name?: string,
+    relatedTo?: string,
+    force = false,
+  ) {
     const n = number.trim();
-    if (!n || calling) return;
+    if (!n) return;
+    if (calling && !force) return;
     const record = resolveSoftphoneRecord({ phone: n, name });
-    const display = record?.name || name || n;
+    const display = name || record?.name || n;
     setDial(n);
+    setContactLabel(display);
     setCalling(true);
     callStartedAt.current = Date.now();
     setTab("keypad");
     setNoteFor(null);
     const call = createCall({
       subject: `Softphone — ${display}`,
-      relatedTo: record?.relatedTo,
+      relatedTo: relatedTo || record?.relatedTo,
       contact: display,
       fromNumber: n,
       callType: "Outbound",
@@ -246,6 +252,18 @@ export function SoftphonePad({
     setActiveCallId(call.id);
     setTick((v) => v + 1);
   }
+
+  const autoStartedFor = React.useRef<number | null>(null);
+  React.useEffect(() => {
+    if (!open || !autoStart) return;
+    const n = presetNumber?.trim();
+    if (!n) return;
+    if (autoStartedFor.current === placementKey) return;
+    autoStartedFor.current = placementKey;
+    startCall(n, presetName, presetRelatedTo, true);
+    // placementKey retriggers a fresh outbound call from a record.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, placementKey, autoStart, presetNumber, presetName, presetRelatedTo]);
 
   function endCall() {
     const elapsed = callStartedAt.current
@@ -344,9 +362,7 @@ export function SoftphonePad({
   if (!mounted || !open) return null;
 
   const width = expanded ? 360 : PHONE_W;
-  const height = noteFor
-    ? Math.min(640, Math.max(PHONE_H, window.innerHeight - 56))
-    : PHONE_H;
+  const height = PHONE_H;
   const top = Math.min(pos.y, Math.max(8, window.innerHeight - height - 8));
   const noteTarget = noteFor
     ? resolveSoftphoneRecord({ phone: noteFor.number, name: noteFor.name })
@@ -399,49 +415,6 @@ export function SoftphonePad({
         </div>
       </div>
 
-      <div className="relative shrink-0 px-4 pb-2">
-        <p className="text-[15px] font-semibold text-slate-900">Calling From</p>
-        {callerIds.length > 1 ? (
-          <>
-            <button
-              type="button"
-              aria-label="Choose calling number"
-              aria-expanded={callerOpen}
-              disabled={calling}
-              onClick={() => setCallerOpen((v) => !v)}
-              className="mt-1 flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 text-left text-[12px] text-slate-600 disabled:opacity-60"
-            >
-              <span className="truncate">{callerId}</span>
-              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-            </button>
-            {callerOpen ? (
-              <div className="absolute z-10 mt-1 w-[calc(100%-2rem)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
-                {callerIds.map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => {
-                      setCallerId(id);
-                      setCallerOpen(false);
-                    }}
-                    className={cn(
-                      "block w-full px-3 py-2 text-left text-[12px] hover:bg-slate-50",
-                      id === callerId && "bg-violet-50 text-violet-700",
-                    )}
-                  >
-                    {id}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </>
-        ) : (
-          <div className="mt-1 flex h-9 items-center rounded-lg border border-slate-200 px-3 text-[12px] text-slate-600">
-            {callerId || "No number assigned"}
-          </div>
-        )}
-      </div>
-
       <div
         className={cn(
           "min-h-0 flex-1 px-4",
@@ -455,7 +428,6 @@ export function SoftphonePad({
             record={noteTarget}
             number={noteFor.number}
             name={noteFor.name}
-            callerId={callerId}
             durationSeconds={noteFor.durationSeconds ?? 0}
             disposition={disposition}
             onDisposition={(status) => {
@@ -480,6 +452,7 @@ export function SoftphonePad({
           <Keypad
             dial={dial}
             calling={calling}
+            callingLabel={contactLabel}
             onDialChange={setDial}
             onCall={() => (calling ? endCall() : startCall())}
           />
@@ -601,11 +574,13 @@ function sanitizeDial(value: string) {
 function Keypad({
   dial,
   calling,
+  callingLabel,
   onDialChange,
   onCall,
 }: {
   dial: string;
   calling: boolean;
+  callingLabel?: string;
   onDialChange: (value: string) => void;
   onCall: () => void;
 }) {
@@ -661,9 +636,14 @@ function Keypad({
   return (
     <div className="pb-1">
       {calling ? (
-        <p className="mb-2 min-h-[28px] text-center text-[15px] font-medium text-emerald-600">
-          Calling {dial}…
-        </p>
+        <>
+          <p className="mb-2 min-h-[28px] text-center text-[15px] font-medium text-emerald-600">
+            Calling {callingLabel || dial}…
+          </p>
+          {callingLabel && callingLabel !== dial ? (
+            <p className="mb-2 text-center text-[12px] text-slate-500">{dial}</p>
+          ) : null}
+        </>
       ) : (
         <input
           ref={inputRef}
@@ -1079,7 +1059,6 @@ function CallNoteComposer({
   record,
   number,
   name,
-  callerId,
   durationSeconds,
   disposition,
   onDisposition,
@@ -1092,7 +1071,6 @@ function CallNoteComposer({
   record: SoftphoneRecord | null;
   number: string;
   name?: string;
-  callerId: string;
   durationSeconds: number;
   disposition: CallStatus;
   onDisposition: (status: CallStatus) => void;
@@ -1103,9 +1081,6 @@ function CallNoteComposer({
   onSkip: () => void;
 }) {
   const displayName = record?.name || name || "Unknown";
-  const dispositionLabel =
-    DISPOSITIONS.find((item) => item.status === disposition)?.label ??
-    "Completed";
 
   return (
     <div className="space-y-2.5 py-0.5 pb-2">
@@ -1118,9 +1093,6 @@ function CallNoteComposer({
             <h3 className="text-[16px] font-semibold text-slate-900">
               Call Summary
             </h3>
-            <p className="truncate text-[11px] text-slate-500">
-              {callerId} • {number || callerId}
-            </p>
           </div>
         </div>
       </div>
@@ -1130,16 +1102,10 @@ function CallNoteComposer({
           {displayName}
         </p>
         <p className="text-[12px] text-slate-500">{number}</p>
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1 text-[12px] font-medium text-rose-600">
-            <PhoneOff className="h-3.5 w-3.5" />
-            Call Ended
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
-            <Check className="h-3 w-3" strokeWidth={3} />
-            {dispositionLabel}
-          </span>
-        </div>
+        <p className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-rose-600">
+          <PhoneOff className="h-3.5 w-3.5" />
+          Call Ended
+        </p>
         <p className="mt-2 inline-flex rounded-lg bg-slate-100 px-3 py-1 text-[12px] font-medium text-slate-600">
           {formatDurationClock(durationSeconds)}
         </p>
@@ -1176,13 +1142,6 @@ function CallNoteComposer({
 
       <div>
         <h3 className="text-[14px] font-semibold text-slate-900">Call note</h3>
-        <p className="mt-1 text-[11px] text-slate-500">
-          Saves to{" "}
-          <span className="font-semibold text-violet-700">
-            {labelForRecord(record, number)}
-          </span>{" "}
-          (lead, then deal, then organisation, then contact).
-        </p>
         <textarea
           value={body}
           onChange={(e) => onChange(e.target.value)}

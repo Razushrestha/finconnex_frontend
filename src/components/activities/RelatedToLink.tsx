@@ -23,7 +23,7 @@ export function RelatedToLink({ relatedTo, className }: RelatedToLinkProps) {
       href={href}
       onClick={(e) => e.stopPropagation()}
       className={cn(
-        "truncate hover:text-violet-700 hover:underline",
+        "truncate cursor-pointer hover:text-violet-700 hover:underline",
         className,
       )}
     >

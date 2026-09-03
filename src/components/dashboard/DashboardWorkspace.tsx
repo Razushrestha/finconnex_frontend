@@ -1,35 +1,48 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Download,
-  LayoutGrid,
-  RefreshCw,
+  ChevronDown,
+  Crown,
+  Maximize2,
+  Minimize2,
   RotateCcw,
   Settings2,
   Star,
 } from "lucide-react";
 import {
-  DASHBOARD_OWNERS,
-  DASHBOARD_TEAMS,
-  DASHBOARD_WIDGETS,
   defaultDashboardLayout,
-  exportDashboardReport,
-  formatCurrency,
   loadDashboardLayout,
   moveWidgetTo,
   restoreDefaultDashboardLayout,
   widgetGridSpan,
   saveDashboardLayout,
   setDefaultDashboardLayout,
-  type DashboardDateRange,
   type DashboardLayout,
   type DashboardWidgetId,
 } from "@/lib/dashboard/layout";
+import { computeExecutiveOverview } from "@/lib/dashboard/executive";
 import {
-  industryPresetLabel,
-  loadIndustryPreset,
-} from "@/lib/dashboard/industry";
+  DASHBOARD_VIEWS,
+  isDashboardViewId,
+  loadDashboardView,
+  saveDashboardView,
+  type DashboardViewId,
+} from "@/lib/dashboard/views";
+import {
+  loadViewHidden,
+  loadViewOrder,
+  moveViewWidget,
+  resetViewOrder,
+  restoreDefaultViewHidden,
+  saveViewHidden,
+  saveViewOrder,
+  setDefaultViewHidden,
+} from "@/lib/dashboard/view-widgets";
+import { SalesDashboardView } from "@/components/dashboard/SalesDashboardView";
+import { PerformanceDashboardView } from "@/components/dashboard/PerformanceDashboardView";
+import { WorkQueueDashboardView } from "@/components/dashboard/WorkQueueDashboardView";
 import {
   DASHBOARD_ROLES,
   listRoleLayouts,
@@ -41,79 +54,126 @@ import {
 } from "@/lib/dashboard/role-layouts";
 import { useCrmDashboardStats } from "@/lib/dashboard/use-crm-dashboard-stats";
 import { UpcomingMeetingsCard } from "@/components/dashboard/static-cards";
-import { DashboardKpiCharts } from "@/components/dashboard/DashboardKpiCharts";
-import { DashboardTaskAttention } from "@/components/dashboard/DashboardTaskAttention";
 import { WorkspaceActivityFeed } from "@/components/dashboard/WorkspaceActivityFeed";
-import { DashboardWidgetSlot } from "@/components/dashboard/DashboardWidgetSlot";
+import {
+  DashboardWidgetSlot,
+  dashboardReorderCanvas,
+} from "@/components/dashboard/DashboardWidgetSlot";
+import {
+  AlertsInsights,
+  CriticalActions,
+  ExecutiveFooter,
+  ExecutiveKpis,
+  PerformanceSnapshot,
+  PipelineGlance,
+  TopPerforming,
+  TrendOverview,
+} from "@/components/dashboard/ExecutiveOverview";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRangePicker";
+import { getRulesActor } from "@/lib/rules/actor";
 import { cn } from "@/lib/utils";
 import type { HierarchyLevel } from "@/lib/rules/permissions";
 
-const DATE_OPTIONS: { value: DashboardDateRange; label: string }[] = [
-  { value: "7d", label: "Last 7 days" },
-  { value: "30d", label: "Last 30 days" },
-  { value: "90d", label: "Last 90 days" },
-  { value: "ytd", label: "Year to date" },
-  { value: "all", label: "All time" },
-];
-
-function KpiTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-border bg-white px-3 py-2.5">
-      <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
-      <p className="mt-0.5 text-lg font-semibold tracking-tight text-foreground">
-        {value}
-      </p>
-    </div>
-  );
+function greetingName() {
+  const hour = new Date().getHours();
+  const when = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const full = getRulesActor().name || "there";
+  return `${when}, ${full.split(" ")[0]} 👋`;
 }
 
-function LiveKpiStrip({
-  stats,
-}: {
-  stats: ReturnType<typeof useCrmDashboardStats>["stats"];
-}) {
-  const tiles = [
-    { label: "Total Leads", value: String(stats.totalLeads) },
-    { label: "Total Contacts", value: String(stats.totalContacts) },
-    { label: "Total Companies", value: String(stats.totalCompanies) },
-    { label: "Total Deals", value: String(stats.totalDeals) },
-    { label: "Pipeline Value", value: formatCurrency(stats.pipelineValue) },
-    { label: "Won Deals Value", value: formatCurrency(stats.wonDealsValue) },
-    { label: "Open Tasks", value: String(stats.openTasks) },
-    { label: "Overdue Tasks", value: String(stats.overdueTasks) },
-    { label: "Activities Today", value: String(stats.activitiesToday) },
-    { label: "Conversion Rate", value: `${stats.conversionRate}%` },
-  ];
-
-  return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-      {tiles.map((t) => (
-        <KpiTile key={t.label} label={t.label} value={t.value} />
-      ))}
-    </div>
-  );
+function spanClass(id: DashboardWidgetId) {
+  const span = widgetGridSpan(id);
+  if (span === "full") return "xl:col-span-6";
+  if (span === "half") return "xl:col-span-3";
+  return "xl:col-span-2";
 }
 
 export function DashboardWorkspace() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [view, setView] = useState<DashboardViewId>("executive");
   const [layout, setLayout] = useState<DashboardLayout>(defaultDashboardLayout);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [role, setRole] = useState<HierarchyLevel>("Manager");
   const [roleLayouts, setRoleLayouts] = useState<NamedDashboardLayout[]>([]);
   const [layoutName, setLayoutName] = useState("");
-  const [dragging, setDragging] = useState<DashboardWidgetId | null>(null);
-  const [over, setOver] = useState<DashboardWidgetId | null>(null);
-  const industry = loadIndustryPreset();
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [over, setOver] = useState<string | null>(null);
+  const [hello, setHello] = useState("Good morning.");
+  const [viewHidden, setViewHidden] = useState<string[]>([]);
+  const [viewOrder, setViewOrder] = useState<string[]>([]);
+  const [fullscreen, setFullscreen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
 
-  const { stats, industry: industryTiles, charts, owners, loading, refresh } =
-    useCrmDashboardStats(layout.filters);
+  const { loading } = useCrmDashboardStats(layout.filters);
+  const executive = useMemo(
+    () => computeExecutiveOverview(layout.filters),
+    [layout.filters, loading],
+  );
 
   useEffect(() => {
-    setLayout(loadDashboardLayout());
+    const stored = loadDashboardLayout();
+    const next =
+      stored.filters.owner === "All"
+        ? stored
+        : { ...stored, filters: { ...stored.filters, owner: "All" } };
+    setLayout(next);
+    if (next !== stored) saveDashboardLayout(next);
     const nextRole = loadActiveDashboardRole();
     setRole(nextRole);
     setRoleLayouts(listRoleLayouts(nextRole));
+    setHello(greetingName());
+    const fromUrl = searchParams.get("view");
+    const initial = isDashboardViewId(fromUrl) ? fromUrl : loadDashboardView();
+    setView(initial);
+    setViewHidden(loadViewHidden(initial));
+    setViewOrder(loadViewOrder(initial));
   }, []);
+
+  useEffect(() => {
+    const fromUrl = searchParams.get("view");
+    if (isDashboardViewId(fromUrl)) {
+      setView(fromUrl);
+      setViewHidden(loadViewHidden(fromUrl));
+      setViewOrder(loadViewOrder(fromUrl));
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    function sync() {
+      setFullscreen(Boolean(document.fullscreenElement));
+    }
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+
+  useEffect(() => {
+    if (!fullscreen || document.fullscreenElement) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setFullscreen(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullscreen]);
+
+  function switchView(next: DashboardViewId) {
+    setView(next);
+    setViewHidden(loadViewHidden(next));
+    setViewOrder(loadViewOrder(next));
+    saveDashboardView(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "executive") params.delete("view");
+    else params.set("view", next);
+    const qs = params.toString();
+    router.replace(qs ? `/?${qs}` : "/", { scroll: false });
+  }
 
   useEffect(() => {
     if (!flash) return;
@@ -126,79 +186,98 @@ export function DashboardWorkspace() {
     saveDashboardLayout(next);
   }
 
-  const ownerOptions = owners.length ? owners : [...DASHBOARD_OWNERS];
-
   const visible = useMemo(
     () => new Set(layout.order.filter((id) => !layout.hidden.includes(id))),
     [layout],
   );
 
-  function dropOn(target: DashboardWidgetId) {
+  function dropOn(target: string) {
     if (dragging && dragging !== target) {
-      persist({
-        ...layout,
-        order: moveWidgetTo(layout.order, dragging, target),
-      });
+      if (view === "executive") {
+        persist({
+          ...layout,
+          order: moveWidgetTo(
+            layout.order,
+            dragging as DashboardWidgetId,
+            target as DashboardWidgetId,
+          ),
+        });
+      } else {
+        const next = moveViewWidget(viewOrder, dragging, target);
+        setViewOrder(next);
+        saveViewOrder(view, next);
+      }
     }
     setDragging(null);
     setOver(null);
   }
+
+  async function toggleFullscreen() {
+    const el = rootRef.current;
+    if (!el) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+      await el.requestFullscreen();
+    } catch {
+      setFullscreen((open) => !open);
+    }
+  }
+
+  function archiveWidget(id: string) {
+    if (view === "executive") {
+      if (layout.hidden.includes(id as DashboardWidgetId)) return;
+      persist({ ...layout, hidden: [...layout.hidden, id as DashboardWidgetId] });
+      return;
+    }
+    if (viewHidden.includes(id)) return;
+    const next = [...viewHidden, id];
+    setViewHidden(next);
+    saveViewHidden(view, next);
+  }
+
+  const reorderProps = {
+    widgetOrder: viewOrder,
+    hiddenWidgets: viewHidden,
+    reordering: false,
+    dragging,
+    over,
+    onDragStart: setDragging,
+    onDragOver: setOver,
+    onDrop: dropOn,
+    onDragEnd: () => {
+      setDragging(null);
+      setOver(null);
+    },
+    onArchive: archiveWidget,
+  };
 
   const sections = useMemo(() => {
     const out: ReactNode[] = [];
 
     for (const id of layout.order) {
       if (!visible.has(id)) continue;
-      const span =
-        widgetGridSpan(id) === "full" ? "xl:col-span-6" : "xl:col-span-2";
 
       let body: ReactNode = null;
-      if (id === "kpis") {
-        body = (
-          <div className="space-y-2">
-            <p className="text-[11px] font-medium text-muted-foreground">
-              Core KPIs
-            </p>
-            <LiveKpiStrip stats={stats} />
-          </div>
-        );
-      } else if (id === "charts") {
-        body = <DashboardKpiCharts charts={charts} />;
-      } else if (id === "industry") {
-        body = (
-          <div className="space-y-2">
-            <p className="text-[11px] font-medium text-muted-foreground">
-              {industryPresetLabel(industry)} widgets
-            </p>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {industryTiles.map((t) => (
-                <div key={t.label} className="space-y-0.5">
-                  <KpiTile label={t.label} value={t.value} />
-                  {t.missingApi ? (
-                    <p className="px-1 text-[10px] text-amber-700">
-                      No API for this field yet
-                    </p>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      } else if (id === "activity") {
-        body = <WorkspaceActivityFeed />;
-      } else if (id === "meetings") {
-        body = <UpcomingMeetingsCard />;
-      } else if (id === "taskUpdates") {
-        body = <DashboardTaskAttention />;
-      }
+      if (id === "kpis") body = <ExecutiveKpis data={executive} />;
+      else if (id === "pipeline") body = <PipelineGlance data={executive} />;
+      else if (id === "performance") body = <PerformanceSnapshot data={executive} />;
+      else if (id === "actions") body = <CriticalActions data={executive} />;
+      else if (id === "trend") body = <TrendOverview data={executive} />;
+      else if (id === "ranking") body = <TopPerforming data={executive} />;
+      else if (id === "alerts") body = <AlertsInsights data={executive} />;
+      else if (id === "activity") body = <WorkspaceActivityFeed />;
+      else if (id === "meetings") body = <UpcomingMeetingsCard />;
 
       if (!body) continue;
       out.push(
         <DashboardWidgetSlot
           key={id}
           id={id}
-          span={span}
-          editing={customizeOpen}
+          span={spanClass(id)}
+          editing={false}
           dragging={dragging}
           over={over}
           onDragStart={setDragging}
@@ -208,6 +287,8 @@ export function DashboardWorkspace() {
             setDragging(null);
             setOver(null);
           }}
+          onArchive={archiveWidget}
+          size={id === "kpis" ? "auto" : "card"}
         >
           {body}
         </DashboardWidgetSlot>,
@@ -215,256 +296,152 @@ export function DashboardWorkspace() {
     }
 
     return out;
-  }, [
-    charts,
-    customizeOpen,
-    dragging,
-    industry,
-    industryTiles,
-    layout,
-    over,
-    stats,
-    visible,
-  ]);
+  }, [customizeOpen, dragging, executive, layout, over, visible]);
 
   return (
-    <div className="flex flex-1 flex-col bg-slate-50">
-    <div className="mx-auto flex w-full max-w-[1920px] flex-1 flex-col gap-3 p-4 lg:px-6 2xl:px-8 2xl:py-5">
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-white px-3 py-2">
-        <LayoutGrid className="h-4 w-4 text-muted-foreground" />
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          Date
-          <select
-            value={layout.filters.dateRange}
-            onChange={(e) =>
-              persist({
-                ...layout,
-                filters: {
-                  ...layout.filters,
-                  dateRange: e.target.value as DashboardDateRange,
-                },
-              })
-            }
-            className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground"
-          >
-            {DATE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          Owner
-          <select
-            value={layout.filters.owner}
-            onChange={(e) =>
-              persist({
-                ...layout,
-                filters: { ...layout.filters, owner: e.target.value },
-              })
-            }
-            className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground"
-          >
-            {ownerOptions.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          Team
-          <select
-            value={layout.filters.team}
-            onChange={(e) =>
-              persist({
-                ...layout,
-                filters: {
-                  ...layout.filters,
-                  team: e.target.value as DashboardLayout["filters"]["team"],
-                },
-              })
-            }
-            className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground"
-          >
-            {DASHBOARD_TEAMS.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="ml-auto flex flex-wrap items-center gap-1.5">
-          {flash ? (
-            <span className="text-xs text-emerald-700 dark:text-emerald-400">
-              {flash}
+    <div
+      ref={rootRef}
+      className={cn(
+        "dashboard-workspace flex flex-1 flex-col bg-[#F4F6F9]",
+        fullscreen && "overflow-y-auto",
+        fullscreen && !document.fullscreenElement && "fixed inset-0 z-[80]",
+      )}
+    >
+      <div className="mx-auto flex w-full max-w-[1920px] flex-1 flex-col gap-3 p-4 lg:px-6 2xl:px-8 2xl:py-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+              <Crown className="h-4 w-4" />
             </span>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => {
-              refresh();
-              setFlash("Refreshing dashboard data");
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
-          >
-            <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-            Refresh
-          </button>
-          <button
-            type="button"
-            onClick={() => setCustomizeOpen((v) => !v)}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium",
-              customizeOpen
-                ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200"
-                : "text-muted-foreground hover:bg-muted",
-            )}
-          >
-            <Settings2 className="h-3.5 w-3.5" />
-            Customize
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setDefaultDashboardLayout(layout);
-              setFlash("Saved as default dashboard");
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
-          >
-            <Star className="h-3.5 w-3.5" />
-            Set default
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              persist(restoreDefaultDashboardLayout());
-              setFlash("Restored default layout");
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Reset
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              exportDashboardReport(stats);
-              setFlash("Dashboard report downloaded");
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Export
-          </button>
-        </div>
-      </div>
-
-      {customizeOpen ? (
-        <div className="space-y-3 rounded-xl border border-violet-200 bg-violet-50/60 px-3 py-2.5">
-          <p className="text-xs font-semibold text-violet-900">
-            Drag widgets on the dashboard
-          </p>
-          <p className="text-[11px] text-violet-800/80">
-            Grab the handle on a card and drop it on another card to move it
-            up, down, left, or right.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {DASHBOARD_WIDGETS.map((w) => {
-              const hidden = layout.hidden.includes(w.id);
-              return (
-                <label
-                  key={w.id}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2 py-1 text-[11px] text-slate-700 ring-1 ring-slate-200"
-                >
-                  <input
-                    type="checkbox"
-                    checked={!hidden}
-                    onChange={() => {
-                      const hiddenNext = hidden
-                        ? layout.hidden.filter((h) => h !== w.id)
-                        : [...layout.hidden, w.id];
-                      persist({ ...layout, hidden: hiddenNext });
-                    }}
-                    className="accent-violet-600"
-                  />
-                  {w.label}
-                </label>
-              );
-            })}
+            <h2 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
+              {hello}
+            </h2>
           </div>
-
-          <div className="border-t border-violet-200/80 pt-3">
-            <p className="mb-2 text-xs font-semibold text-foreground">
-              Save layouts per role
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={role}
-                onChange={(e) => {
-                  const next = e.target.value as HierarchyLevel;
-                  setRole(next);
-                  saveActiveDashboardRole(next);
-                  setRoleLayouts(listRoleLayouts(next));
-                }}
-                className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground"
-              >
-                {DASHBOARD_ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={layoutName}
-                onChange={(e) => setLayoutName(e.target.value)}
-                placeholder="Layout name"
-                className="min-w-[140px] rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  const saved = saveRoleLayout(role, layoutName, layout);
-                  setRoleLayouts(saved);
-                  setFlash(`Saved “${layoutName.trim() || "Untitled"}” for ${role}`);
-                  setLayoutName("");
-                }}
-                className="rounded-lg bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700"
-              >
-                Save for role
-              </button>
-              {roleLayouts.length ? (
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
+              <label className="relative">
                 <select
-                  defaultValue=""
-                  onChange={(e) => {
-                    const name = e.target.value;
-                    if (!name) return;
-                    const next = loadRoleLayout(role, name);
-                    if (next) {
-                      persist(next);
-                      setFlash(`Loaded ${role} layout “${name}”`);
-                    }
-                    e.target.value = "";
-                  }}
-                  className="rounded-md border border-input bg-background px-2 py-1 text-xs text-foreground"
+                  value={view}
+                  onChange={(e) => switchView(e.target.value as DashboardViewId)}
+                  className="h-10 min-w-[13.5rem] appearance-none rounded-full border border-slate-200 bg-white py-2 pr-10 pl-4 text-[13px] font-semibold text-slate-800 outline-none hover:bg-slate-50"
                 >
-                  <option value="">Load saved…</option>
-                  {roleLayouts.map((row) => (
-                    <option key={row.name} value={row.name}>
-                      {row.name}
+                  {DASHBOARD_VIEWS.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
                     </option>
                   ))}
                 </select>
+                <ChevronDown className="pointer-events-none absolute top-1/2 right-3.5 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              </label>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  aria-label="Manage dashboard"
+                  title="Manage dashboard"
+                  className={cn(
+                    "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#5A32A3] outline-none hover:bg-violet-50",
+                    fullscreen && "bg-violet-50 ring-1 ring-violet-200",
+                  )}
+                >
+                  <Settings2 className="h-4 w-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-52">
+                  <DropdownMenuItem className="text-[13px]" onClick={() => void toggleFullscreen()}>
+                    {fullscreen ? (
+                      <Minimize2 className="h-4 w-4 text-[#5A32A3]" />
+                    ) : (
+                      <Maximize2 className="h-4 w-4 text-[#5A32A3]" />
+                    )}
+                    {fullscreen ? "Exit full screen" : "View full screen"}
+                  </DropdownMenuItem>
+                  <DashboardDateRangePicker
+                    filters={layout.filters}
+                    onChange={(next) =>
+                      persist({
+                        ...layout,
+                        filters: { ...layout.filters, ...next, owner: "All" },
+                      })
+                    }
+                  />
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {flash ? <span className="text-xs text-emerald-700">{flash}</span> : null}
+              {customizeOpen ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (view === "executive") {
+                        setDefaultDashboardLayout(layout);
+                      } else {
+                        setDefaultViewHidden(view, viewHidden);
+                      }
+                      setFlash("Saved as default dashboard");
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
+                  >
+                    <Star className="h-3.5 w-3.5" />
+                    Set default
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (view === "executive") {
+                        persist(restoreDefaultDashboardLayout());
+                      } else {
+                        setViewHidden(restoreDefaultViewHidden(view));
+                        setViewOrder(resetViewOrder(view));
+                      }
+                      setFlash("Restored default layout");
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Reset
+                  </button>
+                </>
               ) : null}
             </div>
           </div>
         </div>
-      ) : null}
 
-      <div className="grid grid-cols-1 gap-3 xl:grid-cols-6">{sections}</div>
-    </div>
+        {view === "executive" ? (
+          <>
+            {executive.newLeads === 0 &&
+            executive.settlements === 0 &&
+            layout.filters.dateRange !== "all" ? (
+              <p className="text-[12px] text-slate-500">
+                No new leads or settlements in this timeframe. Pipeline, actions, and
+                rankings still use live records — try Last 90 days or All time to
+                include earlier activity.
+              </p>
+            ) : null}
+            <div className={cn("grid grid-cols-1 gap-3 xl:grid-cols-6", dashboardReorderCanvas(false))}>
+              {sections}
+            </div>
+            <ExecutiveFooter data={executive} />
+          </>
+        ) : null}
+        {view === "sales" ? (
+          <SalesDashboardView
+            filters={layout.filters}
+            {...reorderProps}
+          />
+        ) : null}
+        {view === "performance" ? (
+          <PerformanceDashboardView
+            filters={layout.filters}
+            {...reorderProps}
+          />
+        ) : null}
+        {view === "work-queue" ? (
+          <WorkQueueDashboardView
+            filters={layout.filters}
+            {...reorderProps}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }

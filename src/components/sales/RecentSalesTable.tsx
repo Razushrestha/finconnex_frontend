@@ -10,6 +10,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 
 type PaymentMethod = "Debit Card" | "UPI" | "Credit Card" | "Wallet";
 type OrderStatus = "Completed" | "Pending" | "Cancelled" | "Processing";
@@ -147,7 +148,10 @@ export function RecentSalesTable() {
         </div>
       </div>
 
-      <div className="overflow-x-auto pb-3 [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100">
+      <ResizableColumns
+        storageKey="recent-sales-list"
+        className="overflow-x-auto pb-3 [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100"
+      >
         <table className="w-full min-w-[1050px] border-collapse text-left">
           <thead>
             <tr className="rounded-lg bg-slate-50 text-sm text-slate-500">
@@ -237,7 +241,7 @@ export function RecentSalesTable() {
             ))}
           </tbody>
         </table>
-      </div>
+      </ResizableColumns>
 
       {/* Footer */}
       <div className="mt-3 flex items-center justify-between">
