@@ -155,6 +155,7 @@ const dashboardItems: NavItem[] = [
       { label: "Credit Notes", href: "/finance/credit-notes" },
       { label: "Payments", href: "/finance/payments" },
       { label: "Items / Services", href: "/finance/products" },
+      { label: "Service Agreements", href: "/finance/agreements" },
     ],
   },
   { label: "Support", href: "/support", icon: HelpCircle },
