@@ -1,6 +1,6 @@
+import { ensureCrmAccess, ensureCrmSession } from "@/lib/activity-timeline/auth";
 import {
   cancelAutomationRun,
-  createAutomation,
   createAutomationVersion,
   deleteAutomation,
   disableAutomation,
@@ -14,6 +14,7 @@ import {
   triggerAutomation,
   updateAutomationDraft,
 } from "@/lib/automations/api";
+import { crmFetch } from "@/lib/crm/request";
 import {
   automationToJourney,
   journeyEntityType,
@@ -21,6 +22,67 @@ import {
   journeyTriggerToBackend,
 } from "./mapping";
 import type { JourneyStep, JourneyTrigger, LifecycleJourney } from "./types";
+
+export function journeysPath(suffix = ""): string {
+  return `/v1/journeys${suffix}`;
+}
+
+export function journeyTemplatesPath(suffix = ""): string {
+  return `/v1/journey-templates${suffix}`;
+}
+
+async function resolveAuth() {
+  const scoped = await ensureCrmSession();
+  if (scoped) return scoped;
+  return ensureCrmAccess();
+}
+
+async function journeysRequest(suffix: string, init?: RequestInit): Promise<unknown> {
+  const auth = await resolveAuth();
+  if (!auth) throw new Error("Sign in to manage journeys");
+  return crmFetch(auth, journeysPath(suffix), init);
+}
+
+async function journeyTemplatesRequest(
+  suffix: string,
+  init?: RequestInit,
+): Promise<unknown> {
+  const auth = await resolveAuth();
+  if (!auth) throw new Error("Sign in to manage journeys");
+  return crmFetch(auth, journeyTemplatesPath(suffix), init);
+}
+
+export type JourneyTemplateSummary = {
+  key: string;
+  name: string;
+  description: string;
+  reEntryPolicy: "NEVER" | "AFTER_EXIT" | "ALWAYS";
+  triggerType: string;
+  entityType: string;
+  actionTypes: string[];
+};
+
+/** List the 13 built-in Journey starter templates (real backend, not the client-side seed data). */
+export async function listCrmJourneyTemplates(): Promise<JourneyTemplateSummary[]> {
+  const data = await journeyTemplatesRequest("");
+  return Array.isArray(data) ? (data as JourneyTemplateSummary[]) : [];
+}
+
+/** Creates a real Journey (with enrollment tracking + re-entry control) from a starter template. */
+export async function createCrmJourneyFromTemplate(
+  key: string,
+  options: {
+    name?: string;
+    stepConfig?: Record<string, Record<string, unknown>>;
+    reEntryPolicy?: "NEVER" | "AFTER_EXIT" | "ALWAYS";
+  } = {},
+): Promise<LifecycleJourney> {
+  const created = (await journeyTemplatesRequest(`/${key}/create`, {
+    method: "POST",
+    body: JSON.stringify(options),
+  })) as { automationId: string };
+  return journeyFromAutomationId(created.automationId);
+}
 
 async function journeyFromAutomationId(id: string): Promise<LifecycleJourney> {
   const [automation, { items: runs }] = await Promise.all([
@@ -59,13 +121,18 @@ export async function createCrmJourney(input: {
   steps: JourneyStep[];
 }): Promise<LifecycleJourney> {
   const { triggerType, entityType } = journeyTriggerToBackend(input.trigger);
-  const automation = await createAutomation({
-    name: input.name,
-    triggerType: triggerType as never,
-    entityType: entityType as never,
-    steps: journeyStepsToBackend(input.steps) as never,
-  });
-  return journeyFromAutomationId(automation.id);
+  // Creates a real Journey (not a bare Automation) so enrollment tracking
+  // and re-entry control apply from day one — see backend M4.
+  const journey = (await journeysRequest("", {
+    method: "POST",
+    body: JSON.stringify({
+      name: input.name,
+      triggerType,
+      entityType,
+      steps: journeyStepsToBackend(input.steps),
+    }),
+  })) as { automationId: string };
+  return journeyFromAutomationId(journey.automationId);
 }
 
 /**
