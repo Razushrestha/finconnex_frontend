@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar,
@@ -13,7 +13,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { CALL_OWNERS, CALL_PURPOSES } from "@/lib/calls/types";
+import { CALL_PURPOSES } from "@/lib/calls/types";
 import { createCall, formatCallDate } from "@/lib/calls/store";
 import {
   RELATED_ENTITY_KINDS,
@@ -48,6 +48,14 @@ import {
 } from "@/components/sales/CreateEntityForm";
 import { cn } from "@/lib/utils";
 import { getRulesActor } from "@/lib/rules/actor";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import {
+  assignableOwnerLabel,
+  defaultAssignableOwnerId,
+  listAssignableOwnersLocal,
+  loadAssignableOwners,
+  type AssignableOwner,
+} from "@/lib/users/assignable";
 import {
   assignedCallerIds,
   defaultCallerId,
@@ -94,7 +102,7 @@ const initialState: FormState = {
   relatedName: "",
   fromNumber: defaultCallerId("John Smith"),
   startTime: "",
-  assignedTo: "John Smith",
+  assignedTo: defaultAssignableOwnerId(listAssignableOwnersLocal()),
   subject: "",
   reminderDate: "",
   purpose: "Follow-up",
@@ -229,16 +237,43 @@ export function ScheduleCallForm({
   const [reminderOn, setReminderOn] = useState(false);
   const [newActionItem, setNewActionItem] = useState("");
   const newActionItemRef = useRef<HTMLInputElement>(null);
+  const [ownerOptions, setOwnerOptions] = useState<AssignableOwner[]>(() =>
+    listAssignableOwnersLocal(),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadAssignableOwners().then((rows) => {
+      if (cancelled || !rows.length) return;
+      setOwnerOptions(rows);
+      setForm((prev) => {
+        const assignedTo = defaultAssignableOwnerId(rows, prev.assignedTo);
+        const owner = rows.find((row) => row.id === assignedTo);
+        const numbers = assignedCallerIds(owner?.name ?? assignedTo);
+        return {
+          ...prev,
+          assignedTo,
+          fromNumber: numbers.includes(prev.fromNumber)
+            ? prev.fromNumber
+            : (numbers[0] ?? prev.fromNumber),
+        };
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleOwnerChange(owner: string) {
-    const numbers = assignedCallerIds(owner);
+  function handleOwnerChange(ownerId: string) {
+    const owner = ownerOptions.find((row) => row.id === ownerId);
+    const numbers = assignedCallerIds(owner?.name ?? ownerId);
     setForm((prev) => ({
       ...prev,
-      assignedTo: owner,
+      assignedTo: ownerId,
       fromNumber: numbers.includes(prev.fromNumber)
         ? prev.fromNumber
         : (numbers[0] ?? ""),
@@ -307,10 +342,13 @@ export function ScheduleCallForm({
     });
   }
 
-  const ownerNumbers = assignedCallerIds(form.assignedTo);
+  const ownerLabel =
+    ownerOptions.find((row) => row.id === form.assignedTo)?.name ??
+    form.assignedTo;
+  const ownerNumbers = assignedCallerIds(ownerLabel);
   const minStart = toDatetimeLocalValue(startOfMinute(new Date()));
   const hasStartTime = Boolean(form.startTime.trim());
-  const actor = getRulesActor().name || form.assignedTo || "Admin";
+  const actor = getRulesActor().name || ownerLabel || "Admin";
   const auditPreviewOn = formatTaskTimestamp(new Date());
   const callToOptions = contactOptions(form.callFor);
 
@@ -395,6 +433,15 @@ export function ScheduleCallForm({
     setSubmitted(true);
     if (!validate()) return;
 
+    const relatedMatch =
+      form.relatedKind && form.relatedName
+        ? liveRelatedRecords(form.relatedKind as RelatedEntityKind).find(
+            (item) => item.name === form.relatedName,
+          )
+        : undefined;
+    const contactMatch = liveRelatedRecords("Contact").find(
+      (item) => item.name === form.callFor.trim(),
+    );
     const relatedTo =
       form.relatedKind && form.relatedName
         ? `${form.relatedKind}: ${form.relatedName}`
@@ -434,6 +481,11 @@ export function ScheduleCallForm({
       status: "Scheduled",
       date: toStoredDate(form.startTime),
       assignedTo: form.assignedTo.trim(),
+      relatedType: form.relatedKind || undefined,
+      relatedId:
+        relatedMatch?.id && isUuid(relatedMatch.id) ? relatedMatch.id : undefined,
+      contactId:
+        contactMatch?.id && isUuid(contactMatch.id) ? contactMatch.id : undefined,
       agenda: form.agenda.trim() || undefined,
       purpose: form.purpose.trim() || undefined,
       notes: form.notes.trim() || form.agenda.trim() || undefined,
@@ -821,9 +873,9 @@ export function ScheduleCallForm({
                   value={form.assignedTo}
                   onChange={(e) => handleOwnerChange(e.target.value)}
                 >
-                  {CALL_OWNERS.map((owner) => (
-                    <option key={owner} value={owner}>
-                      {owner}
+                  {ownerOptions.map((owner) => (
+                    <option key={owner.id} value={owner.id}>
+                      {assignableOwnerLabel(owner)}
                     </option>
                   ))}
                 </select>

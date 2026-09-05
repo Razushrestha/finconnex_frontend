@@ -75,12 +75,18 @@ function isUnread(email: Email) {
   return email.status !== "Opened";
 }
 
-export function EmailsWorkspace() {
+export function EmailsWorkspace({
+  onSync,
+  storeRevision = 0,
+}: {
+  onSync?: () => void | Promise<void>;
+  storeRevision?: number;
+}) {
   const router = useRouter();
   const [revision, setRevision] = useState(0);
   const [folder, setFolder] = useState<MailFolder>("inbox");
   const [customFolderId, setCustomFolderId] = useState<string | null>(null);
-  const [focusView, setFocusView] = useState<FocusView>("focused");
+  const [focusView, setFocusView] = useState<FocusView>("all");
   const [labelFilter, setLabelFilter] = useState<MailLabel | null>(null);
   const [query, setQuery] = useState("");
   const [appliedQuery, setAppliedQuery] = useState("");
@@ -104,8 +110,9 @@ export function EmailsWorkspace() {
 
   const emails = useMemo(() => {
     void revision;
+    void storeRevision;
     return listEmails();
-  }, [revision]);
+  }, [revision, storeRevision]);
 
   const userFolders = useMemo(() => {
     void revision;
@@ -160,10 +167,12 @@ export function EmailsWorkspace() {
       );
     }
     if (folder === "inbox") {
-      return focusView === "other" ? otherInbox : focusedInbox;
+      if (focusView === "other") return otherInbox;
+      if (focusView === "focused") return focusedInbox;
+      return inboxAll;
     }
     return folderEmails(emails, folder);
-  }, [emails, folder, customFolderId, focusView, focusedInbox, otherInbox]);
+  }, [emails, folder, customFolderId, focusView, inboxAll, focusedInbox, otherInbox]);
 
   const visible = useMemo(() => {
     const q = appliedQuery.trim().toLowerCase();
@@ -188,7 +197,9 @@ export function EmailsWorkspace() {
     : folder === "inbox"
       ? focusView === "other"
         ? "Other"
-        : "Focused"
+        : focusView === "focused"
+          ? "Focused"
+          : "Inbox"
       : FOLDERS.find((item) => item.id === folder)?.label ?? "Inbox";
 
   const filterCount =
@@ -204,12 +215,18 @@ export function EmailsWorkspace() {
     setFolder(id);
     setCustomFolderId(null);
     setLabelFilter(null);
-    if (id === "inbox") setFocusView("focused");
+    setFilters(EMPTY_MAIL_FILTERS);
+    setFilterOpen(false);
+    setAppliedQuery("");
+    setQuery("");
+    if (id === "inbox") setFocusView("all");
   }
 
   function selectUserFolder(item: MailUserFolder) {
     setCustomFolderId(item.id);
     setLabelFilter(null);
+    setAppliedQuery("");
+    setQuery("");
   }
 
   function addFolder() {
@@ -220,15 +237,20 @@ export function EmailsWorkspace() {
     setCustomFolderId(created.id);
   }
 
-  function syncNow() {
+  async function syncNow() {
     setSyncing(true);
-    window.setTimeout(() => {
+    try {
+      await onSync?.();
+    } finally {
       setRevision((n) => n + 1);
       setSyncedAt(
-        new Date().toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" }),
+        new Date().toLocaleTimeString("en-AU", {
+          hour: "numeric",
+          minute: "2-digit",
+        }),
       );
       setSyncing(false);
-    }, 700);
+    }
   }
 
   return (
@@ -259,6 +281,7 @@ export function EmailsWorkspace() {
                 <button
                   key={item.id}
                   type="button"
+                  aria-pressed={active}
                   onClick={() => selectSystemFolder(item.id)}
                   className={cn(
                     "mb-0.5 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12px]",
@@ -471,32 +494,28 @@ export function EmailsWorkspace() {
 
           {folder === "inbox" && !customFolderId ? (
             <div className="mb-2 flex shrink-0 items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setFocusView("focused")}
-                className={cn(
-                  "rounded-full px-3 py-1 text-[12px] font-semibold",
-                  focusView === "focused"
-                    ? "bg-[#5A32A3] text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200",
-                )}
-              >
-                Focused
-                <span className="ml-1.5 text-[10px] opacity-80">{focusedInbox.length}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setFocusView("other")}
-                className={cn(
-                  "rounded-full px-3 py-1 text-[12px] font-semibold",
-                  focusView === "other"
-                    ? "bg-[#5A32A3] text-white"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200",
-                )}
-              >
-                Other
-                <span className="ml-1.5 text-[10px] opacity-80">{otherInbox.length}</span>
-              </button>
+              {(
+                [
+                  ["all", "All", inboxAll.length],
+                  ["focused", "Focused", focusedInbox.length],
+                  ["other", "Other", otherInbox.length],
+                ] as const
+              ).map(([id, label, count]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setFocusView(id)}
+                  className={cn(
+                    "rounded-full px-3 py-1 text-[12px] font-semibold",
+                    focusView === id
+                      ? "bg-[#5A32A3] text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200",
+                  )}
+                >
+                  {label}
+                  <span className="ml-1.5 text-[10px] opacity-80">{count}</span>
+                </button>
+              ))}
             </div>
           ) : null}
 

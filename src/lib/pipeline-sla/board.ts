@@ -20,13 +20,28 @@ const PIPELINE_STAGE_ALIASES: Record<string, MortgagePipelineStage> = {
   Lost: "Closed Lost",
 };
 
+function mortgageStageCode(stage: string): string {
+  return stage
+    .toUpperCase()
+    .replace(/&/g, "AND")
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
 export function resolvePipelineStage(
   value: string,
 ): MortgagePipelineStage | null {
-  if ((MORTGAGE_PIPELINE_STAGES as readonly string[]).includes(value)) {
-    return value as MortgagePipelineStage;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if ((MORTGAGE_PIPELINE_STAGES as readonly string[]).includes(trimmed)) {
+    return trimmed as MortgagePipelineStage;
   }
-  return PIPELINE_STAGE_ALIASES[value] ?? null;
+  if (PIPELINE_STAGE_ALIASES[trimmed]) return PIPELINE_STAGE_ALIASES[trimmed];
+  const compact = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  for (const stage of MORTGAGE_PIPELINE_STAGES) {
+    if (mortgageStageCode(stage).replace(/_/g, "") === compact) return stage;
+  }
+  return null;
 }
 
 /** Reverse of leadStatusToPipelineStage — CRM status from mortgage stage. */

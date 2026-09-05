@@ -44,6 +44,7 @@ import {
   tryCrmCompany,
 } from "@/lib/companies/api";
 import { EntityCsvImportModal } from "@/components/sales/import/EntityCsvImportModal";
+import { MergeRecordsModal } from "@/components/sales/merge/MergeRecordsModal";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import { onRulesChange } from "@/lib/rules";
 import { viewEnter } from "@/lib/motion";
@@ -64,7 +65,7 @@ import type { CompanyQuickActionKind } from "@/components/sales/companies/Compan
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import { uniqueTags } from "@/lib/tags";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
-import { MergeRecordsModal } from "@/components/sales/merge/MergeRecordsModal";
+import { isUuid } from "@/lib/activity-timeline/auth";
 
 type CompanyRecord = CompanyGroup["companies"][number];
 
@@ -142,12 +143,73 @@ export default function CompaniesPage() {
       if (deleteCompany(id, { skipCrm: true })) n += 1;
     }
     if (n) {
+      const liveIds = selectedIds.filter(isUuid);
       void tryCrmCompany(() =>
-        bulkCrmCompanies({ ids: selectedIds, operation: "DELETE" }),
+        bulkCrmCompanies({
+          ids: liveIds.length ? liveIds : selectedIds,
+          operation: "SOFT_DELETE",
+        }),
       );
     }
     setSelectedIds([]);
     setBulkFlash(`Deleted ${n} compan${n === 1 ? "y" : "ies"}`);
+  }
+
+  function changeOwnerSelected() {
+    if (!selectedIds.length) return;
+    const owner = window.prompt(
+      `Assign owner UUID for ${selectedIds.length} compan${selectedIds.length === 1 ? "y" : "ies"}.`,
+      "",
+    );
+    if (!owner?.trim()) return;
+    const liveIds = selectedIds.filter(isUuid);
+    if (isUuid(owner.trim()) && liveIds.length) {
+      void tryCrmCompany(() =>
+        bulkCrmCompanies({
+          ids: liveIds,
+          operation: "ASSIGN_OWNER",
+          payload: { ownerId: owner.trim() },
+        }),
+      ).then(() => crm.refresh());
+      setBulkFlash("Owner update sent");
+      return;
+    }
+    let n = 0;
+    for (const id of selectedIds) {
+      if (updateCompany(id, { owner: owner.trim() })) n += 1;
+    }
+    setBulkFlash(`Updated owner on ${n} compan${n === 1 ? "y" : "ies"}`);
+  }
+
+  function changeStatusSelected() {
+    if (!selectedIds.length) return;
+    const status = window.prompt(
+      `CRM status for ${selectedIds.length} compan${selectedIds.length === 1 ? "y" : "ies"}.\nUse one of: ${COMPANY_STATUSES.join(", ")}`,
+      "Prospect",
+    );
+    if (!status?.trim()) return;
+    const next = COMPANY_STATUSES.find(
+      (s) => s.toLowerCase() === status.trim().toLowerCase(),
+    );
+    if (!next) {
+      setBulkFlash("Unknown company status");
+      return;
+    }
+    const liveIds = selectedIds.filter(isUuid);
+    if (liveIds.length) {
+      void tryCrmCompany(() =>
+        bulkCrmCompanies({
+          ids: liveIds,
+          operation: "CHANGE_STATUS",
+          payload: { status: next.toUpperCase() },
+        }),
+      ).then(() => crm.refresh());
+    }
+    let n = 0;
+    for (const id of selectedIds) {
+      if (updateCompany(id, { status: next })) n += 1;
+    }
+    setBulkFlash(`Updated status on ${n} compan${n === 1 ? "y" : "ies"}`);
   }
 
   function openPrintView() {
@@ -320,8 +382,8 @@ export default function CompaniesPage() {
           onRunMacro={() => console.log("run macro clicked")}
           onCreateTask={() => console.log("create task clicked")}
           onSetReminder={() => console.log("set reminder clicked")}
-          onMassUpdate={() => console.log("mass update clicked")}
-          onChangeOwner={() => console.log("change owner clicked")}
+          onMassUpdate={() => changeStatusSelected()}
+          onChangeOwner={() => changeOwnerSelected()}
           onCadences={() => console.log("cadences clicked")}
           onAddToCampaigns={() => console.log("add to campaigns clicked")}
           onPrintMailingLabels={() =>
@@ -402,7 +464,7 @@ export default function CompaniesPage() {
             importCrmCompanies({
               rows: rows.map((row) => ({ ...row })),
             }),
-          );
+          ).then(() => crm.refresh());
           return summary;
         }}
         downloadErrorReport={downloadCompanyImportErrorReport}
@@ -413,9 +475,7 @@ export default function CompaniesPage() {
           setBulkFlash(
             `Imported ${s.imported} · updated ${s.updated} · skipped ${s.skipped}`,
           );
-          setTotalCompanies(
-            listCompanyGroups().reduce((n, g) => n + g.companies.length, 0),
-          );
+          crm.refresh();
         }}
       />
 
@@ -431,9 +491,7 @@ export default function CompaniesPage() {
         onMerged={(msg) => {
           setBulkFlash(msg);
           setSelectedIds([]);
-          setTotalCompanies(
-            listCompanyGroups().reduce((n, g) => n + g.companies.length, 0),
-          );
+          crm.refresh();
         }}
       />
     </div>

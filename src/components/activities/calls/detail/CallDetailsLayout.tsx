@@ -7,8 +7,15 @@ import {
   callHasPlayableRecording,
   callPlacedBy,
   callWasPlaced,
+  mergeCrmCalls,
   updateCall,
 } from "@/lib/calls/store";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import {
+  dialCrmCall,
+  startCrmCall,
+  tryCrm,
+} from "@/lib/calls/api";
 import { TaskEditProvider } from "@/components/activities/tasks/detail/TaskEditContext";
 import { CallHeaderSection } from "./CallHeaderSection";
 import { CallMetadataCard } from "./CallMetadataCard";
@@ -50,6 +57,12 @@ export function CallDetailsLayout({
     return Boolean(next);
   }
 
+  async function applyRemote(remote: Call | null) {
+    if (!remote) return;
+    mergeCrmCalls([remote]);
+    onChange(remote);
+  }
+
   return (
     <TaskEditProvider>
       <div className="min-h-screen bg-white">
@@ -58,7 +71,26 @@ export function CallDetailsLayout({
             onBack={onBack}
             backLabel={backLabel}
             canClose={call.status !== "Completed"}
+            canStart={call.status === "Scheduled" && isUuid(call.id)}
+            canDial={isUuid(call.id) && call.status !== "Cancelled"}
             onCloseCall={() => persist({ status: "Completed" })}
+            onStartCall={() => {
+              void tryCrm(() => startCrmCall(call.id)).then((remote) => {
+                if (remote) void applyRemote(remote);
+                else persist({ status: "Scheduled" });
+                toast.success("Call started");
+              });
+            }}
+            onDialCall={() => {
+              void tryCrm(() =>
+                dialCrmCall(call.id, {
+                  fromNumber: call.fromNumber,
+                }),
+              ).then((remote) => {
+                if (remote) void applyRemote(remote);
+                toast.success("Dialing…");
+              });
+            }}
             timelineHref={`/activities/calls/detail/${call.id}/timeline`}
           />
         </div>

@@ -1,9 +1,10 @@
 import {
   ensureCrmSession,
+  isBoundCrmSession,
   isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import type { HierarchyLevel } from "@/lib/rules/permissions";
 import {
   emptyWorkspaceMembersSummary,
@@ -60,6 +61,13 @@ async function requireSession(): Promise<CrmSession> {
     throw new Error("Sign in with a workspace to manage members");
   }
   return session;
+}
+
+async function membersCrm<T>(path: string, init?: RequestInit): Promise<T> {
+  if (isBoundCrmSession()) {
+    return crmFetch(await requireSession(), path, init);
+  }
+  return crmBffFetch<T>(path, init);
 }
 
 function extractRecords(data: unknown): Record<string, unknown>[] {
@@ -236,10 +244,7 @@ function asMember(data: unknown): WorkspaceMember | null {
 export async function listCrmWorkspaceMembers(): Promise<WorkspaceMember[]> {
   const session = await requireSession();
   return normalizeWorkspaceMembers(
-    await crmFetch(
-      session,
-      workspaceMembersPath(session.workspaceId),
-    ),
+    await membersCrm(workspaceMembersPath(session.workspaceId)),
   );
 }
 

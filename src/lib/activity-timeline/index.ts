@@ -17,6 +17,7 @@ export {
   ensureCrmSession,
   ensureCrmAccess,
   bindCrmSession,
+  isBoundCrmSession,
   persistCrmTokens,
   clearCrmTokens,
   getCrmApiBaseUrl,

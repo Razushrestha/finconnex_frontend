@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { listCrmMessages } from "@/lib/messages/api";
+import {
+  listAllCrmMessages,
+  listCrmMessages,
+  listRecentCrmMessages,
+  listUnreadCrmMessages,
+  tryCrmMessage,
+} from "@/lib/messages/api";
 import { replaceCrmMessages } from "@/lib/messages/store";
 
 export type MessagesDataSource = "api" | "demo";
@@ -21,12 +27,26 @@ export function useCrmMessages() {
 
     void (async () => {
       try {
-        const remote = await listCrmMessages();
+        const primary = await listCrmMessages();
+        const [visible, recent, unread] = await Promise.all([
+          tryCrmMessage(() => listAllCrmMessages()),
+          tryCrmMessage(() => listRecentCrmMessages()),
+          tryCrmMessage(() => listUnreadCrmMessages()),
+        ]);
         if (cancelled) return;
-        replaceCrmMessages(remote);
+        const remote = [
+          ...primary,
+          ...(visible ?? []),
+          ...(recent ?? []),
+          ...(unread ?? []),
+        ];
+        const byId = new Map(remote.map((row) => [row.id, row]));
+        replaceCrmMessages([...byId.values()]);
         setSource("api");
+        setError(null);
       } catch (err) {
         if (cancelled) return;
+        replaceCrmMessages([]);
         setSource("demo");
         setError(err instanceof Error ? err.message : "Messages unavailable");
       } finally {

@@ -11,9 +11,15 @@ import {
   completeCrmCall,
   createCrmCall,
   deleteCrmCall,
+  dialCrmCall,
   getCrmCall,
+  listCompletedCrmCalls,
   listCrmCallHistory,
   listCrmCalls,
+  listMissedCrmCalls,
+  listMyCrmCalls,
+  listRelatedCrmCalls,
+  listTodayCrmCalls,
   listUpcomingCrmCalls,
   logCrmCallOutcome,
   normalizeCrmCall,
@@ -42,6 +48,14 @@ const RELATED_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const LIVE_ROUTES: Array<{ method: string; path: string }> = [
   { method: "GET", path: "/v1/calls" },
   { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/calls` },
+  { method: "GET", path: "/v1/calls/today" },
+  { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/calls/today` },
+  { method: "GET", path: "/v1/calls/completed" },
+  { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/calls/completed` },
+  { method: "GET", path: "/v1/calls/missed" },
+  { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/calls/missed` },
+  { method: "GET", path: "/v1/calls/my" },
+  { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/calls/my` },
   { method: "GET", path: "/v1/calls/upcoming" },
   { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/calls/upcoming` },
   { method: "GET", path: "/v1/calls/history" },
@@ -53,10 +67,16 @@ const LIVE_ROUTES: Array<{ method: string; path: string }> = [
     path: `/v1/workspaces/${SESSION.workspaceId}/LEAD/${RELATED_ID}/calls`,
   },
   { method: "POST", path: "/v1/calls" },
+  { method: "POST", path: `/v1/workspaces/${SESSION.workspaceId}/calls` },
   { method: "POST", path: `/v1/calls/${CALL_ID}/start` },
   {
     method: "POST",
     path: `/v1/workspaces/${SESSION.workspaceId}/calls/${CALL_ID}/start`,
+  },
+  { method: "POST", path: `/v1/calls/${CALL_ID}/dial` },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/calls/${CALL_ID}/dial`,
   },
   { method: "POST", path: `/v1/calls/${CALL_ID}/complete` },
   {
@@ -107,13 +127,19 @@ export function smokeCallsWiring() {
   }
   for (const name of [
     "listCrmCalls",
+    "listTodayCrmCalls",
+    "listCompletedCrmCalls",
+    "listMissedCrmCalls",
+    "listMyCrmCalls",
     "listUpcomingCrmCalls",
     "listCrmCallHistory",
     "getCrmCall",
+    "listRelatedCrmCalls",
     "createCrmCall",
     "updateCrmCall",
     "deleteCrmCall",
     "startCrmCall",
+    "dialCrmCall",
     "completeCrmCall",
     "cancelCrmCall",
     "rescheduleCrmCall",
@@ -124,12 +150,35 @@ export function smokeCallsWiring() {
     }
   }
 
+  if (!api.includes("crmBffFetch")) {
+    fail("calls client must call crmBffFetch in the browser");
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('"calls"')) {
+    fail("BFF proxy does not allow calls");
+  }
+
   const catalog = readSrc("src/lib/api/endpoints.ts");
   if (!catalog.includes('path: "/workspaces/:workspaceId/calls"')) {
     fail("endpoint catalog missing workspace calls");
   }
   if (!catalog.includes('path: "/calls/:id/start"')) {
     fail("endpoint catalog missing call start action");
+  }
+  if (!catalog.includes('path: "/calls/:id/dial"')) {
+    fail("endpoint catalog missing call dial action");
+  }
+  if (!catalog.includes('path: "/calls/today"')) {
+    fail("endpoint catalog missing calls/today");
+  }
+
+  const hook = readSrc("src/lib/calls/use-crm-calls.ts");
+  if (!hook.includes("listTodayCrmCalls") || !hook.includes("listMyCrmCalls")) {
+    fail("useCrmCalls does not load today/my call lists");
+  }
+  if (!hook.includes("replaceCrmCalls")) {
+    fail("useCrmCalls does not replace the board from live CRM");
   }
 
   const page = readSrc("src/app/(dashboard)/activities/calls/page.tsx");
@@ -142,6 +191,27 @@ export function smokeCallsWiring() {
   );
   if (!detail.includes("getCrmCall")) {
     fail("call detail page does not call getCrmCall");
+  }
+  const header = readSrc(
+    "src/components/activities/calls/detail/CallHeaderSection.tsx",
+  );
+  if (!header.includes("onStartCall") || !header.includes("onDialCall")) {
+    fail("call header missing start/dial CRM actions");
+  }
+
+  const store = readSrc("src/lib/calls/store.ts");
+  if (!store.includes("replaceCrmCalls")) {
+    fail("calls store missing replaceCrmCalls");
+  }
+
+  const schedule = readSrc("src/components/activities/calls/ScheduleCallForm.tsx");
+  if (!schedule.includes("loadAssignableOwners")) {
+    fail("schedule call form does not load CRM owners");
+  }
+
+  const pad = readSrc("src/components/layout/SoftphonePad.tsx");
+  if (!pad.includes("dialCrmCall")) {
+    fail("softphone does not dial through CRM");
   }
 
   const item = normalizeCrmCall(
@@ -192,9 +262,14 @@ export async function smokeCallsMock() {
 
   try {
     await listCrmCalls();
+    await listTodayCrmCalls();
+    await listCompletedCrmCalls();
+    await listMissedCrmCalls();
+    await listMyCrmCalls();
     await listUpcomingCrmCalls();
     await listCrmCallHistory();
     await getCrmCall(CALL_ID);
+    await listRelatedCrmCalls("LEAD", RELATED_ID);
     await createCrmCall({
       subject: "New call",
       callType: "Outbound",
@@ -204,6 +279,7 @@ export async function smokeCallsMock() {
     });
     await updateCrmCall(CALL_ID, { notes: "Updated" });
     await startCrmCall(CALL_ID);
+    await dialCrmCall(CALL_ID);
     await completeCrmCall(CALL_ID);
     await cancelCrmCall(CALL_ID);
     await rescheduleCrmCall(CALL_ID, "2026-08-26T10:00:00.000Z");
@@ -212,12 +288,18 @@ export async function smokeCallsMock() {
 
     const expected = [
       `GET ${workspaceCallsPath(SESSION.workspaceId)}`,
+      `GET ${workspaceCallsPath(SESSION.workspaceId, "/today")}`,
+      `GET ${workspaceCallsPath(SESSION.workspaceId, "/completed")}`,
+      `GET ${workspaceCallsPath(SESSION.workspaceId, "/missed")}`,
+      `GET ${workspaceCallsPath(SESSION.workspaceId, "/my")}`,
       `GET ${workspaceCallsPath(SESSION.workspaceId, "/upcoming")}`,
       `GET ${workspaceCallsPath(SESSION.workspaceId, "/history")}`,
       `GET ${workspaceCallsPath(SESSION.workspaceId, `/${CALL_ID}`)}`,
+      `GET /v1/workspaces/${SESSION.workspaceId}/LEAD/${RELATED_ID}/calls`,
       `POST ${workspaceCallsPath(SESSION.workspaceId)}`,
       `PATCH ${workspaceCallsPath(SESSION.workspaceId, `/${CALL_ID}`)}`,
       `POST ${workspaceCallsPath(SESSION.workspaceId, `/${CALL_ID}/start`)}`,
+      `POST ${workspaceCallsPath(SESSION.workspaceId, `/${CALL_ID}/dial`)}`,
       `POST ${workspaceCallsPath(SESSION.workspaceId, `/${CALL_ID}/complete`)}`,
       `POST ${workspaceCallsPath(SESSION.workspaceId, `/${CALL_ID}/cancel`)}`,
       `POST ${workspaceCallsPath(SESSION.workspaceId, `/${CALL_ID}/reschedule`)}`,

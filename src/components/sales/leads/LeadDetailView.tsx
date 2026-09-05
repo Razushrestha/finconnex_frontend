@@ -115,6 +115,7 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
         }
         const converted = await convertCrmLead(card.id, {
           convertedDealId: deal.id,
+          convertedCompanyId: card.companyId,
         });
         if (converted) {
           setCard(mapCrmLeadToCard(converted));
@@ -322,6 +323,18 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
                 }
               }
               const scalar: Parameters<typeof updateCrmLead>[1] = {};
+              if (patch.owner) {
+                const members = await listCrmWorkspaceMembers();
+                const match = members.find(
+                  (m) =>
+                    m.name.trim().toLowerCase() ===
+                    patch.owner!.trim().toLowerCase(),
+                );
+                if (match && isUuid(match.userId)) {
+                  const live = await assignCrmLeadOwner(card.id, match.userId);
+                  if (live) applyLive(mapCrmLeadToCard(live));
+                }
+              }
               if (patch.email) {
                 const parts = (patch.name ?? card.name).trim().split(/\s+/);
                 scalar.firstName = parts[0];
@@ -600,15 +613,6 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
               notify("Email scheduled");
               return;
             }
-            const result = await sendEmailDemoLive({
-              email: to[0],
-              subject: values.subject,
-              body: values.body,
-            });
-            if (!result.ok) {
-              notify(result.message);
-              return;
-            }
             createEmail({
               subject: values.subject || "(no subject)",
               body: values.body || "",
@@ -620,12 +624,17 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
               sentDate: formatRulesAt(),
               relatedTo: `Lead: ${card.name}`,
             });
-          setIsComposeOpen(false);
+            setIsComposeOpen(false);
             notify(
               to.length > 1
                 ? `Email sent to ${to.length} recipients`
-                : "Email sent via demo gateway",
+                : "Email sent",
             );
+            void sendEmailDemoLive({
+              email: to[0],
+              subject: values.subject,
+              body: values.body,
+            });
           })();
         }}
       />

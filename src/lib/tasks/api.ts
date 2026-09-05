@@ -1,10 +1,11 @@
 import {
   ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
   isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import { formatRulesAt } from "@/lib/rules/storage";
 import { upsertTask } from "@/lib/tasks/store";
 import {
@@ -78,8 +79,21 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
   }
   if (typeof data === "object") {
     const rec = data as Record<string, unknown>;
-    for (const key of ["items", "tasks", "records", "rows", "result", "collaborators"]) {
+    for (const key of [
+      "items",
+      "tasks",
+      "records",
+      "rows",
+      "result",
+      "collaborators",
+    ]) {
       if (Array.isArray(rec[key])) return extractRecords(rec[key]);
+    }
+    for (const key of ["item", "task", "record"]) {
+      const nested = rec[key];
+      if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+        return extractRecords([nested]);
+      }
     }
     if (rec.data != null && rec.data !== data) return extractRecords(rec.data);
   }
@@ -274,7 +288,28 @@ async function withSession<T>(
   return run(access, false);
 }
 
+function compactBody(input: Record<string, unknown>) {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined || value === null || value === "") continue;
+    if (Array.isArray(value) && value.length === 0) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+async function tasksPath(suffix: string, query = ""): Promise<string> {
+  const scoped = await ensureCrmSession();
+  if (scoped) {
+    return `${workspaceTasksPath(scoped.workspaceId, suffix)}${query}`;
+  }
+  return `${globalTasksPath(suffix)}${query}`;
+}
+
 async function tasksGet(suffix: string, query = ""): Promise<unknown> {
+  if (!isBoundCrmSession()) {
+    return crmBffFetch(await tasksPath(suffix, query));
+  }
   return withSession((session, scoped) => {
     const path = scoped
       ? workspaceTasksPath((session as CrmSession).workspaceId, suffix)
@@ -284,6 +319,9 @@ async function tasksGet(suffix: string, query = ""): Promise<unknown> {
 }
 
 async function tasksMutate(suffix: string, init: RequestInit): Promise<unknown> {
+  if (!isBoundCrmSession()) {
+    return crmBffFetch(await tasksPath(suffix), init);
+  }
   return withSession((session, scoped) => {
     const path = scoped
       ? workspaceTasksPath((session as CrmSession).workspaceId, suffix)
@@ -294,11 +332,26 @@ async function tasksMutate(suffix: string, init: RequestInit): Promise<unknown> 
 
 function asTask(data: unknown): Task | null {
   const items = normalizeTasks(data);
-  if (items[0]) return items[0];
+  if (items[0] && isPersistedTask(items[0])) return items[0];
   if (data && typeof data === "object" && !Array.isArray(data)) {
-    return normalizeTask(data as Record<string, unknown>, 0);
+    const rec = data as Record<string, unknown>;
+    if (!pickStr(rec.id, rec.uuid, rec.taskId, rec.title, rec.subject, rec.name)) {
+      return null;
+    }
+    const mapped = normalizeTask(rec, 0);
+    return isPersistedTask(mapped) ? mapped : null;
   }
   return null;
+}
+
+function isPersistedTask(task: Task) {
+  return Boolean(task.title.trim() && task.title !== "Untitled task" && isUuid(task.taskId));
+}
+
+function sameTaskTitle(a: string, b: string) {
+  const left = a.trim().toLowerCase();
+  const right = b.trim().toLowerCase();
+  return left === right || left.includes(right) || right.includes(left);
 }
 
 export async function listCrmTasks(query: CrmTaskQuery = {}): Promise<Task[]> {
@@ -307,7 +360,7 @@ export async function listCrmTasks(query: CrmTaskQuery = {}): Promise<Task[]> {
       "",
       toQuery({
         page: query.page,
-        limit: query.limit ?? 100,
+        limit: query.limit ?? 200,
         search: query.search,
         status: query.status,
         relatedType: query.relatedType,
@@ -357,36 +410,68 @@ export type CreateCrmTaskInput = {
 
 export function toCreateTaskBody(input: CreateCrmTaskInput): Record<string, unknown> {
   const dueAt = toTaskIso(input.dueDate);
-  return {
-    title: input.title,
-    subject: input.title,
+  const assigneeId = isUuid(input.assignedTo) ? input.assignedTo : undefined;
+  const relatedTo = input.relatedTo;
+  const relatedId = isUuid(input.relatedId)
+    ? input.relatedId
+    : relatedTo && isUuid(relatedTo.id)
+      ? relatedTo.id
+      : undefined;
+  return compactBody({
+    title: input.title.trim(),
+    subject: input.title.trim(),
     type: apiTaskType(input.taskType),
-    taskType: apiTaskType(input.taskType),
     priority: apiTaskPriority(input.priority),
     status: apiTaskStatus(input.status),
-    dueAt,
-    dueDate: dueAt,
-    assignedTo: input.assignedTo,
-    assigneeName: input.assignedTo,
+    dueAt: dueAt || undefined,
+    description: input.description?.trim() || undefined,
+    notes: input.notes?.trim() || undefined,
     relatedType: input.relatedTo?.kind?.toUpperCase(),
-    relatedName: input.relatedTo?.name,
-    relatedId: input.relatedId,
-    relatedTo: input.relatedTo,
-    description: input.description,
-    notes: input.notes,
-    collaborators: input.collaborators,
-  };
+    relatedId,
+    assigneeId,
+    ownerId: assigneeId,
+  });
 }
 
 export async function createCrmTask(
   input: CreateCrmTaskInput,
 ): Promise<Task | null> {
-  return asTask(
+  let created = asTask(
     await tasksMutate("", {
       method: "POST",
       body: JSON.stringify(toCreateTaskBody(input)),
     }),
   );
+  if (created && !sameTaskTitle(created.title, input.title)) {
+    created = null;
+  }
+  if (created && isUuid(created.taskId)) {
+    if (isUuid(input.assignedTo)) {
+      try {
+        created =
+          asTask(
+            await tasksMutate(`/${created.taskId}/assignees/${input.assignedTo}`, {
+              method: "POST",
+              body: "{}",
+            }),
+          ) ?? created;
+      } catch {
+        /* keep created */
+      }
+    }
+    for (const userId of input.collaborators ?? []) {
+      if (!isUuid(userId) || userId === input.assignedTo) continue;
+      try {
+        await tasksMutate(`/${created.taskId}/collaborators/${userId}`, {
+          method: "POST",
+          body: "{}",
+        });
+      } catch {
+        /* keep created */
+      }
+    }
+  }
+  return created;
 }
 
 export async function updateCrmTask(
@@ -404,8 +489,12 @@ export async function updateCrmTask(
     body.dueDate = dueAt;
   }
   if (patch.assignedTo) {
-    body.assignedTo = patch.assignedTo;
-    body.assigneeName = patch.assignedTo;
+    if (isUuid(patch.assignedTo)) {
+      body.assigneeId = patch.assignedTo;
+      body.ownerId = patch.assignedTo;
+    } else {
+      body.assigneeName = patch.assignedTo;
+    }
   }
   if (patch.description != null) body.description = patch.description;
   if (patch.notes != null) body.notes = patch.notes;

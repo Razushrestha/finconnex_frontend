@@ -31,7 +31,7 @@ export function CallsKanbanBoard({
   selectedIds?: string[];
   onSelectedIdsChange?: (ids: string[]) => void;
 }) {
-  const [columns, setColumns] = useState<CallColumn[]>([]);
+  const [columns, setColumns] = useState<CallColumn[]>(() => listCallColumns());
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const [dropTargetPos, setDropTargetPos] = useState<DropTargetPos | null>(
     null,

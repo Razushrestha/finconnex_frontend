@@ -3,6 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pencil, StickyNote, Trash2 } from "lucide-react";
 import { MentionTextarea } from "@/components/shared/MentionTextarea";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import {
+  createCrmNote,
+  deleteCrmNote,
+  isCrmNoteId,
+  listRelatedCrmNotes,
+  persistRemoteNote,
+  tryCrmNote,
+  updateCrmNote,
+} from "@/lib/notes/api";
 import { getRulesActor } from "@/lib/rules/actor";
 import { onLeadActivityChange, emitLeadActivityChange } from "@/lib/leads/lead-extras-store";
 import {
@@ -53,6 +63,8 @@ function noteTitle(body: string) {
 export function RelatedInternalNotes({
   relatedTo,
   extraRelatedTo,
+  relatedType,
+  relatedId,
   seed,
   compact,
   onNotify,
@@ -60,6 +72,8 @@ export function RelatedInternalNotes({
 }: {
   relatedTo: string;
   extraRelatedTo?: string;
+  relatedType?: string;
+  relatedId?: string;
   seed?: {
     id: string;
     body: string;
@@ -75,6 +89,28 @@ export function RelatedInternalNotes({
   const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => onLeadActivityChange(() => setRevision((n) => n + 1)), []);
+
+  useEffect(() => {
+    if (!relatedType || !relatedId || !isUuid(relatedId)) return;
+    let cancelled = false;
+    void tryCrmNote(() => listRelatedCrmNotes(relatedType, relatedId)).then(
+      (rows) => {
+        if (cancelled || !rows) return;
+        for (const row of rows) {
+          persistRemoteNote({
+            ...row,
+            relatedTo: relatedTo || row.relatedTo,
+            relatedType,
+            relatedId,
+          });
+        }
+        setRevision((n) => n + 1);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [relatedType, relatedId, relatedTo]);
 
   useEffect(() => {
     setDraft("");
@@ -127,25 +163,66 @@ export function RelatedInternalNotes({
     setEditingId(null);
   }
 
-  function save() {
+  async function save() {
     const body = draft.trim();
     if (!body) return;
     const actor = getRulesActor().name || "You";
+    const title = noteTitle(body);
+    const parentType = relatedType?.trim();
+    const parentId = relatedId && isUuid(relatedId) ? relatedId : undefined;
     if (editingId) {
-      updateNote(editingId, { title: noteTitle(body), body });
+      updateNote(editingId, { title, body });
+      if (isCrmNoteId(editingId)) {
+        const remote = await tryCrmNote(() =>
+          updateCrmNote(editingId, { title, body }),
+        );
+        if (remote) {
+          persistRemoteNote({
+            ...remote,
+            relatedTo,
+            relatedType: parentType,
+            relatedId: parentId,
+          });
+        }
+      }
       resetForm();
       setRevision((n) => n + 1);
       notify("Note updated");
       return;
     }
-    createNote({
-      title: noteTitle(body),
+    const local = createNote({
+      title,
       body,
       relatedTo,
+      relatedType: parentType,
+      relatedId: parentId,
       noteType: "General",
       createdBy: actor,
       isPrivate: true,
     });
+    if (parentType && parentId) {
+      const remote = await tryCrmNote(() =>
+        createCrmNote({
+          title,
+          body,
+          relatedTo,
+          relatedType: parentType,
+          relatedId: parentId,
+          noteType: "General",
+          createdBy: actor,
+          isPrivate: true,
+        }),
+      );
+      if (remote && isCrmNoteId(remote.id)) {
+        deleteNote(local.id);
+        persistRemoteNote({
+          ...remote,
+          relatedTo,
+          relatedType: parentType,
+          relatedId: parentId,
+        });
+      }
+    }
     resetForm();
     setRevision((n) => n + 1);
     notify("Note saved");
@@ -156,8 +233,11 @@ export function RelatedInternalNotes({
     setDraft(plainBody(note.body));
   }
 
-  function remove(note: Note) {
+  async function remove(note: Note) {
     if (!window.confirm("Delete this note? This cannot be undone.")) return;
+    if (isCrmNoteId(note.id)) {
+      await tryCrmNote(() => deleteCrmNote(note.id));
+    }
     deleteNote(note.id);
     if (editingId === note.id) resetForm();
     setRevision((n) => n + 1);
@@ -209,7 +289,7 @@ export function RelatedInternalNotes({
         <button
           type="button"
           disabled={!draft.trim()}
-          onClick={save}
+          onClick={() => void save()}
           className={cn(
             "h-8 rounded-lg px-3 text-[11px] font-semibold disabled:opacity-40",
             compact
@@ -267,7 +347,7 @@ export function RelatedInternalNotes({
                       type="button"
                       title="Delete note"
                       aria-label="Delete note"
-                      onClick={() => remove(note)}
+                      onClick={() => void remove(note)}
                       className="rounded-md p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

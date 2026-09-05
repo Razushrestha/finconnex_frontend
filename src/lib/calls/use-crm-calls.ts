@@ -2,12 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  listCompletedCrmCalls,
   listCrmCallHistory,
   listCrmCalls,
+  listMissedCrmCalls,
+  listMyCrmCalls,
+  listTodayCrmCalls,
   listUpcomingCrmCalls,
   tryCrm,
 } from "@/lib/calls/api";
-import { mergeCrmCalls } from "@/lib/calls/store";
+import { replaceCrmCalls } from "@/lib/calls/store";
 
 export type CallsDataSource = "api" | "demo" | "mixed";
 
@@ -26,21 +30,31 @@ export function useCrmCalls() {
 
     void (async () => {
       try {
-        const [all, upcoming, history] = await Promise.all([
-          listCrmCalls(),
-          tryCrm(() => listUpcomingCrmCalls()),
-          tryCrm(() => listCrmCallHistory()),
-        ]);
+        const [all, upcoming, history, today, completed, missed, mine] =
+          await Promise.all([
+            tryCrm(() => listCrmCalls()),
+            tryCrm(() => listUpcomingCrmCalls()),
+            tryCrm(() => listCrmCallHistory()),
+            tryCrm(() => listTodayCrmCalls()),
+            tryCrm(() => listCompletedCrmCalls()),
+            tryCrm(() => listMissedCrmCalls()),
+            tryCrm(() => listMyCrmCalls()),
+          ]);
         if (cancelled) return;
         const remote = [
-          ...all,
+          ...(all ?? []),
           ...(upcoming ?? []),
           ...(history ?? []),
+          ...(today ?? []),
+          ...(completed ?? []),
+          ...(missed ?? []),
+          ...(mine ?? []),
         ];
         const byId = new Map(remote.map((c) => [c.id, c]));
         const unique = [...byId.values()];
-        if (unique.length) mergeCrmCalls(unique);
-        setSource(unique.length ? "api" : "demo");
+        replaceCrmCalls(unique);
+        setSource("api");
+        setError(null);
       } catch (err) {
         if (cancelled) return;
         setSource("demo");

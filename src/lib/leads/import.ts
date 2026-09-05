@@ -13,7 +13,7 @@ import {
   listLeadEmails,
   saveLeadColumns,
 } from "@/lib/leads/store";
-import { importCrmLeads, refreshCrmLeadsBoard } from "@/lib/leads/api";
+import { importCrmLeads, importCrmLeadsFromSheets, refreshCrmLeadsBoard } from "@/lib/leads/api";
 import { toCrmCreateBody, uiSourceToCrm, uiStatusToCrm } from "@/lib/leads/api/map";
 import {
   LEAD_SOURCES,
@@ -267,6 +267,75 @@ export function previewLeadImport(
     skipCount: results.filter((r) => r.status === "skip").length,
     errorCount: results.filter((r) => r.status === "error").length,
     updateCount: results.filter((r) => r.status === "update").length,
+  };
+}
+
+export function spreadsheetIdFromSheetsInput(value: string): string {
+  const trimmed = value.trim();
+  const match = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (match?.[1]) return match[1].slice(0, 128);
+  if (trimmed && !trimmed.includes("/") && trimmed.length <= 128) return trimmed;
+  return "client-mapped";
+}
+
+export function invertLeadFieldMapping(
+  fieldToHeader: Record<string, string>,
+): Record<string, string> {
+  const mapping: Record<string, string> = {};
+  for (const [field, header] of Object.entries(fieldToHeader)) {
+    if (!header) continue;
+    mapping[header] = field === "company" ? "companyName" : field;
+  }
+  return mapping;
+}
+
+export async function applyLeadSheetsImport(
+  rows: CsvRow[],
+  mapping: Record<string, string>,
+  settings: LeadImportSettings,
+  spreadsheetId: string,
+): Promise<{ imported: number; updated: number; skipped: number; errors: number } | null> {
+  const preview = previewLeadImport(rows, mapping, settings);
+  const crmRows = rows
+    .map((row, idx) => {
+      const result = preview.results[idx];
+      if (!result || (result.status !== "ok" && result.status !== "update")) {
+        return null;
+      }
+      return toCrmCreateBody({
+        firstName: cell(row, mapping, "firstName"),
+        lastName: cell(row, mapping, "lastName"),
+        email: cell(row, mapping, "email"),
+        phone: cell(row, mapping, "phone"),
+        company: cell(row, mapping, "company"),
+        source: asSource(cell(row, mapping, "source"), settings.defaultSource),
+        estimatedValue: cell(row, mapping, "estimatedValue") || undefined,
+      });
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+
+  if (!crmRows.length) return null;
+
+  const live = await importCrmLeadsFromSheets({
+    spreadsheetId,
+    mapping: invertLeadFieldMapping(mapping),
+    duplicateHandling: settings.updateExisting ? "UPDATE" : "SKIP",
+    rows: crmRows,
+    records: rows.slice(0, 100).map((row) => {
+      const rec: Record<string, string> = {};
+      for (const [key, value] of Object.entries(row)) {
+        rec[key] = String(value ?? "");
+      }
+      return rec;
+    }),
+  });
+  if (!live) return null;
+  await refreshCrmLeadsBoard();
+  return {
+    imported: live.created,
+    updated: live.updated,
+    skipped: live.skipped + preview.skipCount,
+    errors: live.errors.length + preview.errorCount,
   };
 }
 

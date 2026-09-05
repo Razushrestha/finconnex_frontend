@@ -94,7 +94,7 @@ export default function MessagesPage() {
           {view === "timeline" ? (
             <MessagesTimelineView />
           ) : (
-            <MessagesListTable data={crm.loading ? undefined : rows} />
+          <MessagesListTable data={rows} />
           )}
         </div>
       </div>

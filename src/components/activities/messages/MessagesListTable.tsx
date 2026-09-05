@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Ban, Paperclip, RotateCcw, Send, Trash2 } from "lucide-react";
+import { Ban, Mail, MailOpen, Paperclip, RotateCcw, Send, Trash2 } from "lucide-react";
 import type { Message, MessageStatus, MessageType } from "@/lib/messages/types";
 import { cardSubject } from "@/lib/motion";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,8 @@ import {
   downloadCrmMessageAttachment,
   getCrmMessage,
   isCrmMessageId,
+  markCrmMessageRead,
+  markCrmMessageUnread,
   persistRemoteMessage,
   retryCrmMessage,
   sendCrmMessage,
@@ -50,7 +52,7 @@ export function MessagesListTable({ data }: MessagesListTableProps) {
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    if (data) setRows(data);
+    setRows(data ?? listMessages());
   }, [data]);
 
   useEffect(() => {
@@ -271,6 +273,33 @@ export function MessagesListTable({ data }: MessagesListTableProps) {
                   }
                 >
                   <Send className="h-3.5 w-3.5" /> Send
+                </button>
+              ) : null}
+              {detail.type === "Internal" && detail.status !== "Read" ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  className={actionBtn}
+                  onClick={() =>
+                    void runAction(() => markCrmMessageRead(detail.id), "Marked read")
+                  }
+                >
+                  <MailOpen className="h-3.5 w-3.5" /> Mark read
+                </button>
+              ) : null}
+              {detail.type === "Internal" && detail.status === "Read" ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  className={actionBtn}
+                  onClick={() =>
+                    void runAction(
+                      () => markCrmMessageUnread(detail.id),
+                      "Marked unread",
+                    )
+                  }
+                >
+                  <Mail className="h-3.5 w-3.5" /> Mark unread
                 </button>
               ) : null}
               {detail.status === "Failed" ? (

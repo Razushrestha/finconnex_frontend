@@ -31,7 +31,10 @@ export default function EmailsPage() {
           <span className="text-[10px] text-slate-500">{crm.error}</span>
         ) : null}
       </div>
-      <EmailsWorkspace />
+      <EmailsWorkspace
+        onSync={crm.refresh}
+        storeRevision={crm.version}
+      />
     </div>
   );
 }

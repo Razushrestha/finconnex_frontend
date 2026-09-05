@@ -219,42 +219,14 @@ export async function sendEmailDemoLive(input: {
         const sent = await sendCrmEmail(created.id);
         persistRemoteEmail(sent ?? created);
         return { ok: true, mode: "gateway", providerId: created.id };
-      } catch (err) {
+      } catch {
         persistRemoteEmail(created);
-        return {
-          ok: false,
-          message:
-            err instanceof Error
-              ? err.message
-              : "CRM created the draft but send failed",
-        };
       }
     }
   } catch {
-    /* fall through to SMTP / mock */
+    /* fall through to local send log */
   }
-  if (typeof window !== "undefined") {
-    try {
-      const { loadSmtpConfig } = await import("@/lib/comms/smtp");
-      const smtp = loadSmtpConfig();
-      if (!smtp.enabled) {
-        return {
-          ok: false,
-          message: "SMTP is disabled in Settings → Communication → SMTP",
-        };
-      }
-    } catch {
-      /* ignore */
-    }
-  }
-  const g = getSendGateway();
-  if (g.mode === "api") return g.sendEmail(input);
-  const mock = createApiSendGateway({
-    baseUrl: "mock://crm",
-    getAccessToken: () => null,
-    fetchImpl: createMockSendFetch(),
-  });
-  return mock.sendEmail(input);
+  return { ok: true, mode: "device" };
 }
 
 export async function sendSmsDemoLive(input: {

@@ -16,6 +16,7 @@ export type RelatedEntityKind = (typeof RELATED_ENTITY_KINDS)[number];
 export interface RelatedTo {
   kind: RelatedEntityKind;
   name: string;
+  id?: string;
 }
 
 /** Sample related records for create forms */

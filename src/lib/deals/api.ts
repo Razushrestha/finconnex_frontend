@@ -1,8 +1,10 @@
 import {
+  decodeJwtPayload,
   ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import {
   DEAL_PIPELINE_STAGES,
   type DealCurrency,
@@ -73,10 +75,51 @@ export function dealsPath(suffix = ""): string {
   return `/v1/deals${suffix}`;
 }
 
-async function resolveAuth() {
-  const scoped = await ensureCrmSession();
-  if (scoped) return scoped;
-  return ensureCrmAccess();
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
+}
+
+function compactBody(input: Record<string, unknown>) {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined || value === null || value === "") continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+async function dealsFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  if (isBoundCrmSession()) {
+    const scoped = await ensureCrmSession();
+    if (scoped) return crmFetch<T>(scoped, path, init);
+    const access = await ensureCrmAccess();
+    if (!access) throw new Error("Sign in to load deals");
+    return crmFetch<T>(access, path, init);
+  }
+  return crmBffFetch<T>(path, init);
+}
+
+async function dealsGet(suffix: string, query = ""): Promise<unknown> {
+  return dealsFetch(`${dealsPath(suffix)}${query}`);
+}
+
+async function dealsMutate(suffix: string, init: RequestInit): Promise<unknown> {
+  return dealsFetch(dealsPath(suffix), init);
+}
+
+async function jwtOwnerId(): Promise<string | undefined> {
+  try {
+    const access = await ensureCrmAccess();
+    const claims = access?.accessToken
+      ? decodeJwtPayload(access.accessToken)
+      : null;
+    const id = claims?.sub ?? claims?.userId ?? claims?.id;
+    return typeof id === "string" && isUuid(id) ? id : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function extractRecords(data: unknown): Record<string, unknown>[] {
@@ -105,18 +148,6 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
     if (rec.data != null && rec.data !== data) return extractRecords(rec.data);
   }
   return [];
-}
-
-async function dealsGet(suffix: string, query = ""): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to load deals");
-  return crmFetch(auth, `${dealsPath(suffix)}${query}`);
-}
-
-async function dealsMutate(suffix: string, init: RequestInit): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to manage deals");
-  return crmFetch(auth, dealsPath(suffix), init);
 }
 
 export function mapDealStageTitle(raw: string): DealStageTitle {
@@ -319,8 +350,8 @@ export async function listCrmDeals(
     await dealsGet(
       "",
       toQuery({
-        page: query.page,
-        limit: query.limit ?? 100,
+        page: query.page ?? 1,
+        limit: Math.min(100, query.limit ?? 100),
         search: query.search,
         stage: query.stage,
       }),
@@ -328,11 +359,16 @@ export async function listCrmDeals(
   ).map((row, index) => normalizeDeal(row, index));
 }
 
-export async function getCrmDealPipeline(): Promise<Record<
-  DealPipeline,
-  DealStage[]
-> | null> {
-  const data = await dealsGet("/pipeline");
+export async function getCrmDealPipeline(opts?: {
+  currency?: string;
+  pipeline?: string;
+}): Promise<Record<DealPipeline, DealStage[]> | null> {
+  const data = await dealsGet("/pipeline", toQuery({
+      pipeline: opts?.pipeline ?? "default",
+      currency: (opts?.currency ?? "AUD").toUpperCase(),
+      cardLimit: 50,
+    }),
+  );
   const stages = stagesFromUnknown(data);
   if (!stages?.length) return null;
   const board = emptyDealPipelines();
@@ -347,7 +383,10 @@ export async function getCrmDealPipeline(): Promise<Record<
 
 function forecastRange(): { from: string; to: string } {
   const year = new Date().getUTCFullYear();
-  return { from: `${year}-01-01`, to: `${year}-12-31` };
+  return {
+    from: `${year}-01-01T00:00:00.000Z`,
+    to: `${year}-12-31T23:59:59.000Z`,
+  };
 }
 
 export async function getCrmDealForecast(): Promise<CrmDealForecast> {
@@ -371,14 +410,49 @@ export async function getCrmDealForecast(): Promise<CrmDealForecast> {
   };
 }
 
-export async function loadCrmDealsBoard(): Promise<Record<DealPipeline, DealStage[]>> {
-  try {
-    const pipeline = await getCrmDealPipeline();
-    if (pipeline) return pipeline;
-  } catch {
-    /* list is the documented fallback */
+function mergeDealBoards(
+  base: Record<DealPipeline, DealStage[]>,
+  extra: Record<DealPipeline, DealStage[]> | null,
+): Record<DealPipeline, DealStage[]> {
+  if (!extra) return base;
+  const seen = new Set(
+    Object.values(base).flatMap((stages) =>
+      stages.flatMap((stage) => stage.deals.map((deal) => deal.id)),
+    ),
+  );
+  for (const stages of Object.values(extra)) {
+    for (const stage of stages) {
+      const target =
+        base.Deals.find((column) => column.title === stage.title) ??
+        base.Deals[0];
+      if (!target) continue;
+      for (const deal of stage.deals) {
+        if (seen.has(deal.id)) continue;
+        seen.add(deal.id);
+        target.deals.push({
+          ...deal,
+          accentColorClass: target.dotColorClass,
+        });
+      }
+    }
   }
-  return boardFromDeals(await listCrmDeals());
+  return base;
+}
+
+export async function loadCrmDealsBoard(): Promise<Record<DealPipeline, DealStage[]>> {
+  const listed = await listCrmDeals();
+  let board = boardFromDeals(listed);
+  for (const currency of ["AUD", "USD"]) {
+    try {
+      board = mergeDealBoards(
+        board,
+        await getCrmDealPipeline({ currency }),
+      );
+    } catch {
+      /* list is enough when a currency-scoped pipeline 400s */
+    }
+  }
+  return board;
 }
 
 export async function getCrmDeal(
@@ -387,9 +461,36 @@ export async function getCrmDeal(
   return asDeal(await dealsGet(`/${id}`));
 }
 
+function mapDealSource(raw?: string): string | undefined {
+  const value = raw?.trim().toLowerCase() ?? "";
+  if (!value) return undefined;
+  if (value.includes("refer")) return "REFERRAL";
+  if (value.includes("social")) return "SOCIAL_MEDIA";
+  if (value.includes("email")) return "EMAIL_CAMPAIGN";
+  if (value.includes("cold")) return "COLD_CALL";
+  if (value.includes("paid") || value.includes("ad")) return "PAID_AD";
+  if (value.includes("event")) return "EVENT";
+  if (value.includes("partner")) return "PARTNER";
+  if (value.includes("web")) return "WEBSITE";
+  if (value.includes("other")) return "OTHER";
+  return undefined;
+}
+
+function mapLostReason(raw?: string): string | undefined {
+  const value = raw?.trim().toLowerCase().replace(/\s+/g, "_") ?? "";
+  if (!value) return undefined;
+  if (value.includes("price")) return "PRICE";
+  if (value.includes("feature")) return "FEATURE";
+  if (value.includes("competitor")) return "COMPETITOR";
+  if (value.includes("budget")) return "NO_BUDGET";
+  if (value.includes("response")) return "NO_RESPONSE";
+  return "OTHER";
+}
+
 export function toCreateDealBody(input: {
   name: string;
   account?: string;
+  companyId?: string;
   contact?: string;
   contactId?: string;
   stage?: string;
@@ -397,41 +498,73 @@ export function toCreateDealBody(input: {
   currency?: string;
   probability?: number;
   owner?: string;
+  ownerId?: string;
   closeDate?: string;
+  source?: string;
+  description?: string;
+  lostReason?: string;
+  competitor?: string;
 }): Record<string, unknown> {
   const amount = toNum(input.value);
   const close = input.closeDate?.trim();
-  return {
-    name: input.name,
-    title: input.name,
-    account: input.account,
-    companyName: input.account,
-    contactName: input.contact,
-    contactId: input.contactId,
+  const companyId =
+    input.companyId && isUuid(input.companyId)
+      ? input.companyId
+      : input.account && isUuid(input.account)
+        ? input.account
+        : undefined;
+  const currency = input.currency?.trim().toUpperCase();
+  return compactBody({
+    name: input.name.trim(),
     stage: input.stage ? apiDealStage(input.stage) : undefined,
-    value: amount || undefined,
-    amount: amount || undefined,
-    currency: input.currency,
-    probability: input.probability,
-    ownerName: input.owner,
-    owner: input.owner,
+    value: input.value?.trim() ? amount.toFixed(2) : undefined,
+    currency: currency && /^[A-Z]{3}$/.test(currency) ? currency : undefined,
+    probability:
+      input.probability == null
+        ? undefined
+        : Math.min(100, Math.max(0, Math.round(input.probability))),
     expectedCloseDate: close
       ? close.includes("T")
         ? close
         : /^\d{4}-\d{2}-\d{2}/.test(close)
           ? `${close.slice(0, 10)}T00:00:00.000Z`
-          : close
+          : undefined
       : undefined,
-    closeDate: close,
-  };
+    source: mapDealSource(input.source),
+    description: input.description?.trim(),
+    lostReason: mapLostReason(input.lostReason),
+    competitor: input.competitor?.trim(),
+    companyId,
+    ownerId: input.ownerId && isUuid(input.ownerId) ? input.ownerId : undefined,
+  });
 }
 
 export async function createCrmDeal(
   body: Record<string, unknown>,
 ): Promise<(DealRecord & { stageTitle: DealStageTitle }) | null> {
-  return asDeal(
-    await dealsMutate("", { method: "POST", body: JSON.stringify(body) }),
-  );
+  const ownerId =
+    (typeof body.ownerId === "string" && isUuid(body.ownerId)
+      ? body.ownerId
+      : undefined) ?? (await jwtOwnerId());
+  const payload = compactBody({ ...body, ownerId });
+  try {
+    return asDeal(
+      await dealsMutate("", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    );
+  } catch (err) {
+    if (!payload.ownerId) throw err;
+    const { ownerId: _ignored, ...withoutOwner } = payload;
+    void _ignored;
+    return asDeal(
+      await dealsMutate("", {
+        method: "POST",
+        body: JSON.stringify(withoutOwner),
+      }),
+    );
+  }
 }
 
 export async function updateCrmDeal(
@@ -538,12 +671,6 @@ export async function tryCrmDeal<T>(run: () => Promise<T>): Promise<T | null> {
   } catch {
     return null;
   }
-}
-
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
 }
 
 export function isCrmDealId(id: string): boolean {

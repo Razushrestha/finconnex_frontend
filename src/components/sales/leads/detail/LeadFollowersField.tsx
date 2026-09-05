@@ -7,6 +7,7 @@ import { OWNERS } from "@/lib/leads/types";
 import { listCrmUsers } from "@/lib/settings/users-store";
 import { listCrmWorkspaceMembers } from "@/lib/workspace-members/api";
 import { isUuid } from "@/lib/activity-timeline/auth";
+import { addCrmLeadFollower, addCrmLeadFollowerById, removeCrmLeadFollower } from "@/lib/leads/api";
 import { cn } from "@/lib/utils";
 
 const FOLLOWERS_KEY = "followersJson";
@@ -39,10 +40,12 @@ function teamMemberNames(extra: string[] = []): string[] {
 export function LeadFollowersField({
   value,
   owner,
+  leadId,
   onChange,
 }: {
   value?: string;
   owner?: string;
+  leadId?: string;
   onChange: (next: string) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -51,16 +54,21 @@ export function LeadFollowersField({
   const [query, setQuery] = useState("");
   const [followers, setFollowers] = useState(() => parseFollowers(value));
   const [memberNames, setMemberNames] = useState<string[]>([]);
+  const [membersByName, setMembersByName] = useState<Record<string, string>>(
+    {},
+  );
 
   useEffect(() => {
     let cancelled = false;
     void listCrmWorkspaceMembers()
       .then((members) => {
         if (cancelled) return;
-        setMemberNames(
-          members
-            .filter((m) => isUuid(m.userId) && m.name.trim())
-            .map((m) => m.name.trim()),
+        const joined = members.filter((m) => isUuid(m.userId) && m.name.trim());
+        setMemberNames(joined.map((m) => m.name.trim()));
+        setMembersByName(
+          Object.fromEntries(
+            joined.map((m) => [m.name.trim().toLowerCase(), m.userId]),
+          ),
         );
       })
       .catch(() => undefined);
@@ -106,6 +114,10 @@ export function LeadFollowersField({
     return () => window.clearTimeout(id);
   }, [open]);
 
+  function followerUserId(name: string): string | undefined {
+    return membersByName[name.trim().toLowerCase()];
+  }
+
   function persist(next: string[]) {
     setFollowers(next);
     onChange(JSON.stringify(next));
@@ -115,10 +127,20 @@ export function LeadFollowersField({
     persist([...followers, name]);
     setQuery("");
     setOpen(false);
+    const userId = followerUserId(name);
+    if (leadId && isUuid(leadId) && userId) {
+      void addCrmLeadFollowerById(leadId, userId).catch(() =>
+        addCrmLeadFollower(leadId, userId),
+      );
+    }
   }
 
   function remove(name: string) {
     persist(followers.filter((item) => item !== name));
+    const userId = followerUserId(name);
+    if (leadId && isUuid(leadId) && userId) {
+      void removeCrmLeadFollower(leadId, userId);
+    }
   }
 
   const nextSlot = followers.length + 1;

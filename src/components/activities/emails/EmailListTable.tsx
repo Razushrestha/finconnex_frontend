@@ -23,7 +23,6 @@ import {
 import type { Email, EmailStatus } from "@/lib/emails/types";
 import { deleteCrmEmail, tryCrmEmail } from "@/lib/emails/api";
 import { deleteEmail, listEmails, updateEmail } from "@/lib/emails/store";
-import { onRulesChange } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import {
@@ -42,6 +41,7 @@ import {
   type MailLabel,
   MAIL_LABELS,
 } from "@/lib/emails/mailbox";
+import { onRulesChange } from "@/lib/rules";
 import { listUserFolders, type MailUserFolder } from "@/lib/emails/folders";
 import {
   draftFromEmail,
@@ -106,6 +106,30 @@ function tomorrowMorning() {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(h)}:00 ${ap}`;
 }
 
+function emptyFolderCopy(folder: MailFolder, folderLabel: string, customFolderId: string | null) {
+  if (customFolderId) {
+    return `No emails in ${folderLabel}. Move mail here from the list toolbar.`;
+  }
+  switch (folder) {
+    case "trash":
+      return "Trash is empty. Delete a message from Inbox or Sent and it will show here.";
+    case "spam":
+      return "Spam is empty. Mark a message as spam to move it here.";
+    case "archive":
+      return "Archive is empty. Archive a message to move it here.";
+    case "starred":
+      return "No starred mail yet. Click the star on a message to save it here.";
+    case "important":
+      return "No flagged mail yet. Flag a message to save it here.";
+    case "drafts":
+      return "No drafts. Compose a message and save it to see it here.";
+    case "sent":
+      return "No sent mail in Live CRM yet.";
+    default:
+      return `No emails in ${folderLabel.toLowerCase()}.`;
+  }
+}
+
 const iconBtn =
   "inline-flex h-8 items-center gap-1 rounded-lg px-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40";
 
@@ -125,7 +149,6 @@ export function EmailListTable({
   onCompose,
 }: EmailListTableProps) {
   const router = useRouter();
-  const [emails, setEmails] = useState(() => data ?? listEmails());
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -137,16 +160,10 @@ export function EmailListTable({
     return listUserFolders();
   }, [tick]);
   const canRestore = folder === "trash" || folder === "spam" || folder === "archive";
-
-  useEffect(() => {
-    if (data) {
-      setEmails(data);
-      return;
-    }
-    return onRulesChange(() => setEmails(listEmails()));
-  }, [data]);
+  const emails = data ?? listEmails();
 
   useEffect(() => onMailboxChange(() => setTick((n) => n + 1)), []);
+  useEffect(() => onRulesChange(() => setTick((n) => n + 1)), []);
 
   useEffect(() => {
     setSelectedIds((ids) => ids.filter((id) => emails.some((email) => email.id === id)));
@@ -160,7 +177,27 @@ export function EmailListTable({
       : undefined;
 
   function refresh() {
-    if (!data) setEmails(listEmails());
+    setTick((n) => n + 1);
+  }
+
+  function removeEmails(ids: string[]) {
+    if (!ids.length) return;
+    if (folder === "trash") {
+      for (const id of ids) {
+        void tryCrmEmail(() => deleteCrmEmail(id));
+        deleteEmail(id);
+      }
+    } else {
+      for (const id of ids) setMailboxFlag(id, "trash", true);
+    }
+    setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+    setTick((n) => n + 1);
+  }
+
+  function restoreEmails(ids: string[]) {
+    if (!ids.length) return;
+    for (const id of ids) restoreToInbox(id);
+    setSelectedIds([]);
     setTick((n) => n + 1);
   }
 
@@ -178,7 +215,6 @@ export function EmailListTable({
     const email = emails.find((e) => e.id === id);
     if (email && isUnread(email.status)) {
       updateEmail(id, { status: "Opened" });
-      if (!data) setEmails(listEmails());
     }
     router.push(`/activities/emails/detail/${id}`);
   }
@@ -187,25 +223,6 @@ export function EmailListTable({
     for (const id of ids) {
       updateEmail(id, { status: read ? "Opened" : "Delivered" });
     }
-    refresh();
-  }
-
-  function removeEmails(ids: string[]) {
-    if (folder === "trash") {
-      for (const id of ids) {
-        void tryCrmEmail(() => deleteCrmEmail(id));
-        deleteEmail(id);
-      }
-    } else {
-      for (const id of ids) setMailboxFlag(id, "trash", true);
-    }
-    setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
-    refresh();
-  }
-
-  function restoreEmails(ids: string[]) {
-    for (const id of ids) restoreToInbox(id);
-    setSelectedIds([]);
     refresh();
   }
 
@@ -366,6 +383,7 @@ export function EmailListTable({
             {canRestore ? (
               <button
                 type="button"
+                disabled={selectedIds.length === 0}
                 onClick={() => restoreEmails(selectedIds)}
                 className={iconBtn}
               >
@@ -394,8 +412,9 @@ export function EmailListTable({
             <button
               type="button"
               title="Delete"
+              disabled={selectedIds.length === 0}
               onClick={() => removeEmails(selectedIds)}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-rose-50 hover:text-rose-600"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Trash2 className="h-4 w-4" />
             </button>
@@ -797,8 +816,7 @@ export function EmailListTable({
 
         {rows.length === 0 ? (
           <p className="px-4 py-16 text-center text-sm text-slate-400">
-            No emails in {folderLabel.toLowerCase()}
-            {customFolderId ? " folder" : ""}
+            {emptyFolderCopy(folder, folderLabel, customFolderId)}
           </p>
         ) : null}
       </div>

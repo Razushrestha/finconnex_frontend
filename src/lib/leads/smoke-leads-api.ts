@@ -186,6 +186,33 @@ export async function smokeLeadClientWiring() {
   if (!clientSrc.includes("fetchLeadList")) {
     fail("refresh path must still use GET /v1/leads");
   }
+  const ads = readFileSync(
+    path.join(repoRoot(), "src/lib/leads/ads-sync.ts"),
+    "utf8",
+  );
+  if (!ads.includes("importCrmLeadsFromAds")) {
+    fail("ads-sync does not call importCrmLeadsFromAds");
+  }
+  const sheets = readFileSync(
+    path.join(repoRoot(), "src/components/sales/leads/SheetsImportModal.tsx"),
+    "utf8",
+  );
+  if (!sheets.includes("applyLeadSheetsImport")) {
+    fail("SheetsImportModal does not call applyLeadSheetsImport");
+  }
+  const followers = readFileSync(
+    path.join(
+      repoRoot(),
+      "src/components/sales/leads/detail/LeadFollowersField.tsx",
+    ),
+    "utf8",
+  );
+  if (!followers.includes("addCrmLeadFollower")) {
+    fail("LeadFollowersField does not call addCrmLeadFollower");
+  }
+  if (!followers.includes("removeCrmLeadFollower")) {
+    fail("LeadFollowersField does not call removeCrmLeadFollower");
+  }
 }
 
 export async function smokeLeadClientMock() {

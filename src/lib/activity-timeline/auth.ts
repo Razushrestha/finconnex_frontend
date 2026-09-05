@@ -168,8 +168,13 @@ async function resolveAccessToken(): Promise<string | null> {
 }
 
 async function refreshAccessToken(baseUrl: string): Promise<string | null> {
+  const stored = readStorage(REFRESH_KEY);
+  const server = await fetchServerCrmTokens();
   const refreshToken =
-    readStorage(REFRESH_KEY) || (await fetchServerCrmTokens()).refreshToken;
+    (stored && !isJwtExpired(stored) ? stored : null) ||
+    (server.refreshToken && !isJwtExpired(server.refreshToken)
+      ? server.refreshToken
+      : stored || server.refreshToken);
   if (!refreshToken) return null;
   try {
     const data = await crmFetchJson<{
@@ -359,6 +364,10 @@ let boundSession: CrmSession | null = null;
 /** Test / smoke: pin a CRM session so ensureCrmSession skips storage + workspace select. */
 export function bindCrmSession(session: CrmSession | null) {
   boundSession = session;
+}
+
+export function isBoundCrmSession(): boolean {
+  return boundSession != null;
 }
 
 export async function ensureCrmAccess(): Promise<{

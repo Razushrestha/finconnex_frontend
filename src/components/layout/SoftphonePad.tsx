@@ -37,6 +37,8 @@ import {
   parseCallDurationSeconds,
   updateCall,
 } from "@/lib/calls/store";
+import { createCrmCall, dialCrmCall, startCrmCall, tryCrm } from "@/lib/calls/api";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { listAllContacts } from "@/lib/contacts/store";
 import { createNote } from "@/lib/notes/store";
 import {
@@ -232,19 +234,49 @@ export function SoftphonePad({
     callStartedAt.current = Date.now();
     setTab("keypad");
     setNoteFor(null);
-    const call = createCall({
-      subject: `Softphone — ${display}`,
-      relatedTo: record?.relatedTo,
-      contact: display,
-      fromNumber: n,
-      callType: "Outbound",
-      status: "Scheduled",
-      date: formatCallDate(new Date()),
-      assignedTo: OWNER,
-      calledBy: OWNER,
-    });
+    const call = createCall(
+      {
+        subject: `Softphone — ${display}`,
+        relatedTo: record?.relatedTo,
+        contact: display,
+        fromNumber: n,
+        callType: "Outbound",
+        status: "Scheduled",
+        date: formatCallDate(new Date()),
+        assignedTo: OWNER,
+        calledBy: OWNER,
+      },
+      { skipCrm: true },
+    );
     setActiveCallId(call.id);
     setTick((v) => v + 1);
+    void (async () => {
+      const remote = await tryCrm(() =>
+        createCrmCall({
+          subject: call.subject,
+          callType: "Outbound",
+          status: "Scheduled",
+          date: new Date().toISOString(),
+          fromNumber: n,
+          assignedTo: OWNER,
+          contact: display,
+          relatedTo: record?.relatedTo,
+        }),
+      );
+      const id = remote?.id && isUuid(remote.id) ? remote.id : call.id;
+      if (remote?.id && isUuid(remote.id) && remote.id !== call.id) {
+        const { deleteCall, mergeCrmCalls } = await import("@/lib/calls/store");
+        deleteCall(call.id, { skipCrm: true });
+        mergeCrmCalls([remote]);
+        setActiveCallId(remote.id);
+      }
+      if (isUuid(id)) {
+        await tryCrm(() => startCrmCall(id));
+        await tryCrm(() =>
+          dialCrmCall(id, { to: n, fromNumber: n, destination: n }),
+        );
+      }
+    })();
   }
 
   function endCall() {

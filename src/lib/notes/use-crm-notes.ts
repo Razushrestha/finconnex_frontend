@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { listCrmNotes } from "@/lib/notes/api";
+import {
+  listCrmNotes,
+  listMyCrmNotes,
+  listRecentCrmNotes,
+  listStandaloneCrmNotes,
+  tryCrmNote,
+} from "@/lib/notes/api";
 import { replaceCrmNotes } from "@/lib/notes/store";
 
 export type NotesDataSource = "api" | "demo";
@@ -21,12 +27,26 @@ export function useCrmNotes() {
 
     void (async () => {
       try {
-        const remote = await listCrmNotes();
+        const primary = await listCrmNotes();
+        const [recent, mine, standalone] = await Promise.all([
+          tryCrmNote(() => listRecentCrmNotes()),
+          tryCrmNote(() => listMyCrmNotes()),
+          tryCrmNote(() => listStandaloneCrmNotes()),
+        ]);
         if (cancelled) return;
-        replaceCrmNotes(remote);
+        const remote = [
+          ...primary,
+          ...(recent ?? []),
+          ...(mine ?? []),
+          ...(standalone ?? []),
+        ];
+        const byId = new Map(remote.map((row) => [row.id, row]));
+        replaceCrmNotes([...byId.values()]);
         setSource("api");
+        setError(null);
       } catch (err) {
         if (cancelled) return;
+        replaceCrmNotes([]);
         setSource("demo");
         setError(err instanceof Error ? err.message : "Notes unavailable");
       } finally {

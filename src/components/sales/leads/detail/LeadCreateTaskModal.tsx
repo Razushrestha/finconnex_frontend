@@ -39,7 +39,7 @@ import {
 } from "@/lib/rules";
 import { getRulesActor } from "@/lib/rules/actor";
 import { isUuid } from "@/lib/activity-timeline/auth";
-import { createTask, findTaskById, patchTask, updateTaskStatus } from "@/lib/tasks/store";
+import { createTask, deleteTask, findTaskById, patchTask, updateTaskStatus } from "@/lib/tasks/store";
 import {
   createCrmTask,
   isCrmTaskId,
@@ -55,6 +55,7 @@ import {
   notifyToMethod,
   type Priority,
   type ReminderNotifyOption,
+  type Task,
   type TaskActionItem,
   type TaskStatus,
   type TaskType,
@@ -538,7 +539,7 @@ export function LeadCreateTaskModal({
           notes: combinedNotes || undefined,
           collaborators: collaborators.length ? collaborators : undefined,
           actionItems: filledActionItems.length ? filledActionItems : undefined,
-          notifyBy: reminderOn ? ["Email", "In-app"] : undefined,
+          notifyBy: reminderOn ? (["Email", "In-app"] as const) : undefined,
         });
         if (status !== "Completed") updateTaskStatus(editTaskId, status);
         if (isCrmTaskId(editTaskId)) {
@@ -562,6 +563,27 @@ export function LeadCreateTaskModal({
         return;
       }
 
+      const taskInput = {
+        title: title.trim(),
+        taskType,
+        priority,
+        status,
+        dueDate: formatStoredTaskDateTime(dueDate),
+        reminderDate: reminderPayload,
+        reminders,
+        assignedTo,
+        relatedTo: related,
+        description: description.trim() || undefined,
+        notes: combinedNotes || undefined,
+        collaborators: collaborators.length ? collaborators : undefined,
+        actionItems: filledActionItems.length ? filledActionItems : undefined,
+        notifyBy: reminderOn
+          ? (["Email", "In-app"] as Task["notifyBy"])
+          : undefined,
+        attachmentsCount: attachmentsCount || undefined,
+        createdBy: getRulesActor().name || assignedTo,
+      };
+      let task = createTask(taskInput);
       if (isUuid(card.id)) {
         const remote = await tryCrmTask(() =>
           createCrmTask({
@@ -578,50 +600,16 @@ export function LeadCreateTaskModal({
             collaborators: collaborators.length ? collaborators : undefined,
           }),
         );
-        if (remote) {
+        if (remote && remote.taskId !== task.taskId) {
+          deleteTask(task.taskId);
           persistRemoteTask({
+            ...task,
             ...remote,
             relatedTo: related,
           });
-          logCreate("activities.tasks", assignedTo, remote.taskId, title.trim());
-          notifyOwnerAssigned({
-            owner: assignedTo,
-            entityLabel: `Task ${title.trim()}`,
-            relatedTo: `Lead: ${card.name}`,
-            relatedHref: `/activities/tasks`,
-            type: "Task Assigned",
-          });
-          notifyTaskDue({
-            recipient: assignedTo,
-            taskTitle: title.trim(),
-            relatedTo: `Lead: ${card.name}`,
-            relatedHref: "/activities/tasks",
-          });
-          emitLeadActivityChange();
-          onSaved?.(draft?.id);
-          onClose();
-          return;
+          task = remote;
         }
       }
-
-      const task = createTask({
-        title: title.trim(),
-        taskType,
-        priority,
-        status,
-        dueDate: formatStoredTaskDateTime(dueDate),
-        reminderDate: reminderPayload,
-        reminders,
-        assignedTo,
-        relatedTo: related,
-        description: description.trim() || undefined,
-        notes: combinedNotes || undefined,
-        collaborators: collaborators.length ? collaborators : undefined,
-        actionItems: filledActionItems.length ? filledActionItems : undefined,
-        notifyBy: reminderOn ? ["Email", "In-app"] : undefined,
-        attachmentsCount: attachmentsCount || undefined,
-        createdBy: getRulesActor().name || assignedTo,
-      });
       logCreate("activities.tasks", assignedTo, task.taskId, title.trim());
       notifyOwnerAssigned({
         owner: assignedTo,

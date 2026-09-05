@@ -577,6 +577,7 @@ export function LeadMortgageDetail({
             <LeadFollowersField
               value={card.custom?.[FOLLOWERS_KEY]}
               owner={card.owner}
+              leadId={card.id}
               onChange={(next) =>
                 onLeadPatch?.({ custom: { [FOLLOWERS_KEY]: next } })
               }

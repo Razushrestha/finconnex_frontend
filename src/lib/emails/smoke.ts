@@ -136,6 +136,15 @@ export function smokeEmailsWiring() {
     }
   }
 
+  if (!api.includes("crmBffFetch")) {
+    fail("emails client must call crmBffFetch in the browser");
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('"emails"') || !bff.includes('path.includes("emails")')) {
+    fail("BFF proxy does not allow emails");
+  }
+
   const catalog = readSrc("src/lib/api/endpoints.ts");
   for (const fragment of [
     'path: "/emails"',
@@ -159,6 +168,29 @@ export function smokeEmailsWiring() {
   if (!page.includes("useCrmEmails")) {
     fail("emails page does not call useCrmEmails");
   }
+  if (!page.includes("onSync={crm.refresh}")) {
+    fail("emails page does not sync through useCrmEmails.refresh");
+  }
+
+  const hook = readSrc("src/lib/emails/use-crm-emails.ts");
+  if (!hook.includes("replaceCrmEmails")) {
+    fail("emails hook does not replace the store from live CRM");
+  }
+  if (!hook.includes('setSource("api")')) {
+    fail("emails hook must mark a successful empty list as Live CRM");
+  }
+
+  const workspace = readSrc(
+    "src/components/activities/emails/EmailsWorkspace.tsx",
+  );
+  if (!workspace.includes("onSync")) {
+    fail("email workspace does not accept an onSync CRM refresh");
+  }
+
+  const store = readSrc("src/lib/emails/store.ts");
+  if (store.includes("withMissingSeeds")) {
+    fail("emails store must not re-inject demo seed rows");
+  }
 
   const detail = readSrc(
     "src/components/activities/emails/detail/EmailDetailClient.tsx",
@@ -170,6 +202,7 @@ export function smokeEmailsWiring() {
     "cancelCrmEmail",
     "deleteCrmEmail",
     "downloadCrmEmailAttachment",
+    "deleteCrmEmailAttachment",
   ]) {
     if (!detail.includes(name)) {
       fail(`email detail does not call ${name}`);
@@ -181,6 +214,9 @@ export function smokeEmailsWiring() {
   );
   if (!create.includes("createCrmEmail") || !create.includes("sendCrmEmail")) {
     fail("create email form does not call createCrmEmail/sendCrmEmail");
+  }
+  if (!create.includes("applyCrmEmailTemplate") || !create.includes("attachCrmEmailObject")) {
+    fail("create email form does not call apply-template/attachments");
   }
 
   const normalized = normalizeCrmEmail(

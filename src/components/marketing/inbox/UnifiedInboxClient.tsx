@@ -49,6 +49,18 @@ import {
   type InboxAttachment,
   type InboxStatus,
 } from "@/lib/marketing/inbox/types";
+import {
+  crmMessageToInbox,
+  isDemoInboxMessageId,
+  resolveInboxCrmParent,
+} from "@/lib/marketing/inbox/crm-parent";
+import {
+  createCrmMessage,
+  listCrmMessages,
+  listRelatedCrmMessages,
+  sendCrmMessage,
+  tryCrmMessage,
+} from "@/lib/messages/api";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
 import { LeadFollowersField } from "@/components/sales/leads/detail/LeadFollowersField";
@@ -573,6 +585,7 @@ export function UnifiedInboxClient() {
   const sendRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const crmSyncedRef = useRef<string | null>(null);
 
   useEffect(() => {
     const list = listInboxConversations();
@@ -584,6 +597,57 @@ export function UnifiedInboxClient() {
   }, []);
 
   const active = rows.find((c) => c.id === activeId) ?? null;
+
+  useEffect(() => {
+    if (!activeId) return;
+    const conversation = listInboxConversations().find((c) => c.id === activeId);
+    if (!conversation) return;
+    const parent = resolveInboxCrmParent(conversation);
+    const key = `${conversation.id}:${parent?.type ?? "none"}:${parent?.id ?? "none"}`;
+    if (crmSyncedRef.current === key) return;
+    crmSyncedRef.current = key;
+    let cancelled = false;
+    void (async () => {
+      let remote = parent
+        ? await tryCrmMessage(() =>
+            listRelatedCrmMessages(parent.type, parent.id),
+          )
+        : null;
+      if (remote == null) {
+        const all = await tryCrmMessage(() => listCrmMessages());
+        if (cancelled) return;
+        if (all == null) {
+          crmSyncedRef.current = null;
+          return;
+        }
+        const needle = conversation.contactName.trim().toLowerCase();
+        remote = all.filter((row) => {
+          const blob =
+            `${row.relatedTo ?? ""} ${row.to} ${row.from} ${row.subject}`.toLowerCase();
+          return needle ? blob.includes(needle) : false;
+        });
+      }
+      if (cancelled || remote == null) return;
+      const mapped = remote.map((row) => crmMessageToInbox(row, conversation));
+      const extras = conversation.messages.filter(
+        (item) =>
+          !isDemoInboxMessageId(item.id) &&
+          !mapped.some((row) => row.id === item.id),
+      );
+      persist({
+        ...conversation,
+        messages: [...mapped, ...extras],
+        relatedTo: parent?.relatedTo ?? conversation.relatedTo,
+        contactId:
+          parent?.type === "CONTACT" ? parent.id : conversation.contactId,
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // persist is stable enough for this overlay; re-run when the open thread changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId]);
 
   useEffect(() => {
     feedRef.current?.scrollTo({
@@ -748,6 +812,24 @@ export function UnifiedInboxClient() {
       timestamp: formatInboxAt(),
       unreadCount: 0,
     });
+    const parent = resolveInboxCrmParent(active);
+    if (parent && body && !scheduled) {
+      void tryCrmMessage(async () => {
+        const created = await createCrmMessage({
+          type: "External",
+          subject: lastPreview.slice(0, 80),
+          body,
+          from: author,
+          to: active.contactName,
+          relatedTo: parent.relatedTo,
+          relatedType: parent.type,
+          relatedId: parent.id,
+          status: "Draft",
+        });
+        if (!created) return null;
+        return sendCrmMessage(created.id);
+      });
+    }
     setDraft("");
     setPendingFiles([]);
     setReplyTo(null);
@@ -2355,8 +2437,11 @@ function InboxDetailsRail({
   onClearLegacyNotes: () => void;
 }) {
   const relatedRecords = inboxRelatedLinks(conversation);
+  const parent = resolveInboxCrmParent(conversation);
   const notesRelatedTo =
-    conversation.relatedTo?.trim() || `Inbox: ${conversation.id}`;
+    parent?.relatedTo ||
+    conversation.relatedTo?.trim() ||
+    `Inbox: ${conversation.id}`;
   const followers = (conversation.followers ?? []).filter(
     (name) =>
       name.trim() &&
@@ -2374,6 +2459,8 @@ function InboxDetailsRail({
         </p>
         <RelatedInternalNotes
           relatedTo={notesRelatedTo}
+          relatedType={parent?.type}
+          relatedId={parent?.id}
           compact
           onNotify={onNotify}
           seed={

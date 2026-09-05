@@ -1,10 +1,12 @@
 import {
   ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
+  isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmErrorMessage, crmFetch } from "@/lib/crm/request";
-import { mergeCrmEmails } from "@/lib/emails/store";
+import { crmBffFetch, crmErrorMessage, crmFetch } from "@/lib/crm/request";
+import { upsertEmail } from "@/lib/emails/store";
 import type {
   Email,
   EmailAttachmentMeta,
@@ -72,19 +74,32 @@ export function relatedEmailsPath(
   return `/v1/workspaces/${workspaceId}/${relatedType}/${relatedId}/emails`;
 }
 
-export function mapEmailStatus(raw: string): EmailStatus {
+export function mapEmailStatus(raw: string, fallback: EmailStatus = "Draft"): EmailStatus {
   const value = raw.toLowerCase().replace(/[_-]/g, " ");
+  if (!value) return fallback;
   if (value.includes("schedul")) return "Scheduled";
   if (value.includes("open")) return "Opened";
   if (value.includes("deliver")) return "Delivered";
   if (value.includes("bounce")) return "Bounced";
   if (value.includes("fail")) return "Failed";
   if (value.includes("sent") || value.includes("send")) return "Sent";
-  return "Draft";
+  if (value.includes("draft")) return "Draft";
+  return fallback;
 }
 
 function apiStatus(status: EmailStatus): string {
   return status.toUpperCase().replace(/ /g, "_");
+}
+
+function isEmailRecord(row: Record<string, unknown>) {
+  return Boolean(
+    pickStr(row.subject, row.title, row.body, row.html, row.text) ||
+      row.to ||
+      row.recipients ||
+      row.toAddresses ||
+      row.from ||
+      row.fromEmail,
+  );
 }
 
 function extractRecords(data: unknown): Record<string, unknown>[] {
@@ -106,11 +121,39 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
     );
   }
   if (typeof data === "object") {
-    const rec = data as { items?: unknown; emails?: unknown };
-    if (Array.isArray(rec.items)) return extractRecords(rec.items);
-    if (Array.isArray(rec.emails)) return extractRecords(rec.emails);
+    const rec = data as Record<string, unknown>;
+    if (rec.email && typeof rec.email === "object" && !Array.isArray(rec.email)) {
+      return extractRecords(rec.email);
+    }
+    for (const key of [
+      "items",
+      "emails",
+      "records",
+      "rows",
+      "result",
+      "results",
+      "content",
+    ]) {
+      if (Array.isArray(rec[key])) return extractRecords(rec[key]);
+    }
+    if (rec.data != null && rec.data !== data) return extractRecords(rec.data);
+    if (pickStr(rec.id, rec.uuid, rec.emailId) && isEmailRecord(rec)) {
+      return [rec];
+    }
   }
   return [];
+}
+
+function pickRecordId(data: unknown): string {
+  if (!data || typeof data !== "object") return "";
+  const rec = data as Record<string, unknown>;
+  const nested =
+    rec.email && typeof rec.email === "object"
+      ? (rec.email as Record<string, unknown>)
+      : rec.data && typeof rec.data === "object" && !Array.isArray(rec.data)
+        ? (rec.data as Record<string, unknown>)
+        : rec;
+  return pickStr(nested.id, nested.uuid, nested.emailId, rec.id, rec.uuid);
 }
 
 function formatWhen(raw: unknown): string | undefined {
@@ -172,7 +215,10 @@ export function normalizeCrmEmail(
     relatedType: pickStr(raw.relatedType, related && related.type) || undefined,
     relatedId: pickStr(raw.relatedId, related && related.id) || undefined,
     templateUsed: pickStr(raw.templateName, raw.template, raw.templateUsed) || undefined,
-    status: mapEmailStatus(pickStr(raw.status, raw.state, "DRAFT")),
+    status: mapEmailStatus(
+      pickStr(raw.status, raw.state, raw.emailStatus, raw.deliveryStatus),
+      pickStr(raw.sentAt, raw.sentDate, raw.openedAt) ? "Sent" : "Draft",
+    ),
     sentDate: formatWhen(
       raw.sentAt ?? raw.sentDate ?? raw.scheduledAt ?? raw.createdAt,
     ),
@@ -198,60 +244,175 @@ async function withSession<T>(
   return run(access, false);
 }
 
-function emailsUrl(
-  session: CrmSession | Pick<CrmSession, "baseUrl" | "accessToken">,
-  scoped: boolean,
-  suffix: string,
-) {
-  return scoped
-    ? workspaceEmailsPath((session as CrmSession).workspaceId, suffix)
-    : globalEmailsPath(suffix);
+async function emailsPath(suffix: string, query = ""): Promise<string> {
+  const scoped = await ensureCrmSession();
+  if (scoped) {
+    return `${workspaceEmailsPath(scoped.workspaceId, suffix)}${query}`;
+  }
+  return `${globalEmailsPath(suffix)}${query}`;
+}
+
+async function relatedWorkspaceId(): Promise<string | null> {
+  const scoped = await ensureCrmSession();
+  if (scoped?.workspaceId && isUuid(scoped.workspaceId)) return scoped.workspaceId;
+  const env = process.env.NEXT_PUBLIC_WORKSPACE_ID?.trim();
+  return env && isUuid(env) ? env : null;
+}
+
+async function crmEmailsFetch<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  if (isBoundCrmSession()) {
+    const scoped = await ensureCrmSession();
+    if (scoped) return crmFetch<T>(scoped, path, init);
+    const access = await ensureCrmAccess();
+    if (!access) throw new Error("Sign in to manage emails");
+    return crmFetch<T>(access, path, init);
+  }
+  return crmBffFetch<T>(path, init);
 }
 
 async function emailsGet(suffix: string, query = ""): Promise<unknown> {
-  return withSession((session, scoped) =>
-    crmFetch(session, `${emailsUrl(session, scoped, suffix)}${query}`),
-  );
-}
-
-async function emailsMutate(suffix: string, init: RequestInit): Promise<unknown> {
-  return withSession((session, scoped) =>
-    crmFetch(session, emailsUrl(session, scoped, suffix), init),
-  );
-}
-
-async function emailsBlob(suffix: string): Promise<Blob> {
-  return withSession(async (session, scoped) => {
-    const res = await fetch(
-      `${session.baseUrl}${emailsUrl(session, scoped, suffix)}`,
-      {
-        headers: {
-          Accept: "application/octet-stream,application/pdf,*/*",
-          Authorization: `Bearer ${session.accessToken}`,
-        },
-      },
-    );
-    if (!res.ok) {
-      const text = await res.text();
-      let json: unknown = null;
-      try {
-        json = JSON.parse(text);
-      } catch {
-        json = null;
-      }
-      throw new Error(crmErrorMessage(json, `Download failed (${res.status})`));
-    }
-    return res.blob();
+  if (!isBoundCrmSession()) {
+    return crmBffFetch(await emailsPath(suffix, query));
+  }
+  return withSession((session, scoped) => {
+    const path = scoped
+      ? workspaceEmailsPath((session as CrmSession).workspaceId, suffix)
+      : globalEmailsPath(suffix);
+    return crmFetch(session, `${path}${query}`);
   });
 }
 
-function asEmail(data: unknown): Email | null {
-  const items = normalizeCrmEmails(data);
-  if (items[0]) return items[0];
-  if (data && typeof data === "object" && !Array.isArray(data)) {
-    return normalizeCrmEmail(data as Record<string, unknown>, 0);
+async function emailsMutate(suffix: string, init: RequestInit): Promise<unknown> {
+  if (!isBoundCrmSession()) {
+    return crmBffFetch(await emailsPath(suffix), init);
   }
-  return null;
+  return withSession((session, scoped) => {
+    const path = scoped
+      ? workspaceEmailsPath((session as CrmSession).workspaceId, suffix)
+      : globalEmailsPath(suffix);
+    return crmFetch(session, path, init);
+  });
+}
+
+async function blobFromResponse(res: Response): Promise<Blob> {
+  if (!res.ok) {
+    const text = await res.text();
+    let json: unknown = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = null;
+    }
+    throw new Error(crmErrorMessage(json, `Download failed (${res.status})`));
+  }
+  return res.blob();
+}
+
+async function emailsBlob(suffix: string): Promise<Blob> {
+  if (!isBoundCrmSession()) {
+    const path = await emailsPath(suffix);
+    const res = await fetch(`/api/auth/crm${path.slice(3)}`, {
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/octet-stream,application/pdf,*/*",
+      },
+    });
+    return blobFromResponse(res);
+  }
+  return withSession(async (session, scoped) => {
+    const url = scoped
+      ? workspaceEmailsPath((session as CrmSession).workspaceId, suffix)
+      : globalEmailsPath(suffix);
+    const res = await fetch(`${session.baseUrl}${url}`, {
+      headers: {
+        Accept: "application/octet-stream,application/pdf,*/*",
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+    });
+    return blobFromResponse(res);
+  });
+}
+
+function compactBody(input: Record<string, unknown>) {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined || value === null || value === "") continue;
+    if (Array.isArray(value) && value.length === 0) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+function asEmail(data: unknown, fallback?: Partial<Email>): Email | null {
+  const items = normalizeCrmEmails(data);
+  const mapped =
+    items[0] ??
+    (data && typeof data === "object" && !Array.isArray(data)
+      ? normalizeCrmEmail(data as Record<string, unknown>, 0)
+      : null);
+  const mappedId =
+    mapped?.id && !mapped.id.startsWith("crm-email-") ? mapped.id : "";
+  const id = pickStr(pickRecordId(data), mappedId, fallback?.id);
+  if (!id || id.startsWith("crm-email-")) {
+    return fallback?.id
+      ? ({
+          subject: "",
+          body: "",
+          from: "",
+          to: [],
+          status: "Draft",
+          ...fallback,
+          id: fallback.id,
+        } as Email)
+      : null;
+  }
+  const subject =
+    mapped && mapped.subject !== "(no subject)"
+      ? mapped.subject
+      : fallback?.subject || mapped?.subject || "(no subject)";
+  const status =
+    mapped && mapped.status !== "Draft"
+      ? mapped.status
+      : (fallback?.status ?? mapped?.status ?? "Draft");
+  return {
+    subject,
+    body: mapped?.body || fallback?.body || "",
+    from: mapped?.from || fallback?.from || "",
+    to: mapped?.to?.length ? mapped.to : fallback?.to ?? [],
+    cc: mapped?.cc ?? fallback?.cc,
+    bcc: mapped?.bcc ?? fallback?.bcc,
+    relatedTo: mapped?.relatedTo ?? fallback?.relatedTo,
+    relatedType: mapped?.relatedType ?? fallback?.relatedType,
+    relatedId: mapped?.relatedId ?? fallback?.relatedId,
+    templateUsed: mapped?.templateUsed ?? fallback?.templateUsed,
+    status,
+    sentDate: mapped?.sentDate ?? fallback?.sentDate,
+    openedDate: mapped?.openedDate,
+    importance: mapped?.importance ?? fallback?.importance,
+    attachments: mapped?.attachments ?? fallback?.attachments,
+    id,
+  };
+}
+
+function fallbackFromCreate(
+  input: Parameters<typeof toCreateBody>[0],
+): Partial<Email> {
+  return {
+    subject: input.subject.trim(),
+    body: input.body,
+    from: input.from ?? "",
+    to: [...input.to],
+    cc: input.cc?.length ? [...input.cc] : undefined,
+    bcc: input.bcc?.length ? [...input.bcc] : undefined,
+    relatedTo: input.relatedTo,
+    relatedType: input.relatedType,
+    relatedId: input.relatedId,
+    status: input.status ?? "Draft",
+    templateUsed: input.template,
+  };
 }
 
 export async function listCrmEmails(
@@ -261,7 +422,7 @@ export async function listCrmEmails(
     await emailsGet(
       "",
       toQuery({
-        page: query.page,
+        page: query.page ?? 1,
         limit: query.limit ?? 100,
         search: query.search,
         status: query.status,
@@ -278,12 +439,11 @@ export async function listRelatedCrmEmails(
   relatedType: string,
   relatedId: string,
 ): Promise<Email[]> {
-  const scoped = await ensureCrmSession();
-  if (!scoped) throw new Error("Sign in to load related emails");
+  const workspaceId = await relatedWorkspaceId();
+  if (!workspaceId) throw new Error("Sign in to load related emails");
   return normalizeCrmEmails(
-    await crmFetch(
-      scoped,
-      relatedEmailsPath(scoped.workspaceId, relatedType, relatedId),
+    await crmEmailsFetch(
+      relatedEmailsPath(workspaceId, relatedType, relatedId),
     ),
   );
 }
@@ -301,8 +461,8 @@ export function toCreateBody(input: {
   status?: EmailStatus;
   template?: string;
 }): Record<string, unknown> {
-  return {
-    subject: input.subject,
+  return compactBody({
+    subject: input.subject.trim(),
     body: input.body,
     html: input.body,
     from: input.from,
@@ -310,23 +470,23 @@ export function toCreateBody(input: {
     cc: input.cc,
     bcc: input.bcc,
     relatedType: input.relatedType,
-    relatedId: input.relatedId,
+    relatedId: isUuid(input.relatedId) ? input.relatedId : undefined,
     relatedTo: input.relatedTo,
+    fromEmail: input.from,
+    toAddresses: input.to,
     status: input.status ? apiStatus(input.status) : "DRAFT",
     template: input.template,
-    templateName: input.template,
-  };
+  });
 }
 
 export async function createCrmEmail(
   input: Parameters<typeof toCreateBody>[0],
 ): Promise<Email | null> {
-  return asEmail(
-    await emailsMutate("", {
-      method: "POST",
-      body: JSON.stringify(toCreateBody(input)),
-    }),
-  );
+  const raw = await emailsMutate("", {
+    method: "POST",
+    body: JSON.stringify(toCreateBody(input)),
+  });
+  return asEmail(raw, fallbackFromCreate(input));
 }
 
 export async function updateCrmEmail(
@@ -361,12 +521,14 @@ export async function sendCrmEmail(
   id: string,
   extra: Record<string, unknown> = {},
 ): Promise<Email | null> {
-  return asEmail(
-    await emailsMutate(`/${id}/send`, {
-      method: "POST",
-      body: JSON.stringify(extra),
-    }),
-  );
+  const raw = await emailsMutate(`/${id}/send`, {
+    method: "POST",
+    body: JSON.stringify(extra),
+  });
+  return asEmail(raw, {
+    id,
+    status: extra.scheduled ? "Scheduled" : "Sent",
+  });
 }
 
 export async function retryCrmEmail(id: string): Promise<Email | null> {
@@ -440,6 +602,10 @@ export async function tryCrmEmail<T>(run: () => Promise<T>): Promise<T | null> {
 }
 
 export function persistRemoteEmail(email: Email | null) {
-  if (email) mergeCrmEmails([email]);
+  if (email) upsertEmail(email);
   return email;
+}
+
+export function isCrmEmailId(id: string): boolean {
+  return isUuid(id);
 }

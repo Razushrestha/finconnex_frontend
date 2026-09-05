@@ -146,21 +146,73 @@ export function clearCrmTokenCookies(response: NextResponse) {
   response.cookies.set(CRM_REFRESH_COOKIE, "", cleared);
 }
 
+export function isCrmJwtExpired(token: string | null | undefined, skewMs = 15_000): boolean {
+  if (!token) return true;
+  const payload = decodeJwtPayload(token);
+  const exp = payload?.exp;
+  if (typeof exp !== "number" || !Number.isFinite(exp)) return false;
+  return exp * 1000 <= Date.now() + skewMs;
+}
+
+function preferLiveToken(
+  cookie: string | undefined,
+  env: string | undefined,
+): string | null {
+  if (cookie && !isCrmJwtExpired(cookie)) return cookie;
+  if (env && !isCrmJwtExpired(env)) return env;
+  if (cookie) return cookie;
+  return null;
+}
+
 export async function readCrmTokens(): Promise<{
   accessToken: string | null;
   refreshToken: string | null;
 }> {
   const store = await cookies();
   return {
-    accessToken:
-      store.get(CRM_ACCESS_COOKIE)?.value ??
-      process.env.CRM_ACCESS_TOKEN?.trim() ??
-      null,
-    refreshToken:
-      store.get(CRM_REFRESH_COOKIE)?.value ??
-      process.env.CRM_REFRESH_TOKEN?.trim() ??
-      null,
+    accessToken: preferLiveToken(
+      store.get(CRM_ACCESS_COOKIE)?.value,
+      process.env.CRM_ACCESS_TOKEN?.trim(),
+    ),
+    refreshToken: preferLiveToken(
+      store.get(CRM_REFRESH_COOKIE)?.value,
+      process.env.CRM_REFRESH_TOKEN?.trim(),
+    ),
   };
+}
+
+/** Cookie/env CRM JWTs, refreshed and workspace-scoped when possible. */
+export async function resolveLiveCrmAuth(): Promise<{
+  accessToken: string;
+  refreshToken: string | null;
+} | null> {
+  let { accessToken, refreshToken } = await readCrmTokens();
+
+  if ((!accessToken || isCrmJwtExpired(accessToken)) && refreshToken) {
+    try {
+      const rotated = await refreshCrmTokens(refreshToken);
+      accessToken = rotated.accessToken;
+      refreshToken = rotated.refreshToken;
+    } catch {
+      if (!accessToken || isCrmJwtExpired(accessToken)) return null;
+    }
+  }
+
+  if (!accessToken) return null;
+
+  if (!workspaceIdFromToken(accessToken)) {
+    try {
+      const scoped = await activateWorkspace(accessToken, refreshToken);
+      return {
+        accessToken: scoped.accessToken,
+        refreshToken: scoped.refreshToken ?? refreshToken,
+      };
+    } catch {
+      return { accessToken, refreshToken };
+    }
+  }
+
+  return { accessToken, refreshToken };
 }
 
 function envelopeErrorMessage(status: number, body: Envelope<unknown> | null) {

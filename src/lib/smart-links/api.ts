@@ -1,10 +1,5 @@
-import {
-  ensureCrmAccess,
-  ensureCrmSession,
-  getCrmApiBaseUrl,
-  isUuid,
-} from "@/lib/activity-timeline/auth";
-import { crmErrorMessage, crmFetch, unwrapCrmData } from "@/lib/crm/request";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import { crmErrorMessage, unwrapCrmData } from "@/lib/crm/request";
 import type { BrokerHubConfig } from "@/lib/broker-hub/types";
 import { prepareHubForSave, saveHubConfigToLocalStorage } from "@/lib/broker-hub/types";
 
@@ -23,12 +18,6 @@ export type CrmSmartShortLink = {
   generateQr: boolean;
   createdAt: string;
 };
-
-async function resolveAuth() {
-  const scoped = await ensureCrmSession();
-  if (scoped) return scoped;
-  return ensureCrmAccess();
-}
 
 function extractRecords(data: unknown): Record<string, unknown>[] {
   if (!data) return [];
@@ -122,31 +111,16 @@ function mapShortLink(raw: Record<string, unknown>): CrmSmartShortLink {
   };
 }
 
-function smartLinkBase(fallback?: string): string {
-  const explicit = process.env.NEXT_PUBLIC_SMART_LINK_API_URL?.trim();
-  if (explicit) return explicit.replace(/\/$/, "");
-  // Hosted CRM does not have Smart Link routes until that backend is deployed.
-  // Local `npm run dev` in multi-crm-backend-main serves them on 3001.
-  if (process.env.NODE_ENV !== "production") {
-    return "http://127.0.0.1:3001";
-  }
-  return (
-    fallback ||
-    getCrmApiBaseUrl() ||
-    process.env.NEXT_PUBLIC_CRM_API_URL?.trim() ||
-    ""
-  ).replace(/\/$/, "");
-}
-
-function crmBase(): string {
-  return smartLinkBase();
-}
-
-async function crmPublicFetch<T>(path: string): Promise<T> {
-  const base = crmBase();
-  if (!base) throw new Error("CRM API URL is not configured");
-  const res = await fetch(`${base}${path}`, {
-    headers: { Accept: "application/json" },
+async function smartRequest(path: string, init?: RequestInit): Promise<unknown> {
+  const suffix = path.startsWith("/v1/") ? path.slice(3) : path;
+  const res = await fetch(`/api/auth/smart-link${suffix}`, {
+    ...init,
+    credentials: "same-origin",
+    headers: {
+      Accept: "application/json",
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.headers ?? {}),
+    },
   });
   const text = await res.text();
   let json: unknown = null;
@@ -160,15 +134,7 @@ async function crmPublicFetch<T>(path: string): Promise<T> {
   if (!res.ok) {
     throw new Error(crmErrorMessage(json, `CRM request failed (${res.status})`));
   }
-  return unwrapCrmData<T>(json);
-}
-
-async function smartRequest(path: string, init?: RequestInit): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to manage smart links");
-  const baseUrl = smartLinkBase(auth.baseUrl);
-  if (!baseUrl) throw new Error("CRM API URL is not configured");
-  return crmFetch({ ...auth, baseUrl }, path, init);
+  return unwrapCrmData(json);
 }
 
 export function toHubBody(config: BrokerHubConfig): Record<string, unknown> {
@@ -253,7 +219,7 @@ export async function deleteCrmSmartShortLink(id: string): Promise<void> {
 export async function fetchPublishedHubBySlug(
   slug: string,
 ): Promise<BrokerHubConfig | null> {
-  const data = await crmPublicFetch<unknown>(
+  const data = await smartRequest(
     `/v1/public/smart-hubs/${encodeURIComponent(slug)}`,
   );
   const row =
@@ -267,7 +233,7 @@ export async function fetchPublishedHubBySlug(
 export async function resolvePublicShortLink(
   alias: string,
 ): Promise<string | null> {
-  const data = await crmPublicFetch<unknown>(
+  const data = await smartRequest(
     `/v1/public/smart-short-links/${encodeURIComponent(alias)}`,
   );
   if (data && typeof data === "object" && !Array.isArray(data)) {
@@ -290,8 +256,6 @@ export async function saveBrokerHub(
 ): Promise<BrokerHubConfig> {
   const prepared = prepareHubForSave(config);
   saveHubConfigToLocalStorage(prepared);
-  const auth = await resolveAuth();
-  if (!auth) return prepared;
   const remote = await persistCrmHub(prepared);
   saveHubConfigToLocalStorage(remote);
   return remote;

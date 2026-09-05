@@ -39,10 +39,10 @@ export function AdsSyncModal({
   async function run() {
     setBusy(true);
     await new Promise((r) => setTimeout(r, 420));
-    const result = syncAdsLeads(platform, { skipDuplicates });
+    const result = await syncAdsLeads(platform, { skipDuplicates });
     emitRulesChange("all");
     const summary = {
-      imported: result.imported.length,
+      imported: result.created,
       skipped: result.skipped,
     };
     setDone(summary);
@@ -59,7 +59,7 @@ export function AdsSyncModal({
               {ADS_PLATFORM_LABEL[platform]}
             </h2>
             <p className="text-[11px] text-slate-500">
-              Demo sync — fixture leads tagged Social Media
+              Maps fixture rows to POST /v1/leads/import/ads (live network pull is not on the API yet)
             </p>
           </div>
           <button

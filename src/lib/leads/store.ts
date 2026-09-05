@@ -28,6 +28,15 @@ import { getRulesActor } from "@/lib/rules/actor";
 import { formatRulesAt, newRulesId } from "@/lib/rules/storage";
 import { emitLeadActivityChange } from "@/lib/leads/lead-extras-store";
 
+function isUuid(value: string | null | undefined): boolean {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    )
+  );
+}
+
 function leadActor(fallback?: string) {
   return getRulesActor().name || fallback || "System";
 }
@@ -86,18 +95,94 @@ const board = createBoardStore({
   seed: cloneSeed,
 });
 
+const LEADS_BOARD_BACKUP = "finconnex.leads.board.backup.v1";
+
 export function listLeadColumns(): KanbanColumn[] {
-  return normalize(board.list());
+  const stored = normalize(board.list());
+  const hasCards = stored.some((col) => col.cards.length > 0);
+  if (hasCards) return stored;
+  if (typeof localStorage === "undefined") return stored;
+  try {
+    const raw = localStorage.getItem(LEADS_BOARD_BACKUP);
+    if (!raw) return stored;
+    const backup = normalize(JSON.parse(raw) as KanbanColumn[]);
+    if (backup.some((col) => col.cards.length > 0)) return backup;
+  } catch {
+    /* ignore */
+  }
+  return stored;
 }
 
 export function saveLeadColumns(cols: KanbanColumn[]) {
-  board.save(normalize(cols));
+  const next = normalize(cols);
+  board.save(next);
+  if (typeof localStorage === "undefined") return;
+  try {
+    if (next.some((col) => col.cards.length > 0)) {
+      localStorage.setItem(LEADS_BOARD_BACKUP, JSON.stringify(next));
+    }
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+/** Keep locally saved leads that the CRM list/kanban did not return. */
+export function mergeRemoteLeadColumns(remote: KanbanColumn[]): KanbanColumn[] {
+  const remoteNorm = normalize(remote);
+  const remoteIds = new Set(
+    remoteNorm.flatMap((col) => col.cards.map((card) => card.id)),
+  );
+  const remoteEmails = new Set(
+    remoteNorm
+      .flatMap((col) => col.cards.map((card) => card.email.trim().toLowerCase()))
+      .filter(Boolean),
+  );
+  const extras = listLeadColumns()
+    .flatMap((col) => col.cards)
+    .filter((card) => {
+      if (remoteIds.has(card.id)) return false;
+      const email = card.email.trim().toLowerCase();
+      if (email && remoteEmails.has(email)) return false;
+      if (isUuid(card.id)) return true;
+      return /^l-\d{10,}-/.test(card.id);
+    });
+  if (!extras.length) return remoteNorm;
+  const next = remoteNorm.map((col) => ({ ...col, cards: [...col.cards] }));
+  for (const card of extras) {
+    const stage =
+      card.pipelineStage && isMortgagePipelineStage(card.pipelineStage)
+        ? card.pipelineStage
+        : "New Lead";
+    const col = next.find((item) => item.title === stage) ?? next[0];
+    if (!col) continue;
+    col.cards.unshift(card);
+  }
+  return normalize(next);
 }
 
 export function listLeadEmails(): string[] {
   return listLeadColumns().flatMap((c) =>
     c.cards.map((card) => card.email.trim().toLowerCase()),
   );
+}
+
+export function findLeadByEmail(email: string) {
+  const needle = email.trim().toLowerCase();
+  if (!needle) return null;
+  for (const col of listLeadColumns()) {
+    const card = col.cards.find(
+      (item) => item.email.trim().toLowerCase() === needle,
+    );
+    if (card) {
+      return {
+        card,
+        status: col.leadStatus,
+        pipelineStage: col.title,
+        columnId: col.id,
+      };
+    }
+  }
+  return null;
 }
 
 export function findLeadById(id: string) {

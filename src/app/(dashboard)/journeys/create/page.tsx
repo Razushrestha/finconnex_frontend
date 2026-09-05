@@ -78,9 +78,9 @@ export default function CreateJourneyPage() {
   }
 
   return (
-    <div className="relative min-h-full overflow-hidden bg-slate-50">
-      <div className="relative mx-auto flex max-w-[1920px] flex-col p-2.5 sm:p-3 lg:p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1920px] flex-1 flex-col overflow-hidden p-2.5 sm:p-3 lg:p-4">
+        <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <button
               type="button"
@@ -107,7 +107,7 @@ export default function CreateJourneyPage() {
           <p className="mb-2 text-[11px] font-medium text-rose-600">{error}</p>
         ) : null}
 
-        <div className="mb-3 grid gap-3 rounded-2xl border border-slate-100/80 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-3 grid shrink-0 gap-3 rounded-2xl border border-slate-100/80 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
           <label className="flex flex-col gap-1 sm:col-span-2">
             <span className="text-[11px] font-semibold text-slate-600">
               Journey name *
@@ -175,7 +175,7 @@ export default function CreateJourneyPage() {
           </div>
         </div>
 
-        <div className="grid gap-3 xl:grid-cols-[1fr_280px]">
+        <div className="grid min-h-0 flex-1 gap-3 overflow-y-auto xl:grid-cols-[1fr_280px] xl:overflow-hidden">
           <JourneyCanvas
             steps={steps}
             onChange={setSteps}
@@ -183,7 +183,11 @@ export default function CreateJourneyPage() {
             onSelect={setSelectedId}
             showMetrics={false}
           />
-          <JourneyStepInspector step={selected} onChange={updateSelected} />
+          <JourneyStepInspector
+            step={selected}
+            onChange={updateSelected}
+            className="xl:max-h-full"
+          />
         </div>
       </div>
     </div>

@@ -8,12 +8,12 @@ import {
   type MailboxFlags,
 } from "@/lib/emails/mailbox";
 
-export type FocusView = "focused" | "other";
+export type FocusView = "all" | "focused" | "other";
 
 const OTHER_HINTS =
   /social|promotion|promo|newsletter|unsubscribe|sale|offer|% off|linkedin|facebook|instagram|twitter|marketing|digest|roundup|webinar invite|flash deal/i;
 
-export function classifyFocus(email: Email, flags?: MailboxFlags): FocusView {
+export function classifyFocus(email: Email, flags?: MailboxFlags): Exclude<FocusView, "all"> {
   const stored = flags ?? flagsFor(email.id, email);
   if (stored.focusOverride) return stored.focusOverride;
   const hay = `${email.subject} ${email.body} ${email.from} ${email.templateUsed ?? ""}`;

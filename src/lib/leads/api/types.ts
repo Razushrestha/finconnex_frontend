@@ -127,6 +127,7 @@ export type CrmCreateLeadInput = {
   notes?: string;
   description?: string;
   ownerId?: string;
+  pipelineStage?: string;
   doNotContact?: boolean;
 };
 

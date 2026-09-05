@@ -14,8 +14,13 @@ import {
   deleteCrmMessageAttachment,
   downloadCrmMessageAttachment,
   getCrmMessage,
+  listAllCrmMessages,
   listCrmMessages,
+  listRecentCrmMessages,
   listRelatedCrmMessages,
+  listUnreadCrmMessages,
+  markCrmMessageRead,
+  markCrmMessageUnread,
   normalizeMessage,
   relatedMessagesPath,
   retryCrmMessage,
@@ -45,6 +50,12 @@ const DECOY_PATH = "/v1/__no_such_module_messages_probe__";
 const LIVE_ROUTES: Array<{ method: string; path: string }> = [
   { method: "GET", path: "/v1/messages" },
   { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/messages` },
+  { method: "GET", path: "/v1/messages/all" },
+  { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/messages/all` },
+  { method: "GET", path: "/v1/messages/recent" },
+  { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/messages/recent` },
+  { method: "GET", path: "/v1/messages/unread" },
+  { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/messages/unread` },
   { method: "GET", path: `/v1/messages/${ID}` },
   { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/messages/${ID}` },
   { method: "POST", path: "/v1/messages" },
@@ -53,6 +64,16 @@ const LIVE_ROUTES: Array<{ method: string; path: string }> = [
   { method: "PATCH", path: `/v1/workspaces/${SESSION.workspaceId}/messages/${ID}` },
   { method: "DELETE", path: `/v1/messages/${ID}` },
   { method: "DELETE", path: `/v1/workspaces/${SESSION.workspaceId}/messages/${ID}` },
+  { method: "POST", path: `/v1/messages/${ID}/read` },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/messages/${ID}/read`,
+  },
+  { method: "POST", path: `/v1/messages/${ID}/unread` },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/messages/${ID}/unread`,
+  },
   { method: "POST", path: `/v1/messages/${ID}/send` },
   {
     method: "POST",
@@ -121,11 +142,16 @@ export function smokeMessagesWiring() {
   }
   for (const name of [
     "listCrmMessages",
+    "listAllCrmMessages",
+    "listRecentCrmMessages",
+    "listUnreadCrmMessages",
     "getCrmMessage",
     "listRelatedCrmMessages",
     "createCrmMessage",
     "updateCrmMessage",
     "deleteCrmMessage",
+    "markCrmMessageRead",
+    "markCrmMessageUnread",
     "sendCrmMessage",
     "retryCrmMessage",
     "cancelCrmMessage",
@@ -138,10 +164,24 @@ export function smokeMessagesWiring() {
     }
   }
 
+  if (!api.includes("crmBffFetch")) {
+    fail("messages client must call crmBffFetch in the browser");
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('"messages"') || !bff.includes('path.includes("messages")')) {
+    fail("BFF proxy does not allow messages");
+  }
+
   const catalog = readSrc("src/lib/api/endpoints.ts");
   for (const fragment of [
     'path: "/messages"',
+    'path: "/messages/all"',
+    'path: "/messages/recent"',
+    'path: "/messages/unread"',
     'path: "/messages/:id"',
+    'path: "/messages/:id/read"',
+    'path: "/messages/:id/unread"',
     'path: "/messages/:id/send"',
     'path: "/messages/:id/retry"',
     'path: "/messages/:id/cancel"',
@@ -149,6 +189,7 @@ export function smokeMessagesWiring() {
     'path: "/messages/:id/attachments/:attachmentId"',
     'path: "/messages/:id/attachments/:attachmentId/download"',
     'path: "/workspaces/:workspaceId/messages"',
+    'path: "/workspaces/:workspaceId/messages/all"',
     'path: "/workspaces/:workspaceId/:relatedType/:relatedId/messages"',
   ]) {
     if (!catalog.includes(fragment)) {
@@ -162,6 +203,9 @@ export function smokeMessagesWiring() {
   }
 
   const hook = readSrc("src/lib/messages/use-crm-messages.ts");
+  if (!hook.includes("listAllCrmMessages") || !hook.includes("listUnreadCrmMessages")) {
+    fail("messages hook does not load all/unread lists");
+  }
   if (!hook.includes("replaceCrmMessages")) {
     fail("messages hook does not replace the store from live CRM");
   }
@@ -186,6 +230,8 @@ export function smokeMessagesWiring() {
     "cancelCrmMessage",
     "deleteCrmMessage",
     "downloadCrmMessageAttachment",
+    "markCrmMessageRead",
+    "markCrmMessageUnread",
   ]) {
     if (!table.includes(name)) {
       fail(`messages list table does not call ${name}`);
@@ -251,6 +297,9 @@ export async function smokeMessagesMock() {
 
   try {
     await listCrmMessages();
+    await listAllCrmMessages();
+    await listRecentCrmMessages();
+    await listUnreadCrmMessages();
     await getCrmMessage(ID);
     await listRelatedCrmMessages("LEAD", RELATED_ID);
     await createCrmMessage({
@@ -260,6 +309,8 @@ export async function smokeMessagesMock() {
       to: "ada@example.com",
     });
     await updateCrmMessage(ID, { subject: "Updated" });
+    await markCrmMessageRead(ID);
+    await markCrmMessageUnread(ID);
     await sendCrmMessage(ID);
     await retryCrmMessage(ID);
     await cancelCrmMessage(ID);
@@ -273,10 +324,15 @@ export async function smokeMessagesMock() {
 
     const expected = [
       `GET ${workspaceMessagesPath(SESSION.workspaceId)}`,
+      `GET ${workspaceMessagesPath(SESSION.workspaceId, "/all")}`,
+      `GET ${workspaceMessagesPath(SESSION.workspaceId, "/recent")}`,
+      `GET ${workspaceMessagesPath(SESSION.workspaceId, "/unread")}`,
       `GET ${workspaceMessagesPath(SESSION.workspaceId, `/${ID}`)}`,
       `GET ${relatedMessagesPath(SESSION.workspaceId, "LEAD", RELATED_ID)}`,
       `POST ${workspaceMessagesPath(SESSION.workspaceId)}`,
       `PATCH ${workspaceMessagesPath(SESSION.workspaceId, `/${ID}`)}`,
+      `POST ${workspaceMessagesPath(SESSION.workspaceId, `/${ID}/read`)}`,
+      `POST ${workspaceMessagesPath(SESSION.workspaceId, `/${ID}/unread`)}`,
       `POST ${workspaceMessagesPath(SESSION.workspaceId, `/${ID}/send`)}`,
       `POST ${workspaceMessagesPath(SESSION.workspaceId, `/${ID}/retry`)}`,
       `POST ${workspaceMessagesPath(SESSION.workspaceId, `/${ID}/cancel`)}`,

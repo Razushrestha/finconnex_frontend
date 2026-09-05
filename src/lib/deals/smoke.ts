@@ -100,7 +100,7 @@ export function smokeDealsWiring() {
   if (!api.includes("`/v1/deals${suffix}`")) {
     fail("deals client missing /v1/deals path");
   }
-  if (!api.includes('dealsGet("/pipeline")')) {
+  if (!api.includes('dealsGet("/pipeline"')) {
     fail("deals client missing GET /v1/deals/pipeline");
   }
 
@@ -127,6 +127,11 @@ export function smokeDealsWiring() {
   const page = readSrc("src/app/(dashboard)/sales/deals/page.tsx");
   if (!page.includes("useCrmDeals")) {
     fail("deals page does not call useCrmDeals");
+  }
+
+  const form = readSrc("src/components/sales/deals/CreateDealForm.tsx");
+  if (!form.includes("createCrmDeal")) {
+    fail("create deal form does not POST to CRM");
   }
 
   const store = readSrc("src/lib/deals/store.ts");

@@ -27,8 +27,15 @@ function cloneSeed(): CompanyGroup[] {
   }));
 }
 
+function emptyBoard(): CompanyGroup[] {
+  return COMPANY_GROUPS.map((g) => ({
+    ...g,
+    companies: [],
+  }));
+}
+
 const board = createBoardStore({
-  key: "sales:companies:board:v1",
+  key: "sales:companies:board:v2",
   seed: cloneSeed,
 });
 
@@ -88,6 +95,12 @@ export function createCompany(input: {
   annualRevenue?: string;
   status: CompanyStatus;
   owner: string;
+  ownerId?: string;
+  notes?: string;
+  companySize?: string;
+  address?: string;
+  state?: string;
+  country?: string;
 }): CompanyCardData {
   const groups = listCompanyGroups();
   const target =
@@ -195,6 +208,29 @@ export function updateCompany(
     );
   });
   return merged;
+}
+
+export function replaceCrmCompanies(
+  remote: Array<{ company: CompanyCardData; status: CompanyStatus }>,
+) {
+  let groups = emptyBoard();
+  for (const item of remote) {
+    const target =
+      groups.find((g) => g.title === item.status) ??
+      groups.find((g) => g.title === "Prospect") ??
+      groups[0];
+    if (!target) continue;
+    const company: CompanyCardData = {
+      ...item.company,
+      accentColorClass: target.dotColorClass,
+    };
+    groups = groups.map((g) =>
+      g.id === target.id
+        ? { ...g, companies: [...g.companies, company] }
+        : g,
+    );
+  }
+  saveCompanyGroups(groups);
 }
 
 export function mergeCrmCompaniesIntoBoard(

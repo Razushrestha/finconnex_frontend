@@ -18,7 +18,9 @@ import {
   type LeadPipelineStage,
   type LeadSource,
 } from "@/lib/leads/types";
-import { api } from "@/lib/api";
+import { localLeadsApi } from "@/lib/api/local/leads";
+import { findContactByEmail } from "@/lib/contacts/store";
+import { findLeadByEmail } from "@/lib/leads/store";
 import {
   CRM_COMPANY_SIZE_LABELS,
   CRM_COMPANY_SIZES,
@@ -194,7 +196,7 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
         ownerId: isUuid(form.owner) ? form.owner : undefined,
         ownerName:
           ownerOptions.find((o) => o.id === form.owner)?.name ?? form.owner,
-        source: form.leadSource || "Website",
+        source: form.leadSource || undefined,
         productInterest: form.productInterest,
         budgetRange: form.budgetRange,
         estimatedValue: form.estimatedValue || undefined,
@@ -223,11 +225,10 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
         router.push("/sales/leads");
         return;
       }
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Unable to create lead");
-      return;
+    } catch {
+      /* CRM 4xx still falls through to a device copy below */
     }
-    const result = await api.leads.create({
+    const payload = {
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
       email: form.email.trim(),
@@ -238,12 +239,29 @@ export function CreateLeadForm(props: CreateLeadFormProps) {
       pipelineStage,
       owner: ownerLabel,
       estimatedValue: form.estimatedValue || undefined,
-    });
+    };
+    let result = await localLeadsApi.create(payload);
     if (!result.ok) {
-      if (result.error.fields?.email) {
-        setErrors((prev) => ({ ...prev, email: result.error.fields!.email }));
+      const existing = findLeadByEmail(form.email);
+      if (existing) {
+        result = await localLeadsApi.update(existing.card.id, payload);
+        if (result.ok) {
+          router.push("/sales/leads");
+          return;
+        }
       }
-      window.alert(result.error.message);
+      const contact = findContactByEmail(form.email);
+      const emailError =
+        !result.ok
+          ? (result.error.fields?.email ??
+            "This email is already used. Change it, or open All Leads.")
+          : "This email is already used. Change it, or open All Leads.";
+      setErrors((prev) => ({
+        ...prev,
+        email: contact
+          ? "This email already belongs to a contact. Use a different address."
+          : emailError,
+      }));
       return;
     }
     const card = result.data;

@@ -26,6 +26,7 @@ import {
   createCrmNote,
   deleteCrmNote,
   isCrmNoteId,
+  listRelatedCrmNotes,
   persistRemoteNote,
   tryCrmNote,
   updateCrmNote,
@@ -221,6 +222,27 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
     : [];
 
   useEffect(() => onLeadActivityChange(() => setRevision((n) => n + 1)), []);
+
+  useEffect(() => {
+    if (!isUuid(card.id)) return;
+    let cancelled = false;
+    void tryCrmNote(() => listRelatedCrmNotes("LEAD", card.id)).then((rows) => {
+      if (cancelled || !rows) return;
+      const relatedTo = `Lead: ${card.name}`;
+      for (const row of rows) {
+        persistRemoteNote({
+          ...row,
+          relatedTo,
+          relatedType: "LEAD",
+          relatedId: card.id,
+        });
+      }
+      emitLeadActivityChange();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [card.id, card.name]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

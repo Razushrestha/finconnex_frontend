@@ -19,7 +19,9 @@ import { listLeadColumns, deleteLeads, updateLeadOwner, findLeadById, updateLead
 import {
   bulkCrmLeads,
   refreshCrmLeadsBoard,
+  replaceCrmLeadTags,
 } from "@/lib/leads/api";
+import { CRM_LEAD_STATUSES, type CrmLeadStatus } from "@/lib/leads/api/types";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { exportLeadsCsv } from "@/lib/leads/import";
 import { ImportLeadsModal } from "@/components/sales/leads/ImportLeadsModal";
@@ -342,6 +344,36 @@ export default function LeadsPage() {
     }
   }
 
+  async function changeStatusSelected() {
+    if (!selectedIds.length) return;
+    const status = window.prompt(
+      `CRM status for ${selectedIds.length} lead(s).\nUse one of: ${CRM_LEAD_STATUSES.join(", ")}`,
+      "CONTACTED",
+    );
+    if (!status?.trim()) return;
+    const next = status.trim().toUpperCase() as CrmLeadStatus;
+    if (!CRM_LEAD_STATUSES.includes(next)) {
+      setBulkFlash("Unknown CRM status");
+      return;
+    }
+    const liveIds = selectedIds.filter(isUuid);
+    if (!liveIds.length) {
+      setBulkFlash("Select live CRM leads to change status");
+      return;
+    }
+    try {
+      await bulkCrmLeads({
+        ids: liveIds,
+        operation: "CHANGE_STATUS",
+        status: next,
+      });
+      await refreshCrmLeadsBoard();
+      setBulkFlash("Status updated");
+    } catch (err) {
+      setBulkFlash(err instanceof Error ? err.message : "Status update failed");
+    }
+  }
+
   function openPrintView() {
     console.log("print view clicked");
   }
@@ -638,20 +670,29 @@ export default function LeadsPage() {
             onClear={() => setSelectedIds([])}
             onSendMail={() => console.log("send mail clicked")}
             onAddTag={(tag) => {
-              let n = 0;
-              for (const id of selectedIds) {
-                const found = findLeadById(id);
-                if (!found) continue;
-                const next = uniqueTags([...(found.card.tags ?? []), tag]);
-                if (updateLead(id, { tags: next })) n += 1;
-              }
-              setBulkFlash(`Tagged ${n} lead${n === 1 ? "" : "s"} with #${tag}`);
+              void (async () => {
+                let n = 0;
+                for (const id of selectedIds) {
+                  const found = findLeadById(id);
+                  if (!found) continue;
+                  const next = uniqueTags([...(found.card.tags ?? []), tag]);
+                  if (updateLead(id, { tags: next })) n += 1;
+                  if (isUuid(id)) {
+                    try {
+                      await replaceCrmLeadTags(id, next);
+                    } catch {
+                      /* keep local tag even if CRM rejects */
+                    }
+                  }
+                }
+                setBulkFlash(`Tagged ${n} lead${n === 1 ? "" : "s"} with #${tag}`);
+              })();
             }}
             onRemoveTag={() => console.log("remove tag clicked")}
             onRunMacro={() => console.log("run macro clicked")}
             onCreateTask={() => console.log("create task clicked")}
             onSetReminder={() => console.log("set reminder clicked")}
-            onMassUpdate={() => console.log("mass update clicked")}
+            onMassUpdate={() => changeStatusSelected()}
             onChangeOwner={() => changeOwnerSelected()}
             onCadences={() => console.log("cadences clicked")}
             onAddToCampaigns={() => console.log("add to campaigns clicked")}

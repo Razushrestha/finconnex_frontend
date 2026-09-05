@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  taskColumns as initialColumns,
   type TaskColumn,
   type TaskFilters,
   type Task,
@@ -52,7 +51,7 @@ export function KanbanBoard({
   selectedIds: controlledSelectedIds,
   onSelectedIdsChange,
 }: KanbanBoardProps) {
-  const [columns, setColumns] = useState<TaskColumn[]>(initialColumns);
+  const [columns, setColumns] = useState<TaskColumn[]>(() => listTaskColumns());
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const [dropTargetPos, setDropTargetPos] = useState<DropTargetPos | null>(
     null,

@@ -12,12 +12,13 @@ import type { EmailImportance, EmailStatus } from "@/lib/emails/types";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
 import {
   applyCrmEmailTemplate,
+  attachCrmEmailObject,
   createCrmEmail,
   persistRemoteEmail,
   sendCrmEmail,
   tryCrmEmail,
 } from "@/lib/emails/api";
-import { createEmail } from "@/lib/emails/store";
+import { createEmail, deleteEmail, upsertEmail } from "@/lib/emails/store";
 import { takeCompose } from "@/lib/emails/outlook";
 import {
   editEmailWithPrompt,
@@ -296,74 +297,9 @@ export function CreateEmailForm({
         : undefined;
 
     setSending(true);
-    const remote = await tryCrmEmail(() =>
-      createCrmEmail({
-        subject: form.subject.trim(),
-        body: form.body.trim(),
-        from: form.from.trim(),
-        to,
-        cc,
-        bcc,
-        relatedType: form.relatedKind ? form.relatedKind.toUpperCase() : undefined,
-        relatedTo,
-        status: "Draft",
-        template: form.template || undefined,
-      }),
-    );
-
-    if (remote) {
-      persistRemoteEmail(remote);
-      if (form.template) {
-        persistRemoteEmail(
-          await tryCrmEmail(() =>
-            applyCrmEmailTemplate(remote.id, {
-              template: form.template,
-              templateName: form.template,
-            }),
-          ),
-        );
-      }
-      if (status === "Sent" || status === "Scheduled") {
-        const sent = await tryCrmEmail(() =>
-          sendCrmEmail(
-            remote.id,
-            status === "Scheduled" ? { scheduled: true } : {},
-          ),
-        );
-        if (!sent && status === "Sent") {
-          setSending(false);
-          setSendError("CRM created the draft but send failed. Open the email to retry.");
-          router.push(`/activities/emails/detail/${remote.id}`);
-          return;
-        }
-        persistRemoteEmail(
-          sent ?? { ...remote, status, sentDate: formatRulesAt(new Date()) },
-        );
-      }
-      setSending(false);
-      void layoutId;
-      void redirect;
-      router.push(`/activities/emails?focus=${remote.id}`);
-      return;
-    }
-
-    if (status === "Sent") {
-      const result = await sendEmailDemoLive({
-        email: to[0],
-        subject: form.subject.trim(),
-        body: form.body.trim(),
-      });
-      if (!result.ok) {
-        setSending(false);
-        setSendError(result.message);
-        return;
-      }
-    }
-
-    const body = form.body.trim();
-    const created = createEmail({
+    const local = createEmail({
       subject: form.subject.trim(),
-      body,
+      body: form.body.trim(),
       from: form.from.trim(),
       to,
       cc,
@@ -380,6 +316,94 @@ export function CreateEmailForm({
         sizeLabel: formatBytes(a.size),
       })),
     });
+    let keptId = local.id;
+
+    try {
+      const remote = await tryCrmEmail(() =>
+        createCrmEmail({
+          subject: form.subject.trim(),
+          body: form.body.trim(),
+          from: form.from.trim(),
+          to,
+          cc,
+          bcc,
+          relatedType: form.relatedKind ? form.relatedKind.toUpperCase() : undefined,
+          relatedTo,
+          status: "Draft",
+          template: form.template || undefined,
+        }),
+      );
+
+      if (remote) {
+        deleteEmail(local.id);
+        let current = persistRemoteEmail({
+          ...local,
+          ...remote,
+          id: remote.id,
+          status,
+          sentDate: local.sentDate,
+        }) ?? remote;
+        keptId = current.id;
+        for (const file of form.attachments) {
+          await tryCrmEmail(async () => {
+            await attachCrmEmailObject(current.id, {
+              fileName: file.name,
+              name: file.name,
+              size: file.size,
+            });
+            return current;
+          });
+        }
+        if (form.template) {
+          persistRemoteEmail(
+            await tryCrmEmail(() =>
+              applyCrmEmailTemplate(current.id, {
+                template: form.template,
+                templateName: form.template,
+              }),
+            ),
+          );
+        }
+        if (status === "Sent" || status === "Scheduled") {
+          const sent = await tryCrmEmail(() =>
+            sendCrmEmail(
+              current.id,
+              status === "Scheduled" ? { scheduled: true } : {},
+            ),
+          );
+          if (!sent && status === "Sent") {
+            upsertEmail({ ...current, status: "Draft" });
+            setSending(false);
+            setSendError(
+              "CRM created the draft but send failed. Open the email to retry.",
+            );
+            router.push(`/activities/emails/detail/${current.id}`);
+            return;
+          }
+          current =
+            persistRemoteEmail(
+              sent
+                ? { ...current, ...sent, id: sent.id, status }
+                : { ...current, status },
+            ) ?? current;
+          keptId = current.id;
+        }
+      } else if (status === "Sent") {
+        const result = await sendEmailDemoLive({
+          email: to[0],
+          subject: form.subject.trim(),
+          body: form.body.trim(),
+        });
+        if (!result.ok) {
+          setSendError(result.message);
+        }
+        upsertEmail(local);
+      }
+    } catch (err) {
+      upsertEmail(local);
+      setSendError(err instanceof Error ? err.message : "Could not sync to CRM");
+    }
+
     setSending(false);
     void layoutId;
     void redirect;
@@ -395,7 +419,7 @@ export function CreateEmailForm({
       router.push(deal?.href ?? "/sales/deals");
       return;
     }
-    router.push(`/activities/emails?focus=${created.id}`);
+    router.push(`/activities/emails?focus=${keptId}`);
   }
 
   const contactName = form.relatedName || form.to[0] || "";

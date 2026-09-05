@@ -12,7 +12,6 @@ import {
   X,
 } from "lucide-react";
 import {
-  TASK_OWNERS,
   TASK_PRIORITIES,
   TASK_STATUSES,
   TASK_TYPES,
@@ -29,12 +28,20 @@ import {
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
 import { liveRelatedRecords } from "@/lib/activities/related-records";
-import { api } from "@/lib/api";
 import {
   createCrmTask,
   persistRemoteTask,
   tryCrmTask,
 } from "@/lib/tasks/api";
+import { createTask, deleteTask } from "@/lib/tasks/store";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import {
+  assignableOwnerLabel,
+  defaultAssignableOwnerId,
+  listAssignableOwnersLocal,
+  loadAssignableOwners,
+  type AssignableOwner,
+} from "@/lib/users/assignable";
 import {
   logCreate,
   notifyOwnerAssigned,
@@ -104,7 +111,7 @@ const initialState: FormState = {
   status: "Not Started",
   dueDate: "",
   reminderDate: "",
-  assignedTo: "John Smith",
+  assignedTo: defaultAssignableOwnerId(listAssignableOwnersLocal()),
   description: "",
   attachments: [],
   collaborators: [],
@@ -233,6 +240,11 @@ function validateTaskDates(
   return errors;
 }
 
+function ownerDisplay(options: AssignableOwner[], id: string) {
+  const owner = options.find((row) => row.id === id);
+  return owner?.name ?? id;
+}
+
 function newActionItemId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -263,6 +275,24 @@ export function CreateTaskForm({
   const [collaboratorSearch, setCollaboratorSearch] = useState("");
   const newActionItemRef = useRef<HTMLInputElement>(null);
   const collaboratorPickerRef = useRef<HTMLDivElement>(null);
+  const [ownerOptions, setOwnerOptions] = useState<AssignableOwner[]>(() =>
+    listAssignableOwnersLocal(),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadAssignableOwners().then((rows) => {
+      if (cancelled || !rows.length) return;
+      setOwnerOptions(rows);
+      setForm((prev) => ({
+        ...prev,
+        assignedTo: defaultAssignableOwnerId(rows, prev.assignedTo),
+      }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -347,7 +377,10 @@ export function CreateTaskForm({
       : undefined,
   );
 
-  const actor = getRulesActor().name || form.assignedTo || "Admin";
+  const actor =
+    getRulesActor().name ||
+    ownerDisplay(ownerOptions, form.assignedTo) ||
+    "Admin";
   const auditPreviewOn = formatTaskTimestamp(new Date());
 
   useEffect(() => {
@@ -365,13 +398,18 @@ export function CreateTaskForm({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [addingCollaborator]);
 
-  const availableCollaborators = TASK_OWNERS.filter(
+  const availableCollaborators = ownerOptions.filter(
     (owner) =>
-      owner !== form.assignedTo && !form.collaborators.includes(owner),
+      owner.id !== form.assignedTo && !form.collaborators.includes(owner.id),
   );
-  const filteredCollaborators = availableCollaborators.filter((owner) =>
-    owner.toLowerCase().includes(collaboratorSearch.trim().toLowerCase()),
-  );
+  const filteredCollaborators = availableCollaborators.filter((owner) => {
+    const q = collaboratorSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      owner.name.toLowerCase().includes(q) ||
+      owner.email.toLowerCase().includes(q)
+    );
+  });
 
   function validate() {
     const next: Partial<Record<keyof FormState, string>> = {
@@ -438,18 +476,22 @@ export function CreateTaskForm({
     }));
   }
 
-  function addCollaborator(name: string) {
-    if (!name || form.collaborators.includes(name) || name === form.assignedTo)
+  function addCollaborator(userId: string) {
+    if (
+      !userId ||
+      form.collaborators.includes(userId) ||
+      userId === form.assignedTo
+    )
       return;
-    update("collaborators", [...form.collaborators, name]);
+    update("collaborators", [...form.collaborators, userId]);
     setCollaboratorSearch("");
     setAddingCollaborator(false);
   }
 
-  function removeCollaborator(name: string) {
+  function removeCollaborator(userId: string) {
     update(
       "collaborators",
-      form.collaborators.filter((c) => c !== name),
+      form.collaborators.filter((id) => id !== userId),
     );
   }
 
@@ -463,13 +505,25 @@ export function CreateTaskForm({
       window.alert(gate.message);
       return;
     }
+    const relatedMatch =
+      form.relatedKind && form.relatedName
+        ? relatedOptions.find(
+            (item) =>
+              item.kind === form.relatedKind && item.name === form.relatedName,
+          )
+        : undefined;
     const related =
       form.relatedKind && form.relatedName
         ? {
             kind: form.relatedKind as RelatedEntityKind,
             name: form.relatedName,
+            id: relatedMatch?.id,
           }
         : undefined;
+    const ownerName = ownerDisplay(ownerOptions, form.assignedTo) || form.assignedTo;
+    const collaboratorNames = form.collaborators.map((id) =>
+      ownerDisplay(ownerOptions, id),
+    );
 
     let attachmentsCount = 0;
     if (form.attachments.length > 0) {
@@ -510,6 +564,7 @@ export function CreateTaskForm({
           : undefined,
       assignedTo: form.assignedTo,
       relatedTo: related,
+      relatedId: related?.id && isUuid(related.id) ? related.id : undefined,
       description: form.description || undefined,
       notes: form.notes.trim() || undefined,
       collaborators: form.collaborators.length ? form.collaborators : undefined,
@@ -525,25 +580,42 @@ export function CreateTaskForm({
       attachmentsCount: attachmentsCount || undefined,
       createdBy: actor,
     };
-    let task = persistRemoteTask(await tryCrmTask(() => createCrmTask(draft)));
-    if (!task) {
-      const result = await api.tasks.create(draft);
-      if (!result.ok) {
-        window.alert(result.error.message);
-        return;
-      }
-      task = result.data;
+    const local = createTask({
+      ...draft,
+      assignedTo: ownerName,
+      collaborators: collaboratorNames.length ? collaboratorNames : undefined,
+    });
+    let task = local;
+    const remote = await tryCrmTask(() => createCrmTask(draft));
+    if (remote && remote.taskId !== local.taskId) {
+      deleteTask(local.taskId);
+      persistRemoteTask({
+        ...local,
+        ...remote,
+        assignedTo: ownerName || remote.assignedTo,
+        collaborators: collaboratorNames.length
+          ? collaboratorNames
+          : remote.collaborators,
+        relatedTo: related ?? remote.relatedTo,
+        description: local.description ?? remote.description,
+        notes: local.notes ?? remote.notes,
+        reminders: local.reminders,
+        actionItems: local.actionItems,
+        notifyBy: local.notifyBy,
+        repeatRule: local.repeatRule,
+      });
+      task = remote;
     }
-    logCreate("activities.tasks", form.assignedTo, task.taskId, form.title);
+    logCreate("activities.tasks", ownerName, task.taskId, form.title);
     notifyOwnerAssigned({
-      owner: form.assignedTo,
+      owner: ownerName,
       entityLabel: `Task ${form.title}`,
       relatedTo: form.title,
       relatedHref: "/activities/tasks",
       type: "Task Assigned",
     });
     notifyTaskDue({
-      recipient: form.assignedTo,
+      recipient: ownerName,
       taskTitle: form.title,
       relatedTo: form.title,
       relatedHref: "/activities/tasks",
@@ -809,14 +881,14 @@ export function CreateTaskForm({
                 {form.assignedTo ? (
                   <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-2 text-sm text-gray-700">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-[11px] font-semibold text-blue-700">
-                      {initials(form.assignedTo)}
+                      {initials(ownerDisplay(ownerOptions, form.assignedTo))}
                     </span>
-                    {form.assignedTo}
+                    {ownerDisplay(ownerOptions, form.assignedTo)}
                     <button
                       type="button"
                       onClick={() => update("assignedTo", "")}
                       className="text-gray-400 hover:text-gray-600"
-                      aria-label={`Remove ${form.assignedTo}`}
+                      aria-label={`Remove ${ownerDisplay(ownerOptions, form.assignedTo)}`}
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -832,9 +904,9 @@ export function CreateTaskForm({
                       <option value="" disabled>
                         Select an owner
                       </option>
-                      {TASK_OWNERS.map((o) => (
-                        <option key={o} value={o}>
-                          {o}
+                      {ownerOptions.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {assignableOwnerLabel(o)}
                         </option>
                       ))}
                     </select>
@@ -849,20 +921,20 @@ export function CreateTaskForm({
             <div className="border-t border-border pt-4">
               <label className={labelClass}>Collaborators</label>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                {form.collaborators.map((name) => (
+                {form.collaborators.map((userId) => (
                   <span
-                    key={name}
+                    key={userId}
                     className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white py-1 pl-1 pr-2 text-sm text-gray-700"
                   >
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-[11px] font-semibold text-violet-700">
-                      {initials(name)}
+                      {initials(ownerDisplay(ownerOptions, userId))}
                     </span>
-                    {name}
+                    {ownerDisplay(ownerOptions, userId)}
                     <button
                       type="button"
-                      onClick={() => removeCollaborator(name)}
+                      onClick={() => removeCollaborator(userId)}
                       className="text-gray-400 hover:text-gray-600"
-                      aria-label={`Remove collaborator ${name}`}
+                      aria-label={`Remove collaborator ${ownerDisplay(ownerOptions, userId)}`}
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -907,16 +979,16 @@ export function CreateTaskForm({
                       <ul className="max-h-44 overflow-y-auto py-1">
                         {filteredCollaborators.length > 0 ? (
                           filteredCollaborators.map((owner) => (
-                            <li key={owner}>
+                            <li key={owner.id}>
                               <button
                                 type="button"
-                                onClick={() => addCollaborator(owner)}
+                                onClick={() => addCollaborator(owner.id)}
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 hover:bg-violet-50 hover:text-violet-700"
                               >
                                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-100 text-[10px] font-semibold text-blue-700">
-                                  {initials(owner)}
+                                  {initials(owner.name)}
                                 </span>
-                                {owner}
+                                {assignableOwnerLabel(owner)}
                               </button>
                             </li>
                           ))
