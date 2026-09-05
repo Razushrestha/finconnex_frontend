@@ -15,7 +15,6 @@ import {
   JOURNEY_STATUSES,
   JOURNEY_TRIGGERS,
   activeEnrollmentCount,
-  cloneJourney,
   listJourneys,
   overallConversion,
   seedJourneys,
@@ -24,6 +23,8 @@ import {
   type JourneyTrigger,
   type LifecycleJourney,
 } from "@/lib/journeys/types";
+import { cloneCrmJourney, setCrmJourneyStatus } from "@/lib/journeys/api";
+import { useCrmJourneys } from "@/lib/journeys/use-crm-journeys";
 import { cn } from "@/lib/utils";
 
 export default function JourneysPage() {
@@ -37,10 +38,11 @@ export default function JourneysPage() {
   );
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const { loading, error, refresh: refreshCrm } = useCrmJourneys();
 
   useEffect(() => {
     setRows(listJourneys());
-  }, []);
+  }, [loading]);
 
   function flash(msg: string) {
     setToast(msg);
@@ -65,10 +67,10 @@ export default function JourneysPage() {
     return data;
   }, [rows, statusFilter, triggerFilter, search]);
 
-  function toggleStatus(j: LifecycleJourney) {
+  async function toggleStatus(j: LifecycleJourney) {
     const nextStatus: JourneyStatus =
       j.status === "Active" ? "Paused" : "Active";
-    const updated = upsertJourney({
+    const optimistic = upsertJourney({
       ...j,
       status: nextStatus,
       updatedAt: new Date().toLocaleString("en-AU", {
@@ -80,14 +82,29 @@ export default function JourneysPage() {
       }),
     });
     setRows(listJourneys());
-    flash(`${updated.journeyId} → ${nextStatus}`);
+    flash(`${optimistic.journeyId} → ${nextStatus}`);
+    try {
+      await setCrmJourneyStatus(j.id, nextStatus, j.status as "Draft" | "Active" | "Paused");
+      refreshCrm();
+    } catch {
+      // remote unavailable — local optimistic update stands (demo mode)
+    }
   }
 
-  function onClone(j: LifecycleJourney) {
-    const copy = upsertJourney(cloneJourney(j));
-    setRows(listJourneys());
-    flash(`Cloned as ${copy.journeyId}`);
-    router.push(`/journeys/${copy.id}`);
+  async function onClone(j: LifecycleJourney) {
+    try {
+      const copy = await cloneCrmJourney(j.id);
+      upsertJourney(copy);
+      setRows(listJourneys());
+      flash(`Cloned as ${copy.journeyId}`);
+      router.push(`/journeys/${copy.id}`);
+    } catch {
+      const { cloneJourney } = await import("@/lib/journeys/types");
+      const copy = upsertJourney(cloneJourney(j));
+      setRows(listJourneys());
+      flash(`Cloned as ${copy.journeyId}`);
+      router.push(`/journeys/${copy.id}`);
+    }
   }
 
   return (
