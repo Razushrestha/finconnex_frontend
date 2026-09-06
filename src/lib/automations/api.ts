@@ -108,11 +108,63 @@ export async function updateAutomationDraft(
 export async function createAutomationVersion(
   id: string,
   input: CreateAutomationInput,
-): Promise<Automation> {
+): Promise<{ id: string; version: number; status: string }> {
   return automationsRequest(`/${id}/versions`, {
     method: "POST",
     body: JSON.stringify(input),
+  }) as Promise<{ id: string; version: number; status: string }>;
+}
+
+export async function publishAutomationVersion(
+  id: string,
+  versionId: string,
+): Promise<Automation> {
+  return automationsRequest(`/${id}/versions/${versionId}/publish`, {
+    method: "POST",
   }) as Promise<Automation>;
+}
+
+export type AutomationValidationResult = {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  irreversibleActions: string[];
+};
+
+export async function validateAutomation(
+  id: string,
+): Promise<AutomationValidationResult> {
+  return automationsRequest(`/${id}/validate`, {
+    method: "POST",
+  }) as Promise<AutomationValidationResult>;
+}
+
+export type AutomationDryRunResult = {
+  valid: boolean;
+  triggerMatched: boolean;
+  warnings: string[];
+  errors: string[];
+  irreversibleActions: string[];
+  plannedSteps: Array<{
+    index: number;
+    path: string;
+    key: string;
+    type: string;
+    action?: string;
+    branch?: "then" | "else";
+    target: string;
+  }>;
+  mutationPerformed: boolean;
+};
+
+export async function dryRunAutomation(
+  id: string,
+  input: { entityType: string; entityId?: string; snapshot: Record<string, unknown> },
+): Promise<AutomationDryRunResult> {
+  return automationsRequest(`/${id}/dry-run`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  }) as Promise<AutomationDryRunResult>;
 }
 
 export async function deleteAutomation(id: string): Promise<void> {

@@ -259,8 +259,8 @@ export function backendStepsToJourneySteps(
 /** entityType a journey's automation acts on, for dry-run test calls. */
 export function journeyEntityType(automation: Automation): string {
   return (
-    (automation.activeVersion?.definition?.entityType as string | undefined) ??
-    (automation.versions?.[0]?.definition?.entityType as string | undefined) ??
+    (automation.activeVersion?.definition?.trigger?.entityType as string | undefined) ??
+    (automation.versions?.[0]?.definition?.trigger?.entityType as string | undefined) ??
     "LEAD"
   );
 }
