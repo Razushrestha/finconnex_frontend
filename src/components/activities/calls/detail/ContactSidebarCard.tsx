@@ -4,6 +4,7 @@ import { ExternalLink, Mail, User as UserIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
 import { hrefForRelatedTo } from "@/lib/activities/related-href";
+import { composeEmailsHref } from "@/lib/emails/href";
 
 interface ContactSidebarProps {
   contactName?: string;
@@ -59,7 +60,11 @@ export function ContactSidebarCard({
           type="button"
           onClick={() =>
             router.push(
-              `/activities/emails/create?to=${encodeURIComponent(name)}`,
+              composeEmailsHref({
+                to: name.includes("@") ? name : undefined,
+                relatedKind: kind,
+                relatedName: name.includes("@") ? undefined : name,
+              }),
             )
           }
           className="inline-flex items-center gap-1.5 text-xs font-medium text-[#5A32A3] hover:underline"

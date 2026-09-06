@@ -26,6 +26,7 @@ import {
 import { CRM_LEAD_STATUSES, type CrmLeadStatus } from "@/lib/leads/api/types";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { exportLeadsCsv } from "@/lib/leads/import";
+import { composeEmailsHref } from "@/lib/emails/href";
 import { ImportLeadsModal } from "@/components/sales/leads/ImportLeadsModal";
 import { AdsSyncModal } from "@/components/sales/leads/AdsSyncModal";
 import { SheetsImportModal } from "@/components/sales/leads/SheetsImportModal";
@@ -691,7 +692,32 @@ export default function LeadsPage() {
             <EntitySelectionToolbar
             selectedCount={selectedIds.length}
             onClear={() => setSelectedIds([])}
-            onSendMail={() => console.log("send mail clicked")}
+            onSendMail={() => {
+              const emails: string[] = [];
+              let name = "";
+              let id = "";
+              for (const sid of selectedIds) {
+                const found = findLeadById(sid);
+                const email = found?.card.email?.trim();
+                if (email?.includes("@")) emails.push(email);
+                if (!name && found) {
+                  name = found.card.name;
+                  id = found.card.id;
+                }
+              }
+              if (!emails.length) {
+                setBulkFlash("Selected leads have no email address");
+                return;
+              }
+              router.push(
+                composeEmailsHref({
+                  to: emails,
+                  relatedKind: selectedIds.length === 1 ? "Lead" : undefined,
+                  relatedName: selectedIds.length === 1 ? name : undefined,
+                  relatedId: selectedIds.length === 1 ? id : undefined,
+                }),
+              );
+            }}
             onAddTag={(tag) => {
               void (async () => {
                 let n = 0;

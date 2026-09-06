@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   EntityHeader,
   type SortDirection,
@@ -30,6 +31,7 @@ import {
   listContactGroups,
   updateContact,
 } from "@/lib/contacts/store";
+import { composeEmailsHref } from "@/lib/emails/href";
 import { useCrmContacts } from "@/lib/contacts/use-crm-contacts";
 import {
   bulkCrmContacts,
@@ -89,6 +91,7 @@ const DEFAULT_CONTACT_COLUMNS = CONTACT_GROUPS.map((group) => ({
 }));
 
 export default function ContactsPage() {
+  const router = useRouter();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ContactViewMode>("kanban");
   const [filters, setFilters] = useState<ContactFilters>(EMPTY_CONTACT_FILTERS);
@@ -314,7 +317,32 @@ export default function ContactsPage() {
         <EntitySelectionToolbar
           selectedCount={selectedIds.length}
           onClear={() => setSelectedIds([])}
-          onSendMail={() => console.log("send mail clicked")}
+          onSendMail={() => {
+            const emails: string[] = [];
+            let name = "";
+            let id = "";
+            for (const sid of selectedIds) {
+              const found = findContactById(sid);
+              const email = found?.contact.email?.trim();
+              if (email?.includes("@")) emails.push(email);
+              if (!name && found) {
+                name = found.contact.name;
+                id = found.contact.id;
+              }
+            }
+            if (!emails.length) {
+              setBulkFlash("Selected contacts have no email address");
+              return;
+            }
+            router.push(
+              composeEmailsHref({
+                to: emails,
+                relatedKind: selectedIds.length === 1 ? "Contact" : undefined,
+                relatedName: selectedIds.length === 1 ? name : undefined,
+                relatedId: selectedIds.length === 1 ? id : undefined,
+              }),
+            );
+          }}
           onAddTag={(tag) => {
             let n = 0;
             for (const id of selectedIds) {

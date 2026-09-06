@@ -47,9 +47,8 @@ import { RelatedInternalNotes } from "@/components/shared/RelatedInternalNotes";
 import { relatedToLabel } from "@/lib/related-entity";
 import { EditDealModal, type EditDealFormValues } from "./EditDealModal";
 import { ComposeEmailModal } from "../ComposeEmailModal";
-import { sendEmailDemoLive } from "@/lib/comms/send-gateway";
-import { createEmail } from "@/lib/emails/store";
-import { formatRulesAt, emitRulesChange } from "@/lib/rules/storage";
+import { sendCrmActivityEmail } from "@/lib/emails/compose-send";
+import { emitRulesChange } from "@/lib/rules/storage";
 import { logEdit, notifyDealClosed } from "@/lib/rules";
 import { listDealPipelines } from "@/lib/deals/store";
 
@@ -439,24 +438,23 @@ export function DealDetailView({
                 : values.to
                   ? values.to.split(/[,;]+/).map((part) => part.trim()).filter(Boolean)
                   : [fallback];
-              createEmail({
-                subject: values.subject || "(no subject)",
-                body: values.body || "",
-                from: "noreply@finconnex.demo",
-                to,
-                cc: values.ccList,
-                bcc: values.bccList,
-                status: "Sent",
-                sentDate: formatRulesAt(),
-                relatedTo: `Deal: ${deal.name}`,
-              });
-              setIsComposeOpen(false);
-              notify("Email sent");
-              void sendEmailDemoLive({
-                email: to[0],
-                subject: values.subject,
-                body: values.body,
-              });
+              try {
+                await sendCrmActivityEmail({
+                  to,
+                  subject: values.subject || `Re: ${deal.name}`,
+                  body: values.body || "",
+                  cc: values.ccList,
+                  bcc: values.bccList,
+                  relatedType: "DEAL",
+                  relatedId: deal.id,
+                  relatedTo: `Deal: ${deal.name}`,
+                  scheduledAt: values.sendAt,
+                });
+                setIsComposeOpen(false);
+                notify("Email sent");
+              } catch (err) {
+                notify(err instanceof Error ? err.message : "Could not send email");
+              }
             })();
           }}
         />

@@ -10,7 +10,7 @@ import type { LeadCardQuickActionState } from "@/lib/leads/card-types";
 import { createCall, formatCallDate } from "@/lib/calls/store";
 import { createMeeting, formatMeetingDateTime } from "@/lib/meetings/store";
 import { createMessage } from "@/lib/messages/store";
-import { createEmail } from "@/lib/emails/store";
+import { sendCrmActivityEmail } from "@/lib/emails/compose-send";
 import { createNote } from "@/lib/notes/store";
 import { createAttachment } from "@/lib/attachments/store";
 import { getUploadAdapter } from "@/lib/attachments/upload";
@@ -60,7 +60,7 @@ export function defaultQuickActionDraft(kind?: QuickActionKind) {
 export function leadCreateHref(
   kind: QuickActionKind,
   leadName: string,
-  opts?: { email?: string; phone?: string },
+  opts?: { email?: string; phone?: string; leadId?: string },
 ): string {
   const base: Record<QuickActionKind, string> = {
     call: "/activities/calls/create",
@@ -74,6 +74,7 @@ export function leadCreateHref(
   const params = new URLSearchParams();
   params.set("relatedKind", "Lead");
   params.set("relatedName", leadName);
+  if (opts?.leadId) params.set("relatedId", opts.leadId);
   if (kind !== "attachment") params.set("redirect", "true");
   else params.set("compose", "1");
   if (opts?.email) params.set("to", opts.email);
@@ -92,7 +93,7 @@ export async function submitLeadQuickAction(
     priority: Priority;
     assignedTo: string;
   },
-  opts?: { leadEmail?: string },
+  opts?: { leadEmail?: string; leadId?: string },
 ): Promise<
   { ok: true; message: string; id?: string } | { ok: false; message: string }
 > {
@@ -168,16 +169,22 @@ export async function submitLeadQuickAction(
   }
 
   if (kind === "email") {
-    const email = createEmail({
-      subject: title || "Email",
-      body: draft.body.trim() || title,
-      from: owner,
-      to: [opts?.leadEmail || `${leadName.replace(/\s+/g, ".").toLowerCase()}@example.com`],
-      relatedTo,
-      status: "Sent",
-      sentDate: formatRulesAt(new Date()),
-    });
-    return { ok: true, message: "Email sent", id: email.id };
+    try {
+      const sent = await sendCrmActivityEmail({
+        to: [opts?.leadEmail || ""],
+        subject: title || "Email",
+        body: draft.body.trim() || title,
+        relatedType: "LEAD",
+        relatedId: opts?.leadId,
+        relatedTo,
+      });
+      return { ok: true, message: "Email sent", id: sent.id };
+    } catch (err) {
+      return {
+        ok: false,
+        message: err instanceof Error ? err.message : "Could not send email",
+      };
+    }
   }
 
   if (kind === "note") {

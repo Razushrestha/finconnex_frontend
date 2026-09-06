@@ -10,6 +10,9 @@ import { createCall } from "@/lib/calls/store";
 import { createMeeting } from "@/lib/meetings/store";
 import { createNote } from "@/lib/notes/store";
 import { createTask } from "@/lib/tasks/store";
+import { findDealById } from "@/lib/deals/store";
+import { findContactByName } from "@/lib/contacts/store";
+import { sendCrmActivityEmail } from "@/lib/emails/compose-send";
 import { formatRulesAt } from "@/lib/rules/storage";
 import type { DealQuickActionKind } from "@/components/sales/deals/DealRecordCard";
 
@@ -335,8 +338,26 @@ async function persistQuickAction(
       });
       break;
     }
+    case "email": {
+      const found = findDealById(panel.dealId);
+      const contactName = found?.deal.contact || panel.account;
+      const contact = findContactByName(contactName);
+      const to = contact?.email
+        ? [contact.email]
+        : contactName?.includes("@")
+          ? [contactName]
+          : [];
+      await sendCrmActivityEmail({
+        to,
+        subject: `Re: ${panel.dealName}`,
+        body,
+        relatedType: "DEAL",
+        relatedId: panel.dealId,
+        relatedTo,
+      });
+      break;
+    }
     case "note":
-    case "email":
     case "sms":
     default: {
       createNote({

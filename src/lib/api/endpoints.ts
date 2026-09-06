@@ -1048,6 +1048,32 @@ export const ENDPOINT_CATALOG = [
     notes: "Parent feed; relatedType=LEAD|CONTACT|COMPANY|DEAL|…",
   },
 
+  // Dashboard (JWT; workspace-scoped layouts + widgets)
+  { method: "GET", path: "/dashboard", module: "dashboard", notes: "Workspace dashboard metrics" },
+  { method: "GET", path: "/workspaces/:workspaceId/dashboard/layouts", module: "dashboard" },
+  { method: "GET", path: "/workspaces/:workspaceId/dashboard/layouts/:layoutId", module: "dashboard" },
+  { method: "POST", path: "/workspaces/:workspaceId/dashboard/layouts", module: "dashboard" },
+  { method: "PATCH", path: "/workspaces/:workspaceId/dashboard/layouts/:layoutId", module: "dashboard" },
+  { method: "DELETE", path: "/workspaces/:workspaceId/dashboard/layouts/:layoutId", module: "dashboard" },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/dashboard/layouts/:layoutId/duplicate",
+    module: "dashboard",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/dashboard/layouts/:layoutId/set-default",
+    module: "dashboard",
+  },
+  { method: "GET", path: "/workspaces/:workspaceId/dashboard/widgets/catalog", module: "dashboard" },
+  { method: "GET", path: "/workspaces/:workspaceId/dashboard/widgets/:widgetKey", module: "dashboard" },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/dashboard/widgets/:widgetKey/data",
+    module: "dashboard",
+  },
+  { method: "POST", path: "/workspaces/:workspaceId/dashboard/widgets/batch", module: "dashboard" },
+
   // Analytics (workspace JWT required; query widget= enum)
   {
     method: "GET",

@@ -253,14 +253,14 @@ export async function getCrmWorkspaceMember(
 ): Promise<WorkspaceMember | null> {
   const session = await requireSession();
   return asMember(
-    await crmFetch(session, workspaceMembersPath(session.workspaceId, `/${memberId}`)),
+    await membersCrm(workspaceMembersPath(session.workspaceId, `/${memberId}`)),
   );
 }
 
 export async function getCrmWorkspaceMembersSummary(): Promise<WorkspaceMembersSummary> {
   const session = await requireSession();
   return normalizeWorkspaceMembersSummary(
-    await crmFetch(session, workspaceMembersSummaryPath(session.workspaceId)),
+    await membersCrm(workspaceMembersSummaryPath(session.workspaceId)),
   );
 }
 
@@ -273,18 +273,19 @@ export async function inviteCrmWorkspaceMember(input: {
 }): Promise<WorkspaceMember | null> {
   const session = await requireSession();
   const role = apiWorkspaceMemberRole(input.role);
+  const body: Record<string, unknown> = {
+    email: input.email.trim().toLowerCase(),
+    role,
+  };
+  const name = input.name?.trim();
+  if (name) body.name = name;
+  const team = input.team?.trim();
+  if (team) body.team = team;
+  if (input.joinImmediately === true) body.joinImmediately = true;
   return asMember(
-    await crmFetch(session, workspaceMembersPath(session.workspaceId), {
+    await membersCrm(workspaceMembersPath(session.workspaceId), {
       method: "POST",
-      body: JSON.stringify({
-        email: input.email.trim().toLowerCase(),
-        name: input.name?.trim() || undefined,
-        role,
-        workspaceRole: role,
-        team: input.team?.trim() || undefined,
-        joinImmediately: input.joinImmediately === true,
-        status: input.joinImmediately ? "ACTIVE" : "INVITED",
-      }),
+      body: JSON.stringify(body),
     }),
   );
 }
@@ -306,8 +307,7 @@ export async function updateCrmWorkspaceMember(
     body.status = "JOINED";
   }
   return asMember(
-    await crmFetch(
-      session,
+    await membersCrm(
       workspaceMembersPath(session.workspaceId, `/${memberId}`),
       { method: "PATCH", body: JSON.stringify(body) },
     ),
@@ -316,19 +316,17 @@ export async function updateCrmWorkspaceMember(
 
 export async function deleteCrmWorkspaceMember(memberId: string): Promise<void> {
   const session = await requireSession();
-  await crmFetch(
-    session,
-    workspaceMembersPath(session.workspaceId, `/${memberId}`),
-    { method: "DELETE", body: JSON.stringify({}) },
-  );
+  await membersCrm(workspaceMembersPath(session.workspaceId, `/${memberId}`), {
+    method: "DELETE",
+    body: JSON.stringify({}),
+  });
 }
 
 export async function cancelCrmWorkspaceInvitation(
   memberId: string,
 ): Promise<void> {
   const session = await requireSession();
-  await crmFetch(
-    session,
+  await membersCrm(
     workspaceMembersPath(session.workspaceId, `/${memberId}/invitation`),
     { method: "DELETE" },
   );
@@ -339,8 +337,7 @@ export async function resendCrmWorkspaceInvitation(
 ): Promise<WorkspaceMember | null> {
   const session = await requireSession();
   return asMember(
-    await crmFetch(
-      session,
+    await membersCrm(
       workspaceMembersPath(
         session.workspaceId,
         `/${memberId}/invitation/resend`,
@@ -355,7 +352,7 @@ export async function transferCrmWorkspaceOwnership(
 ): Promise<WorkspaceMember | null> {
   const session = await requireSession();
   return asMember(
-    await crmFetch(session, workspaceOwnershipTransferPath(session.workspaceId), {
+    await membersCrm(workspaceOwnershipTransferPath(session.workspaceId), {
       method: "POST",
       body: JSON.stringify({
         memberId,
@@ -377,8 +374,7 @@ export async function importCrmWorkspaceMembers(
   }>,
 ): Promise<{ invited: number; added: number; failed: Array<{ email: string; error: string }> }> {
   const session = await requireSession();
-  const data = await crmFetch(
-    session,
+  const data = await membersCrm(
     workspaceMembersPath(session.workspaceId, "/import"),
     {
       method: "POST",

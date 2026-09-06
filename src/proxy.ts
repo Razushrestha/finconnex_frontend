@@ -9,6 +9,7 @@ const PUBLIC_EXACT = new Set([
   "/forgot-password",
   "/reset-password",
   "/verify-email",
+  "/accept-invitation",
 ]);
 
 /**

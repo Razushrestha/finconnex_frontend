@@ -194,6 +194,7 @@ interface LeadQuickActionDialogProps {
   leadName: string;
   leadEmail?: string;
   leadPhone?: string;
+  leadId?: string;
   onSuccess?: (message: string) => void;
 }
 
@@ -204,6 +205,7 @@ export function LeadQuickActionDialog({
   leadName,
   leadEmail,
   leadPhone,
+  leadId,
   onSuccess,
 }: LeadQuickActionDialogProps) {
   const [draft, setDraft] = useState(() => defaultQuickActionDraft(kind));
@@ -222,6 +224,7 @@ export function LeadQuickActionDialog({
     e.preventDefault();
     const result = await submitLeadQuickAction(kind, leadName, draft, {
       leadEmail,
+      leadId,
     });
     if (!result.ok) {
       setError(result.message);
@@ -248,18 +251,26 @@ export function LeadQuickActionDialog({
       return;
     }
     if (kind === "email") {
-      const r = await gateway.sendEmail({
-        email: leadEmail,
-        subject: draft.title,
-        body: draft.body,
-      });
-      if (!r.ok) setIntentError(r.message);
+      const { sendCrmActivityEmail } = await import("@/lib/emails/compose-send");
+      try {
+        await sendCrmActivityEmail({
+          to: leadEmail ? [leadEmail] : [],
+          subject: draft.title || "Email",
+          body: draft.body,
+          relatedType: "LEAD",
+          relatedId: leadId,
+          relatedTo: `Lead: ${leadName}`,
+        });
+      } catch (err) {
+        setIntentError(err instanceof Error ? err.message : "Could not send email");
+      }
     }
   }
 
   const fullFormHref = leadCreateHref(kind, leadName, {
     email: leadEmail,
     phone: leadPhone,
+    leadId,
   });
 
   const needsSchedule =

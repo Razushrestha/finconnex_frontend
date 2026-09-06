@@ -22,7 +22,12 @@ import {
   type DashboardLayout,
   type DashboardWidgetId,
 } from "@/lib/dashboard/layout";
-import { computeExecutiveOverview } from "@/lib/dashboard/executive";
+import {
+  createCrmDashboardLayout,
+  listCrmDashboardLayouts,
+  setDefaultCrmDashboardLayout,
+  upsertCrmDashboardLayout,
+} from "@/lib/dashboard/api";
 import {
   DASHBOARD_VIEWS,
   isDashboardViewId,
@@ -99,7 +104,6 @@ export function DashboardWorkspace() {
   const searchParams = useSearchParams();
   const [view, setView] = useState<DashboardViewId>("executive");
   const [layout, setLayout] = useState<DashboardLayout>(defaultDashboardLayout);
-  const [customizeOpen, setCustomizeOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [role, setRole] = useState<HierarchyLevel>("Manager");
   const [roleLayouts, setRoleLayouts] = useState<NamedDashboardLayout[]>([]);
@@ -111,12 +115,9 @@ export function DashboardWorkspace() {
   const [viewOrder, setViewOrder] = useState<string[]>([]);
   const [fullscreen, setFullscreen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const layoutSyncRef = useRef<number | null>(null);
 
-  const { loading } = useCrmDashboardStats(layout.filters);
-  const executive = useMemo(
-    () => computeExecutiveOverview(layout.filters),
-    [layout.filters, loading],
-  );
+  const { loading, executive, source } = useCrmDashboardStats(layout.filters);
 
   useEffect(() => {
     const stored = loadDashboardLayout();
@@ -135,6 +136,34 @@ export function DashboardWorkspace() {
     setView(initial);
     setViewHidden(loadViewHidden(initial));
     setViewOrder(loadViewOrder(initial));
+
+    void (async () => {
+      try {
+        const rows = await listCrmDashboardLayouts();
+        const preferred =
+          rows.find((row) => row.isDefault)?.layout ?? rows[0]?.layout;
+        if (preferred) {
+          setLayout((cur) => {
+            const next: DashboardLayout = {
+              ...preferred,
+              filters: { ...preferred.filters, ...cur.filters, owner: "All" },
+            };
+            saveDashboardLayout(next);
+            return next;
+          });
+          return;
+        }
+        const created = await createCrmDashboardLayout(loadDashboardLayout());
+        if (!created?.id) return;
+        setLayout((cur) => {
+          const next = { ...cur, remoteId: created.id };
+          saveDashboardLayout(next);
+          return next;
+        });
+      } catch {
+        /* keep the local layout cache */
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -184,6 +213,20 @@ export function DashboardWorkspace() {
   function persist(next: DashboardLayout) {
     setLayout(next);
     saveDashboardLayout(next);
+    if (layoutSyncRef.current) window.clearTimeout(layoutSyncRef.current);
+    layoutSyncRef.current = window.setTimeout(() => {
+      void upsertCrmDashboardLayout(next)
+        .then((row) => {
+          if (!row?.id) return;
+          setLayout((cur) => {
+            if (cur.remoteId === row.id) return cur;
+            const merged = { ...cur, remoteId: row.id };
+            saveDashboardLayout(merged);
+            return merged;
+          });
+        })
+        .catch(() => undefined);
+    }, 400);
   }
 
   const visible = useMemo(
@@ -296,7 +339,7 @@ export function DashboardWorkspace() {
     }
 
     return out;
-  }, [customizeOpen, dragging, executive, layout, over, visible]);
+  }, [dragging, executive, layout, over, visible]);
 
   return (
     <div
@@ -316,6 +359,26 @@ export function DashboardWorkspace() {
             <h2 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
               {hello}
             </h2>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                loading
+                  ? "bg-slate-100 text-slate-500"
+                  : source === "api"
+                    ? "bg-violet-50 text-violet-700"
+                    : source === "partial"
+                      ? "bg-amber-50 text-amber-700"
+                      : "bg-slate-100 text-slate-500",
+              )}
+            >
+              {loading
+                ? "Loading CRM…"
+                : source === "api"
+                  ? "Live CRM"
+                  : source === "partial"
+                    ? "Live + local"
+                    : "Demo"}
+            </span>
           </div>
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-2">
@@ -367,13 +430,36 @@ export function DashboardWorkspace() {
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
               {flash ? <span className="text-xs text-emerald-700">{flash}</span> : null}
-              {customizeOpen ? (
-                <>
+              <>
                   <button
                     type="button"
                     onClick={() => {
                       if (view === "executive") {
                         setDefaultDashboardLayout(layout);
+                        if (layout.remoteId) {
+                          void setDefaultCrmDashboardLayout(layout.remoteId).catch(
+                            () => undefined,
+                          );
+                        } else {
+                          void upsertCrmDashboardLayout({
+                            ...layout,
+                            isDefault: true,
+                          })
+                            .then((row) => {
+                              if (!row?.id) return;
+                              void setDefaultCrmDashboardLayout(row.id);
+                              setLayout((cur) => {
+                                const merged = {
+                                  ...cur,
+                                  remoteId: row.id,
+                                  isDefault: true,
+                                };
+                                saveDashboardLayout(merged);
+                                return merged;
+                              });
+                            })
+                            .catch(() => undefined);
+                        }
                       } else {
                         setDefaultViewHidden(view, viewHidden);
                       }
@@ -401,7 +487,6 @@ export function DashboardWorkspace() {
                     Reset
                   </button>
                 </>
-              ) : null}
             </div>
           </div>
         </div>
