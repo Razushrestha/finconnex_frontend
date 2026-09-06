@@ -39,6 +39,7 @@ import { emitRulesChange } from "@/lib/rules/storage";
 import { softDeleteRecord } from "@/lib/rules";
 import type { ContactCardData, ContactStatus } from "@/lib/contacts/types";
 import { listRelatedCrmEmails, tryCrmEmail } from "@/lib/emails/api";
+import { composeEmailsHref } from "@/lib/emails/href";
 import { listRelatedCrmCalls, tryCrm as tryCrmCall } from "@/lib/calls/api";
 import { listCrmTasks, tryCrmTask } from "@/lib/tasks/api";
 import { listCrmDocuments, tryCrmDocument } from "@/lib/documents/library/api";
@@ -376,7 +377,16 @@ export function ContactDetailView({
             </h3>
             <button
               type="button"
-              onClick={() => router.push("/activities/emails/create")}
+              onClick={() =>
+                router.push(
+                  composeEmailsHref({
+                    to: contact.email,
+                    relatedKind: "Contact",
+                    relatedName: contact.name,
+                    relatedId: contact.id,
+                  }),
+                )
+              }
               className="text-[11px] font-semibold text-violet-700 hover:underline"
             >
               Send Email
@@ -518,7 +528,15 @@ export function ContactDetailView({
         actions={[
           {
             label: "Send Email",
-            onClick: () => router.push("/activities/emails/create"),
+            onClick: () =>
+              router.push(
+                composeEmailsHref({
+                  to: contact.email,
+                  relatedKind: "Contact",
+                  relatedName: contact.name,
+                  relatedId: contact.id,
+                }),
+              ),
           },
           {
             label: "Edit",

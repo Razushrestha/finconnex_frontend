@@ -16,6 +16,10 @@ import {
   type DashboardChartData,
 } from "@/lib/dashboard/charts";
 import {
+  computeExecutiveOverview,
+  type ExecutiveOverview,
+} from "@/lib/dashboard/executive";
+import {
   fetchLiveDashboardSnapshot,
   type DashboardDataSource,
 } from "@/lib/dashboard/fetch-live-stats";
@@ -29,6 +33,9 @@ export function useCrmDashboardStats(filters: DashboardFilters) {
   );
   const [charts, setCharts] = useState<DashboardChartData>(() =>
     chartsFromStats(computeDashboardStats(filters)),
+  );
+  const [executive, setExecutive] = useState<ExecutiveOverview>(() =>
+    computeExecutiveOverview(filters),
   );
   const [source, setSource] = useState<DashboardDataSource>("demo");
   const [owners, setOwners] = useState<string[]>([]);
@@ -45,6 +52,7 @@ export function useCrmDashboardStats(filters: DashboardFilters) {
       industryTiles(loadIndustryPreset(), computeDashboardStats(filters)),
     );
     setCharts(chartsFromStats(computeDashboardStats(filters)));
+    setExecutive(computeExecutiveOverview(filters));
 
     void (async () => {
       const snap = await fetchLiveDashboardSnapshot(filters);
@@ -52,6 +60,7 @@ export function useCrmDashboardStats(filters: DashboardFilters) {
       setStats(snap.stats);
       setIndustry(snap.industryTiles);
       setCharts(snap.charts);
+      setExecutive(snap.executive);
       setSource(snap.source);
       if (snap.owners.length) setOwners(snap.owners);
       setLoading(false);
@@ -62,5 +71,14 @@ export function useCrmDashboardStats(filters: DashboardFilters) {
     };
   }, [filters, tick]);
 
-  return { stats, industry, charts, source, owners, loading, refresh };
+  return {
+    stats,
+    industry,
+    charts,
+    executive,
+    source,
+    owners,
+    loading,
+    refresh,
+  };
 }

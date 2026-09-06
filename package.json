@@ -30,6 +30,7 @@
     "smoke:credit-notes": "npx tsx --tsconfig tsconfig.json src/lib/finance/credit-notes/smoke.ts",
     "smoke:custom-fields": "npx tsx --tsconfig tsconfig.json src/lib/custom-fields/smoke.ts",
     "smoke:deals": "npx tsx --tsconfig tsconfig.json src/lib/deals/smoke.ts",
+    "smoke:dashboard": "npx tsx --tsconfig tsconfig.json src/lib/dashboard/smoke.ts",
     "smoke:document-requests": "npx tsx --tsconfig tsconfig.json src/lib/documents/requests/smoke.ts",
     "smoke:documents": "npx tsx --tsconfig tsconfig.json src/lib/documents/library/smoke.ts",
     "smoke:emails": "npx tsx --tsconfig tsconfig.json src/lib/emails/smoke.ts",

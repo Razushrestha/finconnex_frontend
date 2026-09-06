@@ -81,7 +81,7 @@ export function NoteDetailsView({
               </h1>
               <div className="flex shrink-0 items-center gap-1.5">
                 {note.isPinned ? (
-                  <Pin className="h-4 w-4 fill-amber-400 text-amber-500" />
+                  <Pin className="h-4 w-4 fill-red-600 text-red-600" />
                 ) : null}
                 {note.isPrivate ? (
                   <Lock className="h-4 w-4 text-slate-400" />

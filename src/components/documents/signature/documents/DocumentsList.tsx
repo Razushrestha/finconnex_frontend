@@ -309,7 +309,7 @@ export default function DocumentsList() {
               ))}
             </colgroup>
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/75 text-sm font-semibold text-slate-500 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-400">
+              <tr className="border-b border-slate-200 bg-slate-50/75 text-sm font-bold text-slate-500 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-400">
                 {COLUMNS.map((col, i) => (
                   <th
                     key={col.key}

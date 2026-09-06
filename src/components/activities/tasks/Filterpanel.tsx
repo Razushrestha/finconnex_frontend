@@ -1,148 +1,48 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Search, ChevronDown, ChevronUp } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { filterEnter } from "@/lib/motion";
-import { TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES } from "@/lib/tasks/types";
+import { DeepFilterPanel } from "@/components/common/DeepFilterPanel";
+import { TASK_FILTER_FIELDS, TASK_SYSTEM_GROUPS } from "@/lib/filters/catalogs";
+import type { DeepFilterValue } from "@/lib/filters/types";
 import type { TaskFilters } from "@/lib/tasks/types";
 
-type FilterSectionId = "status" | "priority" | "type";
-
-interface FilterSection {
-  id: FilterSectionId;
-  title: string;
-  fields: readonly string[];
+function toDeep(filters: TaskFilters): DeepFilterValue {
+  return {
+    groups: {
+      status: filters.statuses,
+      priority: filters.priorities,
+      type: filters.types,
+      system: filters.systemDefined ?? [],
+    },
+    clauses: filters.clauses ?? [],
+  };
 }
 
-const filterSections: FilterSection[] = [
-  { id: "status", title: "Status", fields: TASK_STATUSES },
-  { id: "priority", title: "Priority", fields: TASK_PRIORITIES },
-  { id: "type", title: "Task Type", fields: TASK_TYPES },
-];
-
-const sectionKeyMap: Record<FilterSectionId, keyof TaskFilters> = {
-  status: "statuses",
-  priority: "priorities",
-  type: "types",
-};
-
-const filterControlClass =
-  "h-3.5 w-3.5 shrink-0 rounded border-slate-300 text-violet-500 focus:ring-violet-300";
+function fromDeep(value: DeepFilterValue, prev: TaskFilters): TaskFilters {
+  return {
+    ...prev,
+    statuses: (value.groups.status ?? []) as TaskFilters["statuses"],
+    priorities: (value.groups.priority ?? []) as TaskFilters["priorities"],
+    types: (value.groups.type ?? []) as TaskFilters["types"],
+    systemDefined: value.groups.system ?? [],
+    clauses: value.clauses,
+  };
+}
 
 interface FilterPanelProps {
   filters: TaskFilters;
-  onToggleField: (sectionId: FilterSectionId, field: string) => void;
+  onChange: (next: TaskFilters) => void;
   onClose?: () => void;
 }
 
-export function FilterPanel({
-  filters,
-  onToggleField,
-  onClose,
-}: FilterPanelProps) {
-  const [search, setSearch] = useState("");
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-
-  function toggleSection(id: string) {
-    setCollapsed((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
-
-  function isChecked(sectionId: FilterSectionId, field: string) {
-    return (filters[sectionKeyMap[sectionId]] as string[]).includes(field);
-  }
-
-  const filteredSections = useMemo(() => {
-    if (!search.trim()) return filterSections;
-    return filterSections
-      .map((section) => ({
-        ...section,
-        fields: section.fields.filter((f) =>
-          f.toLowerCase().includes(search.toLowerCase()),
-        ),
-      }))
-      .filter((section) => section.fields.length > 0);
-  }, [search]);
-
+export function FilterPanel({ filters, onChange, onClose }: FilterPanelProps) {
   return (
-    <div
-      className={cn(
-        "flex h-full w-56 shrink-0 flex-col rounded-2xl border border-slate-100 bg-white shadow-sm",
-        filterEnter,
-      )}
-    >
-      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-900">Filter Tasks</h3>
-        {onClose ? (
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close filter panel"
-            className="text-xs font-medium text-slate-400 hover:text-slate-600"
-          >
-            ✕
-          </button>
-        ) : null}
-      </div>
-
-      <div className="border-b border-slate-100 p-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search"
-            className="w-full rounded-lg border border-slate-200 py-1.5 pr-3 pl-8 text-xs text-slate-700 placeholder:text-slate-400 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 focus:outline-none"
-          />
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-3 py-2">
-        {filteredSections.map((section) => {
-          const isCollapsed = collapsed[section.id];
-          return (
-            <div key={section.id} className="mb-3">
-              <button
-                type="button"
-                onClick={() => toggleSection(section.id)}
-                className="mb-1.5 flex w-full items-center justify-between py-1 text-xs font-semibold tracking-wide text-slate-500 uppercase hover:text-slate-700"
-              >
-                {section.title}
-                {isCollapsed ? (
-                  <ChevronDown className="h-3.5 w-3.5" />
-                ) : (
-                  <ChevronUp className="h-3.5 w-3.5" />
-                )}
-              </button>
-              {!isCollapsed && (
-                <div className="space-y-2">
-                  {section.fields.map((field) => (
-                    <label
-                      key={field}
-                      className="flex cursor-pointer items-center gap-2 text-sm text-slate-600"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked(section.id, field)}
-                        onChange={() => onToggleField(section.id, field)}
-                        className={filterControlClass}
-                      />
-                      {field}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {filteredSections.length === 0 && (
-          <p className="py-6 text-center text-xs text-slate-400">
-            No fields match your search.
-          </p>
-        )}
-      </div>
-    </div>
+    <DeepFilterPanel
+      title="Filter Tasks"
+      applied={toDeep(filters)}
+      fields={TASK_FILTER_FIELDS}
+      systemGroups={TASK_SYSTEM_GROUPS}
+      onApply={(next) => onChange(fromDeep(next, filters))}
+      onClose={onClose}
+    />
   );
 }

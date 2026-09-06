@@ -6,6 +6,7 @@ import {
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
 import { crmBffFetch, crmErrorMessage, crmFetch } from "@/lib/crm/request";
+import { htmlToPlainText } from "@/lib/emails/ai-compose";
 import { upsertEmail } from "@/lib/emails/store";
 import type {
   Email,
@@ -85,10 +86,6 @@ export function mapEmailStatus(raw: string, fallback: EmailStatus = "Draft"): Em
   if (value.includes("sent") || value.includes("send")) return "Sent";
   if (value.includes("draft")) return "Draft";
   return fallback;
-}
-
-function apiStatus(status: EmailStatus): string {
-  return status.toUpperCase().replace(/ /g, "_");
 }
 
 function isEmailRecord(row: Record<string, unknown>) {
@@ -346,6 +343,66 @@ function compactBody(input: Record<string, unknown>) {
   return out;
 }
 
+const CRM_RELATED_TYPES = new Set(["LEAD", "CONTACT", "COMPANY", "DEAL"]);
+
+function crmRelatedType(raw?: string): string | undefined {
+  const value = (raw ?? "").trim().toUpperCase();
+  return CRM_RELATED_TYPES.has(value) ? value : undefined;
+}
+
+function joinAddresses(list?: string[]) {
+  const joined = (list ?? [])
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .join(",");
+  return joined || undefined;
+}
+
+function crmPlainBody(html: string) {
+  let text = htmlToPlainText(html);
+  if (!text) text = html.replace(/<[^>]+>/g, " ").trim();
+  return text
+    .replace(/<\s*\/?\s*[a-z][^>]*>/gi, " ")
+    .replace(/javascript:/gi, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export function toCreateBody(input: {
+  subject: string;
+  body: string;
+  from?: string;
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  relatedType?: string;
+  relatedId?: string;
+  relatedTo?: string;
+  status?: EmailStatus;
+  template?: string;
+}): Record<string, unknown> {
+  const relatedType = crmRelatedType(input.relatedType);
+  const relatedId = isUuid(input.relatedId) ? input.relatedId : undefined;
+  const body: Record<string, unknown> = {
+    subject: input.subject.trim(),
+    body: crmPlainBody(input.body),
+    toEmail: input.to[0]?.trim(),
+    cc: joinAddresses(input.cc),
+    bcc: joinAddresses(input.bcc),
+  };
+  if (isUuid(input.template)) body.templateId = input.template;
+  // Nest requires relatedType + matching *Id UUID together; omit both for local demo ids.
+  if (relatedType && relatedId) {
+    body.relatedType = relatedType;
+    if (relatedType === "LEAD") body.leadId = relatedId;
+    if (relatedType === "CONTACT") body.contactId = relatedId;
+    if (relatedType === "COMPANY") body.companyId = relatedId;
+    if (relatedType === "DEAL") body.dealId = relatedId;
+  }
+  return compactBody(body);
+}
+
 function asEmail(data: unknown, fallback?: Partial<Email>): Email | null {
   const items = normalizeCrmEmails(data);
   const mapped =
@@ -448,37 +505,6 @@ export async function listRelatedCrmEmails(
   );
 }
 
-export function toCreateBody(input: {
-  subject: string;
-  body: string;
-  from?: string;
-  to: string[];
-  cc?: string[];
-  bcc?: string[];
-  relatedType?: string;
-  relatedId?: string;
-  relatedTo?: string;
-  status?: EmailStatus;
-  template?: string;
-}): Record<string, unknown> {
-  return compactBody({
-    subject: input.subject.trim(),
-    body: input.body,
-    html: input.body,
-    from: input.from,
-    to: input.to,
-    cc: input.cc,
-    bcc: input.bcc,
-    relatedType: input.relatedType,
-    relatedId: isUuid(input.relatedId) ? input.relatedId : undefined,
-    relatedTo: input.relatedTo,
-    fromEmail: input.from,
-    toAddresses: input.to,
-    status: input.status ? apiStatus(input.status) : "DRAFT",
-    template: input.template,
-  });
-}
-
 export async function createCrmEmail(
   input: Parameters<typeof toCreateBody>[0],
 ): Promise<Email | null> {
@@ -493,18 +519,22 @@ export async function updateCrmEmail(
   id: string,
   patch: Partial<Email> & { body?: string },
 ): Promise<Email | null> {
-  const body: Record<string, unknown> = {};
-  if (patch.subject != null) body.subject = patch.subject;
-  if (patch.body != null) {
-    body.body = patch.body;
-    body.html = patch.body;
-  }
-  if (patch.from != null) body.from = patch.from;
-  if (patch.to) body.to = patch.to;
-  if (patch.cc) body.cc = patch.cc;
-  if (patch.bcc) body.bcc = patch.bcc;
-  if (patch.status) body.status = apiStatus(patch.status);
-  if (patch.templateUsed != null) body.templateName = patch.templateUsed;
+  const relatedType = crmRelatedType(patch.relatedType);
+  const relatedId = isUuid(patch.relatedId) ? patch.relatedId : undefined;
+  const linked = Boolean(relatedType && relatedId);
+  const body = compactBody({
+    subject: patch.subject,
+    body: patch.body != null ? crmPlainBody(patch.body) : undefined,
+    toEmail: patch.to?.[0]?.trim(),
+    cc: joinAddresses(patch.cc),
+    bcc: joinAddresses(patch.bcc),
+    relatedType: linked ? relatedType : undefined,
+    leadId: linked && relatedType === "LEAD" ? relatedId : undefined,
+    contactId: linked && relatedType === "CONTACT" ? relatedId : undefined,
+    companyId: linked && relatedType === "COMPANY" ? relatedId : undefined,
+    dealId: linked && relatedType === "DEAL" ? relatedId : undefined,
+    templateId: isUuid(patch.templateUsed) ? patch.templateUsed : undefined,
+  });
   return asEmail(
     await emailsMutate(`/${id}`, {
       method: "PATCH",
@@ -521,13 +551,19 @@ export async function sendCrmEmail(
   id: string,
   extra: Record<string, unknown> = {},
 ): Promise<Email | null> {
+  const scheduledAt =
+    typeof extra.scheduledAt === "string"
+      ? extra.scheduledAt
+      : extra.scheduled instanceof Date
+        ? extra.scheduled.toISOString()
+        : undefined;
   const raw = await emailsMutate(`/${id}/send`, {
     method: "POST",
-    body: JSON.stringify(extra),
+    body: JSON.stringify(compactBody({ scheduledAt })),
   });
   return asEmail(raw, {
     id,
-    status: extra.scheduled ? "Scheduled" : "Sent",
+    status: scheduledAt ? "Scheduled" : "Sent",
   });
 }
 
@@ -553,10 +589,14 @@ export async function applyCrmEmailTemplate(
   id: string,
   extra: Record<string, unknown>,
 ): Promise<Email | null> {
+  const templateId = pickStr(extra.templateId, extra.template);
+  if (!isUuid(templateId)) {
+    throw new Error("CRM templates require a template UUID");
+  }
   return asEmail(
     await emailsMutate(`/${id}/apply-template`, {
       method: "POST",
-      body: JSON.stringify(extra),
+      body: JSON.stringify({ templateId }),
     }),
   );
 }

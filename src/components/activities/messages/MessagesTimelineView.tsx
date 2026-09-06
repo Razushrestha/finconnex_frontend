@@ -5,10 +5,17 @@ import { ActivityTimelineView } from "@/components/activities/ActivityTimelineVi
 import { parseTaskDueDate } from "@/lib/dashboard/layout";
 import { listMessages } from "@/lib/messages/store";
 import { onRulesChange } from "@/lib/rules";
+import type { Message } from "@/lib/messages/types";
 
-export function MessagesTimelineView() {
-  const [items, setItems] = useState(() => listMessages());
-  useEffect(() => onRulesChange(() => setItems(listMessages())), []);
+export function MessagesTimelineView({ data }: { data?: Message[] }) {
+  const [items, setItems] = useState(() => data ?? listMessages());
+  useEffect(() => {
+    if (data) {
+      setItems(data);
+      return;
+    }
+    return onRulesChange(() => setItems(listMessages()));
+  }, [data]);
   const rows = useMemo(
     () =>
       items.map((message) => ({

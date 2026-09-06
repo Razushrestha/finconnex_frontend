@@ -21,9 +21,11 @@ import {
   relatedEmailsPath,
   retryCrmEmail,
   sendCrmEmail,
+  toCreateBody,
   updateCrmEmail,
   workspaceEmailsPath,
 } from "@/lib/emails/api";
+import { composeEmailsHref } from "@/lib/emails/href";
 import {
   installSmokePolyfill,
   runAsCli,
@@ -215,6 +217,14 @@ export function smokeEmailsWiring() {
   if (!create.includes("createCrmEmail") || !create.includes("sendCrmEmail")) {
     fail("create email form does not call createCrmEmail/sendCrmEmail");
   }
+  const leadDetail = readSrc("src/components/sales/leads/LeadDetailView.tsx");
+  if (!leadDetail.includes("sendCrmActivityEmail")) {
+    fail("lead detail compose does not call sendCrmActivityEmail");
+  }
+  const dealDetail = readSrc("src/components/sales/deals/DealDetailView.tsx");
+  if (!dealDetail.includes("sendCrmActivityEmail")) {
+    fail("deal detail compose does not call sendCrmActivityEmail");
+  }
   if (!create.includes("applyCrmEmailTemplate") || !create.includes("attachCrmEmailObject")) {
     fail("create email form does not call apply-template/attachments");
   }
@@ -232,6 +242,36 @@ export function smokeEmailsWiring() {
   );
   if (normalized.subject !== "Follow up" || normalized.status !== "Sent") {
     fail("normalizeCrmEmail did not map Swagger-shaped fields");
+  }
+
+  const createBody = toCreateBody({
+    subject: "Hi",
+    body: "<p>Hello</p>",
+    to: ["ada@example.com"],
+    cc: ["cc@example.com"],
+    from: "broker@finconnex.com",
+  });
+  if (createBody.toEmail !== "ada@example.com") {
+    fail("toCreateBody must send toEmail");
+  }
+  if ("to" in createBody || "html" in createBody || "from" in createBody) {
+    fail("toCreateBody must not send forbidden CRM fields");
+  }
+  if (String(createBody.body).includes("<p>")) {
+    fail("toCreateBody must strip HTML for CRM body");
+  }
+  if (createBody.cc !== "cc@example.com") {
+    fail("toCreateBody must join cc as a comma string");
+  }
+
+  const href = composeEmailsHref({
+    to: ["ada@example.com", "bob@example.com"],
+    relatedKind: "Lead",
+    relatedName: "Ada",
+    relatedId: ID,
+  });
+  if (!href.includes("/activities/emails/create") || !href.includes("to=")) {
+    fail("composeEmailsHref missing create path");
   }
 }
 
@@ -284,7 +324,7 @@ export async function smokeEmailsMock() {
     await sendCrmEmail(ID);
     await retryCrmEmail(ID);
     await cancelCrmEmail(ID);
-    await applyCrmEmailTemplate(ID, { template: "Follow-up Template" });
+    await applyCrmEmailTemplate(ID, { templateId: ID });
     await attachCrmEmailObject(ID, { objectType: "DOCUMENT", objectId: RELATED_ID });
     await downloadCrmEmailAttachment(ID, ATTACHMENT_ID);
     await deleteCrmEmailAttachment(ID, ATTACHMENT_ID);

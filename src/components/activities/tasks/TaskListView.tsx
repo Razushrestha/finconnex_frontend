@@ -41,7 +41,8 @@ import {
   ManageColumnsModal,
   type ManageColumn,
 } from "@/components/work-queue/ManageColumnsModal";
-import { TableDisplayOptionsMenu } from "@/components/common/TableDisplayOptionsMenu";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
+import { ArrowTag } from "@/components/common/ArrowTag";
 import { CardInitialsAvatar } from "@/components/shared/CardInitialsAvatar";
 import {
   applyTablePreferenceToColumns,
@@ -68,19 +69,19 @@ interface TaskListViewProps {
 }
 
 const PRIORITY_STYLE: Record<Priority, { className: string }> = {
-  Critical: { className: "text-rose-700" },
-  High: { className: "text-orange-600" },
-  Medium: { className: "text-violet-700" },
-  Low: { className: "text-slate-500" },
+  Critical: { className: "bg-red-500" },
+  High: { className: "bg-orange-500" },
+  Medium: { className: "bg-violet-500" },
+  Low: { className: "bg-sky-500" },
 };
 
 const STATUS_STYLE: Record<TaskStatus, { className: string }> = {
-  "Not Started": { className: "text-slate-600" },
-  "In Progress": { className: "text-sky-700" },
-  Waiting: { className: "text-amber-700" },
-  Review: { className: "text-violet-700" },
-  Completed: { className: "text-emerald-700" },
-  Cancelled: { className: "text-rose-700" },
+  "Not Started": { className: "bg-slate-500" },
+  "In Progress": { className: "bg-sky-500" },
+  Waiting: { className: "bg-amber-500" },
+  Review: { className: "bg-violet-500" },
+  Completed: { className: "bg-emerald-500" },
+  Cancelled: { className: "bg-red-500" },
 };
 
 function parseDueDate(dateStr: string): number {
@@ -124,13 +125,11 @@ function TaskPriorityCell({ task }: { task: FlatTask }) {
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Priority ${task.priority}. Change priority`}
-        className={cn(
-          "rounded-md px-1.5 py-0.5 text-left text-[12px] font-semibold transition-colors hover:bg-slate-100",
-          className,
-          open && "bg-slate-100",
-        )}
+        className="text-left"
       >
-        {task.priority}
+        <ArrowTag compact className={className}>
+          {task.priority}
+        </ArrowTag>
       </button>
       {open && (
         <div
@@ -155,12 +154,11 @@ function TaskPriorityCell({ task }: { task: FlatTask }) {
                   setOpen(false);
                 }}
                 className={cn(
-                  "flex w-full px-3 py-1.5 text-left text-[12px] hover:bg-slate-50",
-                  priority === task.priority
-                    ? "font-semibold text-violet-700"
-                    : opt.className,
+                  "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-slate-50",
+                  priority === task.priority && "font-semibold text-violet-700",
                 )}
               >
+                <span className={cn("h-2 w-2 rounded-full", opt.className)} />
                 {priority}
               </button>
             );
@@ -199,13 +197,11 @@ function TaskStatusCell({ task }: { task: FlatTask }) {
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Status ${task.status}. Change status`}
-        className={cn(
-          "rounded-md px-1.5 py-0.5 text-left text-[12px] font-semibold transition-colors hover:bg-slate-100",
-          className,
-          open && "bg-slate-100",
-        )}
+        className="text-left"
       >
-        {task.status}
+        <ArrowTag compact className={className}>
+          {task.status}
+        </ArrowTag>
       </button>
       {open && (
         <div
@@ -233,12 +229,11 @@ function TaskStatusCell({ task }: { task: FlatTask }) {
                   setOpen(false);
                 }}
                 className={cn(
-                  "flex w-full px-3 py-1.5 text-left text-[12px] hover:bg-slate-50",
-                  status === task.status
-                    ? "font-semibold text-violet-700"
-                    : opt.className,
+                  "flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-slate-50",
+                  status === task.status && "font-semibold text-violet-700",
                 )}
               >
+                <span className={cn("h-2 w-2 rounded-full", opt.className)} />
                 {status}
               </button>
             );
@@ -260,7 +255,7 @@ function buildColumnRenderers(): Record<string, ColumnRenderer> {
     title: {
       label: "Task Name",
       tdClassName: cn(
-        "px-3 py-2.5 font-semibold text-slate-900",
+        "px-3 py-2.5 font-normal text-slate-900",
         cardSubject,
       ),
       td: (task) => task.title,
@@ -421,9 +416,9 @@ function buildColumnRenderers(): Record<string, ColumnRenderer> {
       tdClassName: "px-3 py-2.5",
       td: (task) =>
         task.overdue ? (
-          <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+          <ArrowTag compact className="bg-red-500">
             Overdue
-          </span>
+          </ArrowTag>
         ) : (
           <span className="text-slate-300"></span>
         ),
@@ -605,11 +600,21 @@ export function TaskListView({
 
   return (
     <div className="flex h-full min-w-0 flex-col rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
-      <div className="min-h-0 min-w-0 flex-1 overflow-x-scroll overflow-y-auto overscroll-x-contain [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100">
+      <ResizableColumns
+        storageKey="tasks-list"
+        className="min-h-0 min-w-0 flex-1 overflow-x-scroll overflow-y-auto overscroll-x-contain [scrollbar-color:#94a3b8_#f1f5f9] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-400 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-slate-100"
+        pageSize={pageSize}
+        pageSizeOptions={[8, 10, 20, 50]}
+        onPageSizeChange={setPageSize}
+        onManageColumns={() => setManageColumnsOpen(true)}
+      >
         <table className="w-max min-w-full text-left text-[12px]">
           <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/90 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
             <tr>
-              <th className="sticky left-0 z-20 w-10 bg-slate-50/90 px-3 py-2.5">
+              <th
+                data-col-id="select"
+                className="sticky left-0 z-20 w-10 bg-slate-50/90 px-3 py-2.5"
+              >
         <input
                   type="checkbox"
                   checked={allPageSelected}
@@ -626,6 +631,7 @@ export function TaskListView({
                 return (
                   <th
                     key={col.id}
+                    data-col-id={col.id}
                     className="px-3 py-2.5 whitespace-nowrap"
                   >
                     {sortable ? (
@@ -653,19 +659,12 @@ export function TaskListView({
                 );
               })}
               <th
+                data-col-id="options"
                 className={cn(
-                  "sticky right-0 z-20 bg-slate-50/90 px-3 py-2.5 text-right",
+                  "sticky right-0 z-20 w-12 min-w-12 bg-slate-50/90 px-3 py-2.5 text-right",
                   "shadow-[-12px_0_12px_-8px_rgba(15,23,42,0.06)]",
                 )}
-              >
-                <TableDisplayOptionsMenu
-                  pageSize={pageSize}
-                  onPageSizeChange={setPageSize}
-                  pageSizeOptions={[8, 10, 20, 50]}
-                  onManageColumns={() => setManageColumnsOpen(true)}
-                  className="flex justify-end"
-                />
-                </th>
+              />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50 text-slate-700">
@@ -734,7 +733,7 @@ export function TaskListView({
             )}
           </tbody>
         </table>
-      </div>
+      </ResizableColumns>
 
       <div className="mt-4 flex items-center justify-between gap-2 border-t border-slate-100 pt-3">
         <p className="text-[11px] text-slate-400">

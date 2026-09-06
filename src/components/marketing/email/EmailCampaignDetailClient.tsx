@@ -195,6 +195,7 @@ export function EmailCampaignDetailClient({ id }: { id: string }) {
       email: campaign.fromEmail,
       subject: `[TEST] ${campaign.subject}`,
       body: `Test send for campaign ${campaign.name}`,
+      relatedTo: `Campaign: ${campaign.name}`,
     });
     if (!result.ok) {
       flash(result.message);

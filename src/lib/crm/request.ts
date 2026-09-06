@@ -15,6 +15,24 @@ export function crmErrorMessage(json: unknown, fallback: string): string {
     }
     if (typeof msg === "string" && msg.trim()) {
       const text = msg.trim();
+      if (text === "email.error.relatedTypeMismatch") {
+        return "CRM parent record must be a live UUID. Send without linking this local/demo record.";
+      }
+      if (text === "email.error.unsafeHtml") {
+        return "CRM rejected HTML in the email body. Send as plain text.";
+      }
+      if (text === "email.error.singleToRequired") {
+        return "CRM allows one To address. Extra recipients must go in Cc.";
+      }
+      if (text === "email.error.invalidRecipient") {
+        return "Recipient is not a valid email address.";
+      }
+      if (text === "workspace.error.invitationDeliveryFailed") {
+        return "Workspace invitation was created, but the invite email could not be queued. Sending from FinConnex mail instead.";
+      }
+      if (text === "workspace.error.roleRequired") {
+        return "Choose a workspace role before sending the invite.";
+      }
       if (text.toLowerCase() !== "bad request") return text;
     }
     if (Array.isArray(rec.errors) && rec.errors.length) {

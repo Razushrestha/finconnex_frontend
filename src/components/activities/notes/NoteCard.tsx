@@ -109,7 +109,7 @@ export function NoteCard({
         </h4>
         <div className="flex shrink-0 items-center gap-1">
           {note.isPinned ? (
-            <Pin className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
+            <Pin className="h-3.5 w-3.5 fill-red-600 text-red-600" />
           ) : null}
           {note.isPrivate ? (
             <Lock className="h-3.5 w-3.5 text-slate-400" />

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { MoreVertical } from "lucide-react";
 import type { RelatedTableColumn, RelatedTableRow } from "./types";
 import { cn } from "@/lib/utils";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 
 interface RelatedRecordsTableProps {
   title: string;
@@ -51,11 +52,14 @@ export function RelatedRecordsTable({
         </p>
       )}
 
-      <div className="mt-3 overflow-x-auto">
+      <ResizableColumns
+        storageKey={`related:${title}`}
+        className="mt-3 overflow-x-auto"
+      >
         <table className="w-full border-collapse text-left text-[13px]">
           <thead>
             <tr className="border-y border-slate-100 bg-slate-50/60">
-              <th className="w-9 px-4 py-2">
+              <th data-col-id="select" className="w-9 px-4 py-2">
                 <input
                   type="checkbox"
                   className="h-3.5 w-3.5 rounded border-slate-300"
@@ -72,6 +76,7 @@ export function RelatedRecordsTable({
               {columns.map((col) => (
                 <th
                   key={col.key}
+                  data-col-id={col.key}
                   className="px-4 py-2 font-semibold text-slate-500"
                 >
                   {col.label}
@@ -115,7 +120,7 @@ export function RelatedRecordsTable({
             )}
           </tbody>
         </table>
-      </div>
+      </ResizableColumns>
     </div>
   );
 }

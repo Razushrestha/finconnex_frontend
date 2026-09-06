@@ -144,6 +144,7 @@ export function smokeWorkspaceMembersWiring() {
     "cancelCrmWorkspaceInvitation",
     "resendCrmWorkspaceInvitation",
     "transferCrmWorkspaceOwnership",
+    "sendWorkspaceInviteMail",
   ]) {
     if (!ui.includes(name)) {
       fail(`Users settings does not call ${name}`);

@@ -44,16 +44,16 @@ import {
 import { PropertyDetailsEditor, emptyPropertyDetails, type PropertyDetails } from "@/components/documents/requests/PropertyDetailsEditor";
 import {
   RequestScheduleCard,
-  defaultCustomReminder,
-  formatCustomReminder,
   formatRequestDateTime,
   formatRequestDueDate,
+  formatRequestRepeat,
   parseDatetimeLocal,
   validateRequestSchedule,
-  type CustomReminderConfig,
-  type RequestNotifyMethod,
 } from "@/components/documents/requests/RequestScheduleCard";
 import { RequestQuickReview } from "@/components/documents/requests/RequestQuickReview";
+import { defaultReminderRepeatRule } from "@/lib/tasks/repeat-reminder";
+import { turnOffReminderRepeat } from "@/components/activities/tasks/ReminderSettingsCard";
+import type { NotificationMethod } from "@/lib/reminders/types";
 import { readCatalogDescriptionOverrides } from "@/lib/documents/requests/catalog";
 import {
   leadDocumentRequestPeople,
@@ -113,9 +113,6 @@ type HomePurpose = "Property purchase" | "Refinance";
 type AssetPurpose = "Personal" | "Business";
 type Purpose = HomePurpose | AssetPurpose;
 type ApplicantCount = "1" | "2";
-
-const PAGE_GRADIENT =
-  "bg-[linear-gradient(90deg,#efe8f6_0%,#f5eef2_48%,#f8e6dc_100%)]";
 
 const STEPS = [
   { id: 1, label: "Document Request details" },
@@ -454,23 +451,6 @@ export function CreateDocumentRequestForm({
     }),
   );
 
-  useEffect(() => {
-    const main = document.querySelector("main");
-    if (!(main instanceof HTMLElement)) return;
-    const previousColor = main.style.backgroundColor;
-    const previousImage = main.style.backgroundImage;
-    const previousOverflow = main.style.overflow;
-    main.style.backgroundColor = "transparent";
-    main.style.backgroundImage =
-      "linear-gradient(90deg, #efe8f6 0%, #f5eef2 48%, #f8e6dc 100%)";
-    main.style.overflow = "hidden";
-    return () => {
-      main.style.backgroundColor = previousColor;
-      main.style.backgroundImage = previousImage;
-      main.style.overflow = previousOverflow;
-    };
-  }, []);
-
   const [sendOnBehalfOf, setSendOnBehalfOf] = useState(
     () => getRulesActor().name.trim(),
   );
@@ -551,10 +531,9 @@ export function CreateDocumentRequestForm({
   >({});
   const [dueDate, setDueDate] = useState("");
   const [reminderDate, setReminderDate] = useState("");
-  const [customReminder, setCustomReminder] =
-    useState<CustomReminderConfig>(defaultCustomReminder);
-  const [repeatEnabled, setRepeatEnabled] = useState(false);
-  const [notifyBy, setNotifyBy] = useState<RequestNotifyMethod[]>(["Email"]);
+  const [reminderOn, setReminderOn] = useState(false);
+  const [reminderRepeat, setReminderRepeat] = useState(defaultReminderRepeatRule);
+  const [notifyBy, setNotifyBy] = useState<NotificationMethod[]>(["Email"]);
   const [notes, setNotes] = useState("");
   const [template, setTemplate] = useState("");
   const [requestTitle, setRequestTitle] = useState("");
@@ -632,7 +611,10 @@ export function CreateDocumentRequestForm({
 
   function validateStep(current: number) {
     const next: Record<string, string> = {};
-    const scheduleErrors = validateRequestSchedule(dueDate, reminderDate);
+    const scheduleErrors = validateRequestSchedule(
+      dueDate,
+      reminderOn ? reminderDate : "",
+    );
     if (scheduleErrors.dueDate) next.dueDate = scheduleErrors.dueDate;
     if (scheduleErrors.reminderDate) next.reminderDate = scheduleErrors.reminderDate;
 
@@ -667,8 +649,13 @@ export function CreateDocumentRequestForm({
   }
 
   useEffect(() => {
-    if (!dueDate.trim() && repeatEnabled) setRepeatEnabled(false);
-  }, [dueDate, repeatEnabled]);
+    if (dueDate.trim()) return;
+    if (reminderOn) setReminderOn(false);
+    if (reminderDate) setReminderDate("");
+    if (reminderRepeat.preset !== "none") {
+      setReminderRepeat(turnOffReminderRepeat());
+    }
+  }, [dueDate, reminderOn, reminderDate, reminderRepeat.preset]);
 
   function handleDueDateChange(value: string) {
     let nextReminder = reminderDate;
@@ -705,6 +692,26 @@ export function CreateDocumentRequestForm({
       else delete next.reminderDate;
       return next;
     });
+  }
+
+  function handleReminderEnabledChange(on: boolean) {
+    setReminderOn(on);
+    if (on) return;
+    setReminderDate("");
+    setReminderRepeat(turnOffReminderRepeat());
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.reminderDate;
+      return next;
+    });
+  }
+
+  function toggleNotify(method: NotificationMethod) {
+    setNotifyBy((prev) =>
+      prev.includes(method)
+        ? prev.filter((item) => item !== method)
+        : [...prev, method],
+    );
   }
 
   function goNext() {
@@ -795,11 +802,14 @@ export function CreateDocumentRequestForm({
         documentType,
         status: "Requested",
         dueDate: due,
-        reminderDate: reminderDate
+        reminderDate: reminderOn && reminderDate
           ? formatRequestDateTime(reminderDate)
           : undefined,
-        repeat: repeatEnabled ? formatCustomReminder(customReminder) : undefined,
-        notifyBy,
+        repeat:
+          reminderOn && reminderRepeat.preset !== "none"
+            ? formatRequestRepeat(reminderRepeat)
+            : undefined,
+        notifyBy: reminderOn ? notifyBy : undefined,
         requestedBy: sendOnBehalfOf || DOCUMENT_REQUEST_BROKERS[0],
         requestedDate: started,
         lastUpdated: started,
@@ -814,7 +824,7 @@ export function CreateDocumentRequestForm({
             label: "Request created",
             detail: `Invitation sent to ${requestedFrom || "client"}. Visible in the client portal.`,
           },
-          ...(reminderDate
+          ...(reminderOn && reminderDate
             ? [
                 {
                   id: `${ids.id}-t-reminder`,
@@ -823,8 +833,8 @@ export function CreateDocumentRequestForm({
                   label: "Reminder scheduled",
                   detail: [
                     formatRequestDateTime(reminderDate),
-                    repeatEnabled
-                      ? formatCustomReminder(customReminder)
+                    reminderRepeat.preset !== "none"
+                      ? formatRequestRepeat(reminderRepeat)
                       : "Does not repeat",
                     notifyBy.length ? `Notify by ${notifyBy.join(", ")}` : "",
                   ]
@@ -870,7 +880,7 @@ export function CreateDocumentRequestForm({
   }
 
   return (
-    <div className={cn("absolute inset-0 flex flex-col overflow-hidden", PAGE_GRADIENT)}>
+    <div className="absolute inset-0 flex flex-col overflow-hidden bg-slate-50">
       <div className="flex shrink-0 items-center justify-between px-4 py-3 sm:px-6 2xl:px-8">
         <h1 className="text-base font-semibold text-slate-900">
           Create Document Request
@@ -1015,16 +1025,18 @@ export function CreateDocumentRequestForm({
                   dueDate ? formatRequestDateTime(dueDate) : "Not set"
                 }
                 reminderDate={
-                  reminderDate
+                  reminderOn && reminderDate
                     ? formatRequestDateTime(reminderDate)
                     : "Not set"
                 }
                 repeatLabel={
-                  repeatEnabled
-                    ? formatCustomReminder(customReminder)
+                  reminderOn
+                    ? reminderRepeat.preset === "none"
+                      ? "Once"
+                      : formatRequestRepeat(reminderRepeat)
                     : "Off"
                 }
-                notifyBy={notifyBy}
+                notifyBy={reminderOn ? notifyBy : []}
                 notes={notes}
                 onNotesChange={setNotes}
               />
@@ -1037,8 +1049,8 @@ export function CreateDocumentRequestForm({
                 className="flex-1 overflow-y-auto"
                 dueDate={dueDate}
                 reminderDate={reminderDate}
-                customReminder={customReminder}
-                repeatEnabled={repeatEnabled}
+                reminderEnabled={reminderOn}
+                reminderRepeat={reminderRepeat}
                 notifyBy={notifyBy}
                 errors={{
                   dueDate: errors.dueDate,
@@ -1046,9 +1058,9 @@ export function CreateDocumentRequestForm({
                 }}
                 onDueDateChange={handleDueDateChange}
                 onReminderDateChange={handleReminderDateChange}
-                onCustomReminderChange={setCustomReminder}
-                onRepeatEnabledChange={setRepeatEnabled}
-                onNotifyByChange={setNotifyBy}
+                onReminderEnabledChange={handleReminderEnabledChange}
+                onReminderRepeatChange={setReminderRepeat}
+                onToggleNotify={toggleNotify}
               />
             </aside>
           ) : null}

@@ -20,15 +20,30 @@ import {
 import {
   computeDashboardStats,
   parseMoney,
+  rangeStart,
   type DashboardFilters,
   type DashboardLiveStats,
 } from "@/lib/dashboard/layout";
+import {
+  batchCrmDashboardWidgets,
+  getCrmDashboardMetrics,
+  listCrmDashboardWidgetCatalog,
+} from "@/lib/dashboard/api";
+import {
+  computeExecutiveOverview,
+  type ExecutiveOverview,
+} from "@/lib/dashboard/executive";
 import {
   industryTiles,
   loadIndustryPreset,
   type DashboardIndustryTile,
   type IndustryExtras,
 } from "@/lib/dashboard/industry";
+import {
+  applyMetricsToStats,
+  overlayExecutiveOverview,
+  widgetPayloadMap,
+} from "@/lib/dashboard/overlay";
 import {
   listCrmTasks,
   listCrmTasksToday,
@@ -47,6 +62,7 @@ export type LiveDashboardSnapshot = {
   charts: DashboardChartData;
   owners: string[];
   liveHits: string[];
+  executive: ExecutiveOverview;
 };
 
 async function settle<T>(fn: () => Promise<T>): Promise<T | null> {
@@ -62,16 +78,6 @@ function inDateRange(iso: string | undefined, start: Date | null): boolean {
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return true;
   return t >= start.getTime();
-}
-
-function rangeStart(range: DashboardFilters["dateRange"]): Date | null {
-  const now = new Date();
-  if (range === "all") return null;
-  if (range === "ytd") return new Date(now.getFullYear(), 0, 1);
-  const days = range === "7d" ? 7 : range === "30d" ? 30 : 90;
-  const start = new Date(now);
-  start.setDate(start.getDate() - days);
-  return start;
 }
 
 function todayIsoRange(): { from: string; to: string } {
@@ -163,6 +169,63 @@ export async function fetchLiveDashboardSnapshot(
   filters: DashboardFilters,
 ): Promise<LiveDashboardSnapshot> {
   const demo = computeDashboardStats(filters);
+  const localExecutive = computeExecutiveOverview(filters);
+  const [metrics, catalog] = await Promise.all([
+    settle(() => getCrmDashboardMetrics(filters)),
+    settle(() => listCrmDashboardWidgetCatalog()),
+  ]);
+  const widgetKeys = catalog?.map((w) => w.key).filter(Boolean) ?? [];
+  const batchKeys = widgetKeys.length
+    ? widgetKeys
+    : ["kpis", "pipeline", "performance", "actions", "trend", "ranking", "alerts"];
+  const widgetsRaw = await settle(() =>
+    batchCrmDashboardWidgets(batchKeys, filters),
+  );
+  const widgetMap = widgetPayloadMap(widgetsRaw);
+
+  if (metrics != null || widgetsRaw != null) {
+    const liveHits: string[] = [];
+    if (metrics != null) liveHits.push("dashboard");
+    if (catalog?.length) liveHits.push("widget-catalog");
+    if (widgetsRaw != null) liveHits.push("widget-batch");
+    const stats = applyMetricsToStats({ ...demo }, metrics);
+    const executive = overlayExecutiveOverview(
+      localExecutive,
+      metrics,
+      widgetMap,
+    );
+    const members = await settle(() => listCrmWorkspaceMembers());
+    const memberList = members ?? [];
+    const owners = [
+      "All",
+      ...new Set(memberList.map((m) => m.name).filter(Boolean)),
+    ];
+    const trendHasData = executive.trend.some(
+      (p) => p.leads || p.deals || p.settlements,
+    );
+    return {
+      stats,
+      source: liveHits.includes("dashboard") || liveHits.includes("widget-batch")
+        ? "api"
+        : "partial",
+      industryTiles: industryTiles(loadIndustryPreset(), stats),
+      charts: chartsFromStats(
+        stats,
+        trendHasData
+          ? executive.trend.map((p) => ({
+              month: p.label,
+              leads: p.leads,
+              deals: p.deals,
+              won: p.settlements,
+            }))
+          : [],
+      ),
+      owners: owners.length > 1 ? owners : [],
+      liveHits,
+      executive,
+    };
+  }
+
   const start = rangeStart(filters.dateRange);
   const owner = filters.owner === "All" ? null : filters.owner;
 
@@ -345,5 +408,6 @@ export async function fetchLiveDashboardSnapshot(
     charts: chartsFromStats(stats, trendHasData ? trend : []),
     owners: owners.length > 1 ? owners : [],
     liveHits,
+    executive: localExecutive,
   };
 }

@@ -12,6 +12,7 @@ import {
   type ReminderType,
 } from "@/lib/reminders/types";
 import type { ReminderRepeatRule } from "@/lib/tasks/repeat-reminder";
+import type { FieldClause } from "@/lib/filters/types";
 
 export const TASK_TYPES = [
   "Call",
@@ -45,6 +46,8 @@ export interface TaskFilters {
   priorities: Priority[];
   types: TaskType[];
   scope?: TaskScope;
+  systemDefined?: string[];
+  clauses?: FieldClause[];
 }
 
 export const EMPTY_TASK_FILTERS: TaskFilters = {
@@ -52,6 +55,8 @@ export const EMPTY_TASK_FILTERS: TaskFilters = {
   priorities: [],
   types: [],
   scope: "all",
+  systemDefined: [],
+  clauses: [],
 };
 
 export interface TaskActionItem {

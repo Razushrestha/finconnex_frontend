@@ -4,8 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight, MoreHorizontal, Pencil } from "lucide-react";
 import type { EntityDetailHeaderProps } from "./types";
-import { Panel, cn, toneClasses } from "./shared";
+import { Panel, toneDotClass } from "./shared";
 import { RecordTagsRow } from "@/components/shared/tags/RecordTags";
+import { ArrowTag } from "@/components/common/ArrowTag";
 
 export function EntityDetailHeader({
   breadcrumb,
@@ -78,14 +79,9 @@ export function EntityDetailHeader({
                 <h1 className="truncate text-[20px] font-semibold tracking-tight text-slate-900">
                   {name}
                 </h1>
-                <span
-                  className={cn(
-                    "inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset",
-                    toneClasses(status.tone),
-                  )}
-                >
+                <ArrowTag compact className={toneDotClass(status.tone)}>
                   {status.label}
-                </span>
+                </ArrowTag>
               </div>
 
               {subtitleParts.length > 0 && (

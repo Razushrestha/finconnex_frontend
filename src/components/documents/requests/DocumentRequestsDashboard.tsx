@@ -158,9 +158,9 @@ export function DocumentRequestsDashboard({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#f4f2f7]">
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1920px] flex-col gap-4 px-5 py-4">
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+    <div className="min-h-full bg-[#f4f2f7]">
+      <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-4 px-5 py-4">
+        <div className="flex flex-wrap items-center gap-2">
           <span
             className={cn(
               "rounded-full px-2 py-0.5 text-[10px] font-semibold",
@@ -179,7 +179,7 @@ export function DocumentRequestsDashboard({
             <span className="text-[10px] text-slate-500">{error}</span>
           ) : null}
         </div>
-        <div className="grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
           <KpiCard
             label="Total Requests"
             value={kpis.total}
@@ -236,7 +236,7 @@ export function DocumentRequestsDashboard({
           />
         </div>
 
-        <div className="grid shrink-0 grid-cols-[minmax(0,1.35fr)_minmax(0,0.9fr)_minmax(240px,0.75fr)] items-stretch gap-3">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.9fr)_minmax(240px,0.75fr)]">
           <section className="flex min-h-0 flex-col rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
             <div className="mb-2 flex items-center justify-between gap-3">
               <h2 className="text-[14px] font-semibold text-slate-900">
@@ -420,9 +420,8 @@ export function DocumentRequestsDashboard({
           </section>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-            <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[#E5E7EB] px-4 py-3">
+        <section className="min-w-0 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#E5E7EB] px-4 py-3">
               <h2 className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
                 <FileText className="h-4 w-4 shrink-0 text-[#5A32A3]" />
                 Recent Documents
@@ -444,19 +443,19 @@ export function DocumentRequestsDashboard({
                 </Link>
               </div>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="overflow-x-auto">
               <DocumentRequestsList
                 data={preview}
                 limit={PREVIEW_ROWS}
                 framed={false}
                 showRelatedTo
+                columnChrome={false}
                 onRefresh={onRefresh}
                 sort={tableSort}
                 onSortChange={setTableSort}
               />
             </div>
           </section>
-        </div>
       </div>
     </div>
   );

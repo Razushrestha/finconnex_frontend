@@ -7,7 +7,10 @@ interface PageProps {
     redirect?: string;
     relatedKind?: string;
     relatedName?: string;
+    relatedId?: string;
     to?: string;
+    cc?: string;
+    subject?: string;
   }>;
 }
 
@@ -21,7 +24,10 @@ export default async function CreateEmailPage({ searchParams }: PageProps) {
         defaults={{
           relatedKind: asRelatedKind(params.relatedKind),
           relatedName: params.relatedName,
+          relatedId: params.relatedId,
           to: params.to,
+          cc: params.cc,
+          subject: params.subject,
         }}
       />
     </div>

@@ -35,12 +35,17 @@ import {
 import type { QuickActionKind } from "@/lib/leads/panel-actions";
 import { LeadSlaChip } from "@/components/sales/leads/LeadSlaChip";
 import type { LeadFilters } from "./FilterLeadsPanel";
+import { leadMatchesFilters } from "@/lib/filters/records";
 import {
   LeadCardPanelHost,
   type LeadPanelState,
 } from "./panels/LeadCardPanelHost";
 import { cn } from "@/lib/utils";
-import { TableDisplayOptionsMenu } from "@/components/common/TableDisplayOptionsMenu";
+import { StatusColorPill } from "@/components/common/StatusColorPill";
+import { ContactNameLink } from "@/components/sales/ContactNameLink";
+import { resolveLeadContact } from "@/lib/sales/resolve-contact";
+import { useLeadCallFlow } from "@/components/sales/leads/LeadCallPicker";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
   ManageColumnsModal,
   type ManageColumn,
@@ -80,6 +85,8 @@ const QUICK_LABELS: Record<LeadCardQuickActionState["kind"], string> = {
 
 export const DEFAULT_LEAD_LIST_COLUMNS: ManageColumn[] = [
   { id: "lead", label: "Lead", checked: true, required: true },
+  { id: "contactName", label: "Contact Name", checked: true },
+  { id: "email", label: "Email", checked: true },
   { id: "company", label: "Company", checked: true },
   { id: "status", label: "Status", checked: true },
   { id: "sla", label: "Pipeline SLA", checked: true },
@@ -115,10 +122,12 @@ interface ColumnRenderer {
 
 function buildColumnRenderers(
   setPanel: (p: LeadPanelState | null) => void,
+  onCallClick: (lead: LeadRow, anchor: HTMLElement) => void,
 ): Record<string, ColumnRenderer> {
   return {
     lead: {
       th: "Lead",
+      thClassName: "px-3 py-2.5 text-left",
       tdClassName: "px-3 py-1 whitespace-nowrap",
       td: (lead) => (
         <div className="flex items-center gap-2.5">
@@ -127,14 +136,26 @@ function buildColumnRenderers(
           >
             {lead.initials}
           </div>
-          <div className="min-w-0">
-            <p className="font-semibold text-[13px] text-slate-900">
-              {lead.name}
-            </p>
-            <p className="truncate text-[11px] text-slate-400">{lead.email}</p>
-          </div>
+          <p className="font-semibold text-[13px] text-slate-900">
+            {lead.name}
+          </p>
         </div>
       ),
+    },
+    contactName: {
+      th: "Contact Name",
+      thClassName: "px-3 py-2.5 text-left",
+      tdClassName: "px-3 py-1 whitespace-nowrap text-[13px]",
+      td: (lead) => {
+        const contact = resolveLeadContact(lead);
+        return <ContactNameLink name={contact.name} contactId={contact.id} />;
+      },
+    },
+    email: {
+      th: "Email",
+      thClassName: "px-3 py-2.5 text-left",
+      tdClassName: "px-3 py-1 whitespace-nowrap text-[13px] text-slate-600",
+      td: (lead) => lead.email || "",
     },
     company: {
       th: "Company",
@@ -145,10 +166,10 @@ function buildColumnRenderers(
       th: "Status",
       tdClassName: "px-3 py-1 whitespace-nowrap",
       td: (lead) => (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
-          <span className={`h-1.5 w-1.5 rounded-full ${lead.statusDotColor}`} />
-          {lead.stageTitle}
-        </span>
+        <StatusColorPill
+          label={lead.stageTitle}
+          solidClass={lead.statusDotColor}
+        />
       ),
     },
     sla: {
@@ -258,7 +279,7 @@ function buildColumnRenderers(
     },
     actions: {
       th: "Actions",
-      thClassName: "px-3 py-2 text-right",
+      thClassName: "px-3 py-2.5 text-left",
       tdClassName: "px-3 py-1",
       td: (lead, vm) => (
         <div
@@ -275,7 +296,11 @@ function buildColumnRenderers(
               <button
                 key={action.kind}
                 type="button"
-                onClick={() =>
+                onClick={(e) => {
+                  if (action.kind === "call") {
+                    onCallClick(lead, e.currentTarget);
+                    return;
+                  }
                   setPanel({
                     type: "quick-action",
                     kind: action.kind as QuickActionKind,
@@ -284,8 +309,8 @@ function buildColumnRenderers(
                     status: lead.statusTitle,
                     email: lead.email,
                     phone: lead.phone,
-                  })
-                }
+                  });
+                }}
                 aria-label={`${QUICK_LABELS[action.kind]}: ${stateHint}${countHint}`}
                 title={`${QUICK_LABELS[action.kind]} (${stateHint})`}
                 className={cn(
@@ -327,6 +352,7 @@ export function LeadListView({
   const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
   const [internalManageColumns, setInternalManageColumns] =
     useState<ManageColumn[]>(DEFAULT_LEAD_COLUMNS);
+  const callFlow = useLeadCallFlow();
 
   const pageSize = pageSizeProp ?? internalPageSize;
   const setPageSize = onPageSizeChange ?? setInternalPageSize;
@@ -363,7 +389,6 @@ export function LeadListView({
     void revision;
     const source = columnsProp ?? columns;
     const hasStatusFilter = !!filters?.statuses.length;
-    const hasSourceFilter = !!filters?.sources.length;
 
     return source
       .filter(
@@ -374,9 +399,15 @@ export function LeadListView({
       )
       .flatMap((column) =>
         column.cards
-          .filter(
-            (card) =>
-              !hasSourceFilter || filters!.sources.includes(card.source),
+          .filter((card) =>
+            leadMatchesFilters(
+              {
+                ...card,
+                statusTitle: column.leadStatus,
+                stageTitle: column.title,
+              },
+              filters,
+            ),
           )
           .map((card) => ({
             ...card,
@@ -397,7 +428,13 @@ export function LeadListView({
   const someSelected =
     pagedLeads.some((l) => selectedIds.has(l.id)) && !allSelected;
 
-  const columnRenderers = useMemo(() => buildColumnRenderers(setPanel), []);
+  const columnRenderers = useMemo(
+    () =>
+      buildColumnRenderers(setPanel, (lead, anchor) =>
+        callFlow.onCallClick(lead, anchor),
+      ),
+    [callFlow.onCallClick],
+  );
   const orderedVisibleColumns = useMemo(
     () => manageColumns.filter((c) => c.checked),
     [manageColumns],
@@ -426,11 +463,20 @@ export function LeadListView({
 
   return (
     <div className="w-full overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
-      <div className="overflow-x-auto">
+      <ResizableColumns
+        storageKey="leads-list"
+        className="overflow-x-auto"
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
+        onManageColumns={() => {
+          if (onOpenListSettings) onOpenListSettings();
+          else setManageColumnsOpen(true);
+        }}
+      >
         <table className="w-full min-w-[1100px] text-left text-[12px]">
           <thead className="border-b border-slate-100 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
             <tr className="sticky top-0 z-10 bg-slate-50/80">
-              <th className="w-8 px-3 py-2.5">
+              <th data-col-id="select" className="w-8 px-3 py-2.5">
                 <input
                   type="checkbox"
                   checked={allSelected}
@@ -446,8 +492,10 @@ export function LeadListView({
               {orderedVisibleColumns.map((col) => (
                 <th
                   key={col.id}
+                  data-col-id={col.id}
                   className={
-                    columnRenderers[col.id]?.thClassName ?? "px-3 py-2.5"
+                    columnRenderers[col.id]?.thClassName ??
+                    "px-3 py-2.5 text-left"
                   }
                 >
                   {columnRenderers[col.id]?.th}
@@ -455,21 +503,9 @@ export function LeadListView({
               ))}
 
               <th
-                className={cn(
-                  "sticky right-0 z-20 -mr-3 bg-slate-50/80 pr-3 pl-3 text-right",
-                  "shadow-[-12px_0_12px_-8px_rgba(15,23,42,0.06)]",
-                )}
-              >
-                <TableDisplayOptionsMenu
-                  pageSize={pageSize}
-                  onPageSizeChange={setPageSize}
-                  onManageColumns={() => {
-                    if (onOpenListSettings) onOpenListSettings();
-                    else setManageColumnsOpen(true);
-                  }}
-                  className="flex justify-end"
-                />
-              </th>
+                data-col-id="options"
+                className="sticky right-0 z-30 w-12 min-w-12 bg-slate-50/80 px-2 py-2.5 text-left"
+              />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50 text-slate-700">
@@ -521,7 +557,7 @@ export function LeadListView({
             })}
           </tbody>
         </table>
-      </div>
+      </ResizableColumns>
       <div className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-500">
         Showing {pagedLeads.length} of {allLeads.length} leads
       </div>
@@ -535,6 +571,7 @@ export function LeadListView({
           setRevision((n) => n + 1);
         }}
       />
+      {callFlow.picker}
 
       <ManageColumnsModal
         open={manageColumnsOpen}

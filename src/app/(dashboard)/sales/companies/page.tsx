@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ActionOption,
   EntityHeader,
@@ -25,6 +26,7 @@ import {
   listCompanyGroups,
   updateCompany,
 } from "@/lib/companies/store";
+import { composeEmailsHref } from "@/lib/emails/href";
 import { useCrmCompanies } from "@/lib/companies/use-crm-companies";
 import {
   applyCompanyImport,
@@ -76,6 +78,7 @@ const DEFAULT_COMPANY_COLUMNS = COMPANY_GROUPS.map((group) => ({
 }));
 
 export default function CompaniesPage() {
+  const router = useRouter();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [filters, setFilters] = useState<CompanyFilters>(EMPTY_COMPANY_FILTERS);
@@ -229,17 +232,6 @@ export default function CompaniesPage() {
     );
   }
 
-  function toggleFilterField(section: "status" | "source", field: string) {
-    setFilters((prev) => {
-      const key = section === "source" ? "sources" : "statuses";
-      const current = prev[key] as string[];
-      const next = current.includes(field)
-        ? current.filter((f) => f !== field)
-        : [...current, field];
-      return { ...prev, [key]: next };
-    });
-  }
-
   const visibleColumnIds = columns.filter((c) => c.visible).map((c) => c.id);
 
   const actionOptions: ActionOption[] = [
@@ -365,7 +357,20 @@ export default function CompaniesPage() {
         <EntitySelectionToolbar
           selectedCount={selectedIds.length}
           onClear={() => setSelectedIds([])}
-          onSendMail={() => console.log("send mail clicked")}
+          onSendMail={() => {
+            if (selectedIds.length === 1) {
+              const found = findCompanyById(selectedIds[0]);
+              router.push(
+                composeEmailsHref({
+                  relatedKind: "Company",
+                  relatedName: found?.company.name,
+                  relatedId: found?.company.id,
+                }),
+              );
+              return;
+            }
+            router.push("/activities/emails/create");
+          }}
           onAddTag={(tag) => {
             let n = 0;
             for (const id of selectedIds) {
@@ -405,7 +410,7 @@ export default function CompaniesPage() {
           <div className="sticky top-6">
             <FilterCompaniesPanel
               filters={filters}
-              onToggleField={toggleFilterField}
+              onChange={setFilters}
               onClose={() => setIsFilterOpen(false)}
             />
           </div>
