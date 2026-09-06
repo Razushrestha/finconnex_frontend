@@ -1,10 +1,11 @@
-const PAGE_GRADIENT =
-  "h-full min-h-0 w-full overflow-hidden bg-[linear-gradient(90deg,#efe8f6_0%,#f5eef2_48%,#f8e6dc_100%)]";
-
 export default function CreateDocumentRequestLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <div className={PAGE_GRADIENT}>{children}</div>;
+  return (
+    <div className="h-full min-h-0 w-full overflow-hidden bg-slate-50">
+      {children}
+    </div>
+  );
 }

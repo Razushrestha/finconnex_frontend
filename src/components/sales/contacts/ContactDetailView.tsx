@@ -358,6 +358,8 @@ export function ContactDetailView({
           <h3 className="mb-3 text-[13px] font-semibold text-slate-800">Notes</h3>
           <RelatedInternalNotes
             relatedTo={relatedLabel}
+            relatedType="CONTACT"
+            relatedId={contact.id}
             onNotify={notify}
             compact
           />

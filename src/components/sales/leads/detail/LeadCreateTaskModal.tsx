@@ -38,7 +38,15 @@ import {
   requireAction,
 } from "@/lib/rules";
 import { getRulesActor } from "@/lib/rules/actor";
-import { createTask, findTaskById, patchTask, updateTaskStatus } from "@/lib/tasks/store";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import { createTask, deleteTask, findTaskById, patchTask, updateTaskStatus } from "@/lib/tasks/store";
+import {
+  createCrmTask,
+  isCrmTaskId,
+  persistRemoteTask,
+  tryCrmTask,
+  updateCrmTask,
+} from "@/lib/tasks/api";
 import {
   TASK_OWNERS,
   TASK_PRIORITIES,
@@ -47,6 +55,7 @@ import {
   notifyToMethod,
   type Priority,
   type ReminderNotifyOption,
+  type Task,
   type TaskActionItem,
   type TaskStatus,
   type TaskType,
@@ -530,16 +539,31 @@ export function LeadCreateTaskModal({
           notes: combinedNotes || undefined,
           collaborators: collaborators.length ? collaborators : undefined,
           actionItems: filledActionItems.length ? filledActionItems : undefined,
-          notifyBy: reminderOn ? ["Email", "In-app"] : undefined,
+          notifyBy: reminderOn ? (["Email", "In-app"] as const) : undefined,
         });
         if (status !== "Completed") updateTaskStatus(editTaskId, status);
+        if (isCrmTaskId(editTaskId)) {
+          await tryCrmTask(() =>
+            updateCrmTask(editTaskId, {
+              title: title.trim(),
+              taskType,
+              priority,
+              status,
+              dueDate: formatStoredTaskDateTime(dueDate),
+              assignedTo,
+              relatedTo: related,
+              description: description.trim() || undefined,
+              notes: combinedNotes || undefined,
+            }),
+          );
+        }
         emitLeadActivityChange();
         onSaved?.();
         onClose();
         return;
       }
 
-      const task = createTask({
+      const taskInput = {
         title: title.trim(),
         taskType,
         priority,
@@ -553,10 +577,39 @@ export function LeadCreateTaskModal({
         notes: combinedNotes || undefined,
         collaborators: collaborators.length ? collaborators : undefined,
         actionItems: filledActionItems.length ? filledActionItems : undefined,
-        notifyBy: reminderOn ? ["Email", "In-app"] : undefined,
+        notifyBy: reminderOn
+          ? (["Email", "In-app"] as Task["notifyBy"])
+          : undefined,
         attachmentsCount: attachmentsCount || undefined,
         createdBy: getRulesActor().name || assignedTo,
-      });
+      };
+      let task = createTask(taskInput);
+      if (isUuid(card.id)) {
+        const remote = await tryCrmTask(() =>
+          createCrmTask({
+            title: title.trim(),
+            taskType,
+            priority,
+            status,
+            dueDate: formatStoredTaskDateTime(dueDate),
+            assignedTo,
+            relatedTo: related,
+            relatedId: card.id,
+            description: description.trim() || undefined,
+            notes: combinedNotes || undefined,
+            collaborators: collaborators.length ? collaborators : undefined,
+          }),
+        );
+        if (remote && remote.taskId !== task.taskId) {
+          deleteTask(task.taskId);
+          persistRemoteTask({
+            ...task,
+            ...remote,
+            relatedTo: related,
+          });
+          task = remote;
+        }
+      }
       logCreate("activities.tasks", assignedTo, task.taskId, title.trim());
       notifyOwnerAssigned({
         owner: assignedTo,

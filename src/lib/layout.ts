@@ -42,7 +42,7 @@ export const KANBAN_BOARD_ROW =
  * not inset inside the cards. Only appears when the column overflows.
  */
 export const KANBAN_STAGE_SCROLL =
-  "flex h-full min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden -mr-2.5 [scrollbar-width:thin] [scrollbar-color:#94a3b8_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&>*]:min-h-full";
+  "kanban-stage-scroll flex h-full min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden -mr-2.5 [&>*]:min-h-full";
 
 /** Kanban column well behind cards. */
 export const KANBAN_WELL = "border-slate-200/60 bg-slate-100/60";

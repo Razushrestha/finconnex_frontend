@@ -1,5 +1,8 @@
+"use client";
+
 import React from "react";
 import { TableColumn } from "./types";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 
 interface EntityTableProps<T> {
   columns: TableColumn<T>[];
@@ -11,6 +14,7 @@ interface EntityTableProps<T> {
   onPrevPage?: () => void;
   onNextPage?: () => void;
   onRowClick?: (row: T) => void;
+  columnResizeKey?: string;
 }
 
 export function EntityTable<T>({
@@ -23,15 +27,26 @@ export function EntityTable<T>({
   onPrevPage,
   onNextPage,
   onRowClick,
+  columnResizeKey,
 }: EntityTableProps<T>) {
   return (
     <div className="bg-background text-card-foreground rounded-xl border border-border shadow-sm overflow-hidden">
-      <div className="overflow-x-auto">
+      <ResizableColumns
+        storageKey={
+          columnResizeKey ??
+          `finance:${columns.map((c) => String(c.accessorKey)).join("|")}`
+        }
+        className="overflow-x-auto"
+      >
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-muted/50 border-b border-border text-[11px] font-bold text-muted-foreground tracking-wider">
               {columns.map((col, idx) => (
-                <th key={idx} className="py-3 px-4">
+                <th
+                  key={idx}
+                  data-col-id={String(col.accessorKey)}
+                  className="py-3 px-4"
+                >
                   {col.header}
                 </th>
               ))}
@@ -70,7 +85,7 @@ export function EntityTable<T>({
             )}
           </tbody>
         </table>
-      </div>
+      </ResizableColumns>
 
       {/* Pagination Footer matching screenshot structure */}
       <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 border-t border-border bg-muted/20 text-xs text-muted-foreground gap-4">

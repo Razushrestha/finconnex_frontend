@@ -1,7 +1,6 @@
 /** Live notes store (session-backed). */
 
 import {
-  notes as SEED_NOTES,
   NOTE_TYPES,
   type Note,
   type NoteColumn,
@@ -26,13 +25,9 @@ const COLUMN_COLORS: Record<NoteType, string> = {
   Other: "bg-emerald-500 text-white",
 };
 
-function cloneSeed(): Note[] {
-  return SEED_NOTES.map((n) => ({ ...n }));
-}
-
 const store = createBoardStore({
-  key: "activities:notes:list:v1",
-  seed: cloneSeed,
+  key: "activities:notes:list:v2",
+  seed: () => [] as Note[],
 });
 
 export function listNotes(): Note[] {
@@ -215,16 +210,6 @@ function matchKey(value: string, key: string): boolean {
   return name.length > 2 && value.includes(name);
 }
 
-function notesWithLatestSeed(): Note[] {
-  const live = listNotes();
-  const known = new Set(live.map((note) => note.id));
-  const extras = SEED_NOTES.filter((note) => !known.has(note.id));
-  if (extras.length === 0) return live;
-  const merged = [...extras, ...live];
-  saveNotes(merged);
-  return merged;
-}
-
 /** Notes tied to a work-queue row (related record, contact, or subject). */
 export function listNotesForQueueRow(row: {
   subject: string;
@@ -235,7 +220,7 @@ export function listNotesForQueueRow(row: {
     .map((value) => value?.trim().toLowerCase() ?? "")
     .filter(Boolean);
   if (keys.length === 0) return [];
-  return notesWithLatestSeed().filter((note) => {
+  return listNotes().filter((note) => {
     const blob = `${note.relatedTo} ${note.title}`.toLowerCase();
     return keys.some((key) => matchKey(blob, key));
   });
@@ -243,6 +228,19 @@ export function listNotesForQueueRow(row: {
 
 /** Replace the session store with live CRM rows (empty list is a valid live result). */
 export function replaceCrmNotes(remote: Note[]) {
-  saveNotes(remote.map(cloneNote));
+  const remoteIds = new Set(remote.map((row) => row.id));
+  const extras = listNotes().filter((row) => {
+    if (remoteIds.has(row.id)) return false;
+    if (/^n\d+$/.test(row.id)) return false;
+    if (row.id.startsWith("inbox-seed-")) return false;
+    if (row.id.includes("-note-")) return false;
+    const duplicate = remote.some(
+      (item) =>
+        item.title.trim().toLowerCase() === row.title.trim().toLowerCase() &&
+        item.body.trim() === row.body.trim(),
+    );
+    return !duplicate;
+  });
+  saveNotes([...remote.map(cloneNote), ...extras.map(cloneNote)]);
   emitLeadActivityChange();
 }

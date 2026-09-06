@@ -1,8 +1,11 @@
 import {
+  decodeJwtPayload,
   ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
+  isUuid,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import type {
   CompanyCardData,
   CompanyStatus,
@@ -55,10 +58,39 @@ export function companiesPath(suffix = ""): string {
   return `/v1/companies${suffix}`;
 }
 
-async function resolveAuth() {
-  const scoped = await ensureCrmSession();
-  if (scoped) return scoped;
-  return ensureCrmAccess();
+async function companiesFetch<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  if (isBoundCrmSession()) {
+    const scoped = await ensureCrmSession();
+    if (scoped) return crmFetch<T>(scoped, path, init);
+    const access = await ensureCrmAccess();
+    if (!access) throw new Error("Sign in to load companies");
+    return crmFetch<T>(access, path, init);
+  }
+  return crmBffFetch<T>(path, init);
+}
+
+function compactBody(input: Record<string, unknown>) {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined || value === null || value === "") continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+function transferIdFrom(data: unknown): string | null {
+  if (!data || typeof data !== "object") return null;
+  const rec = data as Record<string, unknown>;
+  for (const key of ["transferId", "jobId"]) {
+    const value = rec[key];
+    if (typeof value === "string" && isUuid(value)) return value;
+  }
+  const nested = rec.data;
+  if (nested && nested !== data) return transferIdFrom(nested);
+  return null;
 }
 
 function extractRecords(data: unknown): Record<string, unknown>[] {
@@ -69,10 +101,7 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
       Array.isArray(data[0]) &&
       (typeof data[1] === "number" || data[1] == null)
     ) {
-      return (data[0] as unknown[]).filter(
-        (row): row is Record<string, unknown> =>
-          !!row && typeof row === "object" && !Array.isArray(row),
-      );
+      return extractRecords(data[0]);
     }
     return data.filter(
       (row): row is Record<string, unknown> =>
@@ -80,9 +109,10 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
     );
   }
   if (typeof data === "object") {
-    const rec = data as { items?: unknown; companies?: unknown };
-    if (Array.isArray(rec.items)) return extractRecords(rec.items);
-    if (Array.isArray(rec.companies)) return extractRecords(rec.companies);
+    const rec = data as Record<string, unknown>;
+    for (const key of ["items", "companies", "results", "records", "rows", "data"]) {
+      if (Array.isArray(rec[key])) return extractRecords(rec[key]);
+    }
   }
   return [];
 }
@@ -139,9 +169,12 @@ export function normalizeCrmCompany(
         owner && pickStr(owner.name, owner.email),
         raw.ownerName,
         raw.assignedTo,
-        raw.owner,
+        typeof raw.owner === "string" ? raw.owner : "",
         "—",
       ),
+      ownerId:
+        pickStr(raw.ownerId, owner && pickStr(owner.id, owner.userId)) ||
+        undefined,
       annualRevenue: pickStr(raw.annualRevenue, raw.revenue) || undefined,
       city: pickStr(raw.city, raw.location, raw.addressCity) || undefined,
       accentColorClass: STATUS_DOT[status],
@@ -157,29 +190,30 @@ export function normalizeCrmCompanies(data: unknown): NormalizedCrmCompany[] {
 }
 
 async function companiesGet(suffix: string, query = ""): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to load companies");
-  return crmFetch(auth, `${companiesPath(suffix)}${query}`);
+  return companiesFetch(`${companiesPath(suffix)}${query}`);
 }
 
 async function companiesMutate(
   suffix: string,
   init: RequestInit,
 ): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to manage companies");
-  return crmFetch(auth, companiesPath(suffix), init);
+  return companiesFetch(companiesPath(suffix), init);
 }
 
 export async function listCrmCompanies(
   query: CrmCompanyQuery = {},
 ): Promise<NormalizedCrmCompany[]> {
+  const page = query.page != null ? Math.max(1, query.page) : 1;
+  const limit =
+    query.limit != null
+      ? Math.min(100, Math.max(1, query.limit))
+      : 100;
   return normalizeCrmCompanies(
     await companiesGet(
       "",
       toQuery({
-        page: query.page,
-        limit: query.limit ?? 100,
+        page,
+        limit,
         search: query.search,
         status: query.status,
       }),
@@ -205,6 +239,55 @@ export async function getCrmCompanyTransfer(
   return companiesGet(`/transfers/${transferId}`);
 }
 
+function asHttpUrl(raw?: string): string | undefined {
+  const value = raw?.trim() ?? "";
+  if (!value || /^https?:\/\/$/i.test(value)) return undefined;
+  try {
+    const url = new URL(value.includes("://") ? value : `https://${value}`);
+    if (!url.hostname || url.hostname === "localhost") {
+      if (!value.includes(".")) return undefined;
+    }
+    if (!url.hostname.includes(".")) return undefined;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function asDecimalMoney(raw?: string): string | undefined {
+  const value = raw?.trim() ?? "";
+  if (!value) return undefined;
+  const numeric = value.replace(/[^0-9.]/g, "");
+  if (!numeric) return undefined;
+  const amount = Number(numeric);
+  if (!Number.isFinite(amount)) return undefined;
+  return amount.toFixed(2);
+}
+
+function asCompanySize(raw?: string): string | undefined {
+  const value = raw?.trim().toUpperCase().replace(/[\s-]+/g, "_") ?? "";
+  if (
+    value === "SMALL" ||
+    value === "MEDIUM" ||
+    value === "LARGE" ||
+    value === "ENTERPRISE" ||
+    value === "MICRO"
+  ) {
+    return value;
+  }
+  return undefined;
+}
+
+function asEmployeeCount(raw?: string): number | undefined {
+  const n = Number(raw?.match(/\d+/)?.[0]);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function isPlaceholder(value: string, placeholders: string[]) {
+  const key = value.trim().toLowerCase();
+  return placeholders.some((p) => p.toLowerCase() === key);
+}
+
 export async function createCrmCompany(input: {
   name: string;
   website?: string;
@@ -214,21 +297,68 @@ export async function createCrmCompany(input: {
   annualRevenue?: string;
   status: CompanyStatus;
   owner: string;
+  ownerId?: string;
+  notes?: string;
+  companySize?: string;
+  address?: string;
+  state?: string;
+  country?: string;
 }): Promise<NormalizedCrmCompany | null> {
-  const data = await companiesMutate("", {
-    method: "POST",
-    body: JSON.stringify({
-      name: input.name,
-      website: input.website,
-      industry: input.industry,
-      phone: input.phone,
-      city: input.city,
-      annualRevenue: input.annualRevenue,
-      status: apiStatus(input.status),
-      ownerName: input.owner,
-      owner: input.owner,
-    }),
+  let ownerId = input.ownerId && isUuid(input.ownerId) ? input.ownerId : undefined;
+  if (!ownerId) {
+    try {
+      const access = await ensureCrmAccess();
+      const claims = access?.accessToken
+        ? decodeJwtPayload(access.accessToken)
+        : null;
+      const id = claims?.sub ?? claims?.userId ?? claims?.id;
+      if (typeof id === "string" && isUuid(id)) ownerId = id;
+    } catch {
+      /* ownerId stays optional */
+    }
+  }
+
+  const street = input.address?.trim();
+  const notes = input.notes?.trim();
+  const payload = compactBody({
+    name: input.name,
+    website: asHttpUrl(input.website),
+    industry: input.industry,
+    phone: isPlaceholder(input.phone ?? "", ["+61 400 000 000"])
+      ? undefined
+      : input.phone,
+    city: input.city,
+    annualRevenue: asDecimalMoney(input.annualRevenue),
+    ownerId,
+    description:
+      notes && !/^account context, relationship notes/i.test(notes)
+        ? notes
+        : undefined,
+    size: asCompanySize(input.companySize),
+    employeeCount: asEmployeeCount(input.companySize),
+    street:
+      street && !isPlaceholder(street, ["Street address"])
+        ? street
+        : undefined,
+    state: input.state,
+    country: input.country,
   });
+
+  let data: unknown;
+  try {
+    data = await companiesMutate("", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    if (!ownerId) throw err;
+    const { ownerId: _ignored, ...withoutOwner } = payload;
+    void _ignored;
+    data = await companiesMutate("", {
+      method: "POST",
+      body: JSON.stringify(withoutOwner),
+    });
+  }
   const items = normalizeCrmCompanies(data);
   if (items[0]) return items[0];
   if (data && typeof data === "object" && !Array.isArray(data)) {
@@ -248,6 +378,7 @@ export async function updateCrmCompany(
     annualRevenue: string;
     status: CompanyStatus;
     owner: string;
+    ownerId: string;
   }>,
 ): Promise<NormalizedCrmCompany | null> {
   const body: Record<string, unknown> = {};
@@ -258,9 +389,11 @@ export async function updateCrmCompany(
   if (patch.city != null) body.city = patch.city;
   if (patch.annualRevenue != null) body.annualRevenue = patch.annualRevenue;
   if (patch.status != null) body.status = apiStatus(patch.status);
-  if (patch.owner != null) {
-    body.ownerName = patch.owner;
-    body.owner = patch.owner;
+  if (patch.ownerId && isUuid(patch.ownerId)) {
+    body.ownerId = patch.ownerId;
+  } else if (patch.owner != null) {
+    if (isUuid(patch.owner)) body.ownerId = patch.owner;
+    else body.ownerName = patch.owner;
   }
   const data = await companiesMutate(`/${id}`, {
     method: "PATCH",
@@ -279,28 +412,62 @@ export async function bulkCrmCompanies(input: {
   operation: string;
   payload?: Record<string, unknown>;
 }): Promise<unknown> {
+  const ids = input.ids.filter(isUuid);
+  if (!ids.length) return { affected: 0 };
   return companiesMutate("/bulk", {
     method: "POST",
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, ids }),
   });
+}
+
+export async function pollCrmCompanyTransfer(
+  transferId: string,
+): Promise<unknown> {
+  return getCrmCompanyTransfer(transferId);
+}
+
+export async function followCompanyTransfer(data: unknown): Promise<unknown> {
+  const id = transferIdFrom(data);
+  if (!id) return data;
+  let last: unknown = data;
+  for (let i = 0; i < 8; i += 1) {
+    last = await getCrmCompanyTransfer(id);
+    const rec =
+      last && typeof last === "object"
+        ? (last as Record<string, unknown>)
+        : null;
+    const status = String(rec?.status ?? rec?.state ?? "").toLowerCase();
+    if (
+      status.includes("complete") ||
+      status.includes("done") ||
+      status.includes("fail") ||
+      status.includes("error")
+    ) {
+      return last;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  }
+  return last;
 }
 
 export async function importCrmCompanies(input: {
   rows: Record<string, unknown>[];
 }): Promise<unknown> {
-  return companiesMutate("/import", {
+  const data = await companiesMutate("/import", {
     method: "POST",
     body: JSON.stringify(input),
   });
+  return followCompanyTransfer(data);
 }
 
 export async function exportCrmCompanies(input: {
   ids?: string[];
 } = {}): Promise<unknown> {
-  return companiesMutate("/export", {
+  const data = await companiesMutate("/export", {
     method: "POST",
     body: JSON.stringify(input),
   });
+  return followCompanyTransfer(data);
 }
 
 export async function mergeCrmCompanies(input: {

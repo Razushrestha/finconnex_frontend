@@ -2,6 +2,7 @@ import type { LeadCardData, LeadSource, LeadStatus } from "@/lib/leads/types";
 import {
   PIPELINE_STAGE_DOT,
   pipelineStageToLeadStatus,
+  resolvePipelineStage,
   stageColumnId,
 } from "@/lib/pipeline-sla/board";
 import { formatPipelineTimestamp } from "@/lib/pipeline-sla/ui";
@@ -106,33 +107,56 @@ export function pipelineStageToCrmStatus(stage: string): CrmLeadStatus {
   }
 }
 
-export function uiSourceToCrm(source: LeadSource): CrmLeadSource {
+export function uiSourceToCrm(source: string): CrmLeadSource {
   switch (source) {
-    case "Referral":
-      return "REFERRAL";
+    case "Website":
+      return "WEBSITE";
+    case "Google Ads":
+      return "PAID_AD";
+    case "Facebook":
+    case "Instagram":
+    case "TikTok":
     case "Social Media":
       return "SOCIAL_MEDIA";
-    case "Email Campaign":
-      return "EMAIL_CAMPAIGN";
+    case "Existing Client Referral":
+    case "Employee Referral":
+    case "Referral":
+      return "REFERRAL";
+    case "Referral Partner":
+      return "PARTNER";
+    case "Phone":
     case "Cold Call":
       return "COLD_CALL";
+    case "Event / Seminar":
+      return "EVENT";
+    case "Email Campaign":
+      return "EMAIL_CAMPAIGN";
+    case "Google":
+    case "Imported / Manual":
+    case "Other":
     default:
-      return source === "Website" ? "WEBSITE" : "OTHER";
+      return "OTHER";
   }
 }
 
 export function crmSourceToUi(source: string | null | undefined): LeadSource {
   switch (source) {
-    case "REFERRAL":
-      return "Referral";
-    case "SOCIAL_MEDIA":
-      return "Social Media";
-    case "EMAIL_CAMPAIGN":
-      return "Email Campaign";
-    case "COLD_CALL":
-      return "Cold Call";
     case "WEBSITE":
       return "Website";
+    case "REFERRAL":
+      return "Existing Client Referral";
+    case "COLD_CALL":
+      return "Phone";
+    case "SOCIAL_MEDIA":
+      return "Facebook";
+    case "EMAIL_CAMPAIGN":
+      return "Other";
+    case "PAID_AD":
+      return "Google Ads";
+    case "EVENT":
+      return "Event / Seminar";
+    case "PARTNER":
+      return "Referral Partner";
     default:
       return "Other";
   }
@@ -156,9 +180,11 @@ function formatCreated(value?: string) {
 }
 
 export function formatEstimatedValue(value: string | null | undefined): string | undefined {
-  if (!value) return undefined;
+  if (value == null || value === "") return undefined;
   const n = Number(value);
-  if (!Number.isFinite(n)) return value.startsWith("$") ? value : `$${value}`;
+  if (!Number.isFinite(n)) {
+    return typeof value === "string" && value.startsWith("$") ? value : `$${value}`;
+  }
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -176,9 +202,21 @@ export function parseEstimatedValue(value: string | undefined): string | undefin
 export function asHttpUrl(value: string | undefined): string | undefined {
   const raw = value?.trim();
   if (!raw) return undefined;
-  if (/^https?:\/\//i.test(raw)) return raw;
-  if (raw.includes(".")) return `https://${raw}`;
-  return undefined;
+  const withProtocol = /^https?:\/\//i.test(raw)
+    ? raw
+    : raw.includes(".")
+      ? `https://${raw}`
+      : "";
+  if (!withProtocol) return undefined;
+  try {
+    const url = new URL(withProtocol);
+    if (!url.hostname || url.hostname === "https" || !url.hostname.includes(".")) {
+      return undefined;
+    }
+    return url.toString();
+  } catch {
+    return undefined;
+  }
 }
 
 export const CRM_COMPANY_SIZE_LABELS: Record<CrmCompanySize, string> = {
@@ -231,12 +269,16 @@ function opt(value: string | null | undefined): string | undefined {
   return t || undefined;
 }
 
+export function crmLeadPipelineStage(lead: Pick<CrmLead, "pipelineStage" | "pipelineStageLabel" | "status">): MortgagePipelineStage {
+  return (
+    resolvePipelineStage(lead.pipelineStageLabel ?? "") ??
+    resolvePipelineStage(String(lead.pipelineStage ?? "")) ??
+    crmStatusToPipelineStage(String(lead.status ?? "NEW"))
+  );
+}
+
 export function mapCrmLeadToCard(lead: CrmLead): LeadCardData {
-  const stage = (MORTGAGE_PIPELINE_STAGES as readonly string[]).includes(
-    lead.pipelineStageLabel ?? "",
-  )
-    ? (lead.pipelineStageLabel as MortgagePipelineStage)
-    : crmStatusToPipelineStage(lead.status);
+  const stage = crmLeadPipelineStage(lead);
   const first = lead.firstName?.trim() || "";
   const last = lead.lastName?.trim() || "";
   const name = `${first} ${last}`.trim() || lead.email;
@@ -249,7 +291,7 @@ export function mapCrmLeadToCard(lead: CrmLead): LeadCardData {
     name,
     initials: `${first.charAt(0)}${last.charAt(0)}`.toUpperCase() || "LD",
     company: lead.companyName?.trim() || "",
-    email: lead.email,
+    email: lead.email ?? "",
     phone: lead.phone?.trim() || lead.mobilePhone?.trim() || "",
     owner: lead.ownerId ?? "Unassigned",
     ownerId: lead.ownerId ?? undefined,
@@ -291,6 +333,7 @@ export function mapCrmLeadToCard(lead: CrmLead): LeadCardData {
     redFlags: lead.redFlags ?? [],
     sla: lead.sla ?? null,
     tags: lead.tags,
+    followerIds: lead.followerIds,
     accentColorClass: PIPELINE_STAGE_DOT[stage],
     avatarBgClass: AVATAR_COLORS[hashIndex(lead.id)],
   };
@@ -300,10 +343,20 @@ export function kanbanColumnsToBoard(
   columns: CrmLeadKanbanColumn[],
 ): KanbanColumn[] {
   const byStage = new Map<MortgagePipelineStage, LeadCardData[]>();
+  const seen = new Set<string>();
   for (const col of columns) {
-    const stage = crmStatusToPipelineStage(col.status);
-    const cards = (col.records ?? []).map(mapCrmLeadToCard);
-    byStage.set(stage, [...(byStage.get(stage) ?? []), ...cards]);
+    const fallback =
+      resolvePipelineStage(col.pipelineStage ?? "") ??
+      resolvePipelineStage(col.pipelineStageCode ?? "") ??
+      crmStatusToPipelineStage(String(col.status ?? "NEW"));
+    for (const record of col.records ?? []) {
+      const card = mapCrmLeadToCard(record);
+      if (seen.has(card.id)) continue;
+      seen.add(card.id);
+      const stage =
+        resolvePipelineStage(card.pipelineStage ?? "") ?? fallback;
+      byStage.set(stage, [...(byStage.get(stage) ?? []), card]);
+    }
   }
 
   return MORTGAGE_PIPELINE_STAGES.map((stage) => {
@@ -344,17 +397,19 @@ export function toCrmCreateBody(input: {
   notes?: string;
   description?: string;
   ownerId?: string;
+  pipelineStage?: string;
 }): CrmCreateLeadInput {
   const website = asHttpUrl(input.companyWebsite) ?? asHttpUrl(input.websiteUrl);
+  const firstName = input.firstName.trim();
+  const lastName = input.lastName.trim() || firstName;
   return {
-    firstName: input.firstName,
-    lastName: input.lastName,
+    firstName,
+    lastName,
     email: input.email,
     phone: input.phone?.trim() || undefined,
     mobilePhone: input.mobilePhone?.trim() || undefined,
     jobTitle: input.jobTitle?.trim() || undefined,
     linkedinUrl: asHttpUrl(input.linkedinUrl),
-    websiteUrl: website,
     companyName: input.company?.trim() || undefined,
     companyWebsite: website,
     industry: input.industry?.trim() || undefined,
@@ -366,7 +421,18 @@ export function toCrmCreateBody(input: {
     notes: input.notes?.trim() || undefined,
     description: input.description?.trim() || undefined,
     ownerId: input.ownerId,
+    pipelineStage: uiPipelineStageToCrm(input.pipelineStage),
   };
+}
+
+export function uiPipelineStageToCrm(stage?: string): string | undefined {
+  const resolved = resolvePipelineStage(stage ?? "");
+  if (!resolved) return undefined;
+  return resolved
+    .toUpperCase()
+    .replace(/&/g, "AND")
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
 }
 
 export function uiDealStageToCrm(stage: string): string {

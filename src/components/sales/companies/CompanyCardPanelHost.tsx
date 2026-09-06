@@ -70,6 +70,8 @@ export function CompanyCardPanelHost({
           <div className="flex-1 overflow-y-auto px-5 py-5">
             <RelatedInternalNotes
               relatedTo={`Company: ${panel.companyName}`}
+              relatedType="COMPANY"
+              relatedId={panel.companyId}
               onNotify={(message) => onQuickActionSuccess(message)}
             />
           </div>

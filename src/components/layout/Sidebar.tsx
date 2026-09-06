@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   Package,
@@ -21,6 +21,7 @@ import {
   Calculator,
   Route,
   Settings,
+  Users,
   X,
   CalendarClock,
   Timer,
@@ -70,7 +71,7 @@ const childNavClass = (active: boolean) =>
 
 const dashboardItems: NavItem[] = [
   { label: "Dashboard", href: "/", icon: Package },
-  { label: "Work Queue", href: "/work-queue", icon: Rows4 },
+  { label: "Work Queue", href: "/?view=work-queue", icon: Rows4 },
   {
     label: "Sales",
     icon: BadgePercent,
@@ -155,6 +156,7 @@ const dashboardItems: NavItem[] = [
       { label: "Credit Notes", href: "/finance/credit-notes" },
       { label: "Payments", href: "/finance/payments" },
       { label: "Items / Services", href: "/finance/products" },
+      { label: "Service Agreements", href: "/finance/agreements" },
     ],
   },
   { label: "Support", href: "/support", icon: HelpCircle },
@@ -167,6 +169,7 @@ const dashboardItems: NavItem[] = [
   { label: "Journeys", href: "/journeys", icon: Route },
   { label: "Automations", href: "/automations", icon: Zap },
   { label: "Rules", href: "/rules", icon: Scale },
+  { label: "Users", href: "/users", icon: Users },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 

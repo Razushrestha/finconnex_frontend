@@ -202,14 +202,19 @@ export function emailMatchesFolder(
   if (folder === "drafts") return email.status === "Draft";
   if (folder === "scheduled") return email.status === "Scheduled";
   if (folder === "sent") {
-    return isOutbound(email) && email.status !== "Draft" && email.status !== "Scheduled";
+    return (
+      email.status !== "Draft" &&
+      email.status !== "Scheduled" &&
+      (isOutbound(email) ||
+        email.status === "Sent" ||
+        email.status === "Delivered" ||
+        email.status === "Opened" ||
+        email.status === "Failed" ||
+        email.status === "Bounced")
+    );
   }
   if (folder === "inbox") {
-    return (
-      !isOutbound(email) &&
-      email.status !== "Draft" &&
-      email.status !== "Scheduled"
-    );
+    return email.status !== "Draft" && email.status !== "Scheduled";
   }
   return email.status !== "Draft" && email.status !== "Scheduled";
 }

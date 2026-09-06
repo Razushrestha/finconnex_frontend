@@ -57,6 +57,8 @@ export interface EntityHeaderProps {
   entityLabel: string;
   entityLabelPlural?: string;
   createRoute: string;
+  /** When set, Create opens this instead of navigating to `createRoute`. */
+  onCreate?: () => void;
   breadcrumb?: string[];
   totalCount?: number;
 
@@ -75,6 +77,7 @@ export interface EntityHeaderProps {
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
+  showSearch?: boolean;
 
   viewMode?: "kanban" | "list";
   onViewChange?: (mode: "kanban" | "list") => void;
@@ -102,6 +105,7 @@ export function EntityHeader({
   entityLabel,
   entityLabelPlural = `${entityLabel}s`,
   createRoute,
+  onCreate,
   breadcrumb: _breadcrumb = ["Sales", entityLabelPlural],
   totalCount,
   scopeOptions,
@@ -116,6 +120,7 @@ export function EntityHeader({
   searchValue,
   onSearchChange,
   searchPlaceholder = `Search ${entityLabelPlural}`,
+  showSearch = true,
   viewMode = "kanban",
   onViewChange,
   onRefresh,
@@ -348,7 +353,13 @@ export function EntityHeader({
             </div>
           ) : null}
 
-          <SearchInput value={search} onChange={setSearch} />
+          {showSearch ? (
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder={searchPlaceholder}
+            />
+          ) : null}
 
           <div className="flex h-8 items-center rounded-md border border-slate-200 bg-white p-0.5 dark:border-zinc-700 dark:bg-zinc-900">
             <button
@@ -390,11 +401,15 @@ export function EntityHeader({
             <div className="inline-flex h-8 items-stretch overflow-hidden rounded-md bg-violet-600">
           <button
             type="button"
-            onClick={() =>
+            onClick={() => {
+              if (onCreate) {
+                onCreate();
+                return;
+              }
               router.push(
                 `${createRoute}?layoutid=${DEFAULT_LAYOUT_ID}&redirect=false`,
-              )
-            }
+              );
+            }}
                 className="inline-flex items-center gap-1.5 px-3 text-[12px] font-semibold text-white hover:bg-violet-700"
               >
                 <Plus className="h-3.5 w-3.5" />

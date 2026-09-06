@@ -119,6 +119,61 @@ const LIVE_ROUTES: Array<{ method: string; path: string }> = [
     method: "POST",
     path: `/v1/workspaces/${SESSION.workspaceId}/tasks/${ID}/restore`,
   },
+  { method: "POST", path: `/v1/tasks/${ID}/assignees/${USER_ID}` },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/tasks/${ID}/assignees/${USER_ID}`,
+  },
+  { method: "DELETE", path: `/v1/tasks/${ID}/assignees/${USER_ID}` },
+  {
+    method: "DELETE",
+    path: `/v1/workspaces/${SESSION.workspaceId}/tasks/${ID}/assignees/${USER_ID}`,
+  },
+  { method: "PUT", path: `/v1/tasks/${ID}/assignees` },
+  {
+    method: "PUT",
+    path: `/v1/workspaces/${SESSION.workspaceId}/tasks/${ID}/assignees`,
+  },
+  { method: "POST", path: `/v1/tasks/${ID}/collaborators/${USER_ID}` },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/tasks/${ID}/collaborators/${USER_ID}`,
+  },
+  { method: "DELETE", path: `/v1/tasks/${ID}/collaborators/${USER_ID}` },
+  {
+    method: "DELETE",
+    path: `/v1/workspaces/${SESSION.workspaceId}/tasks/${ID}/collaborators/${USER_ID}`,
+  },
+  { method: "PUT", path: `/v1/tasks/${ID}/collaborators` },
+  {
+    method: "PUT",
+    path: `/v1/workspaces/${SESSION.workspaceId}/tasks/${ID}/collaborators`,
+  },
+  { method: "PUT", path: `/v1/tasks/${ID}/followers` },
+  {
+    method: "PUT",
+    path: `/v1/workspaces/${SESSION.workspaceId}/tasks/${ID}/followers`,
+  },
+  { method: "POST", path: `/v1/tasks/${ID}/tags` },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/tasks/${ID}/tags`,
+  },
+  { method: "DELETE", path: `/v1/tasks/${ID}/tags/${TAG_ID}` },
+  {
+    method: "DELETE",
+    path: `/v1/workspaces/${SESSION.workspaceId}/tasks/${ID}/tags/${TAG_ID}`,
+  },
+  { method: "POST", path: `/v1/tasks/${ID}/attachments` },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/tasks/${ID}/attachments`,
+  },
+  { method: "DELETE", path: `/v1/tasks/${ID}/attachments/${ATT_ID}` },
+  {
+    method: "DELETE",
+    path: `/v1/workspaces/${SESSION.workspaceId}/tasks/${ID}/attachments/${ATT_ID}`,
+  },
 ];
 
 function repoRoot() {
@@ -166,6 +221,14 @@ export function smokeTasksWiring() {
   }
   if (!api.includes("workspaceTasksPath")) {
     fail("tasks client missing workspaceTasksPath");
+  }
+  if (!api.includes("crmBffFetch")) {
+    fail("tasks client must call crmBffFetch in the browser");
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('"tasks"')) {
+    fail("BFF proxy does not allow tasks");
   }
 
   const catalog = readSrc("src/lib/api/endpoints.ts");
@@ -219,6 +282,17 @@ export function smokeTasksWiring() {
   if (!create.includes("createCrmTask")) {
     fail("create task form does not call createCrmTask");
   }
+  if (!create.includes("loadAssignableOwners")) {
+    fail("create task form does not load CRM owners");
+  }
+
+  const store = readSrc("src/lib/tasks/store.ts");
+  if (!store.includes("export function replaceCrmTasks")) {
+    fail("tasks store missing replaceCrmTasks");
+  }
+  if (!store.includes("isDemoSeedTaskId")) {
+    fail("replaceCrmTasks must keep CRM/local cards the list omitted");
+  }
 
   const detail = readSrc(
     "src/app/(dashboard)/activities/tasks/detail/[id]/page.tsx",
@@ -233,11 +307,6 @@ export function smokeTasksWiring() {
     if (!detail.includes(name)) {
       fail(`task detail does not call ${name}`);
     }
-  }
-
-  const store = readSrc("src/lib/tasks/store.ts");
-  if (!store.includes("export function replaceCrmTasks")) {
-    fail("tasks store missing replaceCrmTasks");
   }
 
   const normalized = normalizeTask(

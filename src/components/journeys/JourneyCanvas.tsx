@@ -41,6 +41,7 @@ interface Props {
   onSelect: (id: string | null) => void;
   showMetrics?: boolean;
   readOnly?: boolean;
+  className?: string;
 }
 
 export function JourneyCanvas({
@@ -50,6 +51,7 @@ export function JourneyCanvas({
   onSelect,
   showMetrics = true,
   readOnly = false,
+  className,
 }: Props) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
@@ -91,9 +93,14 @@ export function JourneyCanvas({
   }
 
   return (
-    <div className="grid gap-3 lg:grid-cols-[200px_1fr]">
+    <div
+      className={cn(
+        "grid min-h-0 gap-3 overflow-y-auto lg:h-full lg:grid-cols-[200px_1fr] lg:overflow-hidden",
+        className,
+      )}
+    >
       {!readOnly ? (
-        <aside className="rounded-2xl border border-slate-100/80 bg-white p-3 shadow-sm">
+        <aside className="min-h-0 overflow-y-auto rounded-2xl border border-slate-100/80 bg-white p-3 shadow-sm lg:max-h-full">
           <div className="mb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
             Step palette
           </div>
@@ -122,11 +129,11 @@ export function JourneyCanvas({
 
       <div
         className={cn(
-          "rounded-2xl border border-slate-100/80 bg-white p-4 shadow-sm sm:p-5",
+          "flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-100/80 bg-white p-4 shadow-sm sm:p-5",
           readOnly && "lg:col-span-1",
         )}
       >
-        <div className="mb-3 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
+        <div className="mb-3 shrink-0 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
           Journey canvas
         </div>
 
@@ -135,7 +142,7 @@ export function JourneyCanvas({
             Add steps from the palette to map the lifecycle
           </div>
         ) : (
-          <ol className="relative mx-auto max-w-xl space-y-0">
+          <ol className="relative mx-auto min-h-0 w-full max-w-xl flex-1 space-y-0 overflow-y-auto overscroll-contain pb-8 pr-1">
             {steps.map((step, index) => {
               const Icon = STEP_ICONS[step.type];
               const rate = stepConversionRate(step);
@@ -259,16 +266,23 @@ interface InspectorProps {
   step: JourneyStep | null;
   onChange: (step: JourneyStep) => void;
   readOnly?: boolean;
+  className?: string;
 }
 
 export function JourneyStepInspector({
   step,
   onChange,
   readOnly,
+  className,
 }: InspectorProps) {
   if (!step) {
     return (
-      <div className="rounded-2xl border border-slate-100/80 bg-white p-4 text-center shadow-sm">
+      <div
+        className={cn(
+          "rounded-2xl border border-slate-100/80 bg-white p-4 text-center shadow-sm",
+          className,
+        )}
+      >
         <p className="text-[12px] text-slate-400">
           Select a step on the canvas to edit
         </p>
@@ -277,7 +291,12 @@ export function JourneyStepInspector({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-100/80 bg-white p-4 shadow-sm">
+    <div
+      className={cn(
+        "min-h-0 overflow-y-auto rounded-2xl border border-slate-100/80 bg-white p-4 shadow-sm",
+        className,
+      )}
+    >
       <div className="mb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
         Step settings
       </div>

@@ -1,14 +1,24 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActivityTimelineView } from "@/components/activities/ActivityTimelineView";
 import { parseTaskDueDate } from "@/lib/dashboard/layout";
 import { listMessages } from "@/lib/messages/store";
+import { onRulesChange } from "@/lib/rules";
+import type { Message } from "@/lib/messages/types";
 
-export function MessagesTimelineView() {
+export function MessagesTimelineView({ data }: { data?: Message[] }) {
+  const [items, setItems] = useState(() => data ?? listMessages());
+  useEffect(() => {
+    if (data) {
+      setItems(data);
+      return;
+    }
+    return onRulesChange(() => setItems(listMessages()));
+  }, [data]);
   const rows = useMemo(
     () =>
-      listMessages().map((message) => ({
+      items.map((message) => ({
         id: message.id,
         title: message.subject,
         meta: `${message.status} · ${message.type} · ${message.from} → ${message.to}${
@@ -16,7 +26,7 @@ export function MessagesTimelineView() {
         }`,
         at: message.sentDate ? parseTaskDueDate(message.sentDate) : null,
       })),
-    [],
+    [items],
   );
 
   return (

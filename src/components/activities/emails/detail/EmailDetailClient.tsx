@@ -7,6 +7,7 @@ import type { Email } from "@/lib/emails/types";
 import {
   cancelCrmEmail,
   deleteCrmEmail,
+  deleteCrmEmailAttachment,
   downloadCrmEmailAttachment,
   getCrmEmail,
   persistRemoteEmail,
@@ -217,33 +218,69 @@ export function EmailDetailClient({ id }: { id: string }) {
               </h3>
               <div className="space-y-2">
                 {email.attachments.map((att) => (
-                  <EmailAttachment
-                    key={att.id}
-                    name={att.name}
-                    size={att.sizeLabel ?? "Download"}
-                    onClick={() => {
-                      void (async () => {
-                        try {
-                          const blob = await downloadCrmEmailAttachment(
-                            email.id,
-                            att.id,
-                          );
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement("a");
-                          a.href = url;
-                          a.download = att.name;
-                          a.click();
-                          URL.revokeObjectURL(url);
-                        } catch (err) {
-                          flash(
-                            err instanceof Error
-                              ? err.message
-                              : "Download failed",
-                          );
-                        }
-                      })();
-                    }}
-                  />
+                  <div key={att.id} className="flex items-center gap-2">
+                    <EmailAttachment
+                      name={att.name}
+                      size={att.sizeLabel ?? "Download"}
+                      onClick={() => {
+                        void (async () => {
+                          try {
+                            const blob = await downloadCrmEmailAttachment(
+                              email.id,
+                              att.id,
+                            );
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = att.name;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                          } catch (err) {
+                            flash(
+                              err instanceof Error
+                                ? err.message
+                                : "Download failed",
+                            );
+                          }
+                        })();
+                      }}
+                    />
+                    {email.status === "Draft" ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-medium text-rose-600 disabled:opacity-50"
+                        onClick={() => {
+                          void (async () => {
+                            setBusy(true);
+                            await tryCrmEmail(() =>
+                              deleteCrmEmailAttachment(email.id, att.id),
+                            );
+                            persistRemoteEmail({
+                              ...email,
+                              attachments: (email.attachments ?? []).filter(
+                                (item) => item.id !== att.id,
+                              ),
+                            });
+                            setEmail((current) =>
+                              current
+                                ? {
+                                    ...current,
+                                    attachments: (current.attachments ?? []).filter(
+                                      (item) => item.id !== att.id,
+                                    ),
+                                  }
+                                : current,
+                            );
+                            setBusy(false);
+                            flash("Attachment removed");
+                          })();
+                        }}
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </div>
                 ))}
               </div>
             </div>

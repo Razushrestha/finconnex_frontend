@@ -76,6 +76,10 @@ const LIVE_ROUTES: Array<{ method: string; path: string }> = [
     method: "POST",
     path: `/v1/workspaces/${SESSION.workspaceId}/ownership-transfer`,
   },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/members/import`,
+  },
 ];
 
 function repoRoot() {
@@ -100,6 +104,7 @@ export function smokeWorkspaceMembersWiring() {
     "cancelCrmWorkspaceInvitation",
     "resendCrmWorkspaceInvitation",
     "transferCrmWorkspaceOwnership",
+    "importCrmWorkspaceMembers",
   ]) {
     if (!api.includes(`export async function ${name}`)) {
       fail(`workspace-members client missing ${name}`);
@@ -114,10 +119,20 @@ export function smokeWorkspaceMembersWiring() {
     'path: "/workspaces/:workspaceId/members/:memberId/invitation"',
     'path: "/workspaces/:workspaceId/members/:memberId/invitation/resend"',
     'path: "/workspaces/:workspaceId/ownership-transfer"',
+    'path: "/workspaces/:workspaceId/members/import"',
   ]) {
     if (!catalog.includes(fragment)) {
       fail(`endpoint catalog missing ${fragment}`);
     }
+  }
+
+  const sidebar = readSrc("src/components/layout/Sidebar.tsx");
+  if (!sidebar.includes('href: "/users"')) {
+    fail("Sidebar missing Users nav item");
+  }
+  const usersPage = readSrc("src/app/(dashboard)/users/page.tsx");
+  if (!usersPage.includes("UsersSettingsClient")) {
+    fail("Users page does not mount UsersSettingsClient");
   }
 
   const ui = readSrc("src/components/settings/UsersSettingsClient.tsx");

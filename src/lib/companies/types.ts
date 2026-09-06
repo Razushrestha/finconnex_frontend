@@ -24,6 +24,7 @@ export interface CompanyCardData {
   industry: string;
   phone: string;
   owner: string;
+  ownerId?: string;
   annualRevenue?: string;
   city?: string;
   tags?: string[];

@@ -13,6 +13,7 @@ export type WorkspaceMember = {
   status: WorkspaceMemberStatus;
   isOwner: boolean;
   team?: string;
+  joinedAt?: string;
 };
 
 export type WorkspaceMembersSummary = {

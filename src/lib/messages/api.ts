@@ -1,10 +1,11 @@
 import {
   ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
   isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmErrorMessage, crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmErrorMessage, crmFetch } from "@/lib/crm/request";
 import { formatRulesAt } from "@/lib/rules/storage";
 import { upsertMessage } from "@/lib/messages/store";
 import type {
@@ -190,58 +191,118 @@ async function withSession<T>(
   return run(access, false);
 }
 
-function messagesUrl(
-  session: CrmSession | Pick<CrmSession, "baseUrl" | "accessToken">,
-  scoped: boolean,
-  suffix: string,
-) {
-  return scoped
-    ? workspaceMessagesPath((session as CrmSession).workspaceId, suffix)
-    : globalMessagesPath(suffix);
+async function messagesPath(suffix: string, query = ""): Promise<string> {
+  const scoped = await ensureCrmSession();
+  if (scoped) {
+    return `${workspaceMessagesPath(scoped.workspaceId, suffix)}${query}`;
+  }
+  return `${globalMessagesPath(suffix)}${query}`;
+}
+
+async function relatedWorkspaceId(): Promise<string | null> {
+  const scoped = await ensureCrmSession();
+  if (scoped?.workspaceId && isUuid(scoped.workspaceId)) return scoped.workspaceId;
+  const env = process.env.NEXT_PUBLIC_WORKSPACE_ID?.trim();
+  return env && isUuid(env) ? env : null;
+}
+
+async function crmMessagesFetch<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  if (isBoundCrmSession()) {
+    const scoped = await ensureCrmSession();
+    if (scoped) return crmFetch<T>(scoped, path, init);
+    const access = await ensureCrmAccess();
+    if (!access) throw new Error("Sign in to manage messages");
+    return crmFetch<T>(access, path, init);
+  }
+  return crmBffFetch<T>(path, init);
 }
 
 async function messagesGet(suffix: string, query = ""): Promise<unknown> {
-  return withSession((session, scoped) =>
-    crmFetch(session, `${messagesUrl(session, scoped, suffix)}${query}`),
-  );
+  if (!isBoundCrmSession()) {
+    return crmBffFetch(await messagesPath(suffix, query));
+  }
+  return withSession((session, scoped) => {
+    const path = scoped
+      ? workspaceMessagesPath((session as CrmSession).workspaceId, suffix)
+      : globalMessagesPath(suffix);
+    return crmFetch(session, `${path}${query}`);
+  });
 }
 
 async function messagesMutate(suffix: string, init: RequestInit): Promise<unknown> {
-  return withSession((session, scoped) =>
-    crmFetch(session, messagesUrl(session, scoped, suffix), init),
-  );
+  if (!isBoundCrmSession()) {
+    return crmBffFetch(await messagesPath(suffix), init);
+  }
+  return withSession((session, scoped) => {
+    const path = scoped
+      ? workspaceMessagesPath((session as CrmSession).workspaceId, suffix)
+      : globalMessagesPath(suffix);
+    return crmFetch(session, path, init);
+  });
+}
+
+async function blobFromResponse(res: Response): Promise<Blob> {
+  if (!res.ok) {
+    const text = await res.text();
+    let json: unknown = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = null;
+    }
+    throw new Error(crmErrorMessage(json, `Download failed (${res.status})`));
+  }
+  return res.blob();
 }
 
 async function messagesBlob(suffix: string): Promise<Blob> {
-  return withSession(async (session, scoped) => {
-    const res = await fetch(
-      `${session.baseUrl}${messagesUrl(session, scoped, suffix)}`,
-      {
-        headers: {
-          Accept: "application/octet-stream,application/pdf,*/*",
-          Authorization: `Bearer ${session.accessToken}`,
-        },
+  if (!isBoundCrmSession()) {
+    const path = await messagesPath(suffix);
+    const res = await fetch(`/api/auth/crm${path.slice(3)}`, {
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/octet-stream,application/pdf,*/*",
       },
-    );
-    if (!res.ok) {
-      const text = await res.text();
-      let json: unknown = null;
-      try {
-        json = JSON.parse(text);
-      } catch {
-        json = null;
-      }
-      throw new Error(crmErrorMessage(json, `Download failed (${res.status})`));
-    }
-    return res.blob();
+    });
+    return blobFromResponse(res);
+  }
+  return withSession(async (session, scoped) => {
+    const url = scoped
+      ? workspaceMessagesPath((session as CrmSession).workspaceId, suffix)
+      : globalMessagesPath(suffix);
+    const res = await fetch(`${session.baseUrl}${url}`, {
+      headers: {
+        Accept: "application/octet-stream,application/pdf,*/*",
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+    });
+    return blobFromResponse(res);
   });
+}
+
+function compactBody(input: Record<string, unknown>) {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined || value === null || value === "") continue;
+    out[key] = value;
+  }
+  return out;
 }
 
 function asMessage(data: unknown): Message | null {
   const items = normalizeMessages(data);
-  if (items[0]) return items[0];
+  const first = items[0];
+  if (first && isUuid(first.id) && first.subject !== "Untitled message") {
+    return first;
+  }
   if (data && typeof data === "object" && !Array.isArray(data)) {
-    return normalizeMessage(data as Record<string, unknown>, 0);
+    const mapped = normalizeMessage(data as Record<string, unknown>, 0);
+    if (mapped && isUuid(mapped.id) && mapped.subject !== "Untitled message") {
+      return mapped;
+    }
   }
   return null;
 }
@@ -253,7 +314,7 @@ export async function listCrmMessages(
     await messagesGet(
       "",
       toQuery({
-        page: query.page,
+        page: query.page ?? 1,
         limit: query.limit ?? 100,
         search: query.search,
         status: query.status,
@@ -266,16 +327,27 @@ export async function getCrmMessage(id: string): Promise<Message | null> {
   return asMessage(await messagesGet(`/${id}`));
 }
 
+export async function listAllCrmMessages(): Promise<Message[]> {
+  return normalizeMessages(await messagesGet("/all"));
+}
+
+export async function listRecentCrmMessages(): Promise<Message[]> {
+  return normalizeMessages(await messagesGet("/recent"));
+}
+
+export async function listUnreadCrmMessages(): Promise<Message[]> {
+  return normalizeMessages(await messagesGet("/unread"));
+}
+
 export async function listRelatedCrmMessages(
   relatedType: string,
   relatedId: string,
 ): Promise<Message[]> {
-  const scoped = await ensureCrmSession();
-  if (!scoped) throw new Error("Sign in to load related messages");
+  const workspaceId = await relatedWorkspaceId();
+  if (!workspaceId) throw new Error("Sign in to load related messages");
   return normalizeMessages(
-    await crmFetch(
-      scoped,
-      relatedMessagesPath(scoped.workspaceId, relatedType, relatedId),
+    await crmMessagesFetch(
+      relatedMessagesPath(workspaceId, relatedType, relatedId),
     ),
   );
 }
@@ -292,22 +364,19 @@ export function toCreateMessageBody(input: {
   status?: MessageStatus;
   template?: string;
 }): Record<string, unknown> {
-  return {
+  return compactBody({
     type: apiMessageType(input.type),
-    channel: apiMessageType(input.type),
-    subject: input.subject,
+    subject: input.subject.trim(),
     body: input.body,
     text: input.body,
     from: input.from,
     to: input.to,
-    recipient: input.to,
     relatedTo: input.relatedTo,
     relatedType: input.relatedType,
-    relatedId: input.relatedId,
+    relatedId: isUuid(input.relatedId) ? input.relatedId : undefined,
     status: input.status ? apiMessageStatus(input.status) : "DRAFT",
     template: input.template,
-    templateName: input.template,
-  };
+  });
 }
 
 export async function createCrmMessage(
@@ -347,6 +416,18 @@ export async function updateCrmMessage(
 
 export async function deleteCrmMessage(id: string): Promise<void> {
   await messagesMutate(`/${id}`, { method: "DELETE" });
+}
+
+export async function markCrmMessageRead(id: string): Promise<Message | null> {
+  return asMessage(
+    await messagesMutate(`/${id}/read`, { method: "POST", body: "{}" }),
+  );
+}
+
+export async function markCrmMessageUnread(id: string): Promise<Message | null> {
+  return asMessage(
+    await messagesMutate(`/${id}/unread`, { method: "POST", body: "{}" }),
+  );
 }
 
 export async function sendCrmMessage(

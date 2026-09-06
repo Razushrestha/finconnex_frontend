@@ -18,6 +18,9 @@ import {
   UserPlus,
   Zap,
 } from "lucide-react";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import { useParentActivityTimeline } from "@/lib/activity-timeline";
+import type { NormalizedActivityTimelineItem } from "@/lib/activity-timeline/types";
 import { formatDuration, listLeadConversation } from "@/lib/leads/conversation-store";
 import {
   hrefForLeadActivity,
@@ -265,7 +268,60 @@ function fromConversation(card: LeadCardData): TimelineRow[] {
   });
 }
 
-function systemSeeds(card: LeadCardData, live: TimelineRow[]): TimelineRow[] {
+function fromApiTimeline(
+  items: NormalizedActivityTimelineItem[],
+  card: LeadCardData,
+): TimelineRow[] {
+  return items.flatMap((item) => {
+    const family: EventFamily =
+      item.activityType === "CALL"
+        ? "call"
+        : item.activityType === "EMAIL"
+          ? "email"
+          : item.activityType === "MEETING"
+            ? "meeting"
+            : item.activityType === "NOTE"
+              ? "note"
+              : item.activityType === "TASK"
+                ? "task"
+                : "system";
+    const kind: LeadActivityKind =
+      family === "call"
+        ? "call"
+        : family === "email"
+          ? "email"
+          : family === "meeting"
+            ? "meeting"
+            : family === "note"
+              ? "note"
+              : family === "task"
+                ? "task"
+                : "workflow";
+    const actor = [item.actor?.firstName, item.actor?.lastName]
+      .filter(Boolean)
+      .join(" ");
+    const at = new Date(item.occurredAt || item.createdAt);
+    if (Number.isNaN(at.getTime())) return [];
+    return [
+      {
+        id: item.id,
+        family,
+        kind,
+        at,
+        headline: item.subject || item.activityType,
+        body: item.summary || "",
+        actor: actor || card.owner,
+        badge: item.activityType.replace(/_/g, " "),
+      },
+    ];
+  });
+}
+
+function systemSeeds(
+  card: LeadCardData,
+  live: TimelineRow[],
+  demo: boolean,
+): TimelineRow[] {
   const createdAt =
     parseFlexibleDate(card.createdDate) ??
     parseFlexibleDate(card.pipelineStartedAt) ??
@@ -309,7 +365,7 @@ function systemSeeds(card: LeadCardData, live: TimelineRow[]): TimelineRow[] {
       badge: "Lead Converted",
     });
   }
-  if (!live.some((row) => row.family === "automation")) {
+  if (demo && !live.some((row) => row.family === "automation")) {
     const autoAt = new Date(createdAt);
     autoAt.setMinutes(autoAt.getMinutes() + 5);
     rows.push({
@@ -339,6 +395,14 @@ export function LeadTimelinePanel({ card }: { card: LeadCardData }) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE);
   const chipLabel = CHIPS.find((item) => item.id === chip)?.label ?? "All";
+  const crmEnabled = isUuid(card.id);
+  const { items: apiItems } = useParentActivityTimeline({
+    relatedType: "LEAD",
+    relatedId: card.id,
+    leadNameFallback: card.name,
+    enabled: crmEnabled,
+    filters: { limit: 50 },
+  });
 
   useEffect(() => {
     const bump = () => setRevision((n) => n + 1);
@@ -351,8 +415,12 @@ export function LeadTimelinePanel({ card }: { card: LeadCardData }) {
   }, []);
 
   const rows = useMemo(() => {
-    const live = [...fromCandidates(card, now), ...fromConversation(card)];
-    const extras = systemSeeds(card, live);
+    const live = [
+      ...fromApiTimeline(apiItems, card),
+      ...fromCandidates(card, now),
+      ...fromConversation(card),
+    ];
+    const extras = systemSeeds(card, live, !crmEnabled);
     const seen = new Set<string>();
     return [...live, ...extras]
       .filter((row) => {
@@ -361,7 +429,7 @@ export function LeadTimelinePanel({ card }: { card: LeadCardData }) {
         return !Number.isNaN(row.at.getTime());
       })
       .sort((a, b) => b.at.getTime() - a.at.getTime());
-  }, [card, now, revision]);
+  }, [apiItems, card, crmEnabled, now, revision]);
 
   const filtered = rows.filter((row) => {
     if (!inRange(row.at, range, now)) return false;

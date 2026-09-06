@@ -129,6 +129,47 @@
   html {
     @apply font-sans;
   }
+
+  /* Same hand pointer on every clickable control */
+  a[href],
+  button:not(:disabled):not([aria-disabled="true"]),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="link"],
+  [role="menuitem"],
+  [role="menuitemcheckbox"],
+  [role="menuitemradio"],
+  [role="option"],
+  [role="tab"],
+  [role="checkbox"],
+  [role="radio"],
+  [role="switch"],
+  [role="combobox"],
+  summary,
+  label[for],
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="file"]:not(:disabled),
+  input[type="button"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  input[type="reset"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"],
+  [role="button"][aria-disabled="true"],
+  select:disabled,
+  input:disabled {
+    cursor: not-allowed;
+  }
+
+  /* Titles and labels inside clickable cards keep the hand, not the I-beam */
+  [role="button"] :where(h1, h2, h3, h4, h5, h6, p, span, svg, img),
+  [role="link"] :where(h1, h2, h3, h4, h5, h6, p, span, svg, img),
+  a[href] :where(h1, h2, h3, h4, h5, h6, p, span, svg, img) {
+    cursor: inherit;
+  }
 }
 
 /* Every native dropdown shows a chevron. Skip .fc-select-caret (already has an overlay arrow). */
@@ -171,7 +212,7 @@ select:not([multiple]):not([size]):not(.fc-select-caret) {
 /* Thin custom scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: oklch(0% 0 0 / 0.45) transparent;
+  scrollbar-color: oklch(0% 0 0 / 0.22) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -186,8 +227,8 @@ select:not([multiple]):not([size]):not(.fc-select-caret) {
 *::-webkit-scrollbar-thumb {
   background: linear-gradient(
     180deg,
-    oklch(44.59% 0.00005 271.152 / 0.55),
-    oklch(29.313% 0.00003 271.152 / 0.55)
+    oklch(44.59% 0.00005 271.152 / 0.28),
+    oklch(29.313% 0.00003 271.152 / 0.28)
   );
   border-radius: 9999px;
   border: 2px solid transparent;
@@ -211,6 +252,31 @@ select:not([multiple]):not([size]):not(.fc-select-caret) {
 
 *::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* Kanban column gutter — lighter than the global thumb */
+.kanban-stage-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+.kanban-stage-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.kanban-stage-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.kanban-stage-scroll::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 9999px;
+  border: 0;
+  background-clip: border-box;
+}
+
+.kanban-stage-scroll::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
 }
 
 /* Dark mode */
@@ -395,4 +461,50 @@ select:not([multiple]):not([size]):not(.fc-select-caret) {
   margin: 0.75rem 0;
   border: none;
   border-top: 1px solid #cbd5e1;
+}
+
+.dashboard-workspace:fullscreen,
+.dashboard-workspace:-webkit-full-screen {
+  overflow-y: auto;
+  height: 100%;
+  background: #f4f6f9;
+}
+
+/* Pointing record / status tags — bright fill, white type, arrow on the right. */
+.fc-arrow-tag {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.25rem;
+  height: 1.5rem;
+  padding: 0 1rem 0 0.625rem;
+  border: 0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: #fff;
+  white-space: nowrap;
+  vertical-align: middle;
+  clip-path: polygon(
+    0% 0%,
+    calc(100% - 8px) 0%,
+    100% 50%,
+    calc(100% - 8px) 100%,
+    0% 100%
+  );
+  filter: drop-shadow(0 1px 1.5px rgba(15, 23, 42, 0.22));
+}
+
+button.fc-arrow-tag {
+  cursor: pointer;
+}
+
+.fc-arrow-tag-compact {
+  height: 1.25rem;
+  padding: 0 0.85rem 0 0.4rem;
+  font-size: 10px;
+}
+
+.fc-arrow-tag-removable {
+  padding-right: 1.45rem;
 }

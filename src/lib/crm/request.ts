@@ -12,16 +12,24 @@ type Envelope<T> = {
 };
 
 export function crmErrorMessage(json: unknown, fallback: string): string {
-  if (json && typeof json === "object" && "message" in json) {
-    const envelope = json as Envelope<unknown>;
-    const msg = envelope.message;
-    const base = typeof msg === "string" && msg.trim()
-      ? msg
-      : Array.isArray(msg) && msg.length
-        ? msg.map(String).join(", ")
+  if (json && typeof json === "object") {
+    const rec = json as Record<string, unknown>;
+    const msg = rec.message;
+    const base = Array.isArray(msg) && msg.length
+      ? msg.map(String).join(", ")
+      : typeof msg === "string" && msg.trim() && msg.trim().toLowerCase() !== "bad request"
+        ? msg.trim()
         : null;
-    const detail = Array.isArray(envelope.errors) && envelope.errors.length
-      ? envelope.errors.join(", ")
+    const detail = Array.isArray(rec.errors) && rec.errors.length
+      ? rec.errors
+          .map((item) => {
+            if (typeof item === "string") return item;
+            if (item && typeof item === "object" && "message" in item) {
+              return String((item as { message: unknown }).message);
+            }
+            return JSON.stringify(item);
+          })
+          .join(", ")
       : null;
     if (base && detail && base !== detail) return `${base}: ${detail}`;
     if (detail) return detail;
@@ -63,6 +71,37 @@ async function sendCrm(
   return { res, json };
 }
 
+export async function crmBffFetch<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  if (!path.startsWith("/v1/")) {
+    throw new Error(`CRM path must start with /v1/: ${path}`);
+  }
+  const res = await fetch(`/api/auth/crm${path.slice(3)}`, {
+    ...init,
+    credentials: "same-origin",
+    headers: {
+      Accept: "application/json",
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.headers ?? {}),
+    },
+  });
+  const text = await res.text();
+  let json: unknown = null;
+  if (text) {
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = null;
+    }
+  }
+  if (!res.ok) {
+    throw new Error(crmErrorMessage(json, `CRM request failed (${res.status})`));
+  }
+  return unwrapCrmData<T>(json);
+}
+
 export async function crmFetch<T>(
   session: Pick<CrmSession, "baseUrl" | "accessToken">,
   path: string,
@@ -74,7 +113,11 @@ export async function crmFetch<T>(
     const { ensureCrmSession } = await import("@/lib/activity-timeline/auth");
     const next = await ensureCrmSession();
     if (next?.accessToken && next.accessToken !== session.accessToken) {
-      ({ res, json } = await sendCrm(next, path, init));
+      ({ res, json } = await sendCrm(
+        { ...next, baseUrl: session.baseUrl },
+        path,
+        init,
+      ));
     }
   }
 

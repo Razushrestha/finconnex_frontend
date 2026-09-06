@@ -28,6 +28,13 @@ export {
   fetchLeadCreditReport,
   refreshLeadCreditReport,
   fetchLeadMortgage,
+  putLeadMortgage,
+  changeCrmLeadPipelineStage,
+  replaceCrmLeadTags,
+  replaceCrmLeadFollowers,
+  addCrmLeadFollower,
+  addCrmLeadFollowerById,
+  removeCrmLeadFollower,
   convertCrmLead,
   createCrmDeal,
   refreshCrmLeadsBoard,
@@ -36,6 +43,7 @@ export {
   bindCrmLeadSession,
   bindCrmLeadFetch,
 } from "@/lib/leads/api/client";
+export { hydrateCrmLeadRelated } from "@/lib/leads/api/hydrate";
 export { CRM_LEAD_ENDPOINTS } from "@/lib/leads/api/catalog";
 export {
   mapCrmLeadToCard,

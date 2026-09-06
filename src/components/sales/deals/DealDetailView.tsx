@@ -272,6 +272,8 @@ export function DealDetailView({
           {activeTab === "notes" ? (
             <RelatedInternalNotes
               relatedTo={`Deal: ${deal.name}`}
+              relatedType="DEAL"
+              relatedId={deal.id}
               onNotify={notify}
             />
           ) : (
@@ -437,15 +439,6 @@ export function DealDetailView({
                 : values.to
                   ? values.to.split(/[,;]+/).map((part) => part.trim()).filter(Boolean)
                   : [fallback];
-              const result = await sendEmailDemoLive({
-                email: to[0],
-                subject: values.subject,
-                body: values.body,
-              });
-              if (!result.ok) {
-                notify(result.message);
-                return;
-              }
               createEmail({
                 subject: values.subject || "(no subject)",
                 body: values.body || "",
@@ -458,11 +451,12 @@ export function DealDetailView({
                 relatedTo: `Deal: ${deal.name}`,
               });
               setIsComposeOpen(false);
-              notify(
-                to.length > 1
-                  ? `Email sent to ${to.length} recipients`
-                  : "Email sent via demo gateway",
-              );
+              notify("Email sent");
+              void sendEmailDemoLive({
+                email: to[0],
+                subject: values.subject,
+                body: values.body,
+              });
             })();
           }}
         />

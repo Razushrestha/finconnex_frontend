@@ -27,6 +27,9 @@ import {
 import { SearchInput } from "@/components/ui/search-input";
 import { CreateFormModal } from "@/components/marketing/forms/CreateFormModal";
 import { NameFormModal } from "@/components/marketing/forms/NameFormModal";
+import { AiFormModal } from "@/components/marketing/forms/AiFormModal";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
+import type { FormPage } from "@/lib/form-builder/types";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -34,6 +37,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { TemplateGalleryModal } from "@/components/marketing/forms/TemplateGalleryModal";
 
 export default function MarketingFormsPage() {
   const router = useRouter();
@@ -42,7 +46,17 @@ export default function MarketingFormsPage() {
   const [search, setSearch] = useState("");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [nameModalOpen, setNameModalOpen] = useState(false);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Delete Modal state variables
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [formToDelete, setFormToDelete] = useState<{
+    id: string;
+    embedSlug: string;
+    name: string;
+  } | null>(null);
 
   const [page, setPage] = useState(1);
   const pageSize = 8;
@@ -97,19 +111,27 @@ export default function MarketingFormsPage() {
   const handleDeleteForm = (
     formId: string,
     embedSlug: string,
+    formName: string,
     e: React.MouseEvent,
   ) => {
     e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this form?")) return;
+    setFormToDelete({ id: formId, embedSlug, name: formName });
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDeleteForm = () => {
+    if (!formToDelete) return;
 
     setRows((prev) => {
-      const updated = prev.filter((r) => r.id !== formId);
+      const updated = prev.filter((r) => r.id !== formToDelete.id);
       localStorage.setItem("marketing_forms_storage", JSON.stringify(updated));
       return updated;
     });
 
     // Clean up schema storage
-    localStorage.removeItem(`form_schema_${embedSlug}`);
+    localStorage.removeItem(`form_schema_${formToDelete.embedSlug}`);
+    setDeleteModalOpen(false);
+    setFormToDelete(null);
   };
 
   const handleEditForm = (form: MarketingForm, e: React.MouseEvent) => {
@@ -213,7 +235,7 @@ export default function MarketingFormsPage() {
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-red-600 focus:text-red-600"
-                onClick={(e) => handleDeleteForm(f.id, f.embedSlug, e)}
+                onClick={(e) => handleDeleteForm(f.id, f.embedSlug, f.name, e)}
               >
                 <Trash2 className="mr-2 h-3.5 w-3.5" />
                 Delete
@@ -225,7 +247,7 @@ export default function MarketingFormsPage() {
     },
   ];
 
-  const handleConfirmName = (name: string) => {
+  const createFormAndOpenBuilder = (name: string, pages?: FormPage[]) => {
     const newFormId = crypto.randomUUID();
     const slug = name.toLowerCase().trim().replace(/\s+/g, "-");
 
@@ -236,25 +258,23 @@ export default function MarketingFormsPage() {
       embedSlug: slug,
       destination: "Lead",
       status: "Draft",
-      fields: 1,
+      fields: pages?.reduce((sum, p) => sum + p.fields.length, 0) ?? 1,
       submissions: 0,
       updatedAt: "Just now",
       fieldDefs: [],
       createdBy: "User",
     };
 
-    // 1. Save list metadata
     setRows((prev) => {
       const updated = [newEntry, ...prev];
       localStorage.setItem("marketing_forms_storage", JSON.stringify(updated));
       return updated;
     });
 
-    // 2. Initialize default schema immediately so public link works right away
     const initialFormSchema = {
       title: name,
       themeId: "default",
-      pages: [
+      pages: pages ?? [
         {
           id: crypto.randomUUID(),
           title: "General Information",
@@ -275,13 +295,20 @@ export default function MarketingFormsPage() {
       JSON.stringify(initialFormSchema),
     );
 
-    // Navigate to the builder page
     router.push(
       `/marketing/forms/create?layoutid=standard&redirect=false&slug=${encodeURIComponent(
         slug,
       )}&name=${encodeURIComponent(name)}`,
     );
   };
+
+  const handleConfirmName = (name: string) => createFormAndOpenBuilder(name);
+
+  const handleAiCreate = (name: string, pages: FormPage[]) =>
+    createFormAndOpenBuilder(name, pages);
+
+  const handleTemplateSelected = (name: string, pages: FormPage[]) =>
+    createFormAndOpenBuilder(name, pages);
 
   return (
     <MarketingListShell>
@@ -306,11 +333,11 @@ export default function MarketingFormsPage() {
         }}
         onSelectAi={() => {
           setCreateModalOpen(false);
-          router.push("/marketing/forms/create?layoutid=ai&redirect=false");
+          setAiModalOpen(true);
         }}
         onSelectTemplates={() => {
           setCreateModalOpen(false);
-          router.push("/marketing/forms/templates");
+          setTemplateModalOpen(true);
         }}
       />
 
@@ -318,6 +345,38 @@ export default function MarketingFormsPage() {
         open={nameModalOpen}
         onOpenChange={setNameModalOpen}
         onConfirm={handleConfirmName}
+      />
+
+      <AiFormModal
+        open={aiModalOpen}
+        onOpenChange={setAiModalOpen}
+        onCreate={handleAiCreate}
+      />
+      <TemplateGalleryModal
+        open={templateModalOpen}
+        onOpenChange={setTemplateModalOpen}
+        onSelectTemplate={handleTemplateSelected}
+      />
+
+      {/* Reusable Confirm Modal for Deletion */}
+      <ConfirmModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={confirmDeleteForm}
+        title="Delete Form"
+        description={
+          <span>
+            Are you sure you want to delete{" "}
+            <span className="text-white font-medium">
+              "{formToDelete?.name}"
+            </span>
+            ? This action cannot be undone and will permanently remove its
+            schema and responses.
+          </span>
+        }
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        variant="danger"
       />
 
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-1 py-2">

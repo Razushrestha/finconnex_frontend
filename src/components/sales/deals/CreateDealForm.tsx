@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Handshake,
@@ -19,9 +19,15 @@ import {
   type DealCurrency,
   type DealStageTitle,
 } from "@/lib/deals/types";
-import { COMPANY_NAMES } from "@/lib/companies/types";
 import { CONTACT_SOURCES } from "@/lib/contacts/types";
-import { api } from "@/lib/api";
+import { listCompanyGroups } from "@/lib/companies/store";
+import { useCrmCompanies } from "@/lib/companies/use-crm-companies";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import {
+  createCrmDeal,
+  toCreateDealBody,
+} from "@/lib/deals/api";
+import { mergeCrmDealsIntoBoard } from "@/lib/deals/store";
 import {
   getOrgManager,
   logCreate,
@@ -88,11 +94,19 @@ const initialState: FormState = {
 
 export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
   const router = useRouter();
+  const crmCompanies = useCrmCompanies();
   const [form, setForm] = useState<FormState>(initialState);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
   );
   const [submitted, setSubmitted] = useState(false);
+
+  const accounts = useMemo(() => {
+    void crmCompanies.source;
+    return listCompanyGroups()
+      .flatMap((group) => group.companies)
+      .filter((company) => isUuid(company.id));
+  }, [crmCompanies.source, crmCompanies.loading]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -102,13 +116,15 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
     const next: Partial<Record<keyof FormState, string>> = {
       ...requiredFieldErrors(form as unknown as Record<string, unknown>, [
         "dealName",
-        "account",
         "stage",
         "dealValue",
         "currency",
         "owner",
       ]),
     };
+    if (accounts.length && !isUuid(form.account)) {
+      next.account = "Select a CRM company";
+    }
     if (form.stage === "Closed Lost" && !form.lostReason) {
       next.lostReason = "Lost Reason is required for Closed Lost";
     }
@@ -124,45 +140,52 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
       window.alert(gate.message);
       return;
     }
-    const result = await api.deals.create({
-      dealName: form.dealName.trim(),
-      account: form.account.trim(),
-      contact: form.contact || undefined,
-      stage: form.stage,
-      dealValue: form.dealValue.trim(),
-      currency: form.currency,
-      probability: form.probability ? Number(form.probability) : undefined,
-      owner: form.owner,
-      closeDate: form.expectedCloseDate || undefined,
-    });
-    if (!result.ok) {
-      if (result.error.fields?.dealName) {
-        setErrors((prev) => ({
-          ...prev,
-          dealName: result.error.fields!.dealName,
-        }));
+    try {
+      const remote = await createCrmDeal(
+        toCreateDealBody({
+          name: form.dealName.trim(),
+          companyId: form.account,
+          account: form.account,
+          contact: form.contact || undefined,
+          stage: form.stage || undefined,
+          value: form.dealValue.trim(),
+          currency: form.currency,
+          probability: form.probability ? Number(form.probability) : undefined,
+          owner: form.owner,
+          closeDate: form.expectedCloseDate || undefined,
+          source: form.leadSource || undefined,
+          description: form.description.trim() || undefined,
+          lostReason: form.lostReason || undefined,
+          competitor: form.competitor.trim() || undefined,
+        }),
+      );
+      if (!remote) {
+        throw new Error("The CRM did not return the new deal.");
       }
-      window.alert(result.error.message);
-      return;
-    }
-    const deal = result.data;
-    logCreate("sales.deals", form.owner, deal.id, form.dealName);
-    notifyOwnerAssigned({
-      owner: form.owner,
-      entityLabel: `Deal ${form.dealName}`,
-      relatedTo: form.dealName,
-      relatedHref: "/sales/deals",
-      type: "Lead Assigned",
-    });
-    if (form.stage === "Closed Won" || form.stage === "Closed Lost") {
-      notifyDealClosed({
+      mergeCrmDealsIntoBoard([remote]);
+      logCreate("sales.deals", form.owner, remote.id, form.dealName);
+      notifyOwnerAssigned({
         owner: form.owner,
-        manager: getOrgManager(),
-        dealName: form.dealName,
-        stage: form.stage,
+        entityLabel: `Deal ${form.dealName}`,
         relatedTo: form.dealName,
         relatedHref: "/sales/deals",
+        type: "Lead Assigned",
       });
+      if (form.stage === "Closed Won" || form.stage === "Closed Lost") {
+        notifyDealClosed({
+          owner: form.owner,
+          manager: getOrgManager(),
+          dealName: form.dealName,
+          stage: form.stage,
+          relatedTo: form.dealName,
+          relatedHref: "/sales/deals",
+        });
+      }
+    } catch (err) {
+      window.alert(
+        err instanceof Error ? err.message : "The CRM could not save this deal.",
+      );
+      return;
     }
     if (createAnother) {
       setForm({ ...initialState, owner: form.owner, currency: form.currency });
@@ -207,7 +230,7 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
       </Field>
       <Field
         label="Account"
-        required
+        required={accounts.length > 0}
         error={submitted ? errors.account : undefined}
       >
         <InputShell
@@ -219,10 +242,18 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
             value={form.account}
             onChange={(e) => update("account", e.target.value)}
           >
-            <option value="">Select account</option>
-            {COMPANY_NAMES.map((name) => (
-              <option key={name} value={name}>
-                {name}
+            {accounts.length === 0 ? (
+              <option value="">
+                {crmCompanies.loading
+                  ? "Loading companies…"
+                  : "No CRM companies yet"}
+              </option>
+            ) : (
+              <option value="">Select account</option>
+            )}
+            {accounts.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
               </option>
             ))}
           </select>

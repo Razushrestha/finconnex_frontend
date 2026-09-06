@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { listCrmEmails } from "@/lib/emails/api";
-import { mergeCrmEmails } from "@/lib/emails/store";
+import { replaceCrmEmails } from "@/lib/emails/store";
 
 export type EmailsDataSource = "api" | "demo";
 
@@ -11,6 +11,7 @@ export function useCrmEmails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const [version, setVersion] = useState(0);
 
   const refresh = useCallback(() => setTick((n) => n + 1), []);
 
@@ -21,14 +22,18 @@ export function useCrmEmails() {
 
     void (async () => {
       try {
-        const remote = await listCrmEmails();
+        const remote = await listCrmEmails({ page: 1, limit: 100 });
         if (cancelled) return;
-        if (remote.length) mergeCrmEmails(remote);
-        setSource(remote.length ? "api" : "demo");
+        replaceCrmEmails(remote);
+        setSource("api");
+        setError(null);
+        setVersion((n) => n + 1);
       } catch (err) {
         if (cancelled) return;
+        replaceCrmEmails([]);
         setSource("demo");
         setError(err instanceof Error ? err.message : "Emails unavailable");
+        setVersion((n) => n + 1);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -39,5 +44,5 @@ export function useCrmEmails() {
     };
   }, [tick]);
 
-  return { source, loading, error, refresh };
+  return { source, loading, error, refresh, version };
 }

@@ -1,7 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MessagesFilterPanel } from "@/components/activities/messages/MessagesFilterPanel";
+import { useEffect, useMemo, useState } from "react";
+import {
+  EMPTY_MESSAGE_FILTERS,
+  MessagesFilterPanel,
+  type MessageFilters,
+} from "@/components/activities/messages/MessagesFilterPanel";
+import { messageMatchesFilters } from "@/lib/filters/records";
 import { MessagesListTable } from "@/components/activities/messages/MessagesListTable";
 import { MessagesTimelineView } from "@/components/activities/messages/MessagesTimelineView";
 import {
@@ -37,6 +42,7 @@ const moreMenuItems = [
 export default function MessagesPage() {
   const [view, setView] = useState<ActivityView>("list");
   const [filterOpen, setFilterOpen] = useState(false);
+  const [filters, setFilters] = useState<MessageFilters>(EMPTY_MESSAGE_FILTERS);
   const [sortActive, setSortActive] = useState(true);
   const [rows, setRows] = useState<Message[]>([]);
   const crm = useCrmMessages();
@@ -45,6 +51,11 @@ export default function MessagesPage() {
     if (crm.loading) return;
     setRows(listMessages());
   }, [crm.source, crm.loading]);
+
+  const visibleRows = useMemo(
+    () => rows.filter((row) => messageMatchesFilters(row, filters)),
+    [rows, filters],
+  );
 
   return (
     <div className={BOARD_PAGE}>
@@ -86,15 +97,19 @@ export default function MessagesPage() {
       <div className="relative flex min-h-0 flex-1 items-stretch gap-4 overflow-hidden">
         {filterOpen && (
           <div className="absolute inset-y-0 left-0 z-30 flex sm:relative">
-            <MessagesFilterPanel onClose={() => setFilterOpen(false)} />
+            <MessagesFilterPanel
+              filters={filters}
+              onChange={setFilters}
+              onClose={() => setFilterOpen(false)}
+            />
           </div>
         )}
 
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl">
           {view === "timeline" ? (
-            <MessagesTimelineView />
+            <MessagesTimelineView data={visibleRows} />
           ) : (
-            <MessagesListTable data={crm.loading ? undefined : rows} />
+            <MessagesListTable data={crm.loading ? undefined : visibleRows} />
           )}
         </div>
       </div>

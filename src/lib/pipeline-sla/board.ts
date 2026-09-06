@@ -20,13 +20,28 @@ const PIPELINE_STAGE_ALIASES: Record<string, MortgagePipelineStage> = {
   Lost: "Closed Lost",
 };
 
+function mortgageStageCode(stage: string): string {
+  return stage
+    .toUpperCase()
+    .replace(/&/g, "AND")
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
 export function resolvePipelineStage(
   value: string,
 ): MortgagePipelineStage | null {
-  if ((MORTGAGE_PIPELINE_STAGES as readonly string[]).includes(value)) {
-    return value as MortgagePipelineStage;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if ((MORTGAGE_PIPELINE_STAGES as readonly string[]).includes(trimmed)) {
+    return trimmed as MortgagePipelineStage;
   }
-  return PIPELINE_STAGE_ALIASES[value] ?? null;
+  if (PIPELINE_STAGE_ALIASES[trimmed]) return PIPELINE_STAGE_ALIASES[trimmed];
+  const compact = trimmed.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  for (const stage of MORTGAGE_PIPELINE_STAGES) {
+    if (mortgageStageCode(stage).replace(/_/g, "") === compact) return stage;
+  }
+  return null;
 }
 
 /** Reverse of leadStatusToPipelineStage — CRM status from mortgage stage. */
@@ -93,19 +108,19 @@ export function assertPipelineStageChange(
 }
 
 export const PIPELINE_STAGE_DOT: Record<MortgagePipelineStage, string> = {
-  "New Lead": "bg-sky-500",
-  "Appointment Booked": "bg-cyan-500",
+  "New Lead": "bg-cyan-500",
+  "Appointment Booked": "bg-sky-500",
   "Appointment Missed": "bg-rose-400",
-  "In Conversation": "bg-amber-400",
+  "In Conversation": "bg-violet-500",
   Hold: "bg-slate-400",
   "No Answer": "bg-orange-400",
-  "Waiting on Docs": "bg-orange-500",
-  "Document Received": "bg-violet-500",
-  Findings: "bg-fuchsia-500",
-  "Research & Servicing": "bg-indigo-500",
-  "Servicing Completed": "bg-blue-500",
-  "Loan Proposal Presented": "bg-purple-500",
-  "Future Potential Clients": "bg-teal-500",
+  "Waiting on Docs": "bg-green-500",
+  "Document Received": "bg-purple-500",
+  Findings: "bg-indigo-500",
+  "Research & Servicing": "bg-blue-500",
+  "Servicing Completed": "bg-teal-500",
+  "Loan Proposal Presented": "bg-amber-500",
+  "Future Potential Clients": "bg-pink-500",
   "Closed Won": "bg-emerald-500",
   "Closed Lost": "bg-slate-400",
 };

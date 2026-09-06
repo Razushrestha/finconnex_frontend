@@ -42,7 +42,7 @@ interface SearchItem {
 
 /** Real app routes: kept in sync with Sidebar destinations. */
 const DESTINATIONS: SearchItem[] = [
-  { label: "Dashboard", href: "/", icon: LayoutGrid, keywords: ["dashboard", "home"] },
+  { label: "Dashboard", href: "/", icon: LayoutGrid, keywords: ["dashboard", "home", "executive"] },
   { label: "Leads", href: "/sales/leads", icon: Users, keywords: ["leads", "sales", "prospect"] },
   { label: "Contacts", href: "/sales/contacts", icon: Users, keywords: ["contacts"] },
   { label: "Deals", href: "/sales/deals", icon: Handshake, keywords: ["deals", "pipeline"] },
@@ -56,6 +56,7 @@ const DESTINATIONS: SearchItem[] = [
   { label: "Support", href: "/support", icon: LifeBuoy, keywords: ["support", "ticket"] },
   { label: "Notifications", href: "/notifications", icon: Bell, keywords: ["notifications"] },
   { label: "Rules", href: "/rules", icon: Scale, keywords: ["rules"] },
+  { label: "Users", href: "/users", icon: Users, keywords: ["users", "invite", "role", "members"] },
   { label: "Settings", href: "/settings", icon: Settings, keywords: ["settings"] },
   { label: "My Preferences", href: "/settings/my-preferences", icon: Settings, keywords: ["preferences", "theme"] },
 ];

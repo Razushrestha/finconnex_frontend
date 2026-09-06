@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { listCrmCompanies } from "@/lib/companies/api";
-import { mergeCrmCompaniesIntoBoard } from "@/lib/companies/store";
+import { replaceCrmCompanies } from "@/lib/companies/store";
 
 export type CompaniesDataSource = "api" | "demo";
 
@@ -23,8 +23,8 @@ export function useCrmCompanies() {
       try {
         const remote = await listCrmCompanies();
         if (cancelled) return;
-        if (remote.length) mergeCrmCompaniesIntoBoard(remote);
-        setSource(remote.length ? "api" : "demo");
+        replaceCrmCompanies(remote);
+        setSource("api");
       } catch (err) {
         if (cancelled) return;
         setSource("demo");

@@ -23,24 +23,24 @@ export function liveRelatedRecords(
   if (want("Lead")) {
     for (const column of listLeadColumns()) {
       for (const card of column.cards) {
-        rows.push({ kind: "Lead", name: card.name });
+        rows.push({ kind: "Lead", name: card.name, id: card.id });
       }
     }
   }
   if (want("Contact")) {
     for (const contact of listAllContacts()) {
-      rows.push({ kind: "Contact", name: contact.name });
+      rows.push({ kind: "Contact", name: contact.name, id: contact.id });
     }
   }
   if (want("Deal")) {
     for (const deal of listAllDeals()) {
-      rows.push({ kind: "Deal", name: deal.name });
+      rows.push({ kind: "Deal", name: deal.name, id: deal.id });
     }
   }
   if (want("Company")) {
     for (const group of listCompanyGroups()) {
       for (const company of group.companies) {
-        rows.push({ kind: "Company", name: company.name });
+        rows.push({ kind: "Company", name: company.name, id: company.id });
       }
     }
   }
@@ -60,7 +60,7 @@ export function liveRelatedRecords(
     const key = keyOf({ kind: item.kind, name });
     if (seen.has(key)) continue;
     seen.add(key);
-    unique.push({ kind: item.kind, name });
+    unique.push({ kind: item.kind, name, id: item.id });
   }
   return unique;
 }

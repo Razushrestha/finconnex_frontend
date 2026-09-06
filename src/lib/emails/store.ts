@@ -3,7 +3,6 @@
 export const EMAILS_HYDRATE_KEY_V1 = "activities:emails:list:v1";
 
 import {
-  emails as SEED_EMAILS,
   type Email,
   type EmailColumn,
   type EmailStatus,
@@ -12,36 +11,23 @@ import { createBoardStore } from "@/lib/rules/module-store";
 import { formatRulesAt, newRulesId } from "@/lib/rules/storage";
 import { emitLeadActivityChange } from "@/lib/leads/lead-extras-store";
 
-function cloneSeed(): Email[] {
-  return SEED_EMAILS.map((e) => ({
-    ...e,
-    to: [...e.to],
-    cc: e.cc ? [...e.cc] : undefined,
-    bcc: e.bcc ? [...e.bcc] : undefined,
-  }));
-}
-
-const store = createBoardStore({
-  key: "activities:emails:list:v2",
-  seed: cloneSeed,
-});
-
-function withMissingSeeds(items: Email[]): Email[] {
-  const have = new Set(items.map((email) => email.id));
-  const extras = SEED_EMAILS.filter((email) => !have.has(email.id)).map((email) => ({
+function cloneEmail(email: Email): Email {
+  return {
     ...email,
     to: [...email.to],
     cc: email.cc ? [...email.cc] : undefined,
     bcc: email.bcc ? [...email.bcc] : undefined,
-  }));
-  return extras.length ? [...items, ...extras] : items;
+    attachments: email.attachments?.map((a) => ({ ...a })),
+  };
 }
 
+const store = createBoardStore({
+  key: "activities:emails:list:v3",
+  seed: () => [] as Email[],
+});
+
 export function listEmails(): Email[] {
-  const items = store.list();
-  const merged = withMissingSeeds(items);
-  if (merged.length !== items.length) store.save(merged);
-  return merged;
+  return store.list();
 }
 
 export function saveEmails(items: Email[]) {
@@ -122,9 +108,15 @@ export function createEmail(input: {
       ? input.attachments.map((a) => ({ ...a }))
       : undefined,
   };
-  saveEmails([email, ...listEmails()]);
+  return upsertEmail(email);
+}
+
+export function upsertEmail(email: Email): Email {
+  const next = cloneEmail(email);
+  const items = listEmails().filter((row) => row.id !== next.id);
+  saveEmails([next, ...items]);
   emitLeadActivityChange();
-  return email;
+  return next;
 }
 
 export function findEmailById(id: string) {
@@ -154,18 +146,31 @@ export function deleteEmail(id: string): Email | null {
   return found;
 }
 
+function isDemoSeedId(id: string) {
+  return /^e\d+$/i.test(id);
+}
+
 export function mergeCrmEmails(remote: Email[]) {
   if (!remote.length) return;
   const remoteIds = new Set(remote.map((e) => e.id));
-  const local = listEmails().filter((e) => !remoteIds.has(e.id));
-  saveEmails([
-    ...remote.map((e) => ({
-      ...e,
-      to: [...e.to],
-      cc: e.cc ? [...e.cc] : undefined,
-      bcc: e.bcc ? [...e.bcc] : undefined,
-      attachments: e.attachments?.map((a) => ({ ...a })),
-    })),
-    ...local,
-  ]);
+  const local = listEmails().filter(
+    (e) => !remoteIds.has(e.id) && !isDemoSeedId(e.id),
+  );
+  saveEmails([...remote.map(cloneEmail), ...local.map(cloneEmail)]);
+}
+
+export function replaceCrmEmails(remote: Email[]) {
+  const remoteIds = new Set(remote.map((row) => row.id));
+  const extras = listEmails().filter((row) => {
+    if (isDemoSeedId(row.id)) return false;
+    if (remoteIds.has(row.id)) return false;
+    if (!remote.length) return true;
+    const duplicate = remote.some(
+      (item) =>
+        item.subject.trim().toLowerCase() === row.subject.trim().toLowerCase() &&
+        item.body.trim() === row.body.trim(),
+    );
+    return !duplicate;
+  });
+  saveEmails([...remote.map(cloneEmail), ...extras.map(cloneEmail)]);
 }

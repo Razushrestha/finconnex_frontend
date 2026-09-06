@@ -1,26 +1,34 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { readCrmTokens } from "@/lib/auth/crm-server";
+import {
+  applyCrmTokenCookies,
+  resolveLiveCrmAuth,
+} from "@/lib/auth/crm-server";
 
-/**
- * Returns the live CRM access token when present, else the app session JWT.
- * Cookies win; `.env.local` CRM_ACCESS_TOKEN is a local fallback.
- */
 export async function GET() {
   const session = await getSession();
-  const crm = await readCrmTokens();
+  const live = await resolveLiveCrmAuth();
 
-  if (!session && !crm.accessToken) {
+  if (!session && !live?.accessToken) {
     return NextResponse.json({ authenticated: false });
   }
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     authenticated: true,
-    accessToken: crm.accessToken,
-    refreshToken: crm.refreshToken,
+    accessToken: live?.accessToken ?? null,
+    refreshToken: live?.refreshToken ?? null,
     tenantId: session?.tenantId ?? null,
     tenantSlug: session?.tenantSlug ?? null,
     workspaceId: session?.tenantId ?? null,
     expiresIn: null as number | null,
   });
+
+  if (live?.accessToken) {
+    applyCrmTokenCookies(response, {
+      accessToken: live.accessToken,
+      refreshToken: live.refreshToken,
+    });
+  }
+
+  return response;
 }

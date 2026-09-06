@@ -6,9 +6,11 @@ import {
 } from "@/lib/leads/smoke-leads-api";
 
 describe("Lead CRM API", () => {
-  it("catalog matches Swagger (22 routes)", () => {
-    expect(CRM_LEAD_ENDPOINTS).toHaveLength(22);
-    expect(new Set(CRM_LEAD_ENDPOINTS.map((e) => e.key)).size).toBe(22);
+  it("catalog matches Swagger lead workspace routes", () => {
+    expect(CRM_LEAD_ENDPOINTS.length).toBeGreaterThanOrEqual(31);
+    expect(new Set(CRM_LEAD_ENDPOINTS.map((e) => e.key)).size).toBe(
+      CRM_LEAD_ENDPOINTS.length,
+    );
   });
 
   it("client exports every catalog function and path", async () => {

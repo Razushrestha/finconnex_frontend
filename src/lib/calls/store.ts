@@ -13,6 +13,7 @@ import {
 } from "@/lib/calls/types";
 import type { TaskActionItem, TaskReminder } from "@/lib/tasks/types";
 import type { ReminderRepeatRule } from "@/lib/tasks/repeat-reminder";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { createBoardStore } from "@/lib/rules/module-store";
 import { formatRulesAt, newRulesId } from "@/lib/rules/storage";
 import { emitLeadActivityChange } from "@/lib/leads/lead-extras-store";
@@ -68,12 +69,51 @@ const board = createBoardStore({
   seed: cloneSeed,
 });
 
+const CALLS_BOARD_BACKUP = "finconnex.calls.board.backup.v1";
+
+export function isDemoSeedCallId(id: string) {
+  return /^c\d+$/i.test(id.trim());
+}
+
+function hasUserCalls(cols: CallColumn[]) {
+  return cols.some((col) =>
+    col.calls.some((call) => !isDemoSeedCallId(call.id)),
+  );
+}
+
+function readCallsBackup(): CallColumn[] | null {
+  if (typeof localStorage === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(CALLS_BOARD_BACKUP);
+    if (!raw) return null;
+    const backup = normalize(JSON.parse(raw) as CallColumn[]);
+    return hasUserCalls(backup) ? backup : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCallsBackup(cols: CallColumn[]) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    if (hasUserCalls(cols)) {
+      localStorage.setItem(CALLS_BOARD_BACKUP, JSON.stringify(cols));
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
 export function listCallColumns(): CallColumn[] {
-  return normalize(board.list());
+  const stored = normalize(board.list());
+  if (hasUserCalls(stored)) return stored;
+  return readCallsBackup() ?? stored;
 }
 
 export function saveCallColumns(cols: CallColumn[]) {
-  board.save(normalize(cols));
+  const next = normalize(cols);
+  board.save(next);
+  writeCallsBackup(next);
 }
 
 export function listCalls(): Call[] {
@@ -130,7 +170,10 @@ export function createCall(input: {
   createdBy?: string;
   createdOn?: string;
   attachments?: CallAttachment[];
-}): Call {
+  relatedType?: string;
+  relatedId?: string;
+  contactId?: string;
+}, opts?: { skipCrm?: boolean }): Call {
   const cols = listCallColumns();
   const target =
     cols.find((c) => c.title === input.status) ??
@@ -173,15 +216,20 @@ export function createCall(input: {
     ),
   );
   emitLeadActivityChange();
-  void import("@/lib/calls/api").then(async ({ createCrmCall, tryCrm }) => {
-    const remote = await tryCrm(() => createCrmCall(input));
-    if (remote?.id && remote.id !== call.id) {
-      deleteCall(call.id, { skipCrm: true });
-      mergeCrmCalls([remote]);
-    } else if (remote) {
-      mergeCrmCalls([remote]);
-    }
-  });
+  if (!opts?.skipCrm) {
+    void import("@/lib/calls/api").then(async ({ createCrmCall, tryCrm }) => {
+      const remote = await tryCrm(() => createCrmCall(input));
+      if (
+        remote?.id &&
+        isUuid(remote.id) &&
+        remote.id !== call.id &&
+        remote.subject.trim().toLowerCase() === call.subject.trim().toLowerCase()
+      ) {
+        deleteCall(call.id, { skipCrm: true });
+        mergeCrmCalls([remote]);
+      }
+    });
+  }
   return call;
 }
 
@@ -356,8 +404,11 @@ export function mergeCrmCalls(remote: Call[]) {
   }));
   let next = cols;
   for (const call of remote) {
+    const status = next.some((c) => c.title === call.status)
+      ? call.status
+      : "Scheduled";
     const target =
-      next.find((c) => c.title === call.status) ??
+      next.find((c) => c.title === status) ??
       next.find((c) => c.title === "Scheduled") ??
       next[0];
     if (!target) continue;
@@ -365,12 +416,39 @@ export function mergeCrmCalls(remote: Call[]) {
       col.id === target.id
         ? {
             ...col,
-            calls: [normalizeCall(call, target.title), ...col.calls],
+            calls: [normalizeCall({ ...call, status }, target.title), ...col.calls],
           }
         : col,
     );
   }
   saveCallColumns(next);
+  emitLeadActivityChange();
+}
+
+/** Replace the board from a full CRM list; keep cards the list omitted. */
+export function replaceCrmCalls(remote: Call[]) {
+  const cols = listCallColumns();
+  const titles = new Set(cols.map((col) => col.title));
+  const remoteIds = new Set(remote.map((row) => row.id));
+  const extras = listCalls().filter((call) => {
+    if (remoteIds.has(call.id)) return false;
+    if (isDemoSeedCallId(call.id)) return false;
+    const duplicate = remote.some(
+      (row) =>
+        row.subject.trim().toLowerCase() === call.subject.trim().toLowerCase(),
+    );
+    if (duplicate) return false;
+    return true;
+  });
+  const cloned = [...remote, ...extras].map((call) =>
+    titles.has(call.status) ? call : { ...call, status: "Scheduled" as CallStatus },
+  );
+  saveCallColumns(
+    cols.map((col) => {
+      const calls = cloned.filter((c) => c.status === col.title);
+      return { ...col, calls, count: calls.length };
+    }),
+  );
   emitLeadActivityChange();
 }
 

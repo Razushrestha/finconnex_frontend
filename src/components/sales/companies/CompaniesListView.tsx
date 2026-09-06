@@ -6,8 +6,10 @@ import { type CompanyGroup } from "@/lib/companies/types";
 import { listCompanyGroups } from "@/lib/companies/store";
 import { onRulesChange } from "@/lib/rules";
 import type { CompanyFilters } from "./FilterCompaniesPanel";
+import { companyMatchesFilters } from "@/lib/filters/records";
 import { cn } from "@/lib/utils";
-import { TableDisplayOptionsMenu } from "@/components/common/TableDisplayOptionsMenu";
+import { StatusColorPill } from "@/components/common/StatusColorPill";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
   ManageColumnsModal,
   type ManageColumn,
@@ -89,12 +91,10 @@ const columnRenderers: Record<string, ColumnRenderer> = {
     th: "Status",
     tdClassName: "px-3 py-2 whitespace-nowrap",
     td: (company) => (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
-        <span
-          className={`h-1.5 w-1.5 rounded-full ${company.statusDotColor}`}
-        />
-        {company.statusTitle}
-      </span>
+      <StatusColorPill
+        label={company.statusTitle}
+        solidClass={company.statusDotColor}
+      />
     ),
   },
   owner: {
@@ -166,11 +166,15 @@ export function CompaniesListView({
         (group) => !hasStatusFilter || filters!.statuses.includes(group.title),
       )
       .flatMap((group) =>
-        group.companies.map((c) => ({
-          ...c,
-          statusTitle: group.title,
-          statusDotColor: group.dotColorClass,
-        })),
+        group.companies
+          .filter((c) =>
+            companyMatchesFilters({ ...c, statusTitle: group.title }, filters),
+          )
+          .map((c) => ({
+            ...c,
+            statusTitle: group.title,
+            statusDotColor: group.dotColorClass,
+          })),
       );
   }, [groups, filters]);
 
@@ -208,11 +212,17 @@ export function CompaniesListView({
 
   return (
     <div className="w-full overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
-      <div className="overflow-x-auto">
+      <ResizableColumns
+        storageKey="companies-list"
+        className="overflow-x-auto"
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
+        onManageColumns={() => setManageColumnsOpen(true)}
+      >
         <table className="w-full min-w-[900px] text-left text-[12px]">
           <thead className="border-b border-slate-100 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
             <tr className="sticky top-0 z-10 bg-slate-50/80">
-              <th className="w-8 px-3 py-2.5">
+              <th data-col-id="select" className="w-8 px-3 py-2.5">
                 <input
                   type="checkbox"
                   checked={allSelected}
@@ -228,6 +238,7 @@ export function CompaniesListView({
               {orderedVisibleColumns.map((col) => (
                 <th
                   key={col.id}
+                  data-col-id={col.id}
                   className={
                     columnRenderers[col.id]?.thClassName ?? "px-3 py-2.5"
                   }
@@ -237,18 +248,12 @@ export function CompaniesListView({
               ))}
 
               <th
+                data-col-id="options"
                 className={cn(
-                  "sticky right-0 z-20 -mr-3 bg-slate-50/80 pr-3 pl-3 text-right",
+                  "sticky right-0 z-20 -mr-3 w-12 min-w-12 bg-slate-50/80 pr-3 pl-3 text-right",
                   "shadow-[-12px_0_12px_-8px_rgba(15,23,42,0.06)]",
                 )}
-              >
-                <TableDisplayOptionsMenu
-                  pageSize={pageSize}
-                  onPageSizeChange={setPageSize}
-                  onManageColumns={() => setManageColumnsOpen(true)}
-                  className="flex justify-end"
-                />
-              </th>
+              />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50 text-slate-700">
@@ -293,7 +298,7 @@ export function CompaniesListView({
             )}
           </tbody>
         </table>
-      </div>
+      </ResizableColumns>
       <div className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-500">
         Showing {pagedCompanies.length} of {allCompanies.length} companies
       </div>

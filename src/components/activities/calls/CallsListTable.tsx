@@ -10,12 +10,29 @@ import {
   listCalls,
   type CallScope,
 } from "@/lib/calls/store";
+import { callMatchesFilters } from "@/lib/filters/records";
+import type { CallFilters } from "@/lib/filters/module-filters";
 import { onRulesChange } from "@/lib/rules/storage";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
 import { useRouter } from "next/navigation";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
+import { StatusColorPill } from "@/components/common/StatusColorPill";
+import type { CallStatus } from "@/lib/calls/types";
+
+const CALL_STATUS_TONE: Record<CallStatus, string> = {
+  Scheduled: "bg-sky-100 text-sky-800",
+  Completed: "bg-emerald-100 text-emerald-800",
+  "No Answer": "bg-orange-100 text-orange-800",
+  "Voicemail Left": "bg-violet-100 text-violet-800",
+  Cancelled: "bg-slate-100 text-slate-700",
+  "Left Voicemail": "bg-violet-100 text-violet-800",
+  Busy: "bg-amber-100 text-amber-900",
+  "Wrong Number": "bg-rose-100 text-rose-800",
+};
 
 interface CallsListTableProps {
   scope?: CallScope;
+  filters?: CallFilters;
   sortActive: boolean;
   filterOpen?: boolean;
   selectedIds?: string[];
@@ -24,8 +41,9 @@ interface CallsListTableProps {
 
 export function CallsListTable({
   scope = "all",
+  filters,
   sortActive,
-  filterOpen = false,
+  filterOpen: _filterOpen = false,
   selectedIds: controlledSelectedIds,
   onSelectedIdsChange,
 }: CallsListTableProps) {
@@ -34,7 +52,7 @@ export function CallsListTable({
   const [localSelected, setLocalSelected] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [tick, setTick] = useState(0);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
   const selected = controlledSelectedIds ?? localSelected;
 
   function setSelected(ids: string[]) {
@@ -55,13 +73,15 @@ export function CallsListTable({
   }, []);
 
   const sorted = useMemo(() => {
-    const data = listCalls().filter((call) => callMatchesScope(call, scope));
+    const data = listCalls().filter(
+      (call) => callMatchesScope(call, scope) && callMatchesFilters(call, filters),
+    );
     if (sortActive) {
       data.sort((a, b) => a.date.localeCompare(b.date));
     }
     return data;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scope, sortActive, tick]);
+  }, [scope, sortActive, tick, filters]);
 
   useEffect(() => {
     const focus = new URLSearchParams(window.location.search).get("focus");
@@ -99,14 +119,19 @@ export function CallsListTable({
 
   return (
     <div className="flex h-full w-full min-w-0 flex-col rounded-2xl border border-slate-100 bg-white">
-      <div
-        data-filter-open={filterOpen}
+      <ResizableColumns
+        storageKey="calls-list"
         className="min-h-0 flex-1 overflow-auto"
+        pageSize={pageSize}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
       >
         <table className="w-full min-w-[1000px] border-collapse text-left text-[12px]">
           <thead className="sticky top-0 z-10 bg-slate-50/95 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
             <tr className="border-b border-slate-100">
-              <th className="w-10 px-3 py-2.5">
+              <th data-col-id="select" className="w-10 px-3 py-2.5">
                 <input
                   type="checkbox"
                   checked={allSelected}
@@ -114,14 +139,30 @@ export function CallsListTable({
                   className="h-3.5 w-3.5 rounded border-slate-300 text-violet-500"
                 />
               </th>
-              <th className="px-3 py-2.5">Subject</th>
-              <th className="px-3 py-2.5">Related To</th>
-              <th className="px-3 py-2.5">Contact</th>
-              <th className="px-3 py-2.5">Type</th>
-              <th className="px-3 py-2.5">Status</th>
-              <th className="px-3 py-2.5">Date</th>
-              <th className="px-3 py-2.5">Duration</th>
-              <th className="px-3 py-2.5">Assigned To</th>
+              <th data-col-id="subject" className="px-3 py-2.5">
+                Subject
+              </th>
+              <th data-col-id="relatedTo" className="px-3 py-2.5">
+                Related To
+              </th>
+              <th data-col-id="contact" className="px-3 py-2.5">
+                Contact
+              </th>
+              <th data-col-id="type" className="px-3 py-2.5">
+                Type
+              </th>
+              <th data-col-id="status" className="px-3 py-2.5">
+                Status
+              </th>
+              <th data-col-id="date" className="px-3 py-2.5">
+                Date
+              </th>
+              <th data-col-id="duration" className="px-3 py-2.5">
+                Duration
+              </th>
+              <th data-col-id="assignedTo" className="px-3 py-2.5">
+                Assigned To
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -145,7 +186,7 @@ export function CallsListTable({
                 </td>
                 <td
                   className={cn(
-                    "px-3 py-2 font-semibold text-slate-900",
+                    "px-3 py-2 font-normal text-slate-900",
                     cardSubject,
                   )}
                 >
@@ -169,7 +210,15 @@ export function CallsListTable({
                   {call.contact || ""}
                 </td>
                 <td className="px-3 py-2 text-slate-600">{call.callType}</td>
-                <td className="px-3 py-2 text-slate-600">{call.status}</td>
+                <td className="px-3 py-2">
+                  <StatusColorPill
+                    label={call.status}
+                    toneClassName={
+                      CALL_STATUS_TONE[call.status] ??
+                      "bg-slate-100 text-slate-700"
+                    }
+                  />
+                </td>
                 <td
                   className={cn(
                     "px-3 py-2 whitespace-nowrap",
@@ -188,7 +237,7 @@ export function CallsListTable({
             ))}
           </tbody>
         </table>
-      </div>
+      </ResizableColumns>
       <div className="flex items-center justify-between border-t border-slate-100 px-3 py-2 text-[11px] text-slate-500">
         <span>
           {(safePage - 1) * pageSize + 1}–

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, Check, CheckCircle2, Pencil, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCircle2, Pencil, Phone, PhoneCall, X } from "lucide-react";
 import { ActivityTimelineButton } from "@/components/activities/ActivityTimelineButton";
 import { useTaskPageEditing } from "@/components/activities/tasks/detail/TaskEditContext";
 
@@ -10,7 +10,11 @@ interface CallHeaderProps {
   onBack: () => void;
   backLabel?: string;
   canClose?: boolean;
+  canStart?: boolean;
+  canDial?: boolean;
   onCloseCall: () => void;
+  onStartCall?: () => void;
+  onDialCall?: () => void;
   timelineHref?: string;
 }
 
@@ -18,7 +22,11 @@ export function CallHeaderSection({
   onBack,
   backLabel = "Back to Calls",
   canClose = true,
+  canStart = false,
+  canDial = false,
   onCloseCall,
+  onStartCall,
+  onDialCall,
   timelineHref,
 }: CallHeaderProps) {
   const { editing, beginEdit, saveAll, cancelAll } = useTaskPageEditing();
@@ -76,6 +84,26 @@ export function CallHeaderSection({
             </button>
           </>
         )}
+        {canStart && onStartCall ? (
+          <button
+            type="button"
+            onClick={onStartCall}
+            className="inline-flex items-center gap-1.5 border border-slate-200 px-3.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-violet-300 hover:text-violet-700"
+          >
+            <PhoneCall className="h-3.5 w-3.5" />
+            Start
+          </button>
+        ) : null}
+        {canDial && onDialCall ? (
+          <button
+            type="button"
+            onClick={onDialCall}
+            className="inline-flex items-center gap-1.5 border border-slate-200 px-3.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-violet-300 hover:text-violet-700"
+          >
+            <Phone className="h-3.5 w-3.5" />
+            Dial
+          </button>
+        ) : null}
         {canClose ? (
           <button
             type="button"

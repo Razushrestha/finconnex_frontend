@@ -161,12 +161,52 @@ const board = createBoardStore({
   seed: cloneSeed,
 });
 
+const TASKS_BOARD_BACKUP = "finconnex.tasks.board.backup.v1";
+
+export function isDemoSeedTaskId(id: string) {
+  return /^T-\d+$/i.test(id.trim());
+}
+
+function hasUserTasks(cols: TaskColumn[]) {
+  return cols.some((col) =>
+    col.tasks.some((task) => !isDemoSeedTaskId(task.taskId)),
+  );
+}
+
+function readTasksBackup(): TaskColumn[] | null {
+  if (typeof localStorage === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(TASKS_BOARD_BACKUP);
+    if (!raw) return null;
+    const backup = normalize(JSON.parse(raw) as TaskColumn[]);
+    return hasUserTasks(backup) ? backup : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeTasksBackup(cols: TaskColumn[]) {
+  if (typeof localStorage === "undefined") return;
+  try {
+    if (hasUserTasks(cols)) {
+      localStorage.setItem(TASKS_BOARD_BACKUP, JSON.stringify(cols));
+    }
+  } catch {
+    /* quota / private mode */
+  }
+}
+
 export function listTaskColumns(): TaskColumn[] {
-  return normalize(board.list());
+  const stored = normalize(board.list());
+  if (hasUserTasks(stored)) return stored;
+  const backup = readTasksBackup();
+  return backup ?? stored;
 }
 
 export function saveTaskColumns(cols: TaskColumn[]) {
-  board.save(normalize(cols));
+  const next = normalize(cols);
+  board.save(next);
+  writeTasksBackup(next);
 }
 
 export function createTask(input: {
@@ -854,10 +894,28 @@ export function upsertTask(row: Task) {
   return next;
 }
 
-/** Replace the session board with live CRM rows (empty list is a valid live result). */
+/** Replace the session board with live CRM rows; keep cards the list omitted. */
 export function replaceCrmTasks(remote: Task[]) {
   const cols = listTaskColumns();
-  const cloned = remote.map(cloneTaskRow);
+  const titles = new Set(cols.map((col) => col.title));
+  const remoteIds = new Set(remote.map((row) => row.taskId));
+  const extras = listAllTasks().filter((task) => {
+    if (remoteIds.has(task.taskId)) return false;
+    if (isDemoSeedTaskId(task.taskId)) return false;
+    const duplicate = remote.some(
+      (row) =>
+        row.title.trim().toLowerCase() === task.title.trim().toLowerCase() &&
+        row.dueDate === task.dueDate,
+    );
+    if (duplicate) return false;
+    return true;
+  });
+  const cloned = [...remote.map(cloneTaskRow), ...extras.map(cloneTaskRow)].map(
+    (task) =>
+      titles.has(task.status)
+        ? task
+        : { ...task, status: "Not Started" as TaskStatus },
+  );
   saveTaskColumns(
     cols.map((col) => {
       const tasks = cloned.filter((t) => t.status === col.title);

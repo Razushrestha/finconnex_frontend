@@ -16,7 +16,8 @@ import {
   type CompanyStatus,
 } from "@/lib/companies/types";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
-import { createCompany } from "@/lib/companies/store";
+import { mergeCrmCompaniesIntoBoard } from "@/lib/companies/store";
+import { createCrmCompany } from "@/lib/companies/api";
 import {
   CreateEntityFormShell,
   Field,
@@ -89,19 +90,37 @@ export function CreateCompanyForm({
     return Object.keys(next).length === 0;
   }
 
-  function handleSave(createAnother: boolean) {
+  async function handleSave(createAnother: boolean) {
     setSubmitted(true);
     if (!validate()) return;
-    createCompany({
-      name: form.companyName.trim(),
-      website: form.website.trim() || undefined,
-      industry: form.industry.trim() || undefined,
-      phone: form.phone.trim() || undefined,
-      city: form.city.trim() || undefined,
-      annualRevenue: form.annualRevenue.trim() || undefined,
-      status: form.status as CompanyStatus,
-      owner: form.owner,
-    });
+    try {
+      const remote = await createCrmCompany({
+        name: form.companyName.trim(),
+        website: form.website.trim() || undefined,
+        industry: form.industry.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+        city: form.city.trim() || undefined,
+        annualRevenue: form.annualRevenue.trim() || undefined,
+        status: form.status as CompanyStatus,
+        owner: form.owner,
+        notes: form.notes.trim() || undefined,
+        companySize: form.companySize.trim() || undefined,
+        address: form.address.trim() || undefined,
+        state: form.state.trim() || undefined,
+        country: form.country.trim() || undefined,
+      });
+      if (!remote) {
+        throw new Error("The CRM did not return the new company.");
+      }
+      mergeCrmCompaniesIntoBoard([remote]);
+    } catch (err) {
+      window.alert(
+        err instanceof Error
+          ? err.message
+          : "The CRM could not save this company.",
+      );
+      return;
+    }
     if (createAnother) {
       setForm({ ...initialState, owner: form.owner, status: "Prospect" });
       setErrors({});

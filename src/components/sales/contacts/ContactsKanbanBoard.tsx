@@ -9,6 +9,7 @@ import {
 } from "@/lib/contacts/store";
 import { onRulesChange } from "@/lib/rules";
 import type { ContactFilters } from "./FilterContactsPanel";
+import { contactMatchesFilters } from "@/lib/filters/records";
 import {
   ContactRecordCard,
   type ContactQuickActionKind,
@@ -104,7 +105,6 @@ export function ContactsKanbanBoard({
 
   const visibleGroups = useMemo(() => {
     const hasStatusFilter = !!filters?.statuses.length;
-    const hasSourceFilter = !!filters?.sources.length;
     const hasColumnFilter = !!visibleColumnIds;
 
     const result = hasColumnFilter
@@ -117,9 +117,9 @@ export function ContactsKanbanBoard({
       .filter((g) => !hasStatusFilter || filters!.statuses.includes(g.title))
       .map((g) => ({
         ...g,
-        contacts: hasSourceFilter
-          ? g.contacts.filter((c) => filters!.sources.includes(c.source))
-          : g.contacts,
+        contacts: g.contacts.filter((c) =>
+          contactMatchesFilters({ ...c, statusTitle: g.title }, filters),
+        ),
       }));
   }, [groups, filters, visibleColumnIds]);
 

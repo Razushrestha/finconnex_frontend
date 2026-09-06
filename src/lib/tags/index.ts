@@ -6,6 +6,7 @@ export {
   writeTagColor,
   hashTagTone,
   toneForTag,
+  onTagColorsChange,
   type TagToneId,
 } from "./tones";
 export {

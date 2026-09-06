@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Toaster } from "sonner";
+import {
+  parseTheme,
+  THEME_COOKIE_NAME,
+} from "@/components/theme/theme-cookie";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -17,23 +22,21 @@ export const metadata: Metadata = {
     "Manage sales, finance, and customer relationships across your organization.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const theme = parseTheme((await cookies()).get(THEME_COOKIE_NAME)?.value);
+
   return (
     <html
       lang="en"
-      className={`${inter.variable} h-full antialiased `}
+      className={`${inter.variable} h-full antialiased ${theme}`}
+      style={{ colorScheme: theme }}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("theme");if(t!=="dark"&&t!=="light")t="light";document.documentElement.classList.add(t);document.documentElement.style.colorScheme=t;}catch(e){document.documentElement.classList.add("light");document.documentElement.style.colorScheme="light";}})();`,
-          }}
-        />
         <Toaster />
         <Providers>{children}</Providers>
       </body>

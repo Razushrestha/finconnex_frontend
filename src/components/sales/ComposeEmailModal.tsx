@@ -6,6 +6,7 @@ import {
   Clock,
   Flag,
   Image as ImageIcon,
+  Loader2,
   Mail,
   Maximize2,
   Minimize2,
@@ -47,7 +48,7 @@ export interface ComposeEmailModalProps {
   recipient: ComposeEmailRecipient;
   defaultSubject?: string;
   defaultGreeting?: string;
-  onSend: (values: ComposeEmailSendValues) => void;
+  onSend: (values: ComposeEmailSendValues) => void | Promise<void>;
   onDiscard?: () => void;
 }
 
@@ -252,6 +253,8 @@ export function ComposeEmailModal({
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [scheduleAt, setScheduleAt] = useState(tomorrowNine);
   const [importance, setImportance] = useState<"normal" | "high">("normal");
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState(() => new Date());
   const [flash, setFlash] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -343,7 +346,7 @@ export function ComposeEmailModal({
     setSavedAt(new Date());
   }
 
-  function handleSend(sendAt?: string) {
+  async function handleSend(sendAt?: string) {
     const pendingTo = parseEmailTokens(toDraft);
     const pendingCc = parseEmailTokens(ccDraft);
     const pendingBcc = parseEmailTokens(bccDraft);
@@ -363,19 +366,30 @@ export function ComposeEmailModal({
       notice("Add a subject or message first");
       return;
     }
-    onSend({
-      to: finalTo.join(", "),
-      cc: finalCc.length ? finalCc.join(", ") : undefined,
-      bcc: finalBcc.length ? finalBcc.join(", ") : undefined,
-      toList: finalTo,
-      ccList: finalCc,
-      bccList: finalBcc,
-      subject,
-      body,
-      attachments,
-      sendAt,
-      importance,
-    });
+    if (sending) return;
+    setSending(true);
+    setSendError(null);
+    try {
+      await onSend({
+        to: finalTo.join(", "),
+        cc: finalCc.length ? finalCc.join(", ") : undefined,
+        bcc: finalBcc.length ? finalBcc.join(", ") : undefined,
+        toList: finalTo,
+        ccList: finalCc,
+        bccList: finalBcc,
+        subject,
+        body,
+        attachments,
+        sendAt,
+        importance,
+      });
+    } catch (err) {
+      setSendError(
+        err instanceof Error ? err.message : "Could not send this email.",
+      );
+    } finally {
+      setSending(false);
+    }
   }
 
   function handleDiscard() {
@@ -394,8 +408,8 @@ export function ComposeEmailModal({
   }
 
   const shellClass = cn(
-    "fixed z-50 flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-900 shadow-2xl",
-    "bottom-14 right-4",
+    "fixed z-[80] flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-900 shadow-2xl",
+    "bottom-16 right-4",
     size === "minimized" && "h-11 w-[320px]",
     size === "normal" &&
       "h-[min(680px,calc(100dvh-4.25rem))] w-[min(640px,calc(100vw-1.5rem))]",
@@ -704,7 +718,12 @@ export function ComposeEmailModal({
             </div>
           ) : null}
 
-          <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 bg-[#FAF9FC] px-3 py-2.5">
+          {sendError ? (
+            <p className="border-t border-rose-100 bg-rose-50 px-4 py-2 text-[11px] font-medium text-rose-700">
+              {sendError}
+            </p>
+          ) : null}
+          <div className="relative z-10 flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 bg-[#FAF9FC] px-3 py-2.5">
             <div className="flex min-w-0 items-center gap-1">
               <button
                 type="button"
@@ -735,20 +754,26 @@ export function ComposeEmailModal({
               >
                 Discard
               </button>
-              <div className="relative flex overflow-hidden rounded-lg bg-[#5A32A3] text-white" ref={sendRef}>
+              <div className="relative flex rounded-lg bg-[#5A32A3] text-white" ref={sendRef}>
                 <button
                   type="button"
-                  onClick={() => handleSend()}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold hover:bg-[#4c2a8a]"
+                  disabled={sending}
+                  onClick={() => void handleSend()}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold hover:bg-[#4c2a8a] disabled:opacity-60"
                 >
-                  <SendIcon className="h-3.5 w-3.5" />
-                  Send
+                  {sending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <SendIcon className="h-3.5 w-3.5" />
+                  )}
+                  {sending ? "Sending…" : "Send"}
                 </button>
                 <button
                   type="button"
+                  disabled={sending}
                   aria-label="Send options"
                   onClick={() => setSendOpen((v) => !v)}
-                  className="border-l border-white/20 px-2 py-2 hover:bg-[#4c2a8a]"
+                  className="border-l border-white/20 px-2 py-2 hover:bg-[#4c2a8a] disabled:opacity-60"
                 >
                   <ChevronDown className="h-3 w-3" />
                 </button>

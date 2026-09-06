@@ -106,7 +106,25 @@ export function smokeCompaniesWiring() {
     fail("companies page does not call exportCrmCompanies");
   }
 
+  const hook = readSrc("src/lib/companies/use-crm-companies.ts");
+  if (!hook.includes("replaceCrmCompanies")) {
+    fail("companies hook does not replace the board from CRM");
+  }
+  if (!hook.includes('setSource("api")')) {
+    fail("companies hook does not mark a successful list as Live CRM");
+  }
+
+  if (!api.includes("followCompanyTransfer")) {
+    fail("companies client does not follow transfer jobs");
+  }
+  if (!page.includes("ASSIGN_OWNER")) {
+    fail("companies page does not bulk-assign owner");
+  }
+
   const store = readSrc("src/lib/companies/store.ts");
+  if (!store.includes("export function replaceCrmCompanies")) {
+    fail("companies store missing replaceCrmCompanies");
+  }
   if (!store.includes("createCrmCompany")) {
     fail("companies store does not sync create to CRM");
   }
@@ -120,6 +138,11 @@ export function smokeCompaniesWiring() {
   const merge = readSrc("src/lib/sales/merge.ts");
   if (!merge.includes("mergeCrmCompanies")) {
     fail("mergeCompanies does not call mergeCrmCompanies");
+  }
+
+  const form = readSrc("src/components/sales/companies/CreateCompanyForm.tsx");
+  if (!form.includes("createCrmCompany")) {
+    fail("create company form does not POST to CRM");
   }
 
   const kanban = readSrc(

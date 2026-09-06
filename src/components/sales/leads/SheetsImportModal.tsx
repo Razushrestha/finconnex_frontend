@@ -4,8 +4,10 @@ import { useState } from "react";
 import { FileSpreadsheet, X } from "lucide-react";
 import {
   applyLeadImport,
+  applyLeadSheetsImport,
   defaultLeadImportSettings,
   previewLeadImport,
+  spreadsheetIdFromSheetsInput,
   suggestLeadMapping,
 } from "@/lib/leads/import";
 import { parseCsv } from "@/lib/import/csv";
@@ -67,15 +69,33 @@ export function SheetsImportModal({
       return;
     }
     setBusy(true);
-    await new Promise((r) => setTimeout(r, 360));
-    const mapping = suggestLeadMapping(parsed.headers);
-    const settings = defaultLeadImportSettings();
-    previewLeadImport(parsed.rows, mapping, settings);
-    const summary = await applyLeadImport(parsed.rows, mapping, settings);
-    emitRulesChange("all");
-    setDone(summary);
-    setBusy(false);
-    onImported?.(summary);
+    try {
+      const mapping = suggestLeadMapping(parsed.headers);
+      const settings = defaultLeadImportSettings();
+      previewLeadImport(parsed.rows, mapping, settings);
+      try {
+        const live = await applyLeadSheetsImport(
+          parsed.rows,
+          mapping,
+          settings,
+          spreadsheetIdFromSheetsInput(sheetUrl || DEMO_SHEET_URL),
+        );
+        if (live) {
+          emitRulesChange("all");
+          setDone(live);
+          onImported?.(live);
+          return;
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Sheets import failed");
+      }
+      const summary = await applyLeadImport(parsed.rows, mapping, settings);
+      emitRulesChange("all");
+      setDone(summary);
+      onImported?.(summary);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -87,7 +107,7 @@ export function SheetsImportModal({
               Google Sheets Import
             </h2>
             <p className="text-[11px] text-slate-500">
-              Demo — paste sheet CSV/TSV or load the sample range
+              Sends mapped rows to POST /v1/leads/import/sheets. Google OAuth pull is not on the API yet.
             </p>
           </div>
           <button
@@ -112,7 +132,7 @@ export function SheetsImportModal({
             <>
               <label className="block space-y-1">
                 <span className="text-[11px] font-semibold text-slate-600">
-                  Sheet URL (demo)
+                  Sheet URL
                 </span>
                 <input
                   value={sheetUrl}

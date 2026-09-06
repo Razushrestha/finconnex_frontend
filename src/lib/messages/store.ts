@@ -1,7 +1,6 @@
 /** Live messages store (session-backed). */
 
 import {
-  messages as SEED_MESSAGES,
   type Message,
   type MessageStatus,
   type MessageType,
@@ -10,13 +9,9 @@ import { createBoardStore } from "@/lib/rules/module-store";
 import { formatRulesAt, newRulesId } from "@/lib/rules/storage";
 import { emitLeadActivityChange } from "@/lib/leads/lead-extras-store";
 
-function cloneSeed(): Message[] {
-  return SEED_MESSAGES.map((m) => ({ ...m }));
-}
-
 const store = createBoardStore({
-  key: "activities:messages:list:v1",
-  seed: cloneSeed,
+  key: "activities:messages:list:v2",
+  seed: () => [] as Message[],
 });
 
 export function listMessages(): Message[] {
@@ -93,6 +88,17 @@ export function deleteMessage(id: string): Message | null {
 
 /** Replace the session store with live CRM rows (empty list is a valid live result). */
 export function replaceCrmMessages(remote: Message[]) {
-  saveMessages(remote.map(cloneMessage));
+  const remoteIds = new Set(remote.map((row) => row.id));
+  const extras = listMessages().filter((row) => {
+    if (remoteIds.has(row.id)) return false;
+    if (/^msg-\d+$/.test(row.id)) return false;
+    const duplicate = remote.some(
+      (item) =>
+        item.subject.trim().toLowerCase() === row.subject.trim().toLowerCase() &&
+        item.body.trim() === row.body.trim(),
+    );
+    return !duplicate;
+  });
+  saveMessages([...remote.map(cloneMessage), ...extras.map(cloneMessage)]);
   emitLeadActivityChange();
 }

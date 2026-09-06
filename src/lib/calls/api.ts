@@ -1,9 +1,11 @@
 import {
   ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
+  isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import type { Call, CallStatus, CallType } from "@/lib/calls/types";
 
 export type CrmCallQuery = {
@@ -172,9 +174,17 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
     );
   }
   if (typeof data === "object") {
-    const rec = data as { items?: unknown; calls?: unknown };
-    if (Array.isArray(rec.items)) return extractRecords(rec.items);
-    if (Array.isArray(rec.calls)) return extractRecords(rec.calls);
+    const rec = data as Record<string, unknown>;
+    for (const key of ["items", "calls", "records", "rows", "result"]) {
+      if (Array.isArray(rec[key])) return extractRecords(rec[key]);
+    }
+    for (const key of ["item", "call", "record"]) {
+      const nested = rec[key];
+      if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+        return extractRecords([nested]);
+      }
+    }
+    if (rec.data != null && rec.data !== data) return extractRecords(rec.data);
   }
   return [];
 }
@@ -183,6 +193,20 @@ export function normalizeCrmCalls(data: unknown): Call[] {
   return extractRecords(data)
     .map((raw, index) => normalizeCrmCall(raw, index))
     .filter((item): item is Call => item != null);
+}
+
+async function crmCallsFetch<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  if (isBoundCrmSession()) {
+    const scoped = await ensureCrmSession();
+    if (scoped) return crmFetch<T>(scoped, path, init);
+    const access = await ensureCrmAccess();
+    if (!access) throw new Error("Sign in to load calls");
+    return crmFetch<T>(access, path, init);
+  }
+  return crmBffFetch<T>(path, init);
 }
 
 async function withSession<T>(
@@ -195,7 +219,18 @@ async function withSession<T>(
   return run(access, false);
 }
 
+async function callsPath(suffix: string, query = ""): Promise<string> {
+  const scoped = await ensureCrmSession();
+  if (scoped) {
+    return `${workspaceCallsPath(scoped.workspaceId, suffix)}${query}`;
+  }
+  return `${globalCallsPath(suffix)}${query}`;
+}
+
 async function callsGet(suffix: string, query = ""): Promise<unknown> {
+  if (!isBoundCrmSession()) {
+    return crmBffFetch(await callsPath(suffix, query));
+  }
   return withSession((session, scoped) => {
     const path = scoped
       ? workspaceCallsPath((session as CrmSession).workspaceId, suffix)
@@ -204,15 +239,11 @@ async function callsGet(suffix: string, query = ""): Promise<unknown> {
   });
 }
 
-async function callsMutate(
-  suffix: string,
-  init: RequestInit,
-  opts?: { allowGlobalOnly?: boolean },
-): Promise<unknown> {
+async function callsMutate(suffix: string, init: RequestInit): Promise<unknown> {
+  if (!isBoundCrmSession()) {
+    return crmBffFetch(await callsPath(suffix), init);
+  }
   return withSession((session, scoped) => {
-    if (opts?.allowGlobalOnly && !scoped) {
-      return crmFetch(session, `${globalCallsPath(suffix)}`, init);
-    }
     const path = scoped
       ? workspaceCallsPath((session as CrmSession).workspaceId, suffix)
       : globalCallsPath(suffix);
@@ -220,12 +251,19 @@ async function callsMutate(
   });
 }
 
+async function relatedWorkspaceId(): Promise<string | null> {
+  const scoped = await ensureCrmSession();
+  if (scoped?.workspaceId && isUuid(scoped.workspaceId)) return scoped.workspaceId;
+  const env = process.env.NEXT_PUBLIC_WORKSPACE_ID?.trim();
+  return env && isUuid(env) ? env : null;
+}
+
 export async function listCrmCalls(query: CrmCallQuery = {}): Promise<Call[]> {
   return normalizeCrmCalls(
     await callsGet(
       "",
       toQuery({
-        page: query.page,
+        page: query.page ?? 1,
         limit: query.limit ?? 100,
         status: query.status,
         search: query.search,
@@ -238,29 +276,83 @@ export async function listUpcomingCrmCalls(): Promise<Call[]> {
   return normalizeCrmCalls(await callsGet("/upcoming"));
 }
 
+export async function listTodayCrmCalls(): Promise<Call[]> {
+  return normalizeCrmCalls(await callsGet("/today"));
+}
+
+export async function listCompletedCrmCalls(): Promise<Call[]> {
+  return normalizeCrmCalls(await callsGet("/completed"));
+}
+
+export async function listMissedCrmCalls(): Promise<Call[]> {
+  return normalizeCrmCalls(await callsGet("/missed"));
+}
+
+export async function listMyCrmCalls(): Promise<Call[]> {
+  return normalizeCrmCalls(await callsGet("/my"));
+}
+
 export async function listCrmCallHistory(): Promise<Call[]> {
   return normalizeCrmCalls(await callsGet("/history"));
 }
 
 export async function getCrmCall(id: string): Promise<Call | null> {
-  const items = normalizeCrmCalls(await callsGet(`/${id}`));
-  return items[0] ?? null;
+  return asCall(await callsGet(`/${id}`));
 }
 
 export async function listRelatedCrmCalls(
   relatedType: string,
   relatedId: string,
 ): Promise<Call[]> {
-  const scoped = await ensureCrmSession();
-  if (!scoped) throw new Error("Sign in to load related calls");
-  const data = await crmFetch(
-    scoped,
-    relatedCallsPath(scoped.workspaceId, relatedType, relatedId),
+  const workspaceId = await relatedWorkspaceId();
+  if (!workspaceId) throw new Error("Sign in to load related calls");
+  const data = await crmCallsFetch(
+    relatedCallsPath(workspaceId, relatedType, relatedId),
   );
   return normalizeCrmCalls(data);
 }
 
-function toCreateBody(input: {
+function compactBody(input: Record<string, unknown>) {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined || value === null || value === "") continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+function toCallIso(raw: string): string {
+  const value = raw.trim();
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}T/.test(value)) {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? value : d.toISOString();
+  }
+  const parsed = Date.parse(value);
+  if (!Number.isNaN(parsed)) return new Date(parsed).toISOString();
+  return value;
+}
+
+function asCall(data: unknown): Call | null {
+  const items = normalizeCrmCalls(data);
+  const first = items[0];
+  if (first && isUuid(first.id) && first.subject !== "Untitled call") return first;
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const mapped = normalizeCrmCall(data as Record<string, unknown>, 0);
+    if (mapped && isUuid(mapped.id) && mapped.subject !== "Untitled call") {
+      return mapped;
+    }
+  }
+  return null;
+}
+
+function sameCallTitle(a: string, b: string) {
+  const left = a.trim().toLowerCase();
+  const right = b.trim().toLowerCase();
+  return left === right || left.includes(right) || right.includes(left);
+}
+
+export type CreateCrmCallInput = {
   subject: string;
   callType: CallType;
   status: CallStatus;
@@ -271,52 +363,53 @@ function toCreateBody(input: {
   purpose?: string;
   assignedTo: string;
   relatedTo?: string;
+  relatedType?: string;
+  relatedId?: string;
   contact?: string;
+  contactId?: string;
   duration?: string;
-}) {
-  return {
-    subject: input.subject,
-    title: input.subject,
+};
+
+function toCreateBody(input: CreateCrmCallInput) {
+  const scheduledAt = toCallIso(input.date);
+  const assigneeId = isUuid(input.assignedTo) ? input.assignedTo : undefined;
+  const contactId = isUuid(input.contactId)
+    ? input.contactId
+    : isUuid(input.contact)
+      ? input.contact
+      : undefined;
+  const relatedId = isUuid(input.relatedId) ? input.relatedId : undefined;
+  return compactBody({
+    subject: input.subject.trim(),
+    title: input.subject.trim(),
     type: apiCallType(input.callType),
-    callType: apiCallType(input.callType),
     status: apiCallStatus(input.status),
-    scheduledAt: input.date,
-    startAt: input.date,
+    scheduledAt: scheduledAt || undefined,
+    startAt: scheduledAt || undefined,
     fromNumber: input.fromNumber,
     notes: input.notes,
     agenda: input.agenda,
     purpose: input.purpose,
-    assignedTo: input.assignedTo,
-    relatedTo: input.relatedTo,
-    contact: input.contact,
+    assigneeId,
+    ownerId: assigneeId,
+    contactId,
+    relatedType: input.relatedType?.toUpperCase(),
+    relatedId,
     duration: input.duration,
-  };
+  });
 }
 
 export async function createCrmCall(
-  input: Parameters<typeof toCreateBody>[0],
+  input: CreateCrmCallInput,
 ): Promise<Call | null> {
-  const body = JSON.stringify(toCreateBody(input));
-  try {
-    const scoped = await ensureCrmSession();
-    if (scoped) {
-      const data = await crmFetch(scoped, workspaceCallsPath(scoped.workspaceId), {
-        method: "POST",
-        body,
-      });
-      return normalizeCrmCalls(data)[0] ?? normalizeCrmCall(
-        (data as Record<string, unknown>) ?? {},
-        0,
-      );
-    }
-  } catch {
-    /* fall through to global create */
-  }
-  const data = await callsMutate("", { method: "POST", body }, { allowGlobalOnly: true });
-  return (
-    normalizeCrmCalls(data)[0] ??
-    normalizeCrmCall((data as Record<string, unknown>) ?? {}, 0)
+  const created = asCall(
+    await callsMutate("", {
+      method: "POST",
+      body: JSON.stringify(toCreateBody(input)),
+    }),
   );
+  if (created && !sameCallTitle(created.subject, input.subject)) return null;
+  return created;
 }
 
 export async function updateCrmCall(
@@ -338,7 +431,7 @@ export async function updateCrmCall(
     method: "PATCH",
     body: JSON.stringify(body),
   });
-  return normalizeCrmCalls(data)[0] ?? null;
+  return asCall(data);
 }
 
 export async function deleteCrmCall(id: string): Promise<void> {
@@ -346,20 +439,30 @@ export async function deleteCrmCall(id: string): Promise<void> {
 }
 
 export async function startCrmCall(id: string): Promise<Call | null> {
-  return normalizeCrmCalls(await callsMutate(`/${id}/start`, { method: "POST", body: "{}" }))[0] ?? null;
+  return asCall(await callsMutate(`/${id}/start`, { method: "POST", body: "{}" }));
+}
+
+export async function dialCrmCall(
+  id: string,
+  extra: Record<string, unknown> = {},
+): Promise<Call | null> {
+  return asCall(
+    await callsMutate(`/${id}/dial`, {
+      method: "POST",
+      body: JSON.stringify(extra),
+    }),
+  );
 }
 
 export async function completeCrmCall(
   id: string,
   extra: Record<string, unknown> = {},
 ): Promise<Call | null> {
-  return (
-    normalizeCrmCalls(
-      await callsMutate(`/${id}/complete`, {
-        method: "POST",
-        body: JSON.stringify(extra),
-      }),
-    )[0] ?? null
+  return asCall(
+    await callsMutate(`/${id}/complete`, {
+      method: "POST",
+      body: JSON.stringify(extra),
+    }),
   );
 }
 
@@ -367,13 +470,11 @@ export async function cancelCrmCall(
   id: string,
   extra: Record<string, unknown> = {},
 ): Promise<Call | null> {
-  return (
-    normalizeCrmCalls(
-      await callsMutate(`/${id}/cancel`, {
-        method: "POST",
-        body: JSON.stringify(extra),
-      }),
-    )[0] ?? null
+  return asCall(
+    await callsMutate(`/${id}/cancel`, {
+      method: "POST",
+      body: JSON.stringify(extra),
+    }),
   );
 }
 
@@ -381,13 +482,11 @@ export async function rescheduleCrmCall(
   id: string,
   scheduledAt: string,
 ): Promise<Call | null> {
-  return (
-    normalizeCrmCalls(
-      await callsMutate(`/${id}/reschedule`, {
-        method: "POST",
-        body: JSON.stringify({ scheduledAt, date: scheduledAt }),
-      }),
-    )[0] ?? null
+  return asCall(
+    await callsMutate(`/${id}/reschedule`, {
+      method: "POST",
+      body: JSON.stringify({ scheduledAt, date: scheduledAt }),
+    }),
   );
 }
 
@@ -395,13 +494,11 @@ export async function logCrmCallOutcome(
   id: string,
   extra: Record<string, unknown>,
 ): Promise<Call | null> {
-  return (
-    normalizeCrmCalls(
-      await callsMutate(`/${id}/log-outcome`, {
-        method: "POST",
-        body: JSON.stringify(extra),
-      }),
-    )[0] ?? null
+  return asCall(
+    await callsMutate(`/${id}/log-outcome`, {
+      method: "POST",
+      body: JSON.stringify(extra),
+    }),
   );
 }
 
@@ -438,4 +535,8 @@ export async function tryCrm<T>(run: () => Promise<T>): Promise<T | null> {
   } catch {
     return null;
   }
+}
+
+export function isCrmCallId(id: string) {
+  return isUuid(id);
 }

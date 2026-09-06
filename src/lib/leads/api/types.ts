@@ -127,11 +127,14 @@ export type CrmCreateLeadInput = {
   notes?: string;
   description?: string;
   ownerId?: string;
+  pipelineStage?: string;
   doNotContact?: boolean;
 };
 
 export type CrmLeadKanbanColumn = {
-  status: CrmLeadStatus | string;
+  status?: CrmLeadStatus | string;
+  pipelineStage?: string;
+  pipelineStageCode?: string;
   records: CrmLead[];
   total: number;
 };

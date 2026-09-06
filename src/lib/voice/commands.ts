@@ -12,7 +12,7 @@ export type VoiceAction =
 
 const ROUTES: { keys: string[]; href: string; speak: string }[] = [
   { keys: ["dashboard", "home"], href: "/", speak: "Opening the dashboard." },
-  { keys: ["work queue", "workqueue"], href: "/work-queue", speak: "Opening the work queue." },
+  { keys: ["work queue", "workqueue"], href: "/?view=work-queue", speak: "Opening the work queue." },
   { keys: ["leads", "lead"], href: "/sales/leads", speak: "Opening leads." },
   { keys: ["contacts", "contact"], href: "/sales/contacts", speak: "Opening contacts." },
   { keys: ["deals", "deal", "pipeline"], href: "/sales/deals", speak: "Opening deals." },
@@ -26,6 +26,7 @@ const ROUTES: { keys: string[]; href: string; speak: string }[] = [
   { keys: ["inbox", "messages"], href: "/marketing/inbox", speak: "Opening the inbox." },
   { keys: ["reminders"], href: "/activities/reminders", speak: "Opening reminders." },
   { keys: ["document request", "documents"], href: "/documents/requests", speak: "Opening document requests." },
+  { keys: ["users", "user management", "invite user"], href: "/users", speak: "Opening users." },
   { keys: ["settings"], href: "/settings", speak: "Opening settings." },
 ];
 

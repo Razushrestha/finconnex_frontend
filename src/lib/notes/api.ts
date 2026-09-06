@@ -1,10 +1,11 @@
 import {
   ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
   isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import { formatRulesAt } from "@/lib/rules/storage";
 import { upsertNote } from "@/lib/notes/store";
 import type { Note, NoteType } from "@/lib/notes/types";
@@ -163,33 +164,75 @@ async function withSession<T>(
   return run(access, false);
 }
 
-function notesUrl(
-  session: CrmSession | Pick<CrmSession, "baseUrl" | "accessToken">,
-  scoped: boolean,
-  suffix: string,
-) {
-  return scoped
-    ? workspaceNotesPath((session as CrmSession).workspaceId, suffix)
-    : globalNotesPath(suffix);
+async function notesPath(suffix: string, query = ""): Promise<string> {
+  const scoped = await ensureCrmSession();
+  if (scoped) {
+    return `${workspaceNotesPath(scoped.workspaceId, suffix)}${query}`;
+  }
+  return `${globalNotesPath(suffix)}${query}`;
+}
+
+async function relatedWorkspaceId(): Promise<string | null> {
+  const scoped = await ensureCrmSession();
+  if (scoped?.workspaceId && isUuid(scoped.workspaceId)) return scoped.workspaceId;
+  const env = process.env.NEXT_PUBLIC_WORKSPACE_ID?.trim();
+  return env && isUuid(env) ? env : null;
+}
+
+async function crmNotesFetch<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  if (isBoundCrmSession()) {
+    const scoped = await ensureCrmSession();
+    if (scoped) return crmFetch<T>(scoped, path, init);
+    const access = await ensureCrmAccess();
+    if (!access) throw new Error("Sign in to manage notes");
+    return crmFetch<T>(access, path, init);
+  }
+  return crmBffFetch<T>(path, init);
 }
 
 async function notesGet(suffix: string, query = ""): Promise<unknown> {
-  return withSession((session, scoped) =>
-    crmFetch(session, `${notesUrl(session, scoped, suffix)}${query}`),
-  );
+  if (!isBoundCrmSession()) {
+    return crmBffFetch(await notesPath(suffix, query));
+  }
+  return withSession((session, scoped) => {
+    const path = scoped
+      ? workspaceNotesPath((session as CrmSession).workspaceId, suffix)
+      : globalNotesPath(suffix);
+    return crmFetch(session, `${path}${query}`);
+  });
 }
 
 async function notesMutate(suffix: string, init: RequestInit): Promise<unknown> {
-  return withSession((session, scoped) =>
-    crmFetch(session, notesUrl(session, scoped, suffix), init),
-  );
+  if (!isBoundCrmSession()) {
+    return crmBffFetch(await notesPath(suffix), init);
+  }
+  return withSession((session, scoped) => {
+    const path = scoped
+      ? workspaceNotesPath((session as CrmSession).workspaceId, suffix)
+      : globalNotesPath(suffix);
+    return crmFetch(session, path, init);
+  });
+}
+
+function compactBody(input: Record<string, unknown>) {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined || value === null || value === "") continue;
+    out[key] = value;
+  }
+  return out;
 }
 
 function asNote(data: unknown): Note | null {
   const items = normalizeNotes(data);
-  if (items[0]) return items[0];
+  const first = items[0];
+  if (first && isUuid(first.id)) return first;
   if (data && typeof data === "object" && !Array.isArray(data)) {
-    return normalizeNote(data as Record<string, unknown>, 0);
+    const mapped = normalizeNote(data as Record<string, unknown>, 0);
+    if (mapped && isUuid(mapped.id)) return mapped;
   }
   return null;
 }
@@ -199,7 +242,7 @@ export async function listCrmNotes(query: CrmNoteQuery = {}): Promise<Note[]> {
     await notesGet(
       "",
       toQuery({
-        page: query.page,
+        page: query.page ?? 1,
         limit: query.limit ?? 100,
         search: query.search,
       }),
@@ -211,16 +254,33 @@ export async function getCrmNote(noteId: string): Promise<Note | null> {
   return asNote(await notesGet(`/${noteId}`));
 }
 
+export async function listRecentCrmNotes(): Promise<Note[]> {
+  return normalizeNotes(await notesGet("/recent"));
+}
+
+export async function listMyCrmNotes(): Promise<Note[]> {
+  return normalizeNotes(await notesGet("/my"));
+}
+
+export async function listStandaloneCrmNotes(): Promise<Note[]> {
+  return normalizeNotes(await notesGet("/standalone"));
+}
+
+export async function listCrmNotesByCategory(noteType: NoteType): Promise<Note[]> {
+  return normalizeNotes(
+    await notesGet(`/by-category/${encodeURIComponent(apiNoteType(noteType))}`),
+  );
+}
+
 export async function listRelatedCrmNotes(
   relatedType: string,
   relatedId: string,
 ): Promise<Note[]> {
-  const scoped = await ensureCrmSession();
-  if (!scoped) throw new Error("Sign in to load related notes");
+  const workspaceId = await relatedWorkspaceId();
+  if (!workspaceId) throw new Error("Sign in to load related notes");
   return normalizeNotes(
-    await crmFetch(
-      scoped,
-      relatedNotesPath(scoped.workspaceId, relatedType, relatedId),
+    await crmNotesFetch(
+      relatedNotesPath(workspaceId, relatedType, relatedId),
     ),
   );
 }
@@ -236,23 +296,18 @@ export function toCreateNoteBody(input: {
   isPrivate?: boolean;
   isPinned?: boolean;
 }): Record<string, unknown> {
-  return {
+  return compactBody({
     title: input.title,
     body: input.body,
     text: input.body,
-    content: input.body,
     relatedTo: input.relatedTo,
     relatedType: input.relatedType,
-    relatedId: input.relatedId,
+    relatedId: isUuid(input.relatedId) ? input.relatedId : undefined,
     type: input.noteType ? apiNoteType(input.noteType) : undefined,
     noteType: input.noteType ? apiNoteType(input.noteType) : undefined,
-    createdBy: input.createdBy,
-    authorName: input.createdBy,
     isPrivate: input.isPrivate ?? false,
-    private: input.isPrivate ?? false,
     isPinned: input.isPinned ?? false,
-    pinned: input.isPinned ?? false,
-  };
+  });
 }
 
 export async function createCrmNote(

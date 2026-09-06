@@ -12,7 +12,11 @@ import {
   deleteCrmNote,
   getCrmNote,
   listCrmNotes,
+  listCrmNotesByCategory,
+  listMyCrmNotes,
+  listRecentCrmNotes,
   listRelatedCrmNotes,
+  listStandaloneCrmNotes,
   normalizeNote,
   relatedNotesPath,
   restoreCrmNote,
@@ -40,6 +44,20 @@ const DECOY_PATH = "/v1/__no_such_module_notes_probe__";
 const LIVE_ROUTES: Array<{ method: string; path: string }> = [
   { method: "GET", path: "/v1/notes" },
   { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/notes` },
+  { method: "GET", path: "/v1/notes/recent" },
+  { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/notes/recent` },
+  { method: "GET", path: "/v1/notes/my" },
+  { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/notes/my` },
+  { method: "GET", path: "/v1/notes/standalone" },
+  {
+    method: "GET",
+    path: `/v1/workspaces/${SESSION.workspaceId}/notes/standalone`,
+  },
+  { method: "GET", path: "/v1/notes/by-category/GENERAL" },
+  {
+    method: "GET",
+    path: `/v1/workspaces/${SESSION.workspaceId}/notes/by-category/GENERAL`,
+  },
   { method: "GET", path: `/v1/notes/${ID}` },
   { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/notes/${ID}` },
   {
@@ -84,6 +102,10 @@ export function smokeNotesWiring() {
   }
   for (const name of [
     "listCrmNotes",
+    "listRecentCrmNotes",
+    "listMyCrmNotes",
+    "listStandaloneCrmNotes",
+    "listCrmNotesByCategory",
     "getCrmNote",
     "listRelatedCrmNotes",
     "createCrmNote",
@@ -97,13 +119,27 @@ export function smokeNotesWiring() {
     }
   }
 
+  if (!api.includes("crmBffFetch")) {
+    fail("notes client must call crmBffFetch in the browser");
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('"notes"') || !bff.includes('path.includes("notes")')) {
+    fail("BFF proxy does not allow notes");
+  }
+
   const catalog = readSrc("src/lib/api/endpoints.ts");
   for (const fragment of [
     'path: "/notes"',
+    'path: "/notes/recent"',
+    'path: "/notes/my"',
+    'path: "/notes/standalone"',
+    'path: "/notes/by-category/:noteType"',
     'path: "/notes/:noteId"',
     'path: "/notes/bulk-delete"',
     'path: "/notes/:noteId/restore"',
     'path: "/workspaces/:workspaceId/notes"',
+    'path: "/workspaces/:workspaceId/notes/recent"',
     'path: "/workspaces/:workspaceId/:relatedType/:relatedId/notes"',
   ]) {
     if (!catalog.includes(fragment)) {
@@ -120,6 +156,9 @@ export function smokeNotesWiring() {
   }
 
   const hook = readSrc("src/lib/notes/use-crm-notes.ts");
+  if (!hook.includes("listRecentCrmNotes") || !hook.includes("listMyCrmNotes")) {
+    fail("notes hook does not load recent/my lists");
+  }
   if (!hook.includes("replaceCrmNotes")) {
     fail("notes hook does not replace the store from live CRM");
   }
@@ -139,6 +178,14 @@ export function smokeNotesWiring() {
     if (!detail.includes(name)) {
       fail(`note detail does not call ${name}`);
     }
+  }
+
+  const relatedNotes = readSrc("src/components/shared/RelatedInternalNotes.tsx");
+  if (
+    !relatedNotes.includes("createCrmNote") ||
+    !relatedNotes.includes("listRelatedCrmNotes")
+  ) {
+    fail("RelatedInternalNotes does not persist notes through CRM");
   }
 
   const normalized = normalizeNote(
@@ -189,6 +236,10 @@ export async function smokeNotesMock() {
 
   try {
     await listCrmNotes();
+    await listRecentCrmNotes();
+    await listMyCrmNotes();
+    await listStandaloneCrmNotes();
+    await listCrmNotesByCategory("General");
     await getCrmNote(ID);
     await listRelatedCrmNotes("LEAD", RELATED_ID);
     await createCrmNote({
@@ -205,6 +256,10 @@ export async function smokeNotesMock() {
 
     const expected = [
       `GET ${workspaceNotesPath(SESSION.workspaceId)}`,
+      `GET ${workspaceNotesPath(SESSION.workspaceId, "/recent")}`,
+      `GET ${workspaceNotesPath(SESSION.workspaceId, "/my")}`,
+      `GET ${workspaceNotesPath(SESSION.workspaceId, "/standalone")}`,
+      `GET ${workspaceNotesPath(SESSION.workspaceId, "/by-category/GENERAL")}`,
       `GET ${workspaceNotesPath(SESSION.workspaceId, `/${ID}`)}`,
       `GET ${relatedNotesPath(SESSION.workspaceId, "LEAD", RELATED_ID)}`,
       `POST ${workspaceNotesPath(SESSION.workspaceId)}`,
