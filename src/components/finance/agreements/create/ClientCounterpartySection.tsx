@@ -2,38 +2,48 @@
 
 import React, { useState } from "react";
 
+interface ClientData {
+  clientName: string;
+  abnAndAddress: string;
+  msaRef: string;
+  signatoryName: string;
+  signatoryEmail: string;
+  position: string;
+}
+
 interface ClientCounterpartySectionProps {
-  onClientChange?: (clientName: string) => void;
+  clientData: ClientData;
+  onChange: (updated: Partial<ClientData>) => void;
 }
 
 export function ClientCounterpartySection({
-  onClientChange,
+  clientData,
+  onChange,
 }: ClientCounterpartySectionProps) {
   const [isAddingNew, setIsAddingNew] = useState(false);
-  const [selectedClient, setSelectedClient] = useState(
-    "Harbour Loans Management (HLM-AU)",
-  );
 
   const handleClientSelectionChange = (
     e: React.ChangeEvent<HTMLSelectElement>,
   ) => {
     const val = e.target.value;
-    setSelectedClient(val);
-    if (onClientChange) {
-      onClientChange(
-        val.includes("Harbour")
-          ? "Harbour Loans Management"
-          : "Greystone Realty",
-      );
-    }
-  };
-
-  const handleNewClientNameChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const val = e.target.value;
-    if (onClientChange) {
-      onClientChange(val);
+    if (val.includes("Harbour")) {
+      onChange({
+        clientName: "Harbour Loans Management",
+        abnAndAddress: "ABN: 48 102 443 391 • 12/24Q Queen St, Brisbane QLD",
+        msaRef: "MSA-2026-HLM02",
+        signatoryName: "Marcus Vance",
+        signatoryEmail: "m.vance@harbourloans.com",
+        position: "Managing Director",
+      });
+    } else {
+      onChange({
+        clientName: "Greystone Realty",
+        abnAndAddress: "ABN: 12 998 331 204 • 45 King St, Sydney NSW",
+        msaRef: "MSA-2026-GR01",
+        signatoryName: "Sarah Jenkins",
+        signatoryEmail: "s.jenkins@greystone.com",
+        position: "Principal Director",
+      });
     }
   };
 
@@ -51,7 +61,7 @@ export function ClientCounterpartySection({
         <button
           type="button"
           onClick={() => setIsAddingNew(!isAddingNew)}
-          className="text-xs font-semibold text-violet-600 hover:underline"
+          className="text-xs font-semibold text-violet-600 hover:underline cursor-pointer"
         >
           {isAddingNew ? "← Select Existing Client" : "+ New Client Entity"}
         </button>
@@ -69,27 +79,32 @@ export function ClientCounterpartySection({
               <input
                 type="text"
                 placeholder="e.g. Apex Global Ventures"
-                onChange={handleNewClientNameChange}
+                value={clientData.clientName}
+                onChange={(e) => onChange({ clientName: e.target.value })}
                 className="w-full px-3 py-2 bg-background border border-violet-500 rounded-lg text-xs text-foreground outline-none ring-1 ring-violet-500"
               />
               <input
                 type="text"
                 placeholder="ABN & Address details"
+                value={clientData.abnAndAddress}
+                onChange={(e) => onChange({ abnAndAddress: e.target.value })}
                 className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground outline-none focus:border-violet-500"
               />
             </div>
           ) : (
             <>
               <select
-                value={selectedClient}
+                value={clientData.clientName}
                 onChange={handleClientSelectionChange}
                 className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground outline-none focus:border-violet-500"
               >
-                <option>Harbour Loans Management (HLM-AU)</option>
-                <option>Greystone Realty</option>
+                <option value="Harbour Loans Management">
+                  Harbour Loans Management (HLM-AU)
+                </option>
+                <option value="Greystone Realty">Greystone Realty</option>
               </select>
               <p className="text-[10px] text-muted-foreground mt-1">
-                ABN: 48 102 443 391 • 12/24Q Queen St, Brisbane QLD
+                {clientData.abnAndAddress}
               </p>
             </>
           )}
@@ -107,7 +122,7 @@ export function ClientCounterpartySection({
           <input
             type="text"
             readOnly
-            value="MSA-2026-HLM02"
+            value={clientData.msaRef}
             className="w-full px-3 py-2 bg-muted/50 border border-border rounded-lg text-xs text-muted-foreground outline-none font-mono"
           />
         </div>
@@ -120,7 +135,8 @@ export function ClientCounterpartySection({
           </label>
           <input
             type="text"
-            defaultValue="Marcus Vance"
+            value={clientData.signatoryName}
+            onChange={(e) => onChange({ signatoryName: e.target.value })}
             className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground outline-none focus:border-violet-500"
           />
         </div>
@@ -130,7 +146,8 @@ export function ClientCounterpartySection({
           </label>
           <input
             type="email"
-            defaultValue="m.vance@harbourloans.com"
+            value={clientData.signatoryEmail}
+            onChange={(e) => onChange({ signatoryEmail: e.target.value })}
             className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground outline-none focus:border-violet-500"
           />
         </div>
@@ -140,7 +157,8 @@ export function ClientCounterpartySection({
           </label>
           <input
             type="text"
-            defaultValue="Managing Director"
+            value={clientData.position}
+            onChange={(e) => onChange({ position: e.target.value })}
             className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground outline-none focus:border-violet-500"
           />
         </div>

@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Download } from "lucide-react";
 import MetricsCards from "@/components/finance/agreements/MetricsCards";
 import AgreementFilters from "@/components/finance/agreements/AgreementFilters";
 import AgreementTable from "@/components/finance/agreements/AgreementTable";
-import { CreateAgreementModal } from "@/components/finance/agreements/create/CreateAgreementModal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 
 interface Agreement {
@@ -20,14 +20,29 @@ interface Agreement {
   value: string;
 }
 
+const STORAGE_KEY = "meta_tronix_agreements";
+
+const defaultAgreements: Agreement[] = Array.from(
+  { length: 24 },
+  (_, index) => ({
+    id: `AGR-2026-${String(index + 1).padStart(2, "0")}`,
+    title: `MSA-YL-00${index + 2}`,
+    client: index % 2 === 0 ? "Harbour Loans Management" : "Greystone Realty",
+    desc: "Brokerage Advisory & Compliance Support",
+    cycle: index % 2 === 0 ? "Monthly Retainer" : "Quarterly Invoiced",
+    tier:
+      index % 2 === 0 ? "Tier 1 (24/7 Priority)" : "Tier 2 (Standard Business)",
+    dates: `01/01/2026 - 31/12/2026`,
+    status: index === 3 ? "Under Review" : index === 4 ? "Expiring" : "Active",
+    value: `$${(3600 + index * 400).toLocaleString()}.00`,
+  }),
+);
+
 export default function ServiceAgreementsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedYear, setSelectedYear] = useState("2026");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingAgreement, setEditingAgreement] = useState<Agreement | null>(
-    null,
-  );
 
   // States for handling the confirmation modal deletion flow
   const [agreementToDelete, setAgreementToDelete] = useState<string | null>(
@@ -35,94 +50,48 @@ export default function ServiceAgreementsPage() {
   );
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Initial base dataset containing 24 entries
-  const [agreements, setAgreements] = useState<Agreement[]>(() =>
-    Array.from({ length: 24 }, (_, index) => ({
-      id: `AGR-2026-${String(index + 1).padStart(2, "0")}`,
-      title: `MSA-YL-00${index + 2}`,
-      client: index % 2 === 0 ? "Harbour Loans Management" : "Greystone Realty",
-      desc: "Brokerage Advisory & Compliance Support",
-      cycle: index % 2 === 0 ? "Monthly Retainer" : "Quarterly Invoiced",
-      tier:
-        index % 2 === 0
-          ? "Tier 1 (24/7 Priority)"
-          : "Tier 2 (Standard Business)",
-      dates: `01/01/${selectedYear} - 31/12/${selectedYear}`,
-      status:
-        index === 3 ? "Under Review" : index === 4 ? "Expiring" : "Active",
-      value: `$${(3600 + index * 400).toLocaleString()}.00`,
-    })),
-  );
-
-  const handleSaveAgreement = (newAgreementData: {
-    client: string;
-    title: string;
-    cycle: string;
-    tier: string;
-    value: string;
-  }) => {
-    if (editingAgreement) {
-      setAgreements((prev) =>
-        prev.map((item) =>
-          item.id === editingAgreement.id
-            ? {
-                ...item,
-                client: newAgreementData.client || item.client,
-                title: newAgreementData.title || item.title,
-                cycle: newAgreementData.cycle || item.cycle,
-                tier: newAgreementData.tier || item.tier,
-                value: newAgreementData.value || item.value,
-              }
-            : item,
-        ),
-      );
-    } else {
-      const newEntry: Agreement = {
-        id: `AGR-2026-${String(agreements.length + 1).padStart(2, "0")}`,
-        title: newAgreementData.title || "MSA-YL-Custom",
-        client: newAgreementData.client || "Harbour Loans Management",
-        desc: "Brokerage Advisory & Compliance Support",
-        cycle: newAgreementData.cycle || "Monthly Retainer",
-        tier: newAgreementData.tier || "Tier 1 (24/7 Priority)",
-        dates: `04/01/${selectedYear} - 03/31/2027`,
-        status: "Active",
-        value: newAgreementData.value || "$3,500.00",
-      };
-
-      setAgreements([newEntry, ...agreements]);
+  // Initialize state from localStorage or fall back to default dataset
+  const [agreements, setAgreements] = useState<Agreement[]>(() => {
+    if (typeof window === "undefined") return defaultAgreements;
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse saved agreements:", e);
+      }
     }
+    return defaultAgreements;
+  });
 
-    setIsModalOpen(false);
-    setEditingAgreement(null);
-  };
+  // Persist changes to localStorage so newly created items remain synced
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(agreements));
+  }, [agreements]);
 
   const handleEdit = (agreement: Agreement) => {
-    setEditingAgreement(agreement);
-    setIsModalOpen(true);
+    router.push(`/finance/agreements/create?id=${agreement.id}`);
   };
 
   const handleDownload = (agreementId: string) => {
     alert(`Downloading agreement document for reference: ${agreementId}`);
   };
 
-  // 1. Triggered when clicking delete on the table row
   const handleDeletePrompt = (agreementId: string) => {
     setAgreementToDelete(agreementId);
   };
 
-  // 2. Triggered when confirming inside the modal
   const handleConfirmDelete = async () => {
     if (!agreementToDelete) return;
 
     setIsDeleting(true);
-    // Simulate network latency or async API request if needed
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     setAgreements((prev) =>
       prev.filter((item) => item.id !== agreementToDelete),
     );
     setIsDeleting(false);
-    setAgreementToDelete(null); // Close modal
+    setAgreementToDelete(null);
   };
 
   const filteredData = agreements.filter((item) => {
@@ -159,10 +128,7 @@ export default function ServiceAgreementsPage() {
 
           <button
             type="button"
-            onClick={() => {
-              setEditingAgreement(null);
-              setIsModalOpen(true);
-            }}
+            onClick={() => router.push("/finance/agreements/create")}
             className="inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-violet-600 text-white rounded-xl hover:bg-violet-700 transition-all shadow-sm cursor-pointer"
           >
             <Plus className="w-4 h-4" />
@@ -189,16 +155,6 @@ export default function ServiceAgreementsPage() {
         onEdit={handleEdit}
         onDownload={handleDownload}
         onDelete={handleDeletePrompt}
-      />
-
-      {/* Create / Edit Agreement Modal */}
-      <CreateAgreementModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingAgreement(null);
-        }}
-        onCreate={handleSaveAgreement}
       />
 
       {/* Confirmation Modal Component Integration */}

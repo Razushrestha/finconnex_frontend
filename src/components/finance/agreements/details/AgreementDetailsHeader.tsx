@@ -5,39 +5,26 @@ import { ArrowLeft, Send, Pencil } from "lucide-react";
 import Link from "next/link";
 
 interface AgreementDetailsHeaderProps {
-  agreementId: string;
-  clientName: string;
   onEdit?: () => void;
   onSendNotice?: () => void;
 }
 
 export function AgreementDetailsHeader({
-  agreementId,
-  clientName,
   onEdit,
   onSendNotice,
 }: AgreementDetailsHeaderProps) {
   return (
-    <div className="flex flex-col gap-4 pb-2">
+    <div className="flex flex-col gap-4">
       {/* Top Breadcrumb & Status Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Link
-            href="/finance/service-agreements"
+            href="/finance/agreements"
             className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Back
           </Link>
-        </div>
-      </div>
-
-      {/* Main Title & Action Buttons */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground">
-            Agreement #{agreementId} ({clientName})
-          </h1>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">

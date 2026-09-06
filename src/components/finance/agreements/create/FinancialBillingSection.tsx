@@ -1,11 +1,24 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 
-export function FinancialBillingSection() {
-  const [frequency, setFrequency] = useState("monthly");
-  const [automateInvoices, setAutomateInvoices] = useState(true);
+interface FinancialData {
+  frequency: string;
+  amountValue: string;
+  taxCalc: string;
+  paymentTerms: string;
+  automateInvoices: boolean;
+}
 
+interface FinancialBillingSectionProps {
+  financialData: FinancialData;
+  onChange: (updated: Partial<FinancialData>) => void;
+}
+
+export function FinancialBillingSection({
+  financialData,
+  onChange,
+}: FinancialBillingSectionProps) {
   return (
     <div className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-4">
       <div className="flex items-center justify-between border-b border-border pb-3">
@@ -36,9 +49,9 @@ export function FinancialBillingSection() {
             <button
               key={tab.id}
               type="button"
-              onClick={() => setFrequency(tab.id)}
-              className={`py-2 text-xs font-semibold rounded-lg transition-all ${
-                frequency === tab.id
+              onClick={() => onChange({ frequency: tab.id })}
+              className={`py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                financialData.frequency === tab.id
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
@@ -57,7 +70,8 @@ export function FinancialBillingSection() {
           <div className="relative">
             <input
               type="text"
-              defaultValue="$ 3,500.00"
+              value={financialData.amountValue}
+              onChange={(e) => onChange({ amountValue: e.target.value })}
               className="w-full pl-6 pr-12 py-2 bg-background border border-border rounded-lg text-xs font-bold text-foreground outline-none focus:border-violet-500"
             />
             <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">
@@ -73,7 +87,11 @@ export function FinancialBillingSection() {
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5">
             Tax Calculation
           </label>
-          <select className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground outline-none focus:border-violet-500">
+          <select
+            value={financialData.taxCalc}
+            onChange={(e) => onChange({ taxCalc: e.target.value })}
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground outline-none focus:border-violet-500"
+          >
             <option>GST (10.0%) - Included</option>
             <option>GST (10.0%) - Exclusive</option>
             <option>Tax Exempt</option>
@@ -84,7 +102,11 @@ export function FinancialBillingSection() {
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5">
             Payment Terms
           </label>
-          <select className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground outline-none focus:border-violet-500">
+          <select
+            value={financialData.paymentTerms}
+            onChange={(e) => onChange({ paymentTerms: e.target.value })}
+            className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground outline-none focus:border-violet-500"
+          >
             <option>Net 14 Days (Invoice)</option>
             <option>Net 30 Days (Invoice)</option>
             <option>Immediate / Due on Receipt</option>
@@ -109,14 +131,18 @@ export function FinancialBillingSection() {
         </div>
         <button
           type="button"
-          onClick={() => setAutomateInvoices(!automateInvoices)}
-          className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors ${
-            automateInvoices ? "bg-violet-600" : "bg-muted-foreground/30"
+          onClick={() =>
+            onChange({ automateInvoices: !financialData.automateInvoices })
+          }
+          className={`w-10 h-6 flex items-center rounded-full p-1 transition-colors cursor-pointer ${
+            financialData.automateInvoices
+              ? "bg-violet-600"
+              : "bg-muted-foreground/30"
           }`}
         >
           <div
             className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
-              automateInvoices ? "translate-x-4" : "translate-x-0"
+              financialData.automateInvoices ? "translate-x-4" : "translate-x-0"
             }`}
           />
         </button>
