@@ -1,9 +1,27 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 
-export function ScopeAndSlaSection() {
-  const [selectedTier, setSelectedTier] = useState("tier-1");
+interface ScopeData {
+  agreementTitle: string;
+  categories: string[];
+  selectedTier: string;
+}
+
+interface ScopeAndSlaSectionProps {
+  scopeData: ScopeData;
+  onChange: (updated: Partial<ScopeData>) => void;
+}
+
+export function ScopeAndSlaSection({
+  scopeData,
+  onChange,
+}: ScopeAndSlaSectionProps) {
+  const removeCategory = (catToRemove: string) => {
+    onChange({
+      categories: scopeData.categories.filter((c) => c !== catToRemove),
+    });
+  };
 
   return (
     <div className="bg-card border border-border rounded-2xl p-5 shadow-sm space-y-4">
@@ -28,7 +46,8 @@ export function ScopeAndSlaSection() {
         </label>
         <input
           type="text"
-          defaultValue="Brokerage Advisory, Compliance & Continuous Lending Support SLA"
+          value={scopeData.agreementTitle}
+          onChange={(e) => onChange({ agreementTitle: e.target.value })}
           className="w-full px-3 py-2 bg-background border border-border rounded-lg text-xs text-foreground outline-none focus:border-violet-500"
         />
       </div>
@@ -38,27 +57,29 @@ export function ScopeAndSlaSection() {
           Service Categories Included
         </label>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-500/10 text-violet-600 rounded-md text-xs font-medium border border-violet-500/20">
-            Brokerage Advisory{" "}
-            <button type="button" className="hover:text-rose-500">
-              ×
-            </button>
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-500/10 text-violet-600 rounded-md text-xs font-medium border border-violet-500/20">
-            Compliance & Legal SLA{" "}
-            <button type="button" className="hover:text-rose-500">
-              ×
-            </button>
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-500/10 text-violet-600 rounded-md text-xs font-medium border border-violet-500/20">
-            Loan Packaging{" "}
-            <button type="button" className="hover:text-rose-500">
-              ×
-            </button>
-          </span>
+          {scopeData.categories.map((cat) => (
+            <span
+              key={cat}
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-500/10 text-violet-600 rounded-md text-xs font-medium border border-violet-500/20"
+            >
+              {cat}
+              <button
+                type="button"
+                onClick={() => removeCategory(cat)}
+                className="hover:text-rose-500 cursor-pointer"
+              >
+                ×
+              </button>
+            </span>
+          ))}
           <button
             type="button"
-            className="px-3 py-1 border border-dashed border-border rounded-md text-xs font-semibold text-muted-foreground hover:border-violet-500 hover:text-violet-600 transition-colors"
+            onClick={() => {
+              const newCat = prompt("Enter new service category:");
+              if (newCat)
+                onChange({ categories: [...scopeData.categories, newCat] });
+            }}
+            className="px-3 py-1 border border-dashed border-border rounded-md text-xs font-semibold text-muted-foreground hover:border-violet-500 hover:text-violet-600 transition-colors cursor-pointer"
           >
             + Add Category
           </button>
@@ -89,9 +110,9 @@ export function ScopeAndSlaSection() {
           ].map((tier) => (
             <div
               key={tier.id}
-              onClick={() => setSelectedTier(tier.id)}
+              onClick={() => onChange({ selectedTier: tier.id })}
               className={`cursor-pointer border rounded-xl p-3.5 transition-all ${
-                selectedTier === tier.id
+                scopeData.selectedTier === tier.id
                   ? "border-violet-600 bg-violet-500/5 ring-1 ring-violet-600"
                   : "border-border bg-background hover:border-muted-foreground/40"
               }`}
@@ -103,9 +124,9 @@ export function ScopeAndSlaSection() {
                 <input
                   type="radio"
                   name="sla-tier"
-                  checked={selectedTier === tier.id}
-                  onChange={() => setSelectedTier(tier.id)}
-                  className="accent-violet-600"
+                  checked={scopeData.selectedTier === tier.id}
+                  onChange={() => onChange({ selectedTier: tier.id })}
+                  className="accent-violet-600 cursor-pointer"
                 />
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
