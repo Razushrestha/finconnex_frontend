@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from "react";
-import { Trophy, XCircle } from "lucide-react";
+import { KanbanOutcomeDropBar } from "@/components/common/KanbanOutcomeDropBar";
 import { type DealPipeline, type DealStage } from "@/lib/deals/types";
 import {
   listDealPipelines,
@@ -17,6 +17,7 @@ import {
   notifyStatusChanged,
 } from "@/lib/rules";
 import type { DealFilters } from "./FilterDealsPanel";
+import { dealMatchesFilters } from "@/lib/filters/records";
 import { DealRecordCard } from "./DealRecordCard";
 import type { DealQuickActionKind } from "./DealRecordCard";
 import {
@@ -186,9 +187,14 @@ export function DealsKanbanBoard({
           .filter((s): s is DealStage => !!s)
       : stages;
 
-    return result.filter(
-      (s) => !hasStageFilter || filters!.stages.includes(s.title),
-    );
+    return result
+      .filter((s) => !hasStageFilter || filters!.stages.includes(s.title))
+      .map((s) => ({
+        ...s,
+        deals: s.deals.filter((deal) =>
+          dealMatchesFilters({ ...deal, stageTitle: s.title }, filters),
+        ),
+      }));
   }, [stages, filters, visibleColumnIds]);
 
   const wonStage = useMemo(
@@ -755,58 +761,17 @@ export function DealsKanbanBoard({
       )}
 
       {dragInfo && boardBounds && (
-        <div
-          className="pointer-events-none fixed bottom-6 z-50 flex justify-center px-6"
+        <KanbanOutcomeDropBar
+          over={overOutcome}
+          onOver={setOverOutcome}
+          onLeave={(outcome) =>
+            setOverOutcome((prev) => (prev === outcome ? null : prev))
+          }
+          onDrop={handleOutcomeDrop}
+          wonLabel={`Win (${dragInfo.dealIds.length})`}
+          lostLabel={`Lost (${dragInfo.dealIds.length})`}
           style={{ left: boardBounds.left, width: boardBounds.width }}
-        >
-          <div className="flex w-full gap-4">
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setOverOutcome("won");
-              }}
-              onDragLeave={() =>
-                setOverOutcome((prev) => (prev === "won" ? null : prev))
-              }
-              onDrop={(e) => {
-                e.preventDefault();
-                handleOutcomeDrop("won");
-              }}
-              className={cn(
-                "pointer-events-auto flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-4 text-sm font-semibold shadow-lg backdrop-blur-sm transition-colors",
-                overOutcome === "won"
-                  ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                  : "border-emerald-300 bg-white/90 text-emerald-600",
-              )}
-            >
-              <Trophy className="h-4 w-4" />
-              Won ({dragInfo.dealIds.length})
-            </div>
-
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setOverOutcome("lost");
-              }}
-              onDragLeave={() =>
-                setOverOutcome((prev) => (prev === "lost" ? null : prev))
-              }
-              onDrop={(e) => {
-                e.preventDefault();
-                handleOutcomeDrop("lost");
-              }}
-              className={cn(
-                "pointer-events-auto flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-4 text-sm font-semibold shadow-lg backdrop-blur-sm transition-colors",
-                overOutcome === "lost"
-                  ? "border-rose-500 bg-rose-50 text-rose-700"
-                  : "border-rose-300 bg-white/90 text-rose-600",
-              )}
-            >
-              <XCircle className="h-4 w-4" />
-              Lost ({dragInfo.dealIds.length})
-            </div>
-          </div>
-        </div>
+        />
       )}
 
       {pendingLostDrop && (

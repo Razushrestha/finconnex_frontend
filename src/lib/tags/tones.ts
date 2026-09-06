@@ -1,12 +1,14 @@
 export const TAG_TONES = [
-  { id: "violet", chip: "bg-violet-50 text-violet-700 ring-violet-200", dot: "bg-violet-500" },
-  { id: "rose", chip: "bg-rose-50 text-rose-700 ring-rose-200", dot: "bg-rose-500" },
-  { id: "amber", chip: "bg-amber-50 text-amber-800 ring-amber-200", dot: "bg-amber-500" },
-  { id: "emerald", chip: "bg-emerald-50 text-emerald-700 ring-emerald-200", dot: "bg-emerald-500" },
-  { id: "sky", chip: "bg-sky-50 text-sky-700 ring-sky-200", dot: "bg-sky-500" },
-  { id: "fuchsia", chip: "bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-200", dot: "bg-fuchsia-500" },
-  { id: "orange", chip: "bg-orange-50 text-orange-700 ring-orange-200", dot: "bg-orange-500" },
-  { id: "teal", chip: "bg-teal-50 text-teal-700 ring-teal-200", dot: "bg-teal-500" },
+  { id: "red", color: "#EF4444", chip: "bg-red-500", dot: "bg-red-500" },
+  { id: "orange", color: "#F97316", chip: "bg-orange-500", dot: "bg-orange-500" },
+  { id: "amber", color: "#F59E0B", chip: "bg-amber-500", dot: "bg-amber-500" },
+  { id: "emerald", color: "#22C55E", chip: "bg-emerald-500", dot: "bg-emerald-500" },
+  { id: "sky", color: "#0EA5E9", chip: "bg-sky-500", dot: "bg-sky-500" },
+  { id: "blue", color: "#3B82F6", chip: "bg-blue-500", dot: "bg-blue-500" },
+  { id: "violet", color: "#7C3AED", chip: "bg-violet-500", dot: "bg-violet-500" },
+  { id: "fuchsia", color: "#DB2777", chip: "bg-fuchsia-500", dot: "bg-fuchsia-500" },
+  { id: "rose", color: "#F43F5E", chip: "bg-rose-500", dot: "bg-rose-500" },
+  { id: "teal", color: "#14B8A6", chip: "bg-teal-500", dot: "bg-teal-500" },
 ] as const;
 
 export type TagToneId = (typeof TAG_TONES)[number]["id"];
@@ -14,7 +16,7 @@ export type TagToneId = (typeof TAG_TONES)[number]["id"];
 export const NAMED_TAG_TONES: Record<string, TagToneId> = {
   "new-lead": "violet",
   new: "emerald",
-  hot: "rose",
+  hot: "red",
   priority: "orange",
   proposal: "sky",
   docs: "amber",
@@ -28,6 +30,22 @@ export const NAMED_TAG_TONES: Record<string, TagToneId> = {
 
 const STORAGE_KEY = "crm:tag-colors:v1";
 const LEGACY_KEY = "marketing:inbox:tag-colors:v1";
+
+const TONE_IDS = new Set<string>(TAG_TONES.map((tone) => tone.id));
+
+type TagColorListener = () => void;
+const colorListeners = new Set<TagColorListener>();
+
+export function onTagColorsChange(listener: TagColorListener) {
+  colorListeners.add(listener);
+  return () => {
+    colorListeners.delete(listener);
+  };
+}
+
+function emitTagColorsChange() {
+  colorListeners.forEach((listener) => listener());
+}
 
 export function uniqueTags(values: string[]) {
   const seen = new Set<string>();
@@ -46,7 +64,12 @@ export function uniqueTags(values: string[]) {
 function parseColors(raw: string | null): Record<string, TagToneId> {
   if (!raw) return {};
   try {
-    return JSON.parse(raw) as Record<string, TagToneId>;
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    const out: Record<string, TagToneId> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (TONE_IDS.has(value)) out[key] = value as TagToneId;
+    }
+    return out;
   } catch {
     return {};
   }
@@ -71,6 +94,7 @@ export function writeTagColor(tag: string, tone: TagToneId) {
   } catch {
     /* quota / private mode */
   }
+  emitTagColorsChange();
 }
 
 export function hashTagTone(tag: string): TagToneId {

@@ -9,6 +9,7 @@ import {
   type ForecastPeriod,
 } from "@/lib/forecasting/types";
 import { cn } from "@/lib/utils";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 
 function attainmentPct(closed: number, quota: number) {
   if (!quota) return 0;
@@ -125,7 +126,7 @@ export default function ForecastingPage() {
             {FORECAST_ROWS.length} owners
           </p>
         </div>
-        <div className="overflow-x-auto">
+        <ResizableColumns storageKey="forecasting-list" className="overflow-x-auto">
           <table className="w-full min-w-[860px] text-left text-[13px]">
             <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-medium tracking-wide text-slate-500 uppercase">
               <tr>
@@ -215,7 +216,7 @@ export default function ForecastingPage() {
               </tr>
             </tfoot>
           </table>
-        </div>
+        </ResizableColumns>
       </div>
 
       {/* Territories */}
@@ -228,7 +229,7 @@ export default function ForecastingPage() {
             {TERRITORIES.length} regions
           </p>
         </div>
-        <div className="overflow-x-auto">
+        <ResizableColumns storageKey="forecasting-territories-list" className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-[13px]">
             <thead className="border-b border-slate-200 bg-violet-50/60 text-[11px] font-medium tracking-wide text-violet-700 uppercase">
               <tr>
@@ -265,7 +266,7 @@ export default function ForecastingPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </ResizableColumns>
       </div>
     </div>
   );

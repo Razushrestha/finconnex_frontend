@@ -2,21 +2,19 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { ChevronRight, Columns3, Rows3, Ruler, Settings2 } from "lucide-react";
+import { ChevronRight, Columns3, Rows3, Ruler, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { resetColumnWidths } from "@/lib/list-columns/widths";
 
-const DEFAULT_PAGE_SIZE_OPTIONS = [10, 20, 50];
-
-const DEFAULT_WRAPPER_CLASSNAME = cn(
-  "sticky right-0 z-20 -mr-5 flex justify-end bg-white pr-5 pl-3 sm:-mr-7 sm:pr-7",
-  "shadow-[-12px_0_12px_-8px_rgba(15,23,42,0.06)]",
-);
+const DEFAULT_PAGE_SIZE_OPTIONS = [8, 10, 20, 50];
 
 interface TableDisplayOptionsMenuProps {
-  pageSize: number;
+  pageSize?: number;
   onPageSizeChange?: (size: number) => void;
   onManageColumns?: () => void;
   pageSizeOptions?: number[];
+  storageKey?: string;
+  onResetColumnSize?: () => void;
   className?: string;
 }
 
@@ -25,6 +23,8 @@ export function TableDisplayOptionsMenu({
   onPageSizeChange,
   onManageColumns,
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
+  storageKey,
+  onResetColumnSize,
   className,
 }: TableDisplayOptionsMenuProps) {
   const [optionsMenuOpen, setOptionsMenuOpen] = React.useState(false);
@@ -35,6 +35,9 @@ export function TableDisplayOptionsMenu({
     top: 0,
     right: 0,
   });
+
+  const canReset = Boolean(storageKey || onResetColumnSize);
+  const canPageSize = Boolean(onPageSizeChange && pageSize != null);
 
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -56,7 +59,7 @@ export function TableDisplayOptionsMenu({
   }, [optionsMenuOpen]);
 
   return (
-    <div className={className ?? DEFAULT_WRAPPER_CLASSNAME}>
+    <div className={cn("relative z-50", className)}>
       <button
         ref={optionsButtonRef}
         type="button"
@@ -64,16 +67,17 @@ export function TableDisplayOptionsMenu({
           if (!optionsMenuOpen && optionsButtonRef.current) {
             const rect = optionsButtonRef.current.getBoundingClientRect();
             setMenuPos({
-              top: rect.bottom + 4,
+              top: rect.bottom + 6,
               right: window.innerWidth - rect.right,
             });
           }
           setOptionsMenuOpen((v) => !v);
         }}
-        aria-label="Table display options"
-        className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+        aria-label="Manage columns"
+        title="Manage columns"
+        className="flex h-7 w-7 items-center justify-center rounded-md border border-slate-300 bg-slate-50 text-slate-600 shadow-sm hover:bg-white hover:text-slate-900"
       >
-        <Settings2 className="h-3.5 w-3.5" />
+        <SlidersHorizontal className="h-3.5 w-3.5" />
       </button>
 
       {optionsMenuOpen && typeof document !== "undefined"
@@ -85,75 +89,85 @@ export function TableDisplayOptionsMenu({
                 top: menuPos.top,
                 right: menuPos.right,
               }}
-              className="z-50 w-56 rounded-xl border border-[var(--wq-line)] bg-white py-1.5 text-[13px] shadow-lg"
+              className="z-[80] w-56 rounded-xl border border-slate-900 bg-white py-1.5 text-[13px] shadow-lg"
             >
-              {onManageColumns ? (
+              <button
+                type="button"
+                disabled={!onManageColumns}
+                onClick={() => {
+                  onManageColumns?.();
+                  setOptionsMenuOpen(false);
+                }}
+                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              >
+                <Columns3 className="h-4 w-4 text-slate-400" />
+                Manage Columns
+              </button>
+
+              <button
+                type="button"
+                disabled={!canReset}
+                onClick={() => {
+                  if (storageKey) resetColumnWidths(storageKey);
+                  onResetColumnSize?.();
+                  setOptionsMenuOpen(false);
+                }}
+                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              >
+                <Ruler
+                  className={cn(
+                    "h-4 w-4",
+                    canReset ? "text-slate-400" : "text-slate-300",
+                  )}
+                />
+                Reset Column Size
+              </button>
+
+              {canPageSize ? (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onManageColumns();
-                      setOptionsMenuOpen(false);
-                    }}
-                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-gray-700 hover:bg-[var(--wq-surface)]"
+                  <div className="my-1 border-t border-slate-200" />
+                  <div
+                    className="relative"
+                    onMouseEnter={() => setPageSizeFlyoutOpen(true)}
+                    onMouseLeave={() => setPageSizeFlyoutOpen(false)}
                   >
-                    <Columns3 className="h-4 w-4 text-gray-400" />
-                    Manage Columns
-                  </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-slate-700 hover:bg-slate-50"
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <Rows3 className="h-4 w-4 text-slate-400" />
+                        Records per page
+                      </span>
+                      <span className="flex items-center gap-0.5 text-slate-400">
+                        {pageSize}
+                        <ChevronRight className="h-3.5 w-3.5" />
+                      </span>
+                    </button>
 
-                  <button
-                    type="button"
-                    disabled
-                    className="flex w-full cursor-not-allowed items-center gap-2.5 px-3.5 py-2 text-left text-gray-300"
-                  >
-                    <Ruler className="h-4 w-4 text-gray-300" />
-                    Reset Column Size
-                  </button>
-
-                  <div className="my-1 border-t border-[var(--wq-line)]" />
+                    {pageSizeFlyoutOpen ? (
+                      <div className="absolute top-0 right-full mr-1 w-28 rounded-xl border border-slate-200 bg-white py-1.5 shadow-lg">
+                        {pageSizeOptions.map((size) => (
+                          <button
+                            key={size}
+                            type="button"
+                            onClick={() => {
+                              onPageSizeChange?.(size);
+                              setOptionsMenuOpen(false);
+                            }}
+                            className={cn(
+                              "flex w-full items-center justify-between px-3.5 py-1.5 text-left text-slate-700 hover:bg-slate-50",
+                              pageSize === size && "font-semibold text-slate-900",
+                            )}
+                          >
+                            {size}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </>
               ) : null}
-
-              <div
-                className="relative"
-                onMouseEnter={() => setPageSizeFlyoutOpen(true)}
-                onMouseLeave={() => setPageSizeFlyoutOpen(false)}
-              >
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-2.5 px-3.5 py-2 text-left text-gray-700 hover:bg-[var(--wq-surface)]"
-                >
-                  <span className="flex items-center gap-2.5">
-                    <Rows3 className="h-4 w-4 text-gray-400" />
-                    Records per page
-                  </span>
-                  <span className="flex items-center gap-0.5 text-gray-400">
-                    {pageSize}
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </span>
-                </button>
-
-                {pageSizeFlyoutOpen ? (
-                  <div className="absolute right-full top-0 mr-1 w-28 rounded-xl border border-[var(--wq-line)] bg-white py-1.5 shadow-lg">
-                    {pageSizeOptions.map((size) => (
-                      <button
-                        key={size}
-                        type="button"
-                        onClick={() => {
-                          onPageSizeChange?.(size);
-                          setOptionsMenuOpen(false);
-                        }}
-                        className={cn(
-                          "flex w-full items-center justify-between px-3.5 py-1.5 text-left text-gray-700 hover:bg-[var(--wq-surface)]",
-                          pageSize === size && "font-semibold text-gray-900",
-                        )}
-                      >
-                        {size}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
             </div>,
             document.body,
           )

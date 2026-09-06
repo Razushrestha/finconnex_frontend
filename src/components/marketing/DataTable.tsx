@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { PaginationBar } from "@/components/ui/pagination-bar";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 
 export interface DataTableColumn<T> {
   key: string;
@@ -25,6 +26,7 @@ interface DataTableProps<T> {
   onPageChange: (page: number) => void;
   className?: string;
   entriesLabel?: string;
+  columnResizeKey?: string;
 }
 
 /**
@@ -42,6 +44,7 @@ export function DataTable<T>({
   onPageChange,
   className,
   entriesLabel = "forms",
+  columnResizeKey,
 }: DataTableProps<T>) {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -53,13 +56,21 @@ export function DataTable<T>({
         className,
       )}
     >
-      <div className="min-h-0 flex-1 overflow-auto">
+      <ResizableColumns
+        storageKey={
+          columnResizeKey ??
+          `marketing:${columns.map((c) => c.key).join("|")}`
+        }
+        className="min-h-0 flex-1 overflow-auto"
+        pageSize={pageSize}
+      >
         <table className="w-full min-w-[960px] text-left text-[12px]">
           <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
             <tr>
               {columns.map((c) => (
                 <th
                   key={c.key}
+                  data-col-id={c.key}
                   className={cn("px-3 py-2.5 sm:px-4", c.className)}
                 >
                   {c.header}
@@ -99,9 +110,7 @@ export function DataTable<T>({
             ) : null}
           </tbody>
         </table>
-      </div>
-
-      {/* Replaced old simple footer with the rich PaginationBar */}
+      </ResizableColumns>
       <PaginationBar
         page={safePage}
         pageSize={pageSize}

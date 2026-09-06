@@ -17,6 +17,7 @@ import { avatarColor, initials } from "@/lib/activities/shared";
 import { cardSubject } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 
 const TYPE_META: Record<NoteType, { soft: string; text: string }> = {
   General: { soft: "bg-slate-100", text: "text-slate-600" },
@@ -50,7 +51,7 @@ export function NotesListView({
   const [localSearch, setLocalSearch] = useState("");
   const [localSelectedIds, setLocalSelectedIds] = useState<string[]>([]);
   const [page, setPage] = useState(1);
-  const pageSize = 8;
+  const [pageSize, setPageSize] = useState(8);
   const selectedIds = controlledSelectedIds ?? localSelectedIds;
 
   function setSelectedIds(ids: string[]) {
@@ -147,11 +148,19 @@ export function NotesListView({
         ) : null}
       </div>
       ) : null}
-      <div className="min-h-0 flex-1 overflow-auto">
+      <ResizableColumns
+        storageKey="notes-list"
+        className="min-h-0 flex-1 overflow-auto"
+        pageSize={pageSize}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setPage(1);
+        }}
+      >
         <table className="w-full min-w-[920px] text-left text-[12px]">
           <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
             <tr>
-              <th className="w-10 px-4 py-2.5">
+              <th data-col-id="select" className="w-10 px-4 py-2.5">
                 <input
                   type="checkbox"
                   className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
@@ -160,12 +169,22 @@ export function NotesListView({
                   aria-label="Select all"
                 />
               </th>
-              <th className="w-12 px-4 py-2.5" />
-              <th className="px-4 py-2.5">Title</th>
-              <th className="px-4 py-2.5">Related To</th>
-              <th className="px-4 py-2.5">Type</th>
-              <th className="px-4 py-2.5">Created By</th>
-              <th className="px-4 py-2.5">Created At</th>
+              <th data-col-id="flags" className="w-12 px-4 py-2.5" />
+              <th data-col-id="title" className="px-4 py-2.5">
+                Title
+              </th>
+              <th data-col-id="relatedTo" className="px-4 py-2.5">
+                Related To
+              </th>
+              <th data-col-id="type" className="px-4 py-2.5">
+                Type
+              </th>
+              <th data-col-id="createdBy" className="px-4 py-2.5">
+                Created By
+              </th>
+              <th data-col-id="createdAt" className="px-4 py-2.5">
+                Created At
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -196,7 +215,7 @@ export function NotesListView({
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       {note.isPinned ? (
-                        <Pin className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
+                        <Pin className="h-3.5 w-3.5 fill-red-600 text-red-600" />
                       ) : (
                         <span className="h-3.5 w-3.5" />
                       )}
@@ -208,7 +227,7 @@ export function NotesListView({
                   <td className="max-w-[280px] px-4 py-3">
                     <p
                       className={cn(
-                        "truncate font-semibold text-slate-900",
+                        "truncate font-normal text-slate-900",
                         cardSubject,
                       )}
                     >
@@ -266,7 +285,7 @@ export function NotesListView({
             ) : null}
           </tbody>
         </table>
-      </div>
+      </ResizableColumns>
 
       <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2.5 text-[11px] text-slate-500">
         <span>

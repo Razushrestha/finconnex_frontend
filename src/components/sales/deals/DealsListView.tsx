@@ -14,8 +14,11 @@ import { type DealPipeline, type DealStage } from "@/lib/deals/types";
 import { listDealPipelines } from "@/lib/deals/store";
 import { onRulesChange } from "@/lib/rules";
 import type { DealFilters } from "./FilterDealsPanel";
-import { cn } from "@/lib/utils";
-import { TableDisplayOptionsMenu } from "@/components/common/TableDisplayOptionsMenu";
+import { dealMatchesFilters } from "@/lib/filters/records";
+import { StatusColorPill } from "@/components/common/StatusColorPill";
+import { ContactNameLink } from "@/components/sales/ContactNameLink";
+import { resolveDealContact } from "@/lib/sales/resolve-contact";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
   ManageColumnsModal,
   type ManageColumn,
@@ -37,6 +40,8 @@ interface DealsListViewProps {
 
 const DEFAULT_DEAL_COLUMNS: ManageColumn[] = [
   { id: "name", label: "Deal Name", checked: true, required: true },
+  { id: "contactName", label: "Contact Name", checked: true },
+  { id: "email", label: "Email", checked: true },
   { id: "stage", label: "Stage", checked: true },
   { id: "value", label: "Value", checked: true },
   { id: "account", label: "Account", checked: true },
@@ -68,6 +73,7 @@ interface ColumnRenderer {
 const columnRenderers: Record<string, ColumnRenderer> = {
   name: {
     th: "Deal Name",
+    thClassName: "px-5 py-3.5 text-left font-semibold",
     tdClassName: "px-5 py-1 whitespace-nowrap",
     td: (deal) => (
       <div className="flex items-center gap-3">
@@ -80,14 +86,26 @@ const columnRenderers: Record<string, ColumnRenderer> = {
       </div>
     ),
   },
+  contactName: {
+    th: "Contact Name",
+    thClassName: "px-5 py-3.5 text-left font-semibold",
+    tdClassName: "px-5 py-1 whitespace-nowrap text-[13px]",
+    td: (deal) => {
+      const contact = resolveDealContact(deal);
+      return <ContactNameLink name={contact.name} contactId={contact.id} />;
+    },
+  },
+  email: {
+    th: "Email",
+    thClassName: "px-5 py-3.5 text-left font-semibold",
+    tdClassName: "px-5 py-1 whitespace-nowrap text-slate-600",
+    td: (deal) => resolveDealContact(deal).email || "",
+  },
   stage: {
     th: "Stage",
     tdClassName: "px-5 py-1 whitespace-nowrap",
     td: (deal) => (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
-        <span className={`h-2 w-2 rounded-full ${deal.stageDotColor}`} />
-        {deal.stageTitle}
-      </span>
+      <StatusColorPill label={deal.stageTitle} solidClass={deal.stageDotColor} />
     ),
   },
   value: {
@@ -122,7 +140,7 @@ const columnRenderers: Record<string, ColumnRenderer> = {
   },
   actions: {
     th: "Actions",
-    thClassName: "px-5 py-3.5 text-right font-semibold",
+    thClassName: "px-5 py-3.5 text-left font-semibold",
     tdClassName: "px-5 py-1 whitespace-nowrap text-right",
     td: () => (
       <div className="flex items-center justify-end gap-1">
@@ -212,11 +230,15 @@ export function DealsListView({
         (stage) => !hasStageFilter || filters!.stages.includes(stage.title),
       )
       .flatMap((stage) =>
-        stage.deals.map((deal) => ({
-          ...deal,
-          stageTitle: stage.title,
-          stageDotColor: stage.dotColorClass,
-        })),
+        stage.deals
+          .filter((deal) =>
+            dealMatchesFilters({ ...deal, stageTitle: stage.title }, filters),
+          )
+          .map((deal) => ({
+            ...deal,
+            stageTitle: stage.title,
+            stageDotColor: stage.dotColorClass,
+          })),
       );
   }, [stages, filters]);
 
@@ -253,11 +275,17 @@ export function DealsListView({
 
   return (
     <div className="w-full overflow-hidden rounded-md border border-slate-200/80 bg-white shadow-2xs">
-      <div className="overflow-x-auto">
+      <ResizableColumns
+        storageKey="deals-list"
+        className="overflow-x-auto"
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
+        onManageColumns={() => setManageColumnsOpen(true)}
+      >
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-100 text-xs tracking-wider text-slate-500 uppercase">
             <tr className="sticky top-0 z-10 bg-slate-50/70">
-              <th scope="col" className="w-8 px-5 py-3.5">
+              <th scope="col" data-col-id="select" className="w-8 px-5 py-3.5">
                 <input
                   type="checkbox"
                   checked={allSelected}
@@ -272,10 +300,11 @@ export function DealsListView({
               {orderedVisibleColumns.map((col) => (
                 <th
                   key={col.id}
+                  data-col-id={col.id}
                   scope="col"
                   className={
                     columnRenderers[col.id]?.thClassName ??
-                    "px-5 py-3.5 font-semibold"
+                    "px-5 py-3.5 text-left font-semibold"
                   }
                 >
                   {columnRenderers[col.id]?.th}
@@ -283,19 +312,10 @@ export function DealsListView({
               ))}
 
               <th
+                data-col-id="options"
                 scope="col"
-                className={cn(
-                  "sticky right-0 z-20 -mr-5 bg-slate-50/70 py-3.5 pr-5 pl-3 text-right",
-                  "shadow-[-12px_0_12px_-8px_rgba(15,23,42,0.06)]",
-                )}
-              >
-                <TableDisplayOptionsMenu
-                  pageSize={pageSize}
-                  onPageSizeChange={setPageSize}
-                  onManageColumns={() => setManageColumnsOpen(true)}
-                  className="flex justify-end"
-                />
-              </th>
+                className="sticky right-0 z-30 w-12 min-w-12 bg-slate-50/70 px-2 py-3.5 text-left"
+              />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -342,7 +362,7 @@ export function DealsListView({
             )}
           </tbody>
         </table>
-      </div>
+      </ResizableColumns>
 
       <ManageColumnsModal
         open={manageColumnsOpen}

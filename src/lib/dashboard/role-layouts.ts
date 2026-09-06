@@ -71,5 +71,12 @@ export function loadRoleLayout(
     activeName: name,
   };
   writeJsonStore(STORE_KEY, store);
-  return { ...row.layout, ...defaultDashboardLayout(), ...row.layout };
+  const base = defaultDashboardLayout();
+  return {
+    ...base,
+    ...row.layout,
+    filters: { ...base.filters, ...row.layout.filters },
+    order: row.layout.order?.length ? row.layout.order : base.order,
+    hidden: row.layout.hidden ?? base.hidden,
+  };
 }

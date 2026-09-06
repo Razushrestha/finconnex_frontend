@@ -1,22 +1,18 @@
 "use client";
 
 import React from "react";
+import { ArrowTag } from "@/components/common/ArrowTag";
+import { TAG_TONES, writeTagColor, type TagToneId } from "@/lib/tags";
 
 interface SuggestedTagsCardProps {
   onSelectTag: (tag: string) => void;
 }
 
-const TAGS = [
-  {
-    label: "#Urgent",
-    color: "bg-destructive/10 text-destructive border-destructive/20",
-  },
-  { label: "#Planning", color: "bg-primary/10 text-primary border-primary/20" },
-  {
-    label: "#FollowUp",
-    color: "bg-secondary text-secondary-foreground border-border",
-  },
-  { label: "#Q3", color: "bg-accent text-accent-foreground border-border" },
+const TAGS: { label: string; tone: TagToneId }[] = [
+  { label: "Urgent", tone: "red" },
+  { label: "Planning", tone: "violet" },
+  { label: "FollowUp", tone: "sky" },
+  { label: "Q3", tone: "amber" },
 ];
 
 export const SuggestedTagsCard: React.FC<SuggestedTagsCardProps> = ({
@@ -28,16 +24,22 @@ export const SuggestedTagsCard: React.FC<SuggestedTagsCardProps> = ({
         Suggested Tags
       </h3>
       <div className="flex flex-wrap gap-2">
-        {TAGS.map((tag) => (
-          <button
-            key={tag.label}
-            type="button"
-            onClick={() => onSelectTag(tag.label)}
-            className={`text-xs font-medium px-2.5 py-1 rounded-md border transition-transform active:scale-95 ${tag.color}`}
-          >
-            {tag.label}
-          </button>
-        ))}
+        {TAGS.map((tag) => {
+          const tone = TAG_TONES.find((item) => item.id === tag.tone);
+          return (
+            <ArrowTag
+              key={tag.label}
+              compact
+              color={tone?.color}
+              onClick={() => {
+                writeTagColor(tag.label, tag.tone);
+                onSelectTag(tag.label);
+              }}
+            >
+              {tag.label}
+            </ArrowTag>
+          );
+        })}
       </div>
     </div>
   );

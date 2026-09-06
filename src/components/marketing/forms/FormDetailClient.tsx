@@ -10,6 +10,7 @@ import {
   ClipboardList,
   Route,
 } from "lucide-react";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
   FORM_DESTINATIONS,
   FORM_STATUS_STYLE,
@@ -312,6 +313,7 @@ export function FormDetailClient({ id }: { id: string }) {
 
         {tab === "submissions" ? (
           <div className="overflow-hidden rounded-2xl border border-slate-100/80 bg-white shadow-sm">
+            <ResizableColumns storageKey="form-submissions-list" className="overflow-x-auto">
             <table className="w-full text-left text-[12px]">
               <thead className="border-b border-slate-100 bg-slate-50/70 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
                 <tr>
@@ -371,6 +373,7 @@ export function FormDetailClient({ id }: { id: string }) {
                 ) : null}
               </tbody>
             </table>
+            </ResizableColumns>
           </div>
         ) : null}
 

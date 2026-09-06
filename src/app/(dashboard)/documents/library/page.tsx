@@ -27,6 +27,7 @@ import {
   type LibraryFolder,
 } from "@/lib/documents/library/types";
 import { useCrmDocuments } from "@/lib/documents/library/use-crm-documents";
+import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
   createCrmDocument,
   deleteCrmDocument,
@@ -368,7 +369,10 @@ export default function DocumentLibraryPage() {
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-auto">
+            <ResizableColumns
+              storageKey="library-list"
+              className="min-h-0 flex-1 overflow-auto"
+            >
               <table className="w-full min-w-[900px] text-left text-[12px]">
                 <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
                   <tr>
@@ -508,7 +512,7 @@ export default function DocumentLibraryPage() {
                   ) : null}
                 </tbody>
               </table>
-            </div>
+            </ResizableColumns>
           </div>
         </div>
       </div>

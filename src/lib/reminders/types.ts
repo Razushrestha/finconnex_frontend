@@ -1,6 +1,7 @@
 /** SRS §7.7 Reminders */
 
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import type { FieldClause } from "@/lib/filters/types";
 
 export const REMINDER_TYPES = [
   "Task Due",
@@ -72,6 +73,8 @@ export interface ReminderFilters {
   types: ReminderType[];
   methods: NotificationMethod[];
   owners: string[];
+  systemDefined?: string[];
+  clauses?: FieldClause[];
 }
 
 export const EMPTY_REMINDER_FILTERS: ReminderFilters = {
@@ -79,6 +82,8 @@ export const EMPTY_REMINDER_FILTERS: ReminderFilters = {
   types: [],
   methods: [],
   owners: [],
+  systemDefined: [],
+  clauses: [],
 };
 
 export function reminderMatchesFilters(

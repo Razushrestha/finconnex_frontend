@@ -21,7 +21,7 @@ export default function DocumentRequestsPage() {
   }, [crm.source, crm.loading]);
 
   return (
-    <div className="absolute inset-0 overflow-hidden">
+    <div className="absolute inset-0 overflow-y-auto">
       <DocumentRequestsDashboard
         rows={rows}
         source={crm.source}
