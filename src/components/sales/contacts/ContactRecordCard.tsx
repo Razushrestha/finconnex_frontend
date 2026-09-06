@@ -149,7 +149,7 @@ export function ContactRecordCard({
 
         <div className="flex items-center justify-between gap-1">
           <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700">
-            {contact.source}
+            {contact.source || ""}
           </span>
           <QuickActionsBar
             actions={CONTACT_QUICK_ACTIONS}

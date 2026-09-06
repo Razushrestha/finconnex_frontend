@@ -274,9 +274,9 @@ export default function ContactsPage() {
             ? "Live CRM"
             : crm.loading
               ? "Connecting…"
-              : "Demo"}
+              : "CRM"}
         </span>
-        {crm.error && crm.source === "demo" ? (
+        {crm.error ? (
           <span className="text-[10px] text-slate-500">{crm.error}</span>
         ) : null}
       </div>
@@ -389,7 +389,15 @@ export default function ContactsPage() {
         )}
 
         <div key={viewMode} className={cn("min-h-0 min-w-0 flex-1 overflow-hidden", viewEnter)}>
-          {viewMode === "kanban" ? (
+          {crm.loading ? (
+            <div className="flex h-full items-center justify-center text-sm text-slate-400">
+              Loading contacts…
+            </div>
+          ) : crm.error ? (
+            <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-400">
+              {crm.error}
+            </div>
+          ) : viewMode === "kanban" ? (
             <ContactsKanbanBoard
               filters={filters}
               visibleColumnIds={visibleColumnIds}
@@ -424,8 +432,8 @@ export default function ContactsPage() {
             defaultSource: settings.defaultSource as ContactSource,
           })
         }
-        apply={(rows, mapping, settings) => {
-          const summary = applyContactImport(rows, mapping, {
+        apply={async (rows, mapping, settings) => {
+          const summary = await applyContactImport(rows, mapping, {
             skipDuplicates: settings.skipDuplicates,
             updateExisting: settings.updateExisting,
             defaultOwner: settings.defaultOwner,

@@ -144,9 +144,10 @@ export function MeetingRelatedFields({
           allowCustom={relatedKind === "Contact"}
           createLabel={(name) => `Add contact “${name}”`}
           onCreateOption={(name) => {
-            const created = createQuickContact(name);
-            onRelatedNameChange(created.name);
-            setRecordTick((tick) => tick + 1);
+            void createQuickContact(name).then((created) => {
+              onRelatedNameChange(created.name);
+              setRecordTick((tick) => tick + 1);
+            });
           }}
         />
       </div>

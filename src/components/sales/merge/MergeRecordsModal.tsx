@@ -261,8 +261,8 @@ export function MergeRecordsModal({
                   [
                     "source",
                     "Source",
-                    primaryContact.source,
-                    secondaryContact.source,
+                    primaryContact.source ?? "",
+                    secondaryContact.source ?? "",
                   ],
                 ] as const
               ).map(([key, label, pVal, sVal]) => (

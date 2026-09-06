@@ -63,7 +63,7 @@ export const localContactsApi: ContactsApi = {
 
   async create(input) {
     try {
-      const uniq = assertUniqueEmail(input.email);
+      const uniq = assertUniqueEmail(input.email, { scope: "contacts" });
       if (!uniq.ok) {
         return apiFail(
           new ApiError(409, {
@@ -73,7 +73,7 @@ export const localContactsApi: ContactsApi = {
           }),
         );
       }
-      return apiOk(createContact(input));
+      return apiOk(await createContact(input));
     } catch (e) {
       return apiFail(toApiError(e));
     }

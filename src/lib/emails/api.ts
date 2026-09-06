@@ -6,6 +6,7 @@ import {
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
 import { crmBffFetch, crmErrorMessage, crmFetch } from "@/lib/crm/request";
+import { deliverQueuedCrmEmail } from "@/lib/emails/deliver";
 import { htmlToPlainText } from "@/lib/emails/ai-compose";
 import { upsertEmail } from "@/lib/emails/store";
 import type {
@@ -197,7 +198,7 @@ export function normalizeCrmEmail(
       raw.from,
       raw.sender,
     ),
-    to: asList(raw.to ?? raw.recipients ?? raw.toAddresses),
+    to: asList(raw.to ?? raw.toEmail ?? raw.recipients ?? raw.toAddresses),
     cc: asList(raw.cc).length ? asList(raw.cc) : undefined,
     bcc: asList(raw.bcc).length ? asList(raw.bcc) : undefined,
     relatedTo:
@@ -561,19 +562,28 @@ export async function sendCrmEmail(
     method: "POST",
     body: JSON.stringify(compactBody({ scheduledAt })),
   });
-  return asEmail(raw, {
+  const mapped = asEmail(raw, {
     id,
     status: scheduledAt ? "Scheduled" : "Sent",
   });
+  const sendAt = scheduledAt ? Date.parse(scheduledAt) : 0;
+  if (!sendAt || sendAt <= Date.now() + 5_000) {
+    const full = mapped?.to[0] ? mapped : await getCrmEmail(id);
+    await deliverQueuedCrmEmail(full ?? mapped);
+  }
+  return mapped;
 }
 
 export async function retryCrmEmail(id: string): Promise<Email | null> {
-  return asEmail(
+  const mapped = asEmail(
     await emailsMutate(`/${id}/retry`, {
       method: "POST",
       body: "{}",
     }),
   );
+  const full = mapped?.to[0] ? mapped : await getCrmEmail(id);
+  await deliverQueuedCrmEmail(full ?? mapped);
+  return mapped;
 }
 
 export async function cancelCrmEmail(id: string): Promise<Email | null> {

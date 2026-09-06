@@ -158,14 +158,9 @@ export function ContactDetailView({
   const linkedDeals = useMemo(() => {
     void revision;
     const ids = new Set(contact.dealIds ?? []);
-    const byName = listAllDeals().filter(
-      (d) =>
-        ids.has(d.id) ||
-        d.contactId === contact.id ||
-        d.contact?.trim().toLowerCase() === contact.name.trim().toLowerCase(),
+    return listAllDeals().filter(
+      (d) => ids.has(d.id) || d.contactId === contact.id,
     );
-    const map = new Map(byName.map((d) => [d.id, d]));
-    return Array.from(map.values());
   }, [contact, revision]);
 
   const unlinkableDealOptions = useMemo(() => {
@@ -259,7 +254,7 @@ export function ContactDetailView({
       label: "Do Not Contact",
       value: contact.doNotContact ? "Yes" : "No",
     },
-    { id: "source", label: "Source", value: contact.source },
+    { id: "source", label: "Source", value: contact.source || "—" },
     { id: "created", label: "Created Date", value: contact.createdDate },
     { id: "deals", label: "Linked Deals", value: String(linkedDeals.length) },
     ...(contact.notes

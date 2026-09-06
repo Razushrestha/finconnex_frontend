@@ -109,6 +109,26 @@ export function smokeContactsWiring() {
   }
 
   const store = readSrc("src/lib/contacts/store.ts");
+  if (!store.includes("replaceCrmContactsOnBoard")) {
+    fail("contacts store does not replace the board from CRM");
+  }
+  if (readSrc("src/lib/contacts/types.ts").includes("Olivia Bennett")) {
+    fail("contact kanban still includes static demo cards");
+  }
+  if (
+    readSrc("src/components/sales/contacts/CustomizeContactCardDrawer.tsx").includes(
+      "Olivia Bennett",
+    )
+  ) {
+    fail("contact card preview still includes static demo names");
+  }
+  if (readSrc("src/lib/contacts/use-crm-contacts.ts").includes('"demo"')) {
+    fail("contacts hook still falls back to demo cards");
+  }
+  const client = readSrc("src/lib/contacts/api.ts");
+  if (!client.includes("crmBffFetch")) {
+    fail("contacts client must call crmBffFetch in the browser");
+  }
   if (!store.includes("createCrmContact")) {
     fail("contacts store does not sync create to CRM");
   }

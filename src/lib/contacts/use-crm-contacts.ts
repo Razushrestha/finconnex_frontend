@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { loadCrmContacts } from "@/lib/contacts/api";
-import { mergeCrmContactsIntoBoard } from "@/lib/contacts/store";
+import { replaceCrmContactsOnBoard } from "@/lib/contacts/store";
 
-export type ContactsDataSource = "api" | "demo";
+export type ContactsDataSource = "api" | "empty";
 
 export function useCrmContacts() {
-  const [source, setSource] = useState<ContactsDataSource>("demo");
+  const [source, setSource] = useState<ContactsDataSource>("empty");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
@@ -18,16 +18,18 @@ export function useCrmContacts() {
     let cancelled = false;
     setLoading(true);
     setError(null);
+    replaceCrmContactsOnBoard([]);
 
     void (async () => {
       try {
         const remote = await loadCrmContacts();
         if (cancelled) return;
-        if (remote.length) mergeCrmContactsIntoBoard(remote);
-        setSource(remote.length ? "api" : "demo");
+        replaceCrmContactsOnBoard(remote);
+        setSource(remote.length ? "api" : "empty");
       } catch (err) {
         if (cancelled) return;
-        setSource("demo");
+        replaceCrmContactsOnBoard([]);
+        setSource("empty");
         setError(err instanceof Error ? err.message : "Contacts unavailable");
       } finally {
         if (!cancelled) setLoading(false);

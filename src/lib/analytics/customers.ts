@@ -62,8 +62,9 @@ function matchesOwner(owner: string, filter: string) {
   return filter === "All" || owner === filter;
 }
 
-function contactSourceLabel(source: string, tags: string[] = []) {
-  const mapped = SOURCE_ALIASES[source] ?? campaignNameFor(source, tags);
+function contactSourceLabel(source: string | undefined, tags: string[] = []) {
+  const key = source ?? "";
+  const mapped = SOURCE_ALIASES[key] ?? campaignNameFor(key, tags);
   return mapped || "Other";
 }
 

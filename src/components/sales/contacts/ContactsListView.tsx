@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { type ContactGroup } from "@/lib/contacts/types";
+import { emptyContactGroups, type ContactGroup } from "@/lib/contacts/types";
 import { listContactGroups } from "@/lib/contacts/store";
 import { onRulesChange } from "@/lib/rules";
 import type { ContactFilters } from "./FilterContactsPanel";
@@ -128,7 +128,7 @@ function buildColumnRenderers(
     source: {
       th: "Source",
       tdClassName: "px-3 py-2 whitespace-nowrap text-slate-500",
-      td: (contact) => contact.source,
+      td: (contact) => contact.source ?? "",
     },
     created: {
       th: "Created",
@@ -159,7 +159,7 @@ export function ContactsListView({
   sortValue = "newest",
 }: ContactsListViewProps) {
   const [groups, setGroups] = useState<ContactGroup[]>(
-    () => groupsProp ?? listContactGroups(),
+    () => groupsProp ?? emptyContactGroups(),
   );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pageSize, setPageSize] = useState<number>(10);
@@ -172,6 +172,7 @@ export function ContactsListView({
 
   useEffect(() => {
     if (groupsProp) setGroups(groupsProp);
+    else setGroups(listContactGroups());
   }, [groupsProp]);
 
   useEffect(() => {

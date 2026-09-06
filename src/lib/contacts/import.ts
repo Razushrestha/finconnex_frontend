@@ -20,7 +20,7 @@ import {
   type ContactStatus,
 } from "@/lib/contacts/types";
 import { getRulesActor } from "@/lib/rules/actor";
-import { assertUniqueEmail, listClaimedEmails } from "@/lib/rules/integrity";
+import { assertUniqueEmail } from "@/lib/rules/integrity";
 
 export const CONTACT_IMPORT_FIELDS = [
   {
@@ -155,7 +155,6 @@ export function previewContactImport(
   mapping: Record<string, string>,
   settings: ContactImportSettings,
 ): ContactImportPreview {
-  const claimed = new Set(listClaimedEmails());
   const contactEmails = new Set(
     listContactEmails().map((e) => e.trim().toLowerCase()),
   );
@@ -189,7 +188,7 @@ export function previewContactImport(
       return;
     }
 
-    const uniq = assertUniqueEmail(email);
+    const uniq = assertUniqueEmail(email, { scope: "contacts" });
     if (!uniq.ok && uniq.code === "EMAIL_INVALID") {
       results.push({
         rowIndex: idx + 2,
@@ -214,7 +213,6 @@ export function previewContactImport(
     seenInFile.add(email);
 
     const existsOnContact = contactEmails.has(email);
-    const existsAnywhere = claimed.has(email);
 
     if (existsOnContact && settings.updateExisting) {
       results.push({
@@ -226,25 +224,21 @@ export function previewContactImport(
       });
       return;
     }
-    if (existsAnywhere && settings.skipDuplicates) {
+    if (existsOnContact && settings.skipDuplicates) {
       results.push({
         rowIndex: idx + 2,
         status: "skip",
-        message: existsOnContact
-          ? "Skipped (duplicate contact email)"
-          : "Skipped (email used by a lead)",
+        message: "Skipped (duplicate contact email)",
         email,
         name,
       });
       return;
     }
-    if (existsAnywhere) {
+    if (existsOnContact) {
       results.push({
         rowIndex: idx + 2,
         status: "error",
-        message: existsOnContact
-          ? "Email already exists on a contact"
-          : "Email already used by a lead",
+        message: "Email already exists on a contact",
         email,
         name,
       });
@@ -269,7 +263,7 @@ export function previewContactImport(
   };
 }
 
-export function applyContactImport(
+export async function applyContactImport(
   rows: CsvRow[],
   mapping: Record<string, string>,
   settings: ContactImportSettings,
@@ -278,10 +272,10 @@ export function applyContactImport(
   let imported = 0;
   let updated = 0;
 
-  rows.forEach((row, idx) => {
+  for (const [idx, row] of rows.entries()) {
     const result = preview.results[idx];
     if (!result || (result.status !== "ok" && result.status !== "update")) {
-      return;
+      continue;
     }
 
     const firstName = cell(row, mapping, "firstName");
@@ -327,10 +321,10 @@ export function applyContactImport(
         saveContactGroups(next);
         updated += 1;
       }
-      return;
+      continue;
     }
 
-    createContact({
+    await createContact({
       firstName,
       lastName,
       email,
@@ -342,7 +336,7 @@ export function applyContactImport(
       owner,
     });
     imported += 1;
-  });
+  }
 
   return {
     imported,
@@ -423,18 +417,6 @@ export function sampleContactCsvTemplate() {
       "Status",
       "Owner",
     ],
-    [
-      [
-        "Maya",
-        "Chen",
-        "maya.chen@example.com",
-        "+1 415 555 0199",
-        "+1 415 555 0188",
-        "Fabrikam Inc.",
-        "Referral",
-        "Active",
-        ACTIVITY_OWNERS[0],
-      ],
-    ],
+    [],
   );
 }

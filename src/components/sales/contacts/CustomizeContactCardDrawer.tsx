@@ -212,7 +212,7 @@ function ContactCardPreview({
             isCompact ? "text-[12px]" : "text-[13px]",
           )}
         >
-          Olivia Bennett
+          Contact name
         </h4>
       </div>
 
@@ -227,27 +227,27 @@ function ContactCardPreview({
             <div className="flex items-center gap-2">
               <Building2 className="h-3 w-3 shrink-0 text-slate-400" />
               <span className="truncate font-medium text-slate-700">
-                Northwind Traders
+                Company
               </span>
             </div>
           )}
           {settings.showEmail && (
             <div className="flex items-center gap-2">
               <Mail className="h-3 w-3 shrink-0 text-slate-400" />
-              <span className="truncate">olivia.bennett@northwind.com</span>
+              <span className="truncate">email@company.com</span>
             </div>
           )}
           {settings.showPhone && (
             <div className="flex items-center gap-2">
               <Phone className="h-3 w-3 shrink-0 text-slate-400" />
-              <span>+61 400 100 001</span>
+              <span>Phone</span>
             </div>
           )}
-          {settings.showOwner && <CardOwnerRow name="John Smith" />}
+          {settings.showOwner && <CardOwnerRow name="Owner" />}
           {settings.showCreatedDate && (
             <div className="flex items-center gap-2">
               <Calendar className="h-3 w-3 shrink-0 text-slate-400" />
-              <span>23/07/2026</span>
+              <span>Created date</span>
             </div>
           )}
         </div>
@@ -264,7 +264,7 @@ function ContactCardPreview({
           <div className="flex items-center justify-between gap-1">
             {settings.showSource ? (
               <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700">
-                Website
+                Source
               </span>
             ) : (
               <span />

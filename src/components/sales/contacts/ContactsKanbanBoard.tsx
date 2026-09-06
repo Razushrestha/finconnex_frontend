@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
-import { type ContactGroup, type ContactStatus } from "@/lib/contacts/types";
+import { emptyContactGroups, type ContactGroup, type ContactStatus } from "@/lib/contacts/types";
 import {
   listContactGroups,
   saveContactGroups,
@@ -66,9 +66,7 @@ export function ContactsKanbanBoard({
 }: ContactsKanbanBoardProps) {
   const router = useRouter();
 
-  const [groups, setGroups] = useState<ContactGroup[]>(() =>
-    listContactGroups(),
-  );
+  const [groups, setGroups] = useState<ContactGroup[]>(() => emptyContactGroups());
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const [dropTargetPos, setDropTargetPos] = useState<DropTargetPosition | null>(
     null,
@@ -81,6 +79,7 @@ export function ContactsKanbanBoard({
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
+    setGroups(listContactGroups());
     return onRulesChange(() => setGroups(listContactGroups()));
   }, []);
 

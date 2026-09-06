@@ -634,7 +634,7 @@ function scopedContacts(scope: WorkQueueScope): ContactRow[] {
         status: g.title,
         company: c.company,
         createdDate: c.createdDate,
-        source: c.source,
+        source: c.source ?? "",
       });
     }
   }

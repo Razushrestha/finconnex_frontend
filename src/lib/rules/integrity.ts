@@ -16,13 +16,20 @@ function dealKey(name: string, account: string) {
   return `${name.trim().toLowerCase()}::${account.trim().toLowerCase()}`;
 }
 
+/** Emails already used on Leads. */
+export function listClaimedLeadEmails(): string[] {
+  return [...new Set(listLeadEmails().map(normalizeEmail))];
+}
+
+/** Emails already used on Contacts. */
+export function listClaimedContactEmails(): string[] {
+  return [...new Set(listContactEmails().map(normalizeEmail))];
+}
+
 /** Live emails across Leads + Contacts (seed + created). */
 export function listClaimedEmails(): string[] {
   return [
-    ...new Set([
-      ...listLeadEmails().map(normalizeEmail),
-      ...listContactEmails().map(normalizeEmail),
-    ]),
+    ...new Set([...listClaimedLeadEmails(), ...listClaimedContactEmails()]),
   ];
 }
 
@@ -31,10 +38,15 @@ export function listClaimedDealKeys(): string[] {
   return [...new Set(listDealKeys())];
 }
 
-/** Email must be unique across Leads and Contacts (§28.1). */
+export type UniqueEmailScope = "leads" | "contacts" | "all";
+
+/**
+ * Email uniqueness is per module: leads may reuse a contact email
+ * (Create Lead links Contacts), and contacts stay unique among contacts.
+ */
 export function assertUniqueEmail(
   email: string,
-  opts?: { excludeEmail?: string },
+  opts?: { excludeEmail?: string; scope?: UniqueEmailScope },
 ): RuleResult {
   const normalized = normalizeEmail(email);
   if (!normalized) return fail("EMAIL_REQUIRED", "Email is required");
@@ -44,10 +56,21 @@ export function assertUniqueEmail(
   const exclude = opts?.excludeEmail
     ? normalizeEmail(opts.excludeEmail)
     : null;
-  if (listClaimedEmails().includes(normalized) && normalized !== exclude) {
+  const scope = opts?.scope ?? "all";
+  const claimed =
+    scope === "leads"
+      ? listClaimedLeadEmails()
+      : scope === "contacts"
+        ? listClaimedContactEmails()
+        : listClaimedEmails();
+  if (claimed.includes(normalized) && normalized !== exclude) {
     return fail(
       "EMAIL_NOT_UNIQUE",
-      "Email must be unique across Leads and Contacts",
+      scope === "leads"
+        ? "A lead with this email already exists"
+        : scope === "contacts"
+          ? "A contact with this email already exists"
+          : "Email must be unique across Leads and Contacts",
     );
   }
   return ok();

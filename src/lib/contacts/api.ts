@@ -1,9 +1,10 @@
 import {
   ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
   isUuid,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import type {
   ContactCardData,
   ContactSource,
@@ -67,6 +68,34 @@ async function resolveAuth() {
   return ensureCrmAccess();
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/** Nest `GET /contacts/board` returns `{ status, records, total }[]`. */
+function looksLikeBoardColumn(rec: Record<string, unknown>): boolean {
+  if (Array.isArray(rec.records) || Array.isArray(rec.contacts)) return true;
+  const grouped =
+    rec.status != null || rec.lifecycleStage != null || rec.key != null;
+  return grouped && typeof rec.total === "number" && rec.email == null;
+}
+
+function looksLikeContactRecord(rec: Record<string, unknown>): boolean {
+  if (looksLikeBoardColumn(rec)) return false;
+  return Boolean(
+    pickStr(rec.email, rec.emailAddress, rec.primaryEmail) ||
+      pickStr(rec.firstName, rec.lastName, rec.name, rec.fullName) ||
+      isUuid(pickStr(rec.id, rec.uuid, rec.contactId)),
+  );
+}
+
+function columnRecords(col: Record<string, unknown>): unknown {
+  if (Array.isArray(col.records)) return col.records;
+  if (Array.isArray(col.contacts)) return col.contacts;
+  if (Array.isArray(col.items)) return col.items;
+  return [];
+}
+
 function extractRecords(data: unknown): Record<string, unknown>[] {
   if (!data) return [];
   if (Array.isArray(data)) {
@@ -75,38 +104,46 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
       Array.isArray(data[0]) &&
       (typeof data[1] === "number" || data[1] == null)
     ) {
-      return (data[0] as unknown[]).filter(
-        (row): row is Record<string, unknown> =>
-          !!row && typeof row === "object" && !Array.isArray(row),
-      );
+      return extractRecords(data[0]);
     }
-    return data.filter(
-      (row): row is Record<string, unknown> =>
-        !!row && typeof row === "object" && !Array.isArray(row),
-    );
-  }
-  if (typeof data === "object") {
-    const rec = data as {
-      items?: unknown;
-      contacts?: unknown;
-      columns?: unknown;
-      groups?: unknown;
-    };
-    if (Array.isArray(rec.items)) return extractRecords(rec.items);
-    if (Array.isArray(rec.contacts)) return extractRecords(rec.contacts);
-    for (const key of ["columns", "groups"] as const) {
-      const cols = rec[key];
-      if (!Array.isArray(cols)) continue;
-      const out: Record<string, unknown>[] = [];
-      for (const col of cols) {
-        if (col && typeof col === "object") {
-          out.push(...extractRecords(col));
-        }
-      }
-      if (out.length) return out;
+    const rows = data.filter(isPlainRecord);
+    if (rows.some(looksLikeBoardColumn)) {
+      return rows.flatMap((col) => extractRecords(columnRecords(col)));
     }
+    return rows.filter(looksLikeContactRecord);
   }
+  if (!isPlainRecord(data)) return [];
+
+  if (data.data != null) {
+    const nested = extractRecords(data.data);
+    if (nested.length) return nested;
+  }
+  if (Array.isArray(data.items)) return extractRecords(data.items);
+  if (Array.isArray(data.contacts)) return extractRecords(data.contacts);
+  if (Array.isArray(data.records)) return extractRecords(data.records);
+  if (Array.isArray(data.rows)) return extractRecords(data.rows);
+  for (const key of ["columns", "groups"] as const) {
+    const cols = data[key];
+    if (!Array.isArray(cols)) continue;
+    const out = extractRecords(cols);
+    if (out.length) return out;
+  }
+  if (looksLikeContactRecord(data)) return [data];
   return [];
+}
+
+function unwrapContactPayload(data: unknown): Record<string, unknown> | null {
+  let cur: unknown = data;
+  for (let i = 0; i < 6; i += 1) {
+    if (!isPlainRecord(cur)) break;
+    if (looksLikeContactRecord(cur)) return cur;
+    if (cur.data != null) {
+      cur = cur.data;
+      continue;
+    }
+    break;
+  }
+  return null;
 }
 
 export function mapContactStatus(raw: string): ContactStatus {
@@ -145,9 +182,7 @@ function initialsFromName(name: string) {
 
 function formatCreated(raw: unknown): string {
   const value = pickStr(raw);
-  if (!value) {
-    return new Date().toLocaleDateString("en-AU");
-  }
+  if (!value) return "";
   const parsed = Date.parse(value);
   if (Number.isNaN(parsed)) return value;
   return new Date(parsed).toLocaleDateString("en-AU");
@@ -172,19 +207,19 @@ export function normalizeCrmContact(
       : null;
   const first = pickStr(raw.firstName, raw.givenName);
   const last = pickStr(raw.lastName, raw.familyName);
-  const name =
-    pickStr(raw.name, raw.fullName, `${first} ${last}`.trim()) || "Untitled contact";
-  const status = mapContactStatus(pickStr(raw.status, raw.state, "ACTIVE"));
-  const id = pickStr(raw.id, raw.uuid, raw.contactId) || `crm-ct-${index}`;
+  const name = pickStr(raw.name, raw.fullName, `${first} ${last}`.trim());
+  const status = mapContactStatus(pickStr(raw.status, raw.state) || "ACTIVE");
+  const id = pickStr(raw.id, raw.uuid, raw.contactId);
+  const sourceRaw = pickStr(raw.source, raw.leadSource, raw.origin);
 
   return {
     status,
     contact: {
       id,
-      name,
+      name: name || [first, last].filter(Boolean).join(" ") || emailFallback(raw),
       firstName: first || undefined,
       lastName: last || undefined,
-      initials: pickStr(raw.initials) || initialsFromName(name),
+      initials: pickStr(raw.initials) || initialsFromName(name || first || last || "C"),
       company: pickStr(
         company && pickStr(company.name, company.title),
         raw.companyName,
@@ -199,7 +234,6 @@ export function normalizeCrmContact(
         raw.ownerName,
         raw.assignedTo,
         typeof raw.owner === "string" ? raw.owner : "",
-        "—",
       ),
       ownerId: pickStr(raw.ownerId, owner && owner.id) || undefined,
       jobTitle: pickStr(raw.jobTitle) || undefined,
@@ -210,9 +244,7 @@ export function normalizeCrmContact(
         raw.doNotContact === true ||
         String(raw.doNotContact).toLowerCase() === "true",
       notes: pickStr(raw.notes) || undefined,
-      source: mapContactSource(
-        pickStr(raw.source, raw.leadSource, raw.origin, "WEBSITE"),
-      ),
+      source: sourceRaw ? mapContactSource(sourceRaw) : undefined,
       createdDate: formatCreated(raw.createdAt ?? raw.createdDate ?? raw.createdOn),
       accentColorClass: STATUS_DOT[status],
       avatarBgClass: AVATAR_COLORS[index % AVATAR_COLORS.length],
@@ -220,25 +252,34 @@ export function normalizeCrmContact(
   };
 }
 
+function emailFallback(raw: Record<string, unknown>): string {
+  return pickStr(raw.email, raw.emailAddress, raw.primaryEmail);
+}
+
 export function normalizeCrmContacts(data: unknown): NormalizedCrmContact[] {
-  return extractRecords(data).map((row, index) =>
-    normalizeCrmContact(row, index),
-  );
+  return extractRecords(data)
+    .map((row, index) => normalizeCrmContact(row, index))
+    .filter((item) => isUuid(item.contact.id));
+}
+
+async function contactsCrm<T>(path: string, init?: RequestInit): Promise<T> {
+  if (isBoundCrmSession()) {
+    const auth = await resolveAuth();
+    if (!auth) throw new Error("Sign in to load contacts");
+    return crmFetch(auth, path, init);
+  }
+  return crmBffFetch<T>(path, init);
 }
 
 async function contactsGet(suffix: string, query = ""): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to load contacts");
-  return crmFetch(auth, `${contactsPath(suffix)}${query}`);
+  return contactsCrm(`${contactsPath(suffix)}${query}`);
 }
 
 async function contactsMutate(
   suffix: string,
   init: RequestInit,
 ): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to manage contacts");
-  return crmFetch(auth, contactsPath(suffix), init);
+  return contactsCrm(contactsPath(suffix), init);
 }
 
 export async function listCrmContactBoard(): Promise<NormalizedCrmContact[]> {
@@ -261,12 +302,18 @@ export async function listCrmContacts(
   );
 }
 
+function isLiveNormalizedContact(item: NormalizedCrmContact): boolean {
+  return isUuid(item.contact.id) || Boolean(item.contact.email);
+}
+
 /** Prefer Swagger board; fall back to paginated list. */
 export async function loadCrmContacts(
   query: CrmContactQuery = {},
 ): Promise<NormalizedCrmContact[]> {
   try {
-    const board = await listCrmContactBoard();
+    const board = await listCrmContactBoard().then((rows) =>
+      rows.filter(isLiveNormalizedContact),
+    );
     if (board.length) return board;
   } catch {
     /* list endpoint is the documented fallback */
@@ -280,10 +327,9 @@ export async function getCrmContact(
   if (!isUuid(id)) return null;
   const data = await contactsGet(`/${id}`);
   const items = normalizeCrmContacts(data);
-  if (items[0]) return items[0];
-  if (data && typeof data === "object" && !Array.isArray(data)) {
-    return normalizeCrmContact(data as Record<string, unknown>, 0);
-  }
+  if (items[0] && isLiveNormalizedContact(items[0])) return items[0];
+  const entity = unwrapContactPayload(data);
+  if (entity) return normalizeCrmContact(entity, 0);
   return null;
 }
 
@@ -307,29 +353,32 @@ export async function createCrmContact(input: {
   notes?: string;
 }): Promise<NormalizedCrmContact | null> {
   const body: Record<string, unknown> = {
-    firstName: input.firstName,
-    lastName: input.lastName,
-    email: input.email,
-    phone: input.phone,
-    mobilePhone: input.mobile,
-    source: input.source ? apiSource(input.source) : undefined,
-    jobTitle: input.jobTitle,
-    department: input.department,
-    linkedinUrl: input.linkedinUrl,
-    lifecycleStage: input.lifecycleStage,
-    doNotContact: input.doNotContact,
-    notes: input.notes,
+    firstName: input.firstName.trim(),
+    lastName: input.lastName.trim(),
+    email: input.email.trim(),
   };
-  if (input.companyId) body.companyId = input.companyId;
-  if (input.ownerId) body.ownerId = input.ownerId;
+  if (input.phone?.trim()) body.phone = input.phone.trim();
+  if (input.mobile?.trim()) body.mobilePhone = input.mobile.trim();
+  if (input.source) body.source = apiSource(input.source);
+  if (input.jobTitle?.trim()) body.jobTitle = input.jobTitle.trim();
+  if (input.department?.trim()) body.department = input.department.trim();
+  if (input.linkedinUrl?.trim()) body.linkedinUrl = input.linkedinUrl.trim();
+  if (input.lifecycleStage?.trim()) body.lifecycleStage = input.lifecycleStage.trim();
+  if (input.doNotContact != null) body.doNotContact = input.doNotContact;
+  if (input.notes?.trim()) body.notes = input.notes.trim();
+  if (input.companyId && isUuid(input.companyId)) body.companyId = input.companyId;
+  else if (input.company && isUuid(input.company)) body.companyId = input.company;
+  if (input.ownerId && isUuid(input.ownerId)) body.ownerId = input.ownerId;
   const data = await contactsMutate("", {
     method: "POST",
     body: JSON.stringify(body),
   });
   const items = normalizeCrmContacts(data);
-  if (items[0]) return items[0];
-  if (data && typeof data === "object" && !Array.isArray(data)) {
-    return normalizeCrmContact(data as Record<string, unknown>, 0);
+  if (items[0] && isLiveNormalizedContact(items[0])) return items[0];
+  const entity = unwrapContactPayload(data);
+  if (entity) {
+    const mapped = normalizeCrmContact(entity, 0);
+    if (isLiveNormalizedContact(mapped)) return mapped;
   }
   return null;
 }

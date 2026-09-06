@@ -10,6 +10,7 @@ const ALLOWED_ROOTS = new Set([
   "deals",
   "calls",
   "companies",
+  "contacts",
   "smart-hubs",
   "smart-short-links",
   "emails",

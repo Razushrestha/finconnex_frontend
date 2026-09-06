@@ -217,6 +217,9 @@ export function smokeEmailsWiring() {
   if (!create.includes("createCrmEmail") || !create.includes("sendCrmEmail")) {
     fail("create email form does not call createCrmEmail/sendCrmEmail");
   }
+  if (!api.includes("deliverQueuedCrmEmail")) {
+    fail("email send does not deliver through the app SendGrid route");
+  }
   const leadDetail = readSrc("src/components/sales/leads/LeadDetailView.tsx");
   if (!leadDetail.includes("sendCrmActivityEmail")) {
     fail("lead detail compose does not call sendCrmActivityEmail");

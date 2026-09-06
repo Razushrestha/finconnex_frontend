@@ -36,15 +36,21 @@ export function AddApplicantContactModal({
       setError("Enter a valid email");
       return;
     }
-    const contact = createContact({
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      email: email.trim(),
-      phone: phone.trim() || undefined,
-      status: "Active",
-      owner: getRulesActor().name || "John Smith",
-    });
-    onCreated({ name: contact.name, email: contact.email });
+    void (async () => {
+      try {
+        const contact = await createContact({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email: email.trim(),
+          phone: phone.trim() || undefined,
+          status: "Active",
+          owner: getRulesActor().name || "John Smith",
+        });
+        onCreated({ name: contact.name, email: contact.email });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not save contact");
+      }
+    })();
   }
 
   return (
