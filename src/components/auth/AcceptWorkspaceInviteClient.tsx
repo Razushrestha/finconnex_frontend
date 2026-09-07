@@ -2,16 +2,39 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+function tokenFromLocation() {
+  if (typeof window === "undefined") return "";
+  const hash = window.location.hash.replace(/^#/, "");
+  return (
+    new URLSearchParams(hash).get("token")?.trim() ||
+    new URLSearchParams(hash).get("invitationToken")?.trim() ||
+    ""
+  );
+}
+
 export function AcceptWorkspaceInviteClient() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const token =
+  const queryToken =
     searchParams.get("token")?.trim() ||
     searchParams.get("invitationToken")?.trim() ||
     "";
+  const [token, setToken] = React.useState(queryToken);
+
+  React.useEffect(() => {
+    if (queryToken) {
+      setToken(queryToken);
+      return;
+    }
+    const hashed = tokenFromLocation();
+    if (hashed) {
+      router.replace(`/invite/accept?token=${encodeURIComponent(hashed)}`);
+    }
+  }, [queryToken, router]);
   const [status, setStatus] = React.useState<"idle" | "working" | "ok" | "error">(
     token ? "working" : "idle",
   );

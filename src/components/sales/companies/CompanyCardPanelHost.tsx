@@ -5,6 +5,7 @@ import { RelatedInternalNotes } from "@/components/shared/RelatedInternalNotes";
 import { useState } from "react";
 import { X } from "lucide-react";
 import type { CompanyQuickActionKind } from "@/components/sales/companies/CompanyCard";
+import { composeEmailsHref } from "@/lib/emails/href";
 
 export interface CompanyQuickActionPanelState {
   type: "quick-action";
@@ -80,6 +81,16 @@ export function CompanyCardPanelHost({
             panel={panel}
             onCancel={onClose}
             onSubmit={(message) => {
+              if (panel.kind === "email") {
+                window.location.assign(
+                  composeEmailsHref({
+                    relatedKind: "Company",
+                    relatedName: panel.companyName,
+                    relatedId: panel.companyId,
+                  }),
+                );
+                return;
+              }
               onQuickActionSuccess(message);
               onClose();
             }}

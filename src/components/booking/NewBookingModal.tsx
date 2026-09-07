@@ -526,10 +526,11 @@ export function NewBookingModal({
                   allowCustom={relatedKind === "Contact"}
                   createLabel={(name) => `Add contact “${name}”`}
                   onCreateOption={(name) => {
-                    const created = createQuickContact(name);
-                    setRelatedName(created.name);
-                    setClientId(created.id);
-                    setRecordTick((tick) => tick + 1);
+                    void createQuickContact(name).then((created) => {
+                      setRelatedName(created.name);
+                      setClientId(created.id);
+                      setRecordTick((tick) => tick + 1);
+                    });
                   }}
                 />
               </Field>

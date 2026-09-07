@@ -251,7 +251,7 @@ export function runContactReport(id: string, filters: LibraryFilters, now: Date)
         name: c.name,
         company: c.company,
         owner: c.owner,
-        source: c.source,
+        source: c.source ?? "",
         status: c.status,
         created: c.createdDate,
       }),

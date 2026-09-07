@@ -35,10 +35,8 @@ import { leadSendHref } from "@/lib/leads/convert-actions";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import type { LeadMoreAction } from "@/components/sales/leads/LeadMoreMenu";
 import { createDeal } from "@/lib/deals/store";
-import { sendEmailDemoLive } from "@/lib/comms/send-gateway";
-import { createEmail } from "@/lib/emails/store";
+import { sendCrmActivityEmail } from "@/lib/emails/compose-send";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
-import { formatRulesAt } from "@/lib/rules/storage";
 import { listCrmWorkspaceMembers } from "@/lib/workspace-members/api";
 import { FOLLOWERS_KEY } from "@/components/sales/leads/detail/LeadFollowersField";
 import {
@@ -598,44 +596,29 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
               : values.to
                 ? values.to.split(/[,;]+/).map((part) => part.trim()).filter(Boolean)
                 : [card.email];
-            if (values.sendAt) {
-              createEmail({
-                subject: values.subject || "(no subject)",
-                body: values.body || "",
-                from: "noreply@finconnex.demo",
+            try {
+              await sendCrmActivityEmail({
                 to,
+                subject: values.subject || `Follow up with ${card.name}`,
+                body: values.body || "",
                 cc: values.ccList,
                 bcc: values.bccList,
-                status: "Scheduled",
-                sentDate: values.sendAt,
+                relatedType: "LEAD",
+                relatedId: card.id,
                 relatedTo: `Lead: ${card.name}`,
+                scheduledAt: values.sendAt,
               });
               setIsComposeOpen(false);
-              notify("Email scheduled");
-              return;
+              notify(
+                values.sendAt
+                  ? "Email scheduled"
+                  : to.length > 1
+                    ? `Email sent to ${to.length} recipients`
+                    : "Email sent",
+              );
+            } catch (err) {
+              notify(err instanceof Error ? err.message : "Could not send email");
             }
-            createEmail({
-              subject: values.subject || "(no subject)",
-              body: values.body || "",
-              from: "noreply@finconnex.demo",
-              to,
-              cc: values.ccList,
-              bcc: values.bccList,
-              status: "Sent",
-              sentDate: formatRulesAt(),
-              relatedTo: `Lead: ${card.name}`,
-            });
-            setIsComposeOpen(false);
-            notify(
-              to.length > 1
-                ? `Email sent to ${to.length} recipients`
-                : "Email sent",
-            );
-            void sendEmailDemoLive({
-              email: to[0],
-              subject: values.subject,
-              body: values.body,
-            });
           })();
         }}
       />

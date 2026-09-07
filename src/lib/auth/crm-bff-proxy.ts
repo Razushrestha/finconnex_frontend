@@ -10,12 +10,14 @@ const ALLOWED_ROOTS = new Set([
   "deals",
   "calls",
   "companies",
+  "contacts",
   "smart-hubs",
   "smart-short-links",
   "emails",
   "tasks",
   "messages",
   "notes",
+  "dashboard",
   "public",
 ]);
 
@@ -38,8 +40,11 @@ function isAllowed(path: string[]): boolean {
       path.includes("tasks") ||
       path.includes("messages") ||
       path.includes("notes") ||
+      path.includes("dashboard") ||
       path[2] === "members" ||
-      path[2] === "members-summary"
+      path[2] === "members-summary" ||
+      path[2] === "members-admin" ||
+      path[2] === "ownership-transfer"
     );
   }
   if (!ALLOWED_ROOTS.has(root)) return false;

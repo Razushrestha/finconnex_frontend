@@ -86,6 +86,7 @@ export function LeadCardPanelHost({
         leadName={panel.leadName}
         leadEmail={panel.email}
         leadPhone={panel.phone}
+        leadId={panel.leadId}
         onSuccess={onQuickActionSuccess}
       />
     );

@@ -203,30 +203,27 @@ export async function sendEmailDemoLive(input: {
   email?: string;
   subject?: string;
   body?: string;
+  relatedType?: string;
+  relatedId?: string;
+  relatedTo?: string;
 }): Promise<SendResult> {
   try {
-    const { createCrmEmail, persistRemoteEmail, sendCrmEmail } = await import(
-      "@/lib/emails/api"
-    );
-    const created = await createCrmEmail({
+    const { sendCrmActivityEmail } = await import("@/lib/emails/compose-send");
+    const sent = await sendCrmActivityEmail({
+      to: input.email ? [input.email] : [],
       subject: input.subject ?? "",
       body: input.body ?? "",
-      to: input.email ? [input.email] : [],
-      status: "Draft",
+      relatedType: input.relatedType,
+      relatedId: input.relatedId,
+      relatedTo: input.relatedTo,
     });
-    if (created) {
-      try {
-        const sent = await sendCrmEmail(created.id);
-        persistRemoteEmail(sent ?? created);
-        return { ok: true, mode: "gateway", providerId: created.id };
-      } catch {
-        persistRemoteEmail(created);
-      }
-    }
-  } catch {
-    /* fall through to local send log */
+    return { ok: true, mode: "gateway", providerId: sent.id };
+  } catch (err) {
+    return {
+      ok: false,
+      message: err instanceof Error ? err.message : "Could not send email",
+    };
   }
-  return { ok: true, mode: "device" };
 }
 
 export async function sendSmsDemoLive(input: {

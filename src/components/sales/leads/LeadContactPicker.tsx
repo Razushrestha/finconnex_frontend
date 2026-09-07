@@ -7,9 +7,11 @@ import {
   findContactByEmail,
   findContactById,
   listAllContacts,
+  mergeCrmContactsIntoBoard,
   updateContact,
 } from "@/lib/contacts/store";
 import type { ContactCardData, ContactSource } from "@/lib/contacts/types";
+import { listCrmContacts } from "@/lib/contacts/api";
 import { cn } from "@/lib/utils";
 import {
   elevatedInputClass,
@@ -65,10 +67,10 @@ function toLinked(contact: ContactCardData): LinkedLeadContact {
     id: contact.id,
     name: contact.name,
     email: contact.email,
-    phone: contact.phone,
-    firstName: parts.firstName,
+    phone: contact.phone || contact.mobile || "",
+    firstName: contact.firstName || parts.firstName,
     middleName: parts.middleName,
-    lastName: parts.lastName,
+    lastName: contact.lastName || parts.lastName,
   };
 }
 
@@ -173,6 +175,8 @@ export function LeadContactPicker({
     lastName?: boolean;
     email?: boolean;
   }>({});
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const selectedIds = useMemo(
     () => new Set(contacts.map((contact) => contact.id)),
@@ -180,12 +184,14 @@ export function LeadContactPicker({
   );
   const directory = useMemo(() => {
     // `tick` forces a refresh when the contacts store mutates elsewhere;
-    // `open` re-fetches the directory each time the picker is opened.
-    // Neither is read directly in the body.
+    // `open` re-fetches the directory each time the picker is opened;
+    // `loading` recomputes once the initial load completes. None are
+    // read directly in the body.
     void tick;
     void open;
+    void loading;
     return listAllContacts();
-  }, [tick, open]);
+  }, [tick, open, loading]);
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -215,6 +221,56 @@ export function LeadContactPicker({
     const id = window.setTimeout(() => searchRef.current?.focus(), 0);
     return () => window.clearTimeout(id);
   }, [open]);
+
+  useEffect(() => {
+    let cancelled = false;
+    // Genuine data-fetch effect: setLoading/setLoadError seed state before
+    // the async fetch below settles (mirrors use-crm-custom-fields.ts).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLoading(true);
+    setLoadError(null);
+    void (async () => {
+      try {
+        const rows = await listCrmContacts({ limit: 100 });
+        if (cancelled) return;
+        if (rows.length) mergeCrmContactsIntoBoard(rows);
+        setTick((n) => n + 1);
+      } catch (err) {
+        if (cancelled) return;
+        setLoadError(
+          err instanceof Error ? err.message : "Could not load contacts",
+        );
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const q = query.trim();
+    if (q.length < 2) return;
+    let cancelled = false;
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const rows = await listCrmContacts({ search: q, limit: 50 });
+          if (cancelled || !rows.length) return;
+          mergeCrmContactsIntoBoard(rows);
+          setTick((n) => n + 1);
+        } catch {
+          /* keep the contacts already loaded from the list */
+        }
+      })();
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
+  }, [open, query]);
 
   function resetAddForm(prefill = "") {
     const parts = splitNameParts(prefill);
@@ -259,7 +315,7 @@ export function LeadContactPicker({
     onChange(next);
   }
 
-  function saveNewContact() {
+  async function saveNewContact() {
     const firstName = addFirstName.trim();
     const middleName = addMiddleName.trim();
     const lastName = addLastName.trim();
@@ -289,33 +345,37 @@ export function LeadContactPicker({
       return;
     }
     const name = displayName(firstName, middleName, lastName);
-    const created = createContact({
-      firstName,
-      lastName,
-      email,
-      phone: addPhone.trim(),
-      status: "Active",
-      owner: owner.trim() || "You",
-      source: toContactSource(leadSource),
-    });
-    const saved =
-      created.name !== name
-        ? (updateContact(created.id, { name }) ?? created)
-        : created;
-    const linked: LinkedLeadContact = {
-      id: saved.id,
-      name: saved.name,
-      email: saved.email,
-      phone: saved.phone,
-      firstName,
-      middleName,
-      lastName,
-    };
-    onChange([...contacts, linked]);
-    setTick((n) => n + 1);
-    setQuery("");
-    setOpen(false);
-    setAdding(false);
+    try {
+      const created = await createContact({
+        firstName,
+        lastName,
+        email,
+        phone: addPhone.trim(),
+        status: "Active",
+        owner: owner.trim() || "You",
+        source: toContactSource(leadSource),
+      });
+      const saved =
+        created.name !== name
+          ? (updateContact(created.id, { name }) ?? created)
+          : created;
+      const linked: LinkedLeadContact = {
+        id: saved.id,
+        name: saved.name,
+        email: saved.email,
+        phone: saved.phone,
+        firstName,
+        middleName,
+        lastName,
+      };
+      onChange([...contacts, linked]);
+      setTick((n) => n + 1);
+      setQuery("");
+      setOpen(false);
+      setAdding(false);
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : "Could not save contact");
+    }
   }
 
   const nextRole = contacts.length === 0 ? "Primary" : "Secondary";
@@ -402,9 +462,17 @@ export function LeadContactPicker({
                 </label>
               </div>
               <div className="max-h-56 overflow-y-auto py-1">
-                {matches.length === 0 ? (
+                {loading && matches.length === 0 ? (
                   <p className="px-3 py-3 text-[12px] text-slate-400">
-                    No matching contacts
+                    Loading contacts…
+                  </p>
+                ) : matches.length === 0 ? (
+                  <p className="px-3 py-3 text-[12px] text-slate-400">
+                    {query.trim()
+                      ? "No matching contacts"
+                      : loadError
+                        ? loadError
+                        : "No contacts yet. Add one below, or create them on Contacts."}
                   </p>
                 ) : (
                   matches.map((contact) => (

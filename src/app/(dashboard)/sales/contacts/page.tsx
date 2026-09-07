@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   EntityHeader,
   type SortDirection,
@@ -30,6 +31,7 @@ import {
   listContactGroups,
   updateContact,
 } from "@/lib/contacts/store";
+import { composeEmailsHref } from "@/lib/emails/href";
 import { useCrmContacts } from "@/lib/contacts/use-crm-contacts";
 import {
   bulkCrmContacts,
@@ -89,6 +91,7 @@ const DEFAULT_CONTACT_COLUMNS = CONTACT_GROUPS.map((group) => ({
 }));
 
 export default function ContactsPage() {
+  const router = useRouter();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ContactViewMode>("kanban");
   const [filters, setFilters] = useState<ContactFilters>(EMPTY_CONTACT_FILTERS);
@@ -271,9 +274,9 @@ export default function ContactsPage() {
             ? "Live CRM"
             : crm.loading
               ? "Connecting…"
-              : "Demo"}
+              : "CRM"}
         </span>
-        {crm.error && crm.source === "demo" ? (
+        {crm.error ? (
           <span className="text-[10px] text-slate-500">{crm.error}</span>
         ) : null}
       </div>
@@ -314,7 +317,32 @@ export default function ContactsPage() {
         <EntitySelectionToolbar
           selectedCount={selectedIds.length}
           onClear={() => setSelectedIds([])}
-          onSendMail={() => console.log("send mail clicked")}
+          onSendMail={() => {
+            const emails: string[] = [];
+            let name = "";
+            let id = "";
+            for (const sid of selectedIds) {
+              const found = findContactById(sid);
+              const email = found?.contact.email?.trim();
+              if (email?.includes("@")) emails.push(email);
+              if (!name && found) {
+                name = found.contact.name;
+                id = found.contact.id;
+              }
+            }
+            if (!emails.length) {
+              setBulkFlash("Selected contacts have no email address");
+              return;
+            }
+            router.push(
+              composeEmailsHref({
+                to: emails,
+                relatedKind: selectedIds.length === 1 ? "Contact" : undefined,
+                relatedName: selectedIds.length === 1 ? name : undefined,
+                relatedId: selectedIds.length === 1 ? id : undefined,
+              }),
+            );
+          }}
           onAddTag={(tag) => {
             let n = 0;
             for (const id of selectedIds) {
@@ -361,7 +389,15 @@ export default function ContactsPage() {
         )}
 
         <div key={viewMode} className={cn("min-h-0 min-w-0 flex-1 overflow-hidden", viewEnter)}>
-          {viewMode === "kanban" ? (
+          {crm.loading ? (
+            <div className="flex h-full items-center justify-center text-sm text-slate-400">
+              Loading contacts…
+            </div>
+          ) : crm.error ? (
+            <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-400">
+              {crm.error}
+            </div>
+          ) : viewMode === "kanban" ? (
             <ContactsKanbanBoard
               filters={filters}
               visibleColumnIds={visibleColumnIds}
@@ -396,8 +432,8 @@ export default function ContactsPage() {
             defaultSource: settings.defaultSource as ContactSource,
           })
         }
-        apply={(rows, mapping, settings) => {
-          const summary = applyContactImport(rows, mapping, {
+        apply={async (rows, mapping, settings) => {
+          const summary = await applyContactImport(rows, mapping, {
             skipDuplicates: settings.skipDuplicates,
             updateExisting: settings.updateExisting,
             defaultOwner: settings.defaultOwner,

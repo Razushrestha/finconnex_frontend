@@ -22,7 +22,7 @@ export const RULES_SECTIONS = [
     id: "28.1",
     title: "Data Integrity",
     points: [
-      "Email unique across Leads and Contacts",
+      "Lead emails unique among leads; contact emails unique among contacts",
       "Deal Name + Account unique",
       "Required fields on create",
       "System fields non-editable",

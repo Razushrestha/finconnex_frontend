@@ -74,7 +74,7 @@ function slotEndIso(startIso: string, durationMinutes: number) {
   return `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}T${pad(end.getHours())}:${pad(end.getMinutes())}`;
 }
 
-export function confirmPublicBooking(input: {
+export async function confirmPublicBooking(input: {
   page: BookingPage;
   guestName: string;
   guestEmail: string;
@@ -83,7 +83,7 @@ export function confirmPublicBooking(input: {
   answers: Record<string, string>;
   /** Existing manage token when guest is rescheduling */
   rescheduleToken?: string;
-}): { booking: Booking; manageToken: string } {
+}): Promise<{ booking: Booking; manageToken: string }> {
   const page = input.page;
   const end = slotEndIso(input.start, page.durationMinutes);
   const when = formatBookingWhen(input.start, end);
@@ -117,7 +117,7 @@ export function confirmPublicBooking(input: {
     leadId = lead.id;
     createdLead = true;
 
-    const contact = createContact({
+    const contact = await createContact({
       firstName,
       lastName,
       email: input.guestEmail,

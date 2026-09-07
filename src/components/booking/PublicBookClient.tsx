@@ -143,7 +143,7 @@ function BookFlow({
     setStep("details");
   }
 
-  function confirm() {
+  async function confirm() {
     const next: Record<string, string> = {};
     if (!name.trim()) next.name = "Required";
     if (!email.trim() || !email.includes("@")) next.email = "Valid email required";
@@ -158,7 +158,7 @@ function BookFlow({
     try {
       const dateStr = toLocalDateStr(selectedDate);
       const start = `${dateStr}T${selectedSlot}`;
-      const result = confirmPublicBooking({
+      const result = await confirmPublicBooking({
         page,
         guestName: name.trim(),
         guestEmail: email.trim(),

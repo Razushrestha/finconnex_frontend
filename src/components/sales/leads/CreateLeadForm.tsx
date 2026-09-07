@@ -12,7 +12,7 @@ import {
   type LoanPurpose,
 } from "@/lib/leads/types";
 import { api } from "@/lib/api";
-import { findContactByEmail, findContactById } from "@/lib/contacts/store";
+import { findContactById } from "@/lib/contacts/store";
 import { findLeadByEmail, updateLead } from "@/lib/leads/store";
 import { syncCreatedLead } from "@/lib/leads/api";
 import { isUuid } from "@/lib/activity-timeline/auth";
@@ -351,26 +351,23 @@ export function CreateLeadForm({
     };
     let result = await api.leads.create(payload);
     if (!result.ok) {
-      const existing = findLeadByEmail(primary.email);
-      if (existing) {
-        result = await api.leads.update(existing.card.id, payload);
-        if (result.ok) {
-          router.push("/sales/leads");
-          return;
-        }
+    const existing = findLeadByEmail(primary.email);
+    if (existing) {
+      result = await api.leads.update(existing.card.id, payload);
+      if (result.ok) {
+        attachExtras(existing.card.id, primary);
+        router.push("/sales/leads");
+        return;
       }
-      const contact = findContactByEmail(primary.email);
-      const emailError =
-        !result.ok
-          ? (result.error.fields?.email ??
-            "This email is already used. Change it, or open All Leads.")
-          : "This email is already used. Change it, or open All Leads.";
-      setErrors((prev) => ({
-        ...prev,
-        email: contact
-          ? "This email already belongs to a contact. Use a different address."
-          : emailError,
-      }));
+    }
+    setErrors((prev) => ({
+      ...prev,
+      email:
+        (!result.ok
+          ? (result.error.fields?.email ?? result.error.message)
+          : null) ||
+        "A lead with this email already exists. Open All Leads to continue that record.",
+    }));
       return;
     }
     attachExtras(result.data.id, primary);

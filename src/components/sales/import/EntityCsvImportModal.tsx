@@ -72,7 +72,14 @@ export interface EntityCsvImportModalProps {
       defaultStatus: string;
       defaultSource: string;
     },
-  ) => { imported: number; updated: number; skipped: number; errors: number };
+  ) =>
+    | { imported: number; updated: number; skipped: number; errors: number }
+    | Promise<{
+        imported: number;
+        updated: number;
+        skipped: number;
+        errors: number;
+      }>;
   downloadErrorReport: (preview: CsvImportPreview) => void;
   sampleTemplate: string;
   sampleFilename: string;
@@ -205,11 +212,11 @@ export function EntityCsvImportModal(props: EntityCsvImportModalProps) {
     setStep("preview");
   }
 
-  function confirmImport() {
+  async function confirmImport() {
     setBusy(true);
     setError(null);
     try {
-      const result = apply(rows, mapping, settings);
+      const result = await apply(rows, mapping, settings);
       setSummary(result);
       setStep("done");
       onImported?.(result);

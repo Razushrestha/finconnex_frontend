@@ -11,14 +11,29 @@ type Envelope<T> = {
   data?: T;
 };
 
+const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
+  "email.error.relatedTypeMismatch":
+    "CRM parent record must be a live UUID. Send without linking this local/demo record.",
+  "email.error.unsafeHtml":
+    "CRM rejected HTML in the email body. Send as plain text.",
+  "email.error.singleToRequired":
+    "CRM allows one To address. Extra recipients must go in Cc.",
+  "email.error.invalidRecipient": "Recipient is not a valid email address.",
+  "workspace.error.invitationDeliveryFailed":
+    "Workspace invitation was created, but the invite email could not be queued. Sending from FinConnex mail instead.",
+  "workspace.error.roleRequired":
+    "Choose a workspace role before sending the invite.",
+};
+
 export function crmErrorMessage(json: unknown, fallback: string): string {
   if (json && typeof json === "object") {
     const rec = json as Record<string, unknown>;
     const msg = rec.message;
     const base = Array.isArray(msg) && msg.length
       ? msg.map(String).join(", ")
-      : typeof msg === "string" && msg.trim() && msg.trim().toLowerCase() !== "bad request"
-        ? msg.trim()
+      : typeof msg === "string" && msg.trim()
+        ? FRIENDLY_MESSAGE_KEYS[msg.trim()] ??
+          (msg.trim().toLowerCase() !== "bad request" ? msg.trim() : null)
         : null;
     const detail = Array.isArray(rec.errors) && rec.errors.length
       ? rec.errors
@@ -102,6 +117,35 @@ export async function crmBffFetch<T>(
   return unwrapCrmData<T>(json);
 }
 
+/**
+ * True once a hard sign-out redirect has been kicked off, so a page full of
+ * components each hitting a dead session don't all separately clear cookies
+ * and race each other to redirect.
+ */
+let signOutInFlight = false;
+
+/**
+ * The CRM backend revokes a refresh token's whole session on reuse (an
+ * anti-theft guard) — once that happens, `ensureCrmSession()` keeps handing
+ * back the same locally-still-unexpired access token forever, because it
+ * only checks the JWT's own `exp` claim, which knows nothing about a
+ * server-side revocation. That token is dead no matter how many times it's
+ * retried, so every request that touches it (deals, leads, automations —
+ * anything using crmFetch/httpRequest) fails with the raw backend error
+ * string surfaced as-is. Force a real sign-out instead of looping on it.
+ */
+export async function forceSignOutForDeadSession(): Promise<void> {
+  if (signOutInFlight || typeof window === "undefined") return;
+  signOutInFlight = true;
+  try {
+    const { clearCrmTokens } = await import("@/lib/activity-timeline/auth");
+    clearCrmTokens();
+    await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => undefined);
+  } finally {
+    window.location.href = "/login?reason=session_expired";
+  }
+}
+
 export async function crmFetch<T>(
   session: Pick<CrmSession, "baseUrl" | "accessToken">,
   path: string,
@@ -118,6 +162,12 @@ export async function crmFetch<T>(
         path,
         init,
       ));
+    } else if (res.status === 401) {
+      // Retrying handed back the exact same (locally-valid-looking) token —
+      // the session itself is revoked server-side, not just momentarily
+      // stale. No further retry can fix this; force a clean re-login.
+      void forceSignOutForDeadSession();
+      throw new Error("Your session has expired. Signing you out — please sign in again.");
     }
   }
 

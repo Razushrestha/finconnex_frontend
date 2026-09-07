@@ -18,7 +18,7 @@ import {
   type ContactStatus,
 } from "@/lib/contacts/types";
 import { COMPANY_NAMES } from "@/lib/companies/types";
-import { api } from "@/lib/api";
+import { createContact } from "@/lib/contacts/store";
 import {
   logCreate,
   notifyOwnerAssigned,
@@ -58,7 +58,7 @@ const initialState: FormState = {
   mobile: "",
   leadSource: "",
   status: "Active",
-  owner: "John Smith",
+  owner: "",
   company: "",
 };
 
@@ -104,34 +104,33 @@ export function CreateContactForm({
       window.alert(gate.message);
       return;
     }
-    const result = await api.contacts.create({
-      firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
-      email: form.email.trim(),
-      phone: form.phone,
-      mobile: form.mobile,
-      company: form.company,
-      source: form.leadSource || "Website",
-      status: form.status || "Active",
-      owner: form.owner,
-    });
-    if (!result.ok) {
-      if (result.error.fields?.email) {
-        setErrors((prev) => ({ ...prev, email: result.error.fields!.email }));
-      }
-      window.alert(result.error.message);
+    try {
+      const contact = await createContact({
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim(),
+        phone: form.phone,
+        mobile: form.mobile,
+        company: form.company,
+        source: form.leadSource || "Website",
+        status: form.status || "Active",
+        owner: form.owner,
+      });
+      const label = contact.name;
+      logCreate("sales.contacts", form.owner, contact.id, label);
+      notifyOwnerAssigned({
+        owner: form.owner,
+        entityLabel: `Contact ${label}`,
+        relatedTo: label,
+        relatedHref: "/sales/contacts",
+        type: "Lead Assigned",
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not save contact";
+      window.alert(message);
       return;
     }
-    const contact = result.data;
-    const label = contact.name;
-    logCreate("sales.contacts", form.owner, contact.id, label);
-    notifyOwnerAssigned({
-      owner: form.owner,
-      entityLabel: `Contact ${label}`,
-      relatedTo: label,
-      relatedHref: "/sales/contacts",
-      type: "Lead Assigned",
-    });
     if (createAnother) {
       setForm({ ...initialState, owner: form.owner, status: "Active" });
       setErrors({});

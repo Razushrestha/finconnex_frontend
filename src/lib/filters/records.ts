@@ -91,7 +91,7 @@ export function contactMatchesFilters(
   filters?: ContactFilters,
 ) {
   if (!filters) return true;
-  if (filters.sources.length && !filters.sources.includes(contact.source)) {
+  if (filters.sources.length && (!contact.source || !filters.sources.includes(contact.source))) {
     return false;
   }
   if (!matchesSystemDefined(filters.systemDefined, { createdDate: contact.createdDate })) {

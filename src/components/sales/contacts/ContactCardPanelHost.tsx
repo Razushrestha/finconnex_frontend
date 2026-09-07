@@ -4,6 +4,7 @@ import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import { useState } from "react";
 import { X } from "lucide-react";
 import type { ContactQuickActionKind } from "@/components/sales/contacts/ContactRecordCard";
+import { sendCrmActivityEmail } from "@/lib/emails/compose-send";
 
 export interface ContactQuickActionPanelState {
   type: "quick-action";
@@ -67,7 +68,7 @@ export function ContactCardPanelHost({
         <QuickActionForm
           panel={panel}
           onCancel={onClose}
-          onSubmit={(message) => {
+          onSubmit={async (message) => {
             onQuickActionSuccess(message);
             onClose();
           }}
@@ -124,10 +125,34 @@ function QuickActionForm({
 }: {
   panel: ContactQuickActionPanelState;
   onCancel: () => void;
-  onSubmit: (message: string) => void;
+  onSubmit: (message: string) => void | Promise<void>;
 }) {
   const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const config = FIELD_CONFIG[panel.kind];
+
+  async function handleSubmit() {
+    setError(null);
+    setBusy(true);
+    try {
+      if (panel.kind === "email") {
+        await sendCrmActivityEmail({
+          to: [panel.email],
+          subject: `Email to ${panel.contactName}`,
+          body: value.trim(),
+          relatedType: "CONTACT",
+          relatedId: panel.contactId,
+          relatedTo: `Contact: ${panel.contactName}`,
+        });
+      }
+      await onSubmit(`${config.successVerb} ${panel.contactName}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not send email");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="flex flex-1 flex-col justify-between overflow-y-auto px-5 py-5">
@@ -143,20 +168,24 @@ function QuickActionForm({
           placeholder={`${config.placeholder(panel)} Type @ to assign someone.`}
           className="w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
         />
+        {error ? (
+          <p className="text-[12px] font-medium text-rose-600">{error}</p>
+        ) : null}
       </div>
 
       <div className="mt-4 flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
         <button
           type="button"
           onClick={onCancel}
+          disabled={busy}
           className="rounded-md px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-50"
         >
           Cancel
         </button>
         <button
           type="button"
-          disabled={!value.trim()}
-          onClick={() => onSubmit(`${config.successVerb} ${panel.contactName}`)}
+          disabled={busy || !value.trim()}
+          onClick={() => void handleSubmit()}
           className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {PANEL_TITLES[panel.kind]}

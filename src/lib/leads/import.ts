@@ -22,7 +22,7 @@ import {
   type LeadStatus,
 } from "@/lib/leads/types";
 import { getRulesActor } from "@/lib/rules/actor";
-import { assertUniqueEmail, listClaimedEmails } from "@/lib/rules/integrity";
+import { assertUniqueEmail } from "@/lib/rules/integrity";
 
 export const LEAD_IMPORT_FIELDS = [
   {
@@ -154,7 +154,6 @@ export function previewLeadImport(
   mapping: Record<string, string>,
   settings: LeadImportSettings,
 ): LeadImportPreview {
-  const claimed = new Set(listClaimedEmails());
   const leadEmails = new Set(
     listLeadEmails().map((e) => e.trim().toLowerCase()),
   );
@@ -188,7 +187,7 @@ export function previewLeadImport(
       return;
     }
 
-    const uniq = assertUniqueEmail(email);
+    const uniq = assertUniqueEmail(email, { scope: "leads" });
     if (!uniq.ok && uniq.code === "EMAIL_INVALID") {
       results.push({
         rowIndex: idx + 2,
@@ -213,7 +212,6 @@ export function previewLeadImport(
     seenInFile.add(email);
 
     const existsOnLead = leadEmails.has(email);
-    const existsAnywhere = claimed.has(email);
 
     if (existsOnLead && settings.updateExisting) {
       results.push({
@@ -225,25 +223,21 @@ export function previewLeadImport(
       });
       return;
     }
-    if (existsAnywhere && settings.skipDuplicates) {
+    if (existsOnLead && settings.skipDuplicates) {
       results.push({
         rowIndex: idx + 2,
         status: "skip",
-        message: existsOnLead
-          ? "Skipped (duplicate lead email)"
-          : "Skipped (email used by a contact)",
+        message: "Skipped (duplicate lead email)",
         email,
         name,
       });
       return;
     }
-    if (existsAnywhere) {
+    if (existsOnLead) {
       results.push({
         rowIndex: idx + 2,
         status: "error",
-        message: existsOnLead
-          ? "Email already exists on a lead"
-          : "Email already used by a contact",
+        message: "Email already exists on a lead",
         email,
         name,
       });

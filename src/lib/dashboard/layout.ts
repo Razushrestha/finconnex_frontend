@@ -71,6 +71,8 @@ export interface DashboardLayout {
   hidden: DashboardWidgetId[];
   filters: DashboardFilters;
   isDefault: boolean;
+  /** CRM layout id from GET/POST /dashboard/layouts. */
+  remoteId?: string;
 }
 
 const LAYOUT_KEY = "dashboard:layout:v3";
@@ -102,8 +104,13 @@ export function defaultDashboardLayout(): DashboardLayout {
   };
 }
 
-function migrateWidgetId(id: string): DashboardWidgetId | null {
-  const aliased = WIDGET_ALIASES[id] ?? id;
+export function migrateWidgetId(id: string): DashboardWidgetId | null {
+  const raw = id.trim();
+  const lower = raw.toLowerCase().replace(/[_-]/g, "");
+  const aliased =
+    WIDGET_ALIASES[raw] ??
+    WIDGET_ALIASES[lower] ??
+    (DASHBOARD_WIDGETS.some((w) => w.id === raw) ? raw : lower);
   return DASHBOARD_WIDGETS.some((w) => w.id === aliased)
     ? (aliased as DashboardWidgetId)
     : null;
@@ -129,6 +136,7 @@ export function loadDashboardLayout(): DashboardLayout {
       .filter((id): id is DashboardWidgetId => !!id),
     filters: { ...defaultDashboardFilters(), ...stored.filters },
     isDefault: !!stored.isDefault,
+    remoteId: stored.remoteId,
   };
 }
 

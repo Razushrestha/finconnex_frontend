@@ -82,7 +82,7 @@ export function EditContactForm({ contactId }: { contactId: string }) {
       email: found.contact.email,
       phone: found.contact.phone,
       mobile: found.contact.mobile ?? "",
-      leadSource: found.contact.source,
+      leadSource: found.contact.source || "",
       status: found.status,
       owner: found.contact.owner,
       company: found.contact.company,

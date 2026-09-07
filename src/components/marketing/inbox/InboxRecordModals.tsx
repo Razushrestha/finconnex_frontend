@@ -41,13 +41,13 @@ function toContactSource(source: string): ContactSource {
     : "Other";
 }
 
-function resolveOrCreateContact(input: {
+async function resolveOrCreateContact(input: {
   name: string;
   email: string;
   phone: string;
   owner: string;
   source: string;
-}): ContactCardData {
+}): Promise<ContactCardData> {
   const existing = findContactByEmail(input.email);
   if (existing) {
     if (!existing.phone.trim() && input.phone.trim()) {
@@ -152,7 +152,7 @@ export function InboxLinkContactModal({
 
   if (!open) return null;
 
-  function saveNew() {
+  async function saveNew() {
     if (!formName.trim()) {
       setError("Name is required");
       return;
@@ -166,7 +166,7 @@ export function InboxLinkContactModal({
       return;
     }
     onLinked(
-      resolveOrCreateContact({
+      await resolveOrCreateContact({
         name: formName,
         email: formEmail,
         phone: formPhone,
@@ -396,7 +396,7 @@ export function InboxCreateLeadModal({
 
   if (!open) return null;
 
-  function submit() {
+  async function submit() {
     if (!formName.trim()) {
       setError("Name is required");
       return;
@@ -419,7 +419,7 @@ export function InboxCreateLeadModal({
     }
     const { firstName, lastName } = splitPersonName(formName);
     const actor = owner?.trim() || getRulesActor().name || "You";
-    const contact = resolveOrCreateContact({
+    const contact = await resolveOrCreateContact({
       name: formName,
       email: formEmail,
       phone: formPhone,

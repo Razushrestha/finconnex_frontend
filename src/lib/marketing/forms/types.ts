@@ -429,12 +429,13 @@ export type ProcessResult = {
 };
 
 /** Validate visible required fields, route into CRM, optional journey enroll. */
-export function processFormSubmission(
+export async function processFormSubmission(
   slug: string,
   values: Record<string, string>,
-):
+): Promise<
   | { ok: true; result: ProcessResult }
-  | { ok: false; errors: Record<string, string> } {
+  | { ok: false; errors: Record<string, string> }
+> {
   const form = getFormBySlug(slug);
   if (!form || form.status !== "Published") {
     return { ok: false, errors: { _form: "Form not available" } };
@@ -534,7 +535,7 @@ export function processFormSubmission(
       "company",
       "organization",
     );
-    const contact = createContact({
+    const contact = await createContact({
       firstName,
       lastName,
       email: contactEmail,

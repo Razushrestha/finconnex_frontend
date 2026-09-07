@@ -68,7 +68,7 @@ export const localLeadsApi: LeadsApi = {
 
   async create(input) {
     try {
-      const uniq = assertUniqueEmail(input.email);
+      const uniq = assertUniqueEmail(input.email, { scope: "leads" });
       if (!uniq.ok) {
         return apiFail(
           new ApiError(409, {
@@ -96,6 +96,7 @@ export const localLeadsApi: LeadsApi = {
       if (patch.email && patch.email !== found.card.email) {
         const uniq = assertUniqueEmail(patch.email, {
           excludeEmail: found.card.email,
+          scope: "leads",
         });
         if (!uniq.ok) {
           return apiFail(

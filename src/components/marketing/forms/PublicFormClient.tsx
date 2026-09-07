@@ -88,9 +88,9 @@ export function PublicFormClient({ slug }: { slug: string }) {
     );
   }
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const out = processFormSubmission(slug, values);
+    const out = await processFormSubmission(slug, values);
     if (!out.ok) {
       setErrors(out.errors);
       return;

@@ -39,6 +39,7 @@ import {
   transferCrmWorkspaceOwnership,
   updateCrmWorkspaceMember,
 } from "@/lib/workspace-members/api";
+import { sendWorkspaceInviteMail } from "@/lib/workspace-members/invite-mail";
 import {
   activateCrmWorkspaceMember,
   deactivateCrmWorkspaceMember,
@@ -265,57 +266,79 @@ export function UsersSettingsClient() {
       flash("Name and email are required");
       return;
     }
-    if (live) {
-      setBusy(true);
-      try {
-        if (editingId) {
-          persistRemoteWorkspaceMember(
-            await updateCrmWorkspaceMember(editingId, {
-              role: draft.role,
-              team: draft.team,
-            }),
-          );
-          flash("Member updated");
-        } else {
-          persistRemoteWorkspaceMember(
-            await inviteCrmWorkspaceMember({
-              email: draft.email,
-              name: draft.name,
-              role: draft.role,
-              team: draft.team,
-              joinImmediately: mode === "add",
-            }),
-          );
-          flash(
-            mode === "add" ? "User added to the workspace" : "Invitation sent",
-          );
-        }
+    setBusy(true);
+    try {
+      if (live && editingId) {
+        persistRemoteWorkspaceMember(
+          await updateCrmWorkspaceMember(editingId, {
+            role: draft.role,
+            team: draft.team,
+          }),
+        );
+        flash("Member updated");
         resetDraft();
         crm.refresh();
-      } catch (err) {
-        flash(err instanceof Error ? err.message : "Could not save member");
-      } finally {
-        setBusy(false);
+        return;
       }
-      return;
+      if (!live && editingId) {
+        updateCrmUser(editingId, {
+          name: draft.name,
+          email: draft.email,
+          role: draft.role,
+          team: draft.team,
+        });
+        flash("User updated");
+        resetDraft();
+        refreshLocal();
+        return;
+      }
+
+      try {
+        persistRemoteWorkspaceMember(
+          await inviteCrmWorkspaceMember({
+            email: draft.email,
+            name: draft.name,
+            role: draft.role,
+            team: draft.team,
+            joinImmediately: mode === "add",
+          }),
+        );
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "";
+        if (
+          live &&
+          (mode !== "invite" ||
+            !/invitationDeliveryFailed|could not be queued/i.test(msg))
+        ) {
+          throw err;
+        }
+        if (!live) {
+          createCrmUser({
+            ...draft,
+            status: mode === "add" ? "Active" : "Invited",
+          });
+        }
+      }
+
+      if (mode === "invite") {
+        await sendWorkspaceInviteMail({
+          to: draft.email,
+          name: draft.name,
+          role: draft.role,
+          team: draft.team,
+        });
+        flash("Invitation email sent");
+      } else {
+        flash(live ? "User added to the workspace" : "User added");
+      }
+      resetDraft();
+      if (live) crm.refresh();
+      else refreshLocal();
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Could not save member");
+    } finally {
+      setBusy(false);
     }
-    if (editingId) {
-      updateCrmUser(editingId, {
-        name: draft.name,
-        email: draft.email,
-        role: draft.role,
-        team: draft.team,
-      });
-      flash("User updated");
-    } else {
-      createCrmUser({
-        ...draft,
-        status: mode === "add" ? "Active" : "Invited",
-      });
-      flash(mode === "add" ? "User added" : "Invitation sent");
-    }
-    resetDraft();
-    refreshLocal();
   }
 
   async function removeUser(u: CrmUser) {
@@ -355,6 +378,16 @@ export function UsersSettingsClient() {
     setBusy(true);
     try {
       persistRemoteWorkspaceMember(await resendCrmWorkspaceInvitation(row.id));
+      try {
+        await sendWorkspaceInviteMail({
+          to: row.email,
+          name: row.name,
+          role: row.role,
+          team: row.team,
+        });
+      } catch {
+        /* CRM resend already queued the official invite */
+      }
       flash("Invitation resent");
       crm.refresh();
     } catch (err) {

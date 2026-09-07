@@ -1,44 +1,33 @@
 /** Live contact board store: session-backed (production adapter: swap for API). */
 
 import {
-  CONTACT_GROUPS,
-  OWNERS,
+  emptyContactGroups,
   type ContactCardData,
   type ContactGroup,
   type ContactSource,
   type ContactStatus,
 } from "@/lib/contacts/types";
 import { createBoardStore } from "@/lib/rules/module-store";
-import { formatRulesAt, newRulesId } from "@/lib/rules/storage";
 import { getRulesActor } from "@/lib/rules/actor";
-
-const AVATAR_COLORS = [
-  "bg-amber-50 text-amber-600",
-  "bg-pink-50 text-pink-600",
-  "bg-teal-50 text-teal-600",
-  "bg-blue-50 text-blue-600",
-  "bg-indigo-50 text-indigo-600",
-  "bg-violet-50 text-violet-600",
-  "bg-emerald-50 text-emerald-600",
-  "bg-rose-50 text-rose-600",
-];
+import { isUuid } from "@/lib/activity-timeline/auth";
 
 function cloneSeed(): ContactGroup[] {
-  return CONTACT_GROUPS.map((g) => ({
-    ...g,
-    contacts: g.contacts.map((c) => ({ ...c })),
-  }));
+  return emptyContactGroups();
+}
+
+function liveContacts(contacts: ContactCardData[]): ContactCardData[] {
+  return contacts.filter((c) => isUuid(c.id)).map((c) => ({ ...c }));
 }
 
 const board = createBoardStore({
-  key: "sales:contacts:board:v2",
+  key: "sales:contacts:board:v5",
   seed: cloneSeed,
 });
 
 export function listContactGroups(): ContactGroup[] {
   return board.list().map((g) => ({
     ...g,
-    contacts: g.contacts.map((c) => ({ ...c })),
+    contacts: liveContacts(g.contacts),
   }));
 }
 
@@ -188,7 +177,7 @@ export function unlinkDealFromContact(
   return updateContact(contactId, { dealIds });
 }
 
-export function createContact(input: {
+export async function createContact(input: {
   firstName: string;
   lastName: string;
   email: string;
@@ -198,49 +187,17 @@ export function createContact(input: {
   source?: ContactSource;
   status: ContactStatus;
   owner: string;
-}): ContactCardData {
-  const groups = listContactGroups();
-  const target =
-    groups.find((g) => g.title === input.status) ??
-    groups.find((g) => g.title === "Active") ??
-    groups[0];
-  const name = `${input.firstName} ${input.lastName}`.trim();
-  const initials = `${input.firstName.charAt(0)}${input.lastName.charAt(0)}`.toUpperCase();
-  const avatarIndex = groups.reduce((n, g) => n + g.contacts.length, 0);
-  const contact: ContactCardData = {
-    id: newRulesId("ct"),
-    name,
-    initials,
-    company: input.company?.trim() || "",
-    email: input.email.trim(),
-    phone: input.phone?.trim() || "",
-    mobile: input.mobile?.trim() || undefined,
-    owner: input.owner,
-    source: input.source ?? "Website",
-    createdDate: formatRulesAt().split(",")[0] ?? formatRulesAt(),
-    accentColorClass: target.dotColorClass,
-    avatarBgClass: AVATAR_COLORS[avatarIndex % AVATAR_COLORS.length],
-  };
-
-  saveContactGroups(
-    groups.map((g) =>
-      g.id === target.id
-        ? { ...g, contacts: [contact, ...g.contacts] }
-        : g,
-    ),
-  );
-  void import("@/lib/contacts/api").then(async ({ createCrmContact, tryCrmContact }) => {
-    const remote = await tryCrmContact(() => createCrmContact(input));
-    if (!remote) return;
-    if (remote.contact.id !== contact.id) {
-      deleteContact(contact.id, { skipCrm: true });
-    }
-    mergeCrmContactsIntoBoard([remote]);
-  });
-  return contact;
+}): Promise<ContactCardData> {
+  const { createCrmContact, isCrmContactId } = await import("@/lib/contacts/api");
+  const remote = await createCrmContact(input);
+  if (!remote || !isCrmContactId(remote.contact.id)) {
+    throw new Error("CRM did not save the contact");
+  }
+  mergeCrmContactsIntoBoard([remote]);
+  return remote.contact;
 }
 
-export function createQuickContact(fullName: string): ContactCardData {
+export async function createQuickContact(fullName: string): Promise<ContactCardData> {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
   const firstName = parts[0] || "Contact";
   const lastName = parts.slice(1).join(" ");
@@ -250,12 +207,12 @@ export function createQuickContact(fullName: string): ContactCardData {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, ".")
       .replace(/^\.+|\.+$/g, "") || "contact";
-  const created = createContact({
+  const created = await createContact({
     firstName,
     lastName: lastName || firstName,
     email: `${slug}@added.finconnex.local`,
     status: "Active",
-    owner: getRulesActor().name || OWNERS[0],
+    owner: getRulesActor().name || "",
     source: "Other",
   });
   const label = fullName.trim() || created.name;
@@ -283,6 +240,24 @@ export function deleteContact(
     });
   }
   return found.contact;
+}
+
+export function replaceCrmContactsOnBoard(
+  remote: Array<{ contact: ContactCardData; status: ContactStatus }>,
+) {
+  const groups = emptyContactGroups();
+  for (const item of remote) {
+    const target =
+      groups.find((g) => g.title === item.status) ??
+      groups.find((g) => g.title === "Active") ??
+      groups[0];
+    if (!target) continue;
+    target.contacts.push({
+      ...item.contact,
+      accentColorClass: target.dotColorClass,
+    });
+  }
+  saveContactGroups(groups);
 }
 
 export function mergeCrmContactsIntoBoard(
