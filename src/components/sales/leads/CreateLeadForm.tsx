@@ -335,8 +335,20 @@ export function CreateLeadForm({
         afterSave(createAnother, pipelineStage);
         return;
       }
-    } catch {
-      /* CRM 4xx still falls through to a device copy below */
+    } catch (err) {
+      // A duplicate email is the common case here and it is not recoverable
+      // by retrying — surface it instead of falling through to a second POST
+      // that can only fail too.
+      const status = (err as { status?: number })?.status;
+      if (status === 409) {
+        setErrors((prev) => ({
+          ...prev,
+          email:
+            "A lead with this email already exists. Open All Leads to continue that record.",
+        }));
+        return;
+      }
+      /* other CRM errors still fall through to a device copy below */
     }
     const payload = {
       firstName,
