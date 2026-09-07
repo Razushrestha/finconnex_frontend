@@ -182,7 +182,16 @@ export function LeadContactPicker({
     () => new Set(contacts.map((contact) => contact.id)),
     [contacts],
   );
-  const directory = useMemo(() => listAllContacts(), [tick, open, loading]);
+  const directory = useMemo(() => {
+    // `tick` forces a refresh when the contacts store mutates elsewhere;
+    // `open` re-fetches the directory each time the picker is opened;
+    // `loading` recomputes once the initial load completes. None are
+    // read directly in the body.
+    void tick;
+    void open;
+    void loading;
+    return listAllContacts();
+  }, [tick, open, loading]);
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -215,6 +224,9 @@ export function LeadContactPicker({
 
   useEffect(() => {
     let cancelled = false;
+    // Genuine data-fetch effect: setLoading/setLoadError seed state before
+    // the async fetch below settles (mirrors use-crm-custom-fields.ts).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setLoadError(null);
     void (async () => {

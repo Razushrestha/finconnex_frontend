@@ -16,6 +16,11 @@ export function useCrmCustomFields() {
 
   useEffect(() => {
     let cancelled = false;
+    // Kick off the fetch triggered by `tick` (mount or manual refresh) and
+    // flag it as in-flight before the request resolves — a genuine
+    // external-system sync (network I/O), not a prop mirror, so there's no
+    // render-time equivalent for this setState pair.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setError(null);
 

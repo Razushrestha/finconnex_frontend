@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Calendar, X } from "lucide-react";
 import {
   Dialog,
@@ -82,7 +82,18 @@ export function LeadActivityScheduleModal({
   const [saving, setSaving] = useState(false);
   const editing = Boolean(editId || draft);
 
-  useEffect(() => {
+  // Reset the draft whenever the modal (re)opens for a different
+  // call/meeting/draft. Computed during render — gated on a state diff of
+  // the reset key, per React's documented "adjusting state when a prop
+  // changes" pattern — instead of in an effect (react-hooks/set-state-in-effect).
+  const resetKey = `${open}|${kind}|${card.owner}|${editId ?? ""}|${draft?.id ?? ""}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey);
+    resetDraft();
+  }
+
+  function resetDraft() {
     if (!open) return;
     setError("");
     setSaving(false);
@@ -133,7 +144,7 @@ export function LeadActivityScheduleModal({
     setPurpose("");
     setCallStatus("Scheduled");
     setMeetingStatus("Scheduled");
-  }, [open, kind, card.owner, editId, draft?.id]);
+  }
 
   const owners = ACTIVITY_OWNERS.includes(
     card.owner as (typeof ACTIVITY_OWNERS)[number],

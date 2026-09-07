@@ -14,6 +14,7 @@ import {
   upsertJourney,
   type JourneyTrigger,
 } from "@/lib/journeys/types";
+import { createCrmJourney } from "@/lib/journeys/api";
 import {
   JourneyCanvas,
   JourneyStepInspector,
@@ -39,6 +40,7 @@ export default function CreateJourneyPage() {
     steps[0]?.id ?? null,
   );
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const selected = steps.find((s) => s.id === selectedId) ?? null;
 
@@ -52,7 +54,7 @@ export default function CreateJourneyPage() {
     setSteps((prev) => prev.map((s) => (s.id === next.id ? next : s)));
   }
 
-  function onSave() {
+  async function onSave() {
     if (!name.trim()) {
       setError("Journey name is required");
       return;
@@ -61,20 +63,36 @@ export default function CreateJourneyPage() {
       setError("Add at least one step");
       return;
     }
-    const ids = nextJourneyIds();
-    const created = upsertJourney({
-      id: ids.id,
-      journeyId: ids.journeyId,
-      name: name.trim(),
-      trigger,
-      status: "Draft",
-      exitConditions,
-      steps,
-      enrollments: [],
-      createdBy,
-      updatedAt: formatJourneyAt(),
-    });
-    router.push(`/journeys/${created.id}`);
+    setSaving(true);
+    setError(null);
+    try {
+      const created = await createCrmJourney({ name: name.trim(), trigger, steps });
+      upsertJourney({ ...created, exitConditions, createdBy });
+      router.push(`/journeys/${created.id}`);
+    } catch (e) {
+      // remote unavailable — fall back to local-only draft (demo mode)
+      const ids = nextJourneyIds();
+      const created = upsertJourney({
+        id: ids.id,
+        journeyId: ids.journeyId,
+        name: name.trim(),
+        trigger,
+        status: "Draft",
+        exitConditions,
+        steps,
+        enrollments: [],
+        createdBy,
+        updatedAt: formatJourneyAt(),
+      });
+      setError(
+        e instanceof Error
+          ? `Saved locally only — CRM sync failed: ${e.message}`
+          : "Saved locally only — CRM sync failed",
+      );
+      router.push(`/journeys/${created.id}`);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -95,11 +113,12 @@ export default function CreateJourneyPage() {
           </div>
           <button
             type="button"
-            onClick={onSave}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white hover:bg-violet-700"
+            onClick={() => void onSave()}
+            disabled={saving}
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
           >
             <Save className="h-3.5 w-3.5" />
-            Save draft
+            {saving ? "Saving…" : "Save draft"}
           </button>
         </div>
 

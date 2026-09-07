@@ -3,49 +3,52 @@ import type { CrmSession } from "@/lib/activity-timeline/auth";
 type Envelope<T> = {
   statusCode?: number;
   message?: string | string[];
+  /** Some endpoints (e.g. automation validate/publish) throw
+   * `UnprocessableEntityException({ message, errors })` — a per-field
+   * breakdown alongside the generic message. Surface it when present so a
+   * validation failure reads as more than one opaque i18n key. */
+  errors?: string[];
   data?: T;
+};
+
+const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
+  "email.error.relatedTypeMismatch":
+    "CRM parent record must be a live UUID. Send without linking this local/demo record.",
+  "email.error.unsafeHtml":
+    "CRM rejected HTML in the email body. Send as plain text.",
+  "email.error.singleToRequired":
+    "CRM allows one To address. Extra recipients must go in Cc.",
+  "email.error.invalidRecipient": "Recipient is not a valid email address.",
+  "workspace.error.invitationDeliveryFailed":
+    "Workspace invitation was created, but the invite email could not be queued. Sending from FinConnex mail instead.",
+  "workspace.error.roleRequired":
+    "Choose a workspace role before sending the invite.",
 };
 
 export function crmErrorMessage(json: unknown, fallback: string): string {
   if (json && typeof json === "object") {
     const rec = json as Record<string, unknown>;
     const msg = rec.message;
-    if (Array.isArray(msg) && msg.length) {
-      return msg.map(String).join(", ");
-    }
-    if (typeof msg === "string" && msg.trim()) {
-      const text = msg.trim();
-      if (text === "email.error.relatedTypeMismatch") {
-        return "CRM parent record must be a live UUID. Send without linking this local/demo record.";
-      }
-      if (text === "email.error.unsafeHtml") {
-        return "CRM rejected HTML in the email body. Send as plain text.";
-      }
-      if (text === "email.error.singleToRequired") {
-        return "CRM allows one To address. Extra recipients must go in Cc.";
-      }
-      if (text === "email.error.invalidRecipient") {
-        return "Recipient is not a valid email address.";
-      }
-      if (text === "workspace.error.invitationDeliveryFailed") {
-        return "Workspace invitation was created, but the invite email could not be queued. Sending from FinConnex mail instead.";
-      }
-      if (text === "workspace.error.roleRequired") {
-        return "Choose a workspace role before sending the invite.";
-      }
-      if (text.toLowerCase() !== "bad request") return text;
-    }
-    if (Array.isArray(rec.errors) && rec.errors.length) {
-      return rec.errors
-        .map((item) => {
-          if (typeof item === "string") return item;
-          if (item && typeof item === "object" && "message" in item) {
-            return String((item as { message: unknown }).message);
-          }
-          return JSON.stringify(item);
-        })
-        .join(", ");
-    }
+    const base = Array.isArray(msg) && msg.length
+      ? msg.map(String).join(", ")
+      : typeof msg === "string" && msg.trim()
+        ? FRIENDLY_MESSAGE_KEYS[msg.trim()] ??
+          (msg.trim().toLowerCase() !== "bad request" ? msg.trim() : null)
+        : null;
+    const detail = Array.isArray(rec.errors) && rec.errors.length
+      ? rec.errors
+          .map((item) => {
+            if (typeof item === "string") return item;
+            if (item && typeof item === "object" && "message" in item) {
+              return String((item as { message: unknown }).message);
+            }
+            return JSON.stringify(item);
+          })
+          .join(", ")
+      : null;
+    if (base && detail && base !== detail) return `${base}: ${detail}`;
+    if (detail) return detail;
+    if (base) return base;
   }
   return fallback;
 }
@@ -114,6 +117,35 @@ export async function crmBffFetch<T>(
   return unwrapCrmData<T>(json);
 }
 
+/**
+ * True once a hard sign-out redirect has been kicked off, so a page full of
+ * components each hitting a dead session don't all separately clear cookies
+ * and race each other to redirect.
+ */
+let signOutInFlight = false;
+
+/**
+ * The CRM backend revokes a refresh token's whole session on reuse (an
+ * anti-theft guard) — once that happens, `ensureCrmSession()` keeps handing
+ * back the same locally-still-unexpired access token forever, because it
+ * only checks the JWT's own `exp` claim, which knows nothing about a
+ * server-side revocation. That token is dead no matter how many times it's
+ * retried, so every request that touches it (deals, leads, automations —
+ * anything using crmFetch/httpRequest) fails with the raw backend error
+ * string surfaced as-is. Force a real sign-out instead of looping on it.
+ */
+export async function forceSignOutForDeadSession(): Promise<void> {
+  if (signOutInFlight || typeof window === "undefined") return;
+  signOutInFlight = true;
+  try {
+    const { clearCrmTokens } = await import("@/lib/activity-timeline/auth");
+    clearCrmTokens();
+    await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" }).catch(() => undefined);
+  } finally {
+    window.location.href = "/login?reason=session_expired";
+  }
+}
+
 export async function crmFetch<T>(
   session: Pick<CrmSession, "baseUrl" | "accessToken">,
   path: string,
@@ -130,6 +162,12 @@ export async function crmFetch<T>(
         path,
         init,
       ));
+    } else if (res.status === 401) {
+      // Retrying handed back the exact same (locally-valid-looking) token —
+      // the session itself is revoked server-side, not just momentarily
+      // stale. No further retry can fix this; force a clean re-login.
+      void forceSignOutForDeadSession();
+      throw new Error("Your session has expired. Signing you out — please sign in again.");
     }
   }
 

@@ -166,14 +166,27 @@ function ApplicantFinanceColumn({
   const [refreshing, setRefreshing] = useState(false);
   const [creditNote, setCreditNote] = useState<string | null>(null);
 
+  // Recompute the locally-generated report whenever the identifying key
+  // changes, before the async credit-report fetch (if any) can override
+  // it. Computed during render — gated on a state diff of the key, per
+  // React's documented "adjusting state when a prop changes" pattern —
+  // instead of as a synchronous setState inside the effect below
+  // (react-hooks/set-state-in-effect).
+  const reportResetKey = `${card.id}|${role}|${name}`;
+  const [prevReportResetKey, setPrevReportResetKey] =
+    useState(reportResetKey);
+  if (prevReportResetKey !== reportResetKey) {
+    setPrevReportResetKey(reportResetKey);
+    setReport(buildCreditReport(`${card.id}:${role}:${name}`, name, true));
+  }
+
   useEffect(() => {
+    if (!isUuid(card.id)) return;
     const generated = buildCreditReport(
       `${card.id}:${role}:${name}`,
       name,
       true,
     );
-    setReport(generated);
-    if (!isUuid(card.id)) return;
     let cancelled = false;
     void fetchLeadCreditReport(card.id).then((raw) => {
       if (cancelled || !raw || typeof raw !== "object") return;

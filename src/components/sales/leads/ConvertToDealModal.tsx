@@ -45,14 +45,22 @@ export function ConvertToDealModal({
   const [expectedCloseDate, setExpectedCloseDate] = useState("");
   const [dealStage, setDealStage] = useState(dealStages[0] ?? "");
 
-  useEffect(() => {
+  // Reset the draft whenever the modal (re)opens. Adjusting state during
+  // render — gated on a state diff of the reset key, per React's documented
+  // "adjusting state when a prop changes" pattern — avoids the extra commit
+  // a `useEffect` here would cause (react-hooks/set-state-in-effect) and
+  // avoids reading a ref during render (react-hooks/refs).
+  const resetKey = `${isOpen}|${defaultDealName}|${dealStages.join(",")}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey);
     if (isOpen) {
       setDealName(defaultDealName);
       setAmount("");
       setExpectedCloseDate("");
       setDealStage(dealStages[0] ?? "");
     }
-  }, [isOpen, defaultDealName, dealStages]);
+  }
 
   useEffect(() => {
     if (!isOpen) return;
@@ -108,6 +116,7 @@ export function ConvertToDealModal({
 
         <div className="mt-4 flex items-center gap-3 rounded-lg bg-muted/50 border border-border/50 p-3">
           {primaryContact.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- avatarUrl is an arbitrary/remote URL; next/image would require width/height and a configured loader, which risks layout changes here.
             <img
               src={primaryContact.avatarUrl}
               alt={primaryContact.name}

@@ -390,6 +390,11 @@ export function deleteJourney(id: string) {
   writeStore(listJourneys().filter((j) => j.id !== id));
 }
 
+/** Full replace of the local cache with data fetched from the CRM backend. */
+export function replaceCrmJourneys(remote: LifecycleJourney[]) {
+  writeStore(remote.map((j) => ({ ...j })));
+}
+
 export function getJourneyById(id: string) {
   return listJourneys().find((j) => j.id === id);
 }

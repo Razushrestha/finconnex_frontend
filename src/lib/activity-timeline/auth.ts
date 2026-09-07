@@ -167,28 +167,50 @@ async function resolveAccessToken(): Promise<string | null> {
   return null;
 }
 
+/**
+ * The backend rotates refresh tokens on every use and revokes the whole
+ * session if a stale (already-consumed) refresh token is replayed — a reuse-
+ * detection guard against token theft. Several components independently
+ * call ensureCrmSession() when their requests 401 around the same time (e.g.
+ * loading a workflow page fires member/automation/notification calls
+ * together), so without dedup every one of them would race its own
+ * `/v1/auth/refresh-token` call: the first wins and rotates the token, and
+ * every other concurrent caller then presents the now-stale token and gets
+ * the entire session revoked. Sharing one in-flight promise means concurrent
+ * callers all await the same single refresh instead of racing.
+ */
+let inflightRefresh: Promise<string | null> | null = null;
+
 async function refreshAccessToken(baseUrl: string): Promise<string | null> {
-  const stored = readStorage(REFRESH_KEY);
-  const server = await fetchServerCrmTokens();
-  const refreshToken =
-    (stored && !isJwtExpired(stored) ? stored : null) ||
-    (server.refreshToken && !isJwtExpired(server.refreshToken)
-      ? server.refreshToken
-      : stored || server.refreshToken);
-  if (!refreshToken) return null;
+  if (inflightRefresh) return inflightRefresh;
+  inflightRefresh = (async () => {
+    const stored = readStorage(REFRESH_KEY);
+    const server = await fetchServerCrmTokens();
+    const refreshToken =
+      (stored && !isJwtExpired(stored) ? stored : null) ||
+      (server.refreshToken && !isJwtExpired(server.refreshToken)
+        ? server.refreshToken
+        : stored || server.refreshToken);
+    if (!refreshToken) return null;
+    try {
+      const data = await crmFetchJson<{
+        accessToken?: string;
+        refreshToken?: string;
+      }>(baseUrl, "/v1/auth/refresh-token", refreshToken, { method: "POST" });
+      if (!data?.accessToken) return null;
+      persistCrmTokens({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken ?? refreshToken,
+      });
+      return data.accessToken;
+    } catch {
+      return null;
+    }
+  })();
   try {
-    const data = await crmFetchJson<{
-      accessToken?: string;
-      refreshToken?: string;
-    }>(baseUrl, "/v1/auth/refresh-token", refreshToken, { method: "POST" });
-    if (!data?.accessToken) return null;
-    persistCrmTokens({
-      accessToken: data.accessToken,
-      refreshToken: data.refreshToken ?? refreshToken,
-    });
-    return data.accessToken;
-  } catch {
-    return null;
+    return await inflightRefresh;
+  } finally {
+    inflightRefresh = null;
   }
 }
 

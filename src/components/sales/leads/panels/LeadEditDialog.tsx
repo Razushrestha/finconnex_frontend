@@ -1,7 +1,7 @@
 "use client";
 
 import { MentionTextarea } from "@/components/shared/MentionTextarea";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -319,9 +319,19 @@ export function LeadEditDialog({
 }: LeadEditDialogProps) {
   const [activeSection, setActiveSection] = useState<SectionId>(initialSection);
 
-  useEffect(() => {
+  // Reset the active section whenever the dialog (re)opens (or the
+  // requested initial section changes). Computed during render — gated on
+  // a state diff of the reset key, per React's documented "adjusting
+  // state when a prop changes" pattern — instead of in an effect
+  // (react-hooks/set-state-in-effect).
+  const activeSectionResetKey = `${open}|${initialSection}`;
+  const [prevActiveSectionResetKey, setPrevActiveSectionResetKey] = useState(
+    activeSectionResetKey,
+  );
+  if (prevActiveSectionResetKey !== activeSectionResetKey) {
+    setPrevActiveSectionResetKey(activeSectionResetKey);
     if (open) setActiveSection(initialSection);
-  }, [open, initialSection]);
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -420,9 +430,14 @@ function TasksSection({
   );
   const [priority, setPriority] = useState<Priority>("Medium");
 
-  useEffect(() => {
+  // Sync `tasks` from `leadName` whenever it changes, per React's
+  // documented "adjusting state when a prop changes" pattern — computed
+  // during render instead of in an effect (react-hooks/set-state-in-effect).
+  const [prevTasksLeadName, setPrevTasksLeadName] = useState(leadName);
+  if (prevTasksLeadName !== leadName) {
+    setPrevTasksLeadName(leadName);
     setTasks(loadLeadTasks(leadName));
-  }, [leadName]);
+  }
 
   const openTasks = useMemo(
     () =>
@@ -654,9 +669,14 @@ function NotesSection({
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
 
-  useEffect(() => {
+  // Sync `notes` from `leadName` whenever it changes, per React's
+  // documented "adjusting state when a prop changes" pattern — computed
+  // during render instead of in an effect (react-hooks/set-state-in-effect).
+  const [prevNotesLeadName, setPrevNotesLeadName] = useState(leadName);
+  if (prevNotesLeadName !== leadName) {
+    setPrevNotesLeadName(leadName);
     setNotes(loadLeadNotes(leadName));
-  }, [leadName]);
+  }
 
   function handleAddNote(e: React.FormEvent) {
     e.preventDefault();
@@ -845,9 +865,15 @@ function AppointmentSection({
   const [meetingLink, setMeetingLink] = useState("");
   const [agenda, setAgenda] = useState("");
 
-  useEffect(() => {
+  // Sync `appointments` from `leadName` whenever it changes, per React's
+  // documented "adjusting state when a prop changes" pattern — computed
+  // during render instead of in an effect (react-hooks/set-state-in-effect).
+  const [prevAppointmentsLeadName, setPrevAppointmentsLeadName] =
+    useState(leadName);
+  if (prevAppointmentsLeadName !== leadName) {
+    setPrevAppointmentsLeadName(leadName);
     setAppointments(loadLeadAppointments(leadName));
-  }, [leadName]);
+  }
 
   const upcoming = appointments.filter((a) => !a.previous);
   const previous = appointments.filter((a) => a.previous);

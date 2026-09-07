@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Clock, Crosshair } from "lucide-react";
 import type { LeadSlaViewModel, SlaClockView } from "@/lib/pipeline-sla/types";
 import {
@@ -68,16 +68,16 @@ function ClockRow({
 }
 
 function useSlaBadgesVisible() {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    setVisible(arePipelineSlaBadgesVisible());
-    return onPipelineSlaChange(() => {
-      setVisible(arePipelineSlaBadgesVisible());
-    });
-  }, []);
-
-  return visible;
+  // Subscribes to the "finconnex:pipeline-sla" setting change event and
+  // reads the current value directly — the React-documented way to sync
+  // with an external store without an effect-driven setState (avoids
+  // react-hooks/set-state-in-effect). Matches the prior behavior of
+  // rendering `false` until mount, then the real persisted value.
+  return useSyncExternalStore(
+    onPipelineSlaChange,
+    () => arePipelineSlaBadgesVisible(),
+    () => false,
+  );
 }
 
 /**

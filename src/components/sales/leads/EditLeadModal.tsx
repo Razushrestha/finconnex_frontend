@@ -63,10 +63,19 @@ export function EditLeadModal({
 }: EditLeadModalProps) {
   const [values, setValues] = useState(initialValues);
 
-  useEffect(() => {
-    if (isOpen) setValues(initialValues);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  // Reset the form whenever the modal (re)opens. Adjusting state during
+  // render — gated on a state diff of the reset key, per React's documented
+  // "adjusting state when a prop changes" pattern — avoids the extra commit
+  // a `useEffect` here would cause (react-hooks/set-state-in-effect) and
+  // avoids reading a ref during render (react-hooks/refs).
+  const resetKey = `${isOpen}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey);
+    if (isOpen) {
+      setValues(initialValues);
+    }
+  }
 
   useEffect(() => {
     if (!isOpen) return;

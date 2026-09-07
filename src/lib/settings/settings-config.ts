@@ -137,10 +137,31 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
       },
       { title: "Workflow Templates", slug: "workflow-templates" },
       { title: "Approval Workflows", slug: "approval-workflows" },
-      { title: "Assignment Rules", slug: "assignment-rules" },
-      { title: "Round Robin", slug: "round-robin" },
-      { title: "SLA Rules", slug: "sla-rules" },
-      { title: "Escalation Rules", slug: "escalation-rules" },
+      {
+        title: "Assignment Rules",
+        slug: "assignment-rules",
+        blurb:
+          "Round-robin, territory, and product-based lead routing (§2.2)",
+      },
+      {
+        title: "Round Robin",
+        slug: "round-robin",
+        blurb: "Round-robin pools are configured per rule under Assignment Rules",
+      },
+      {
+        title: "SLA Rules",
+        slug: "sla-rules",
+        blurb:
+          "Ticket response/resolution deadlines, business hours, and auto-close (§13)",
+      },
+      {
+        title: "Escalation Rules",
+        slug: "escalation-rules",
+        blurb:
+          "Build with the Workflow Builder: trigger “Record inactive for” on Lead",
+        moduleHref: "/settings/workflow-and-automation/workflow-builder",
+        moduleLabel: "Open Workflow Builder",
+      },
       { title: "Scheduled Jobs", slug: "scheduled-jobs" },
       { title: "Automation Logs", slug: "automation-logs" },
     ],

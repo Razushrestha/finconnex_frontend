@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useHasMounted } from "@/lib/use-has-mounted";
 import { createPortal } from "react-dom";
 import { ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -372,11 +373,7 @@ export function CreditReportDrawer({
   report: CreditReport;
   onClose: () => void;
 }) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useHasMounted();
 
   useEffect(() => {
     if (!open) return;

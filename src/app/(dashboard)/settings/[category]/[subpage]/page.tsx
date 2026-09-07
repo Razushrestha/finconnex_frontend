@@ -18,6 +18,8 @@ import { BackupRestoreSettingsClient } from "@/components/settings/BackupRestore
 import { FieldPermissionsSettingsClient } from "@/components/settings/FieldPermissionsSettingsClient";
 import { AutomationLogsSettingsClient } from "@/components/settings/AutomationLogsSettingsClient";
 import { WorkflowRulesSettingsClient } from "@/components/settings/WorkflowRulesSettingsClient";
+import { AssignmentRulesSettingsClient } from "@/components/settings/AssignmentRulesSettingsClient";
+import { TicketSlaSettingsClient } from "@/components/settings/TicketSlaSettingsClient";
 import { SmtpSettingsClient } from "@/components/settings/SmtpSettingsClient";
 import { CapabilitiesSettingsClient } from "@/components/settings/CapabilitiesSettingsClient";
 import { UsersSettingsClient } from "@/components/settings/UsersSettingsClient";
@@ -74,6 +76,11 @@ export default async function SettingsSubPage({ params }: PageProps) {
       <FieldPermissionsSettingsClient />
     ) : key === "workflow-and-automation/workflow-builder" ? (
       <WorkflowRulesSettingsClient />
+    ) : key === "workflow-and-automation/assignment-rules" ||
+      key === "workflow-and-automation/round-robin" ? (
+      <AssignmentRulesSettingsClient />
+    ) : key === "workflow-and-automation/sla-rules" ? (
+      <TicketSlaSettingsClient />
     ) : key === "workflow-and-automation/automation-logs" ? (
       <AutomationLogsSettingsClient />
     ) : key === "communication/smtp" ? (

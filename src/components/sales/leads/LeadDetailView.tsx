@@ -290,6 +290,7 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
           void (async () => {
             try {
               if (patch.custom && Object.keys(patch.custom).length) {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const { [FOLLOWERS_KEY]: _followers, ...mortgageCustom } =
                   patch.custom;
                 if (Object.keys(mortgageCustom).length) {

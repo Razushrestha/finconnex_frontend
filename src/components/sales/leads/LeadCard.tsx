@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useMemo, useState, useEffect, useRef } from "react";
+import { useId, useMemo, useState, useRef } from "react";
+import { useHasMounted } from "@/lib/use-has-mounted";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -113,7 +114,7 @@ export function LeadCard({
   const router = useRouter();
   const nameId = useId();
   const dragMovedRef = useRef(false);
-  const [isMounted, setIsMounted] = useState(false);
+  const isMounted = useHasMounted();
   const [selected, setSelected] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customization, setCustomization] =
@@ -121,10 +122,6 @@ export function LeadCard({
   const callFlow = useLeadCallFlow();
 
   const detailHref = `/sales/leads/detail/${card.id}`;
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   function openDetail() {
     if (dragMovedRef.current || isDragging) return;

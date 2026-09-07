@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 export function LeadInlineField({
@@ -19,9 +19,17 @@ export function LeadInlineField({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
 
-  useEffect(() => {
+  // Sync the draft from `value` while not actively editing, per React's
+  // documented "adjusting state when a prop changes" pattern — computed
+  // during render (gated on a state diff of the combined value/editing
+  // key, matching the original effect's `[value, editing]` deps) instead
+  // of in an effect (react-hooks/set-state-in-effect).
+  const syncKey = `${value}|${editing}`;
+  const [prevSyncKey, setPrevSyncKey] = useState(syncKey);
+  if (prevSyncKey !== syncKey) {
+    setPrevSyncKey(syncKey);
     if (!editing) setDraft(value);
-  }, [value, editing]);
+  }
 
   function commit() {
     const next = draft.trim();

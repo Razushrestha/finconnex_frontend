@@ -89,6 +89,10 @@ function LeadCallPicker({
     if (top + approxH > window.innerHeight - 8) {
       top = Math.max(8, rect.top - approxH - 6);
     }
+    // Genuine DOM measurement (anchor's post-layout position, viewport
+    // size) — not derivable during render, so this setState is
+    // synchronizing with an external system rather than mirroring props.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPos({ left, top });
   }, [anchor, targets.length]);
 

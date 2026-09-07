@@ -65,15 +65,49 @@ async function parseError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, body);
 }
 
+async function readBody<T>(res: Response): Promise<T> {
+  if (res.status === 204) return undefined as T;
+  const text = await res.text();
+  if (!text) return undefined as T;
+  return JSON.parse(text) as T;
+}
+
 /**
  * Low-level request. Throws ApiError on non-2xx.
  * Prefer module methods on `api` which return ApiResult.
+ *
+ * Attaches the CRM bearer token the same way `crmFetch` does — this client
+ * used to rely on `credentials: "include"` alone, but the CRM session lives
+ * in a client-refreshed access token (see activity-timeline/auth.ts), not a
+ * cookie that gets silently refreshed server-side. Without the header, a
+ * revoked/stale session surfaced as the raw backend string
+ * "Invalid or missing access token" via a plain alert(), forever, since there
+ * was nothing here to retry or force a re-login.
  */
 export async function httpRequest<T>(
   path: string,
   opts: HttpRequestOptions = {},
 ): Promise<T> {
   const method = opts.method ?? "GET";
+  const url = buildUrl(path, opts.query, opts.rawPath);
+  const { ensureCrmSession } = await import("@/lib/activity-timeline/auth");
+
+  const doFetch = async (accessToken: string | null, signal: AbortSignal) =>
+    fetch(url, {
+      method,
+      credentials: "include",
+      signal,
+      headers: {
+        Accept: "application/json",
+        ...(opts.body !== undefined
+          ? { "Content-Type": "application/json" }
+          : {}),
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        ...opts.headers,
+      },
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    });
+
   const controller = new AbortController();
   const timeout = window.setTimeout(
     () => controller.abort(),
@@ -81,26 +115,30 @@ export async function httpRequest<T>(
   );
 
   try {
-    const res = await fetch(buildUrl(path, opts.query, opts.rawPath), {
-      method,
-      credentials: "include",
-      signal: controller.signal,
-      headers: {
-        Accept: "application/json",
-        ...(opts.body !== undefined
-          ? { "Content-Type": "application/json" }
-          : {}),
-        ...opts.headers,
-      },
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-    });
+    const session = await ensureCrmSession();
+    let res = await doFetch(session?.accessToken ?? null, controller.signal);
+
+    if (res.status === 401) {
+      const next = await ensureCrmSession();
+      if (next?.accessToken && next.accessToken !== session?.accessToken) {
+        res = await doFetch(next.accessToken, controller.signal);
+      } else {
+        // Retrying handed back the exact same (locally-valid-looking) token —
+        // the session is revoked server-side, not just momentarily stale.
+        const { forceSignOutForDeadSession } = await import(
+          "@/lib/crm/request"
+        );
+        void forceSignOutForDeadSession();
+        throw new ApiError(401, {
+          code: "UNAUTHORIZED",
+          message:
+            "Your session has expired. Signing you out — please sign in again.",
+        });
+      }
+    }
 
     if (!res.ok) throw await parseError(res);
-    if (res.status === 204) return undefined as T;
-
-    const text = await res.text();
-    if (!text) return undefined as T;
-    return JSON.parse(text) as T;
+    return await readBody<T>(res);
   } catch (err) {
     if (err instanceof ApiError) throw err;
     if (err instanceof DOMException && err.name === "AbortError") {
