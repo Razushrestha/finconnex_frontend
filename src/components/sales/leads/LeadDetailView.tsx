@@ -36,7 +36,6 @@ import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import type { LeadMoreAction } from "@/components/sales/leads/LeadMoreMenu";
 import { createDeal } from "@/lib/deals/store";
 import { sendCrmActivityEmail } from "@/lib/emails/compose-send";
-import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import { listCrmWorkspaceMembers } from "@/lib/workspace-members/api";
 import { FOLLOWERS_KEY } from "@/components/sales/leads/detail/LeadFollowersField";
 import {
@@ -46,6 +45,7 @@ import {
 import { ComposeEmailModal } from "../ComposeEmailModal";
 import { EditLeadModal } from "./EditLeadModal";
 import { LeadMortgageDetail } from "./detail/LeadMortgageDetail";
+import { defaultActorName } from "@/lib/rules/actor";
 
 const LEAD_STATUS_OPTIONS = [
   "New",
@@ -210,7 +210,7 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
       stage: values.dealStage,
       dealValue: values.amount || card.estimatedValue || "$0",
       currency: "AUD",
-      owner: card.owner || ACTIVITY_OWNERS[0],
+      owner: card.owner || defaultActorName(),
       closeDate: values.expectedCloseDate,
     });
     const updated = updateLead(card.id, {
@@ -222,7 +222,7 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
     if (updated) setCard(updated);
     logCreate(
       "sales.deals",
-      card.owner || ACTIVITY_OWNERS[0],
+      card.owner || defaultActorName(),
       deal.id,
       deal.name,
     );
@@ -717,7 +717,7 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
               setCard(updated);
               logEdit(
                 "sales.leads",
-                card.owner || ACTIVITY_OWNERS[0],
+                card.owner || defaultActorName(),
                 card.id,
                 name,
                 [

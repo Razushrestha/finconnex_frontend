@@ -15,6 +15,7 @@ import {
 import { NoteHeader } from "@/components/activities/notes/create/NoteHeader";
 import { NoteEditorCard } from "@/components/activities/notes/create/NoteEditorCard";
 import { SuggestedTagsCard } from "@/components/activities/notes/create/SuggestedTagsCard";
+import { defaultActorName } from "@/lib/rules/actor";
 
 export default function NewNotePage() {
   const router = useRouter();
@@ -28,7 +29,7 @@ export default function NewNotePage() {
   const [relatedName, setRelatedName] = useState(params.get("relatedName") ?? "");
   const [relatedId, setRelatedId] = useState(params.get("relatedId") ?? "");
   const [noteType, setNoteType] = useState<NoteType>("General");
-  const [createdBy, setCreatedBy] = useState("John Smith");
+  const [createdBy, setCreatedBy] = useState(defaultActorName());
   const [isPrivate, setIsPrivate] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const [errors, setErrors] = useState<{ body?: string; relatedName?: string }>(
@@ -66,7 +67,7 @@ export default function NewNotePage() {
           relatedType: relatedKind.toUpperCase(),
           relatedId,
           noteType,
-          createdBy: createdBy.trim() || "John Smith",
+          createdBy: createdBy.trim() || defaultActorName(),
           isPrivate,
           isPinned,
         }),

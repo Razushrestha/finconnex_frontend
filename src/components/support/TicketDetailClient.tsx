@@ -61,6 +61,7 @@ import {
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import { cn } from "@/lib/utils";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   elevatedInputClass,
   elevatedSelectClass,
@@ -117,7 +118,7 @@ export function TicketDetailClient({ id }: { id: string }) {
   }
 
   function actor() {
-    return getRulesActor().name || row?.assignedTo || row?.createdBy || SUPPORT_AGENTS[0];
+    return getRulesActor().name || row?.assignedTo || row?.createdBy || defaultActorName();
   }
 
   function setStatus(status: TicketStatus, actionLabel?: string) {

@@ -1,6 +1,5 @@
 /** Contacts CSV import / export. */
 
-import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import {
   autoMapHeaders,
   downloadCsv,
@@ -19,7 +18,7 @@ import {
   type ContactSource,
   type ContactStatus,
 } from "@/lib/contacts/types";
-import { getRulesActor } from "@/lib/rules/actor";
+import { getRulesActor, defaultActorName } from "@/lib/rules/actor";
 import { assertUniqueEmail } from "@/lib/rules/integrity";
 
 export const CONTACT_IMPORT_FIELDS = [
@@ -134,7 +133,7 @@ export function defaultContactImportSettings(): ContactImportSettings {
   return {
     skipDuplicates: true,
     updateExisting: false,
-    defaultOwner: getRulesActor().name || ACTIVITY_OWNERS[0],
+    defaultOwner: getRulesActor().name || defaultActorName(),
     defaultStatus: "Active",
     defaultSource: "Website",
   };
@@ -293,7 +292,7 @@ export async function applyContactImport(
       settings.defaultStatus,
     );
     const owner =
-      cell(row, mapping, "owner") || settings.defaultOwner || ACTIVITY_OWNERS[0];
+      cell(row, mapping, "owner") || settings.defaultOwner || defaultActorName();
 
     if (result.status === "update") {
       let did = false;

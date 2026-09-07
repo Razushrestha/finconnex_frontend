@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   HelpCircle,
   User,
@@ -62,7 +63,7 @@ export function CreateTicketForm({ layoutId: _l, redirect: _r }: Props) {
   const [category, setCategory] = useState<TicketCategory | "">("");
   const [assignedTo, setAssignedTo] = useState<string>("");
   const [description, setDescription] = useState("");
-  const [createdBy, setCreatedBy] = useState<string>(SUPPORT_AGENTS[0]);
+  const [createdBy, setCreatedBy] = useState<string>(defaultActorName());
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   function validate() {

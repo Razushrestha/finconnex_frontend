@@ -9,9 +9,9 @@ const DEFAULT_TENANT: AuthTenant = {
 };
 
 const DEFAULT_USER: AuthUser = {
-  id: "user_john",
-  email: "admin@finconnex.com",
-  name: "John Smith",
+  id: "",
+  email: "",
+  name: "",
   role: "Manager",
 };
 

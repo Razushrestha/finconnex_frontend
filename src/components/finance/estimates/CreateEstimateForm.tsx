@@ -32,6 +32,7 @@ import {
 } from "@/lib/finance/related-prefill";
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   CreateEntityFormShell,
   Field,
@@ -67,7 +68,7 @@ export function CreateEstimateForm({
   const [dealName, setDealName] = useState<string>(
     defaultFinanceDealName(prefill),
   );
-  const [owner, setOwner] = useState<string>(FINANCE_OWNERS[0]);
+  const [owner, setOwner] = useState<string>(defaultActorName());
   const [validUntil, setValidUntil] = useState(defaultFinanceValidUntil());
   const [notes, setNotes] = useState("");
   const [lineItems, setLineItems] = useState<FinanceLineItem[]>([

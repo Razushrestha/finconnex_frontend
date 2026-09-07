@@ -29,6 +29,7 @@ import {
 import { chargePaymentDemoLive } from "@/lib/finance/pay-gateway";
 import { FINANCE_OWNERS, formatAUD, formatFinanceDate } from "@/lib/finance/shared";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   CreateEntityFormShell,
   Field,
@@ -53,7 +54,7 @@ export function CreatePaymentForm({ layoutId: _l, redirect: _r }: Props) {
   const [status, setStatus] = useState<PaymentStatus>("Completed");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
-  const [recordedBy, setRecordedBy] = useState<string>(FINANCE_OWNERS[0]);
+  const [recordedBy, setRecordedBy] = useState<string>(defaultActorName());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [gatewayMsg, setGatewayMsg] = useState<string | null>(null);

@@ -1,9 +1,4 @@
-export const ACTIVITY_OWNERS = [
-  "John Smith",
-  "Shiva Kadhka",
-  "Tejas Gokhe",
-  "Roshna Abraham",
-] as const;
+export const ACTIVITY_OWNERS: readonly string[] = [];
 
 export const RELATED_ENTITY_KINDS = [
   "Lead",
@@ -19,20 +14,14 @@ export interface RelatedTo {
   id?: string;
 }
 
-/** Sample related records for create forms */
+/**
+ * Related-record options for create forms. Was a hardcoded sample list of
+ * fake leads/contacts/companies/deals; real records come from the CRM stores.
+ */
 export const RELATED_RECORD_OPTIONS: {
   kind: RelatedEntityKind;
   name: string;
-}[] = [
-  { kind: "Lead", name: "William Anderson" },
-  { kind: "Lead", name: "Chloe Ramirez" },
-  { kind: "Contact", name: "Olivia Bennett" },
-  { kind: "Contact", name: "Marcus Lin" },
-  { kind: "Company", name: "Northwind Traders" },
-  { kind: "Company", name: "Fabrikam Inc." },
-  { kind: "Deal", name: "Atlas CRM Rollout" },
-  { kind: "Deal", name: "Greystone Realty" },
-];
+}[] = [];
 
 export function formatRelatedTo(r?: RelatedTo | string) {
   if (!r) return "";

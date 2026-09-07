@@ -12,9 +12,9 @@ import {
 } from "@/lib/dashboard/layout";
 
 const TEAM_OWNERS: Record<string, string[]> = {
-  Sales: ["John Smith", "Shiva Kadhka"],
-  Operations: ["Tejas Gokhe"],
-  Support: ["Roshna Abraham"],
+  Sales: [],
+  Operations: [],
+  Support: [],
 };
 
 const FUNNEL: { label: string; stages: string[] }[] = [

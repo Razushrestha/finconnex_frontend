@@ -1,6 +1,5 @@
 /** SRS §10.3 WhatsApp Campaigns */
 
-import { WHATSAPP_TEMPLATE_SEEDS } from "@/lib/marketing/templates/seed";
 
 export type WhatsAppCampaignStatus =
   | "Draft"
@@ -57,98 +56,7 @@ export interface WhatsAppCampaign {
 
 const STORE_KEY = "marketing:whatsapp:v1";
 
-function wt(id: string) {
-  return WHATSAPP_TEMPLATE_SEEDS.find((t) => t.id === id)!;
-}
-
-export const whatsappCampaigns: WhatsAppCampaign[] = [
-  {
-    id: "wc1",
-    campaignId: "WA-8001",
-    name: "Appointment reminders: this week",
-    templateId: "wt1",
-    templateName: wt("wt1").name,
-    templateApproval: "Approved",
-    templateBody: wt("wt1").body,
-    templateHeader: wt("wt1").header,
-    templateButtons: wt("wt1").buttons,
-    audience: "Meetings · Tomorrow",
-    status: "Completed",
-    scheduledAt: "19/07/2026 16:00",
-    sentCount: 18,
-    deliveredCount: 17,
-    readCount: 14,
-    failedCount: 1,
-    replyCount: 5,
-    createdBy: "John Smith",
-    createdAt: "18/07/2026",
-    audit: [
-      { id: "a1", at: "18/07/2026 10:00", action: "Created", actor: "John Smith" },
-      {
-        id: "a2",
-        at: "18/07/2026 10:05",
-        action: "Template already Approved",
-        actor: "System",
-      },
-      { id: "a3", at: "19/07/2026 16:00", action: "Launched", actor: "System" },
-      { id: "a4", at: "19/07/2026 16:10", action: "Completed", actor: "System" },
-    ],
-  },
-  {
-    id: "wc2",
-    campaignId: "WA-8002",
-    name: "Rate window promo",
-    templateId: "wt2",
-    templateName: wt("wt2").name,
-    templateApproval: "Pending Meta",
-    templateBody: wt("wt2").body,
-    templateButtons: wt("wt2").buttons,
-    audience: "Leads · Mortgage · Warm",
-    status: "Draft",
-    sentCount: 0,
-    deliveredCount: 0,
-    readCount: 0,
-    failedCount: 0,
-    replyCount: 0,
-    createdBy: "Tejas Gokhe",
-    createdAt: "20/07/2026",
-    audit: [
-      { id: "a1", at: "20/07/2026 11:00", action: "Created", actor: "Tejas Gokhe" },
-      {
-        id: "a2",
-        at: "20/07/2026 11:05",
-        action: "Submitted for Meta Approval",
-        actor: "Tejas Gokhe",
-      },
-    ],
-  },
-  {
-    id: "wc3",
-    campaignId: "WA-8003",
-    name: "Document request nudge",
-    templateId: "wt3",
-    templateName: wt("wt3").name,
-    templateApproval: "Draft",
-    templateBody: wt("wt3").body,
-    audience: "Document Requests · Pending",
-    status: "Draft",
-    sentCount: 0,
-    deliveredCount: 0,
-    readCount: 0,
-    failedCount: 0,
-    replyCount: 0,
-    createdBy: "Roshna Abraham",
-    createdAt: "21/07/2026",
-    audit: [
-      {
-        id: "a1",
-        at: "21/07/2026 09:00",
-        action: "Created",
-        actor: "Roshna Abraham",
-      },
-    ],
-  },
-];
+export const whatsappCampaigns: WhatsAppCampaign[] = [];
 
 function readStore(): WhatsAppCampaign[] | null {
   if (typeof window === "undefined") return null;

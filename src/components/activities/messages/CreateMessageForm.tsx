@@ -39,6 +39,7 @@ import {
 } from "@/lib/messages/api";
 import { createMessage } from "@/lib/messages/store";
 import { formatRulesAt } from "@/lib/rules/storage";
+import { defaultActorName } from "@/lib/rules/actor";
 
 interface CreateMessageFormProps {
   layoutId: string;
@@ -73,7 +74,7 @@ const initialState: FormState = {
   type: "External",
   subject: "",
   body: "",
-  from: "John Smith",
+  from: defaultActorName(),
   to: "",
   relatedKind: "",
   relatedName: "",
@@ -129,7 +130,7 @@ export function CreateMessageForm({
       type: form.type as MessageType,
       subject: form.subject.trim(),
       body: form.body.trim(),
-      from: form.from.trim() || "John Smith",
+      from: form.from.trim() || defaultActorName(),
       to: form.to.trim() || form.relatedName,
       relatedTo,
       relatedType: form.relatedKind

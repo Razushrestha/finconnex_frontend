@@ -29,7 +29,7 @@ import {
 import { onRulesChange } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
-import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import { defaultActorName } from "@/lib/rules/actor";
 
 type CalendarView = "Day" | "Week" | "Month" | "Agenda";
 
@@ -228,7 +228,7 @@ export default function CalendarPage() {
       type: newType,
       start: `${newDate}T${newTime}`,
       end: `${newDate}T${String(Number(newTime.slice(0, 2)) + 1).padStart(2, "0")}${newTime.slice(2)}`,
-      owner: ACTIVITY_OWNERS[0],
+      owner: defaultActorName(),
       relatedTo: "General",
     });
     setCalendarItems(listCalendarItems());

@@ -22,6 +22,7 @@ import {
 } from "@/components/sales/CreateEntityForm";
 
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   createCrmNote,
   isCrmNoteId,
@@ -57,7 +58,7 @@ const initialState: FormState = {
   relatedId: "",
   noteType: "General",
   isPrivate: false,
-  createdBy: "John Smith",
+  createdBy: defaultActorName(),
 };
 
 export function CreateNoteForm({
@@ -116,7 +117,7 @@ export function CreateNoteForm({
           relatedType: form.relatedKind.toUpperCase(),
           relatedId: form.relatedId,
           noteType: (form.noteType || "General") as NoteType,
-          createdBy: form.createdBy.trim() || "John Smith",
+          createdBy: form.createdBy.trim() || defaultActorName(),
           isPrivate: form.isPrivate,
         }),
       );

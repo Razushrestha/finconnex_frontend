@@ -5,6 +5,7 @@ import {
 } from "@/lib/activity-timeline/auth";
 import { crmErrorMessage, crmFetch, unwrapCrmData } from "@/lib/crm/request";
 import { formatFinanceAt, formatFinanceDate } from "@/lib/finance/shared";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   type Payment,
   type PaymentMethod,
@@ -221,7 +222,7 @@ export function normalizePayment(
     raw.createdByName,
     raw.userName,
     raw.actor,
-    "John Smith",
+    defaultActorName(),
   );
   const createdAt = formatDate(raw.createdAt ?? raw.paymentDate);
 

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   Timer,
   User,
@@ -40,12 +41,12 @@ interface Props {
 export function CreateTimeEntryForm({ layoutId: _l, redirect: _r }: Props) {
   const router = useRouter();
   const [relatedIdx, setRelatedIdx] = useState(0);
-  const [user, setUser] = useState<string>(TIME_USERS[0]);
+  const [user, setUser] = useState<string>(defaultActorName());
   const [date, setDate] = useState(formatTimeDate());
   const [hours, setHours] = useState("1");
   const [minutes, setMinutes] = useState("0");
   const [billable, setBillable] = useState(true);
-  const [rate, setRate] = useState(String(DEFAULT_RATES[TIME_USERS[0]] ?? 200));
+  const [rate, setRate] = useState(String(DEFAULT_RATES[defaultActorName()] ?? 200));
   const [description, setDescription] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 

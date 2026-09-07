@@ -51,7 +51,7 @@ function countInboxUnread() {
 
 export function Navbar({
   onOpenMobileMenu,
-  user = { name: "John Smith", role: "Manager" },
+  user = { name: "", role: "Manager" },
 }: NavbarProps) {
   const router = useRouter();
   const pathname = usePathname();

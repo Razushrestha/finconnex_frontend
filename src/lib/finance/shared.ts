@@ -17,12 +17,7 @@ export interface FinanceAuditEvent {
   actor: string;
 }
 
-export const FINANCE_OWNERS = [
-  "John Smith",
-  "Tejas Gokhe",
-  "Roshna Abraham",
-  "Shiva Kadhka",
-] as const;
+export const FINANCE_OWNERS: readonly string[] = [];
 
 export const FINANCE_CLIENTS = [
   { id: "c1", name: "Greystone Realty", contact: "Priya Mehta", email: "priya@greystone.example" },

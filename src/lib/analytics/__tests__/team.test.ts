@@ -1,9 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { seedCrmFixtures } from "@/test-support/crm-fixtures";
 import { computeTeamAnalytics, defaultTeamAnalyticsFilters, rankMembers } from "@/lib/analytics/team";
 
 const july = new Date(2026, 6, 23, 12, 0, 0);
 
 describe("team analytics", () => {
+  beforeEach(() => seedCrmFixtures());
+
   it("builds team KPIs, productivity, and member rankings from CRM stores", () => {
     const data = computeTeamAnalytics(
       { ...defaultTeamAnalyticsFilters(), dateRange: "all" },

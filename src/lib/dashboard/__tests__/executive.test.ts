@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { seedCrmFixtures } from "@/test-support/crm-fixtures";
 import {
   computeExecutiveOverview,
   formatCompactMoney,
@@ -8,6 +9,8 @@ import { defaultDashboardFilters } from "@/lib/dashboard/layout";
 const july = new Date(2026, 6, 23, 12, 0, 0);
 
 describe("executive overview", () => {
+  beforeEach(() => seedCrmFixtures(july));
+
   it("builds a seven-stage funnel and live KPI totals from CRM stores", () => {
     const data = computeExecutiveOverview(
       { ...defaultDashboardFilters(), dateRange: "month" },

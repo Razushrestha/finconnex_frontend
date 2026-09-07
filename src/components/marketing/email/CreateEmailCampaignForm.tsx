@@ -30,6 +30,7 @@ import {
   EMAIL_TEMPLATE_SEEDS,
 } from "@/lib/marketing/templates/seed";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   CreateEntityFormShell,
   Field,
@@ -56,14 +57,14 @@ export function CreateEmailCampaignForm({
   const [audience, setAudience] = useState<string>(AUDIENCE_OPTIONS[0]);
   const [templateId, setTemplateId] = useState(EMAIL_TEMPLATE_SEEDS[0].id);
   const [subject, setSubject] = useState(EMAIL_TEMPLATE_SEEDS[0].subject);
-  const [fromName, setFromName] = useState<string>(ACTIVITY_OWNERS[0]);
+  const [fromName, setFromName] = useState<string>(defaultActorName());
   const [fromEmail, setFromEmail] = useState("john@finconnex.example");
   const [scheduledAt, setScheduledAt] = useState("");
   const [previewText, setPreviewText] = useState(
     EMAIL_TEMPLATE_SEEDS[0].previewText,
   );
   const [body, setBody] = useState(EMAIL_TEMPLATE_SEEDS[0].bodyHtml);
-  const [createdBy, setCreatedBy] = useState<string>(ACTIVITY_OWNERS[0]);
+  const [createdBy, setCreatedBy] = useState<string>(defaultActorName());
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   function onTemplateChange(id: string) {

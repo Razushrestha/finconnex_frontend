@@ -62,6 +62,7 @@ import {
   type ConsultationSetupValue,
 } from "@/components/booking/ConsultationSetup";
 import { cn } from "@/lib/utils";
+import { defaultActorName } from "@/lib/rules/actor";
 
 interface BookingPageFormProps {
   layoutId: string;
@@ -165,7 +166,7 @@ export function BookingPageForm({
     initial?.slug ? normalizeBookingSlug(initial.slug) : "",
   );
   const [slugTouched, setSlugTouched] = useState(Boolean(initial?.slug));
-  const [owner, setOwner] = useState<string>(initial?.owner ?? ACTIVITY_OWNERS[0]);
+  const [owner, setOwner] = useState<string>(initial?.owner ?? defaultActorName());
 
   // Keep Public URL free of "--" (and strip pasted /book/ prefixes)
   useEffect(() => {

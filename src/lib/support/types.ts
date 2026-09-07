@@ -86,12 +86,7 @@ export const TICKET_CATEGORIES: TicketCategory[] = [
   "General",
 ];
 
-export const SUPPORT_AGENTS = [
-  "John Smith",
-  "Tejas Gokhe",
-  "Roshna Abraham",
-  "Shiva Kadhka",
-] as const;
+export const SUPPORT_AGENTS: readonly string[] = [];
 
 export const SUPPORT_REQUESTERS = [
   "Priya Mehta",
@@ -101,13 +96,7 @@ export const SUPPORT_REQUESTERS = [
   "Olivia Bennett",
 ] as const;
 
-export const SUPPORT_ACCOUNTS = [
-  "Greystone Realty",
-  "Harbour Loans",
-  "Northside Mortgage",
-  "Apex Property Group",
-  "Northwind Traders",
-] as const;
+export const SUPPORT_ACCOUNTS: readonly string[] = [];
 
 const STORE_KEY = "support:tickets:v1";
 
@@ -129,195 +118,7 @@ export function formatTicketDate(d = new Date()) {
   });
 }
 
-export const supportTickets: SupportTicket[] = [
-  {
-    id: "tk1",
-    ticketId: "TKT-5001",
-    subject: "Portal login fails after refinance close",
-    requester: "Priya Mehta",
-    relatedAccount: "Greystone Realty",
-    priority: "High",
-    status: "In Progress",
-    category: "Technical",
-    assignedTo: "John Smith",
-    description:
-      "Client cannot sign into the client portal after their refinance deal was marked Closed Won. Error: session expired loop.",
-    createdBy: "John Smith",
-    createdAt: "18/07/2026",
-    modifiedAt: "20/07/2026 11:20",
-    notes: [
-      {
-        id: "n1",
-        kind: "internal",
-        body: "Looks like SSO cookie not cleared on deal close. Checking auth middleware.",
-        at: "18/07/2026 14:30",
-        actor: "John Smith",
-      },
-      {
-        id: "n2",
-        kind: "public",
-        body: "Thanks for reporting: we're investigating the portal session issue and will update you shortly.",
-        at: "18/07/2026 15:00",
-        actor: "John Smith",
-      },
-    ],
-    audit: [
-      { id: "a1", at: "18/07/2026 10:00", action: "Created", actor: "John Smith" },
-      { id: "a2", at: "18/07/2026 10:15", action: "Assigned to John Smith", actor: "John Smith" },
-      { id: "a3", at: "18/07/2026 10:16", action: "Status → Open", actor: "John Smith" },
-      { id: "a4", at: "18/07/2026 14:00", action: "Status → In Progress", actor: "John Smith" },
-    ],
-  },
-  {
-    id: "tk2",
-    ticketId: "TKT-5002",
-    subject: "Invoice PDF missing line-item tax",
-    requester: "Marcus Chen",
-    relatedAccount: "Harbour Loans",
-    priority: "Medium",
-    status: "Pending",
-    category: "Billing",
-    assignedTo: "Tejas Gokhe",
-    description:
-      "Downloaded INV-3202 PDF shows subtotal but GST column is blank. Client needs corrected copy for accounting.",
-    createdBy: "Tejas Gokhe",
-    createdAt: "19/07/2026",
-    modifiedAt: "20/07/2026 09:00",
-    notes: [
-      {
-        id: "n3",
-        kind: "public",
-        body: "We've raised this with finance ops. Can you confirm whether the online invoice view shows tax correctly?",
-        at: "19/07/2026 16:00",
-        actor: "Tejas Gokhe",
-      },
-    ],
-    audit: [
-      { id: "a1", at: "19/07/2026 11:00", action: "Created", actor: "Tejas Gokhe" },
-      { id: "a2", at: "19/07/2026 11:05", action: "Assigned to Tejas Gokhe", actor: "Tejas Gokhe" },
-      { id: "a3", at: "19/07/2026 16:05", action: "Status → Pending", actor: "Tejas Gokhe" },
-    ],
-  },
-  {
-    id: "tk3",
-    ticketId: "TKT-5003",
-    subject: "Request: WhatsApp template for settlement day",
-    requester: "Aisha Khan",
-    relatedAccount: "Northside Mortgage",
-    priority: "Low",
-    status: "New",
-    category: "Feature Request",
-    description:
-      "Please add a settlement-day WhatsApp template to the library for brokers to send clients.",
-    createdBy: "Roshna Abraham",
-    createdAt: "21/07/2026",
-    modifiedAt: "21/07/2026 09:30",
-    notes: [],
-    audit: [
-      { id: "a1", at: "21/07/2026 09:30", action: "Created", actor: "Roshna Abraham" },
-    ],
-  },
-  {
-    id: "tk4",
-    ticketId: "TKT-5004",
-    subject: "E-signature link expired for engagement letter",
-    requester: "Daniel Rossi",
-    relatedAccount: "Apex Property Group",
-    priority: "Critical",
-    status: "Resolved",
-    category: "Bug",
-    assignedTo: "Shiva Kadhka",
-    description:
-      "Client received e-sign link that expired within 1 hour. Need new link and longer validity.",
-    resolvedAt: "17/07/2026 14:00",
-    surveySentAt: "17/07/2026 14:05",
-    satisfactionRating: 4,
-    satisfactionComment: "Quick fix once escalated. Would like longer link TTL.",
-    createdBy: "Shiva Kadhka",
-    createdAt: "16/07/2026",
-    modifiedAt: "17/07/2026 14:05",
-    escalatedAt: "16/07/2026 12:00",
-    notes: [
-      {
-        id: "n4",
-        kind: "internal",
-        body: "Escalated: TTL was 60m in staging config. Bumped to 7 days.",
-        at: "16/07/2026 12:05",
-        actor: "Shiva Kadhka",
-      },
-      {
-        id: "n5",
-        kind: "public",
-        body: "New signing link sent. Validity is now 7 days: please confirm once signed.",
-        at: "16/07/2026 13:00",
-        actor: "Shiva Kadhka",
-      },
-    ],
-    audit: [
-      { id: "a1", at: "16/07/2026 10:00", action: "Created", actor: "Shiva Kadhka" },
-      { id: "a2", at: "16/07/2026 12:00", action: "Escalated → Critical", actor: "Shiva Kadhka" },
-      { id: "a3", at: "17/07/2026 14:00", action: "Status → Resolved", actor: "Shiva Kadhka" },
-      { id: "a4", at: "17/07/2026 14:05", action: "Satisfaction survey sent", actor: "System" },
-      { id: "a5", at: "17/07/2026 16:20", action: "Satisfaction rating 4/5", actor: "Daniel Rossi" },
-    ],
-  },
-  {
-    id: "tk5",
-    ticketId: "TKT-5005",
-    subject: "Document request reminder emails bouncing",
-    requester: "Olivia Bennett",
-    relatedAccount: "Northwind Traders",
-    priority: "High",
-    status: "Closed",
-    category: "Technical",
-    assignedTo: "Roshna Abraham",
-    description:
-      "Automated document-request reminders bounce for two contacts. Bounce code 550.",
-    resolvedAt: "12/07/2026 10:00",
-    closedAt: "14/07/2026 09:00",
-    surveySentAt: "12/07/2026 10:05",
-    satisfactionRating: 5,
-    satisfactionComment: "Resolved cleanly. Thanks!",
-    createdBy: "Roshna Abraham",
-    createdAt: "10/07/2026",
-    modifiedAt: "14/07/2026 09:00",
-    notes: [
-      {
-        id: "n6",
-        kind: "public",
-        body: "Invalid mailbox on contact record: updated email and re-sent request. Please confirm receipt.",
-        at: "11/07/2026 15:00",
-        actor: "Roshna Abraham",
-      },
-    ],
-    audit: [
-      { id: "a1", at: "10/07/2026 11:00", action: "Created", actor: "Roshna Abraham" },
-      { id: "a2", at: "12/07/2026 10:00", action: "Status → Resolved", actor: "Roshna Abraham" },
-      { id: "a3", at: "14/07/2026 09:00", action: "Status → Closed", actor: "Roshna Abraham" },
-    ],
-  },
-  {
-    id: "tk6",
-    ticketId: "TKT-5006",
-    subject: "General: how to export campaign report",
-    requester: "Marcus Chen",
-    relatedAccount: "Harbour Loans",
-    priority: "Low",
-    status: "Open",
-    category: "General",
-    assignedTo: "John Smith",
-    description: "Where do I export open/click rates for last week's email campaign?",
-    createdBy: "John Smith",
-    createdAt: "20/07/2026",
-    modifiedAt: "20/07/2026 16:00",
-    notes: [],
-    audit: [
-      { id: "a1", at: "20/07/2026 15:30", action: "Created", actor: "John Smith" },
-      { id: "a2", at: "20/07/2026 16:00", action: "Assigned to John Smith", actor: "John Smith" },
-      { id: "a3", at: "20/07/2026 16:00", action: "Status → Open", actor: "John Smith" },
-    ],
-  },
-];
+export const supportTickets: SupportTicket[] = [];
 
 function readStore(): SupportTicket[] | null {
   if (typeof window === "undefined") return null;

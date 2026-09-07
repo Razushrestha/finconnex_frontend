@@ -68,12 +68,7 @@ export const CALC_CURRENCIES: CalcCurrency[] = [
   "NZD",
 ];
 
-export const CALC_OWNERS = [
-  "John Smith",
-  "Tejas Gokhe",
-  "Roshna Abraham",
-  "Shiva Kadhka",
-] as const;
+export const CALC_OWNERS: readonly string[] = [];
 
 export const CALC_SHARE_TARGETS = [
   "Client (email)",
@@ -505,61 +500,7 @@ function writeStore(list: SavedCalculation[]) {
   window.localStorage.setItem(STORE_KEY, JSON.stringify(list));
 }
 
-export const seedCalculations: SavedCalculation[] = [
-  {
-    id: "calc-seed-1",
-    calcId: "CALC-5001",
-    title: "Harbour commission estimate",
-    type: "Commission",
-    currency: "AUD",
-    inputs: { dealAmount: "650000", rate: "0.65" },
-    result: {
-      primaryLabel: "Commission",
-      primaryValue: 4225,
-      primaryFormat: "money",
-      formula: CALCULATOR_FORMULAS.Commission,
-      lines: [
-        { label: "Deal amount", value: 650000, format: "money" },
-        { label: "Rate", value: 0.65, format: "percent" },
-        { label: "Commission", value: 4225, format: "money" },
-      ],
-    },
-    formula: CALCULATOR_FORMULAS.Commission,
-    savedBy: "John Smith",
-    savedAt: "18/07/2026 10:15",
-    sharedWith: "Sales team",
-  },
-  (() => {
-    const loanInputs = {
-      principal: "500000",
-      annualRate: "6.2",
-      termYears: "30",
-    };
-    const loanRun = runCalculator("Loan", loanInputs);
-    const loanResult: CalcRunResult =
-      loanRun.ok
-        ? loanRun.result
-        : {
-            primaryLabel: "Monthly repayment",
-            primaryValue: 3060.15,
-            primaryFormat: "money",
-            formula: CALCULATOR_FORMULAS.Loan,
-            lines: [],
-          };
-    return {
-      id: "calc-seed-2",
-      calcId: "CALC-5002",
-      title: "Sample loan repayment",
-      type: "Loan" as const,
-      currency: "AUD" as const,
-      inputs: loanInputs,
-      result: loanResult,
-      formula: CALCULATOR_FORMULAS.Loan,
-      savedBy: "Roshna Abraham",
-      savedAt: "20/07/2026 14:40",
-    };
-  })(),
-];
+export const seedCalculations: SavedCalculation[] = [];
 
 export function listCalculations(): SavedCalculation[] {
   return readStore() ?? seedCalculations.map((c) => ({ ...c, inputs: { ...c.inputs } }));

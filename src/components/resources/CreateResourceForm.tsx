@@ -38,6 +38,7 @@ import {
   elevatedSelectClass,
 } from "@/components/sales/CreateEntityForm";
 import { cn } from "@/lib/utils";
+import { defaultActorName } from "@/lib/rules/actor";
 
 interface Props {
   layoutId: string;
@@ -84,7 +85,7 @@ export function CreateResourceForm({ layoutId: _l, redirect: _r }: Props) {
   const [description, setDescription] = useState("");
   const [tagsRaw, setTagsRaw] = useState("");
   const [accessLevel, setAccessLevel] = useState<ResourceAccess>("Internal");
-  const [uploadedBy, setUploadedBy] = useState<string>(RESOURCE_OWNERS[0]);
+  const [uploadedBy, setUploadedBy] = useState<string>(defaultActorName());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);

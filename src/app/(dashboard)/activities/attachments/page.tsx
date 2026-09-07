@@ -5,7 +5,7 @@ import {
   ArrowLeft,
   Folder,
   FolderOpen,
-    Paperclip,
+  Paperclip,
   Plus,
   Search,
   X,
@@ -27,7 +27,6 @@ import {
 } from "@/lib/attachments/store";
 import { tryCrmStorage, uploadCrmStorageFile } from "@/lib/storage/api";
 import {
-  ACTIVITY_OWNERS,
   RELATED_RECORD_OPTIONS,
   initials,
   avatarColor,
@@ -35,8 +34,9 @@ import {
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
+import { defaultActorName } from "@/lib/rules/actor";
 
-/** "Lead: William Anderson" → "William Anderson" */
+/** "Lead: Jane Doe" -> "Jane Doe" */
 export function clientNameFromRelatedTo(relatedTo?: string): string {
   if (!relatedTo?.trim()) return "Unassigned";
   const m = relatedTo.trim().match(/^([^:]+):\s*(.+)$/);
@@ -44,7 +44,7 @@ export function clientNameFromRelatedTo(relatedTo?: string): string {
   return relatedTo.trim();
 }
 
-/** "William Anderson" + Lead → "Lead: William Anderson" */
+/** "Jane Doe" + Lead -> "Lead: Jane Doe" */
 export function relatedToFromClient(
   clientName: string,
   kind = "Lead",
@@ -204,7 +204,7 @@ export default function AttachmentsPage() {
       fileName: name,
       kind,
       relatedTo: relatedTo || undefined,
-      uploadedBy: ACTIVITY_OWNERS[0],
+      uploadedBy: defaultActorName(),
       notes: notes || undefined,
       sizeLabel: stored?.size
         ? `${Math.max(1, Math.round(stored.size / 1024))} KB`
@@ -467,7 +467,7 @@ export default function AttachmentsPage() {
                   value={clientName}
                   onChange={(e) => setClientName(e.target.value)}
                   className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:ring-2 focus:ring-violet-300"
-                  placeholder="e.g. Raju / William Anderson"
+                  placeholder="Search by record name"
                   required
                 />
                 <datalist id="client-folder-options">

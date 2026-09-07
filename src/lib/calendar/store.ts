@@ -8,6 +8,7 @@ import {
 import { createBoardStore } from "@/lib/rules/module-store";
 import { newRulesId } from "@/lib/rules/storage";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import { defaultActorName } from "@/lib/rules/actor";
 
 function cloneSeed(): CalendarItem[] {
   return SEED.map((i) => ({ ...i }));
@@ -57,7 +58,7 @@ export function createCalendarItem(input: {
     type: input.type,
     start: input.start,
     end: input.end,
-    owner: input.owner ?? ACTIVITY_OWNERS[0],
+    owner: input.owner ?? defaultActorName(),
     relatedTo: input.relatedTo,
     colorClass: color,
   };
@@ -76,7 +77,7 @@ export function syncExternalCalendarEvents(): CalendarItem[] {
         type: "Meeting" as const,
         start: "2026-07-23T11:00",
         end: "2026-07-23T11:30",
-        owner: ACTIVITY_OWNERS[0],
+        owner: defaultActorName(),
         relatedTo: "External: Google Calendar",
         colorClass: "bg-sky-500",
       },
@@ -85,7 +86,7 @@ export function syncExternalCalendarEvents(): CalendarItem[] {
         title: "Synced: Docs follow-up (Outlook)",
         type: "Reminder" as const,
         start: "2026-07-24T09:00",
-        owner: ACTIVITY_OWNERS[1] ?? ACTIVITY_OWNERS[0],
+        owner: ACTIVITY_OWNERS[1] ?? defaultActorName(),
         relatedTo: "External: Outlook",
         colorClass: "bg-rose-500",
       },

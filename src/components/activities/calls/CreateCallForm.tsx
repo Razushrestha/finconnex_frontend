@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Phone, X } from "lucide-react";
 import { CALL_OWNERS, CALL_PURPOSES } from "@/lib/calls/types";
 import { createCall } from "@/lib/calls/store";
-import { getRulesActor } from "@/lib/rules/actor";
+import { getRulesActor, defaultActorName } from "@/lib/rules/actor";
 import {
   RELATED_ENTITY_KINDS,
   type RelatedEntityKind,
@@ -61,10 +61,10 @@ const initialState: FormState = {
   callFor: "",
   relatedKind: "",
   relatedName: "",
-  fromNumber: defaultCallerId("John Smith"),
+  fromNumber: defaultCallerId(defaultActorName()),
   startTime: "",
   duration: "",
-  assignedTo: "John Smith",
+  assignedTo: defaultActorName(),
   subject: "",
   agenda: "",
   purpose: "",

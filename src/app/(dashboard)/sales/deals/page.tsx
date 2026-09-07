@@ -63,6 +63,7 @@ import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
 import { SORT_OPTIONS } from "../leads/page";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   type KanbanField,
   type KanbanViewConfig,
@@ -213,7 +214,7 @@ export default function DealsPage() {
 
   function changeOwnerSelected() {
     const owner =
-      ACTIVITY_OWNERS.find((o) => o !== "John Smith") ?? ACTIVITY_OWNERS[0];
+      defaultActorName();
     const n = updateDealOwners(selectedIds, owner);
     emitRulesChange("all");
     setSelectedIds([]);

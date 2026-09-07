@@ -26,7 +26,7 @@ import {
   tryCrmDocumentRequest,
 } from "@/lib/documents/requests/api";
 import { matchPortalForApplicant } from "@/lib/documents/requests/pack";
-import { getRulesActor } from "@/lib/rules/actor";
+import { getRulesActor, defaultActorName } from "@/lib/rules/actor";
 import { cn } from "@/lib/utils";
 import {
   REQUEST_DOC_CATEGORIES,
@@ -810,7 +810,7 @@ export function CreateDocumentRequestForm({
             ? formatRequestRepeat(reminderRepeat)
             : undefined,
         notifyBy: reminderOn ? notifyBy : undefined,
-        requestedBy: sendOnBehalfOf || DOCUMENT_REQUEST_BROKERS[0],
+        requestedBy: sendOnBehalfOf || defaultActorName(),
         requestedDate: started,
         lastUpdated: started,
         progress: 0,
@@ -820,7 +820,7 @@ export function CreateDocumentRequestForm({
           {
             id: `${ids.id}-t-created`,
             at: started,
-            by: sendOnBehalfOf || DOCUMENT_REQUEST_BROKERS[0],
+            by: sendOnBehalfOf || defaultActorName(),
             label: "Request created",
             detail: `Invitation sent to ${requestedFrom || "client"}. Visible in the client portal.`,
           },
@@ -829,7 +829,7 @@ export function CreateDocumentRequestForm({
                 {
                   id: `${ids.id}-t-reminder`,
                   at: formatRequestDateTime(reminderDate),
-                  by: sendOnBehalfOf || DOCUMENT_REQUEST_BROKERS[0],
+                  by: sendOnBehalfOf || defaultActorName(),
                   label: "Reminder scheduled",
                   detail: [
                     formatRequestDateTime(reminderDate),
@@ -849,7 +849,7 @@ export function CreateDocumentRequestForm({
               {
                 id: `${ids.id}-m-note`,
                 at: started,
-                by: sendOnBehalfOf || DOCUMENT_REQUEST_BROKERS[0],
+                by: sendOnBehalfOf || defaultActorName(),
                 from: "team",
                 text: notes.trim(),
               },

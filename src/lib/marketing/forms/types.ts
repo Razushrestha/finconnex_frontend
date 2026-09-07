@@ -16,7 +16,7 @@ import {
 } from "@/lib/journeys/types";
 import { createLead } from "@/lib/leads/store";
 import { createContact } from "@/lib/contacts/store";
-import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import { defaultActorName } from "@/lib/rules/actor";
 
 export type FormStatus = "Draft" | "Published" | "Paused" | "Archived";
 
@@ -150,30 +150,6 @@ export function visibleFields(
   return fieldDefs.filter((f) => isFieldVisible(f, values, fieldDefs));
 }
 
-const DEFAULT_LEAD_FIELDS: FormFieldDef[] = [
-  { id: "f1", label: "First name", type: "Text", required: true },
-  { id: "f2", label: "Last name", type: "Text", required: true },
-  { id: "f3", label: "Email", type: "Email", required: true },
-  { id: "f4", label: "Phone", type: "Phone", required: false },
-  {
-    id: "f5",
-    label: "Loan purpose",
-    type: "Select",
-    required: true,
-    options: ["Purchase", "Refinance", "Investment"],
-  },
-  {
-    id: "f5b",
-    label: "Current lender",
-    type: "Text",
-    required: true,
-    showWhen: { fieldId: "f5", equals: "Refinance" },
-  },
-  { id: "f6", label: "Notes", type: "Textarea", required: false },
-  { id: "f7", label: "Preferred suburb", type: "Text", required: false },
-  { id: "f8", label: "Approx. loan amount", type: "Text", required: false },
-];
-
 function normalizeForm(raw: MarketingForm): MarketingForm {
   return {
     ...raw,
@@ -183,85 +159,7 @@ function normalizeForm(raw: MarketingForm): MarketingForm {
   };
 }
 
-export const marketingForms: MarketingForm[] = [
-  {
-    id: "mf1",
-    formId: "FR-6001",
-    name: "Lead capture: home loan",
-    status: "Published",
-    submissions: 312,
-    fields: DEFAULT_LEAD_FIELDS.length,
-    fieldDefs: DEFAULT_LEAD_FIELDS,
-    destination: "Lead",
-    journeyId: "lj3",
-    journeyName: "Form → booked call (draft)",
-    createdBy: "John Smith",
-    updatedAt: "18/07/2026",
-    embedSlug: "home-loan-lead",
-    description: "Capture new mortgage enquiries from your website.",
-    thankYouMessage: "Thanks: a broker will be in touch shortly.",
-    bookingSlug: "john-discovery",
-    bookingLabel: "Or book a discovery call now",
-  },
-  {
-    id: "mf2",
-    formId: "FR-6002",
-    name: "Support intake: document issue",
-    status: "Published",
-    submissions: 94,
-    fields: 5,
-    fieldDefs: [
-      { id: "d1", label: "Full name", type: "Text", required: true },
-      { id: "d2", label: "Email", type: "Email", required: true },
-      {
-        id: "d3",
-        label: "Issue type",
-        type: "Select",
-        required: true,
-        options: ["Upload failed", "Missing file", "Wrong document", "Other"],
-      },
-      {
-        id: "d3b",
-        label: "Describe the issue",
-        type: "Textarea",
-        required: true,
-        showWhen: { fieldId: "d3", equals: "Other" },
-      },
-      { id: "d4", label: "Upload file", type: "File", required: false },
-    ],
-    destination: "Ticket",
-    createdBy: "Roshna Abraham",
-    updatedAt: "15/07/2026",
-    embedSlug: "doc-intake",
-    description: "Routes into Support as a new ticket.",
-  },
-  {
-    id: "mf3",
-    formId: "FR-6003",
-    name: "Event RSVP: broker breakfast",
-    status: "Draft",
-    submissions: 0,
-    fields: 6,
-    fieldDefs: [
-      { id: "e1", label: "Name", type: "Text", required: true },
-      { id: "e2", label: "Email", type: "Email", required: true },
-      { id: "e3", label: "Company", type: "Text", required: false },
-      { id: "e4", label: "Guests", type: "Text", required: false },
-      {
-        id: "e5",
-        label: "Dietary",
-        type: "Select",
-        required: false,
-        options: ["None", "Vegetarian", "Vegan", "Gluten-free"],
-      },
-      { id: "e6", label: "Questions", type: "Textarea", required: false },
-    ],
-    destination: "Contact",
-    createdBy: "Tejas Gokhe",
-    updatedAt: "20/07/2026",
-    embedSlug: "broker-breakfast",
-  },
-];
+export const marketingForms: MarketingForm[] = [];
 
 function readStore(): MarketingForm[] | null {
   if (typeof window === "undefined") return null;
@@ -519,7 +417,7 @@ export async function processFormSubmission(
       company,
       source: "Website",
       status: "New",
-      owner: ACTIVITY_OWNERS[0],
+      owner: defaultActorName(),
     });
     createdRecordRef = lead.id;
     createdRecordHref = `/sales/leads`;
@@ -544,7 +442,7 @@ export async function processFormSubmission(
       company,
       source: "Website",
       status: "Active",
-      owner: ACTIVITY_OWNERS[0],
+      owner: defaultActorName(),
     });
     createdRecordRef = contact.id;
     createdRecordHref = `/sales/contacts`;

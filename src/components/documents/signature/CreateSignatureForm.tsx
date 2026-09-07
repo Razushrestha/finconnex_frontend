@@ -42,6 +42,7 @@ import {
   toCreateSignatureRequestBody,
 } from "@/lib/documents/signature/api";
 import { cn } from "@/lib/utils";
+import { defaultActorName } from "@/lib/rules/actor";
 
 interface Props {
   layoutId: string;
@@ -103,7 +104,7 @@ export function CreateSignatureForm({ layoutId: _l, redirect: _r }: Props) {
   const [relatedKind, setRelatedKind] = useState<RelatedEntityKind | "">("");
   const [relatedName, setRelatedName] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
-  const [createdBy, setCreatedBy] = useState<string>(ACTIVITY_OWNERS[0]);
+  const [createdBy, setCreatedBy] = useState<string>(defaultActorName());
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const relatedOptions = relatedKind

@@ -70,12 +70,7 @@ export const RESOURCE_ACCESS_LEVELS: ResourceAccess[] = [
   "Restricted",
 ];
 
-export const RESOURCE_OWNERS = [
-  "John Smith",
-  "Tejas Gokhe",
-  "Roshna Abraham",
-  "Shiva Kadhka",
-] as const;
+export const RESOURCE_OWNERS: readonly string[] = [];
 
 export const RESOURCE_TYPE_STYLE: Record<ResourceType, string> = {
   Document: "bg-sky-50 text-sky-700",
@@ -120,138 +115,7 @@ export function formatResourceDate(d = new Date()) {
   });
 }
 
-export const resourceItems: ResourceItem[] = [
-  {
-    id: "res1",
-    resourceId: "RES-4001",
-    name: "Home loan pitch deck (Jul 2026)",
-    type: "Document",
-    category: "Sales",
-    fileOrUrl: "FinConnex_Pitch_Deck_Jul2026.pdf",
-    isExternalUrl: false,
-    description: "Current broker-facing pitch deck. Use this version only.",
-    tags: ["pitch", "home-loan", "collateral"],
-    accessLevel: "Internal",
-    uploadedBy: "John Smith",
-    uploadDate: "01/07/2026",
-    downloadCount: 48,
-    sharedWith: "Sales team",
-    audit: [
-      { id: "a1", at: "01/07/2026 09:00", action: "Uploaded", actor: "John Smith" },
-      { id: "a2", at: "05/07/2026 11:00", action: "Shared with Sales team", actor: "John Smith" },
-    ],
-  },
-  {
-    id: "res2",
-    resourceId: "RES-4002",
-    name: "First-home buyer playbook",
-    type: "Guide",
-    category: "Training",
-    fileOrUrl: "FHB_Playbook_v3.pdf",
-    isExternalUrl: false,
-    description: "Step-by-step playbook for first-home buyer conversations.",
-    tags: ["playbook", "first-home", "training"],
-    accessLevel: "Internal",
-    uploadedBy: "Roshna Abraham",
-    uploadDate: "08/07/2026",
-    downloadCount: 31,
-    audit: [
-      { id: "a1", at: "08/07/2026 10:30", action: "Uploaded", actor: "Roshna Abraham" },
-    ],
-  },
-  {
-    id: "res3",
-    resourceId: "RES-4003",
-    name: "Product overview video",
-    type: "Video",
-    category: "Product",
-    fileOrUrl: "https://video.finconnex.example/product-overview",
-    isExternalUrl: true,
-    description: "3-minute overview for new brokers.",
-    tags: ["video", "onboarding"],
-    accessLevel: "Internal",
-    uploadedBy: "Tejas Gokhe",
-    uploadDate: "12/07/2026",
-    downloadCount: 19,
-    audit: [
-      { id: "a1", at: "12/07/2026 14:00", action: "Uploaded", actor: "Tejas Gokhe" },
-    ],
-  },
-  {
-    id: "res4",
-    resourceId: "RES-4004",
-    name: "Engagement letter template",
-    type: "Template",
-    category: "Legal",
-    fileOrUrl: "Engagement_Letter_Template.docx",
-    isExternalUrl: false,
-    description: "Standard engagement letter: Legal approved.",
-    tags: ["template", "legal", "engagement"],
-    accessLevel: "Restricted",
-    uploadedBy: "Shiva Kadhka",
-    uploadDate: "15/07/2026",
-    downloadCount: 12,
-    audit: [
-      { id: "a1", at: "15/07/2026 09:15", action: "Uploaded", actor: "Shiva Kadhka" },
-    ],
-  },
-  {
-    id: "res5",
-    resourceId: "RES-4005",
-    name: "Marketing brand kit",
-    type: "Image",
-    category: "Marketing",
-    fileOrUrl: "Brand_Kit_Assets.zip",
-    isExternalUrl: false,
-    description: "Logos, colours, and social templates.",
-    tags: ["brand", "assets"],
-    accessLevel: "Internal",
-    uploadedBy: "Tejas Gokhe",
-    uploadDate: "18/07/2026",
-    downloadCount: 22,
-    audit: [
-      { id: "a1", at: "18/07/2026 11:00", action: "Uploaded", actor: "Tejas Gokhe" },
-    ],
-  },
-  {
-    id: "res6",
-    resourceId: "RES-4006",
-    name: "Refinance FAQ for clients",
-    type: "FAQ",
-    category: "Support",
-    fileOrUrl: "https://help.finconnex.example/refinance-faq",
-    isExternalUrl: true,
-    description: "Client-facing FAQ: safe to share publicly.",
-    tags: ["faq", "refinance", "client"],
-    accessLevel: "Public",
-    uploadedBy: "John Smith",
-    uploadDate: "20/07/2026",
-    downloadCount: 67,
-    sharedWith: "All staff",
-    audit: [
-      { id: "a1", at: "20/07/2026 08:40", action: "Uploaded", actor: "John Smith" },
-      { id: "a2", at: "20/07/2026 08:45", action: "Access → Public", actor: "John Smith" },
-    ],
-  },
-  {
-    id: "res7",
-    resourceId: "RES-4007",
-    name: "Compliance checklist link",
-    type: "Link",
-    category: "Legal",
-    fileOrUrl: "https://intranet.finconnex.example/compliance-checklist",
-    isExternalUrl: true,
-    description: "Living checklist on intranet.",
-    tags: ["compliance", "checklist"],
-    accessLevel: "Restricted",
-    uploadedBy: "Shiva Kadhka",
-    uploadDate: "21/07/2026",
-    downloadCount: 8,
-    audit: [
-      { id: "a1", at: "21/07/2026 16:00", action: "Uploaded", actor: "Shiva Kadhka" },
-    ],
-  },
-];
+export const resourceItems: ResourceItem[] = [];
 
 function readStore(): ResourceItem[] | null {
   if (typeof window === "undefined") return null;

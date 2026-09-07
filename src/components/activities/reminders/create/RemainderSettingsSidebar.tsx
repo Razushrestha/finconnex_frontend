@@ -25,12 +25,7 @@ interface ReminderSettingsSidebarProps {
   onAddAssignee: (assignee: Assignee) => void;
 }
 
-const MOCK_TEAM_USERS: Assignee[] = [
-  { id: "u1", name: "Alex Sterling" },
-  { id: "u2", name: "Roshna Abraham" },
-  { id: "u3", name: "Tejas Gokhe" },
-  { id: "u4", name: "Shiva Khadka" },
-];
+const MOCK_TEAM_USERS: Assignee[] = [];
 
 export const ReminderSettingsSidebar: React.FC<
   ReminderSettingsSidebarProps

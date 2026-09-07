@@ -13,7 +13,7 @@ import { fail, ok, type RuleResult, type RulesActor } from "@/lib/rules/types";
 const ACTOR_KEY = "rules:actor:v1";
 
 const FALLBACK_ACTOR: RulesActor = {
-  name: "John Smith",
+  name: "",
   role: "Manager",
 };
 
@@ -35,9 +35,23 @@ export function getRulesActor(): RulesActor {
   return { ...FALLBACK_ACTOR };
 }
 
-/** Demo org manager for §28.3 deal-close fan-out. */
+/**
+ * Org manager for §28.3 deal-close fan-out. Was a hardcoded demo name; now
+ * the signed-in actor, and "" before the session hydrates.
+ */
 export function getOrgManager() {
-  return "Tejas Gokhe";
+  return getRulesActor().name;
+}
+
+/**
+ * Default owner/assignee for new records: the signed-in user.
+ *
+ * Replaces the `SOME_OWNERS[0]` defaults that took the first name from a
+ * hardcoded demo list. Returns "" before the session hydrates, which renders
+ * as an empty selection rather than a fabricated person.
+ */
+export function defaultActorName(): string {
+  return getRulesActor().name;
 }
 
 /** §28.5: gate an action; logs permission_denied when blocked. */

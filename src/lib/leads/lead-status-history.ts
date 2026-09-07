@@ -4,7 +4,6 @@
  */
 
 import {
-  appendAuditEvent,
   listAuditEvents,
   type AuditEvent,
   type FieldChange,
@@ -13,7 +12,6 @@ import { parseFlexibleDate } from "@/lib/leads/activity-dates";
 import type { LeadActivityCandidate, LeadActivityKind } from "@/lib/leads/card-types";
 import { MORTGAGE_PIPELINE_STAGES } from "@/lib/pipeline-sla/types";
 
-const SEED_META = "lead-card-phase-12";
 const LEAD_MODULE = "sales.leads";
 const LEAD_SCOPED_MODULES = new Set([
   LEAD_MODULE,
@@ -27,39 +25,13 @@ const LEAD_SCOPED_MODULES = new Set([
 const PIPELINE_STAGES = new Set<string>(MORTGAGE_PIPELINE_STAGES);
 
 /** Demo status history so Last Activity can show “Status changed” without a drag. */
+/**
+ * Previously seeded fabricated lead status-change history into the audit
+ * log so the timeline looked populated. Real history is written by actual
+ * status changes, so this is now a no-op kept for its call sites.
+ */
 export function ensureLeadStatusHistorySeeds() {
-  const events = listAuditEvents();
-  if (events.some((e) => e.meta?.seed === SEED_META)) return;
-
-  appendAuditEvent(
-    {
-      action: "status_change",
-      module: LEAD_MODULE,
-      recordId: "l-c1",
-      recordLabel: "Katherina Brooks",
-      actor: "Roshna Abraham",
-      summary: "Katherina Brooks: New → Contacted",
-      changes: [{ field: "status", from: "New", to: "Contacted" }],
-      at: "10/07/2026 09:00 AM",
-      meta: { seed: SEED_META },
-    },
-    { emit: false },
-  );
-
-  appendAuditEvent(
-    {
-      action: "status_change",
-      module: LEAD_MODULE,
-      recordId: "l-n1",
-      recordLabel: "William Anderson",
-      actor: "John Smith",
-      summary: "William Anderson: Contacted → New",
-      changes: [{ field: "status", from: "Contacted", to: "New" }],
-      at: "01/07/2026 02:00 PM",
-      meta: { seed: SEED_META },
-    },
-    { emit: false },
-  );
+  // intentionally empty
 }
 
 function matchesLead(event: AuditEvent, leadName: string): boolean {

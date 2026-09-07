@@ -33,45 +33,7 @@ export type CrmUser = {
  * member from creation — this SEED is never what a user actually sees; it
  * only ever appears as an instant first paint or an offline/dev fallback.
  */
-const SEED: CrmUser[] = [
-  {
-    id: "user_john",
-    name: "John Smith",
-    email: "admin@finconnex.com",
-    role: "Manager",
-    status: "Active",
-    team: "Sales",
-    lastLoginAt: new Date().toISOString(),
-    joinedAt: "2024-05-12",
-  },
-  {
-    id: "user_shiva",
-    name: "Shiva Kadhka",
-    email: "shiva@finconnex.com",
-    role: "Team Lead",
-    status: "Active",
-    team: "Sales",
-    joinedAt: "2024-06-03",
-  },
-  {
-    id: "user_tejas",
-    name: "Tejas Gokhe",
-    email: "tejas@finconnex.com",
-    role: "User",
-    status: "Active",
-    team: "Support",
-    joinedAt: "2024-07-18",
-  },
-  {
-    id: "user_roshna",
-    name: "Roshna Abraham",
-    email: "roshna@finconnex.com",
-    role: "User",
-    status: "Invited",
-    team: "Marketing",
-    joinedAt: "2024-08-01",
-  },
-];
+const SEED: CrmUser[] = [];
 
 function load(): CrmUser[] {
   const raw = readPersistedJson<CrmUser[]>(STORE_KEY, SEED);

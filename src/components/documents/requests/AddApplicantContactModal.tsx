@@ -44,7 +44,7 @@ export function AddApplicantContactModal({
           email: email.trim(),
           phone: phone.trim() || undefined,
           status: "Active",
-          owner: getRulesActor().name || "John Smith",
+          owner: getRulesActor().name,
         });
         onCreated({ name: contact.name, email: contact.email });
       } catch (err) {

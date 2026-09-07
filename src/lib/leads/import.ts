@@ -1,6 +1,5 @@
 /** Leads CSV import: field map, validate, apply to board store. */
 
-import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import {
   autoMapHeaders,
   downloadCsv,
@@ -21,7 +20,7 @@ import {
   type LeadSource,
   type LeadStatus,
 } from "@/lib/leads/types";
-import { getRulesActor } from "@/lib/rules/actor";
+import { getRulesActor, defaultActorName } from "@/lib/rules/actor";
 import { assertUniqueEmail } from "@/lib/rules/integrity";
 
 export const LEAD_IMPORT_FIELDS = [
@@ -133,7 +132,7 @@ export function defaultLeadImportSettings(): LeadImportSettings {
   return {
     skipDuplicates: true,
     updateExisting: false,
-    defaultOwner: getRulesActor().name || ACTIVITY_OWNERS[0],
+    defaultOwner: getRulesActor().name || defaultActorName(),
     defaultStatus: "New",
     defaultSource: "Website",
   };
@@ -394,7 +393,7 @@ export async function applyLeadImport(
     const source = asSource(cell(row, mapping, "source"), settings.defaultSource);
     const status = asStatus(cell(row, mapping, "status"), settings.defaultStatus);
     const owner =
-      cell(row, mapping, "owner") || settings.defaultOwner || ACTIVITY_OWNERS[0];
+      cell(row, mapping, "owner") || settings.defaultOwner || defaultActorName();
     const estimatedValue = cell(row, mapping, "estimatedValue") || undefined;
 
     if (result.status === "update") {
@@ -530,10 +529,10 @@ export function sampleLeadCsvTemplate(): string {
         "Nguyen",
         "ava.nguyen@example.com",
         "+1 415 555 0101",
-        "Northwind Traders",
+        "Example Pty Ltd",
         "Website",
         "New",
-        ACTIVITY_OWNERS[0],
+        defaultActorName(),
         "25000",
       ],
     ],

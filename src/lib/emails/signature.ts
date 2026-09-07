@@ -11,37 +11,17 @@ export interface SignatureProfile {
   body: string;
 }
 
-export const DEFAULT_SIGNATURE = `John Smith
-Senior Mortgage Broker | FinConnex
-john.smith@finconnex.com
-+61 400 000 000`;
+/**
+ * Blank by default. This was a hardcoded demo signature for a fabricated
+ * broker; a real one is composed per user in email settings.
+ */
+export const DEFAULT_SIGNATURE = "";
 
-const BUILTIN: SignatureProfile[] = [
-  {
-    id: "own",
-    name: "Bishnu",
-    email: "bishnu@nepatronix.com",
-    body: `Bishnu
-Mortgage Broker | FinConnex
-bishnu@nepatronix.com
-+61 400 000 000`,
-  },
-  {
-    id: "john",
-    name: "John Smith",
-    email: "john.smith@finconnex.com",
-    body: DEFAULT_SIGNATURE,
-  },
-  {
-    id: "loans",
-    name: "FinConnex Loans",
-    email: "loans@finconnex.com",
-    body: `FinConnex Loans
-loans@finconnex.com
-www.finconnex.com.au
-Level 3, Suite 23 / 301 Castlereagh St, Sydney NSW 2000`,
-  },
-];
+/**
+ * Built-in signature profiles came from demo identities; real profiles are
+ * created by the user in email settings.
+ */
+const BUILTIN: SignatureProfile[] = [];
 
 function readMap(): Record<string, string> {
   if (typeof window === "undefined") return {};

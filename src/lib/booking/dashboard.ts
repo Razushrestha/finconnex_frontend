@@ -27,50 +27,7 @@ export interface DashboardAppointment {
   avatarClass: string;
 }
 
-export const DASHBOARD_CONSULTANTS: DashboardConsultant[] = [
-  {
-    id: "mohit",
-    name: "Mohit Chapagain",
-    role: "Senior Broker",
-    photo: "https://i.pravatar.cc/80?u=mohit-chapagain",
-    bookings: 12,
-  },
-  {
-    id: "priya",
-    name: "Priya Shah",
-    role: "Lending Advisor",
-    photo: "https://i.pravatar.cc/80?u=priya-shah",
-    bookings: 9,
-  },
-  {
-    id: "shiva",
-    name: "Shiva Kadhka",
-    role: "Mortgage Specialist",
-    photo: "https://i.pravatar.cc/80?u=shiva-kadhka",
-    bookings: 8,
-  },
-  {
-    id: "john",
-    name: "John Smith",
-    role: "Senior Consultant",
-    photo: "https://i.pravatar.cc/80?u=john-smith-fc",
-    bookings: 7,
-  },
-  {
-    id: "tejas",
-    name: "Tejas Gokhe",
-    role: "Product Consultant",
-    photo: "https://i.pravatar.cc/80?u=tejas-gokhe",
-    bookings: 6,
-  },
-  {
-    id: "roshna",
-    name: "Roshna Abraham",
-    role: "Client Success",
-    photo: "https://i.pravatar.cc/80?u=roshna-abraham",
-    bookings: 5,
-  },
-];
+export const DASHBOARD_CONSULTANTS: DashboardConsultant[] = [];
 
 export const DASHBOARD_ADMIN = DASHBOARD_CONSULTANTS[0];
 

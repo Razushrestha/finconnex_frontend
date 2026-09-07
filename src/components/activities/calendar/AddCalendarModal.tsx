@@ -174,7 +174,7 @@ export default function AddEventModal({
             <input
               value={owner}
               onChange={(e) => setOwner(e.target.value)}
-              placeholder="e.g. John Smith"
+              placeholder="Calendar owner"
               className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-[13px] font-medium text-slate-900 outline-none placeholder:text-slate-300 focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
             />
           </div>

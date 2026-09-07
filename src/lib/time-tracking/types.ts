@@ -77,12 +77,7 @@ export const TIME_STATUSES: TimeEntryStatus[] = [
   "Rejected",
 ];
 
-export const TIME_USERS = [
-  "John Smith",
-  "Tejas Gokhe",
-  "Roshna Abraham",
-  "Shiva Kadhka",
-] as const;
+export const TIME_USERS: readonly string[] = [];
 
 export const RELATED_RECORD_OPTIONS: TimeRelatedTo[] = [
   {
@@ -127,12 +122,11 @@ export const RELATED_RECORD_OPTIONS: TimeRelatedTo[] = [
   },
 ];
 
-export const DEFAULT_RATES: Record<string, number> = {
-  "John Smith": 280,
-  "Tejas Gokhe": 250,
-  "Roshna Abraham": 220,
-  "Shiva Kadhka": 200,
-};
+/**
+ * Per-user billable rates. Was a demo map keyed by fake names; real rates
+ * are configured per user, and callers already fall back to a default.
+ */
+export const DEFAULT_RATES: Record<string, number> = {};
 
 export const TIME_STATUS_STYLE: Record<TimeEntryStatus, string> = {
   Draft: "bg-slate-100 text-slate-700",
@@ -181,178 +175,7 @@ export function relatedLabel(r: TimeRelatedTo) {
   return `${r.kind}: ${r.name}`;
 }
 
-export const timeEntries: TimeEntry[] = [
-  {
-    id: "te1",
-    entryId: "TE-7001",
-    relatedTo: RELATED_RECORD_OPTIONS[2],
-    user: "John Smith",
-    date: "18/07/2026",
-    durationHours: 2.5,
-    billable: true,
-    rate: 280,
-    description: "Client discovery call and file review",
-    status: "Approved",
-    createdBy: "John Smith",
-    createdAt: "18/07/2026, 09:10",
-    modifiedAt: "19/07/2026, 11:00",
-    audit: [
-      {
-        id: "a1",
-        at: "18/07/2026, 09:10",
-        action: "Logged manually",
-        actor: "John Smith",
-      },
-      {
-        id: "a2",
-        at: "19/07/2026, 11:00",
-        action: "Approved",
-        actor: "Tejas Gokhe",
-      },
-    ],
-  },
-  {
-    id: "te2",
-    entryId: "TE-7002",
-    relatedTo: RELATED_RECORD_OPTIONS[0],
-    user: "Roshna Abraham",
-    date: "19/07/2026",
-    durationHours: 1.25,
-    billable: true,
-    rate: 220,
-    description: "Draft engagement letter and compliance checklist",
-    status: "Submitted",
-    createdBy: "Roshna Abraham",
-    createdAt: "19/07/2026, 14:20",
-    modifiedAt: "19/07/2026, 16:00",
-    audit: [
-      {
-        id: "a1",
-        at: "19/07/2026, 14:20",
-        action: "Logged manually",
-        actor: "Roshna Abraham",
-      },
-      {
-        id: "a2",
-        at: "19/07/2026, 16:00",
-        action: "Submitted for approval",
-        actor: "Roshna Abraham",
-      },
-    ],
-  },
-  {
-    id: "te3",
-    entryId: "TE-7003",
-    relatedTo: RELATED_RECORD_OPTIONS[4],
-    user: "Tejas Gokhe",
-    date: "20/07/2026",
-    durationHours: 0.75,
-    billable: false,
-    rate: 250,
-    description: "Internal triage: non-billable support",
-    status: "Logged",
-    createdBy: "Tejas Gokhe",
-    createdAt: "20/07/2026, 10:05",
-    modifiedAt: "20/07/2026, 10:50",
-    audit: [
-      {
-        id: "a1",
-        at: "20/07/2026, 10:05",
-        action: "Timer started",
-        actor: "Tejas Gokhe",
-      },
-      {
-        id: "a2",
-        at: "20/07/2026, 10:50",
-        action: "Timer stopped · 0.75h",
-        actor: "Tejas Gokhe",
-      },
-    ],
-  },
-  {
-    id: "te4",
-    entryId: "TE-7004",
-    relatedTo: RELATED_RECORD_OPTIONS[7],
-    user: "Shiva Kadhka",
-    date: "21/07/2026",
-    durationHours: 3,
-    billable: true,
-    rate: 200,
-    description: "Agency retainer: weekly creative standup + revisions",
-    status: "Approved",
-    createdBy: "Shiva Kadhka",
-    createdAt: "21/07/2026, 08:30",
-    modifiedAt: "22/07/2026, 09:15",
-    audit: [
-      {
-        id: "a1",
-        at: "21/07/2026, 08:30",
-        action: "Logged manually",
-        actor: "Shiva Kadhka",
-      },
-      {
-        id: "a2",
-        at: "22/07/2026, 09:15",
-        action: "Approved",
-        actor: "John Smith",
-      },
-    ],
-  },
-  {
-    id: "te5",
-    entryId: "TE-7005",
-    relatedTo: RELATED_RECORD_OPTIONS[3],
-    user: "John Smith",
-    date: "22/07/2026",
-    durationHours: 1,
-    billable: true,
-    rate: 280,
-    description: "Lender application packaging",
-    status: "Invoiced",
-    invoiceId: "inv1",
-    invoiceRef: "INV-3201",
-    createdBy: "John Smith",
-    createdAt: "22/07/2026, 11:00",
-    modifiedAt: "22/07/2026, 15:40",
-    audit: [
-      {
-        id: "a1",
-        at: "22/07/2026, 11:00",
-        action: "Logged manually",
-        actor: "John Smith",
-      },
-      {
-        id: "a2",
-        at: "22/07/2026, 15:40",
-        action: "Invoiced → INV-3201",
-        actor: "John Smith",
-      },
-    ],
-  },
-  {
-    id: "te6",
-    entryId: "TE-7006",
-    relatedTo: RELATED_RECORD_OPTIONS[6],
-    user: "Tejas Gokhe",
-    date: formatTimeDate(),
-    durationHours: 0,
-    billable: true,
-    rate: 250,
-    description: "Enablement workshop prep",
-    status: "Draft",
-    createdBy: "Tejas Gokhe",
-    createdAt: formatTimeAt(),
-    modifiedAt: formatTimeAt(),
-    audit: [
-      {
-        id: "a1",
-        at: formatTimeAt(),
-        action: "Draft created",
-        actor: "Tejas Gokhe",
-      },
-    ],
-  },
-];
+export const timeEntries: TimeEntry[] = [];
 
 function readStore(): TimeEntry[] | null {
   if (typeof window === "undefined") return null;

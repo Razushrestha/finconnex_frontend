@@ -10,7 +10,7 @@ import type { JourneyStep, LifecycleJourney } from "@/lib/journeys/types";
 import { sendEmailDemoLive, sendSmsDemoLive } from "@/lib/comms/send-gateway";
 import { createTask } from "@/lib/tasks/store";
 import { loadSettingsValues } from "@/lib/settings/settings-store";
-import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import { defaultActorName } from "@/lib/rules/actor";
 
 const RUNS_KEY = "workflows:runs:v1";
 const LOGS_KEY = "workflows:logs:v1";
@@ -153,7 +153,7 @@ async function executeStep(
           priority: "Medium",
           status: "Not Started",
           dueDate: due.toLocaleDateString("en-AU"),
-          assignedTo: ACTIVITY_OWNERS[0],
+          assignedTo: defaultActorName(),
           description: step.detail,
           createdBy: "Workflow runner",
         });

@@ -31,28 +31,7 @@ const STORE_KEY = "workspace-members:v1";
  * members fetched from the CRM API. Never what a real workspace's members
  * list actually shows once that fetch resolves.
  */
-const SEED: WorkspaceMember[] = [
-  {
-    id: "wm-demo-1",
-    userId: "user_john",
-    name: "John Smith",
-    email: "admin@finconnex.com",
-    role: "Manager",
-    status: "Active",
-    isOwner: true,
-    team: "Sales",
-  },
-  {
-    id: "wm-demo-2",
-    userId: "user_roshna",
-    name: "Roshna Abraham",
-    email: "roshna@finconnex.com",
-    role: "User",
-    status: "Invited",
-    isOwner: false,
-    team: "Marketing",
-  },
-];
+const SEED: WorkspaceMember[] = [];
 
 function readStore(): WorkspaceMember[] | null {
   if (typeof window === "undefined") return null;

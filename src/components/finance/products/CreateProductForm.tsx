@@ -16,6 +16,7 @@ import {
   tryCrmProduct,
 } from "@/lib/finance/products/api";
 import { FINANCE_OWNERS, formatFinanceDate } from "@/lib/finance/shared";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   CreateEntityFormShell,
   Field,
@@ -39,7 +40,7 @@ export function CreateProductForm({ layoutId: _l, redirect: _r }: Props) {
   const [taxRate, setTaxRate] = useState("10");
   const [unit, setUnit] = useState("unit");
   const [description, setDescription] = useState("");
-  const [createdBy, setCreatedBy] = useState<string>(FINANCE_OWNERS[0]);
+  const [createdBy, setCreatedBy] = useState<string>(defaultActorName());
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   function validate() {

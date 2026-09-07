@@ -44,6 +44,7 @@ import {
   stripSystemFields,
 } from "@/lib/rules";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
+import { defaultActorName } from "@/lib/rules/actor";
 
 export function TimeEntryDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -155,14 +156,14 @@ export function TimeEntryDetailClient({ id }: { id: string }) {
 
   function onApprove() {
     if (!row) return;
-    approveTimeEntry(row.id, "John Smith");
+    approveTimeEntry(row.id, defaultActorName());
     reload();
     flash("Approved");
   }
 
   function onReject() {
     if (!row) return;
-    rejectTimeEntry(row.id, "John Smith");
+    rejectTimeEntry(row.id, defaultActorName());
     reload();
     flash("Rejected");
   }

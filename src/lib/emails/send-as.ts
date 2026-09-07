@@ -14,18 +14,7 @@ const DEFAULT_OWN: SendAsIdentity = {
   kind: "own",
 };
 
-const GRANTED: SendAsIdentity[] = [
-  {
-    email: "john.smith@finconnex.com",
-    name: "John Smith",
-    kind: "send-as",
-  },
-  {
-    email: "loans@finconnex.com",
-    name: "FinConnex Loans",
-    kind: "shared",
-  },
-];
+const GRANTED: SendAsIdentity[] = [];
 
 function canSendAsOther() {
   const role = getRulesActor().role ?? "User";

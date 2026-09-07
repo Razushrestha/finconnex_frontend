@@ -15,6 +15,7 @@ import {
   WHATSAPP_TEMPLATE_SEEDS,
 } from "@/lib/marketing/templates/seed";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   CreateEntityFormShell,
   Field,
@@ -38,7 +39,7 @@ export function CreateWhatsAppCampaignForm({
   const [audience, setAudience] = useState<string>(AUDIENCE_OPTIONS[4]);
   const [status, setStatus] = useState<WhatsAppCampaignStatus>("Draft");
   const [scheduledAt, setScheduledAt] = useState("");
-  const [createdBy, setCreatedBy] = useState<string>(ACTIVITY_OWNERS[0]);
+  const [createdBy, setCreatedBy] = useState<string>(defaultActorName());
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const template = WHATSAPP_TEMPLATE_SEEDS.find((t) => t.id === templateId)!;
