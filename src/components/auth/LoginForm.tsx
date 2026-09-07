@@ -103,7 +103,10 @@ export function LoginForm() {
       }
 
       logAuth("login", email.trim());
-      window.location.href = destination;
+      window.location.href = (data as { needsWorkspace?: boolean })
+        .needsWorkspace
+        ? "/create-workspace"
+        : destination;
     } catch {
       setError("Network error. Check your connection and try again.");
       setIsLoading(false);

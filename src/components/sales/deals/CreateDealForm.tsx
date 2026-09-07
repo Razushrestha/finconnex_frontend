@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Handshake,
@@ -15,7 +15,6 @@ import {
   DEAL_CURRENCIES,
   DEAL_STAGES,
   LOST_REASONS,
-  OWNERS,
   type DealCurrency,
   type DealStageTitle,
 } from "@/lib/deals/types";
@@ -23,6 +22,12 @@ import { CONTACT_SOURCES } from "@/lib/contacts/types";
 import { listCompanyGroups } from "@/lib/companies/store";
 import { useCrmCompanies } from "@/lib/companies/use-crm-companies";
 import { isUuid } from "@/lib/activity-timeline/auth";
+import {
+  assignableOwnerLabel,
+  defaultAssignableOwnerId,
+  listAssignableOwnersLocal,
+  loadAssignableOwners,
+} from "@/lib/users/assignable";
 import {
   createCrmDeal,
   toCreateDealBody,
@@ -76,7 +81,7 @@ const STAGE_PROBABILITY: Record<DealStageTitle, number> = {
   "Closed Lost": 0,
 };
 
-const initialState: FormState = {
+const initialState: Omit<FormState, "owner"> = {
   dealName: "",
   account: "",
   contact: "",
@@ -86,7 +91,6 @@ const initialState: FormState = {
   expectedCloseDate: "",
   dealValue: "",
   currency: "AUD",
-  owner: "John Smith",
   description: "",
   lostReason: "",
   competitor: "",
@@ -95,11 +99,34 @@ const initialState: FormState = {
 export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
   const router = useRouter();
   const crmCompanies = useCrmCompanies();
-  const [form, setForm] = useState<FormState>(initialState);
+  const [form, setForm] = useState<FormState>(() => {
+    const owners = listAssignableOwnersLocal();
+    return { ...initialState, owner: defaultAssignableOwnerId(owners) };
+  });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
   );
   const [submitted, setSubmitted] = useState(false);
+  const [ownerOptions, setOwnerOptions] = useState(() =>
+    listAssignableOwnersLocal(),
+  );
+  const ownerLabel =
+    ownerOptions.find((o) => o.id === form.owner)?.name ?? form.owner;
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadAssignableOwners().then((options) => {
+      if (cancelled || !options.length) return;
+      setOwnerOptions(options);
+      setForm((prev) => ({
+        ...prev,
+        owner: defaultAssignableOwnerId(options, prev.owner),
+      }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const accounts = useMemo(() => {
     void crmCompanies.source;
@@ -151,7 +178,7 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
           value: form.dealValue.trim(),
           currency: form.currency,
           probability: form.probability ? Number(form.probability) : undefined,
-          owner: form.owner,
+          ownerId: form.owner,
           closeDate: form.expectedCloseDate || undefined,
           source: form.leadSource || undefined,
           description: form.description.trim() || undefined,
@@ -163,9 +190,9 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
         throw new Error("The CRM did not return the new deal.");
       }
       mergeCrmDealsIntoBoard([remote]);
-      logCreate("sales.deals", form.owner, remote.id, form.dealName);
+      logCreate("sales.deals", ownerLabel, remote.id, form.dealName);
       notifyOwnerAssigned({
-        owner: form.owner,
+        owner: ownerLabel,
         entityLabel: `Deal ${form.dealName}`,
         relatedTo: form.dealName,
         relatedHref: "/sales/deals",
@@ -173,7 +200,7 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
       });
       if (form.stage === "Closed Won" || form.stage === "Closed Lost") {
         notifyDealClosed({
-          owner: form.owner,
+          owner: ownerLabel,
           manager: getOrgManager(),
           dealName: form.dealName,
           stage: form.stage,
@@ -379,9 +406,9 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
             value={form.owner}
             onChange={(e) => update("owner", e.target.value)}
           >
-            {OWNERS.map((o) => (
-              <option key={o} value={o}>
-                {o}
+            {ownerOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {assignableOwnerLabel(o)}
               </option>
             ))}
           </select>

@@ -28,12 +28,6 @@ export const LOST_REASONS = [
   "Other",
 ] as const;
 
-export const OWNERS = [
-  "John Smith",
-  "Shiva Kadhka",
-  "Tejas Gokhe",
-  "Roshna Abraham",
-] as const;
 
 export const DEAL_PIPELINES = [
   "Deals",

@@ -116,6 +116,7 @@ export function sessionFromCrmUser(
     tenantId: workspace?.id || fromJwt || user.id,
     tenantSlug: workspace?.slug || "workspace",
     tenantName: workspace?.name || "Workspace",
+    hasWorkspace: !!(workspace?.id || fromJwt),
   };
 }
 
@@ -312,6 +313,18 @@ async function crmFetch<T>(
   }
 
   return { data: data as T, accessToken, refreshToken };
+}
+
+export async function crmSignup(input: {
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+}): Promise<void> {
+  await crmFetch<unknown>("/auth/signup", {
+    method: "POST",
+    body: input,
+  });
 }
 
 export async function crmForgotPassword(email: string): Promise<void> {
@@ -548,16 +561,11 @@ export async function activateWorkspace(
     }
   }
 
-  if (!workspaces.length) {
-    try {
-      const created = await crmCreateWorkspace(accessToken, refreshToken);
-      accessToken = created.accessToken ?? accessToken;
-      refreshToken = created.refreshToken ?? refreshToken;
-      workspaces = [created.workspace];
-    } catch {
-      /* create route unavailable */
-    }
-  }
+  // Deliberately no longer auto-creates a workspace here (used to silently
+  // create one named "FinConnex" for any workspace-less login). Workspace
+  // creation is now always a deliberate, user-named step via the
+  // /create-workspace onboarding screen — see `needsWorkspace` handling in
+  // the login route.
 
   const envId =
     preferredId?.trim() ||

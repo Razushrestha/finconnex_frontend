@@ -15,11 +15,11 @@ import {
 import {
   CONTACT_SOURCES,
   CONTACT_STATUSES,
-  OWNERS,
   type ContactSource,
   type ContactStatus,
 } from "@/lib/contacts/types";
-import { COMPANY_NAMES } from "@/lib/companies/types";
+import { listCompanyGroups } from "@/lib/companies/store";
+import { listAssignableOwnersLocal } from "@/lib/users/assignable";
 import { findContactById, updateContact } from "@/lib/contacts/store";
 import { logEdit, requireAction, requiredFieldErrors } from "@/lib/rules";
 import { emitRulesChange } from "@/lib/rules/storage";
@@ -100,6 +100,12 @@ export function EditContactForm({ contactId }: { contactId: string }) {
     {},
   );
   const [submitted, setSubmitted] = useState(false);
+  const [ownerNames] = useState(() =>
+    listAssignableOwnersLocal().map((o) => o.name),
+  );
+  const [companyNames] = useState(() =>
+    listCompanyGroups().flatMap((g) => g.companies.map((c) => c.name)),
+  );
 
   if (!found || !form) {
     return (
@@ -288,7 +294,7 @@ export function EditContactForm({ contactId }: { contactId: string }) {
             onChange={(e) => update("company", e.target.value)}
           >
             <option value="">Select company</option>
-            {COMPANY_NAMES.map((name) => (
+            {companyNames.map((name) => (
               <option key={name} value={name}>
                 {name}
               </option>
@@ -344,7 +350,7 @@ export function EditContactForm({ contactId }: { contactId: string }) {
             value={form.owner}
             onChange={(e) => update("owner", e.target.value)}
           >
-            {OWNERS.map((o) => (
+            {ownerNames.map((o) => (
               <option key={o} value={o}>
                 {o}
               </option>

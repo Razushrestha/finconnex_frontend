@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2,
@@ -12,9 +12,14 @@ import {
 } from "lucide-react";
 import {
   COMPANY_STATUSES,
-  OWNERS,
   type CompanyStatus,
 } from "@/lib/companies/types";
+import {
+  assignableOwnerLabel,
+  defaultAssignableOwnerId,
+  listAssignableOwnersLocal,
+  loadAssignableOwners,
+} from "@/lib/users/assignable";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { mergeCrmCompaniesIntoBoard } from "@/lib/companies/store";
 import { createCrmCompany } from "@/lib/companies/api";
@@ -49,7 +54,7 @@ interface FormState {
   notes: string;
 }
 
-const initialState: FormState = {
+const initialState: Omit<FormState, "owner"> = {
   companyName: "",
   website: "",
   industry: "",
@@ -61,7 +66,6 @@ const initialState: FormState = {
   state: "",
   country: "Australia",
   status: "Prospect",
-  owner: "John Smith",
   notes: "",
 };
 
@@ -70,11 +74,34 @@ export function CreateCompanyForm({
   redirect,
 }: CreateCompanyFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(initialState);
+  const [form, setForm] = useState<FormState>(() => {
+    const owners = listAssignableOwnersLocal();
+    return { ...initialState, owner: defaultAssignableOwnerId(owners) };
+  });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
   );
   const [submitted, setSubmitted] = useState(false);
+  const [ownerOptions, setOwnerOptions] = useState(() =>
+    listAssignableOwnersLocal(),
+  );
+  const ownerLabel =
+    ownerOptions.find((o) => o.id === form.owner)?.name ?? form.owner;
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadAssignableOwners().then((options) => {
+      if (cancelled || !options.length) return;
+      setOwnerOptions(options);
+      setForm((prev) => ({
+        ...prev,
+        owner: defaultAssignableOwnerId(options, prev.owner),
+      }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -102,7 +129,8 @@ export function CreateCompanyForm({
         city: form.city.trim() || undefined,
         annualRevenue: form.annualRevenue.trim() || undefined,
         status: form.status as CompanyStatus,
-        owner: form.owner,
+        owner: ownerLabel,
+        ownerId: form.owner,
         notes: form.notes.trim() || undefined,
         companySize: form.companySize.trim() || undefined,
         address: form.address.trim() || undefined,
@@ -284,9 +312,9 @@ export function CreateCompanyForm({
             value={form.owner}
             onChange={(e) => update("owner", e.target.value)}
           >
-            {OWNERS.map((o) => (
-              <option key={o} value={o}>
-                {o}
+            {ownerOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {assignableOwnerLabel(o)}
               </option>
             ))}
           </select>

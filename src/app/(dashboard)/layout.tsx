@@ -14,5 +14,10 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  // Authenticated but no real workspace yet (fresh signup) → onboarding
+  if (session.hasWorkspace === false) {
+    redirect("/create-workspace");
+  }
+
   return <DashboardShell session={session}>{children}</DashboardShell>;
 }

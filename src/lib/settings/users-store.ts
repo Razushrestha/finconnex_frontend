@@ -24,6 +24,15 @@ export type CrmUser = {
   joinedAt?: string;
 };
 
+/**
+ * Local-only placeholder shown before the live workspace-members fetch
+ * resolves (see `loadAssignableOwners()` in `@/lib/users/assignable.ts`,
+ * which always attempts the real CRM API first and only keeps data derived
+ * from this SEED if that live fetch fails). Once any real member exists
+ * server-side — true for every real workspace, since its owner is a real
+ * member from creation — this SEED is never what a user actually sees; it
+ * only ever appears as an instant first paint or an offline/dev fallback.
+ */
 const SEED: CrmUser[] = [
   {
     id: "user_john",

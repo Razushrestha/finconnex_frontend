@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { getSession, createSessionToken } from "@/lib/auth/session";
-import { getSessionCookieOptions, SESSION_COOKIE } from "@/lib/auth/constants";
+import { getSession } from "@/lib/auth/session";
 import {
   applyCrmTokenCookies,
   crmListMyWorkspaces,
-  crmSelectWorkspace,
   CrmAuthError,
   isCrmAuthEnabled,
   readCrmTokens,
 } from "@/lib/auth/crm-server";
+import { remintSessionForWorkspace } from "@/lib/auth/workspace-session";
 
 export async function GET() {
   const session = await getSession();
@@ -93,38 +92,21 @@ export async function POST(request: Request) {
       tokens.accessToken,
       tokens.refreshToken,
     );
-    const workspace =
-      listed.workspaces.find((w) => w.id === workspaceId) ?? null;
-    const selected = await crmSelectWorkspace(
-      workspaceId,
-      listed.accessToken ?? tokens.accessToken,
-      listed.refreshToken ?? tokens.refreshToken,
-    );
-
-    const nextSession = await createSessionToken(
-      {
-        ...session,
-        tenantId: workspace?.id ?? workspaceId,
-        tenantSlug: workspace?.slug ?? session.tenantSlug,
-        tenantName: workspace?.name ?? session.tenantName,
-      },
-      false,
-    );
+    const workspace = listed.workspaces.find((w) => w.id === workspaceId) ?? {
+      id: workspaceId,
+      slug: session.tenantSlug,
+      name: session.tenantName,
+    };
 
     const response = NextResponse.json({
       success: true,
       workspace,
       workspaceId,
     });
-    applyCrmTokenCookies(response, {
-      accessToken: selected.data.accessToken,
-      refreshToken: selected.refreshToken ?? tokens.refreshToken,
+    await remintSessionForWorkspace(response, session, workspace, {
+      accessToken: listed.accessToken ?? tokens.accessToken,
+      refreshToken: listed.refreshToken ?? tokens.refreshToken,
     });
-    response.cookies.set(
-      SESSION_COOKIE,
-      nextSession,
-      getSessionCookieOptions(false),
-    );
     return response;
   } catch (err) {
     const message =

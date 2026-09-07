@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
@@ -7,7 +6,7 @@ import {
   Shield,
   Users,
 } from "lucide-react";
-import { LoginForm } from "@/components/auth/LoginForm";
+import { SignupForm } from "@/components/auth/SignupForm";
 
 const features = [
   {
@@ -33,11 +32,11 @@ const features = [
 ];
 
 export const metadata: Metadata = {
-  title: "Sign in: FinConnex",
-  description: "Sign in to your organization workspace",
+  title: "Sign up: FinConnex",
+  description: "Create your FinConnex account",
 };
 
-export default function LoginPage() {
+export default function SignupPage() {
   return (
     <div className="flex min-h-screen">
       {/* Brand panel */}
@@ -54,11 +53,11 @@ export default function LoginPage() {
         <div className="relative space-y-6">
           <div>
             <h1 className="text-3xl leading-tight font-bold text-white">
-              Manage every client relationship, securely.
+              Create your own workspace in minutes.
             </h1>
             <p className="mt-3 max-w-sm text-sm leading-relaxed text-violet-100">
-              Sign in to access dashboards, sales pipelines, finance reports,
-              and team tools.
+              Sign up, verify your email, and set up a workspace only your
+              team can see.
             </p>
           </div>
 
@@ -93,43 +92,37 @@ export default function LoginPage() {
           <div className="mb-8 lg:hidden">
             <div className="text-2xl font-bold text-gray-900">FinConnex</div>
             <p className="mt-1 text-sm text-gray-500">
-              Sign in to your workspace
+              Create your FinConnex account
             </p>
           </div>
 
           <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
             <div className="mb-6">
               <h2 className="text-xl font-semibold text-gray-900">
-                Welcome back
+                Create your account
               </h2>
               <p className="mt-1 text-sm text-gray-500">
-                Sign in with your FinConnex account email and password
+                You&apos;ll set up your own workspace after verifying your
+                email
               </p>
             </div>
 
-            <Suspense
-              fallback={
-                <div className="flex h-40 items-center justify-center text-sm text-gray-400">
-                  Loading...
-                </div>
-              }
-            >
-              <LoginForm />
-            </Suspense>
+            <SignupForm />
 
             <p className="mt-6 text-center text-sm text-gray-500">
-              Don&apos;t have an account?{" "}
+              Already have an account?{" "}
               <Link
-                href="/signup"
+                href="/login"
                 className="font-medium text-violet-600 hover:text-violet-700"
               >
-                Sign up
+                Sign in
               </Link>
             </p>
           </div>
 
           <p className="mt-6 text-center text-xs text-gray-400">
-            By signing in, you agree to our Terms of Service and Privacy Policy
+            By signing up, you agree to our Terms of Service and Privacy
+            Policy
           </p>
         </div>
       </div>

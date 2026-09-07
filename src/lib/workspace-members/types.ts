@@ -24,6 +24,13 @@ export type WorkspaceMembersSummary = {
 
 const STORE_KEY = "workspace-members:v1";
 
+/**
+ * Local-only placeholder used the same way as `settings/users-store.ts`'s
+ * SEED — an instant first paint / offline fallback before
+ * `replaceCrmWorkspaceMembers()` overwrites this store with the real
+ * members fetched from the CRM API. Never what a real workspace's members
+ * list actually shows once that fetch resolves.
+ */
 const SEED: WorkspaceMember[] = [
   {
     id: "wm-demo-1",

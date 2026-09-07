@@ -9,13 +9,6 @@ export const COMPANY_STATUSES = [
 ] as const;
 export type CompanyStatus = (typeof COMPANY_STATUSES)[number];
 
-export const OWNERS = [
-  "John Smith",
-  "Shiva Kadhka",
-  "Tejas Gokhe",
-  "Roshna Abraham",
-] as const;
-
 export interface CompanyCardData {
   id: string;
   name: string;
@@ -203,7 +196,3 @@ export const COMPANY_GROUPS: CompanyGroup[] = [
   },
 ];
 
-/** Flat account names for Deal create forms */
-export const COMPANY_NAMES = COMPANY_GROUPS.flatMap((g) =>
-  g.companies.map((c) => c.name),
-);

@@ -184,9 +184,11 @@ export async function createContact(input: {
   phone?: string;
   mobile?: string;
   company?: string;
+  companyId?: string;
   source?: ContactSource;
   status: ContactStatus;
   owner: string;
+  ownerId?: string;
 }): Promise<ContactCardData> {
   const { createCrmContact, isCrmContactId } = await import("@/lib/contacts/api");
   const remote = await createCrmContact(input);
