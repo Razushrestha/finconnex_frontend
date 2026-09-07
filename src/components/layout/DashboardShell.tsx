@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Navbar from "@/components/layout/Navbar";
 import { BottomBar } from "@/components/layout/BottomBar";
+import { CrmTokenKeepAlive } from "@/components/layout/CrmTokenKeepAlive";
 import type { SessionPayload } from "@/lib/auth/types";
 import { setRulesActor } from "@/lib/rules/actor";
 import { BOTTOM_BAR_H } from "@/lib/layout";
@@ -74,6 +75,7 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
         <div className={`${BOTTOM_BAR_H} shrink-0`} aria-hidden />
       </div>
       <BottomBar />
+      <CrmTokenKeepAlive />
     </div>
   );
 }

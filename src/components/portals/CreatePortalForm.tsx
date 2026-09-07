@@ -79,8 +79,8 @@ function CompactField({
 export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [clientId, setClientId] = useState<string>(PORTAL_CLIENTS[0].id);
-  const [slug, setSlug] = useState("greystone");
+  const [clientId, setClientId] = useState<string>(PORTAL_CLIENTS[0]?.id ?? "");
+  const [slug, setSlug] = useState("");
   const [status, setStatus] = useState<PortalStatus>("Active");
   const [accessLevel, setAccessLevel] =
     useState<PortalAccessLevel>("Full");
@@ -91,8 +91,8 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
     "Invoices",
   ]);
   const [createdBy, setCreatedBy] = useState<string>(PORTAL_OWNERS[0]);
-  const [contactName, setContactName] = useState<string>(PORTAL_CLIENTS[0].contact);
-  const [contactEmail, setContactEmail] = useState<string>(PORTAL_CLIENTS[0].email);
+  const [contactName, setContactName] = useState<string>(PORTAL_CLIENTS[0]?.contact ?? "");
+  const [contactEmail, setContactEmail] = useState<string>(PORTAL_CLIENTS[0]?.email ?? "");
   const [contactTouched, setContactTouched] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [slugTouched, setSlugTouched] = useState(false);
@@ -116,7 +116,7 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
 
   function onNameChange(v: string) {
     setName(v);
-    if (!slugTouched) setSlug(uniqueSlug(v || client.name));
+    if (!slugTouched) setSlug(uniqueSlug(v || client?.name || ""));
   }
 
   function toggleModule(m: PortalModule) {
@@ -141,7 +141,7 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
   }
 
   function onSave(createAnother: boolean) {
-    if (!validate()) return;
+    if (!validate() || !client) return;
     const ids = nextPortalIds();
     const finalSlug = uniqueSlug(slug);
     const created = upsertPortal(
@@ -437,7 +437,7 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
                       {name.trim() || "Untitled portal"}
                     </p>
                     <p className="truncate text-[11px] text-slate-500">
-                      {client.name}
+                      {client?.name ?? "No client"}
                     </p>
                   </div>
                 </div>

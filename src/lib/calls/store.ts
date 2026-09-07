@@ -65,7 +65,7 @@ function normalize(cols: CallColumn[]): CallColumn[] {
 }
 
 const board = createBoardStore({
-  key: "activities:calls:board:v3",
+  key: "activities:calls:board:v4",
   seed: cloneSeed,
 });
 
@@ -253,7 +253,7 @@ export function deleteCall(id: string, opts?: { skipCrm?: boolean }): Call | nul
   if (found) {
     saveCallColumns(next);
     emitLeadActivityChange();
-    if (!opts?.skipCrm) {
+    if (!opts?.skipCrm && isUuid(id)) {
       void import("@/lib/calls/api").then(({ deleteCrmCall, tryCrm }) => {
         void tryCrm(() => deleteCrmCall(id));
       });
@@ -319,6 +319,7 @@ export function updateCall(id: string, patch: Partial<Call>): Call | null {
   }
 
   emitLeadActivityChange();
+  if (!isUuid(id)) return merged;
   void import("@/lib/calls/api").then(
     async ({ syncCallStatus, updateCrmCall, rescheduleCrmCall, tryCrm }) => {
       if (nextStatus !== found.call.status) {

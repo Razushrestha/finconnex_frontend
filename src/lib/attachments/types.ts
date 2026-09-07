@@ -24,24 +24,4 @@ export interface Attachment {
   byteSize?: number;
 }
 
-export const attachmentsSeed: Attachment[] = [
-  {
-    id: "att-1",
-    fileName: "rate-lock-checklist.pdf",
-    kind: "Document",
-    relatedTo: "Lead: William Anderson",
-    uploadedBy: "John Smith",
-    uploadedAt: "22/07/2026 04:15 PM",
-    sizeLabel: "240 KB",
-    notes: "Shared after discovery call",
-  },
-  {
-    id: "att-2",
-    fileName: "id-scan.jpg",
-    kind: "Image",
-    relatedTo: "Lead: Chloe Ramirez",
-    uploadedBy: "Shiva Kadhka",
-    uploadedAt: "21/07/2026 11:00 AM",
-    sizeLabel: "1.2 MB",
-  },
-];
+export const attachmentsSeed: Attachment[] = [];

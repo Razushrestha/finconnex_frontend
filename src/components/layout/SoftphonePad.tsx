@@ -36,8 +36,8 @@ import {
   parseCallDurationSeconds,
   updateCall,
 } from "@/lib/calls/store";
-import { createCrmCall, dialCrmCall, startCrmCall, tryCrm } from "@/lib/calls/api";
 import { isUuid } from "@/lib/activity-timeline/auth";
+import { placeOutboundCrmCall } from "@/lib/calls/api";
 import { listAllContacts } from "@/lib/contacts/store";
 import { createNote } from "@/lib/notes/store";
 import {
@@ -106,6 +106,9 @@ export function SoftphonePad({
   presetNumber,
   presetName,
   presetRelatedTo,
+  presetRelatedType,
+  presetRelatedId,
+  presetContactId,
   autoStart = false,
   placementKey = 0,
 }: {
@@ -115,6 +118,9 @@ export function SoftphonePad({
   presetNumber?: string;
   presetName?: string;
   presetRelatedTo?: string;
+  presetRelatedType?: string;
+  presetRelatedId?: string;
+  presetContactId?: string;
   autoStart?: boolean;
   placementKey?: number;
 }) {
@@ -228,6 +234,7 @@ export function SoftphonePad({
     name?: string,
     relatedTo?: string,
     force = false,
+    extra?: { relatedType?: string; relatedId?: string; contactId?: string },
   ) {
     const n = number.trim();
     if (!n) return;
@@ -242,8 +249,8 @@ export function SoftphonePad({
     setNoteFor(null);
     const call = createCall(
       {
-        subject: `Softphone — ${display}`,
-        relatedTo: relatedTo || record?.relatedTo,
+        subject: `Outbound call — ${display}`,
+        relatedTo: relatedTo || presetRelatedTo || record?.relatedTo,
         contact: display,
         fromNumber: n,
         callType: "Outbound",
@@ -257,31 +264,34 @@ export function SoftphonePad({
     setActiveCallId(call.id);
     setTick((v) => v + 1);
     void (async () => {
-      const remote = await tryCrm(() =>
-        createCrmCall({
-          subject: call.subject,
-          callType: "Outbound",
-          status: "Scheduled",
-          date: new Date().toISOString(),
-          fromNumber: n,
-          assignedTo: OWNER,
-          contact: display,
-          relatedTo: record?.relatedTo,
-        }),
-      );
-      const id = remote?.id && isUuid(remote.id) ? remote.id : call.id;
-      if (remote?.id && isUuid(remote.id) && remote.id !== call.id) {
-        const { deleteCall, mergeCrmCalls } = await import("@/lib/calls/store");
+      const relatedType =
+        extra?.relatedType || presetRelatedType || undefined;
+      const relatedId = extra?.relatedId || presetRelatedId || undefined;
+      const contactId = extra?.contactId || presetContactId || undefined;
+      const result = await placeOutboundCrmCall({
+        phone: n,
+        name: display,
+        subject: `Outbound call — ${display}`,
+        relatedTo: relatedTo || presetRelatedTo || record?.relatedTo,
+        relatedType: relatedType as
+          | "LEAD"
+          | "CONTACT"
+          | "COMPANY"
+          | "DEAL"
+          | undefined,
+        relatedId,
+        contactId,
+      });
+      if (result.call?.id && isUuid(result.call.id) && result.call.id !== call.id) {
+        const { deleteCall } = await import("@/lib/calls/store");
         deleteCall(call.id, { skipCrm: true });
-        mergeCrmCalls([remote]);
-        setActiveCallId(remote.id);
+        setActiveCallId(result.call.id);
       }
-      if (isUuid(id)) {
-        await tryCrm(() => startCrmCall(id));
-        await tryCrm(() =>
-          dialCrmCall(id, { to: n, fromNumber: n, destination: n }),
-        );
+      if (!result.ok) {
+        const { toast } = await import("sonner");
+        toast.error(result.message);
       }
+      setTick((v) => v + 1);
     })();
   }
 
@@ -527,7 +537,13 @@ export function SoftphonePad({
             query={query}
             onQuery={setQuery}
             rows={contacts}
-            onCall={(c) => startCall(c.mobile || c.phone, c.name)}
+            onCall={(c) =>
+              startCall(c.mobile || c.phone, c.name, `Contact: ${c.name}`, false, {
+                relatedType: "CONTACT",
+                relatedId: c.id,
+                contactId: c.id,
+              })
+            }
           />
         ) : null}
 

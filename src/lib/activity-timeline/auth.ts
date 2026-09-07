@@ -167,45 +167,24 @@ async function resolveAccessToken(): Promise<string | null> {
   return null;
 }
 
-/**
- * The backend rotates refresh tokens on every use and revokes the whole
- * session if a stale (already-consumed) refresh token is replayed — a reuse-
- * detection guard against token theft. Several components independently
- * call ensureCrmSession() when their requests 401 around the same time (e.g.
- * loading a workflow page fires member/automation/notification calls
- * together), so without dedup every one of them would race its own
- * `/v1/auth/refresh-token` call: the first wins and rotates the token, and
- * every other concurrent caller then presents the now-stale token and gets
- * the entire session revoked. Sharing one in-flight promise means concurrent
- * callers all await the same single refresh instead of racing.
- */
 let inflightRefresh: Promise<string | null> | null = null;
 
-async function refreshAccessToken(baseUrl: string): Promise<string | null> {
+/**
+ * Refresh only through the Next BFF. Calling /v1/auth/refresh-token from the
+ * browser races the server cookie refresh and revokes the CRM session.
+ */
+async function refreshAccessToken(_baseUrl: string): Promise<string | null> {
   if (inflightRefresh) return inflightRefresh;
   inflightRefresh = (async () => {
-    const stored = readStorage(REFRESH_KEY);
     const server = await fetchServerCrmTokens();
-    const refreshToken =
-      (stored && !isJwtExpired(stored) ? stored : null) ||
-      (server.refreshToken && !isJwtExpired(server.refreshToken)
-        ? server.refreshToken
-        : stored || server.refreshToken);
-    if (!refreshToken) return null;
-    try {
-      const data = await crmFetchJson<{
-        accessToken?: string;
-        refreshToken?: string;
-      }>(baseUrl, "/v1/auth/refresh-token", refreshToken, { method: "POST" });
-      if (!data?.accessToken) return null;
+    if (server.accessToken) {
       persistCrmTokens({
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken ?? refreshToken,
+        accessToken: server.accessToken,
+        refreshToken: server.refreshToken,
       });
-      return data.accessToken;
-    } catch {
-      return null;
+      if (!isJwtExpired(server.accessToken, 5_000)) return server.accessToken;
     }
+    return server.accessToken;
   })();
   try {
     return await inflightRefresh;
@@ -443,6 +422,24 @@ export async function ensureCrmSession(): Promise<CrmSession | null> {
     } catch {
       return null;
     }
+  }
+}
+
+/** Always hit the BFF so a 401 retries with a newly rotated access JWT. */
+export async function refreshCrmSession(): Promise<CrmSession | null> {
+  if (boundSession) return boundSession;
+  const baseUrl = getCrmApiBaseUrl();
+  if (!baseUrl) return null;
+  const rawToken = await refreshAccessToken(baseUrl);
+  if (!rawToken) return null;
+  try {
+    const { workspaceId, accessToken } = await resolveWorkspaceId(
+      baseUrl,
+      rawToken,
+    );
+    return { baseUrl, accessToken, workspaceId };
+  } catch {
+    return null;
   }
 }
 

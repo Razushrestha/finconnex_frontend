@@ -4,7 +4,9 @@ import { cookies } from "next/headers";
 import type { NextResponse } from "next/server";
 import {
   CRM_ACCESS_COOKIE,
+  CRM_ACCESS_FALLBACK_MAX_AGE,
   CRM_REFRESH_COOKIE,
+  CRM_TOKEN_REFRESH_SKEW_MS,
   getSessionCookieOptions,
   REMEMBER_MAX_AGE,
   SESSION_MAX_AGE,
@@ -127,7 +129,7 @@ export function applyCrmTokenCookies(
   const base = getSessionCookieOptions(rememberMe);
   response.cookies.set(CRM_ACCESS_COOKIE, tokens.accessToken, {
     ...base,
-    maxAge: tokenMaxAgeSeconds(tokens.accessToken, 15 * 60),
+    maxAge: tokenMaxAgeSeconds(tokens.accessToken, CRM_ACCESS_FALLBACK_MAX_AGE),
   });
   if (tokens.refreshToken) {
     response.cookies.set(CRM_REFRESH_COOKIE, tokens.refreshToken, {
@@ -146,7 +148,18 @@ export function clearCrmTokenCookies(response: NextResponse) {
   response.cookies.set(CRM_REFRESH_COOKIE, "", cleared);
 }
 
-export function isCrmJwtExpired(token: string | null | undefined, skewMs = 15_000): boolean {
+export function crmJwtExpiresInSeconds(token: string | null | undefined): number | null {
+  if (!token) return null;
+  const payload = decodeJwtPayload(token);
+  const exp = payload?.exp;
+  if (typeof exp !== "number" || !Number.isFinite(exp)) return null;
+  return Math.max(0, exp - Math.floor(Date.now() / 1000));
+}
+
+export function isCrmJwtExpired(
+  token: string | null | undefined,
+  skewMs = CRM_TOKEN_REFRESH_SKEW_MS,
+): boolean {
   if (!token) return true;
   const payload = decodeJwtPayload(token);
   const exp = payload?.exp;
@@ -182,7 +195,29 @@ export async function readCrmTokens(): Promise<{
 }
 
 /** Cookie/env CRM JWTs, refreshed and workspace-scoped when possible. */
+let inflightAuth: Promise<{
+  accessToken: string;
+  refreshToken: string | null;
+} | null> | null = null;
+let inflightRotate: Promise<{
+  accessToken: string;
+  refreshToken: string;
+}> | null = null;
+
 export async function resolveLiveCrmAuth(): Promise<{
+  accessToken: string;
+  refreshToken: string | null;
+} | null> {
+  if (inflightAuth) return inflightAuth;
+  inflightAuth = resolveLiveCrmAuthOnce();
+  try {
+    return await inflightAuth;
+  } finally {
+    inflightAuth = null;
+  }
+}
+
+async function resolveLiveCrmAuthOnce(): Promise<{
   accessToken: string;
   refreshToken: string | null;
 } | null> {
@@ -194,7 +229,7 @@ export async function resolveLiveCrmAuth(): Promise<{
       accessToken = rotated.accessToken;
       refreshToken = rotated.refreshToken;
     } catch {
-      if (!accessToken || isCrmJwtExpired(accessToken)) return null;
+      if (!accessToken || isCrmJwtExpired(accessToken, 0)) return null;
     }
   }
 
@@ -368,18 +403,26 @@ export async function refreshCrmTokens(refreshToken: string): Promise<{
   accessToken: string;
   refreshToken: string;
 }> {
-  const { data } = await crmFetch<{
-    accessToken: string;
-    refreshToken: string;
-  }>("/auth/refresh-token", {
-    method: "POST",
-    refreshToken,
-    bearer: "refresh",
-  });
-  if (!data?.accessToken || !data?.refreshToken) {
-    throw new CrmAuthError(401, "Could not refresh CRM session");
+  if (inflightRotate) return inflightRotate;
+  inflightRotate = (async () => {
+    const { data } = await crmFetch<{
+      accessToken: string;
+      refreshToken: string;
+    }>("/auth/refresh-token", {
+      method: "POST",
+      refreshToken,
+      bearer: "refresh",
+    });
+    if (!data?.accessToken || !data?.refreshToken) {
+      throw new CrmAuthError(401, "Could not refresh CRM session");
+    }
+    return data;
+  })();
+  try {
+    return await inflightRotate;
+  } finally {
+    inflightRotate = null;
   }
-  return data;
 }
 
 export async function crmMe(accessToken: string, refreshToken?: string | null) {

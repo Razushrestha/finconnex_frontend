@@ -62,32 +62,12 @@ export const PORTAL_MODULES: PortalModule[] = [
   "Reports",
 ];
 
-export const PORTAL_CLIENTS = [
-  {
-    id: "c1",
-    name: "Greystone Realty",
-    contact: "Priya Mehta",
-    email: "priya@greystone.example",
-  },
-  {
-    id: "c2",
-    name: "Harbour Loans",
-    contact: "Marcus Chen",
-    email: "marcus@harbour.example",
-  },
-  {
-    id: "c3",
-    name: "Northside Mortgage",
-    contact: "Aisha Khan",
-    email: "aisha@northside.example",
-  },
-  {
-    id: "c4",
-    name: "Apex Property Group",
-    contact: "Daniel Rossi",
-    email: "daniel@apex.example",
-  },
-] as const;
+export const PORTAL_CLIENTS: {
+  id: string;
+  name: string;
+  contact: string;
+  email: string;
+}[] = [];
 
 export const PORTAL_OWNERS = [
   "John Smith",
@@ -96,7 +76,7 @@ export const PORTAL_OWNERS = [
   "Shiva Kadhka",
 ] as const;
 
-const STORE_KEY = "portals:v1";
+const STORE_KEY = "portals:v2";
 
 export function formatPortalAt(d = new Date()) {
   return d.toLocaleString("en-AU", {
@@ -158,84 +138,7 @@ export function canSignInPortal(p: ClientPortal) {
   return p.accessLevel === "Full" || p.accessLevel === "Limited";
 }
 
-export const clientPortals: ClientPortal[] = [
-  {
-    id: "prt1",
-    portalId: "PRT-7001",
-    name: "Greystone Client Portal",
-    clientId: "c1",
-    clientName: "Greystone Realty",
-    slug: "greystone",
-    status: "Active",
-    accessLevel: "Full",
-    modules: ["Deals", "Documents", "Tasks", "Tickets", "Invoices", "Reports"],
-    primaryContactName: "Priya Mehta",
-    primaryContactEmail: "priya@greystone.example",
-    inviteSentAt: "10/07/2026 09:00",
-    lastLoginAt: "20/07/2026 11:15",
-    createdBy: "John Smith",
-    createdAt: "08/07/2026",
-    activity: [
-      { id: "v1", at: "10/07/2026 09:00", action: "Invite sent", actor: "John Smith" },
-      { id: "v2", at: "11/07/2026 08:40", action: "Client logged in", actor: "Priya Mehta" },
-      { id: "v3", at: "18/07/2026 09:05", action: "Viewed invoice INV-3201", actor: "Priya Mehta" },
-      { id: "v4", at: "20/07/2026 11:15", action: "Client logged in", actor: "Priya Mehta" },
-    ],
-    audit: [
-      { id: "a1", at: "08/07/2026 10:00", action: "Created", actor: "John Smith" },
-      { id: "a2", at: "08/07/2026 10:10", action: "Status → Active", actor: "John Smith" },
-      { id: "a3", at: "10/07/2026 09:00", action: "Invite sent", actor: "John Smith" },
-    ],
-  },
-  {
-    id: "prt2",
-    portalId: "PRT-7002",
-    name: "Harbour self-service",
-    clientId: "c2",
-    clientName: "Harbour Loans",
-    slug: "harbour",
-    status: "Active",
-    accessLevel: "Limited",
-    modules: ["Documents", "Tickets", "Tasks", "Invoices", "Reports"],
-    primaryContactName: "Marcus Chen",
-    primaryContactEmail: "marcus@harbour.example",
-    inviteSentAt: "15/07/2026 14:00",
-    createdBy: "Tejas Gokhe",
-    createdAt: "14/07/2026",
-    activity: [
-      { id: "v1", at: "15/07/2026 14:00", action: "Invite sent", actor: "Tejas Gokhe" },
-    ],
-    audit: [
-      { id: "a1", at: "14/07/2026 11:00", action: "Created", actor: "Tejas Gokhe" },
-      { id: "a2", at: "14/07/2026 11:20", action: "Access → Limited", actor: "Tejas Gokhe" },
-    ],
-  },
-  {
-    id: "prt3",
-    portalId: "PRT-7003",
-    name: "Apex portal (suspended)",
-    clientId: "c4",
-    clientName: "Apex Property Group",
-    slug: "apex",
-    status: "Suspended",
-    accessLevel: "Full",
-    modules: ["Deals", "Documents", "Invoices", "Tickets"],
-    primaryContactName: "Daniel Rossi",
-    primaryContactEmail: "daniel@apex.example",
-    inviteSentAt: "01/06/2026 10:00",
-    lastLoginAt: "05/06/2026 16:00",
-    createdBy: "Shiva Kadhka",
-    createdAt: "28/05/2026",
-    activity: [
-      { id: "v1", at: "01/06/2026 10:00", action: "Invite sent", actor: "Shiva Kadhka" },
-      { id: "v2", at: "12/06/2026 09:00", action: "Suspended: overdue invoice", actor: "Shiva Kadhka" },
-    ],
-    audit: [
-      { id: "a1", at: "28/05/2026 09:00", action: "Created", actor: "Shiva Kadhka" },
-      { id: "a2", at: "12/06/2026 09:00", action: "Status → Suspended", actor: "Shiva Kadhka" },
-    ],
-  },
-];
+export const clientPortals: ClientPortal[] = [];
 
 function readStore(): ClientPortal[] | null {
   if (typeof window === "undefined") return null;

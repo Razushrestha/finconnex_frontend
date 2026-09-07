@@ -9,6 +9,9 @@ export type SoftphoneOpenDetail = {
   phone?: string;
   name?: string;
   relatedTo?: string;
+  relatedType?: string;
+  relatedId?: string;
+  contactId?: string;
   autoStart?: boolean;
 };
 
@@ -36,7 +39,13 @@ export function openSoftphoneNear(
   el: HTMLElement | null,
   extra: Pick<
     SoftphoneOpenDetail,
-    "phone" | "name" | "relatedTo" | "autoStart"
+    | "phone"
+    | "name"
+    | "relatedTo"
+    | "relatedType"
+    | "relatedId"
+    | "contactId"
+    | "autoStart"
   > = {},
 ) {
   const rect = el?.getBoundingClientRect();
@@ -55,4 +64,31 @@ export function subscribeSoftphoneOpen(
   };
   window.addEventListener(EVENT, onEvent);
   return () => window.removeEventListener(EVENT, onEvent);
+}
+
+export function startCrmRecordCall(input: {
+  phone?: string;
+  name: string;
+  relatedTo?: string;
+  relatedType?: string;
+  relatedId?: string;
+  contactId?: string;
+  anchor?: HTMLElement | null;
+}): { ok: true } | { ok: false; message: string } {
+  const phone = (input.phone ?? "").trim();
+  if (!phone) {
+    const message = `${input.name} has no phone number.`;
+    void import("sonner").then(({ toast }) => toast.error(message));
+    return { ok: false, message };
+  }
+  openSoftphoneNear(input.anchor ?? null, {
+    phone,
+    name: input.name,
+    relatedTo: input.relatedTo,
+    relatedType: input.relatedType,
+    relatedId: input.relatedId,
+    contactId: input.contactId,
+    autoStart: true,
+  });
+  return { ok: true };
 }

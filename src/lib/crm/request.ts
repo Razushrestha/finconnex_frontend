@@ -27,10 +27,40 @@ const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
     "That timezone is not valid for CRM meetings.",
   "note.error.relatedTypeMismatch":
     "Related entity and record do not match. Pick a live CRM record.",
+  "reminder.error.parentRequired":
+    "Link this reminder to a live Task, Call, or Meeting.",
+  "reminder.error.invalidRemindAt":
+    "Reminder time must be a valid date and time.",
   "workspace.error.invitationDeliveryFailed":
     "Workspace invitation was created, but the invite email could not be queued. Sending from FinConnex mail instead.",
   "workspace.error.roleRequired":
     "Choose a workspace role before sending the invite.",
+  "message.error.invalidRecipient":
+    "CRM SMS needs a live contact, or Nest with TWILIO_SMS_TO set.",
+  "lead.error.conversationPhoneRequired":
+    "This CRM lead has no phone number, so Twilio did not send.",
+  "call.error.relatedTypeMismatch":
+    "Link this call to a live CRM lead, contact, company, or deal — or omit the related record.",
+  "call.error.voiceDispatchUnavailable":
+    "CRM cannot place this Twilio Voice call. It must be outbound, have an E.164 phone, and not already be dispatched.",
+  "sms.error.voiceNotConfigured":
+    "Hosted CRM is missing Twilio Voice env (TWIML URL, from-number, or status callback). FinConnex can place the call from local Twilio settings if those are set.",
+  "sms.error.voiceFromNotConfigured":
+    "Set TWILIO_VOICE_FROM to an E.164 number (the Twilio Voice caller ID).",
+  "sms.error.voiceTwimlNotConfigured":
+    "Set TWILIO_VOICE_TWIML_URL to an https TwiML URL, then restart the CRM API.",
+  "sms.error.voiceStatusCallbackNotConfigured":
+    "Set TWILIO_VOICE_STATUS_CALLBACK_URL to an https webhook, then restart the CRM API.",
+  "sms.error.voiceRecipientInvalid":
+    "The destination number is not valid E.164 for Twilio Voice.",
+  "call.error.voiceDispatchUnknown":
+    "Twilio accepted the dial request, but CRM could not record the Call SID. Check the call again before retrying.",
+  "call.error.invalidTransition":
+    "This call is not in a state that can be started.",
+  "sms.error.notConfigured":
+    "Twilio is not configured on the CRM server.",
+  "sms.error.phoneNumberNotConfigured":
+    "Twilio from-number is missing on the CRM server.",
 };
 
 export function crmErrorMessage(json: unknown, fallback: string): string {
@@ -162,8 +192,8 @@ export async function crmFetch<T>(
   let { res, json } = await sendCrm(session, path, init);
 
   if ([401, 403, 404, 405].includes(res.status)) {
-    const { ensureCrmSession } = await import("@/lib/activity-timeline/auth");
-    const next = await ensureCrmSession();
+    const { refreshCrmSession } = await import("@/lib/activity-timeline/auth");
+    const next = await refreshCrmSession();
     if (next?.accessToken && next.accessToken !== session.accessToken) {
       ({ res, json } = await sendCrm(
         { ...next, baseUrl: session.baseUrl },

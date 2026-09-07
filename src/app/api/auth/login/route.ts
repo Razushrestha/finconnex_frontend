@@ -19,8 +19,19 @@ import {
   sessionFromCrmUser,
 } from "@/lib/auth/crm-server";
 
-function friendlyAuthMessage(raw: string) {
+function friendlyAuthMessage(raw: string, status?: number) {
+  if (status === 502 || status === 503 || status === 504) {
+    return "FinConnex CRM is unavailable (bad gateway). Try again when the API is back.";
+  }
   const key = raw.toLowerCase();
+  if (
+    key.includes("bad gateway") ||
+    key.includes("<html") ||
+    key.includes("econnrefused") ||
+    key.includes("fetch failed")
+  ) {
+    return "FinConnex CRM is unavailable (bad gateway). Try again when the API is back.";
+  }
   if (key.includes("invalid") || key.includes("unauthorized") || key.includes("credential")) {
     return "Invalid email or password.";
   }
@@ -114,14 +125,15 @@ export async function POST(request: Request) {
       });
       return response;
     } catch (err) {
-      const message =
+      const status = err instanceof CrmAuthError ? err.status : 502;
+      const raw =
         err instanceof CrmAuthError
-          ? friendlyAuthMessage(err.message)
+          ? err.message
           : "Unable to sign in. Please try again.";
-      const status = err instanceof CrmAuthError ? err.status : 401;
+      const message = friendlyAuthMessage(raw, status);
       return NextResponse.json(
         { error: message },
-        { status: status >= 400 && status < 600 ? status : 401 },
+        { status: status >= 400 && status < 600 ? status : 502 },
       );
     }
   } catch (error) {

@@ -49,7 +49,14 @@ import {
   type ConversationItem,
 } from "@/lib/leads/conversation-store";
 import { createMeeting, formatMeetingDateTime } from "@/lib/meetings/store";
+import {
+  createCrmMessage,
+  CRM_SMS_TO_NUMBER,
+  listRelatedCrmMessages,
+  persistRemoteMessage,
+} from "@/lib/messages/api";
 import { createMessage } from "@/lib/messages/store";
+import type { Message } from "@/lib/messages/types";
 import type { LeadCardData } from "@/lib/leads/types";
 import { cn } from "@/lib/utils";
 import { LeadComposerEmojiPicker } from "@/components/sales/leads/detail/LeadComposerEmojiPicker";
@@ -133,6 +140,39 @@ function channelLabel(channel: ConversationChannel) {
   return "Call";
 }
 
+function conversationStatus(raw: string): ConversationItem["status"] {
+  const value = raw.toLowerCase();
+  if (value.includes("read")) return "read";
+  if (value.includes("deliver")) return "delivered";
+  return "sent";
+}
+
+function crmMessageToConversationItem(
+  row: Message,
+  leadId: string,
+  owner: string,
+): ConversationItem {
+  const blob = `${row.subject} ${row.template ?? ""} ${row.type}`.toLowerCase();
+  const channel: ConversationChannel = blob.includes("whatsapp")
+    ? "whatsapp"
+    : blob.includes("email")
+      ? "email"
+      : "sms";
+  const parsed = row.sentDate ? Date.parse(row.sentDate) : Number.NaN;
+  return {
+    id: row.id,
+    leadId,
+    channel,
+    kind: channel === "email" ? "email" : "text",
+    direction: "out",
+    fromName: row.from && row.from !== "—" ? row.from : owner,
+    body: row.body,
+    subject: row.subject,
+    at: Number.isNaN(parsed) ? new Date().toISOString() : new Date(parsed).toISOString(),
+    status: conversationStatus(row.status),
+  };
+}
+
 function summarize(items: ConversationItem[], first: string) {
   const lastIn = [...items].reverse().find((item) => item.direction === "in");
   const lastOut = [...items].reverse().find((item) => item.direction === "out");
@@ -154,7 +194,7 @@ export function LeadConversationPanel({ card }: { card: LeadCardData }) {
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("oldest");
   const [filterOpen, setFilterOpen] = useState(false);
   const [composerChannel, setComposerChannel] =
-    useState<ComposerChannel>("whatsapp");
+    useState<ComposerChannel>("sms");
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState("");
   const [, setSubject] = useState("");
@@ -191,42 +231,58 @@ export function LeadConversationPanel({ card }: { card: LeadCardData }) {
   useEffect(() => {
     if (!isUuid(card.id)) return;
     let cancelled = false;
-    void fetchLeadConversations(card.id, { limit: 50 }).then((page) => {
-      if (cancelled || !page) return;
-      setRemoteItems(
-        page.records.map((row) => ({
-          id: row.id,
-          leadId: card.id,
-          channel: (["whatsapp", "sms", "email", "call"].includes(row.channel)
-            ? row.channel
-            : "sms") as ConversationChannel,
-          kind:
-            row.kind === "call"
-              ? "call"
-              : row.kind === "email"
-                ? "email"
-                : "text",
-          direction:
-            String(row.direction).toLowerCase() === "inbound" ||
-            String(row.direction).toLowerCase() === "in"
-              ? "in"
-              : "out",
-          fromName: row.fromName || card.owner,
-          body: row.body,
-          subject: row.subject,
-          at:
-            typeof row.at === "string"
-              ? row.at
-              : new Date(row.at).toISOString(),
-          status: "sent",
-          durationSeconds: row.durationSeconds,
-        })),
-      );
-    });
+    void (async () => {
+      const [page, related] = await Promise.all([
+        fetchLeadConversations(card.id, { limit: 50 }).catch(() => null),
+        listRelatedCrmMessages("LEAD", card.id).catch(() => [] as Message[]),
+      ]);
+      if (cancelled) return;
+      const fromConversations: ConversationItem[] = (page?.records ?? []).map((row) => ({
+        id: row.id,
+        leadId: card.id,
+        channel: (["whatsapp", "sms", "email", "call"].includes(row.channel)
+          ? row.channel
+          : "sms") as ConversationChannel,
+        kind: (row.kind === "call"
+          ? "call"
+          : row.kind === "email"
+            ? "email"
+            : row.kind === "voice"
+              ? "voice"
+              : "text") as ConversationItem["kind"],
+        direction: (String(row.direction).toLowerCase() === "inbound" ||
+        String(row.direction).toLowerCase() === "in"
+          ? "in"
+          : "out") as ConversationItem["direction"],
+        fromName: row.fromName || card.owner,
+        body: row.body,
+        subject: row.subject,
+        at:
+          typeof row.at === "string"
+            ? row.at
+            : new Date(row.at).toISOString(),
+        status: "sent" as const,
+        durationSeconds: row.durationSeconds,
+      }));
+      const fromMessages = related.map((row) => {
+        persistRemoteMessage({
+          ...row,
+          relatedTo: `Lead: ${card.name}`,
+          relatedType: "LEAD",
+          relatedId: card.id,
+        });
+        return crmMessageToConversationItem(row, card.id, card.owner);
+      });
+      const byId = new Map<string, ConversationItem>();
+      for (const item of [...fromConversations, ...fromMessages]) {
+        byId.set(item.id, item);
+      }
+      setRemoteItems([...byId.values()]);
+    })();
     return () => {
       cancelled = true;
     };
-  }, [card.id, card.owner, revision]);
+  }, [card.id, card.name, card.owner, revision]);
 
   useEffect(() => {
     if (!plusOpen && !emojiOpen) return;
@@ -330,51 +386,57 @@ export function LeadConversationPanel({ card }: { card: LeadCardData }) {
       return;
     }
 
-    const related = `Lead: ${card.name}`;
-    createMessage({
-      type: "External",
-      subject:
-        composerChannel === "whatsapp"
-          ? `WhatsApp: ${card.name}`
-          : body.slice(0, 48) || "SMS",
-      body: body || attachment?.name || "",
-      from: card.owner,
-      to: card.phone || card.name,
-      relatedTo: related,
-      status: "Sent",
-      template: composerChannel === "whatsapp" ? "WhatsApp" : undefined,
-    });
+    const text = body || attachment?.name || "";
+    const subject =
+      composerChannel === "whatsapp"
+        ? `WhatsApp: ${card.name}`
+        : text.slice(0, 48) || "SMS";
 
-    if (isUuid(card.id)) {
-      void postLeadConversation(card.id, {
-        channel: composerChannel,
-        body: body || attachment?.name || "",
-        subject:
-          composerChannel === "whatsapp"
-            ? `WhatsApp: ${card.name}`
-            : undefined,
-        send: true,
-      })
-        .then(() => setRevision((n) => n + 1))
-        .catch((err) =>
-          notify(err instanceof Error ? err.message : "Send failed"),
-        );
-    } else {
-      addLeadConversationItem({
-        leadId: card.id,
-        channel: composerChannel,
-        kind: "text",
-        direction: "out",
-        fromName: card.owner,
-        body: body || attachment?.name || "",
-        status: "read",
-        attachment: attachment ?? undefined,
-      });
-    }
+    void (async () => {
+      try {
+        const twilioRes = await fetch("/api/auth/sms", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            body: text,
+            channel: composerChannel,
+          }),
+        });
+        const twilioJson = (await twilioRes.json().catch(() => ({}))) as {
+          error?: string;
+          sid?: string;
+        };
+        if (!twilioRes.ok) {
+          throw new Error(twilioJson.error || "Twilio did not send the SMS.");
+        }
+        if (isUuid(card.id)) {
+          void postLeadConversation(card.id, {
+            channel: composerChannel,
+            body: text,
+            subject: composerChannel === "whatsapp" ? subject : undefined,
+            send: false,
+          }).catch(() => null);
+          void createCrmMessage({
+            type: "External",
+            subject,
+            body: text,
+            to: CRM_SMS_TO_NUMBER,
+            relatedType: "LEAD",
+            relatedId: card.id,
+            channel: composerChannel === "whatsapp" ? "WHATSAPP" : "SMS",
+            send: false,
+          }).then((row) => persistRemoteMessage(row));
+        }
+        setRevision((n) => n + 1);
+        notify(`SMS queued from +17372212163 to ${CRM_SMS_TO_NUMBER}`);
+      } catch (err) {
+        notify(err instanceof Error ? err.message : "Send failed");
+      }
+    })();
     setDraft("");
     setSubject("");
     setAttachment(null);
-    notify("Message sent");
   }
 
   function sendVoice() {
@@ -692,7 +754,7 @@ export function LeadConversationPanel({ card }: { card: LeadCardData }) {
                   send();
                 }
               }}
-              placeholder={`Message ${card.name}...`}
+              placeholder={`Message ${CRM_SMS_TO_NUMBER}…`}
               rows={1}
               className="h-7 w-full resize-none bg-transparent px-1 text-[12px] leading-snug text-slate-800 outline-none placeholder:text-slate-400"
             />

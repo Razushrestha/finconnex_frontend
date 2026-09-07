@@ -14,7 +14,7 @@ function cloneSeed(): CalendarItem[] {
 }
 
 const store = createBoardStore({
-  key: "activities:calendar:items:v1",
+  key: "activities:calendar:items:v2",
   seed: cloneSeed,
 });
 

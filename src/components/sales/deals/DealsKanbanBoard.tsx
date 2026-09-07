@@ -18,6 +18,7 @@ import {
 } from "@/lib/rules";
 import type { DealFilters } from "./FilterDealsPanel";
 import { dealMatchesFilters } from "@/lib/filters/records";
+import { resolveDealContact } from "@/lib/sales/resolve-contact";
 import { DealRecordCard } from "./DealRecordCard";
 import type { DealQuickActionKind } from "./DealRecordCard";
 import {
@@ -105,6 +106,20 @@ export function DealsKanbanBoard({
   }
 
   function openQuickAction(kind: DealQuickActionKind, deal: DealRecord) {
+    if (kind === "call") {
+      const linked = resolveDealContact(deal);
+      void import("@/lib/softphone/events").then(({ startCrmRecordCall }) => {
+        startCrmRecordCall({
+          phone: linked.phone,
+          name: linked.name || deal.name,
+          relatedTo: `Deal: ${deal.name}`,
+          relatedType: linked.id ? "CONTACT" : undefined,
+          relatedId: linked.id,
+          contactId: linked.id,
+        });
+      });
+      return;
+    }
     setPanel({
       type: "quick-action",
       kind,

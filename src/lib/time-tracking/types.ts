@@ -84,48 +84,7 @@ export const TIME_USERS = [
   "Shiva Kadhka",
 ] as const;
 
-export const RELATED_RECORD_OPTIONS: TimeRelatedTo[] = [
-  {
-    kind: "Matter",
-    name: "Anderson: refinance matter",
-    clientId: "c1",
-  },
-  {
-    kind: "Matter",
-    name: "Harbour: first-home matter",
-    clientId: "c2",
-  },
-  {
-    kind: "Deal",
-    name: "Greystone refinance package",
-    clientId: "c1",
-  },
-  {
-    kind: "Deal",
-    name: "Harbour first-home buyer",
-    clientId: "c2",
-  },
-  {
-    kind: "Ticket",
-    name: "TKT-5001: Portal login issue",
-    clientId: "c1",
-  },
-  {
-    kind: "Ticket",
-    name: "TKT-5003: Document upload failed",
-    clientId: "c3",
-  },
-  {
-    kind: "Project",
-    name: "Q3 broker enablement",
-    clientId: "c4",
-  },
-  {
-    kind: "Project",
-    name: "Agency retainer: Apex",
-    clientId: "c4",
-  },
-];
+export const RELATED_RECORD_OPTIONS: TimeRelatedTo[] = [];
 
 export const DEFAULT_RATES: Record<string, number> = {
   "John Smith": 280,
@@ -144,7 +103,7 @@ export const TIME_STATUS_STYLE: Record<TimeEntryStatus, string> = {
   Rejected: "bg-rose-100 text-rose-800",
 };
 
-const STORE_KEY = "time-tracking:entries:v1";
+const STORE_KEY = "time-tracking:entries:v2";
 
 export function formatTimeAt(d = new Date()) {
   return d.toLocaleString("en-AU", {
@@ -181,178 +140,7 @@ export function relatedLabel(r: TimeRelatedTo) {
   return `${r.kind}: ${r.name}`;
 }
 
-export const timeEntries: TimeEntry[] = [
-  {
-    id: "te1",
-    entryId: "TE-7001",
-    relatedTo: RELATED_RECORD_OPTIONS[2],
-    user: "John Smith",
-    date: "18/07/2026",
-    durationHours: 2.5,
-    billable: true,
-    rate: 280,
-    description: "Client discovery call and file review",
-    status: "Approved",
-    createdBy: "John Smith",
-    createdAt: "18/07/2026, 09:10",
-    modifiedAt: "19/07/2026, 11:00",
-    audit: [
-      {
-        id: "a1",
-        at: "18/07/2026, 09:10",
-        action: "Logged manually",
-        actor: "John Smith",
-      },
-      {
-        id: "a2",
-        at: "19/07/2026, 11:00",
-        action: "Approved",
-        actor: "Tejas Gokhe",
-      },
-    ],
-  },
-  {
-    id: "te2",
-    entryId: "TE-7002",
-    relatedTo: RELATED_RECORD_OPTIONS[0],
-    user: "Roshna Abraham",
-    date: "19/07/2026",
-    durationHours: 1.25,
-    billable: true,
-    rate: 220,
-    description: "Draft engagement letter and compliance checklist",
-    status: "Submitted",
-    createdBy: "Roshna Abraham",
-    createdAt: "19/07/2026, 14:20",
-    modifiedAt: "19/07/2026, 16:00",
-    audit: [
-      {
-        id: "a1",
-        at: "19/07/2026, 14:20",
-        action: "Logged manually",
-        actor: "Roshna Abraham",
-      },
-      {
-        id: "a2",
-        at: "19/07/2026, 16:00",
-        action: "Submitted for approval",
-        actor: "Roshna Abraham",
-      },
-    ],
-  },
-  {
-    id: "te3",
-    entryId: "TE-7003",
-    relatedTo: RELATED_RECORD_OPTIONS[4],
-    user: "Tejas Gokhe",
-    date: "20/07/2026",
-    durationHours: 0.75,
-    billable: false,
-    rate: 250,
-    description: "Internal triage: non-billable support",
-    status: "Logged",
-    createdBy: "Tejas Gokhe",
-    createdAt: "20/07/2026, 10:05",
-    modifiedAt: "20/07/2026, 10:50",
-    audit: [
-      {
-        id: "a1",
-        at: "20/07/2026, 10:05",
-        action: "Timer started",
-        actor: "Tejas Gokhe",
-      },
-      {
-        id: "a2",
-        at: "20/07/2026, 10:50",
-        action: "Timer stopped · 0.75h",
-        actor: "Tejas Gokhe",
-      },
-    ],
-  },
-  {
-    id: "te4",
-    entryId: "TE-7004",
-    relatedTo: RELATED_RECORD_OPTIONS[7],
-    user: "Shiva Kadhka",
-    date: "21/07/2026",
-    durationHours: 3,
-    billable: true,
-    rate: 200,
-    description: "Agency retainer: weekly creative standup + revisions",
-    status: "Approved",
-    createdBy: "Shiva Kadhka",
-    createdAt: "21/07/2026, 08:30",
-    modifiedAt: "22/07/2026, 09:15",
-    audit: [
-      {
-        id: "a1",
-        at: "21/07/2026, 08:30",
-        action: "Logged manually",
-        actor: "Shiva Kadhka",
-      },
-      {
-        id: "a2",
-        at: "22/07/2026, 09:15",
-        action: "Approved",
-        actor: "John Smith",
-      },
-    ],
-  },
-  {
-    id: "te5",
-    entryId: "TE-7005",
-    relatedTo: RELATED_RECORD_OPTIONS[3],
-    user: "John Smith",
-    date: "22/07/2026",
-    durationHours: 1,
-    billable: true,
-    rate: 280,
-    description: "Lender application packaging",
-    status: "Invoiced",
-    invoiceId: "inv1",
-    invoiceRef: "INV-3201",
-    createdBy: "John Smith",
-    createdAt: "22/07/2026, 11:00",
-    modifiedAt: "22/07/2026, 15:40",
-    audit: [
-      {
-        id: "a1",
-        at: "22/07/2026, 11:00",
-        action: "Logged manually",
-        actor: "John Smith",
-      },
-      {
-        id: "a2",
-        at: "22/07/2026, 15:40",
-        action: "Invoiced → INV-3201",
-        actor: "John Smith",
-      },
-    ],
-  },
-  {
-    id: "te6",
-    entryId: "TE-7006",
-    relatedTo: RELATED_RECORD_OPTIONS[6],
-    user: "Tejas Gokhe",
-    date: formatTimeDate(),
-    durationHours: 0,
-    billable: true,
-    rate: 250,
-    description: "Enablement workshop prep",
-    status: "Draft",
-    createdBy: "Tejas Gokhe",
-    createdAt: formatTimeAt(),
-    modifiedAt: formatTimeAt(),
-    audit: [
-      {
-        id: "a1",
-        at: formatTimeAt(),
-        action: "Draft created",
-        actor: "Tejas Gokhe",
-      },
-    ],
-  },
-];
+export const timeEntries: TimeEntry[] = [];
 
 function readStore(): TimeEntry[] | null {
   if (typeof window === "undefined") return null;
@@ -572,6 +360,9 @@ export function generateInvoiceFromTime(
 
   const client =
     FINANCE_CLIENTS.find((c) => c.id === clientId) ?? FINANCE_CLIENTS[0];
+  if (!client) {
+    return { error: "Add a finance client before invoicing time entries." };
+  }
 
   const lineItems: FinanceLineItem[] = rows.map((e) =>
     newLineItem({

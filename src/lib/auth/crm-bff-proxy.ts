@@ -4,6 +4,12 @@ import {
   applyCrmTokenCookies,
   resolveLiveCrmAuth,
 } from "@/lib/auth/crm-server";
+import {
+  createTwilioVoiceCall,
+  parseDialPath,
+  pickCallPhone,
+  twilioVoiceFromNextEnv,
+} from "@/lib/calls/twilio-voice-fallback";
 
 const ALLOWED_ROOTS = new Set([
   "leads",
@@ -18,6 +24,7 @@ const ALLOWED_ROOTS = new Set([
   "meetings",
   "messages",
   "notes",
+  "reminders",
   "dashboard",
   "public",
 ]);
@@ -42,6 +49,7 @@ function isAllowed(path: string[]): boolean {
       path.includes("meetings") ||
       path.includes("messages") ||
       path.includes("notes") ||
+      path.includes("reminders") ||
       path.includes("dashboard") ||
       path[2] === "members" ||
       path[2] === "members-summary" ||
@@ -112,9 +120,64 @@ export async function proxyCrmV1(
     body: body || undefined,
   });
 
-  const text = await upstream.text();
+  let text = await upstream.text();
+  let status = upstream.status;
+
+  const dial = parseDialPath(path);
+  if (request.method === "POST" && dial && status >= 500 && auth?.accessToken) {
+    const cfg = twilioVoiceFromNextEnv();
+    if (!cfg) {
+      text = JSON.stringify({
+        message:
+          "Hosted CRM Voice is not configured, and local Twilio Voice env is incomplete (need account, from-number, and TwiML URL).",
+      });
+    } else {
+      const callPath = dial.workspaceId
+        ? `${base}/v1/workspaces/${encodeURIComponent(dial.workspaceId)}/calls/${encodeURIComponent(dial.callId)}`
+        : `${base}/v1/calls/${encodeURIComponent(dial.callId)}`;
+      try {
+        const callRes = await fetch(callPath, {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${auth.accessToken}`,
+          },
+        });
+        const callText = await callRes.text();
+        const callJson = callRes.ok ? JSON.parse(callText) : null;
+        const to = pickCallPhone(callJson);
+        if (!to) {
+          text = JSON.stringify({
+            message:
+              "CRM call has no E.164 phone. Set a number on the call, or TWILIO_SMS_TO in .env.local.",
+          });
+        } else {
+          const placed = await createTwilioVoiceCall(to);
+          const envelope =
+            callJson && typeof callJson === "object"
+              ? (callJson as Record<string, unknown>)
+              : { data: {} };
+          const data =
+            envelope.data && typeof envelope.data === "object"
+              ? (envelope.data as Record<string, unknown>)
+              : envelope;
+          data.voiceProviderSid = placed.sid;
+          data.voiceProviderStatus = placed.status;
+          envelope.data = data;
+          envelope.message = "Twilio Voice queued from FinConnex.";
+          text = JSON.stringify(envelope);
+          status = 201;
+        }
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Twilio Voice fallback failed.";
+        text = JSON.stringify({ message });
+        status = 502;
+      }
+    }
+  }
+
   const response = new NextResponse(text, {
-    status: upstream.status,
+    status,
     headers: {
       "Content-Type":
         upstream.headers.get("content-type") || "application/json",

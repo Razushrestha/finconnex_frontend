@@ -22,6 +22,7 @@ import {
   markCrmMessageRead,
   markCrmMessageUnread,
   normalizeMessage,
+  toCreateMessageBody,
   relatedMessagesPath,
   retryCrmMessage,
   sendCrmMessage,
@@ -113,6 +114,14 @@ const LIVE_ROUTES: Array<{ method: string; path: string }> = [
   {
     method: "GET",
     path: `/v1/workspaces/${SESSION.workspaceId}/LEAD/${RELATED_ID}/messages`,
+  },
+  {
+    method: "GET",
+    path: `/v1/workspaces/${SESSION.workspaceId}/CONTACT/${RELATED_ID}/messages`,
+  },
+  {
+    method: "GET",
+    path: `/v1/workspaces/${SESSION.workspaceId}/COMPANY/${RELATED_ID}/messages`,
   },
 ];
 
@@ -219,6 +228,82 @@ export function smokeMessagesWiring() {
   if (!create.includes("createCrmMessage") || !create.includes("sendCrmMessage")) {
     fail("create message form does not call createCrmMessage/sendCrmMessage");
   }
+  if (!create.includes("useCrmRelatedRecords") || !create.includes("relatedId")) {
+    fail("create message form must pick a live CRM related record");
+  }
+  if (create.includes("tryCrmMessage") || create.includes("createMessage(")) {
+    fail("create message form must not silently fall back to local store");
+  }
+
+  const payload = toCreateMessageBody({
+    type: "External",
+    subject: "New",
+    body: "Hi",
+    to: "ada@example.com",
+    relatedTo: "Lead: William Anderson",
+    relatedType: "LEAD",
+    relatedId: RELATED_ID,
+    channel: "SMS",
+  });
+  if (payload.messageType !== "EXTERNAL") {
+    fail("toCreateMessageBody must send Nest messageType");
+  }
+  if (payload.leadId !== RELATED_ID || payload.relatedType !== "LEAD") {
+    fail("toCreateMessageBody must send leadId for a lead parent");
+  }
+  if (payload.channel !== "SMS") {
+    fail("toCreateMessageBody must send SMS/WhatsApp channel when provided");
+  }
+  if (
+    "relatedTo" in payload ||
+    "relatedId" in payload ||
+    "text" in payload ||
+    "from" in payload ||
+    "status" in payload ||
+    "template" in payload ||
+    "type" in payload ||
+    "to" in payload
+  ) {
+    fail("toCreateMessageBody must not send forbidden extra fields");
+  }
+
+  const leadConv = readSrc(
+    "src/components/sales/leads/detail/LeadConversationPanel.tsx",
+  );
+  if (
+    !leadConv.includes("listRelatedCrmMessages") ||
+    !leadConv.includes("createCrmMessage")
+  ) {
+    fail("lead conversation panel does not use the CRM messages API");
+  }
+
+  const relatedPanel = readSrc("src/components/shared/RelatedCrmMessages.tsx");
+  if (
+    !relatedPanel.includes("listRelatedCrmMessages") ||
+    !relatedPanel.includes("createCrmMessage")
+  ) {
+    fail("RelatedCrmMessages does not persist messages through CRM");
+  }
+
+  const contactDetail = readSrc(
+    "src/components/sales/contacts/ContactDetailView.tsx",
+  );
+  if (
+    !contactDetail.includes("RelatedCrmMessages") ||
+    !contactDetail.includes('relatedType="CONTACT"')
+  ) {
+    fail("contact detail does not load related CRM messages");
+  }
+
+  const companyDetail = readSrc(
+    "src/components/sales/companies/CompanyDetailView.tsx",
+  );
+  if (
+    !companyDetail.includes("RelatedCrmMessages") ||
+    !companyDetail.includes('relatedType="COMPANY"')
+  ) {
+    fail("company detail does not load related CRM messages");
+  }
 
   const table = readSrc(
     "src/components/activities/messages/MessagesListTable.tsx",
@@ -302,11 +387,16 @@ export async function smokeMessagesMock() {
     await listUnreadCrmMessages();
     await getCrmMessage(ID);
     await listRelatedCrmMessages("LEAD", RELATED_ID);
+    await listRelatedCrmMessages("CONTACT", RELATED_ID);
+    await listRelatedCrmMessages("COMPANY", RELATED_ID);
     await createCrmMessage({
       type: "External",
       subject: "New",
       body: "Hi",
       to: "ada@example.com",
+      relatedType: "LEAD",
+      relatedId: RELATED_ID,
+      channel: "SMS",
     });
     await updateCrmMessage(ID, { subject: "Updated" });
     await markCrmMessageRead(ID);
@@ -329,6 +419,8 @@ export async function smokeMessagesMock() {
       `GET ${workspaceMessagesPath(SESSION.workspaceId, "/unread")}`,
       `GET ${workspaceMessagesPath(SESSION.workspaceId, `/${ID}`)}`,
       `GET ${relatedMessagesPath(SESSION.workspaceId, "LEAD", RELATED_ID)}`,
+      `GET ${relatedMessagesPath(SESSION.workspaceId, "CONTACT", RELATED_ID)}`,
+      `GET ${relatedMessagesPath(SESSION.workspaceId, "COMPANY", RELATED_ID)}`,
       `POST ${workspaceMessagesPath(SESSION.workspaceId)}`,
       `PATCH ${workspaceMessagesPath(SESSION.workspaceId, `/${ID}`)}`,
       `POST ${workspaceMessagesPath(SESSION.workspaceId, `/${ID}/read`)}`,

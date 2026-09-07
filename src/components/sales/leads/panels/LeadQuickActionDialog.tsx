@@ -238,7 +238,14 @@ export function LeadQuickActionDialog({
     setIntentError(null);
     const gateway = getSendGateway();
     if (kind === "call") {
-      const r = await gateway.placeCall({ phone: leadPhone });
+      const { startCrmRecordCall } = await import("@/lib/softphone/events");
+      const r = startCrmRecordCall({
+        phone: leadPhone,
+        name: leadName,
+        relatedTo: `Lead: ${leadName}`,
+        relatedType: "LEAD",
+        relatedId: leadId,
+      });
       if (!r.ok) setIntentError(r.message);
       return;
     }

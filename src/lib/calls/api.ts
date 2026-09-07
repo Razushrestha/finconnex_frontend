@@ -133,7 +133,8 @@ export function normalizeCrmCall(
     callType: mapCallType(pickStr(raw.type, raw.callType, raw.direction, "OUTBOUND")),
     status: mapCallStatus(pickStr(raw.status, raw.state, "SCHEDULED")),
     date: asDate(
-      raw.scheduledAt ??
+      raw.callDate ??
+        raw.scheduledAt ??
         raw.startAt ??
         raw.startedAt ??
         raw.date ??
@@ -336,20 +337,12 @@ function toCallIso(raw: string): string {
 function asCall(data: unknown): Call | null {
   const items = normalizeCrmCalls(data);
   const first = items[0];
-  if (first && isUuid(first.id) && first.subject !== "Untitled call") return first;
+  if (first && isUuid(first.id)) return first;
   if (data && typeof data === "object" && !Array.isArray(data)) {
     const mapped = normalizeCrmCall(data as Record<string, unknown>, 0);
-    if (mapped && isUuid(mapped.id) && mapped.subject !== "Untitled call") {
-      return mapped;
-    }
+    if (mapped && isUuid(mapped.id)) return mapped;
   }
   return null;
-}
-
-function sameCallTitle(a: string, b: string) {
-  const left = a.trim().toLowerCase();
-  const right = b.trim().toLowerCase();
-  return left === right || left.includes(right) || right.includes(left);
 }
 
 export type CreateCrmCallInput = {
@@ -368,34 +361,78 @@ export type CreateCrmCallInput = {
   contact?: string;
   contactId?: string;
   duration?: string;
+  toNumber?: string;
 };
 
+function toE164(raw?: string): string | undefined {
+  let compact = (raw ?? "").trim().replace(/[^\d+]/g, "");
+  if (!compact) return undefined;
+  if (compact.startsWith("00")) compact = `+${compact.slice(2)}`;
+  if (/^0\d{9}$/.test(compact)) compact = `+61${compact.slice(1)}`;
+  if (/^61\d{8,10}$/.test(compact)) compact = `+${compact}`;
+  if (/^[1-9]\d{8,14}$/.test(compact)) compact = `+${compact}`;
+  if (!/^\+[1-9]\d{7,14}$/.test(compact)) return undefined;
+  return compact;
+}
+
+function fallbackVoicePhone() {
+  return (
+    toE164(process.env.NEXT_PUBLIC_TWILIO_SMS_TO) ||
+    toE164(process.env.NEXT_PUBLIC_TWILIO_PHONE_NUMBER)
+  );
+}
+
+function resolveOutboundPhone(raw?: string): string | undefined {
+  return toE164(raw) || fallbackVoicePhone();
+}
+
+function durationSeconds(raw?: string): number | undefined {
+  if (!raw?.trim()) return undefined;
+  const n = Number(raw);
+  if (Number.isInteger(n) && n >= 0 && n <= 86400) return n;
+  return undefined;
+}
+
 function toCreateBody(input: CreateCrmCallInput) {
-  const scheduledAt = toCallIso(input.date);
-  const assigneeId = isUuid(input.assignedTo) ? input.assignedTo : undefined;
+  const callDate = toCallIso(input.date) || new Date().toISOString();
+  const assignedToId = isUuid(input.assignedTo) ? input.assignedTo : undefined;
+  const relatedType = (input.relatedType ?? "").trim().toUpperCase();
+  const relatedId = isUuid(input.relatedId) ? input.relatedId : undefined;
   const contactId = isUuid(input.contactId)
     ? input.contactId
     : isUuid(input.contact)
       ? input.contact
-      : undefined;
-  const relatedId = isUuid(input.relatedId) ? input.relatedId : undefined;
+      : relatedType === "CONTACT"
+        ? relatedId
+        : undefined;
+  const leadId = relatedType === "LEAD" ? relatedId : undefined;
+  const companyId = relatedType === "COMPANY" ? relatedId : undefined;
+  const dealId = relatedType === "DEAL" ? relatedId : undefined;
+  const parentType = leadId
+    ? "LEAD"
+    : contactId
+      ? "CONTACT"
+      : companyId
+        ? "COMPANY"
+        : dealId
+          ? "DEAL"
+          : undefined;
+  const phone = resolveOutboundPhone(input.toNumber) || resolveOutboundPhone(input.fromNumber);
   return compactBody({
-    subject: input.subject.trim(),
-    title: input.subject.trim(),
-    type: apiCallType(input.callType),
-    status: apiCallStatus(input.status),
-    scheduledAt: scheduledAt || undefined,
-    startAt: scheduledAt || undefined,
-    fromNumber: input.fromNumber,
+    subject: input.subject.trim().slice(0, 255),
+    callType: apiCallType(input.callType),
+    callDate,
+    phone,
     notes: input.notes,
     agenda: input.agenda,
     purpose: input.purpose,
-    assigneeId,
-    ownerId: assigneeId,
+    assignedToId,
+    relatedType: parentType,
+    leadId,
     contactId,
-    relatedType: input.relatedType?.toUpperCase(),
-    relatedId,
-    duration: input.duration,
+    companyId,
+    dealId,
+    duration: durationSeconds(input.duration),
   });
 }
 
@@ -408,7 +445,6 @@ export async function createCrmCall(
       body: JSON.stringify(toCreateBody(input)),
     }),
   );
-  if (created && !sameCallTitle(created.subject, input.subject)) return null;
   return created;
 }
 
@@ -417,16 +453,17 @@ export async function updateCrmCall(
   patch: Partial<Call>,
 ): Promise<Call | null> {
   const body: Record<string, unknown> = {};
-  if (patch.subject) body.subject = patch.subject;
-  if (patch.callType) body.type = apiCallType(patch.callType);
-  if (patch.status) body.status = apiCallStatus(patch.status);
-  if (patch.date) body.scheduledAt = patch.date;
-  if (patch.fromNumber != null) body.fromNumber = patch.fromNumber;
+  if (patch.subject) body.subject = patch.subject.slice(0, 255);
+  if (patch.callType) body.callType = apiCallType(patch.callType);
+  if (patch.date) body.callDate = toCallIso(patch.date);
+  const phone = toE164(patch.fromNumber);
+  if (phone) body.phone = phone;
   if (patch.notes != null) body.notes = patch.notes;
   if (patch.agenda != null) body.agenda = patch.agenda;
   if (patch.purpose != null) body.purpose = patch.purpose;
-  if (patch.assignedTo) body.assignedTo = patch.assignedTo;
-  if (patch.outcome != null) body.outcome = patch.outcome;
+  if (patch.assignedTo && isUuid(patch.assignedTo)) {
+    body.assignedToId = patch.assignedTo;
+  }
   const data = await callsMutate(`/${id}`, {
     method: "PATCH",
     body: JSON.stringify(body),
@@ -444,48 +481,40 @@ export async function startCrmCall(id: string): Promise<Call | null> {
 
 export async function dialCrmCall(
   id: string,
-  extra: Record<string, unknown> = {},
+  _extra: Record<string, unknown> = {},
 ): Promise<Call | null> {
-  return asCall(
-    await callsMutate(`/${id}/dial`, {
-      method: "POST",
-      body: JSON.stringify(extra),
-    }),
-  );
+  return asCall(await callsMutate(`/${id}/dial`, { method: "POST", body: "{}" }));
 }
 
 export async function completeCrmCall(
   id: string,
   extra: Record<string, unknown> = {},
 ): Promise<Call | null> {
+  const outcome = pickStr(extra.outcome, extra.notes, "Completed").slice(0, 2000);
   return asCall(
     await callsMutate(`/${id}/complete`, {
       method: "POST",
-      body: JSON.stringify(extra),
+      body: JSON.stringify({ outcome }),
     }),
   );
 }
 
 export async function cancelCrmCall(
   id: string,
-  extra: Record<string, unknown> = {},
+  _extra: Record<string, unknown> = {},
 ): Promise<Call | null> {
-  return asCall(
-    await callsMutate(`/${id}/cancel`, {
-      method: "POST",
-      body: JSON.stringify(extra),
-    }),
-  );
+  return asCall(await callsMutate(`/${id}/cancel`, { method: "POST" }));
 }
 
 export async function rescheduleCrmCall(
   id: string,
   scheduledAt: string,
 ): Promise<Call | null> {
+  const callDate = toCallIso(scheduledAt) || scheduledAt;
   return asCall(
     await callsMutate(`/${id}/reschedule`, {
       method: "POST",
-      body: JSON.stringify({ scheduledAt, date: scheduledAt }),
+      body: JSON.stringify({ callDate }),
     }),
   );
 }
@@ -494,10 +523,24 @@ export async function logCrmCallOutcome(
   id: string,
   extra: Record<string, unknown>,
 ): Promise<Call | null> {
+  const outcome = pickStr(extra.outcome, extra.notes, "Logged").slice(0, 2000);
+  const rawStatus = pickStr(extra.status).toUpperCase().replace(/[\s-]+/g, "_");
+  const status =
+    rawStatus === "VOICEMAIL_LEFT" ||
+    rawStatus === "LEFT_VOICEMAIL" ||
+    rawStatus === "VOICEMAIL"
+      ? "VOICEMAIL_LEFT"
+      : rawStatus === "COMPLETED"
+        ? "COMPLETED"
+        : "NO_ANSWER";
   return asCall(
     await callsMutate(`/${id}/log-outcome`, {
       method: "POST",
-      body: JSON.stringify(extra),
+      body: JSON.stringify({
+        status,
+        outcome,
+        createFollowUpTask: extra.createFollowUpTask === true,
+      }),
     }),
   );
 }
@@ -521,8 +564,11 @@ export async function syncCallStatus(
     status === "Left Voicemail"
   ) {
     return logCrmCallOutcome(id, {
+      status:
+        status === "Voicemail Left" || status === "Left Voicemail"
+          ? "VOICEMAIL_LEFT"
+          : "NO_ANSWER",
       outcome: extra?.outcome ?? status,
-      notes: extra?.notes,
     });
   }
   if (extra?.date) return rescheduleCrmCall(id, extra.date);
@@ -539,4 +585,79 @@ export async function tryCrm<T>(run: () => Promise<T>): Promise<T | null> {
 
 export function isCrmCallId(id: string) {
   return isUuid(id);
+}
+
+export type PlaceOutboundCallInput = {
+  phone?: string;
+  name: string;
+  subject?: string;
+  relatedTo?: string;
+  relatedType?: string;
+  relatedId?: string;
+  contactId?: string;
+};
+
+export async function placeOutboundCrmCall(
+  input: PlaceOutboundCallInput,
+): Promise<
+  | { ok: true; call: Call }
+  | { ok: false; call: Call | null; message: string }
+> {
+  const to = resolveOutboundPhone(input.phone);
+  if (!to) {
+    return {
+      ok: false,
+      call: null,
+      message: `${input.name} has no phone number in E.164 format (e.g. +61481549363).`,
+    };
+  }
+  const subject = input.subject?.trim() || `Outbound call — ${input.name}`;
+  try {
+    const created = await createCrmCall({
+      subject,
+      callType: "Outbound",
+      status: "Scheduled",
+      date: new Date().toISOString(),
+      fromNumber: to,
+      toNumber: to,
+      assignedTo: input.name,
+      contact: input.name,
+      contactId: input.contactId,
+      relatedTo: input.relatedTo,
+      relatedType: input.relatedType,
+      relatedId: input.relatedId,
+    });
+    if (!created?.id || !isUuid(created.id)) {
+      return {
+        ok: false,
+        call: created,
+        message: "Sign in to a live CRM workspace to place the call.",
+      };
+    }
+    const { mergeCrmCalls } = await import("@/lib/calls/store");
+    mergeCrmCalls([created]);
+    const withPhone = await updateCrmCall(created.id, {
+      fromNumber: to,
+      callType: "Outbound",
+    });
+    if (withPhone) mergeCrmCalls([withPhone]);
+    // Nest claimVoiceDispatch requires SCHEDULED (or IN_PROGRESS). Dial first —
+    // /start moves the row to IN_PROGRESS and used to 409 the Twilio dispatch.
+    const dialed = await dialCrmCall(created.id, {
+      to,
+      toNumber: to,
+      destination: to,
+      phone: to,
+    });
+    if (dialed) mergeCrmCalls([dialed]);
+    const started = await startCrmCall(created.id);
+    if (started) mergeCrmCalls([started]);
+    return { ok: true, call: started ?? dialed ?? created };
+  } catch (err) {
+    return {
+      ok: false,
+      call: null,
+      message: err instanceof Error ? err.message : "Twilio Voice dial failed.",
+    };
+  }
 }

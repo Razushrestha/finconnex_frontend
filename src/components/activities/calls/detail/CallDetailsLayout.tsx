@@ -84,7 +84,10 @@ export function CallDetailsLayout({
             onDialCall={() => {
               void tryCrm(() =>
                 dialCrmCall(call.id, {
-                  fromNumber: call.fromNumber,
+                  to: call.fromNumber,
+                  toNumber: call.fromNumber,
+                  destination: call.fromNumber,
+                  phone: call.fromNumber,
                 }),
               ).then((remote) => {
                 if (remote) void applyRemote(remote);

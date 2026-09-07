@@ -18,9 +18,11 @@ import {
 } from "@/lib/messages/types";
 import {
   RELATED_ENTITY_KINDS,
-  RELATED_RECORD_OPTIONS,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import { useCrmRelatedRecords } from "@/lib/activities/use-crm-related-records";
+import RelatedRecordCombobox from "@/components/activities/tasks/RelatedRecordComboBox";
 import {
   CreateEntityFormShell,
   Field,
@@ -33,11 +35,11 @@ import {
 
 import {
   createCrmMessage,
+  CRM_SMS_TO_NUMBER,
+  isCrmMessageId,
   persistRemoteMessage,
   sendCrmMessage,
-  tryCrmMessage,
 } from "@/lib/messages/api";
-import { createMessage } from "@/lib/messages/store";
 import { formatRulesAt } from "@/lib/rules/storage";
 
 interface CreateMessageFormProps {
@@ -46,6 +48,7 @@ interface CreateMessageFormProps {
   defaults?: {
     relatedKind?: RelatedEntityKind;
     relatedName?: string;
+    relatedId?: string;
     to?: string;
   };
 }
@@ -58,6 +61,7 @@ interface FormState {
   to: string;
   relatedKind: RelatedEntityKind | "";
   relatedName: string;
+  relatedId: string;
   status: MessageStatus | "";
   template: string;
 }
@@ -74,9 +78,10 @@ const initialState: FormState = {
   subject: "",
   body: "",
   from: "John Smith",
-  to: "",
+  to: CRM_SMS_TO_NUMBER,
   relatedKind: "",
   relatedName: "",
+  relatedId: "",
   status: "Draft",
   template: "",
 };
@@ -91,6 +96,7 @@ export function CreateMessageForm({
     ...initialState,
     relatedKind: defaults?.relatedKind ?? "",
     relatedName: defaults?.relatedName ?? "",
+    relatedId: defaults?.relatedId ?? "",
     to: defaults?.to ?? defaults?.relatedName ?? "",
   });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
@@ -103,15 +109,21 @@ export function CreateMessageForm({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  const relatedOptions = form.relatedKind
-    ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === form.relatedKind)
-    : RELATED_RECORD_OPTIONS;
+  const extra =
+    form.relatedKind && form.relatedName
+      ? { kind: form.relatedKind, name: form.relatedName }
+      : undefined;
+  const { options: relatedOptions, loading: relatedLoading } =
+    useCrmRelatedRecords(form.relatedKind, extra);
 
   function validate() {
     const next: Partial<Record<keyof FormState, string>> = {};
     if (!form.type) next.type = "Type is required";
     if (!form.subject.trim()) next.subject = "Subject is required";
     if (!form.body.trim()) next.body = "Body is required";
+    if (form.relatedKind && !isUuid(form.relatedId)) {
+      next.relatedName = "Pick a live CRM record";
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -125,28 +137,28 @@ export function CreateMessageForm({
         ? `${form.relatedKind}: ${form.relatedName}`
         : undefined;
     const status = (form.status || "Draft") as MessageStatus;
-    const payload = {
-      type: form.type as MessageType,
-      subject: form.subject.trim(),
-      body: form.body.trim(),
-      from: form.from.trim() || "John Smith",
-      to: form.to.trim() || form.relatedName,
-      relatedTo,
-      relatedType: form.relatedKind
-        ? form.relatedKind.toUpperCase()
-        : undefined,
-      status: "Draft" as MessageStatus,
-      template: form.template || undefined,
-    };
-
-    const remote = await tryCrmMessage(() => createCrmMessage(payload));
-    let createdId: string;
-
-    if (remote) {
-      persistRemoteMessage(remote);
-      createdId = remote.id;
+    try {
+      const remote = persistRemoteMessage(
+        await createCrmMessage({
+          type: form.type as MessageType,
+          subject: form.subject.trim(),
+          body: form.body.trim(),
+          to: CRM_SMS_TO_NUMBER,
+          relatedTo,
+          relatedType: form.relatedKind
+            ? form.relatedKind.toUpperCase()
+            : undefined,
+          relatedId: form.relatedId,
+          channel: form.type === "Internal" ? undefined : "SMS",
+          send: false,
+        }),
+      );
+      if (!remote || !isCrmMessageId(remote.id)) {
+        throw new Error("CRM did not save the message");
+      }
+      let createdId = remote.id;
       if (status !== "Draft" && status !== "Failed") {
-        const sent = await tryCrmMessage(() => sendCrmMessage(remote.id));
+        const sent = persistRemoteMessage(await sendCrmMessage(remote.id));
         if (!sent && status === "Sent") {
           setSendError(
             "CRM created the draft but send failed. Open the message to retry.",
@@ -157,30 +169,27 @@ export function CreateMessageForm({
         persistRemoteMessage(
           sent ?? { ...remote, status, sentDate: formatRulesAt(new Date()) },
         );
+        createdId = sent?.id ?? remote.id;
       }
-    } else {
-      const local = createMessage({
-        ...payload,
-        status,
-        sentDate: status === "Draft" ? undefined : formatRulesAt(new Date()),
-      });
-      createdId = local.id;
-    }
 
-    if (createAnother) {
-      setForm({
-        ...initialState,
-        from: form.from,
-        relatedKind: form.relatedKind,
-        relatedName: form.relatedName,
-      });
-      setErrors({});
-      setSubmitted(false);
-      return;
+      if (createAnother) {
+        setForm({
+          ...initialState,
+          from: form.from,
+          relatedKind: form.relatedKind,
+          relatedName: form.relatedName,
+          relatedId: form.relatedId,
+        });
+        setErrors({});
+        setSubmitted(false);
+        return;
+      }
+      void layoutId;
+      void redirect;
+      router.push(`/activities/messages?focus=${createdId}`);
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : "Could not save message");
     }
-    void layoutId;
-    void redirect;
-    router.push(`/activities/messages?focus=${createdId}`);
   }
 
   return (
@@ -261,7 +270,7 @@ export function CreateMessageForm({
             className={elevatedInputClass(true)}
             value={form.to}
             onChange={(e) => update("to", e.target.value)}
-            placeholder="Recipient name or email"
+            placeholder={CRM_SMS_TO_NUMBER}
           />
         </InputShell>
       </Field>
@@ -291,6 +300,7 @@ export function CreateMessageForm({
             onChange={(e) => {
               update("relatedKind", e.target.value as RelatedEntityKind | "");
               update("relatedName", "");
+              update("relatedId", "");
             }}
           >
             <option value="">None</option>
@@ -302,22 +312,24 @@ export function CreateMessageForm({
           </select>
         </InputShell>
       </Field>
-      <Field label="Related To">
-        <InputShell>
-          <select
-            className={elevatedSelectClass(false)}
-            value={form.relatedName}
-            onChange={(e) => update("relatedName", e.target.value)}
-            disabled={!form.relatedKind}
-          >
-            <option value="">Select record</option>
-            {relatedOptions.map((r) => (
-              <option key={`${r.kind}-${r.name}`} value={r.name}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </InputShell>
+      <Field
+        label="Related To"
+        error={submitted ? errors.relatedName : undefined}
+      >
+        <RelatedRecordCombobox
+          value={form.relatedName}
+          onChange={(name) => update("relatedName", name)}
+          onSelectOption={(option) => update("relatedId", option?.id ?? "")}
+          options={relatedOptions}
+          disabled={!form.relatedKind}
+          placeholder={
+            relatedLoading
+              ? "Loading CRM records…"
+              : form.relatedKind
+                ? "Search record…"
+                : "Select related entity first"
+          }
+        />
       </Field>
       <Field label="Template">
         <InputShell icon={FileText}>

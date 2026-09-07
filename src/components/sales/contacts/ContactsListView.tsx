@@ -201,7 +201,20 @@ export function ContactsListView({
 
   const columnRenderers = useMemo(
     () =>
-      buildColumnRenderers((kind, contact) =>
+      buildColumnRenderers((kind, contact) => {
+        if (kind === "call") {
+          void import("@/lib/softphone/events").then(({ startCrmRecordCall }) => {
+            startCrmRecordCall({
+              phone: contact.mobile || contact.phone,
+              name: contact.name,
+              relatedTo: `Contact: ${contact.name}`,
+              relatedType: "CONTACT",
+              relatedId: contact.id,
+              contactId: contact.id,
+            });
+          });
+          return;
+        }
         setPanel({
           type: "quick-action",
           kind,
@@ -209,8 +222,8 @@ export function ContactsListView({
           contactName: contact.name,
           email: contact.email,
           phone: contact.phone,
-        }),
-      ),
+        });
+      }),
     [],
   );
 

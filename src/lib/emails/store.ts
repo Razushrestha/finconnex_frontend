@@ -22,7 +22,7 @@ function cloneEmail(email: Email): Email {
 }
 
 const store = createBoardStore({
-  key: "activities:emails:list:v3",
+  key: "activities:emails:list:v4",
   seed: () => [] as Email[],
 });
 

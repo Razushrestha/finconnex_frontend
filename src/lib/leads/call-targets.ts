@@ -49,6 +49,8 @@ export function startLeadApplicantCall(
     phone,
     name: target.name,
     relatedTo: `Lead: ${card.name}`,
+    relatedType: "LEAD",
+    relatedId: card.id,
     autoStart: true,
   });
   return { ok: true };

@@ -50,7 +50,7 @@ function toColumns(items: Meeting[]): MeetingColumn[] {
 }
 
 const store = createBoardStore({
-  key: "activities:meetings:list:v3",
+  key: "activities:meetings:list:v4",
   seed: cloneSeed,
 });
 

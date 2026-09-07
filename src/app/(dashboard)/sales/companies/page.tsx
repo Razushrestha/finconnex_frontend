@@ -223,6 +223,18 @@ export default function CompaniesPage() {
     kind: CompanyQuickActionKind,
     company: CompanyRecord,
   ) {
+    if (kind === "call") {
+      void import("@/lib/softphone/events").then(({ startCrmRecordCall }) => {
+        startCrmRecordCall({
+          phone: company.phone,
+          name: company.name,
+          relatedTo: `Company: ${company.name}`,
+          relatedType: "COMPANY",
+          relatedId: company.id,
+        });
+      });
+      return;
+    }
     console.log(`Quick action "${kind}" triggered for company:`, company.name);
   }
 

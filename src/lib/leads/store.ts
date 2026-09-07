@@ -100,7 +100,7 @@ function normalize(cols: KanbanColumn[]): KanbanColumn[] {
 }
 
 const board = createBoardStore({
-  key: "sales:leads:board:v6",
+  key: "sales:leads:board:v7",
   seed: cloneSeed,
 });
 

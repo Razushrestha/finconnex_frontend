@@ -55,7 +55,7 @@ interface Props {
 export function CreateTicketForm({ layoutId: _l, redirect: _r }: Props) {
   const router = useRouter();
   const [subject, setSubject] = useState("");
-  const [requester, setRequester] = useState<string>(SUPPORT_REQUESTERS[0]);
+  const [requester, setRequester] = useState<string>(SUPPORT_REQUESTERS[0] ?? "");
   const [relatedAccount, setRelatedAccount] = useState<string>("");
   const [priority, setPriority] = useState<TicketPriority>("Medium");
   const [status, setStatus] = useState<TicketStatus>("New");

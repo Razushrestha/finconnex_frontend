@@ -24,19 +24,9 @@ export const FINANCE_OWNERS = [
   "Shiva Kadhka",
 ] as const;
 
-export const FINANCE_CLIENTS = [
-  { id: "c1", name: "Greystone Realty", contact: "Priya Mehta", email: "priya@greystone.example" },
-  { id: "c2", name: "Harbour Loans", contact: "Marcus Chen", email: "marcus@harbour.example" },
-  { id: "c3", name: "Northside Mortgage", contact: "Aisha Khan", email: "aisha@northside.example" },
-  { id: "c4", name: "Apex Property Group", contact: "Daniel Rossi", email: "daniel@apex.example" },
-] as const;
+export const FINANCE_CLIENTS: { id: string; name: string; contact: string; email: string }[] = [];
 
-export const FINANCE_DEALS = [
-  "Greystone refinance package",
-  "Harbour first-home buyer",
-  "Northside investment loan",
-  "Apex commercial facility",
-] as const;
+export const FINANCE_DEALS: string[] = [];
 
 export function lineAmount(item: FinanceLineItem) {
   const base = item.quantity * item.unitPrice;

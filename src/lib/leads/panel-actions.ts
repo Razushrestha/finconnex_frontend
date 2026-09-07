@@ -7,8 +7,16 @@ import { formatRulesAt } from "@/lib/rules/storage";
 import { getRulesActor } from "@/lib/rules/actor";
 import { emitLeadActivityChange } from "@/lib/leads/lead-extras-store";
 import type { LeadCardQuickActionState } from "@/lib/leads/card-types";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { createCall, formatCallDate } from "@/lib/calls/store";
 import { createMeeting, formatMeetingDateTime } from "@/lib/meetings/store";
+import {
+  createCrmMessage,
+  CRM_SMS_TO_NUMBER,
+  isCrmMessageId,
+  persistRemoteMessage,
+  sendCrmMessage,
+} from "@/lib/messages/api";
 import { createMessage } from "@/lib/messages/store";
 import { sendCrmActivityEmail } from "@/lib/emails/compose-send";
 import { createNote } from "@/lib/notes/store";
@@ -155,10 +163,39 @@ export async function submitLeadQuickAction(
   }
 
   if (kind === "sms") {
+    const body = draft.body.trim() || title;
+    const subject = title || body.slice(0, 48) || "SMS";
+    if (opts?.leadId && isUuid(opts.leadId)) {
+      try {
+        const created = persistRemoteMessage(
+          await createCrmMessage({
+            type: "External",
+            subject,
+            body,
+            to: CRM_SMS_TO_NUMBER,
+            relatedType: "LEAD",
+            relatedId: opts.leadId,
+            channel: "SMS",
+            send: false,
+          }),
+        );
+        if (!created || !isCrmMessageId(created.id)) {
+          throw new Error("CRM did not save the message");
+        }
+        persistRemoteMessage(await sendCrmMessage(created.id));
+        emitLeadActivityChange();
+        return { ok: true, message: `SMS sent to ${CRM_SMS_TO_NUMBER}`, id: created.id };
+      } catch (err) {
+        return {
+          ok: false,
+          message: err instanceof Error ? err.message : "Could not send SMS",
+        };
+      }
+    }
     const msg = createMessage({
       type: "External",
-      subject: title || draft.body.slice(0, 48) || "SMS",
-      body: draft.body.trim() || title,
+      subject,
+      body,
       from: owner,
       to: leadName,
       relatedTo,

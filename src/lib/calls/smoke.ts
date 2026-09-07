@@ -210,8 +210,16 @@ export function smokeCallsWiring() {
   }
 
   const pad = readSrc("src/components/layout/SoftphonePad.tsx");
-  if (!pad.includes("dialCrmCall")) {
+  if (!pad.includes("placeOutboundCrmCall")) {
     fail("softphone does not dial through CRM");
+  }
+  const apiSrc = readSrc("src/lib/calls/api.ts");
+  if (
+    !apiSrc.includes("export async function placeOutboundCrmCall") ||
+    !apiSrc.includes("startCrmCall") ||
+    !apiSrc.includes("dialCrmCall")
+  ) {
+    fail("outbound helper missing start/dial");
   }
 
   const item = normalizeCrmCall(
@@ -278,8 +286,8 @@ export async function smokeCallsMock() {
       assignedTo: "Ada",
     });
     await updateCrmCall(CALL_ID, { notes: "Updated" });
-    await startCrmCall(CALL_ID);
     await dialCrmCall(CALL_ID);
+    await startCrmCall(CALL_ID);
     await completeCrmCall(CALL_ID);
     await cancelCrmCall(CALL_ID);
     await rescheduleCrmCall(CALL_ID, "2026-08-26T10:00:00.000Z");

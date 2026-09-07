@@ -157,7 +157,7 @@ export const TASKS_HYDRATE_KEY_V2 = "activities:tasks:board:v2";
 
 const board = createBoardStore({
   // v5: multiple typed reminders on each task
-  key: "activities:tasks:board:v5",
+  key: "activities:tasks:board:v6",
   seed: cloneSeed,
 });
 

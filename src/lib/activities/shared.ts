@@ -23,16 +23,7 @@ export interface RelatedTo {
 export const RELATED_RECORD_OPTIONS: {
   kind: RelatedEntityKind;
   name: string;
-}[] = [
-  { kind: "Lead", name: "William Anderson" },
-  { kind: "Lead", name: "Chloe Ramirez" },
-  { kind: "Contact", name: "Olivia Bennett" },
-  { kind: "Contact", name: "Marcus Lin" },
-  { kind: "Company", name: "Northwind Traders" },
-  { kind: "Company", name: "Fabrikam Inc." },
-  { kind: "Deal", name: "Atlas CRM Rollout" },
-  { kind: "Deal", name: "Greystone Realty" },
-];
+}[] = [];
 
 export function formatRelatedTo(r?: RelatedTo | string) {
   if (!r) return "";

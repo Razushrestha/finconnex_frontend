@@ -50,7 +50,7 @@ export interface CreditNote {
   audit: FinanceAuditEvent[];
 }
 
-const STORE_KEY = "finance:credit-notes:v1";
+const STORE_KEY = "finance:credit-notes:v2";
 
 function withMoney(
   partial: Omit<CreditNote, "subtotal" | "tax" | "total">,
@@ -58,41 +58,7 @@ function withMoney(
   return { ...partial, ...totalsFromLines(partial.lineItems) };
 }
 
-export const creditNotes: CreditNote[] = [
-  withMoney({
-    id: "cn-demo-1",
-    creditNoteId: "CN-4101",
-    title: "Greystone packaging credit",
-    status: "Draft",
-    clientId: "c1",
-    clientName: "Greystone Realty",
-    invoiceRef: "INV-3201",
-    owner: "John Smith",
-    issueDate: formatFinanceDate(),
-    reason: "Fee adjustment",
-    notes: "Demo credit note until live CRM returns rows.",
-    lineItems: [
-      {
-        id: "cnli1",
-        name: "Home loan packaging credit",
-        quantity: 1,
-        unitPrice: 220,
-        taxRate: 10,
-      },
-    ],
-    attachments: [],
-    createdBy: "John Smith",
-    createdAt: formatFinanceAt(),
-    audit: [
-      {
-        id: "cna1",
-        at: formatFinanceAt(),
-        action: "Created",
-        actor: "John Smith",
-      },
-    ],
-  }),
-];
+export const creditNotes: CreditNote[] = [];
 
 function readStore(): CreditNote[] | null {
   if (typeof window === "undefined") return null;

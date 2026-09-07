@@ -355,7 +355,22 @@ export function ContactsKanbanBoard({
                                   handleDragStart(e, contact.id, group.id)
                                 }
                                 onDragEnd={handleDragEnd}
-                                onQuickAction={(kind: ContactQuickActionKind) =>
+                                onQuickAction={(kind: ContactQuickActionKind) => {
+                                  if (kind === "call") {
+                                    void import("@/lib/softphone/events").then(
+                                      ({ startCrmRecordCall }) => {
+                                        startCrmRecordCall({
+                                          phone: contact.mobile || contact.phone,
+                                          name: contact.name,
+                                          relatedTo: `Contact: ${contact.name}`,
+                                          relatedType: "CONTACT",
+                                          relatedId: contact.id,
+                                          contactId: contact.id,
+                                        });
+                                      },
+                                    );
+                                    return;
+                                  }
                                   setPanel({
                                     type: "quick-action",
                                     kind,
@@ -363,8 +378,8 @@ export function ContactsKanbanBoard({
                                     contactName: contact.name,
                                     email: contact.email,
                                     phone: contact.phone,
-                                  })
-                                }
+                                  });
+                                }}
                                 isSelected={selectedIds.includes(contact.id)}
                                 onToggleSelect={onToggleSelect}
                               />

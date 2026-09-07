@@ -138,6 +138,10 @@ export default function TimeTrackingPage() {
 
   function onStartTimer() {
     const related = RELATED_RECORD_OPTIONS[timerRelated];
+    if (!related) {
+      flash("No related record available from CRM yet");
+      return;
+    }
     startTimer({ user: timerUser, relatedTo: related });
     refresh();
     flash(`Timer started for ${timerUser}`);

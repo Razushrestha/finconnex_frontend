@@ -108,57 +108,7 @@ export function reminderMatchesFilters(
   return true;
 }
 
-export const reminders: Reminder[] = [
-  {
-    id: "r1",
-    title: "Demo environment setup due",
-    relatedTo: "Task: T-004",
-    dateTime: "21/07/2026 05:00 PM",
-    type: "Task Due",
-    status: "Pending",
-    notificationMethod: "In-app",
-    owner: "Roshna Abraham",
-  },
-  {
-    id: "r2",
-    title: "Kickoff meeting starts",
-    relatedTo: "Meeting: Project Kickoff",
-    dateTime: "22/07/2026 01:45 PM",
-    type: "Meeting Start",
-    status: "Pending",
-    notificationMethod: "Web Push",
-    owner: "John Smith",
-  },
-  {
-    id: "r3",
-    title: "Follow up with Chloe",
-    relatedTo: "Lead: Chloe Ramirez",
-    dateTime: "23/07/2026 10:00 AM",
-    type: "Follow-up",
-    status: "Snoozed",
-    notificationMethod: "Email",
-    owner: "Shiva Kadhka",
-  },
-  {
-    id: "r4",
-    title: "Send proposal reminder",
-    relatedTo: "Deal: Greystone Realty",
-    dateTime: "20/07/2026 09:00 AM",
-    type: "Custom",
-    status: "Triggered",
-    notificationMethod: "SMS",
-    owner: "Tejas Gokhe",
-  },
-  {
-    id: "r5",
-    title: "Old quota check",
-    dateTime: "15/07/2026 12:00 PM",
-    type: "Custom",
-    status: "Dismissed",
-    notificationMethod: "In-app",
-    owner: "John Smith",
-  },
-];
+export const reminders: Reminder[] = [];
 
 export interface ReminderColumn {
   id: string;

@@ -45,8 +45,8 @@ export type ConversationItem = {
   callOutcome?: "completed" | "missed";
 };
 
-const KEY = "sales:leads:conversation:v4";
-const SEEDED = "sales:leads:conversation:seeded:v4";
+const KEY = "sales:leads:conversation:v5";
+const SEEDED = "sales:leads:conversation:seeded:v5";
 
 function readAll(): ConversationItem[] {
   return readJsonStore<ConversationItem[]>(KEY, []);
@@ -66,150 +66,8 @@ function markSeeded(leadId: string) {
   writeJsonStore(SEEDED, [...ids]);
 }
 
-function isoDaysAgo(days: number, hours: number, minutes: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  d.setHours(hours, minutes, 0, 0);
-  return d.toISOString();
-}
-
-function seedThread(card: LeadCardData): ConversationItem[] {
-  const first = card.name.split(" ")[0] ?? card.name;
-  const owner = card.owner;
-  return [
-    {
-      id: `${card.id}-c1`,
-      leadId: card.id,
-      channel: "whatsapp",
-      kind: "text",
-      direction: "in",
-      fromName: card.name,
-      body: `Hi, can you send through the loan options we discussed for ${first}?`,
-      at: isoDaysAgo(1, 10, 20),
-      status: "read",
-    },
-    {
-      id: `${card.id}-c2`,
-      leadId: card.id,
-      channel: "email",
-      kind: "email",
-      direction: "out",
-      fromName: owner,
-      fromEmail: `${owner.toLowerCase().replace(/\s+/g, ".")}@finconnex.com.au`,
-      toEmail: card.email,
-      subject: "Meeting Summary – Home Loan Consultation",
-      body: `Dear ${first},\n\nI hope you are well. Thank you for your time on the consultation. Sharing the comparison we walked through — the variable + offset option is still my recommendation.\n\nHappy to jump on a call after you've had a look.\n\nKind regards,\n${owner}`,
-      at: isoDaysAgo(1, 11, 5),
-      status: "read",
-      attachment: { name: "Loan Options Summary.pdf", size: "245 KB" },
-    },
-    {
-      id: `${card.id}-c9`,
-      leadId: card.id,
-      channel: "call",
-      kind: "call",
-      direction: "in",
-      fromName: card.name,
-      body: "Missed inbound call",
-      at: isoDaysAgo(1, 13, 36),
-      status: "read",
-      callOutcome: "missed",
-    },
-    {
-      id: `${card.id}-c7`,
-      leadId: card.id,
-      channel: "call",
-      kind: "call",
-      direction: "out",
-      fromName: owner,
-      body: "Consultation call — borrowing and timeframe",
-      at: isoDaysAgo(1, 14, 52),
-      status: "read",
-      durationSeconds: 58,
-      callOutcome: "completed",
-    },
-    {
-      id: `${card.id}-c10`,
-      leadId: card.id,
-      channel: "call",
-      kind: "call",
-      direction: "out",
-      fromName: owner,
-      body: "Quick follow-up call",
-      at: isoDaysAgo(1, 15, 48),
-      status: "read",
-      durationSeconds: 2,
-      callOutcome: "completed",
-    },
-    {
-      id: `${card.id}-c3`,
-      leadId: card.id,
-      channel: "sms",
-      kind: "text",
-      direction: "in",
-      fromName: card.name,
-      body: "Thanks — we'll review tonight and come back with questions.",
-      at: isoDaysAgo(1, 15, 42),
-      status: "read",
-    },
-    {
-      id: `${card.id}-c8`,
-      leadId: card.id,
-      channel: "whatsapp",
-      kind: "voice",
-      direction: "in",
-      fromName: card.name,
-      body: "Voice message",
-      at: isoDaysAgo(1, 16, 2),
-      status: "read",
-      durationSeconds: 18,
-    },
-    {
-      id: `${card.id}-c11`,
-      leadId: card.id,
-      channel: "whatsapp",
-      kind: "voice",
-      direction: "out",
-      fromName: owner,
-      body: "Voice message",
-      at: isoDaysAgo(1, 16, 8),
-      status: "read",
-      durationSeconds: 12,
-    },
-    {
-      id: `${card.id}-c4`,
-      leadId: card.id,
-      channel: "whatsapp",
-      kind: "text",
-      direction: "out",
-      fromName: owner,
-      body: "Perfect. I'll hold the current rates until Friday.",
-      at: isoDaysAgo(1, 16, 10),
-      status: "read",
-    },
-    {
-      id: `${card.id}-c5`,
-      leadId: card.id,
-      channel: "sms",
-      kind: "text",
-      direction: "in",
-      fromName: card.name,
-      body: "Can we book a consult for this week?",
-      at: isoDaysAgo(0, 9, 12),
-      status: "read",
-    },
-    {
-      id: `${card.id}-c6`,
-      leadId: card.id,
-      channel: "whatsapp",
-      kind: "text",
-      direction: "out",
-      fromName: owner,
-      body: `Yes ${first} — I can do tomorrow 10:00 AM. Does that work?`,
-      at: isoDaysAgo(0, 9, 28),
-      status: "read",
-    },
-  ];
+function seedThread(_card: LeadCardData): ConversationItem[] {
+  return [];
 }
 
 function importLive(card: LeadCardData): ConversationItem[] {

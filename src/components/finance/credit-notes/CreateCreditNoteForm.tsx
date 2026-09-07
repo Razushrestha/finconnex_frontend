@@ -41,7 +41,7 @@ export function CreateCreditNoteForm({ layoutId: _l, redirect: _r }: Props) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<CreditNoteStatus>("Draft");
-  const [clientId, setClientId] = useState<string>(FINANCE_CLIENTS[0].id);
+  const [clientId, setClientId] = useState<string>(FINANCE_CLIENTS[0]?.id ?? "");
   const [owner, setOwner] = useState<string>(FINANCE_OWNERS[0]);
   const [issueDate, setIssueDate] = useState(formatFinanceDate());
   const [invoiceRef, setInvoiceRef] = useState("");
@@ -59,6 +59,7 @@ export function CreateCreditNoteForm({ layoutId: _l, redirect: _r }: Props) {
   function validate() {
     const next: Record<string, string> = {};
     if (!title.trim()) next.title = "Title is required";
+    if (!client) next.client = "Client is required";
     if (!lineItems.length || lineItems.some((i) => !i.name.trim()))
       next.lines = "Add at least one named line item";
     setErrors(next);
@@ -72,7 +73,7 @@ export function CreateCreditNoteForm({ layoutId: _l, redirect: _r }: Props) {
 
     const draft = {
       title: title.trim(),
-      clientName: client.name,
+      clientName: client?.name ?? "",
       invoiceRef: invoiceRef.trim() || undefined,
       reason: reason.trim() || undefined,
       notes: notes.trim() || undefined,

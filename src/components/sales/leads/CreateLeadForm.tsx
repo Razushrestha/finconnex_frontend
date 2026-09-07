@@ -14,7 +14,7 @@ import {
 import { api } from "@/lib/api";
 import { findContactById } from "@/lib/contacts/store";
 import { findLeadByEmail, updateLead } from "@/lib/leads/store";
-import { syncCreatedLead } from "@/lib/leads/api";
+import { syncCreatedLead, CrmLeadHttpError } from "@/lib/leads/api";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import {
   assignableOwnerLabel,
@@ -335,8 +335,21 @@ export function CreateLeadForm({
         afterSave(createAnother, pipelineStage);
         return;
       }
-    } catch {
-      /* CRM 4xx still falls through to a device copy below */
+    } catch (err) {
+      const duplicate =
+        err instanceof CrmLeadHttpError
+          ? err.status === 409
+          : err instanceof Error && /already exists/i.test(err.message);
+      if (duplicate) {
+        setErrors((prev) => ({
+          ...prev,
+          email:
+            err instanceof Error
+              ? err.message
+              : "A lead with this email already exists in the CRM.",
+        }));
+        return;
+      }
     }
     const payload = {
       firstName,

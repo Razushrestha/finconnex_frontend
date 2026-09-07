@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createReminderScheduleEntry,
@@ -9,10 +9,18 @@ import {
 } from "@/lib/reminders/types";
 import {
   createCrmReminder,
+  createRelatedCrmReminder,
+  isCrmReminderId,
   persistRemoteReminder,
-  toCreateReminderBody,
+  reminderDateTimeToIso,
 } from "@/lib/reminders/api";
-import { upsertReminder } from "@/lib/reminders/store";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import {
+  defaultAssignableOwnerId,
+  loadAssignableOwners,
+  resolveCrmAssigneeUserId,
+} from "@/lib/users/assignable";
+import type { ReminderParentType } from "@/lib/reminders/related";
 import { ReminderHeader } from "@/components/activities/reminders/create/RemainderHeader";
 import { ReminderDetailsCard } from "@/components/activities/reminders/create/RemainderDetailsCard";
 import { ReminderSchedulesCard } from "@/components/activities/reminders/create/ReminderSchedulesCard";
@@ -29,24 +37,36 @@ export default function CreateReminderPage() {
   const [subject, setSubject] = useState("");
   const [notes, setNotes] = useState("");
   const [scheduleEntries, setScheduleEntries] = useState<ReminderScheduleEntry[]>(
-    [createReminderScheduleEntry("Web Push")],
+    [createReminderScheduleEntry("In-app")],
   );
 
-  const [selectedEntity, setSelectedEntity] = useState<
-    "Lead" | "Contact" | "Company" | "Deal"
-  >("Lead");
+  const [selectedEntity, setSelectedEntity] = useState<ReminderParentType | "">(
+    "",
+  );
   const [searchRecord, setSearchRecord] = useState("");
+  const [relatedId, setRelatedId] = useState("");
 
   const [notificationMethod, setNotificationMethod] =
-    useState<NotificationMethod>("Web Push");
+    useState<NotificationMethod>("In-app");
   const [frequency, setFrequency] = useState("Does not repeat");
   const [leadTime, setLeadTime] = useState("15 minutes before");
 
-  const [assignees, setAssignees] = useState<Assignee[]>([
-    { id: "u1", name: "Alex Sterling" },
-  ]);
+  const [assignees, setAssignees] = useState<Assignee[]>([]);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadAssignableOwners().then((rows) => {
+      if (cancelled) return;
+      const id = defaultAssignableOwnerId(rows);
+      const match = rows.find((row) => row.id === id);
+      if (match) setAssignees([{ id: match.id, name: match.name }]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function handleRemoveAssignee(id: string) {
     setAssignees((prev) => prev.filter((a) => a.id !== id));
@@ -66,72 +86,55 @@ export default function CreateReminderPage() {
   }
 
   async function handleSave() {
-    if (!subject.trim()) return;
+    if (!subject.trim()) {
+      setSaveError("Subject is required");
+      return;
+    }
     const validEntries = scheduleEntries.filter(
       (entry) => entry.date && entry.time,
     );
-    if (validEntries.length === 0) return;
+    if (validEntries.length === 0) {
+      setSaveError("Add at least one reminder date and time");
+      return;
+    }
+    if (selectedEntity && !isUuid(relatedId)) {
+      setSaveError("Pick a live Task, Call, or Meeting");
+      return;
+    }
     setSaving(true);
     setSaveError(null);
-    const first = validEntries[0];
-    const parsed = Date.parse(`${first.date}T${first.time}`);
-    const dueAt = Number.isNaN(parsed)
-      ? new Date().toISOString()
-      : new Date(parsed).toISOString();
-    const relatedId = /^[0-9a-f-]{36}$/i.test(searchRecord.trim())
-      ? searchRecord.trim()
-      : undefined;
     try {
-      const created = persistRemoteReminder(
-        await createCrmReminder(
-          toCreateReminderBody({
-            title: subject.trim(),
-            notes: notes.trim() || undefined,
-            dueAt,
-            notificationMethod,
-            relatedTo: searchRecord.trim()
-              ? `${selectedEntity}: ${searchRecord.trim()}`
-              : undefined,
-            relatedType: selectedEntity.toUpperCase(),
-            relatedId,
-            owner: assignees[0]?.name,
-          }),
-        ),
+      const targetUserId = await resolveCrmAssigneeUserId(assignees[0]?.id);
+      if (!targetUserId || !isUuid(targetUserId)) {
+        throw new Error("Assign a workspace member");
+      }
+      let lastId = "";
+      for (const entry of validEntries) {
+        const remindAt = reminderDateTimeToIso(entry.date, entry.time);
+        const payload = {
+          title: subject.trim(),
+          notes: notes.trim() || undefined,
+          remindAt,
+          dueAt: remindAt,
+          targetUserId,
+        };
+        const created = persistRemoteReminder(
+          selectedEntity && isUuid(relatedId)
+            ? await createRelatedCrmReminder(selectedEntity, relatedId, payload)
+            : await createCrmReminder(payload),
+        );
+        if (!created?.id || !isCrmReminderId(created.id)) {
+          throw new Error("CRM did not save the reminder");
+        }
+        lastId = created.id;
+      }
+      router.push(
+        lastId
+          ? `/activities/reminders/detail/${lastId}`
+          : "/activities/reminders",
       );
-      if (!created) {
-        upsertReminder({
-          id: `rem-${Date.now()}`,
-          title: subject.trim(),
-          relatedTo: searchRecord.trim()
-            ? `${selectedEntity}: ${searchRecord.trim()}`
-            : undefined,
-          dateTime: `${first.date} ${first.time}`,
-          type: "Custom",
-          status: "Pending",
-          notificationMethod,
-          owner: assignees[0]?.name ?? "—",
-        });
-      }
-      router.push("/activities/reminders");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Create failed";
-      if (/sign in/i.test(message)) {
-        upsertReminder({
-          id: `rem-${Date.now()}`,
-          title: subject.trim(),
-          relatedTo: searchRecord.trim()
-            ? `${selectedEntity}: ${searchRecord.trim()}`
-            : undefined,
-          dateTime: `${first.date} ${first.time}`,
-          type: "Custom",
-          status: "Pending",
-          notificationMethod,
-          owner: assignees[0]?.name ?? "—",
-        });
-        router.push("/activities/reminders");
-        return;
-      }
-      setSaveError(message);
+      setSaveError(err instanceof Error ? err.message : "Could not save reminder");
     } finally {
       setSaving(false);
     }
@@ -142,6 +145,7 @@ export default function CreateReminderPage() {
       <ReminderHeader
         onCancel={() => router.push("/activities/reminders")}
         onSave={() => void handleSave()}
+        saving={saving}
       />
       {saveError ? (
         <p className="text-[12px] text-rose-600">{saveError}</p>
@@ -170,6 +174,8 @@ export default function CreateReminderPage() {
             onSelectEntity={setSelectedEntity}
             searchRecord={searchRecord}
             onSearchRecordChange={setSearchRecord}
+            relatedId={relatedId}
+            onRelatedIdChange={setRelatedId}
           />
         </div>
 
