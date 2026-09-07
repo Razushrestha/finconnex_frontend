@@ -423,7 +423,8 @@ export async function deleteCrmCompany(id: string): Promise<void> {
 
 export async function bulkCrmCompanies(input: {
   ids: string[];
-  operation: string;
+  /** Must match BulkCompanyOperation on the API — "DELETE" is rejected 400. */
+  operation: "ASSIGN_OWNER" | "CHANGE_STATUS" | "SOFT_DELETE";
   payload?: Record<string, unknown>;
 }): Promise<unknown> {
   const ids = input.ids.filter(isUuid);

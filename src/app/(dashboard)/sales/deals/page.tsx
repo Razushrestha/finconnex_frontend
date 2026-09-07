@@ -204,7 +204,7 @@ export default function DealsPage() {
     if (!selectedIds.length) return;
     if (!window.confirm(`Delete ${selectedIds.length} deal(s)?`)) return;
     void tryCrmDeal(() =>
-      bulkCrmDeals({ ids: selectedIds, operation: "DELETE" }),
+      bulkCrmDeals({ ids: selectedIds, operation: "SOFT_DELETE" }),
     );
     const n = deleteDeals(selectedIds);
     emitRulesChange("all");
