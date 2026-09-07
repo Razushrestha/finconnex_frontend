@@ -327,6 +327,17 @@ export async function crmSignup(input: {
   });
 }
 
+/** Activates a freshly signed-up account with the fixed signup code. */
+export async function crmVerifySignupOtp(input: {
+  email: string;
+  otp: string;
+}): Promise<void> {
+  await crmFetch<unknown>("/auth/signup/verify-otp", {
+    method: "POST",
+    body: input,
+  });
+}
+
 export async function crmForgotPassword(email: string): Promise<void> {
   await crmFetch<unknown>("/auth/forgot-password", {
     method: "POST",

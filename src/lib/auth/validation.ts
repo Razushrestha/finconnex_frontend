@@ -21,6 +21,11 @@ export const signupSchema = z.object({
 
 export type SignupFormValues = z.infer<typeof signupSchema>;
 
+export const verifyOtpSchema = z.object({
+  email: z.string().trim().email("Enter a valid email address"),
+  otp: z.string().trim().min(1, "Enter your verification code").max(16),
+});
+
 export const resetPasswordSchema = z
   .object({
     token: z.string().trim().min(1, "Reset token is required"),

@@ -4,8 +4,8 @@ import { signupSchema } from "@/lib/auth/validation";
 
 // Deliberately never reveals whether an email is already registered (the
 // backend already returns an identical response either way) — always the
-// same success message, no session/cookies set. The user must verify their
-// email and then log in normally.
+// same success message, no session/cookies set. The user then activates the
+// account with the signup code (`/api/auth/verify-otp`) and logs in normally.
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
@@ -37,8 +37,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
-      message:
-        "If this email isn't already registered, we've sent a verification link.",
+      message: "Account created. Enter your verification code to activate it.",
     });
   } catch (error) {
     console.error("[auth/signup]", error);
