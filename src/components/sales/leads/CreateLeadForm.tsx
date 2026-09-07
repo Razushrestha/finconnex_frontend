@@ -341,10 +341,16 @@ export function CreateLeadForm({
       // that can only fail too.
       const status = (err as { status?: number })?.status;
       if (status === 409) {
+        // Emails are unique across BOTH leads and contacts in a workspace, so
+        // the conflict may be either. Show the server's message rather than
+        // guessing — "a contact already uses this email" points somewhere very
+        // different from "a lead already uses it".
+        const serverMessage = (err as { message?: string })?.message?.trim();
         setErrors((prev) => ({
           ...prev,
           email:
-            "A lead with this email already exists. Open All Leads to continue that record.",
+            serverMessage ||
+            "This email is already used by another record in this workspace.",
         }));
         return;
       }
