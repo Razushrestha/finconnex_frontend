@@ -86,11 +86,7 @@ export function CalculatorWorkspaceClient() {
 
   const primaryDisplay = useMemo(() => {
     if (!result) return null;
-    return formatCalcValue(
-      result.primaryValue,
-      result.primaryFormat,
-      currency,
-    );
+    return formatCalcValue(result.primaryValue, result.primaryFormat, currency);
   }, [result, currency]);
 
   function flash(msg: string) {
@@ -351,7 +347,9 @@ export function CalculatorWorkspaceClient() {
                       <div className="font-semibold text-slate-900">
                         {c.calcId}
                       </div>
-                      <div className="text-[11px] text-slate-600">{c.title}</div>
+                      <div className="text-[11px] text-slate-600">
+                        {c.title}
+                      </div>
                     </td>
                     <td className="px-3 py-3">
                       <span
