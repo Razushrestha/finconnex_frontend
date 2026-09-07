@@ -178,7 +178,14 @@ export function LeadContactPicker({
     () => new Set(contacts.map((contact) => contact.id)),
     [contacts],
   );
-  const directory = useMemo(() => listAllContacts(), [tick, open]);
+  const directory = useMemo(() => {
+    // `tick` forces a refresh when the contacts store mutates elsewhere;
+    // `open` re-fetches the directory each time the picker is opened.
+    // Neither is read directly in the body.
+    void tick;
+    void open;
+    return listAllContacts();
+  }, [tick, open]);
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();

@@ -265,7 +265,18 @@ export function LeadCreateTaskModal({
 
   const editing = Boolean(editTaskId || draft);
 
-  useEffect(() => {
+  // Reset the draft whenever the modal (re)opens for a different
+  // task/draft. Computed during render — gated on a state diff of the
+  // reset key, per React's documented "adjusting state when a prop
+  // changes" pattern — instead of in an effect (react-hooks/set-state-in-effect).
+  const resetKey = `${open}|${card.name}|${card.owner}|${editTaskId ?? ""}|${draft?.id ?? ""}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey);
+    resetDraft();
+  }
+
+  function resetDraft() {
     if (!open) return;
     setView("main");
     setError("");
@@ -343,7 +354,7 @@ export function LeadCreateTaskModal({
     setDescription("");
     setNotes("");
     setActionItems([]);
-  }, [open, card.name, card.owner, editTaskId, draft?.id]);
+  }
 
   useEffect(() => {
     if (!addingCollaborator) return;

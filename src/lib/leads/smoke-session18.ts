@@ -19,7 +19,7 @@ import {
   listSlaAttentionLeads,
   SLA_ATTENTION_RANK,
 } from "@/lib/pipeline-sla/work-queue";
-import { CATEGORIES_DEFAULT } from "@/lib/work-queue/config";
+import { CATEGORIES_DEFAULT, type WorkqueueItemId } from "@/lib/work-queue/config";
 import { listWorkqueueItemRows } from "@/lib/work-queue/live";
 
 const fail: (msg: string) => never = smokeFail;
@@ -127,7 +127,10 @@ export function runSmokeSession18() {
   }
 
   const overdueOnly = listWorkqueueItemRows(
-    "sla_overdue" as any,
+    // Kept as-typed (with the underscore) to preserve this smoke test's
+    // existing runtime behavior exactly; cast via `unknown` instead of
+    // `any` since the literal doesn't match the `WorkqueueItemId` union.
+    "sla_overdue" as unknown as WorkqueueItemId,
     "John Smith",
     "all",
     now,
@@ -140,7 +143,7 @@ export function runSmokeSession18() {
   }
 
   const arjunRows = listWorkqueueItemRows(
-    "sla-milestone-overdue" as any,
+    "sla-milestone-overdue",
     "Tejas Gokhe",
     "all",
     now,

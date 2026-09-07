@@ -77,14 +77,20 @@ export function LeadFollowersField({
     };
   }, []);
 
-  useEffect(() => {
+  // Sync `followers` from the `value` prop whenever it changes, per
+  // React's documented "adjusting state when a prop changes" pattern —
+  // computed during render (gated on a state diff of the previous value)
+  // instead of in an effect (react-hooks/set-state-in-effect).
+  const [prevFollowersValue, setPrevFollowersValue] = useState(value);
+  if (prevFollowersValue !== value) {
+    setPrevFollowersValue(value);
     const parsed = parseFollowers(value);
     setFollowers((current) => {
       if (parsed.length === 0 && current.length > 0) return current;
       if (parsed.join("\0") === current.join("\0")) return current;
       return parsed;
     });
-  }, [value]);
+  }
 
   const candidates = useMemo(() => {
     const taken = new Set(followers.map((name) => name.toLowerCase()));
@@ -107,9 +113,17 @@ export function LeadFollowersField({
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
+  // Reset the search query whenever the dropdown (re)opens. Computed
+  // during render — gated on a state diff of `open` — instead of as a
+  // synchronous setState inside the effect below (react-hooks/set-state-in-effect).
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
+    if (open) setQuery("");
+  }
+
   useEffect(() => {
     if (!open) return;
-    setQuery("");
     const id = window.setTimeout(() => searchRef.current?.focus(), 0);
     return () => window.clearTimeout(id);
   }, [open]);

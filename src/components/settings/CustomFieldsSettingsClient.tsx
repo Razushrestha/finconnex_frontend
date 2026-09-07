@@ -41,10 +41,17 @@ export function CustomFieldsSettingsClient() {
   const importRef = useRef<HTMLInputElement>(null);
   const patchTimers = useRef<Record<string, number>>({});
 
-  useEffect(() => {
-    if (crm.loading) return;
-    setFields(listCustomFields());
-  }, [crm.source, crm.loading]);
+  // Refresh `fields` once the CRM custom-fields source has finished
+  // loading (or changes source). Computed during render — gated on a
+  // state diff of the reset key, per React's documented "adjusting state
+  // when a prop changes" pattern — instead of in an effect
+  // (react-hooks/set-state-in-effect).
+  const fieldsSyncKey = `${crm.source}|${crm.loading}`;
+  const [prevFieldsSyncKey, setPrevFieldsSyncKey] = useState(fieldsSyncKey);
+  if (prevFieldsSyncKey !== fieldsSyncKey) {
+    setPrevFieldsSyncKey(fieldsSyncKey);
+    if (!crm.loading) setFields(listCustomFields());
+  }
 
   useEffect(() => {
     return onCustomFieldsChange(() => setFields(listCustomFields()));

@@ -16,9 +16,6 @@ import {
   FileText,
   Home,
   Mail,
-  MapPin,
-  MessageSquare,
-  MoreHorizontal,
   Pencil,
   Phone,
   StickyNote,
@@ -32,19 +29,15 @@ import {
   daysInStage,
   leadApplicants,
   leadFinancials,
-  leadBuyerTag,
-  leadLocation,
   leadQualification,
   leadScoreBreakdown,
   LEAD_DETAIL_STAGES,
 } from "@/lib/leads/detail-snapshot";
 import {
-  hrefForLeadActivity,
   hrefForLeadNextBest,
   leadNextBestActivity,
   listLeadActivityCandidates,
 } from "@/lib/leads/activity-index";
-import { formatRelativeTime } from "@/lib/leads/activity-dates";
 import type { LeadActivityCandidate } from "@/lib/leads/card-types";
 import { relatedToLabel } from "@/lib/related-entity";
 import { RecordTagsRow } from "@/components/shared/tags/RecordTags";
@@ -140,41 +133,6 @@ const RELATED = [
 const CONVERSATION_KINDS = new Set(["call", "sms", "email"]);
 const ACTIVITY_KINDS = new Set(["task", "meeting", "reminder"]);
 const DOCUMENT_KINDS = new Set(["attachment", "document"]);
-
-const KIND_META: Record<
-  string,
-  { label: string; icon: typeof Phone; tone: string }
-> = {
-  call: { label: "Call", icon: Phone, tone: "bg-orange-50 text-orange-600" },
-  sms: {
-    label: "SMS",
-    icon: MessageSquare,
-    tone: "bg-sky-50 text-sky-600",
-  },
-  email: { label: "Email", icon: Mail, tone: "bg-emerald-50 text-emerald-600" },
-  task: { label: "Task", icon: Check, tone: "bg-violet-50 text-violet-600" },
-  meeting: {
-    label: "Appointment",
-    icon: CalendarDays,
-    tone: "bg-amber-50 text-amber-600",
-  },
-  reminder: { label: "Reminder", icon: Clock, tone: "bg-indigo-50 text-indigo-600" },
-  note: {
-    label: "Note",
-    icon: StickyNote,
-    tone: "bg-amber-50 text-amber-700",
-  },
-  attachment: {
-    label: "Document",
-    icon: FileText,
-    tone: "bg-rose-50 text-rose-600",
-  },
-  document: {
-    label: "Document",
-    icon: FileText,
-    tone: "bg-rose-50 text-rose-600",
-  },
-};
 
 function newestFirst(a: LeadActivityCandidate, b: LeadActivityCandidate) {
   return (b.dueAt?.getTime() ?? 0) - (a.dueAt?.getTime() ?? 0);
@@ -325,8 +283,6 @@ export function LeadMortgageDetail({
   const score = leadScoreBreakdown(card);
   const qualification = leadQualification(card);
   const inStage = daysInStage(card);
-  const tag = leadBuyerTag(card);
-  const location = leadLocation(card);
   const conversationCount = useMemo(
     () => listLeadConversation(card).length,
     [card],
@@ -342,6 +298,9 @@ export function LeadMortgageDetail({
     };
   }, []);
   const activity = useMemo(() => {
+    // activityTick forces recompute when lead-activity/rules stores change
+    // (onLeadActivityChange/onRulesChange above); not read directly here.
+    void activityTick;
     const all = listLeadActivityCandidates(card.name);
     return {
       conversation: all.filter((item) => CONVERSATION_KINDS.has(item.kind)).sort(newestFirst),
@@ -351,7 +310,12 @@ export function LeadMortgageDetail({
       timeline: [...all].sort(newestFirst),
     };
   }, [card.name, activityTick]);
-  const now = useMemo(() => new Date(), [activityTick]);
+  const now = useMemo(() => {
+    // activityTick forces a fresh timestamp when lead activity changes;
+    // not read directly here.
+    void activityTick;
+    return new Date();
+  }, [activityTick]);
   const nextAction = useMemo(
     () => leadNextBestActivity(card.name, now),
     [card.name, now],
@@ -1070,116 +1034,3 @@ function Meta({
   );
 }
 
-function ActivityRows({
-  items,
-  fallback,
-}: {
-  items: LeadActivityCandidate[];
-  fallback?: { label: string; when: string; icon: typeof Phone; tone: string }[];
-}) {
-  const now = new Date();
-  if (items.length === 0 && fallback) {
-    return (
-      <ul className="space-y-3">
-        {fallback.map((row) => {
-          const Icon = row.icon;
-          return (
-            <li key={row.label} className="flex items-center gap-2.5">
-              <span
-                className={cn(
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                  row.tone,
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium text-slate-800">{row.label}</p>
-                <p className="text-[11px] text-slate-400">{row.when}</p>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    );
-  }
-
-  if (items.length === 0) {
-    return (
-      <p className="py-6 text-center text-[13px] text-slate-400">
-        Nothing to show yet.
-      </p>
-    );
-  }
-
-  return (
-    <ul className="space-y-3">
-      {items.map((item) => {
-        const meta = KIND_META[item.kind] ?? KIND_META.note;
-        const Icon = meta.icon;
-        const href = hrefForLeadActivity(item);
-        const when = item.dueAt ? formatRelativeTime(item.dueAt, now) : "";
-        const body = (
-          <>
-            <span
-              className={cn(
-                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                meta.tone,
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-medium text-slate-800">
-                {item.title}
-              </span>
-              <span className="text-[11px] text-slate-400">
-                {meta.label}
-                {when ? ` · ${when}` : ""}
-              </span>
-            </span>
-          </>
-        );
-        return (
-          <li key={`${item.kind}-${item.id}`}>
-            {href ? (
-              <Link href={href} className="flex items-center gap-2.5 hover:opacity-80">
-                {body}
-              </Link>
-            ) : (
-              <div className="flex items-center gap-2.5">{body}</div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function ActivityFeedCard({
-  title,
-  items,
-  empty,
-  fallback,
-  actions,
-}: {
-  title: string;
-  items: LeadActivityCandidate[];
-  empty: string;
-  fallback?: { label: string; when: string; icon: typeof Phone; tone: string }[];
-  actions?: React.ReactNode;
-}) {
-  return (
-    <Card>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-[15px] font-semibold text-slate-900">{title}</h2>
-        {actions}
-      </div>
-      {items.length === 0 && !fallback ? (
-        <p className="py-8 text-center text-[13px] text-slate-400">{empty}</p>
-      ) : (
-        <ActivityRows items={items} fallback={fallback} />
-      )}
-    </Card>
-  );
-}

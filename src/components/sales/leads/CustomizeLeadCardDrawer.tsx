@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   X,
   LayoutGrid,
@@ -47,9 +47,17 @@ export function CustomizeLeadCardDrawer({
 }: CustomizeLeadCardDrawerProps) {
   const [draft, setDraft] = useState<LeadCardCustomizationSettings>(value);
 
-  useEffect(() => {
+  // Reset the draft whenever the drawer (re)opens or the incoming settings
+  // change while open, computed during render — gated on a state diff of
+  // the reset key, per React's documented "adjusting state when a prop
+  // changes" pattern — instead of in an effect, and without reading a ref
+  // during render (react-hooks/refs).
+  const resetKey = `${open}|${JSON.stringify(value)}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey);
     if (open) setDraft(value);
-  }, [open, value]);
+  }
 
   if (!open) return null;
 

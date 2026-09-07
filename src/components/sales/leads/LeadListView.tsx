@@ -10,7 +10,7 @@ import {
   StickyNote,
   Paperclip,
 } from "lucide-react";
-import { type KanbanColumn, type LeadStatus } from "@/lib/leads/types";
+import { type KanbanColumn } from "@/lib/leads/types";
 import { listLeadColumns } from "@/lib/leads/store";
 import { onRulesChange } from "@/lib/rules";
 import { onLeadActivityChange } from "@/lib/leads/lead-extras-store";
@@ -100,6 +100,7 @@ const DEFAULT_LEAD_COLUMNS = DEFAULT_LEAD_LIST_COLUMNS;
 
 type LeadRow = ReturnType<typeof buildAllLeadsShape>;
 // Helper purely for type inference — never called
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- referenced above only via `typeof` for the LeadRow type
 function buildAllLeadsShape(columns: KanbanColumn[]) {
   return columns.flatMap((column) =>
     column.cards.map((card) => ({
@@ -359,9 +360,15 @@ export function LeadListView({
   const manageColumns = manageColumnsProp ?? internalManageColumns;
   const setManageColumns = onManageColumnsChange ?? setInternalManageColumns;
 
-  useEffect(() => {
+  // Sync `columns` from the `columnsProp` prop whenever it changes, per
+  // React's documented "adjusting state when a prop changes" pattern —
+  // computed during render (gated on a state diff of the previous prop)
+  // instead of in an effect (react-hooks/set-state-in-effect).
+  const [prevColumnsProp, setPrevColumnsProp] = useState(columnsProp);
+  if (prevColumnsProp !== columnsProp) {
+    setPrevColumnsProp(columnsProp);
     if (columnsProp) setColumns(columnsProp);
-  }, [columnsProp]);
+  }
 
   useEffect(() => {
     return onRulesChange(() => {
@@ -433,6 +440,12 @@ export function LeadListView({
       buildColumnRenderers(setPanel, (lead, anchor) =>
         callFlow.onCallClick(lead, anchor),
       ),
+    // `callFlow` itself is a brand-new object every render (from
+    // useLeadCallFlow()); only `onCallClick` (memoized with useCallback([]))
+    // is actually used here, so depending on the whole object would force
+    // this to recompute on every render instead of only when the callback
+    // identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [callFlow.onCallClick],
   );
   const orderedVisibleColumns = useMemo(

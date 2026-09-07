@@ -521,6 +521,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
 
   const requests = useMemo(() => {
     void recordsTick;
+    void requestTick;
     const live = listDocumentRequests().filter((req) =>
       requestMatchesLead(req, card),
     );

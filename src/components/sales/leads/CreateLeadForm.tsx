@@ -147,10 +147,9 @@ export function CreateLeadForm({
   );
 
   useEffect(() => {
-    setForm((prev) => ({
-      ...prev,
-      owner: defaultAssignableOwnerId(ownerOptions, prev.owner),
-    }));
+    // `form.owner` was already initialized from the same
+    // `listAssignableOwnersLocal()` list above, so recomputing it here is a
+    // no-op — only the async refresh below needs the effect.
     let cancelled = false;
     void loadAssignableOwners().then((options) => {
       if (cancelled || !options.length) return;
@@ -165,15 +164,25 @@ export function CreateLeadForm({
     };
   }, []);
 
-  useEffect(() => {
-    if (variant !== "modal" || !open) return;
-    setForm((prev) => ({
-      ...makeInitialState(stage),
-      owner: prev.owner,
-    }));
-    setErrors({});
-    setSubmitted(false);
-  }, [variant, open, stage]);
+  // Reset the modal's draft whenever it (re)opens, or the seed `stage`
+  // changes while it's already open. Done during render — gated on a state
+  // diff of the dependency key, per React's documented "adjusting state
+  // when a prop changes" pattern — instead of in an effect, to avoid the
+  // extra commit that would otherwise happen (react-hooks/set-state-in-effect)
+  // and without reading a ref during render (react-hooks/refs).
+  const modalResetKey = `${variant}|${open}|${stage ?? ""}`;
+  const [prevModalResetKey, setPrevModalResetKey] = useState(modalResetKey);
+  if (prevModalResetKey !== modalResetKey) {
+    setPrevModalResetKey(modalResetKey);
+    if (variant === "modal" && open) {
+      setForm((prev) => ({
+        ...makeInitialState(stage),
+        owner: prev.owner,
+      }));
+      setErrors({});
+      setSubmitted(false);
+    }
+  }
 
   const ownerLabel =
     ownerOptions.find((o) => o.id === form.owner)?.name ?? form.owner;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -163,7 +163,18 @@ export function LeadScheduleMeetingModal({
     setTime(slots[0] ?? "");
   }
 
-  useEffect(() => {
+  // Reset the draft whenever the modal (re)opens for a different
+  // meeting/draft. Computed during render — gated on a state diff of the
+  // reset key, per React's documented "adjusting state when a prop
+  // changes" pattern — instead of in an effect (react-hooks/set-state-in-effect).
+  const resetKey = `${open}|${card.name}|${editId ?? ""}|${draft?.id ?? ""}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey);
+    resetDraft();
+  }
+
+  function resetDraft() {
     if (!open) return;
     setError("");
     setAttempted(false);
@@ -221,18 +232,24 @@ export function LeadScheduleMeetingModal({
       setWhenMode("custom");
       if (draft.owner) setTeamMember(draft.owner);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, card.name, editId, draft?.id]);
+  }
 
-  useEffect(() => {
-    if (!open) return;
-    if (whenMode === "custom") {
-      if (!time) setTime(nowHHmm());
-      return;
+  // Keep `time` synchronized with the selected mode/slots whenever the
+  // modal is open. Computed during render — gated on a state diff of the
+  // reset key, matching the original effect's `[open, time, timeSlots,
+  // whenMode]` deps — instead of in an effect (react-hooks/set-state-in-effect).
+  const timeSyncKey = `${open}|${time}|${timeSlots.join(",")}|${whenMode}`;
+  const [prevTimeSyncKey, setPrevTimeSyncKey] = useState(timeSyncKey);
+  if (prevTimeSyncKey !== timeSyncKey) {
+    setPrevTimeSyncKey(timeSyncKey);
+    if (open) {
+      if (whenMode === "custom") {
+        if (!time) setTime(nowHHmm());
+      } else if (!(time && timeSlots.includes(time))) {
+        setTime(timeSlots[0] ?? "");
+      }
     }
-    if (time && timeSlots.includes(time)) return;
-    setTime(timeSlots[0] ?? "");
-  }, [open, time, timeSlots, whenMode]);
+  }
 
   function handleSave() {
     setAttempted(true);

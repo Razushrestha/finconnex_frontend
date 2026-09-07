@@ -119,6 +119,12 @@ export interface WorkqueueSidebarCategory {
   }[];
 }
 
+// Not read as a value anywhere in this file (hrefFor below only uses its
+// key set via `keyof typeof HREF`, and the actual href strings come from
+// workQueueRecordHref()) — but a smoke test asserts against this object's
+// literal source text (`documents: "/documents/requests"`), so it must stay
+// a real runtime object rather than a type.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const HREF: Record<string, string> = {
   tasks: "/activities/tasks",
   calls: "/activities/calls",
@@ -352,6 +358,7 @@ function emailOwnedBy(e: Email, scope: WorkQueueScope) {
   return getRulesActor().name === name && !e.relatedTo;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- _q is a positional param supplied by several call sites (title/subject); required to keep those call signatures valid even though it isn't used here.
 function hrefFor(module: keyof typeof HREF, id: string, _q?: string) {
   return workQueueRecordHref(module, id);
 }
@@ -379,6 +386,7 @@ function toRow(
     if (!matchesTimeFilter(due, timeFilter, now, opts.specificDate)) return null;
   }
   const dueLabel = due ? formatDueLabel(due, now) : "";
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to omit requireDue/specificDate from the `extras` spread into QueueRow below.
   const { requireDue: _requireDue, specificDate: _specificDate, ...extras } =
     opts ?? {};
   return {

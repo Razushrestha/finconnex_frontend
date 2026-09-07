@@ -415,6 +415,9 @@ export function LeadTimelinePanel({ card }: { card: LeadCardData }) {
   }, []);
 
   const rows = useMemo(() => {
+    // `revision` forces a refresh on lead-activity/rules changes from
+    // external stores; it is not read directly in the body.
+    void revision;
     const live = [
       ...fromApiTimeline(apiItems, card),
       ...fromCandidates(card, now),

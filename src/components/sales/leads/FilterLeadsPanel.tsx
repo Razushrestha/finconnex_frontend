@@ -52,10 +52,12 @@ export function FilterLeadsPanel({
 }: FilterLeadsPanelProps) {
   const [customTick, setCustomTick] = useState(0);
   useEffect(() => onCustomFieldsChange(() => setCustomTick((n) => n + 1)), []);
-  const fields = useMemo(
-    () => leadFilterFields(listActiveCustomFieldsForEntity("Lead")),
-    [customTick],
-  );
+  const fields = useMemo(() => {
+    // customTick forces recompute when the custom-fields store changes
+    // (onCustomFieldsChange below); it is not read directly in the body.
+    void customTick;
+    return leadFilterFields(listActiveCustomFieldsForEntity("Lead"));
+  }, [customTick]);
   return (
     <DeepFilterPanel
       title="Filter Leads by"

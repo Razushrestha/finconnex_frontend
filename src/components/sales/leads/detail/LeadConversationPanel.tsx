@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { isUuid } from "@/lib/activity-timeline/auth";
+import { useHasMounted } from "@/lib/use-has-mounted";
 import {
   fetchLeadConversations,
   postLeadConversation,
@@ -156,7 +157,7 @@ export function LeadConversationPanel({ card }: { card: LeadCardData }) {
     useState<ComposerChannel>("whatsapp");
   const [query, setQuery] = useState("");
   const [draft, setDraft] = useState("");
-  const [subject, setSubject] = useState("");
+  const [, setSubject] = useState("");
   const [attachment, setAttachment] = useState<ConversationAttachment | null>(
     null,
   );
@@ -175,11 +176,20 @@ export function LeadConversationPanel({ card }: { card: LeadCardData }) {
 
   useEffect(() => onLeadActivityChange(() => setRevision((n) => n + 1)), []);
 
+  // Reset remoteItems synchronously when card.id becomes non-fetchable —
+  // computed during render (gated on a state diff of the previous id)
+  // instead of as a synchronous setState inside the effect below
+  // (react-hooks/set-state-in-effect).
+  const [prevConversationCardId, setPrevConversationCardId] = useState(
+    card.id,
+  );
+  if (prevConversationCardId !== card.id) {
+    setPrevConversationCardId(card.id);
+    if (!isUuid(card.id)) setRemoteItems(null);
+  }
+
   useEffect(() => {
-    if (!isUuid(card.id)) {
-      setRemoteItems(null);
-      return;
-    }
+    if (!isUuid(card.id)) return;
     let cancelled = false;
     void fetchLeadConversations(card.id, { limit: 50 }).then((page) => {
       if (cancelled || !page) return;
@@ -1219,10 +1229,9 @@ function EmailFullPage({
   onClose: () => void;
 }) {
   const sent = `${formatDayLabel(item.at)} · ${formatTime(item.at)}`;
-  const [mounted, setMounted] = useState(false);
+  const mounted = useHasMounted();
 
   useEffect(() => {
-    setMounted(true);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
