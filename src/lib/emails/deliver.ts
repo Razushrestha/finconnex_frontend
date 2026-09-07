@@ -1,45 +1,20 @@
-import { isBoundCrmSession } from "@/lib/activity-timeline/auth";
 import type { Email } from "@/lib/emails/types";
 
-export async function deliverAppMail(input: {
-  to?: string[];
-  subject?: string;
-  body?: string;
-  cc?: string[];
-  bcc?: string[];
-}): Promise<void> {
-  if (typeof window === "undefined" || isBoundCrmSession()) return;
-  const to = (input.to ?? []).map((item) => item.trim()).filter(Boolean);
-  const subject = input.subject?.trim() ?? "";
-  const text = input.body?.trim() || subject;
-  if (!to[0] || !subject) {
-    throw new Error("Email is missing a recipient or subject");
-  }
-  const res = await fetch("/api/auth/mail/deliver", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      to,
-      subject,
-      text,
-      cc: input.cc,
-      bcc: input.bcc,
-    }),
-  });
-  const json = (await res.json().catch(() => ({}))) as { error?: string };
-  if (!res.ok) {
-    throw new Error(json.error || `Email was queued but not delivered (${res.status})`);
-  }
-}
-
+/**
+ * Delivery is the backend's job.
+ *
+ * This used to POST to `/api/auth/mail/deliver`, which sends through the
+ * Next.js app's *own* SendGrid credentials (`SENDGRID_API_KEY` in
+ * `.env.local`) — a second delivery path running alongside the backend's.
+ * With no key set on this app it threw "SendGrid is not configured on this
+ * app", surfacing as a failure on actions that had already succeeded
+ * server-side: `POST /workspaces/:id/members` and `POST /workspaces/:id/emails`
+ * both return 201 and the backend queues its own delivery job.
+ *
+ * Kept as a no-op so the call sites in `@/lib/emails/api` keep their shape.
+ * Restore a real implementation only if the app is meant to deliver mail
+ * itself, which would mean sending every message twice.
+ */
 export async function deliverQueuedCrmEmail(email: Email | null) {
-  if (!email) return;
-  await deliverAppMail({
-    to: email.to,
-    subject: email.subject,
-    body: email.body,
-    cc: email.cc,
-    bcc: email.bcc,
-  });
+  void email;
 }
