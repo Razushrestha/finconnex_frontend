@@ -23,7 +23,7 @@ import {
   RELATED_ENTITY_KINDS,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
-import { liveRelatedRecords } from "@/lib/activities/related-records";
+import { useCrmRelatedRecords } from "@/lib/activities/use-crm-related-records";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { createMeeting } from "@/lib/meetings/store";
 import {
@@ -105,12 +105,15 @@ export function CreateMeetingForm({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  const relatedOptions = liveRelatedRecords(
-    form.relatedKind,
+  const extra =
     form.relatedKind && form.relatedName
-      ? { kind: form.relatedKind as RelatedEntityKind, name: form.relatedName }
-      : undefined,
-  );
+      ? {
+          kind: form.relatedKind as RelatedEntityKind,
+          name: form.relatedName,
+        }
+      : undefined;
+  const { options: relatedOptions, loading: relatedLoading } =
+    useCrmRelatedRecords(form.relatedKind, extra);
 
   function validate() {
     const next: Partial<Record<keyof FormState, string>> = {};
@@ -256,9 +259,11 @@ export function CreateMeetingForm({
             onChange={(e) => update("relatedName", e.target.value)}
             disabled={!form.relatedKind}
           >
-            <option value="">Select record</option>
+            <option value="">
+              {relatedLoading ? "Loading CRM records…" : "Select record"}
+            </option>
             {relatedOptions.map((r) => (
-              <option key={`${r.kind}-${r.name}`} value={r.name}>
+              <option key={`${r.kind}-${r.id || r.name}`} value={r.name}>
                 {r.name}
               </option>
             ))}

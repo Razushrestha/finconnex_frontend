@@ -24,6 +24,10 @@ import {
   type RelatedEntityKind,
   type RelatedTo,
 } from "@/lib/activities/shared";
+import { findCompanyById } from "@/lib/companies/store";
+import { findContactById } from "@/lib/contacts/store";
+import { findDealById } from "@/lib/deals/store";
+import { findLeadById } from "@/lib/leads/store";
 
 export type CrmTaskQuery = {
   page?: number;
@@ -96,6 +100,17 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
       }
     }
     if (rec.data != null && rec.data !== data) return extractRecords(rec.data);
+    const hasId = pickStr(rec.id, rec.uuid, rec.taskId);
+    const hasTitle = pickStr(rec.subject, rec.title, rec.name);
+    if (
+      hasId &&
+      (hasTitle || rec.status != null) &&
+      !Array.isArray(rec.items) &&
+      !Array.isArray(rec.tasks) &&
+      !Array.isArray(rec.records)
+    ) {
+      return [rec];
+    }
   }
   return [];
 }
@@ -103,7 +118,7 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
 export function mapTaskStatus(raw: string): TaskStatus {
   const value = raw.toLowerCase().replace(/[_-]/g, " ");
   if (value.includes("progress")) return "In Progress";
-  if (value.includes("wait")) return "Waiting";
+  if (value.includes("wait") || value.includes("defer")) return "Waiting";
   if (value.includes("review")) return "Review";
   if (value.includes("complete") || value.includes("done") || value.includes("closed")) {
     return "Completed";
@@ -115,20 +130,21 @@ export function mapTaskStatus(raw: string): TaskStatus {
 
 function apiTaskStatus(status: TaskStatus): string {
   if (status === "In Progress") return "IN_PROGRESS";
-  if (status === "Waiting") return "WAITING";
-  if (status === "Review") return "REVIEW";
+  if (status === "Waiting" || status === "Review") return "DEFERRED";
   if (status === "Completed") return "COMPLETED";
   if (status === "Cancelled") return "CANCELLED";
   return "NOT_STARTED";
 }
 
 export function mapTaskPriority(raw: string): Priority {
-  const value = raw.toLowerCase();
+  const value = raw.toLowerCase().replace(/[_-]/g, " ");
+  if (value.includes("urgent") || value.includes("critical")) return "Critical";
   const hit = TASK_PRIORITIES.find((p) => p.toLowerCase() === value);
   return hit ?? "Medium";
 }
 
 function apiTaskPriority(priority: Priority): string {
+  if (priority === "Critical") return "URGENT";
   return priority.toUpperCase();
 }
 
@@ -141,7 +157,7 @@ export function mapTaskType(raw: string): TaskType {
 }
 
 function apiTaskType(type: TaskType): string {
-  if (type === "Team Action") return "TEAM_ACTION";
+  if (type === "Team Action") return "OTHER";
   if (type === "Follow-up") return "FOLLOW_UP";
   return type.toUpperCase().replace(/[\s-]+/g, "_");
 }
@@ -181,6 +197,29 @@ export function toTaskIso(raw: string): string {
   return value;
 }
 
+function memberDisplay(raw: unknown): string {
+  if (typeof raw === "string") return raw.trim();
+  if (!raw || typeof raw !== "object") return "";
+  const rec = raw as Record<string, unknown>;
+  const user =
+    rec.user && typeof rec.user === "object"
+      ? (rec.user as Record<string, unknown>)
+      : rec;
+  const firstLast = [pickStr(user.firstName), pickStr(user.lastName)]
+    .filter(Boolean)
+    .join(" ");
+  return pickStr(
+    rec.name,
+    rec.fullName,
+    rec.displayName,
+    firstLast,
+    user.email,
+    rec.email,
+    rec.userId,
+    rec.id,
+  );
+}
+
 function mapRelated(raw: Record<string, unknown>): RelatedTo | undefined {
   const nested =
     raw.relatedTo && typeof raw.relatedTo === "object"
@@ -191,20 +230,80 @@ function mapRelated(raw: Record<string, unknown>): RelatedTo | undefined {
     raw.relatedType,
     raw.parentType,
   );
-  const name = pickStr(
-    nested && (nested.name ?? nested.title ?? nested.label),
-    raw.relatedName,
-    typeof raw.relatedTo === "string" ? raw.relatedTo : "",
-  );
-  if (!name && !kindRaw) return undefined;
   const kindMap: Record<string, RelatedEntityKind> = {
     lead: "Lead",
     contact: "Contact",
     company: "Company",
     deal: "Deal",
   };
-  const kind = kindMap[kindRaw.toLowerCase()] ?? "Lead";
-  return { kind, name: name || kind };
+  const kind =
+    kindMap[kindRaw.toLowerCase()] ??
+    (pickStr(raw.leadId)
+      ? "Lead"
+      : pickStr(raw.contactId)
+        ? "Contact"
+        : pickStr(raw.companyId)
+          ? "Company"
+          : pickStr(raw.dealId)
+            ? "Deal"
+            : kindRaw
+              ? "Lead"
+              : undefined);
+  if (!kind && !kindRaw) {
+    const idOnly = pickStr(
+      raw.leadId,
+      raw.contactId,
+      raw.companyId,
+      raw.dealId,
+      nested && nested.id,
+      raw.relatedId,
+    );
+    if (!idOnly) return undefined;
+  }
+  const resolvedKind = kind ?? "Lead";
+  const id = pickStr(
+    nested && nested.id,
+    raw.relatedId,
+    resolvedKind === "Lead" ? raw.leadId : "",
+    resolvedKind === "Contact" ? raw.contactId : "",
+    resolvedKind === "Company" ? raw.companyId : "",
+    resolvedKind === "Deal" ? raw.dealId : "",
+  );
+  const storedName =
+    resolvedKind === "Company"
+      ? findCompanyById(id)?.company.name
+      : resolvedKind === "Contact"
+        ? findContactById(id)?.contact.name
+        : resolvedKind === "Deal"
+          ? findDealById(id)?.deal.name
+          : findLeadById(id)?.card.name;
+  const name = pickStr(
+    nested && (nested.name ?? nested.title ?? nested.label),
+    raw.relatedName,
+    typeof raw.relatedTo === "string" ? raw.relatedTo : "",
+    storedName,
+  );
+  if (!name && !id && !kindRaw) return undefined;
+  return {
+    kind: resolvedKind,
+    name: name || resolvedKind,
+    id: isUuid(id) ? id : id || undefined,
+  };
+}
+
+function relatedApiFields(relatedTo?: RelatedTo, relatedId?: string) {
+  const id = isUuid(relatedId)
+    ? relatedId
+    : relatedTo && isUuid(relatedTo.id)
+      ? relatedTo.id
+      : undefined;
+  const kind = relatedTo?.kind?.toUpperCase();
+  if (!kind || !id) return {};
+  if (kind === "LEAD") return { relatedType: "LEAD", leadId: id };
+  if (kind === "CONTACT") return { relatedType: "CONTACT", contactId: id };
+  if (kind === "COMPANY") return { relatedType: "COMPANY", companyId: id };
+  if (kind === "DEAL") return { relatedType: "DEAL", dealId: id };
+  return {};
 }
 
 function mapNameList(raw: unknown): string[] {
@@ -220,13 +319,17 @@ export function normalizeTask(raw: Record<string, unknown>, index: number): Task
     raw.assignee && typeof raw.assignee === "object"
       ? (raw.assignee as Record<string, unknown>)
       : null;
-  const assignedTo = pickStr(
-    assignee && (assignee.name ?? assignee.email),
-    raw.assignedTo,
-    raw.assigneeName,
-    raw.ownerName,
-    "Unassigned",
-  );
+  const assignees = extractRecords(raw.assignees);
+  const assignedTo =
+    memberDisplay(assignees[0]) ||
+    pickStr(
+      assignee && (assignee.name ?? assignee.email),
+      raw.assignedTo,
+      raw.assigneeName,
+      raw.ownerName,
+      memberDisplay(raw.createdBy),
+      "Unassigned",
+    );
   const status = mapTaskStatus(pickStr(raw.status, raw.state, "NOT_STARTED"));
   const createdOn = pickStr(raw.createdAt, raw.createdOn)
     ? formatRulesAt(new Date(pickStr(raw.createdAt, raw.createdOn)))
@@ -242,11 +345,16 @@ export function normalizeTask(raw: Record<string, unknown>, index: number): Task
     priority: mapTaskPriority(pickStr(raw.priority, "MEDIUM")),
     status,
     dueDate: formatDueDisplay(raw.dueAt ?? raw.dueDate ?? raw.dueOn),
+    reminderDate: formatDueDisplay(raw.reminderAt ?? raw.reminderDate) || undefined,
     assignedTo,
     relatedTo: mapRelated(raw),
     description: pickStr(raw.description) || undefined,
     notes: pickStr(raw.notes) || undefined,
-    createdBy: pickStr(raw.createdByName, raw.createdBy, assignedTo),
+    createdBy: pickStr(
+      memberDisplay(raw.createdBy),
+      raw.createdByName,
+      assignedTo,
+    ),
     createdOn,
     modifiedBy: pickStr(raw.updatedByName, raw.modifiedBy, assignedTo),
     modifiedOn,
@@ -260,8 +368,13 @@ export function normalizeTask(raw: Record<string, unknown>, index: number): Task
         : undefined,
     collaborators: collaborators.length ? collaborators : undefined,
     attachmentsCount:
-      typeof raw.attachmentsCount === "number" ? raw.attachmentsCount : undefined,
+      typeof raw.attachmentsCount === "number"
+        ? raw.attachmentsCount
+        : Array.isArray(raw.attachments)
+          ? raw.attachments.length
+          : undefined,
     overdue:
+      raw.isOverdue === true ||
       raw.overdue === true ||
       pickStr(raw.state, raw.bucket).toLowerCase().includes("overdue"),
     assignee: {
@@ -348,26 +461,33 @@ function isPersistedTask(task: Task) {
   return Boolean(task.title.trim() && task.title !== "Untitled task" && isUuid(task.taskId));
 }
 
-function sameTaskTitle(a: string, b: string) {
-  const left = a.trim().toLowerCase();
-  const right = b.trim().toLowerCase();
-  return left === right || left.includes(right) || right.includes(left);
-}
-
 export async function listCrmTasks(query: CrmTaskQuery = {}): Promise<Task[]> {
-  return normalizeTasks(
-    await tasksGet(
-      "",
-      toQuery({
-        page: query.page,
-        limit: query.limit ?? 200,
-        search: query.search,
-        status: query.status,
-        relatedType: query.relatedType,
-        relatedId: query.relatedId,
-      }),
-    ),
-  );
+  const limit = Math.min(100, Math.max(1, query.limit ?? 100));
+  const relatedType = query.relatedType
+    ? query.relatedType.toUpperCase()
+    : undefined;
+  const startPage = query.page != null ? Math.max(1, query.page) : 1;
+  const maxPages = query.page != null ? 1 : 20;
+  const all: Task[] = [];
+  for (let i = 0; i < maxPages; i += 1) {
+    const page = startPage + i;
+    const batch = normalizeTasks(
+      await tasksGet(
+        "",
+        toQuery({
+          page,
+          limit,
+          search: query.search,
+          status: query.status,
+          relatedType,
+          relatedId: query.relatedId,
+        }),
+      ),
+    );
+    all.push(...batch);
+    if (batch.length < limit) break;
+  }
+  return all;
 }
 
 export async function listCrmTasksToday(): Promise<Task[]> {
@@ -406,106 +526,93 @@ export type CreateCrmTaskInput = {
   description?: string;
   notes?: string;
   collaborators?: string[];
+  reminderDate?: string;
+  startDate?: string;
+  attachmentKeys?: string[];
+  repeatEvery?: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
 };
 
 export function toCreateTaskBody(input: CreateCrmTaskInput): Record<string, unknown> {
-  const dueAt = toTaskIso(input.dueDate);
-  const assigneeId = isUuid(input.assignedTo) ? input.assignedTo : undefined;
-  const relatedTo = input.relatedTo;
-  const relatedId = isUuid(input.relatedId)
-    ? input.relatedId
-    : relatedTo && isUuid(relatedTo.id)
-      ? relatedTo.id
-      : undefined;
+  const dueDate = toTaskIso(input.dueDate) || new Date().toISOString();
+  const startDate = toTaskIso(input.startDate ?? "") || dueDate;
+  const owners = isUuid(input.assignedTo) ? [input.assignedTo] : [];
+  const collaboratorIds = (input.collaborators ?? []).filter(
+    (id) => isUuid(id) && id !== input.assignedTo,
+  );
   return compactBody({
-    title: input.title.trim(),
     subject: input.title.trim(),
-    type: apiTaskType(input.taskType),
+    taskType: apiTaskType(input.taskType),
     priority: apiTaskPriority(input.priority),
-    status: apiTaskStatus(input.status),
-    dueAt: dueAt || undefined,
-    description: input.description?.trim() || undefined,
-    notes: input.notes?.trim() || undefined,
-    relatedType: input.relatedTo?.kind?.toUpperCase(),
-    relatedId,
-    assigneeId,
-    ownerId: assigneeId,
+    startDate,
+    dueDate,
+    reminderAt: input.reminderDate
+      ? toTaskIso(input.reminderDate) || undefined
+      : undefined,
+    description: input.description?.trim() || input.notes?.trim() || undefined,
+    assigneeIds: owners,
+    collaboratorIds,
+    attachmentKeys: input.attachmentKeys,
+    repeatEvery: input.repeatEvery,
+    recurrenceTimezone: input.repeatEvery
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : undefined,
+    recurrenceLimit: input.repeatEvery ? 12 : undefined,
+    ...relatedApiFields(input.relatedTo, input.relatedId),
   });
 }
 
 export async function createCrmTask(
   input: CreateCrmTaskInput,
 ): Promise<Task | null> {
-  let created = asTask(
+  const { resolveCrmAssigneeUserId } = await import("@/lib/users/assignable");
+  const assigneeId = await resolveCrmAssigneeUserId(input.assignedTo);
+  if (!assigneeId) {
+    throw new Error(
+      "Could not find a workspace member to assign. Sign in and pick a Task Owner.",
+    );
+  }
+  const created = asTask(
     await tasksMutate("", {
       method: "POST",
-      body: JSON.stringify(toCreateTaskBody(input)),
+      body: JSON.stringify(
+        toCreateTaskBody({ ...input, assignedTo: assigneeId }),
+      ),
     }),
   );
-  if (created && !sameTaskTitle(created.title, input.title)) {
-    created = null;
-  }
-  if (created && isUuid(created.taskId)) {
-    if (isUuid(input.assignedTo)) {
-      try {
-        created =
-          asTask(
-            await tasksMutate(`/${created.taskId}/assignees/${input.assignedTo}`, {
-              method: "POST",
-              body: "{}",
-            }),
-          ) ?? created;
-      } catch {
-        /* keep created */
-      }
-    }
-    for (const userId of input.collaborators ?? []) {
-      if (!isUuid(userId) || userId === input.assignedTo) continue;
-      try {
-        await tasksMutate(`/${created.taskId}/collaborators/${userId}`, {
-          method: "POST",
-          body: "{}",
-        });
-      } catch {
-        /* keep created */
-      }
-    }
-  }
   return created;
 }
 
 export async function updateCrmTask(
   id: string,
-  patch: Partial<Task>,
+  patch: Partial<Task> & { relatedId?: string; attachmentKeys?: string[] },
 ): Promise<Task | null> {
   const body: Record<string, unknown> = {};
-  if (patch.title) body.title = patch.title;
-  if (patch.taskType) body.type = apiTaskType(patch.taskType);
+  if (patch.title) body.subject = patch.title;
+  if (patch.taskType) body.taskType = apiTaskType(patch.taskType);
   if (patch.priority) body.priority = apiTaskPriority(patch.priority);
-  if (patch.status) body.status = apiTaskStatus(patch.status);
   if (patch.dueDate) {
-    const dueAt = toTaskIso(patch.dueDate);
-    body.dueAt = dueAt;
-    body.dueDate = dueAt;
+    const dueDate = toTaskIso(patch.dueDate);
+    body.dueDate = dueDate;
   }
-  if (patch.assignedTo) {
-    if (isUuid(patch.assignedTo)) {
-      body.assigneeId = patch.assignedTo;
-      body.ownerId = patch.assignedTo;
-    } else {
-      body.assigneeName = patch.assignedTo;
-    }
+  if (patch.reminderDate) {
+    body.reminderAt = toTaskIso(patch.reminderDate);
+  }
+  if (patch.assignedTo && isUuid(patch.assignedTo)) {
+    body.assigneeIds = [patch.assignedTo];
   }
   if (patch.description != null) body.description = patch.description;
-  if (patch.notes != null) body.notes = patch.notes;
-  if (patch.relatedTo) {
-    body.relatedType = patch.relatedTo.kind.toUpperCase();
-    body.relatedName = patch.relatedTo.name;
+  if (patch.relatedTo || patch.relatedId) {
+    Object.assign(body, relatedApiFields(patch.relatedTo, patch.relatedId));
+  }
+  if (patch.attachmentKeys) body.attachmentKeys = patch.attachmentKeys;
+  if (patch.collaborators?.length) {
+    const ids = patch.collaborators.filter((item) => isUuid(item));
+    if (ids.length) body.collaboratorIds = ids;
   }
   return asTask(
     await tasksMutate(`/${id}`, {
       method: "PATCH",
-      body: JSON.stringify(body),
+      body: JSON.stringify(compactBody(body)),
     }),
   );
 }
@@ -539,15 +646,22 @@ export async function bulkCrmTasks(
   operation: "complete" | "reassign" | "delete",
   extra: Record<string, unknown> = {},
 ): Promise<unknown> {
+  const mapped =
+    operation === "complete"
+      ? "MARK_COMPLETE"
+      : operation === "reassign"
+        ? "REASSIGN"
+        : "SOFT_DELETE";
   return tasksMutate("/bulk", {
     method: "POST",
-    body: JSON.stringify({
-      ids,
-      taskIds: ids,
-      operation,
-      action: operation,
-      ...extra,
-    }),
+    body: JSON.stringify(
+      compactBody({
+        ids,
+        operation: mapped,
+        assigneeId:
+          typeof extra.assigneeId === "string" ? extra.assigneeId : undefined,
+      }),
+    ),
   });
 }
 
@@ -585,7 +699,7 @@ export async function replaceCrmTaskAssignees(
   return asTask(
     await tasksMutate(`/${id}/assignees`, {
       method: "PUT",
-      body: JSON.stringify({ userIds, assigneeIds: userIds }),
+      body: JSON.stringify({ userIds }),
     }),
   );
 }
@@ -615,7 +729,7 @@ export async function replaceCrmTaskCollaborators(
   return asTask(
     await tasksMutate(`/${id}/collaborators`, {
       method: "PUT",
-      body: JSON.stringify({ userIds, collaboratorIds: userIds }),
+      body: JSON.stringify({ userIds }),
     }),
   );
 }
@@ -627,7 +741,7 @@ export async function replaceCrmTaskFollowers(
   return asTask(
     await tasksMutate(`/${id}/followers`, {
       method: "PUT",
-      body: JSON.stringify({ userIds, followerIds: userIds }),
+      body: JSON.stringify({ userIds }),
     }),
   );
 }
@@ -639,7 +753,7 @@ export async function addCrmTaskTag(
   return asTask(
     await tasksMutate(`/${id}/tags`, {
       method: "POST",
-      body: JSON.stringify({ name: tag.name, tagId: tag.tagId, tag: tag.name }),
+      body: JSON.stringify({ name: tag.name }),
     }),
   );
 }
@@ -656,11 +770,7 @@ export async function addCrmTaskAttachment(
     await tasksMutate(`/${id}/attachments`, {
       method: "POST",
       body: JSON.stringify({
-        fileKey: attachment.key,
-        storageKey: attachment.key,
         key: attachment.key,
-        url: attachment.url,
-        fileName: attachment.fileName,
       }),
     }),
   );
@@ -681,14 +791,18 @@ export async function syncTaskStatus(
 ): Promise<Task | null> {
   if (status === "Completed") return completeCrmTask(id);
   if (status === "Cancelled") return cancelCrmTask(id);
-  if (status === "Not Started" || status === "In Progress") {
-    const current = await tryCrmTask(() => getCrmTask(id));
-    if (current?.status === "Completed" || current?.status === "Cancelled") {
-      const reopened = await reopenCrmTask(id);
-      if (status === "Not Started") return reopened;
-    }
+  const current = await tryCrmTask(() => getCrmTask(id));
+  if (
+    current &&
+    (current.status === "Completed" || current.status === "Cancelled") &&
+    (status === "Not Started" ||
+      status === "In Progress" ||
+      status === "Waiting" ||
+      status === "Review")
+  ) {
+    return reopenCrmTask(id);
   }
-  return updateCrmTask(id, { status });
+  return current;
 }
 
 export async function tryCrmTask<T>(run: () => Promise<T>): Promise<T | null> {

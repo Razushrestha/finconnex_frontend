@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { MoreVertical } from "lucide-react";
 import { type CompanyGroup } from "@/lib/companies/types";
 import { listCompanyGroups } from "@/lib/companies/store";
@@ -68,7 +69,12 @@ const columnRenderers: Record<string, ColumnRenderer> = {
         >
           {company.initials}
         </div>
-        <span className="font-semibold text-slate-900">{company.name}</span>
+        <Link
+          href={`/sales/companies/detail/${encodeURIComponent(company.id)}`}
+          className="font-semibold text-slate-900 hover:text-violet-700 hover:underline"
+        >
+          {company.name}
+        </Link>
       </div>
     ),
   },

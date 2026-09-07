@@ -6,11 +6,13 @@ import { X } from "lucide-react";
 interface MeetingHeaderProps {
   onCancel: () => void;
   onSendInvites: () => void;
+  sending?: boolean;
 }
 
 export const MeetingHeader: React.FC<MeetingHeaderProps> = ({
   onCancel,
   onSendInvites,
+  sending = false,
 }) => {
   return (
     <div className="flex items-center justify-between px-4 py-2">
@@ -29,9 +31,10 @@ export const MeetingHeader: React.FC<MeetingHeaderProps> = ({
         <button
           type="button"
           onClick={onSendInvites}
-          className="rounded-md bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800"
+          disabled={sending}
+          className="rounded-md bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Send Invites
+          {sending ? "Sending…" : "Send Invites"}
         </button>
       </div>
     </div>

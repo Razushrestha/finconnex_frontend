@@ -373,7 +373,7 @@ export async function smokeTasksMock() {
       priority: "High",
       status: "Not Started",
       dueDate: "30/08/2026",
-      assignedTo: "Tejas",
+      assignedTo: USER_ID,
     });
     await updateCrmTask(ID, { title: "Updated" });
     await completeCrmTask(ID);

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Globe,
   Phone,
@@ -118,9 +119,18 @@ export function CompanyCard({
   onToggleSelect,
   onSaveCardSettings,
 }: CompanyCardProps) {
+  const router = useRouter();
+  const dragMovedRef = useRef(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customization, setCustomization] =
     useState<CompanyCardCustomizationSettings>(DEFAULT_COMPANY_CARD_SETTINGS);
+
+  const detailHref = `/sales/companies/detail/${encodeURIComponent(company.id)}`;
+
+  function openDetail() {
+    if (dragMovedRef.current || isDragging) return;
+    router.push(detailHref);
+  }
 
   const rawQuickActions = (company as { quickActions?: unknown }).quickActions;
   const quickActionItems: QuickActionItem<CompanyQuickActionKind>[] =
@@ -145,12 +155,35 @@ export function CompanyCard({
     <>
       <div
         draggable
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
+        onDragStart={(e) => {
+          const target = e.target as HTMLElement | null;
+          if (target?.closest("a,button,input,textarea,select,[role='button']")) {
+            e.preventDefault();
+            return;
+          }
+          dragMovedRef.current = true;
+          onDragStart(e);
+        }}
+        onDragEnd={() => {
+          onDragEnd();
+          window.setTimeout(() => {
+            dragMovedRef.current = false;
+          }, 0);
+        }}
+        onClick={openDetail}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openDetail();
+          }
+        }}
+        role="link"
+        tabIndex={0}
+        aria-label={`Open ${company.name}`}
         data-focus-id={company.id}
         data-company-id={company.id}
         className={cn(
-          "group/card w-full shrink-0",
+          "group/card w-full shrink-0 cursor-pointer",
           entityCardBox,
           cardMotion,
           isDragging && cardDragging,
@@ -158,8 +191,9 @@ export function CompanyCard({
       >
         <div className="mb-3 flex items-center justify-between gap-2">
           <Link
-            href={`/sales/companies/detail/${company.id}`}
+            href={detailHref}
             className="min-w-0"
+            onClick={(e) => e.stopPropagation()}
           >
             <h3
               className={cn(

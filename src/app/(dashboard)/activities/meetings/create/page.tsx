@@ -12,7 +12,16 @@ import {
 } from "@/components/activities/meetings/create/MeetingFormCard";
 import { AvailabilityCard } from "@/components/activities/meetings/create/AvailabilityCard";
 import { PreparationTasksCard } from "@/components/activities/meetings/create/PreparationTasksCard";
-import { createMeeting, formatMeetingDateTime } from "@/lib/meetings/store";
+import { formatMeetingDateTime } from "@/lib/meetings/store";
+import {
+  createCrmMeeting,
+  isCrmMeetingId,
+  persistRemoteMeeting,
+} from "@/lib/meetings/api";
+import {
+  resolveRelatedMeetingInvitees,
+  sendRelatedMeetingInvites,
+} from "@/lib/meetings/invite-related";
 import {
   assignedCalendarMembers,
   availabilityRuleForDate,
@@ -90,7 +99,9 @@ export default function ScheduleMeetingPage() {
   const [relatedName, setRelatedName] = useState(
     params.get("relatedName") ?? "",
   );
+  const [relatedId, setRelatedId] = useState(params.get("relatedId") ?? "");
   const [attempted, setAttempted] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const selectedCalendar = calendars.find((page) => page.id === calendarId);
   const teamMembers = assignedCalendarMembers(selectedCalendar);
@@ -142,7 +153,7 @@ export default function ScheduleMeetingPage() {
     setTime(slots[0] ?? "");
   }
 
-  function handleSendInvites() {
+  async function handleSendInvites() {
     setAttempted(true);
     if (!title.trim()) {
       toast.error("Appointment title is required");
@@ -192,52 +203,104 @@ export default function ScheduleMeetingPage() {
         ? formatTaskRepeatSummary(repeatRule)
         : "";
     const note = [agenda.trim(), repeatNote].filter(Boolean).join("\n");
-    const relatedTo =
-      relatedKind && relatedName.trim()
-        ? `${relatedKind}: ${relatedName.trim()}`
-        : undefined;
-    let firstCreatedId = "";
-    starts.forEach((startDate) => {
-      const endDate = new Date(startDate.getTime() + minutes * 60 * 1000);
-      const created = createMeeting({
+    const relatedTo = `${relatedKind}: ${relatedName.trim()}`;
+    const meetingLinkValue =
+      locationMode === "default"
+        ? selectedCalendar?.meetingViaDetail ||
+          selectedCalendar?.videoLink ||
+          undefined
+        : isVideo
+          ? meetingLink
+          : undefined;
+    const meetingTypeValue =
+      locationMode === "default" && selectedCalendar
+        ? meetingTypeFromPage(selectedCalendar)
+        : meetingType;
+
+    setSending(true);
+    try {
+      const invitees = await resolveRelatedMeetingInvitees(
+        relatedKind,
+        relatedName.trim(),
+        relatedId,
+      );
+      if (!invitees.length) {
+        toast.error(
+          `No email on this ${relatedKind.toLowerCase()}. Add an email on the related record, then send invites again.`,
+        );
+        return;
+      }
+
+      const linkId =
+        relatedId && relatedId.length
+          ? relatedId
+          : relatedKind === "Contact" || relatedKind === "Lead"
+            ? invitees[0]?.relatedId
+            : undefined;
+
+      let firstCreatedId = "";
+      for (const startDate of starts) {
+        const endDate = new Date(startDate.getTime() + minutes * 60 * 1000);
+        const startDateTime = startDate.toISOString();
+        const endDateTime = endDate.toISOString();
+        const draft = {
+          title: title.trim(),
+          relatedTo,
+          relatedKind,
+          relatedId: linkId,
+          type: meetingTypeValue,
+          status: "Scheduled" as const,
+          startDateTime,
+          endDateTime,
+          organizer: host,
+          location,
+          meetingLink: meetingLinkValue,
+          notes: note || undefined,
+          agenda: agenda.trim() || undefined,
+          timezone,
+          externalAttendees: invitees.map((item) => ({
+            email: item.email,
+            name: item.name,
+          })),
+        };
+        const remote = persistRemoteMeeting(await createCrmMeeting(draft));
+        const createdId = remote?.id ?? "";
+        if (!createdId) {
+          throw new Error("CRM did not save the meeting");
+        }
+        if (!firstCreatedId) firstCreatedId = createdId;
+      }
+
+      await sendRelatedMeetingInvites({
+        invitees,
         title: title.trim(),
-        relatedTo,
-        type:
-          locationMode === "default" && selectedCalendar
-            ? meetingTypeFromPage(selectedCalendar)
-            : meetingType,
-        startDateTime: formatMeetingDateTime(startDate),
-        endDateTime: formatMeetingDateTime(endDate),
-        organizer: host,
+        startLabel: first.startLabel,
+        endLabel: first.endLabel,
         location,
-        meetingLink:
-          locationMode === "default"
-            ? selectedCalendar?.meetingViaDetail ||
-              selectedCalendar?.videoLink ||
-              undefined
-            : isVideo
-              ? meetingLink
-              : undefined,
-        notes: note || undefined,
-        attendees: host
-          ? [
-              {
-                id: "host",
-                name: host,
-                email: `${host.toLowerCase().replace(/\s+/g, ".")}@finconnex.com`,
-                role: "Host",
-              },
-            ]
-          : [],
+        meetingLink: meetingLinkValue,
+        agenda: note,
+        relatedKind,
+        relatedName: relatedName.trim(),
+        relatedId: linkId,
       });
-      if (!firstCreatedId) firstCreatedId = created.id;
-    });
-    toast.success(
-      starts.length > 1
-        ? `Invites sent for ${starts.length} occurrences`
-        : "Invites sent",
-    );
-    router.push(`/activities/meetings/detail/${firstCreatedId}`);
+
+      toast.success(
+        starts.length > 1
+          ? `Invites emailed to ${invitees.map((item) => item.email).join(", ")} for ${starts.length} occurrences`
+          : `Invite emailed to ${invitees.map((item) => item.email).join(", ")}`,
+      );
+      router.push(
+        isCrmMeetingId(firstCreatedId)
+          ? `/activities/meetings/detail/${firstCreatedId}`
+          : "/activities/meetings",
+      );
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Could not send meeting invites",
+      );
+    } finally {
+      setSending(false);
+    }
   }
 
   const calendarOptions = useMemo(
@@ -249,7 +312,8 @@ export default function ScheduleMeetingPage() {
     <div className="flex min-h-screen w-full flex-col bg-background">
       <MeetingHeader
         onCancel={() => router.push("/activities/meetings")}
-        onSendInvites={handleSendInvites}
+        onSendInvites={() => void handleSendInvites()}
+        sending={sending}
       />
 
       <div className="mx-auto grid w-full max-w-[1920px] grid-cols-1 gap-4 px-4 py-3 pb-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,400px)] lg:gap-6 2xl:px-8">
@@ -305,9 +369,13 @@ export default function ScheduleMeetingPage() {
             timezone={timezone}
             onTimezoneChange={setTimezone}
             relatedKind={relatedKind}
-            onRelatedKindChange={setRelatedKind}
+            onRelatedKindChange={(kind) => {
+              setRelatedKind(kind);
+              setRelatedId("");
+            }}
             relatedName={relatedName}
             onRelatedNameChange={setRelatedName}
+            onRelatedIdChange={setRelatedId}
             recurring={recurring}
             onRecurringChange={setRecurring}
             repeatRule={repeatRule}

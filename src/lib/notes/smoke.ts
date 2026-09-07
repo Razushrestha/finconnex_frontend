@@ -20,6 +20,7 @@ import {
   normalizeNote,
   relatedNotesPath,
   restoreCrmNote,
+  toCreateNoteBody,
   updateCrmNote,
   workspaceNotesPath,
 } from "@/lib/notes/api";
@@ -170,6 +171,26 @@ export function smokeNotesWiring() {
   if (!create.includes("createCrmNote")) {
     fail("create note form does not call createCrmNote");
   }
+  const createPage = readSrc(
+    "src/app/(dashboard)/activities/notes/create/page.tsx",
+  );
+  if (!createPage.includes("createCrmNote")) {
+    fail("create note page does not call createCrmNote");
+  }
+  const payload = toCreateNoteBody({
+    title: "New",
+    body: "Hello",
+    relatedTo: "Lead: William Anderson",
+    relatedType: "LEAD",
+    relatedId: RELATED_ID,
+    noteType: "General",
+  });
+  if (payload.leadId !== RELATED_ID) {
+    fail("toCreateNoteBody must send leadId for a lead parent");
+  }
+  if ("relatedTo" in payload || "relatedId" in payload || "text" in payload) {
+    fail("toCreateNoteBody must not send forbidden extra fields");
+  }
 
   const detail = readSrc(
     "src/app/(dashboard)/activities/notes/detail/[id]/page.tsx",
@@ -247,6 +268,7 @@ export async function smokeNotesMock() {
       body: "Hello",
       relatedTo: "Lead: William Anderson",
       relatedType: "LEAD",
+      relatedId: RELATED_ID,
       noteType: "General",
     });
     await updateCrmNote(ID, { title: "Updated" });

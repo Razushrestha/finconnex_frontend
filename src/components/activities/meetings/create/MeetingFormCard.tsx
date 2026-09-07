@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FC } from "react";
 import { ChevronDown, Link2, MapPin, LocateFixed } from "lucide-react";
 import type { MeetingType } from "@/lib/meetings/types";
 import { DateTimeSection } from "@/components/booking/DateTimeSection";
@@ -11,7 +11,7 @@ import {
   type ReminderRepeatRule,
 } from "@/lib/tasks/repeat-reminder";
 import { formatSlotRange } from "@/lib/booking/types";
-import { liveRelatedRecords } from "@/lib/activities/related-records";
+import { useCrmRelatedRecords } from "@/lib/activities/use-crm-related-records";
 import {
   RELATED_ENTITY_KINDS,
   type RelatedEntityKind,
@@ -74,6 +74,7 @@ interface MeetingFormCardProps {
   onRelatedKindChange: (kind: RelatedEntityKind | "") => void;
   relatedName: string;
   onRelatedNameChange: (name: string) => void;
+  onRelatedIdChange?: (id: string) => void;
   recurring?: boolean;
   onRecurringChange?: (on: boolean) => void;
   repeatRule?: ReminderRepeatRule;
@@ -90,23 +91,24 @@ export function MeetingRelatedFields({
   onRelatedKindChange,
   relatedName,
   onRelatedNameChange,
+  onRelatedIdChange,
 }: {
   relatedKind: RelatedEntityKind | "";
   onRelatedKindChange: (kind: RelatedEntityKind | "") => void;
   relatedName: string;
   onRelatedNameChange: (name: string) => void;
+  onRelatedIdChange?: (id: string) => void;
 }) {
   const [recordTick, setRecordTick] = useState(0);
-  const relatedOptions = useMemo(
-    () =>
-      liveRelatedRecords(
-        relatedKind,
-        relatedKind && relatedName
-          ? { kind: relatedKind, name: relatedName }
-          : undefined,
-      ),
-    [relatedKind, relatedName, recordTick],
+  const extra =
+    relatedKind && relatedName
+      ? { kind: relatedKind, name: relatedName }
+      : undefined;
+  const { options: relatedOptions, loading } = useCrmRelatedRecords(
+    relatedKind,
+    extra,
   );
+  void recordTick;
 
   return (
     <div className="grid grid-cols-1 gap-4">
@@ -120,6 +122,7 @@ export function MeetingRelatedFields({
           onChange={(e) => {
             onRelatedKindChange(e.target.value as RelatedEntityKind | "");
             onRelatedNameChange("");
+            onRelatedIdChange?.("");
           }}
         >
           <option value="" disabled>
@@ -139,13 +142,22 @@ export function MeetingRelatedFields({
         <RelatedRecordCombobox
           value={relatedName}
           onChange={onRelatedNameChange}
+          onSelectOption={(option) => onRelatedIdChange?.(option?.id ?? "")}
           options={relatedOptions}
           disabled={!relatedKind}
+          placeholder={
+            loading
+              ? "Loading CRM records…"
+              : relatedKind
+                ? "Search record…"
+                : "Select related entity first"
+          }
           allowCustom={relatedKind === "Contact"}
           createLabel={(name) => `Add contact “${name}”`}
           onCreateOption={(name) => {
             void createQuickContact(name).then((created) => {
               onRelatedNameChange(created.name);
+              onRelatedIdChange?.(created.id);
               setRecordTick((tick) => tick + 1);
             });
           }}
@@ -155,7 +167,7 @@ export function MeetingRelatedFields({
   );
 }
 
-export const MeetingFormCard: React.FC<MeetingFormCardProps> = ({
+export const MeetingFormCard: FC<MeetingFormCardProps> = ({
   calendars,
   calendarId,
   onCalendarChange,
@@ -191,6 +203,7 @@ export const MeetingFormCard: React.FC<MeetingFormCardProps> = ({
   onRelatedKindChange,
   relatedName,
   onRelatedNameChange,
+  onRelatedIdChange,
   recurring = false,
   onRecurringChange,
   repeatRule = defaultReminderRepeatRule,
@@ -317,6 +330,7 @@ export const MeetingFormCard: React.FC<MeetingFormCardProps> = ({
           onRelatedKindChange={onRelatedKindChange}
           relatedName={relatedName}
           onRelatedNameChange={onRelatedNameChange}
+          onRelatedIdChange={onRelatedIdChange}
         />
       )}
 

@@ -7,11 +7,13 @@ import { cn } from "@/lib/utils";
 type RelatedRecordOption = {
   kind: string;
   name: string;
+  id?: string;
 };
 
 interface RelatedRecordComboboxProps {
   value: string;
   onChange: (value: string) => void;
+  onSelectOption?: (option: RelatedRecordOption | null) => void;
   options: RelatedRecordOption[];
   disabled?: boolean;
   placeholder?: string;
@@ -23,6 +25,7 @@ interface RelatedRecordComboboxProps {
 export default function RelatedRecordCombobox({
   value,
   onChange,
+  onSelectOption,
   options,
   disabled = false,
   placeholder = "Search record…",
@@ -72,9 +75,10 @@ export default function RelatedRecordCombobox({
       (record) => record.name.toLowerCase() === customName.toLowerCase(),
     );
 
-  function selectRecord(name: string) {
-    onChange(name);
-    setQuery(name);
+  function selectRecord(record: RelatedRecordOption) {
+    onChange(record.name);
+    onSelectOption?.(record);
+    setQuery(record.name);
     setOpen(false);
   }
 
@@ -86,11 +90,12 @@ export default function RelatedRecordCombobox({
       setOpen(false);
       return;
     }
-    selectRecord(customName);
+    selectRecord({ kind: "", name: customName });
   }
 
   function clearSelection() {
     onChange("");
+    onSelectOption?.(null);
     setQuery("");
     setOpen(false);
     inputRef.current?.focus();
@@ -171,13 +176,13 @@ export default function RelatedRecordCombobox({
               </button>
             </li>
           ) : null}
-          {visible.map((record) => {
+          {visible.map((record, index) => {
             const selected = record.name === value;
             return (
-              <li key={`${record.kind}-${record.name}`}>
+              <li key={`${record.kind}-${record.id || record.name}-${index}`}>
                 <button
                   type="button"
-                  onClick={() => selectRecord(record.name)}
+                  onClick={() => selectRecord(record)}
                   className={cn(
                     "flex w-full flex-col px-3 py-2 text-left transition-colors hover:bg-violet-50",
                     selected && "bg-violet-50",

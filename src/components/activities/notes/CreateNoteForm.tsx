@@ -7,22 +7,26 @@ import { NOTE_TYPES, type NoteType } from "@/lib/notes/types";
 import {
   ACTIVITY_OWNERS,
   RELATED_ENTITY_KINDS,
-  RELATED_RECORD_OPTIONS,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import { useCrmRelatedRecords } from "@/lib/activities/use-crm-related-records";
+import RelatedRecordCombobox from "@/components/activities/tasks/RelatedRecordComboBox";
 import {
   CreateEntityFormShell,
   Field,
   InputShell,
-  TextAreaShell,
   elevatedInputClass,
   elevatedSelectClass,
   elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
 
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
-import { createCrmNote, persistRemoteNote, tryCrmNote } from "@/lib/notes/api";
-import { createNote } from "@/lib/notes/store";
+import {
+  createCrmNote,
+  isCrmNoteId,
+  persistRemoteNote,
+} from "@/lib/notes/api";
 
 interface CreateNoteFormProps {
   layoutId: string;
@@ -30,6 +34,7 @@ interface CreateNoteFormProps {
   defaults?: {
     relatedKind?: RelatedEntityKind;
     relatedName?: string;
+    relatedId?: string;
   };
 }
 
@@ -38,6 +43,7 @@ interface FormState {
   body: string;
   relatedKind: RelatedEntityKind | "";
   relatedName: string;
+  relatedId: string;
   noteType: NoteType | "";
   isPrivate: boolean;
   createdBy: string;
@@ -48,6 +54,7 @@ const initialState: FormState = {
   body: "",
   relatedKind: "",
   relatedName: "",
+  relatedId: "",
   noteType: "General",
   isPrivate: false,
   createdBy: "John Smith",
@@ -63,25 +70,33 @@ export function CreateNoteForm({
     ...initialState,
     relatedKind: defaults?.relatedKind ?? "",
     relatedName: defaults?.relatedName ?? "",
+    relatedId: defaults?.relatedId ?? "",
   });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
   );
   const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  const relatedOptions = form.relatedKind
-    ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === form.relatedKind)
-    : RELATED_RECORD_OPTIONS;
+  const extra =
+    form.relatedKind && form.relatedName
+      ? { kind: form.relatedKind, name: form.relatedName }
+      : undefined;
+  const { options: relatedOptions, loading: relatedLoading } =
+    useCrmRelatedRecords(form.relatedKind, extra);
 
   function validate() {
     const next: Partial<Record<keyof FormState, string>> = {};
     if (!form.body.trim()) next.body = "Body is required";
     if (!form.relatedKind || !form.relatedName) {
       next.relatedName = "Related To is required";
+    } else if (!isUuid(form.relatedId)) {
+      next.relatedName = "Pick a live CRM record";
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -90,36 +105,44 @@ export function CreateNoteForm({
   async function handleSave(createAnother: boolean) {
     setSubmitted(true);
     if (!validate()) return;
-    const relatedTo = `${form.relatedKind}: ${form.relatedName}`;
-    const payload = {
-      title: form.title.trim() || form.body.trim().slice(0, 60),
-      body: form.body.trim(),
-      relatedTo,
-      relatedType: form.relatedKind
-        ? form.relatedKind.toUpperCase()
-        : undefined,
-      noteType: (form.noteType || "General") as NoteType,
-      createdBy: form.createdBy.trim() || "John Smith",
-      isPrivate: form.isPrivate,
-    };
-    const remote = await tryCrmNote(() => createCrmNote(payload));
-    const created = remote
-      ? persistRemoteNote(remote) ?? remote
-      : createNote(payload);
-    if (createAnother) {
-      setForm({
-        ...initialState,
-        createdBy: form.createdBy,
-        relatedKind: form.relatedKind,
-        relatedName: form.relatedName,
-      });
-      setErrors({});
-      setSubmitted(false);
-      return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const created = persistRemoteNote(
+        await createCrmNote({
+          title: form.title.trim() || form.body.trim().slice(0, 60),
+          body: form.body.trim(),
+          relatedTo: `${form.relatedKind}: ${form.relatedName}`,
+          relatedType: form.relatedKind.toUpperCase(),
+          relatedId: form.relatedId,
+          noteType: (form.noteType || "General") as NoteType,
+          createdBy: form.createdBy.trim() || "John Smith",
+          isPrivate: form.isPrivate,
+        }),
+      );
+      if (!created?.id || !isCrmNoteId(created.id)) {
+        throw new Error("CRM did not save the note");
+      }
+      if (createAnother) {
+        setForm({
+          ...initialState,
+          createdBy: form.createdBy,
+          relatedKind: form.relatedKind,
+          relatedName: form.relatedName,
+          relatedId: form.relatedId,
+        });
+        setErrors({});
+        setSubmitted(false);
+        return;
+      }
+      void layoutId;
+      void redirect;
+      router.push(`/activities/notes/detail/${created.id}`);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Could not save note");
+    } finally {
+      setSaving(false);
     }
-    void layoutId;
-    void redirect;
-    router.push(`/activities/notes/detail/${created.id}`);
   }
 
   return (
@@ -136,6 +159,12 @@ export function CreateNoteForm({
       saveLabel="Save Note"
       onSave={handleSave}
     >
+      {saveError ? (
+        <p className="col-span-full text-[12px] text-rose-600">{saveError}</p>
+      ) : null}
+      {saving ? (
+        <p className="col-span-full text-[12px] text-slate-500">Saving…</p>
+      ) : null}
       <Field label="Title" className="col-span-full">
         <InputShell icon={StickyNote}>
           <input
@@ -155,6 +184,7 @@ export function CreateNoteForm({
             onChange={(e) => {
               update("relatedKind", e.target.value as RelatedEntityKind | "");
               update("relatedName", "");
+              update("relatedId", "");
             }}
           >
             <option value="">Select entity</option>
@@ -171,21 +201,20 @@ export function CreateNoteForm({
         required
         error={submitted ? errors.relatedName : undefined}
       >
-        <InputShell error={!!(submitted && errors.relatedName)}>
-          <select
-            className={elevatedSelectClass(false)}
-            value={form.relatedName}
-            onChange={(e) => update("relatedName", e.target.value)}
-            disabled={!form.relatedKind}
-          >
-            <option value="">Select record</option>
-            {relatedOptions.map((r) => (
-              <option key={`${r.kind}-${r.name}`} value={r.name}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </InputShell>
+        <RelatedRecordCombobox
+          value={form.relatedName}
+          onChange={(name) => update("relatedName", name)}
+          onSelectOption={(option) => update("relatedId", option?.id ?? "")}
+          options={relatedOptions}
+          disabled={!form.relatedKind}
+          placeholder={
+            relatedLoading
+              ? "Loading CRM records…"
+              : form.relatedKind
+                ? "Search record…"
+                : "Select related entity first"
+          }
+        />
       </Field>
       <Field label="Note Type">
         <InputShell>

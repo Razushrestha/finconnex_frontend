@@ -87,7 +87,33 @@ export function mapNoteType(raw: string): NoteType {
 }
 
 function apiNoteType(type: NoteType): string {
-  return type.toUpperCase().replace(/\s+/g, "_");
+  if (type === "Call Summary") return "CALL_SUMMARY";
+  if (type === "Meeting Notes") return "MEETING_NOTES";
+  if (type === "Follow-up") return "FOLLOW_UP";
+  if (type === "Other") return "OTHER";
+  return "GENERAL";
+}
+
+function noteRelatedApiFields(relatedType?: string, relatedId?: string) {
+  const id = relatedId && isUuid(relatedId) ? relatedId : undefined;
+  const kind = relatedType?.trim().toUpperCase();
+  if (!kind || !id) return {};
+  if (kind === "LEAD") return { relatedType: "LEAD", leadId: id };
+  if (kind === "CONTACT") return { relatedType: "CONTACT", contactId: id };
+  if (kind === "COMPANY") return { relatedType: "COMPANY", companyId: id };
+  if (kind === "DEAL") return { relatedType: "DEAL", dealId: id };
+  if (kind === "QUOTE") return { relatedType: "QUOTE", quoteId: id };
+  if (kind === "ESTIMATE") return { relatedType: "ESTIMATE", estimateId: id };
+  if (kind === "INVOICE") return { relatedType: "INVOICE", invoiceId: id };
+  if (kind === "CREDIT_NOTE") return { relatedType: "CREDIT_NOTE", creditNoteId: id };
+  return {};
+}
+
+function plainNoteBody(raw: string) {
+  return raw
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function formatWhen(raw: unknown): string {
@@ -278,10 +304,9 @@ export async function listRelatedCrmNotes(
 ): Promise<Note[]> {
   const workspaceId = await relatedWorkspaceId();
   if (!workspaceId) throw new Error("Sign in to load related notes");
+  const kind = relatedType.trim().toUpperCase();
   return normalizeNotes(
-    await crmNotesFetch(
-      relatedNotesPath(workspaceId, relatedType, relatedId),
-    ),
+    await crmNotesFetch(relatedNotesPath(workspaceId, kind, relatedId)),
   );
 }
 
@@ -296,17 +321,14 @@ export function toCreateNoteBody(input: {
   isPrivate?: boolean;
   isPinned?: boolean;
 }): Record<string, unknown> {
+  const related = noteRelatedApiFields(input.relatedType, input.relatedId);
   return compactBody({
-    title: input.title,
-    body: input.body,
-    text: input.body,
-    relatedTo: input.relatedTo,
-    relatedType: input.relatedType,
-    relatedId: isUuid(input.relatedId) ? input.relatedId : undefined,
-    type: input.noteType ? apiNoteType(input.noteType) : undefined,
-    noteType: input.noteType ? apiNoteType(input.noteType) : undefined,
+    title: input.title.trim() || undefined,
+    body: plainNoteBody(input.body),
+    noteType: input.noteType ? apiNoteType(input.noteType) : "GENERAL",
     isPrivate: input.isPrivate ?? false,
     isPinned: input.isPinned ?? false,
+    ...related,
   });
 }
 
@@ -325,27 +347,14 @@ export async function updateCrmNote(
   noteId: string,
   patch: Partial<Note>,
 ): Promise<Note | null> {
-  const body: Record<string, unknown> = {};
-  if (patch.title != null) body.title = patch.title;
-  if (patch.body != null) {
-    body.body = patch.body;
-    body.text = patch.body;
-  }
-  if (patch.relatedTo != null) body.relatedTo = patch.relatedTo;
-  if (patch.relatedType != null) body.relatedType = patch.relatedType;
-  if (patch.relatedId != null) body.relatedId = patch.relatedId;
-  if (patch.noteType) {
-    body.type = apiNoteType(patch.noteType);
-    body.noteType = apiNoteType(patch.noteType);
-  }
-  if (patch.isPrivate != null) {
-    body.isPrivate = patch.isPrivate;
-    body.private = patch.isPrivate;
-  }
-  if (patch.isPinned != null) {
-    body.isPinned = patch.isPinned;
-    body.pinned = patch.isPinned;
-  }
+  const body = compactBody({
+    title: patch.title,
+    body: patch.body != null ? plainNoteBody(patch.body) : undefined,
+    noteType: patch.noteType ? apiNoteType(patch.noteType) : undefined,
+    isPrivate: patch.isPrivate,
+    isPinned: patch.isPinned,
+    ...noteRelatedApiFields(patch.relatedType, patch.relatedId),
+  });
   return asNote(
     await notesMutate(`/${noteId}`, {
       method: "PATCH",
@@ -367,7 +376,7 @@ export async function restoreCrmNote(noteId: string): Promise<Note | null> {
 export async function bulkDeleteCrmNotes(ids: string[]): Promise<void> {
   await notesMutate("/bulk-delete", {
     method: "POST",
-    body: JSON.stringify({ ids, noteIds: ids }),
+    body: JSON.stringify({ ids }),
   });
 }
 

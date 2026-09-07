@@ -19,6 +19,14 @@ const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
   "email.error.singleToRequired":
     "CRM allows one To address. Extra recipients must go in Cc.",
   "email.error.invalidRecipient": "Recipient is not a valid email address.",
+  "meeting.error.relatedTypeMismatch":
+    "Related entity and record do not match. Pick the record again, then send invites.",
+  "meeting.error.invalidRange":
+    "Meeting end time must be after the start time.",
+  "meeting.error.invalidTimezone":
+    "That timezone is not valid for CRM meetings.",
+  "note.error.relatedTypeMismatch":
+    "Related entity and record do not match. Pick a live CRM record.",
   "workspace.error.invitationDeliveryFailed":
     "Workspace invitation was created, but the invite email could not be queued. Sending from FinConnex mail instead.",
   "workspace.error.roleRequired":

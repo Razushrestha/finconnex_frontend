@@ -408,38 +408,34 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
       setEditingId(null);
       notify("Note updated");
     } else if (isUuid(card.id)) {
-      const remote = await tryCrmNote(() =>
-        createCrmNote({
-          title: heading,
-          body: html,
-          relatedTo,
-          relatedType: "LEAD",
-          relatedId: card.id,
-          noteType: mapped.noteType,
-          createdBy: card.owner,
-          isPrivate: mapped.isPrivate,
-          isPinned: pin,
-        }),
-      );
-      if (remote) {
+      try {
+        const remote = persistRemoteNote(
+          await createCrmNote({
+            title: heading,
+            body: html,
+            relatedTo,
+            relatedType: "LEAD",
+            relatedId: card.id,
+            noteType: mapped.noteType,
+            createdBy: card.owner,
+            isPrivate: mapped.isPrivate,
+            isPinned: pin,
+          }),
+        );
+        if (!remote || !isCrmNoteId(remote.id)) {
+          throw new Error("CRM did not save the note");
+        }
         persistRemoteNote({
           ...remote,
           relatedTo,
           relatedType: "LEAD",
           relatedId: card.id,
         });
-      } else {
-        createNote({
-          title: heading,
-          body: html,
-          relatedTo,
-          noteType: mapped.noteType,
-          createdBy: card.owner,
-          isPrivate: mapped.isPrivate,
-          isPinned: pin,
-        });
+        notify("Note saved");
+      } catch (err) {
+        notify(err instanceof Error ? err.message : "Could not save note");
+        return;
       }
-      notify("Note saved");
     } else {
       createNote({
         title: heading,
@@ -507,39 +503,32 @@ export function LeadNotesPanel({ card }: { card: LeadCardData }) {
 
   function duplicateNote(note: Note) {
     if (isUuid(card.id)) {
-      void tryCrmNote(() =>
-        createCrmNote({
-          title: `${note.title} (copy)`,
-          body: note.body,
-          relatedTo: note.relatedTo,
-          relatedType: "LEAD",
-          relatedId: card.id,
-          noteType: note.noteType,
-          createdBy: card.owner,
-          isPrivate: note.isPrivate,
-          isPinned: false,
-        }),
-      ).then((remote) => {
-        if (remote) {
+      void createCrmNote({
+        title: `${note.title} (copy)`,
+        body: note.body,
+        relatedTo: note.relatedTo,
+        relatedType: "LEAD",
+        relatedId: card.id,
+        noteType: note.noteType,
+        createdBy: card.owner,
+        isPrivate: note.isPrivate,
+        isPinned: false,
+      })
+        .then((remote) => {
+          if (!remote || !isCrmNoteId(remote.id)) {
+            throw new Error("CRM did not save the note");
+          }
           persistRemoteNote({
             ...remote,
             relatedTo: `Lead: ${card.name}`,
             relatedType: "LEAD",
             relatedId: card.id,
           });
-        } else {
-          createNote({
-            title: `${note.title} (copy)`,
-            body: note.body,
-            relatedTo: note.relatedTo,
-            noteType: note.noteType,
-            createdBy: card.owner,
-            isPrivate: note.isPrivate,
-            isPinned: false,
-          });
-        }
-        emitLeadActivityChange();
-      });
+          emitLeadActivityChange();
+        })
+        .catch((err) => {
+          notify(err instanceof Error ? err.message : "Could not duplicate note");
+        });
     } else {
       createNote({
         title: `${note.title} (copy)`,

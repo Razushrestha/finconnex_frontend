@@ -29,19 +29,6 @@ export const PERFORMANCE_WIDGETS: ViewWidget[] = [
   { id: "mom-growth", label: "Month on Month Growth" },
 ];
 
-export const WORK_QUEUE_WIDGETS: ViewWidget[] = [
-  { id: "kpis", label: "Work Queue KPIs", span: "full" },
-  { id: "tasks-today", label: "Tasks Due Today" },
-  { id: "follow-ups", label: "Follow-ups Due" },
-  { id: "documents", label: "Documents Pending" },
-  { id: "appointments", label: "Appointments Today" },
-  { id: "missed", label: "Missed Appointments" },
-  { id: "stale", label: "Stale Deals" },
-  { id: "approvals", label: "Approvals Pending" },
-  { id: "lenders", label: "Lender Pending Actions" },
-  { id: "urgent", label: "Urgent / High Priority" },
-];
-
 const HIDDEN_KEY = "dashboard:view-hidden:v1";
 const DEFAULT_HIDDEN_KEY = "dashboard:view-hidden-default:v1";
 const ORDER_KEY = "dashboard:view-order:v1";
@@ -52,7 +39,6 @@ type OrderMap = Partial<Record<DashboardViewId, string[]>>;
 export function widgetsForView(view: DashboardViewId): ViewWidget[] {
   if (view === "sales") return SALES_WIDGETS;
   if (view === "performance") return PERFORMANCE_WIDGETS;
-  if (view === "work-queue") return WORK_QUEUE_WIDGETS;
   return [];
 }
 

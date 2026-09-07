@@ -7,12 +7,14 @@ interface NoteHeaderProps {
   lastEdited?: string;
   onDiscard: () => void;
   onSave: (createAnother: boolean) => void;
+  saving?: boolean;
 }
 
 export const NoteHeader: React.FC<NoteHeaderProps> = ({
   lastEdited = "Last edited just now",
   onDiscard,
   onSave,
+  saving = false,
 }) => {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-2 border-b border-border gap-4">
@@ -35,9 +37,10 @@ export const NoteHeader: React.FC<NoteHeaderProps> = ({
         <button
           type="button"
           onClick={() => onSave(false)}
-          className="px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors shadow-sm flex items-center space-x-1.5"
+          disabled={saving}
+          className="px-4 py-2 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors shadow-sm flex items-center space-x-1.5 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <span>Save Note</span>
+          <span>{saving ? "Saving…" : "Save Note"}</span>
         </button>
       </div>
     </div>

@@ -37,6 +37,10 @@ const STATUS_DOT: Record<CompanyStatus, string> = {
   Partner: "bg-violet-500",
 };
 
+export function isCrmCompanyId(id: string): boolean {
+  return isUuid(id);
+}
+
 function pickStr(...values: unknown[]): string {
   for (const value of values) {
     if (typeof value === "string" && value.trim()) return value.trim();
@@ -227,8 +231,18 @@ export async function getCrmCompany(
   const data = await companiesGet(`/${id}`);
   const items = normalizeCrmCompanies(data);
   if (items[0]) return items[0];
-  if (data && typeof data === "object" && !Array.isArray(data)) {
-    return normalizeCrmCompany(data as Record<string, unknown>, 0);
+  let raw: unknown = data;
+  for (let i = 0; i < 4; i += 1) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) break;
+    const rec = raw as Record<string, unknown>;
+    if (pickStr(rec.id, rec.uuid, rec.companyId, rec.name, rec.companyName)) {
+      return normalizeCrmCompany(rec, 0);
+    }
+    if (rec.data && rec.data !== raw) {
+      raw = rec.data;
+      continue;
+    }
+    break;
   }
   return null;
 }

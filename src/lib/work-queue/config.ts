@@ -156,8 +156,8 @@ export const USER_TAB_COLORS = [
   "#EC4899",
 ] as const;
 
-/** v2 — adds Pipeline SLA category (Session 18). */
-export const QUEUE_STORAGE_KEY = "finconnex:workqueue:categories:v2";
+/** v3 — drop leftover Mohit/session extra queues; keep Pipeline SLA. */
+export const QUEUE_STORAGE_KEY = "finconnex:workqueue:categories:v3";
 
 export function cloneCategories(
   cats: WorkqueueCategoryDef[] = CATEGORIES_DEFAULT,

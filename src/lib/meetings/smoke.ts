@@ -23,6 +23,7 @@ import {
   rescheduleCrmMeeting,
   setCrmMeetingReminders,
   startCrmMeeting,
+  toCreateMeetingBody,
   updateCrmMeeting,
   workspaceMeetingsPath,
 } from "@/lib/meetings/api";
@@ -122,6 +123,14 @@ export function smokeMeetingsWiring() {
   if (!api.includes("workspaceMeetingsPath")) {
     fail("meetings client missing workspaceMeetingsPath");
   }
+  if (!api.includes("crmBffFetch")) {
+    fail("meetings client must call crmBffFetch in the browser");
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('"meetings"') || !bff.includes('path.includes("meetings")')) {
+    fail("BFF proxy does not allow meetings");
+  }
   if (!api.includes("relatedMeetingsPath")) {
     fail("meetings client missing relatedMeetingsPath");
   }
@@ -167,6 +176,11 @@ export function smokeMeetingsWiring() {
     fail("create meeting form does not call createCrmMeeting");
   }
 
+  const schedule = readSrc("src/app/(dashboard)/activities/meetings/create/page.tsx");
+  if (!schedule.includes("sendRelatedMeetingInvites")) {
+    fail("schedule meeting page does not email related records");
+  }
+
   const detail = readSrc("src/app/(dashboard)/activities/meetings/detail/[id]/page.tsx");
   for (const name of [
     "getCrmMeeting",
@@ -193,6 +207,18 @@ export function smokeMeetingsWiring() {
   );
   if (normalized.title !== "Project kickoff" || normalized.status !== "In Progress") {
     fail("normalizeMeeting did not map Swagger-shaped fields");
+  }
+
+  const created = toCreateMeetingBody({
+    title: "New",
+    type: "Video Call",
+    status: "Scheduled",
+    startDateTime: "2026-07-17T14:00:00.000Z",
+    endDateTime: "2026-07-17T15:00:00.000Z",
+    organizer: "Tejas",
+  });
+  if (created.meetingType !== "VIDEO_CALL") {
+    fail("create meeting body must send Prisma MeetingType VIDEO_CALL");
   }
 }
 

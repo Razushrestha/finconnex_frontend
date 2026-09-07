@@ -15,6 +15,7 @@ const ALLOWED_ROOTS = new Set([
   "smart-short-links",
   "emails",
   "tasks",
+  "meetings",
   "messages",
   "notes",
   "dashboard",
@@ -38,6 +39,7 @@ function isAllowed(path: string[]): boolean {
       path.includes("calls") ||
       path.includes("emails") ||
       path.includes("tasks") ||
+      path.includes("meetings") ||
       path.includes("messages") ||
       path.includes("notes") ||
       path.includes("dashboard") ||

@@ -31,15 +31,26 @@ import { liveRelatedRecords } from "@/lib/activities/related-records";
 import {
   createCrmTask,
   persistRemoteTask,
-  tryCrmTask,
 } from "@/lib/tasks/api";
 import { createTask, deleteTask } from "@/lib/tasks/store";
 import { isUuid } from "@/lib/activity-timeline/auth";
+import { listCrmCompanies, tryCrmCompany } from "@/lib/companies/api";
+import { mergeCrmCompaniesIntoBoard } from "@/lib/companies/store";
+import { listCrmContacts, tryCrmContact } from "@/lib/contacts/api";
+import { mergeCrmContactsIntoBoard } from "@/lib/contacts/store";
+import { listCrmDeals, tryCrmDeal } from "@/lib/deals/api";
+import { mergeCrmDealsIntoBoard } from "@/lib/deals/store";
+import { fetchLeadList } from "@/lib/leads/api";
+import { mapCrmLeadToCard } from "@/lib/leads/api/map";
+import { upsertLeadFromCard } from "@/lib/leads/store";
+import { uploadCrmStorageFile } from "@/lib/storage/api";
+import type { RelatedTo } from "@/lib/activities/shared";
 import {
   assignableOwnerLabel,
   defaultAssignableOwnerId,
   listAssignableOwnersLocal,
   loadAssignableOwners,
+  resolveCrmAssigneeUserId,
   type AssignableOwner,
 } from "@/lib/users/assignable";
 import {
@@ -278,6 +289,7 @@ export function CreateTaskForm({
   const [ownerOptions, setOwnerOptions] = useState<AssignableOwner[]>(() =>
     listAssignableOwnersLocal(),
   );
+  const [extraRelated, setExtraRelated] = useState<RelatedTo[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -293,6 +305,70 @@ export function CreateTaskForm({
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const kind = form.relatedKind;
+    if (!kind) {
+      setExtraRelated([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const rows: RelatedTo[] = [];
+      if (kind === "Company") {
+        const remote = await tryCrmCompany(() =>
+          listCrmCompanies({ limit: 100 }),
+        );
+        if (remote?.length) {
+          mergeCrmCompaniesIntoBoard(remote);
+          for (const item of remote) {
+            rows.push({
+              kind: "Company",
+              name: item.company.name,
+              id: item.company.id,
+            });
+          }
+        }
+      } else if (kind === "Contact") {
+        const remote = await tryCrmContact(() =>
+          listCrmContacts({ limit: 100 }),
+        );
+        if (remote?.length) {
+          mergeCrmContactsIntoBoard(remote);
+          for (const item of remote) {
+            rows.push({
+              kind: "Contact",
+              name: item.contact.name,
+              id: item.contact.id,
+            });
+          }
+        }
+      } else if (kind === "Deal") {
+        const remote = await tryCrmDeal(() => listCrmDeals({ limit: 100 }));
+        if (remote?.length) {
+          mergeCrmDealsIntoBoard(remote);
+          for (const item of remote) {
+            rows.push({ kind: "Deal", name: item.name, id: item.id });
+          }
+        }
+      } else if (kind === "Lead") {
+        try {
+          const remote = await fetchLeadList({ limit: 100 });
+          for (const lead of remote) {
+            const card = mapCrmLeadToCard(lead);
+            upsertLeadFromCard(card);
+            rows.push({ kind: "Lead", name: card.name, id: card.id });
+          }
+        } catch {
+          /* keep local picker */
+        }
+      }
+      if (!cancelled) setExtraRelated(rows);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [form.relatedKind]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -370,12 +446,22 @@ export function CreateTaskForm({
   const minReminderDate = minDueDate;
   const hasDueDate = Boolean(form.dueDate.trim());
 
-  const relatedOptions = liveRelatedRecords(
-    form.relatedKind,
-    form.relatedKind && form.relatedName
-      ? { kind: form.relatedKind as RelatedEntityKind, name: form.relatedName }
-      : undefined,
-  );
+  const relatedOptions = [
+    ...extraRelated,
+    ...liveRelatedRecords(
+      form.relatedKind,
+      form.relatedKind && form.relatedName
+        ? { kind: form.relatedKind as RelatedEntityKind, name: form.relatedName }
+        : undefined,
+    ),
+  ].filter((item, index, list) => {
+    const key = `${item.kind}:${(item.id || item.name).toLowerCase()}`;
+    return (
+      list.findIndex(
+        (row) => `${row.kind}:${(row.id || row.name).toLowerCase()}` === key,
+      ) === index
+    );
+  });
 
   const actor =
     getRulesActor().name ||
@@ -521,14 +607,32 @@ export function CreateTaskForm({
           }
         : undefined;
     const ownerName = ownerDisplay(ownerOptions, form.assignedTo) || form.assignedTo;
+    const assigneeUserId = await resolveCrmAssigneeUserId(form.assignedTo);
+    if (!assigneeUserId) {
+      window.alert(
+        "Could not find a workspace member to assign. Sign in, then pick a Task Owner.",
+      );
+      return;
+    }
     const collaboratorNames = form.collaborators.map((id) =>
       ownerDisplay(ownerOptions, id),
     );
 
+    let attachmentKeys: string[] = [];
     let attachmentsCount = 0;
     if (form.attachments.length > 0) {
-      const adapter = getUploadAdapter();
       for (const file of form.attachments) {
+        try {
+          const stored = await uploadCrmStorageFile(file);
+          if (stored.key) {
+            attachmentKeys.push(stored.key);
+            attachmentsCount += 1;
+            continue;
+          }
+        } catch {
+          /* fall back to local metadata upload */
+        }
+        const adapter = getUploadAdapter();
         const result = await adapter.upload({
           fileName: file.name,
           data: await file.arrayBuffer(),
@@ -542,6 +646,16 @@ export function CreateTaskForm({
         attachmentsCount += 1;
       }
     }
+
+    const repeatPreset = form.taskRepeat.preset;
+    const repeatEvery =
+      repeatOn &&
+      (repeatPreset === "daily" ||
+        repeatPreset === "weekly" ||
+        repeatPreset === "monthly" ||
+        repeatPreset === "yearly")
+        ? (repeatPreset.toUpperCase() as "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY")
+        : undefined;
 
     const draft = {
       title: form.title.trim(),
@@ -562,7 +676,7 @@ export function CreateTaskForm({
               form.dueDate,
             )
           : undefined,
-      assignedTo: form.assignedTo,
+      assignedTo: assigneeUserId,
       relatedTo: related,
       relatedId: related?.id && isUuid(related.id) ? related.id : undefined,
       description: form.description || undefined,
@@ -577,6 +691,8 @@ export function CreateTaskForm({
         repeatOn && form.taskRepeat.preset !== "none"
           ? form.taskRepeat
           : undefined,
+      repeatEvery,
+      attachmentKeys: attachmentKeys.length ? attachmentKeys : undefined,
       attachmentsCount: attachmentsCount || undefined,
       createdBy: actor,
     };
@@ -586,25 +702,37 @@ export function CreateTaskForm({
       collaborators: collaboratorNames.length ? collaboratorNames : undefined,
     });
     let task = local;
-    const remote = await tryCrmTask(() => createCrmTask(draft));
-    if (remote && remote.taskId !== local.taskId) {
+    try {
+      const remote = await createCrmTask(draft);
+      if (remote && remote.taskId !== local.taskId) {
+        deleteTask(local.taskId);
+        persistRemoteTask({
+          ...local,
+          ...remote,
+          assignedTo: ownerName || remote.assignedTo,
+          collaborators: collaboratorNames.length
+            ? collaboratorNames
+            : remote.collaborators,
+          relatedTo: related ?? remote.relatedTo,
+          description: local.description ?? remote.description,
+          notes: local.notes ?? remote.notes,
+          reminders: local.reminders,
+          actionItems: local.actionItems,
+          notifyBy: local.notifyBy,
+          repeatRule: local.repeatRule,
+        });
+        task = remote;
+      } else if (!remote) {
+        deleteTask(local.taskId);
+        window.alert("CRM did not return the new task. Please try again.");
+        return;
+      }
+    } catch (err) {
       deleteTask(local.taskId);
-      persistRemoteTask({
-        ...local,
-        ...remote,
-        assignedTo: ownerName || remote.assignedTo,
-        collaborators: collaboratorNames.length
-          ? collaboratorNames
-          : remote.collaborators,
-        relatedTo: related ?? remote.relatedTo,
-        description: local.description ?? remote.description,
-        notes: local.notes ?? remote.notes,
-        reminders: local.reminders,
-        actionItems: local.actionItems,
-        notifyBy: local.notifyBy,
-        repeatRule: local.repeatRule,
-      });
-      task = remote;
+      window.alert(
+        err instanceof Error ? err.message : "Could not save this task to CRM.",
+      );
+      return;
     }
     logCreate("activities.tasks", ownerName, task.taskId, form.title);
     notifyOwnerAssigned({

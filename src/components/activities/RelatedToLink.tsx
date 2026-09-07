@@ -12,7 +12,7 @@ interface RelatedToLinkProps {
 
 export function RelatedToLink({ relatedTo, className }: RelatedToLinkProps) {
   const label = formatRelatedTo(relatedTo).trim() || "Unrelated";
-  const href = hrefForRelatedTo(label);
+  const href = hrefForRelatedTo(relatedTo);
 
   if (!href) {
     return <span className={cn("truncate", className)}>{label}</span>;

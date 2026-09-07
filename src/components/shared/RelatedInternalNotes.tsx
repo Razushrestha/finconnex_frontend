@@ -190,38 +190,44 @@ export function RelatedInternalNotes({
       notify("Note updated");
       return;
     }
-    const local = createNote({
-      title,
-      body,
-      relatedTo,
-      relatedType: parentType,
-      relatedId: parentId,
-      noteType: "General",
-      createdBy: actor,
-      isPrivate: true,
-    });
     if (parentType && parentId) {
-      const remote = await tryCrmNote(() =>
-        createCrmNote({
-          title,
-          body,
-          relatedTo,
-          relatedType: parentType,
-          relatedId: parentId,
-          noteType: "General",
-          createdBy: actor,
-          isPrivate: true,
-        }),
-      );
-      if (remote && isCrmNoteId(remote.id)) {
-        deleteNote(local.id);
+      try {
+        const remote = persistRemoteNote(
+          await createCrmNote({
+            title,
+            body,
+            relatedTo,
+            relatedType: parentType.toUpperCase(),
+            relatedId: parentId,
+            noteType: "General",
+            createdBy: actor,
+            isPrivate: true,
+          }),
+        );
+        if (!remote || !isCrmNoteId(remote.id)) {
+          throw new Error("CRM did not save the note");
+        }
         persistRemoteNote({
           ...remote,
           relatedTo,
-          relatedType: parentType,
+          relatedType: parentType.toUpperCase(),
           relatedId: parentId,
         });
+      } catch (err) {
+        notify(err instanceof Error ? err.message : "Could not save note");
+        return;
       }
+    } else {
+      createNote({
+        title,
+        body,
+        relatedTo,
+        relatedType: parentType,
+        relatedId: parentId,
+        noteType: "General",
+        createdBy: actor,
+        isPrivate: true,
+      });
     }
     resetForm();
     setRevision((n) => n + 1);

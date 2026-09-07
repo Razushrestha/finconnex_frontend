@@ -1,12 +1,15 @@
 import {
   ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
   isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import { formatRulesAt } from "@/lib/rules/storage";
 import { upsertMeeting } from "@/lib/meetings/store";
+import { meetingRelatedApiFields } from "@/lib/meetings/invite-related";
+import type { RelatedEntityKind } from "@/lib/activities/shared";
 import type {
   Attendee,
   Meeting,
@@ -93,10 +96,10 @@ export function mapMeetingType(raw: string): MeetingType {
 }
 
 function apiMeetingType(type: MeetingType): string {
-  if (type === "Phone Call") return "PHONE";
+  if (type === "Phone Call") return "PHONE_CALL";
   if (type === "Conference") return "CONFERENCE";
   if (type === "In-person") return "IN_PERSON";
-  return "VIDEO";
+  return "VIDEO_CALL";
 }
 
 export function mapMeetingStatus(raw: string): MeetingStatus {
@@ -106,14 +109,6 @@ export function mapMeetingStatus(raw: string): MeetingStatus {
   if (value.includes("cancel")) return "Cancelled";
   if (value.includes("reschedul")) return "Rescheduled";
   return "Scheduled";
-}
-
-function apiMeetingStatus(status: MeetingStatus): string {
-  if (status === "In Progress") return "IN_PROGRESS";
-  if (status === "Completed") return "COMPLETED";
-  if (status === "Cancelled") return "CANCELLED";
-  if (status === "Rescheduled") return "RESCHEDULED";
-  return "SCHEDULED";
 }
 
 function formatWhen(raw: unknown): string {
@@ -130,6 +125,21 @@ export function toMeetingIso(raw: string): string {
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
     const d = new Date(value);
     return Number.isNaN(d.getTime()) ? value : d.toISOString();
+  }
+  const au = value.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4}),?\s+(\d{1,2}):(\d{2})(?:\s*([ap]m))?/i,
+  );
+  if (au) {
+    const day = Number(au[1]);
+    const month = Number(au[2]);
+    const year = Number(au[3]);
+    let hour = Number(au[4]);
+    const minute = Number(au[5]);
+    const mer = au[6]?.toLowerCase();
+    if (mer === "pm" && hour < 12) hour += 12;
+    if (mer === "am" && hour === 12) hour = 0;
+    const d = new Date(year, month - 1, day, hour, minute);
+    if (!Number.isNaN(d.getTime())) return d.toISOString();
   }
   const parsed = Date.parse(value);
   if (!Number.isNaN(parsed)) return new Date(parsed).toISOString();
@@ -208,22 +218,46 @@ async function withSession<T>(
   return run(access, false);
 }
 
+function isMissingCrmRoute(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  return /\(404\)|not found/i.test(message);
+}
+
+async function meetingsCall(
+  suffix: string,
+  query = "",
+  init?: RequestInit,
+): Promise<unknown> {
+  const scoped = await ensureCrmSession();
+  const paths = [
+    ...(scoped?.workspaceId
+      ? [`${workspaceMeetingsPath(scoped.workspaceId, suffix)}${query}`]
+      : []),
+    `${globalMeetingsPath(suffix)}${query}`,
+  ].filter((path, index, all) => all.indexOf(path) === index);
+
+  let lastError: unknown;
+  for (let i = 0; i < paths.length; i += 1) {
+    try {
+      if (isBoundCrmSession()) {
+        return await withSession((session) => crmFetch(session, paths[i], init));
+      }
+      return await crmBffFetch(paths[i], init);
+    } catch (err) {
+      lastError = err;
+      if (i < paths.length - 1 && isMissingCrmRoute(err)) continue;
+      throw err;
+    }
+  }
+  throw lastError;
+}
+
 async function meetingsGet(suffix: string, query = ""): Promise<unknown> {
-  return withSession((session, scoped) => {
-    const path = scoped
-      ? workspaceMeetingsPath((session as CrmSession).workspaceId, suffix)
-      : globalMeetingsPath(suffix);
-    return crmFetch(session, `${path}${query}`);
-  });
+  return meetingsCall(suffix, query);
 }
 
 async function meetingsMutate(suffix: string, init: RequestInit): Promise<unknown> {
-  return withSession((session, scoped) => {
-    const path = scoped
-      ? workspaceMeetingsPath((session as CrmSession).workspaceId, suffix)
-      : globalMeetingsPath(suffix);
-    return crmFetch(session, path, init);
-  });
+  return meetingsCall(suffix, "", init);
 }
 
 function asMeeting(data: unknown): Meeting | null {
@@ -238,17 +272,26 @@ function asMeeting(data: unknown): Meeting | null {
 export async function listCrmMeetings(
   query: CrmMeetingQuery = {},
 ): Promise<Meeting[]> {
-  return normalizeMeetings(
-    await meetingsGet(
-      "",
-      toQuery({
-        page: query.page,
-        limit: query.limit ?? 100,
-        search: query.search,
-        status: query.status,
-      }),
-    ),
-  );
+  const limit = Math.min(100, Math.max(1, query.limit ?? 100));
+  const startPage = query.page != null ? Math.max(1, query.page) : 1;
+  const maxPages = query.page != null ? 1 : 20;
+  const all: Meeting[] = [];
+  for (let i = 0; i < maxPages; i += 1) {
+    const batch = normalizeMeetings(
+      await meetingsGet(
+        "",
+        toQuery({
+          page: startPage + i,
+          limit,
+          search: query.search,
+          status: query.status,
+        }),
+      ),
+    );
+    all.push(...batch);
+    if (batch.length < limit) break;
+  }
+  return all;
 }
 
 export async function listUpcomingCrmMeetings(): Promise<Meeting[]> {
@@ -265,12 +308,11 @@ export async function listRelatedCrmMeetings(
 ): Promise<Meeting[]> {
   const scoped = await ensureCrmSession();
   if (!scoped) throw new Error("Sign in to load related meetings");
-  return normalizeMeetings(
-    await crmFetch(
-      scoped,
-      relatedMeetingsPath(scoped.workspaceId, relatedType, relatedId),
-    ),
-  );
+  const path = relatedMeetingsPath(scoped.workspaceId, relatedType, relatedId);
+  const data = isBoundCrmSession()
+    ? await crmFetch(scoped, path)
+    : await crmBffFetch(path);
+  return normalizeMeetings(data);
 }
 
 export function toCreateMeetingBody(input: {
@@ -281,33 +323,54 @@ export function toCreateMeetingBody(input: {
   endDateTime: string;
   organizer: string;
   relatedTo?: string;
+  relatedKind?: RelatedEntityKind | "";
+  relatedId?: string;
   location?: string;
   meetingLink?: string;
   agenda?: string;
   notes?: string;
+  timezone?: string;
+  externalAttendees?: Array<{ email: string; name?: string }>;
 }): Record<string, unknown> {
   const startAt = toMeetingIso(input.startDateTime);
   const endAt = toMeetingIso(input.endDateTime);
-  return {
+  const httpsLink =
+    input.meetingLink && /^https:\/\//i.test(input.meetingLink.trim())
+      ? input.meetingLink.trim()
+      : undefined;
+  const timezoneMatch = input.timezone?.match(/([A-Za-z]+\/[A-Za-z_]+)/);
+  const related = meetingRelatedApiFields(input.relatedKind, input.relatedId);
+  const body: Record<string, unknown> = {
     title: input.title,
-    subject: input.title,
-    type: apiMeetingType(input.type),
-    meetingType: apiMeetingType(input.type),
-    status: apiMeetingStatus(input.status),
     startAt,
-    startDateTime: startAt,
-    scheduledAt: startAt,
     endAt,
-    endDateTime: endAt,
-    organizerName: input.organizer,
-    organizer: input.organizer,
-    relatedTo: input.relatedTo,
-    location: input.location,
-    meetingLink: input.meetingLink,
-    meetingUrl: input.meetingLink,
-    agenda: input.agenda,
-    notes: input.notes,
+    meetingType: apiMeetingType(input.type),
+    ...related,
   };
+  const location = input.location?.trim() ?? "";
+  if (location && location.length <= 500 && !/^https:\/\//i.test(location)) {
+    body.location = location;
+  }
+  if (httpsLink) body.meetingLink = httpsLink;
+  else {
+    const fromLocation = location.match(/https:\/\/[^\s]+/i)?.[0];
+    if (fromLocation && fromLocation.length <= 2048) body.meetingLink = fromLocation;
+  }
+  const agenda = (input.agenda || input.notes || "").trim();
+  if (agenda) body.agenda = agenda;
+  const timezone = timezoneMatch?.[1];
+  if (timezone) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();
+      body.timezone = timezone;
+    } catch {
+      /* omit invalid IANA labels from the booking dropdown */
+    }
+  }
+  if (input.externalAttendees?.length) {
+    body.externalAttendees = input.externalAttendees;
+  }
+  return body;
 }
 
 export async function createCrmMeeting(
@@ -325,25 +388,18 @@ export async function updateCrmMeeting(
   id: string,
   patch: Partial<Meeting>,
 ): Promise<Meeting | null> {
+  const httpsLink =
+    patch.meetingLink && /^https:\/\//i.test(patch.meetingLink.trim())
+      ? patch.meetingLink.trim()
+      : undefined;
   const body: Record<string, unknown> = {};
   if (patch.title) body.title = patch.title;
-  if (patch.type) body.type = apiMeetingType(patch.type);
-  if (patch.status) body.status = apiMeetingStatus(patch.status);
-  if (patch.startDateTime) {
-    const startAt = toMeetingIso(patch.startDateTime);
-    body.startAt = startAt;
-    body.scheduledAt = startAt;
-  }
+  if (patch.type) body.meetingType = apiMeetingType(patch.type);
+  if (patch.startDateTime) body.startAt = toMeetingIso(patch.startDateTime);
   if (patch.endDateTime) body.endAt = toMeetingIso(patch.endDateTime);
   if (patch.location != null) body.location = patch.location;
-  if (patch.meetingLink != null) {
-    body.meetingLink = patch.meetingLink;
-    body.meetingUrl = patch.meetingLink;
-  }
+  if (httpsLink) body.meetingLink = httpsLink;
   if (patch.agenda != null) body.agenda = patch.agenda;
-  if (patch.notes != null) body.notes = patch.notes;
-  if (patch.organizer) body.organizerName = patch.organizer;
-  if (patch.relatedTo != null) body.relatedTo = patch.relatedTo;
   return asMeeting(
     await meetingsMutate(`/${id}`, {
       method: "PATCH",
@@ -378,10 +434,14 @@ export async function completeCrmMeeting(
   id: string,
   extra: Record<string, unknown> = {},
 ): Promise<Meeting | null> {
+  const outcome =
+    typeof extra.outcome === "string" && extra.outcome.trim()
+      ? extra.outcome.trim()
+      : "Completed";
   return asMeeting(
     await meetingsMutate(`/${id}/complete`, {
       method: "POST",
-      body: JSON.stringify(extra),
+      body: JSON.stringify({ outcome }),
     }),
   );
 }
@@ -398,9 +458,7 @@ export async function rescheduleCrmMeeting(
       method: "POST",
       body: JSON.stringify({
         startAt,
-        scheduledAt: startAt,
-        startDateTime: startAt,
-        ...(endAt ? { endAt, endDateTime: endAt } : {}),
+        ...(endAt ? { endAt } : {}),
       }),
     }),
   );
@@ -431,7 +489,7 @@ export async function replaceCrmMeetingAttendees(
   return asMeeting(
     await meetingsMutate(`/${id}/attendees`, {
       method: "PUT",
-      body: JSON.stringify({ userIds, attendeeIds: userIds }),
+      body: JSON.stringify({ userIds }),
     }),
   );
 }
@@ -440,13 +498,12 @@ export async function setCrmMeetingReminders(
   id: string,
   minutesBefore: number[],
 ): Promise<Meeting | null> {
+  const minutes = minutesBefore.find((value) => value > 0) ?? 15;
+  const reminderAt = new Date(Date.now() + minutes * 60 * 1000).toISOString();
   return asMeeting(
     await meetingsMutate(`/${id}/reminders`, {
       method: "POST",
-      body: JSON.stringify({
-        minutesBefore,
-        reminders: minutesBefore.map((minutes) => ({ minutesBefore: minutes })),
-      }),
+      body: JSON.stringify({ reminderAt }),
     }),
   );
 }

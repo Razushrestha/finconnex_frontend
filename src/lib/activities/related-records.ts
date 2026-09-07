@@ -1,21 +1,42 @@
+import { isUuid } from "@/lib/activity-timeline/auth";
 import {
   RELATED_RECORD_OPTIONS,
   type RelatedEntityKind,
   type RelatedTo,
 } from "@/lib/activities/shared";
-import { listCompanyGroups } from "@/lib/companies/store";
-import { listAllContacts } from "@/lib/contacts/store";
-import { listAllDeals } from "@/lib/deals/store";
-import { listLeadColumns } from "@/lib/leads/store";
+import { listCrmCompanies, tryCrmCompany } from "@/lib/companies/api";
+import { listCompanyGroups, mergeCrmCompaniesIntoBoard } from "@/lib/companies/store";
+import { listCrmContacts, tryCrmContact } from "@/lib/contacts/api";
+import { listAllContacts, mergeCrmContactsIntoBoard } from "@/lib/contacts/store";
+import { listCrmDeals, tryCrmDeal } from "@/lib/deals/api";
+import { listAllDeals, mergeCrmDealsIntoBoard } from "@/lib/deals/store";
+import { fetchLeadList } from "@/lib/leads/api";
+import { mapCrmLeadToCard } from "@/lib/leads/api/map";
+import { listLeadColumns, upsertLeadFromCard } from "@/lib/leads/store";
 
 function keyOf(item: RelatedTo) {
-  return `${item.kind}:${item.name.trim().toLowerCase()}`;
+  return `${item.kind}:${(item.id || item.name).trim().toLowerCase()}`;
 }
 
-/** Live CRM records plus seed samples, for Related Entity / Related Record pickers. */
+function dedupe(rows: RelatedTo[]): RelatedTo[] {
+  const seen = new Set<string>();
+  const unique: RelatedTo[] = [];
+  for (const item of rows) {
+    const name = item.name.trim();
+    if (!name) continue;
+    const key = keyOf({ kind: item.kind, name, id: item.id });
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push({ kind: item.kind, name, id: item.id });
+  }
+  return unique;
+}
+
+/** Local board records for Related Entity / Related Record pickers. */
 export function liveRelatedRecords(
   kind?: RelatedEntityKind | "",
   extra?: RelatedTo,
+  opts?: { includeSamples?: boolean },
 ): RelatedTo[] {
   const rows: RelatedTo[] = [];
   const want = (next: RelatedEntityKind) => !kind || kind === next;
@@ -45,22 +66,87 @@ export function liveRelatedRecords(
     }
   }
 
-  for (const item of RELATED_RECORD_OPTIONS) {
-    if (want(item.kind)) rows.push(item);
+  if (opts?.includeSamples) {
+    for (const item of RELATED_RECORD_OPTIONS) {
+      if (want(item.kind)) rows.push(item);
+    }
   }
   if (extra && extra.name.trim() && want(extra.kind)) {
     rows.unshift(extra);
   }
 
-  const seen = new Set<string>();
-  const unique: RelatedTo[] = [];
-  for (const item of rows) {
-    const name = item.name.trim();
-    if (!name) continue;
-    const key = keyOf({ kind: item.kind, name });
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push({ kind: item.kind, name, id: item.id });
+  return dedupe(rows);
+}
+
+/** Load Lead / Contact / Company / Deal rows from CRM for related-record pickers. */
+export async function fetchCrmRelatedRecords(
+  kind: RelatedEntityKind,
+): Promise<RelatedTo[]> {
+  if (kind === "Company") {
+    const remote = await tryCrmCompany(() => listCrmCompanies({ limit: 100 }));
+    if (!remote?.length) return [];
+    mergeCrmCompaniesIntoBoard(remote);
+    return remote
+      .filter((item) => isUuid(item.company.id) && item.company.name.trim())
+      .map((item) => ({
+        kind: "Company" as const,
+        name: item.company.name,
+        id: item.company.id,
+      }));
   }
-  return unique;
+
+  if (kind === "Contact") {
+    const remote = await tryCrmContact(() => listCrmContacts({ limit: 100 }));
+    if (!remote?.length) return [];
+    mergeCrmContactsIntoBoard(remote);
+    return remote
+      .filter((item) => isUuid(item.contact.id) && item.contact.name.trim())
+      .map((item) => ({
+        kind: "Contact" as const,
+        name: item.contact.name,
+        id: item.contact.id,
+      }));
+  }
+
+  if (kind === "Deal") {
+    const remote = await tryCrmDeal(() => listCrmDeals({ limit: 100 }));
+    if (!remote?.length) return [];
+    mergeCrmDealsIntoBoard(remote);
+    return remote
+      .filter((item) => isUuid(item.id) && item.name.trim())
+      .map((item) => ({
+        kind: "Deal" as const,
+        name: item.name,
+        id: item.id,
+      }));
+  }
+
+  try {
+    const remote = await fetchLeadList({ limit: 100 });
+    const rows: RelatedTo[] = [];
+    for (const lead of remote) {
+      const card = mapCrmLeadToCard(lead);
+      if (!isUuid(card.id) || !card.name.trim()) continue;
+      upsertLeadFromCard(card);
+      rows.push({ kind: "Lead", name: card.name, id: card.id });
+    }
+    return rows;
+  } catch {
+    return [];
+  }
+}
+
+export function mergeRelatedRecordOptions(
+  remote: RelatedTo[],
+  kind?: RelatedEntityKind | "",
+  extra?: RelatedTo,
+): RelatedTo[] {
+  const local = liveRelatedRecords(kind, extra).filter(
+    (row) => !row.id || isUuid(row.id),
+  );
+  const preferred = remote.length ? remote : local;
+  return dedupe([
+    ...(extra && extra.name.trim() ? [extra] : []),
+    ...preferred,
+  ]);
 }

@@ -2,7 +2,6 @@ export const DASHBOARD_VIEWS = [
   { id: "executive", label: "Executive Overview" },
   { id: "sales", label: "Sales Dashboard" },
   { id: "performance", label: "Performance Dashboard" },
-  { id: "work-queue", label: "Work Queue Dashboard" },
 ] as const;
 
 export type DashboardViewId = (typeof DASHBOARD_VIEWS)[number]["id"];

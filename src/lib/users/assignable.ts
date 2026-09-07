@@ -1,4 +1,4 @@
-import { isUuid } from "@/lib/activity-timeline/auth";
+import { decodeJwtPayload, ensureCrmSession, isUuid } from "@/lib/activity-timeline/auth";
 import { listCrmUsers } from "@/lib/settings/users-store";
 import { listCrmWorkspaceMembers } from "@/lib/workspace-members/api";
 import {
@@ -96,8 +96,12 @@ export async function loadAssignableOwners(): Promise<AssignableOwner[]> {
       .filter((member) => member.status !== "Inactive")
       .map(toOwner);
     const merged = mergeOwners([...live, ...local]);
+    const uuidOwners = merged.filter((row) => isUuid(row.id));
+    if (uuidOwners.length) return uuidOwners;
     return merged.length ? merged : fallbackOwners();
   } catch {
+    const uuidLocal = local.filter((row) => isUuid(row.id));
+    if (uuidLocal.length) return uuidLocal;
     return local.length ? local : fallbackOwners();
   }
 }
@@ -106,20 +110,67 @@ export function defaultAssignableOwnerId(
   options: AssignableOwner[],
   currentId?: string,
 ): string {
-  if (currentId && options.some((row) => row.id === currentId)) {
+  const uuidOptions = options.filter((row) => isUuid(row.id));
+  const pool = uuidOptions.length ? uuidOptions : options;
+  if (currentId && isUuid(currentId) && pool.some((row) => row.id === currentId)) {
     return currentId;
   }
   const actor = getRulesActor();
   const email = actor.email?.trim().toLowerCase();
   const name = actor.name.trim().toLowerCase();
+  const actorId = actor.id && isUuid(actor.id) ? actor.id : "";
   const match =
+    (actorId ? pool.find((row) => row.id === actorId) : undefined) ??
     (email
-      ? options.find((row) => row.email.trim().toLowerCase() === email)
+      ? pool.find((row) => row.email.trim().toLowerCase() === email)
       : undefined) ??
-    options.find((row) => row.name.trim().toLowerCase() === name) ??
-    options.find((row) => row.id === currentId) ??
-    options[0];
-  return match?.id ?? currentId ?? "";
+    pool.find((row) => row.name.trim().toLowerCase() === name) ??
+    pool[0];
+  return match?.id ?? "";
+}
+
+function currentSessionUserId(accessToken: string): string | undefined {
+  const payload = decodeJwtPayload(accessToken);
+  const id = payload?.sub ?? payload?.userId ?? payload?.id;
+  return typeof id === "string" && isUuid(id) ? id : undefined;
+}
+
+/** Map a picker name / id to a CRM user UUID for assigneeIds. */
+export async function resolveCrmAssigneeUserId(
+  preferred?: string,
+): Promise<string | undefined> {
+  if (preferred && isUuid(preferred)) return preferred;
+  const session = await ensureCrmSession();
+  const jwt = session ? currentSessionUserId(session.accessToken) : undefined;
+  const hint = preferred?.trim().toLowerCase();
+  const actor = getRulesActor();
+  try {
+    const members = await listRemoteMembers();
+    const match =
+      members.find((m) => m.userId === jwt || m.id === jwt) ??
+      (hint
+        ? members.find(
+            (m) =>
+              m.name.trim().toLowerCase() === hint ||
+              m.email.trim().toLowerCase() === hint ||
+              m.userId.toLowerCase() === hint,
+          )
+        : undefined) ??
+      (actor.email
+        ? members.find(
+            (m) => m.email.trim().toLowerCase() === actor.email?.trim().toLowerCase(),
+          )
+        : undefined) ??
+      members.find(
+        (m) => m.name.trim().toLowerCase() === actor.name.trim().toLowerCase(),
+      ) ??
+      members.find((m) => isUuid(m.userId));
+    if (match && isUuid(match.userId)) return match.userId;
+    if (match && isUuid(match.id)) return match.id;
+  } catch {
+    /* directory optional */
+  }
+  return jwt;
 }
 
 export function assignableOwnerLabel(row: AssignableOwner): string {

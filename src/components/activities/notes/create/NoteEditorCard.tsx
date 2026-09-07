@@ -1,13 +1,14 @@
 "use client";
 
 import { MentionTextarea } from "@/components/shared/MentionTextarea";
+import RelatedRecordCombobox from "@/components/activities/tasks/RelatedRecordComboBox";
 import { NOTE_TYPES, type NoteType } from "@/lib/notes/types";
 import {
   RELATED_ENTITY_KINDS,
-  RELATED_RECORD_OPTIONS,
   ACTIVITY_OWNERS,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
+import { useCrmRelatedRecords } from "@/lib/activities/use-crm-related-records";
 import { Lock } from "lucide-react";
 
 interface NoteEditorCardProps {
@@ -17,6 +18,7 @@ interface NoteEditorCardProps {
   onRelatedKindChange: (val: RelatedEntityKind | "") => void;
   relatedName: string;
   onRelatedNameChange: (val: string) => void;
+  onRelatedIdChange?: (id: string) => void;
   noteType: NoteType | "";
   onNoteTypeChange: (type: NoteType) => void;
   createdBy: string;
@@ -38,6 +40,7 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
   onRelatedKindChange,
   relatedName,
   onRelatedNameChange,
+  onRelatedIdChange,
   noteType,
   onNoteTypeChange,
   createdBy,
@@ -51,13 +54,17 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
   submitted,
   errors,
 }) => {
-  const relatedOptions = relatedKind
-    ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === relatedKind)
-    : RELATED_RECORD_OPTIONS;
+  const extra =
+    relatedKind && relatedName
+      ? { kind: relatedKind, name: relatedName }
+      : undefined;
+  const { options: relatedOptions, loading } = useCrmRelatedRecords(
+    relatedKind,
+    extra,
+  );
 
   return (
     <div className="bg-white text-card-foreground rounded-xl border border-border shadow-sm overflow-hidden flex flex-col">
-      {/* Top Meta & Title Section */}
       <div className="p-5 border-b border-border space-y-4">
         <input
           type="text"
@@ -68,7 +75,6 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
         />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-          {/* Related Entity Kind */}
           <div>
             <label className="block text-[11px] font-medium text-muted-foreground mb-1">
               Related Entity
@@ -78,6 +84,7 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
               onChange={(e) => {
                 onRelatedKindChange(e.target.value as RelatedEntityKind | "");
                 onRelatedNameChange("");
+                onRelatedIdChange?.("");
               }}
               className="w-full bg-input/50 hover:bg-input px-3 py-2 rounded-lg border border-border text-foreground focus:outline-none cursor-pointer"
             >
@@ -96,42 +103,31 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
             </select>
           </div>
 
-          {/* Related To Record */}
           <div>
             <label className="block text-[11px] font-medium text-muted-foreground mb-1">
               Related Record <span className="text-destructive">*</span>
             </label>
-            <select
+            <RelatedRecordCombobox
               value={relatedName}
-              onChange={(e) => onRelatedNameChange(e.target.value)}
+              onChange={onRelatedNameChange}
+              onSelectOption={(option) => onRelatedIdChange?.(option?.id ?? "")}
+              options={relatedOptions}
               disabled={!relatedKind}
-              className={`w-full bg-input/50 hover:bg-input px-3 py-2 rounded-lg border text-foreground focus:outline-none cursor-pointer ${
-                submitted && errors.relatedName
-                  ? "border-destructive bg-destructive/10"
-                  : "border-border"
-              }`}
-            >
-              <option value="" className="bg-popover text-popover-foreground">
-                Select record
-              </option>
-              {relatedOptions.map((r) => (
-                <option
-                  key={`${r.kind}-${r.name}`}
-                  value={r.name}
-                  className="bg-popover text-popover-foreground"
-                >
-                  {r.name}
-                </option>
-              ))}
-            </select>
-            {submitted && errors.relatedName && (
+              placeholder={
+                loading
+                  ? "Loading CRM records…"
+                  : relatedKind
+                    ? "Search record…"
+                    : "Select related entity first"
+              }
+            />
+            {submitted && errors.relatedName ? (
               <span className="text-[10px] text-destructive mt-0.5 block">
                 {errors.relatedName}
               </span>
-            )}
+            ) : null}
           </div>
 
-          {/* Note Type Selector */}
           <div>
             <label className="block text-[11px] font-medium text-muted-foreground mb-1">
               Note Type
@@ -153,7 +149,6 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
             </select>
           </div>
 
-          {/* Created By Owner */}
           <div>
             <label className="block text-[11px] font-medium text-muted-foreground mb-1">
               Created By
@@ -176,7 +171,6 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
           </div>
         </div>
 
-        {/* Private Toggle Checkbox */}
         <div className="pt-1">
           <label className="inline-flex items-center gap-2.5 cursor-pointer">
             <input
@@ -193,7 +187,6 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
         </div>
       </div>
 
-      {/* Formatting Toolbar */}
       <div className="bg-muted/50 px-5 py-2.5 border-b border-border flex items-center justify-between text-muted-foreground text-sm">
         <div className="flex items-center space-x-1">
           <button
@@ -243,7 +236,6 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
         </button>
       </div>
 
-      {/* Main Body Textarea */}
       <div className="p-5 space-y-1">
         <label className="block text-[11px] font-medium text-muted-foreground">
           Body <span className="text-destructive">*</span>
@@ -257,11 +249,11 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
             submitted && errors.body ? "border-destructive" : ""
           }`}
         />
-        {submitted && errors.body && (
+        {submitted && errors.body ? (
           <span className="text-[10px] text-destructive block">
             {errors.body}
           </span>
-        )}
+        ) : null}
       </div>
     </div>
   );

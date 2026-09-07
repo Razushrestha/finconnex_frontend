@@ -47,7 +47,6 @@ import {
 } from "@/lib/dashboard/view-widgets";
 import { SalesDashboardView } from "@/components/dashboard/SalesDashboardView";
 import { PerformanceDashboardView } from "@/components/dashboard/PerformanceDashboardView";
-import { WorkQueueDashboardView } from "@/components/dashboard/WorkQueueDashboardView";
 import {
   DASHBOARD_ROLES,
   listRoleLayouts,
@@ -120,6 +119,10 @@ export function DashboardWorkspace() {
   const { loading, executive, source } = useCrmDashboardStats(layout.filters);
 
   useEffect(() => {
+    if (searchParams.get("view") === "work-queue") {
+      router.replace("/work-queue");
+      return;
+    }
     const stored = loadDashboardLayout();
     const next =
       stored.filters.owner === "All"
@@ -516,12 +519,6 @@ export function DashboardWorkspace() {
         ) : null}
         {view === "performance" ? (
           <PerformanceDashboardView
-            filters={layout.filters}
-            {...reorderProps}
-          />
-        ) : null}
-        {view === "work-queue" ? (
-          <WorkQueueDashboardView
             filters={layout.filters}
             {...reorderProps}
           />

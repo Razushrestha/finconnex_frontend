@@ -71,7 +71,7 @@ const childNavClass = (active: boolean) =>
 
 const dashboardItems: NavItem[] = [
   { label: "Dashboard", href: "/", icon: Package },
-  { label: "Work Queue", href: "/?view=work-queue", icon: Rows4 },
+  { label: "Work Queue", href: "/work-queue", icon: Rows4 },
   {
     label: "Sales",
     icon: BadgePercent,

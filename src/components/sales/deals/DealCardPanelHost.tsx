@@ -9,6 +9,12 @@ import { getUploadAdapter } from "@/lib/attachments/upload";
 import { createCall } from "@/lib/calls/store";
 import { createMeeting } from "@/lib/meetings/store";
 import { createNote } from "@/lib/notes/store";
+import {
+  createCrmNote,
+  isCrmNoteId,
+  persistRemoteNote,
+} from "@/lib/notes/api";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { createTask } from "@/lib/tasks/store";
 import { findDealById } from "@/lib/deals/store";
 import { findContactByName } from "@/lib/contacts/store";
@@ -357,14 +363,37 @@ async function persistQuickAction(
       });
       break;
     }
-    case "note":
+    case "note": {
+      if (isUuid(panel.dealId)) {
+        const remote = persistRemoteNote(
+          await createCrmNote({
+            title: body.slice(0, 60) || "Note",
+            body,
+            relatedTo,
+            relatedType: "DEAL",
+            relatedId: panel.dealId,
+            noteType: "General",
+            createdBy: owner,
+          }),
+        );
+        if (!remote || !isCrmNoteId(remote.id)) {
+          throw new Error("CRM did not save the note");
+        }
+      } else {
+        createNote({
+          title: body.slice(0, 60) || "Note",
+          body,
+          relatedTo,
+          noteType: "General",
+          createdBy: owner,
+        });
+      }
+      break;
+    }
     case "sms":
     default: {
       createNote({
-        title:
-          panel.kind === "note"
-            ? body.slice(0, 60) || "Note"
-            : `${PANEL_TITLES[panel.kind]} · ${panel.dealName}`,
+        title: `${PANEL_TITLES[panel.kind]} · ${panel.dealName}`,
         body,
         relatedTo,
         noteType: "General",
