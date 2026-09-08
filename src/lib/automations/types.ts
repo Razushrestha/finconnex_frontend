@@ -100,6 +100,27 @@ export const AUTOMATION_ACTION_TYPES = [
   "LINK_RECORD",
   "CANCEL_REMINDERS",
   "WEBHOOK",
+  "CREATE_LEAD",
+  "DELETE_LEAD",
+  "CREATE_CONTACT",
+  "DELETE_CONTACT",
+  "CREATE_COMPANY",
+  "DELETE_COMPANY",
+  "CREATE_DEAL",
+  "DELETE_DEAL",
+  "ADD_FOLLOWER",
+  "REMOVE_FOLLOWER",
+  "ROUND_ROBIN_ASSIGN",
+  "ASSOCIATE_CONTACT",
+  "REMOVE_ASSOCIATION",
+  "SCHEDULE_CALL",
+  "CREATE_MEETING",
+  "SEND_SMS",
+  "SEND_WHATSAPP",
+  "REQUEST_DOCUMENTS",
+  "UPDATE_DOCUMENT_STATUS",
+  "SEND_DOCUMENT_REMINDER",
+  "END_AUTOMATION",
 ] as const;
 export type AutomationActionType = (typeof AUTOMATION_ACTION_TYPES)[number];
 
@@ -228,58 +249,58 @@ export const ACTION_CATALOG: Record<
   SEND_NOTIFICATION: { label: "Send Internal Notification", category: "Communication", icon: "bell" },
   TRIGGER_AUTOMATION: { label: "Trigger Another Automation", category: "Flow Control", icon: "workflow" },
   WEBHOOK: { label: "Send Webhook", category: "Integrations", icon: "webhook" },
+  CREATE_LEAD: { label: "Create Lead", category: "Records", icon: "user-plus" },
+  DELETE_LEAD: { label: "Delete Lead", category: "Records", icon: "user-minus" },
+  CREATE_CONTACT: { label: "Create Contact", category: "Records", icon: "user-plus" },
+  DELETE_CONTACT: { label: "Delete Contact", category: "Records", icon: "user-minus" },
+  CREATE_COMPANY: { label: "Create Organization", category: "Records", icon: "building" },
+  DELETE_COMPANY: { label: "Delete Organization", category: "Records", icon: "building" },
+  CREATE_DEAL: { label: "Create Deal", category: "Records", icon: "circle-dollar-sign" },
+  DELETE_DEAL: { label: "Delete Deal", category: "Records", icon: "circle-dollar-sign" },
+  ADD_FOLLOWER: { label: "Add Follower", category: "Relationships & Assignment", icon: "user-plus" },
+  REMOVE_FOLLOWER: { label: "Remove Follower", category: "Relationships & Assignment", icon: "user-minus" },
+  ROUND_ROBIN_ASSIGN: { label: "Round Robin Assignment", category: "Relationships & Assignment", icon: "shuffle" },
+  ASSOCIATE_CONTACT: { label: "Associate Organization", category: "Relationships & Assignment", icon: "link" },
+  REMOVE_ASSOCIATION: { label: "Remove Association", category: "Relationships & Assignment", icon: "unlink" },
+  SCHEDULE_CALL: { label: "Schedule Call", category: "Tasks", icon: "phone" },
+  CREATE_MEETING: { label: "Create Meeting", category: "Tasks", icon: "calendar-plus" },
+  SEND_SMS: { label: "Send SMS", category: "Communication", icon: "message-square" },
+  SEND_WHATSAPP: { label: "Send WhatsApp", category: "Communication", icon: "message-circle" },
+  REQUEST_DOCUMENTS: { label: "Request Documents", category: "Documents", icon: "file-plus" },
+  UPDATE_DOCUMENT_STATUS: { label: "Update Document Status", category: "Documents", icon: "file-check" },
+  SEND_DOCUMENT_REMINDER: { label: "Send Document Reminder", category: "Documents", icon: "file-clock" },
+  END_AUTOMATION: { label: "End Automation", category: "Flow Control", icon: "circle-stop" },
 };
 
 /**
- * Actions from the CRM's full 48-action taxonomy that aren't wired to a real
- * executor yet — each needs either a schema field that doesn't exist (e.g.
- * Document has no status field to update), a real third-party integration
- * (Instagram/Messenger), or engine-level support (Wait Until Condition, End
- * Automation) beyond a config-only action. Shown disabled in the picker so
- * the full taxonomy stays visible without pretending any of these run today.
+ * Actions from the CRM's full taxonomy that still have no executor.
+ *
+ * Everything else that used to sit here is now wired — see ACTION_CATALOG.
+ * What remains needs one of: a third-party integration the workspace does
+ * not have (Instagram/Messenger), a schema field that does not exist
+ * (team assignment), or engine work beyond a single action step
+ * (condition waits, cross-run cancellation). Shown disabled in the picker
+ * so the full taxonomy stays visible without pretending any of these run.
  */
 export const PLANNED_ACTIONS: { label: string; category: string; note: string }[] = [
   { label: "Wait Until Condition", category: "Flow Control", note: "Needs engine support" },
-  { label: "End Automation", category: "Flow Control", note: "Needs engine support" },
-  { label: "Stop Other Automation", category: "Flow Control", note: "Needs engine support" },
-  { label: "Create Lead", category: "Records", note: "Executor not built yet" },
-  { label: "Delete Lead", category: "Records", note: "Executor not built yet" },
-  { label: "Create Contact", category: "Records", note: "Executor not built yet" },
-  { label: "Delete Contact", category: "Records", note: "Executor not built yet" },
-  { label: "Create Organization", category: "Records", note: "Executor not built yet" },
-  { label: "Delete Organization", category: "Records", note: "Executor not built yet" },
-  { label: "Create Deal", category: "Records", note: "Executor not built yet" },
-  { label: "Delete Deal", category: "Records", note: "Executor not built yet" },
-  { label: "Add Follower", category: "Relationships & Assignment", note: "Executor not built yet" },
-  { label: "Remove Follower", category: "Relationships & Assignment", note: "Executor not built yet" },
+  { label: "Stop Other Automation", category: "Flow Control", note: "Needs cross-run cancellation" },
   { label: "Assign Team", category: "Relationships & Assignment", note: "No team-assignment field yet" },
-  { label: "Round Robin Assignment", category: "Relationships & Assignment", note: "Executor not built yet" },
-  { label: "Associate Contact", category: "Relationships & Assignment", note: "Executor not built yet" },
-  { label: "Remove Association", category: "Relationships & Assignment", note: "Executor not built yet" },
-  { label: "Schedule Call", category: "Tasks", note: "Executor not built yet" },
-  { label: "Create Meeting", category: "Tasks", note: "Executor not built yet" },
-  { label: "Activity Action", category: "Tasks", note: "Executor not built yet" },
-  { label: "Send SMS", category: "Communication", note: "Executor not built yet" },
-  { label: "Send WhatsApp", category: "Communication", note: "Executor not built yet" },
+  { label: "Activity Action", category: "Tasks", note: "No defined behaviour yet" },
   { label: "Send Instagram DM", category: "Communication", note: "Needs Meta app integration" },
   { label: "Send Facebook Messenger", category: "Communication", note: "Needs Meta app integration" },
-  { label: "Send Client Notification", category: "Communication", note: "Executor not built yet" },
-  { label: "Request Documents", category: "Documents", note: "Executor not built yet" },
-  { label: "Update Document Status", category: "Documents", note: "Document has no status field" },
-  { label: "Send Document Reminder", category: "Documents", note: "Executor not built yet" },
-  { label: "API Request", category: "Integrations", note: "Executor not built yet" },
+  { label: "Send Client Notification", category: "Communication", note: "Needs a client portal channel" },
 ];
 
 /**
- * Mirrors IMPLEMENTED_ACTIONS in automation-definition.service.ts — the
- * backend enum has a few action types that were reserved but never wired
- * into the executor. Selecting one always fails validation with
- * `automation.error.actionNotSupported`, so the picker must not offer it.
+ * Mirrors IMPLEMENTED_ACTIONS in automation-definition.service.ts: enum
+ * members the backend declares but never wired into the executor, which
+ * always fail validation with `automation.error.actionNotSupported`. Empty
+ * today — every action in ACTION_CATALOG has an executor. REMOVE_FROM_WORK_QUEUE
+ * is the one unwired backend member, and it is deliberately absent from
+ * AUTOMATION_ACTION_TYPES rather than listed here.
  */
-const NOT_YET_IMPLEMENTED_ACTIONS: AutomationActionType[] = [
-  "LINK_RECORD",
-  "CANCEL_REMINDERS",
-];
+const NOT_YET_IMPLEMENTED_ACTIONS: AutomationActionType[] = [];
 
 export function isActionImplemented(action: AutomationActionType): boolean {
   return !NOT_YET_IMPLEMENTED_ACTIONS.includes(action);
@@ -311,8 +332,34 @@ export function isActionAllowedForEntity(
   if ((["ADD_TAG", "REMOVE_TAG"] as AutomationActionType[]).includes(action)) {
     return entityType === "TASK";
   }
-  return true;
+  const scope = ACTION_ENTITY_SCOPE[action];
+  return scope ? scope.includes(entityType) : true;
 }
+
+const CRM_RECORD_ENTITIES: AutomationEntityType[] = ["LEAD", "CONTACT", "COMPANY", "DEAL"];
+
+/**
+ * Mirrors ACTION_ENTITY_SCOPE in automation-definition.service.ts. An action
+ * missing from this map runs against any trigger entity.
+ */
+const ACTION_ENTITY_SCOPE: Partial<Record<AutomationActionType, AutomationEntityType[]>> = {
+  DELETE_LEAD: ["LEAD"],
+  DELETE_CONTACT: ["CONTACT"],
+  DELETE_COMPANY: ["COMPANY"],
+  DELETE_DEAL: ["DEAL"],
+  ADD_FOLLOWER: ["LEAD"],
+  REMOVE_FOLLOWER: ["LEAD"],
+  ROUND_ROBIN_ASSIGN: CRM_RECORD_ENTITIES,
+  ASSOCIATE_CONTACT: ["LEAD"],
+  REMOVE_ASSOCIATION: ["LEAD"],
+  LINK_RECORD: ["LEAD"],
+  SCHEDULE_CALL: CRM_RECORD_ENTITIES,
+  CREATE_MEETING: CRM_RECORD_ENTITIES,
+  REQUEST_DOCUMENTS: CRM_RECORD_ENTITIES,
+  CANCEL_REMINDERS: [...CRM_RECORD_ENTITIES, "TASK", "CALL", "MEETING"],
+  UPDATE_DOCUMENT_STATUS: ["DOCUMENT_REQUEST"],
+  SEND_DOCUMENT_REMINDER: ["DOCUMENT_REQUEST"],
+};
 
 export const FLOW_CONTROL_CATALOG = {
   WAIT_FOR_DURATION: { label: "Wait", category: "Flow Control", icon: "hourglass" },
@@ -405,8 +452,53 @@ export const AUTOMATION_ACTION_KEYS: Record<
     allowed: ["triggerType", "entityType", "entityId"],
     required: ["triggerType"],
   },
-  LINK_RECORD: { allowed: ["entityType", "entityId"], required: ["entityType", "entityId"] },
+  // LINK_RECORD links the trigger Lead to a Company, the same mutation as
+  // ASSOCIATE_CONTACT — it does not take a free entityType/entityId pair.
+  LINK_RECORD: { allowed: ["companyId"], required: ["companyId"] },
   CANCEL_REMINDERS: { allowed: [], required: [] },
+  CREATE_LEAD: {
+    allowed: ["firstName", "lastName", "email", "phone", "jobTitle", "companyId", "source", "ownerId"],
+    required: ["firstName", "lastName", "email"],
+  },
+  CREATE_CONTACT: {
+    allowed: ["firstName", "lastName", "email", "phone", "jobTitle", "companyId", "ownerId"],
+    required: ["email"],
+  },
+  CREATE_COMPANY: {
+    allowed: ["name", "website", "industry", "ownerId"],
+    required: ["name"],
+  },
+  CREATE_DEAL: {
+    allowed: ["name", "stage", "value", "currency", "companyId", "ownerId", "expectedCloseDate"],
+    required: ["name"],
+  },
+  DELETE_LEAD: { allowed: ["recordId"], required: [] },
+  DELETE_CONTACT: { allowed: ["recordId"], required: [] },
+  DELETE_COMPANY: { allowed: ["recordId"], required: [] },
+  DELETE_DEAL: { allowed: ["recordId"], required: [] },
+  ADD_FOLLOWER: { allowed: ["userId"], required: ["userId"] },
+  REMOVE_FOLLOWER: { allowed: ["userId"], required: ["userId"] },
+  // Neither key is in `required`: the backend accepts either one alone.
+  ROUND_ROBIN_ASSIGN: { allowed: ["memberUserIds", "ruleId"], required: [] },
+  ASSOCIATE_CONTACT: { allowed: ["companyId"], required: ["companyId"] },
+  REMOVE_ASSOCIATION: { allowed: [], required: [] },
+  SCHEDULE_CALL: {
+    allowed: ["subject", "callType", "callAt", "callInMs", "duration", "agenda", "notes", "assignedToId", "participantIds"],
+    required: ["subject"],
+  },
+  CREATE_MEETING: {
+    allowed: ["title", "meetingType", "startAt", "startInMs", "durationMinutes", "location", "meetingLink", "agenda", "notes", "attendeeIds"],
+    required: ["title"],
+  },
+  SEND_SMS: { allowed: ["toPhone", "body"], required: ["toPhone", "body"] },
+  SEND_WHATSAPP: { allowed: ["toPhone", "body"], required: ["toPhone", "body"] },
+  REQUEST_DOCUMENTS: {
+    allowed: ["title", "documentType", "requestedFromId", "dueDate", "dueInMs", "notes"],
+    required: ["title", "documentType", "requestedFromId"],
+  },
+  UPDATE_DOCUMENT_STATUS: { allowed: ["status"], required: ["status"] },
+  SEND_DOCUMENT_REMINDER: { allowed: ["message"], required: [] },
+  END_AUTOMATION: { allowed: ["reason"], required: [] },
 };
 
 export const AUTOMATION_FAILURE_POLICIES = [
