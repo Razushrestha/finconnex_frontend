@@ -23,6 +23,7 @@ import {
   relatedRemindersPath,
   rescheduleCrmReminder,
   snoozeCrmReminder,
+  toCreateReminderBody,
   updateCrmReminder,
   workspaceRemindersPath,
 } from "@/lib/reminders/api";
@@ -97,11 +98,11 @@ const LIVE_ROUTES: Array<{ method: string; path: string }> = [
   },
   {
     method: "GET",
-    path: `/v1/workspaces/${SESSION.workspaceId}/Task/${PARENT_ID}/reminders`,
+    path: relatedRemindersPath(SESSION.workspaceId, "TASK", PARENT_ID),
   },
   {
     method: "POST",
-    path: `/v1/workspaces/${SESSION.workspaceId}/Task/${PARENT_ID}/reminders`,
+    path: relatedRemindersPath(SESSION.workspaceId, "TASK", PARENT_ID),
   },
 ];
 
@@ -184,6 +185,43 @@ export function smokeRemindersWiring() {
   const create = readSrc("src/app/(dashboard)/activities/reminders/create/page.tsx");
   if (!create.includes("createCrmReminder")) {
     fail("create reminder page does not call createCrmReminder");
+  }
+  if (!create.includes("createRelatedCrmReminder")) {
+    fail("create reminder page does not call createRelatedCrmReminder");
+  }
+  if (!create.includes("targetUserId")) {
+    fail("create reminder page must send targetUserId");
+  }
+
+  if (!api.includes("crmBffFetch")) {
+    fail("reminders client must call crmBffFetch in the browser");
+  }
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('"reminders"') || !bff.includes('path.includes("reminders")')) {
+    fail("BFF proxy does not allow reminders");
+  }
+  const payload = toCreateReminderBody({
+    title: "New",
+    dueAt: "2026-09-07T19:52:00.000Z",
+    notes: "ignored extra",
+    relatedTo: "Lead: demo",
+    relatedType: "LEAD",
+    owner: "Alex Sterling",
+    targetUserId: PARENT_ID,
+  });
+  if (payload.title !== "New" || payload.remindAt !== "2026-09-07T19:52:00.000Z") {
+    fail("toCreateReminderBody must send title and remindAt");
+  }
+  if (payload.targetUserId !== PARENT_ID) {
+    fail("toCreateReminderBody must send targetUserId");
+  }
+  if (
+    "relatedTo" in payload ||
+    "notes" in payload ||
+    "dueAt" in payload ||
+    "channel" in payload
+  ) {
+    fail("toCreateReminderBody must not send forbidden extra fields");
   }
 
   const relatedHook = readSrc("src/lib/reminders/use-related-crm-reminders.ts");

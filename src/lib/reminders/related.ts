@@ -4,8 +4,22 @@ import {
   createTaskReminder,
   type TaskReminder,
 } from "@/lib/tasks/types";
+import { listCrmCalls, tryCrm } from "@/lib/calls/api";
+import { listCrmMeetings, tryCrmMeeting } from "@/lib/meetings/api";
+import { listCrmTasks, tryCrmTask } from "@/lib/tasks/api";
 
 export type ReminderParentType = "Task" | "Call" | "Meeting";
+
+export const REMINDER_PARENT_TYPES: ReminderParentType[] = [
+  "Task",
+  "Call",
+  "Meeting",
+];
+
+export type ReminderParentRecord = {
+  id: string;
+  name: string;
+};
 
 export function reminderDueAt(reminder: TaskReminder): string {
   if (reminder.date && reminder.time) {
@@ -14,6 +28,36 @@ export function reminderDueAt(reminder: TaskReminder): string {
     return `${reminder.date}T${reminder.time}:00`;
   }
   return new Date().toISOString();
+}
+
+export async function fetchReminderParentRecords(
+  kind: ReminderParentType,
+): Promise<ReminderParentRecord[]> {
+  if (kind === "Task") {
+    const rows = await tryCrmTask(() => listCrmTasks({ limit: 100 }));
+    return (rows ?? [])
+      .map((task) => ({
+        id: task.taskId,
+        name: task.title,
+      }))
+      .filter((row) => isUuid(row.id) && row.name.trim());
+  }
+  if (kind === "Call") {
+    const rows = await tryCrm(() => listCrmCalls({ limit: 100 }));
+    return (rows ?? [])
+      .map((call) => ({
+        id: call.id,
+        name: call.subject,
+      }))
+      .filter((row) => isUuid(row.id) && row.name.trim());
+  }
+  const rows = await tryCrmMeeting(() => listCrmMeetings({ limit: 100 }));
+  return (rows ?? [])
+    .map((meeting) => ({
+      id: meeting.id,
+      name: meeting.title,
+    }))
+    .filter((row) => isUuid(row.id) && row.name.trim());
 }
 
 export function reminderToTaskReminder(row: Reminder): TaskReminder {

@@ -62,36 +62,16 @@ export const PORTAL_MODULES: PortalModule[] = [
   "Reports",
 ];
 
-export const PORTAL_CLIENTS = [
-  {
-    id: "c1",
-    name: "Greystone Realty",
-    contact: "Priya Mehta",
-    email: "priya@greystone.example",
-  },
-  {
-    id: "c2",
-    name: "Harbour Loans",
-    contact: "Marcus Chen",
-    email: "marcus@harbour.example",
-  },
-  {
-    id: "c3",
-    name: "Northside Mortgage",
-    contact: "Aisha Khan",
-    email: "aisha@northside.example",
-  },
-  {
-    id: "c4",
-    name: "Apex Property Group",
-    contact: "Daniel Rossi",
-    email: "daniel@apex.example",
-  },
-] as const;
+export const PORTAL_CLIENTS: {
+  id: string;
+  name: string;
+  contact: string;
+  email: string;
+}[] = [];
 
 export const PORTAL_OWNERS: readonly string[] = [];
 
-const STORE_KEY = "portals:v1";
+const STORE_KEY = "portals:v2";
 
 export function formatPortalAt(d = new Date()) {
   return d.toLocaleString("en-AU", {

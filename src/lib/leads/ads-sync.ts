@@ -1,5 +1,5 @@
 /**
- * Phase F1 — Meta / LinkedIn / TikTok lead sync (demo fixtures).
+ * Phase F1 — Meta / LinkedIn / TikTok lead sync.
  */
 
 import { createLead, listLeadEmails } from "@/lib/leads/store";
@@ -21,75 +21,10 @@ export type AdsLeadFixture = {
 };
 
 const FIXTURES: Record<AdsPlatform, AdsLeadFixture[]> = {
-  facebook: [
-    {
-      id: "fb-1",
-      firstName: "Priya",
-      lastName: "Nair",
-      email: "priya.nair.fb@example.com",
-      phone: "+61 400 111 201",
-      company: "Nair Homes",
-      campaign: "Meta · Rate Lock Q3",
-    },
-    {
-      id: "fb-2",
-      firstName: "Lucas",
-      lastName: "Nguyen",
-      email: "lucas.nguyen.fb@example.com",
-      phone: "+61 400 111 202",
-      company: "Nguyen Property",
-      campaign: "Meta · First Home Buyer",
-    },
-  ],
-  linkedin: [
-    {
-      id: "li-1",
-      firstName: "Amelia",
-      lastName: "Brooks",
-      email: "amelia.brooks.li@example.com",
-      phone: "+61 400 222 301",
-      company: "Brooks Advisory",
-      campaign: "LinkedIn · Broker Partner",
-    },
-  ],
-  tiktok: [
-    {
-      id: "tt-1",
-      firstName: "Jordan",
-      lastName: "Lee",
-      email: "jordan.lee.tt@example.com",
-      phone: "+61 400 333 401",
-      company: "Lee Living",
-      campaign: "TikTok · Refinance Shorts",
-    },
-    {
-      id: "tt-2",
-      firstName: "Sofia",
-      lastName: "Martinez",
-      email: "sofia.martinez.tt@example.com",
-      company: "Martinez Group",
-      campaign: "TikTok · Refinance Shorts",
-    },
-  ],
-  google: [
-    {
-      id: "ga-1",
-      firstName: "Ethan",
-      lastName: "Walsh",
-      email: "ethan.walsh.ga@example.com",
-      phone: "+61 400 444 501",
-      company: "Walsh Finance",
-      campaign: "Google Ads · Home Loan Search",
-    },
-    {
-      id: "ga-2",
-      firstName: "Mia",
-      lastName: "Patel",
-      email: "mia.patel.ga@example.com",
-      company: "Patel Group",
-      campaign: "Google Ads · Refinance",
-    },
-  ],
+  facebook: [],
+  linkedin: [],
+  tiktok: [],
+  google: [],
 };
 
 export const ADS_PLATFORM_LABEL: Record<AdsPlatform, string> = {
@@ -99,7 +34,6 @@ export const ADS_PLATFORM_LABEL: Record<AdsPlatform, string> = {
   google: "Google Ads",
 };
 
-/** Map ad platforms onto existing LeadSource enum. */
 export function adsPlatformToSource(platform: AdsPlatform): LeadSource {
   if (platform === "facebook") return "Facebook";
   if (platform === "tiktok") return "TikTok";

@@ -51,6 +51,7 @@ import { sendCrmActivityEmail } from "@/lib/emails/compose-send";
 import { emitRulesChange } from "@/lib/rules/storage";
 import { logEdit, notifyDealClosed } from "@/lib/rules";
 import { listDealPipelines } from "@/lib/deals/store";
+import { resolveDealContact } from "@/lib/sales/resolve-contact";
 
 export function DealDetailView({
   deal: initialDeal,
@@ -220,7 +221,20 @@ export function DealDetailView({
                 },
               ]
             : []),
-          { label: "Call", icon: Phone },
+          { label: "Call", icon: Phone, onClick: () => {
+            const linked = resolveDealContact(deal);
+            void import("@/lib/softphone/events").then(({ startCrmRecordCall }) => {
+              const r = startCrmRecordCall({
+                phone: linked.phone,
+                name: linked.name || deal.name,
+                relatedTo: `Deal: ${deal.name}`,
+                relatedType: linked.id ? "CONTACT" : undefined,
+                relatedId: linked.id,
+                contactId: linked.id,
+              });
+              if (!r.ok) notify(r.message);
+            });
+          } },
         ]}
         onEditDetails={() => setIsEditOpen(true)}
         onMoreActions={() => notify("More actions…")}

@@ -1,12 +1,16 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Users, Search, Plus, Check } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import {
   NOTIFICATION_METHODS,
-  NotificationMethod,
-  REMINDER_OWNERS,
-} from "@/lib/reminders/types"; // adjust path as needed
+  type NotificationMethod,
+} from "@/lib/reminders/types";
+import {
+  loadAssignableOwners,
+  type AssignableOwner,
+} from "@/lib/users/assignable";
+import { isUuid } from "@/lib/activity-timeline/auth";
 
 interface Assignee {
   id: string;
@@ -25,8 +29,6 @@ interface ReminderSettingsSidebarProps {
   onAddAssignee: (assignee: Assignee) => void;
 }
 
-const MOCK_TEAM_USERS: Assignee[] = [];
-
 export const ReminderSettingsSidebar: React.FC<
   ReminderSettingsSidebarProps
 > = ({
@@ -42,8 +44,19 @@ export const ReminderSettingsSidebar: React.FC<
 }) => {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [teamUsers, setTeamUsers] = useState<AssignableOwner[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadAssignableOwners().then((rows) => {
+      if (!cancelled) setTeamUsers(rows.filter((row) => isUuid(row.id)));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -59,15 +72,15 @@ export const ReminderSettingsSidebar: React.FC<
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filteredUsers = MOCK_TEAM_USERS.filter(
+  const filteredUsers = teamUsers.filter(
     (user) =>
       !assignees.some((a) => a.id === user.id) &&
-      user.name.toLowerCase().includes(query.toLowerCase()),
+      (user.name.toLowerCase().includes(query.toLowerCase()) ||
+        user.email.toLowerCase().includes(query.toLowerCase())),
   );
 
   return (
     <div className="bg-white text-card-foreground rounded-xl border border-border p-5 shadow-sm space-y-6">
-      {/* Delivery Method */}
       <div className="space-y-3">
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Delivery Method
@@ -109,7 +122,6 @@ export const ReminderSettingsSidebar: React.FC<
         </div>
       </div>
 
-      {/* Frequency */}
       <div className="space-y-1.5">
         <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Frequency
@@ -119,28 +131,13 @@ export const ReminderSettingsSidebar: React.FC<
           onChange={(e) => onFrequencyChange(e.target.value)}
           className="w-full bg-input/50 hover:bg-input border border-border rounded-lg px-3 py-2.5 text-xs text-foreground focus:outline-none cursor-pointer"
         >
-          <option
-            value="Does not repeat"
-            className="bg-popover text-popover-foreground"
-          >
-            Does not repeat
-          </option>
-          <option value="Daily" className="bg-popover text-popover-foreground">
-            Daily
-          </option>
-          <option value="Weekly" className="bg-popover text-popover-foreground">
-            Weekly
-          </option>
-          <option
-            value="Monthly"
-            className="bg-popover text-popover-foreground"
-          >
-            Monthly
-          </option>
+          <option value="Does not repeat">Does not repeat</option>
+          <option value="Daily">Daily</option>
+          <option value="Weekly">Weekly</option>
+          <option value="Monthly">Monthly</option>
         </select>
       </div>
 
-      {/* Lead Time */}
       <div className="space-y-1.5">
         <label className="block text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Lead Time
@@ -150,45 +147,18 @@ export const ReminderSettingsSidebar: React.FC<
           onChange={(e) => onLeadTimeChange(e.target.value)}
           className="w-full bg-input/50 hover:bg-input border border-border rounded-lg px-3 py-2.5 text-xs text-foreground focus:outline-none cursor-pointer"
         >
-          <option
-            value="15 minutes before"
-            className="bg-popover text-popover-foreground"
-          >
-            15 minutes before
-          </option>
-          <option
-            value="30 minutes before"
-            className="bg-popover text-popover-foreground"
-          >
-            30 minutes before
-          </option>
-          <option
-            value="1 hour before"
-            className="bg-popover text-popover-foreground"
-          >
-            1 hour before
-          </option>
-          <option
-            value="1 day before"
-            className="bg-popover text-popover-foreground"
-          >
-            1 day before
-          </option>
+          <option value="15 minutes before">15 minutes before</option>
+          <option value="30 minutes before">30 minutes before</option>
+          <option value="1 hour before">1 hour before</option>
+          <option value="1 day before">1 day before</option>
         </select>
       </div>
 
-      {/* Assign To (Interactive Chips + Search Dropdown) */}
       <div className="space-y-2 relative" ref={containerRef}>
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Assign To
           </label>
-          <button
-            type="button"
-            className="text-[11px] font-semibold text-primary hover:underline"
-          >
-            Add Team
-          </button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 bg-input/50 border border-border rounded-lg p-2 min-h-[44px]">
@@ -238,7 +208,6 @@ export const ReminderSettingsSidebar: React.FC<
           )}
         </div>
 
-        {/* Dropdown list */}
         {isOpen && (
           <div className="absolute left-0 right-0 mt-1 bg-popover text-popover-foreground border border-border rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto">
             {filteredUsers.length > 0 ? (
@@ -246,7 +215,7 @@ export const ReminderSettingsSidebar: React.FC<
                 <div
                   key={user.id}
                   onClick={() => {
-                    onAddAssignee(user);
+                    onAddAssignee({ id: user.id, name: user.name });
                     setQuery("");
                     setIsOpen(false);
                   }}
@@ -259,7 +228,7 @@ export const ReminderSettingsSidebar: React.FC<
               ))
             ) : (
               <div className="px-3 py-2.5 text-xs text-muted-foreground text-center">
-                No users found
+                {teamUsers.length ? "No users found" : "Loading workspace members…"}
               </div>
             )}
           </div>

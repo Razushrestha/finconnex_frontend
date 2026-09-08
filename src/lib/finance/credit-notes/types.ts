@@ -49,7 +49,7 @@ export interface CreditNote {
   audit: FinanceAuditEvent[];
 }
 
-const STORE_KEY = "finance:credit-notes:v1";
+const STORE_KEY = "finance:credit-notes:v2";
 
 function withMoney(
   partial: Omit<CreditNote, "subtotal" | "tax" | "total">,

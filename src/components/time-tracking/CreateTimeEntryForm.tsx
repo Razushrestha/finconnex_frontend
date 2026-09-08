@@ -65,12 +65,13 @@ export function CreateTimeEntryForm({ layoutId: _l, redirect: _r }: Props) {
     if (durationHours <= 0) next.duration = "Duration must be greater than 0";
     if (billable && !(Number(rate) > 0)) next.rate = "Rate is required";
     if (!description.trim()) next.description = "Description is required";
+    if (!related) next.related = "Related record is required";
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
   function onSave(createAnother: boolean) {
-    if (!validate()) return;
+    if (!validate() || !related) return;
     const ids = nextTimeEntryIds();
     const now = formatTimeAt();
     const entry = appendTimeAudit(

@@ -42,7 +42,7 @@ function cloneSeed(): Record<DealPipeline, DealStage[]> {
 }
 
 const board = createBoardStore({
-  key: "sales:deals:pipelines:v1",
+  key: "sales:deals:pipelines:v2",
   seed: cloneSeed,
 });
 

@@ -90,7 +90,9 @@ export async function httpRequest<T>(
 ): Promise<T> {
   const method = opts.method ?? "GET";
   const url = buildUrl(path, opts.query, opts.rawPath);
-  const { ensureCrmSession } = await import("@/lib/activity-timeline/auth");
+  const { ensureCrmSession, refreshCrmSession } = await import(
+    "@/lib/activity-timeline/auth"
+  );
 
   const doFetch = async (accessToken: string | null, signal: AbortSignal) =>
     fetch(url, {
@@ -119,7 +121,7 @@ export async function httpRequest<T>(
     let res = await doFetch(session?.accessToken ?? null, controller.signal);
 
     if (res.status === 401) {
-      const next = await ensureCrmSession();
+      const next = await refreshCrmSession();
       if (next?.accessToken && next.accessToken !== session?.accessToken) {
         res = await doFetch(next.accessToken, controller.signal);
       } else {

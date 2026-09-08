@@ -29,7 +29,7 @@ export interface FinanceJourney {
   updatedAt: string;
 }
 
-const STORE_KEY = "finance:journey:v1";
+const STORE_KEY = "finance:journey:v2";
 
 function readStore(): FinanceJourney[] | null {
   if (typeof window === "undefined") return null;
@@ -46,40 +46,7 @@ function writeStore(list: FinanceJourney[]) {
   sessionStorage.setItem(STORE_KEY, JSON.stringify(list));
 }
 
-const seedJourneys: FinanceJourney[] = [
-  {
-    id: "jny1",
-    token: "jny-greystone-refinance",
-    clientId: "c1",
-    clientName: "Greystone Realty",
-    contactName: "Priya Mehta",
-    contactEmail: "priya@greystone.example",
-    dealName: "Greystone refinance package",
-    estimateId: "est1",
-    quotationId: "quo1",
-    signatureRequestId: "sr2",
-    invoiceId: "inv1",
-    paymentIds: ["pay1"],
-    status: "Paid",
-    createdAt: "14/07/2026",
-    updatedAt: "16/07/2026",
-  },
-  {
-    id: "jny2",
-    token: "jny-harbour-packaging",
-    clientId: "c2",
-    clientName: "Harbour Loans",
-    contactName: "Marcus Chen",
-    contactEmail: "marcus@harbour.example",
-    dealName: "Harbour first-home buyer",
-    quotationId: "quo2",
-    signatureRequestId: "sr-quo2",
-    paymentIds: [],
-    status: "AwaitingSignature",
-    createdAt: "19/07/2026",
-    updatedAt: "19/07/2026",
-  },
-];
+const seedJourneys: FinanceJourney[] = [];
 
 export function listJourneys(): FinanceJourney[] {
   return (

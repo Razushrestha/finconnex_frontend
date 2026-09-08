@@ -69,7 +69,20 @@ export interface Invoice {
   audit: FinanceAuditEvent[];
 }
 
-const STORE_KEY = "finance:invoices:v1";
+const STORE_KEY = "finance:invoices:v2";
+
+function withMoney(
+  partial: Omit<Invoice, "subtotal" | "tax" | "total" | "amountDue"> & {
+    amountPaid: number;
+  },
+): Invoice {
+  const t = totalsFromLines(partial.lineItems);
+  return {
+    ...partial,
+    ...t,
+    amountDue: Math.max(0, t.total - partial.amountPaid),
+  };
+}
 
 export const invoices: Invoice[] = [];
 

@@ -151,7 +151,7 @@ export interface SignatureRequest {
   updatedAt?: string;
 }
 
-const STORE_KEY = "signature:requests:v2";
+const STORE_KEY = "signature:requests:v3";
 const LEGACY_STORE_KEY = "signature:requests";
 
 export const SIGNER_COLORS = [

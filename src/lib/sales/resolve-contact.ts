@@ -36,6 +36,7 @@ export function resolveDealContact(deal: DealRecord): {
   name: string;
   id?: string;
   email: string;
+  phone: string;
 } {
   if (deal.contactId) {
     const found = findContactById(deal.contactId);
@@ -44,15 +45,21 @@ export function resolveDealContact(deal: DealRecord): {
         name: found.contact.name,
         id: found.contact.id,
         email: found.contact.email,
+        phone: found.contact.mobile || found.contact.phone || "",
       };
     }
   }
   if (deal.contact?.trim()) {
     const byName = findContactByName(deal.contact);
     if (byName) {
-      return { name: byName.name, id: byName.id, email: byName.email };
+      return {
+        name: byName.name,
+        id: byName.id,
+        email: byName.email,
+        phone: byName.mobile || byName.phone || "",
+      };
     }
-    return { name: deal.contact.trim(), email: "" };
+    return { name: deal.contact.trim(), email: "", phone: "" };
   }
-  return { name: "", email: "" };
+  return { name: "", email: "", phone: "" };
 }

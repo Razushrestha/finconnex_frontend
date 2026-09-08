@@ -91,7 +91,7 @@ export interface InboxChannelConnection {
   via: string;
 }
 
-const STORE_KEY = "marketing:inbox:v7";
+const STORE_KEY = "marketing:inbox:v8";
 const CONNECTIONS_KEY = "marketing:inbox:connections";
 
 export const inboxChannelConnections: InboxChannelConnection[] = [

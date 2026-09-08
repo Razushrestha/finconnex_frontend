@@ -19,10 +19,11 @@ describe("assigned-to-me scopes", () => {
     });
   });
 
-  it("treats John Smith as the current demo user by default", () => {
-    expect(isCurrentUserIdentity("John Smith")).toBe(true);
-    expect(isAssignedToCurrentUser("Tejas Gokhe")).toBe(false);
-    expect(isCurrentUserIdentity("John Cena")).toBe(false);
+  it("treats the signed-in actor as the current user, not a demo persona", () => {
+    setRulesActor({ name: "Ada Lovelace", role: "Manager" });
+    expect(isCurrentUserIdentity("Ada Lovelace")).toBe(true);
+    expect(isCurrentUserIdentity("Someone Else")).toBe(false);
+    expect(isAssignedToCurrentUser("Someone Else")).toBe(false);
   });
 
   it("matches organizer emails for the signed-in owner", () => {

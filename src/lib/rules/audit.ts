@@ -41,7 +41,7 @@ export interface AuditEvent {
   meta?: Record<string, string>;
 }
 
-const STORE_KEY = "rules:audit:v1";
+const STORE_KEY = "rules:audit:v2";
 const MAX_EVENTS = 500;
 
 function readStore(): AuditEvent[] {

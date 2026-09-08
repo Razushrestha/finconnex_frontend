@@ -88,17 +88,11 @@ export const TICKET_CATEGORIES: TicketCategory[] = [
 
 export const SUPPORT_AGENTS: readonly string[] = [];
 
-export const SUPPORT_REQUESTERS = [
-  "Priya Mehta",
-  "Marcus Chen",
-  "Aisha Khan",
-  "Daniel Rossi",
-  "Olivia Bennett",
-] as const;
+export const SUPPORT_REQUESTERS: string[] = [];
 
-export const SUPPORT_ACCOUNTS: readonly string[] = [];
+export const SUPPORT_ACCOUNTS: string[] = [];
 
-const STORE_KEY = "support:tickets:v1";
+const STORE_KEY = "support:tickets:v2";
 
 export function formatTicketAt(d = new Date()) {
   return d.toLocaleString("en-AU", {

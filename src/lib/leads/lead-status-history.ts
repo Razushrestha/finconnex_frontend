@@ -1,6 +1,6 @@
 /**
  * Lead audit events → timeline candidates.
- * Live mutations log create / edit / status / delete; seeds fill demo history.
+ * Live mutations log create / edit / status / delete.
  */
 
 import {
@@ -24,15 +24,8 @@ const LEAD_SCOPED_MODULES = new Set([
 ]);
 const PIPELINE_STAGES = new Set<string>(MORTGAGE_PIPELINE_STAGES);
 
-/** Demo status history so Last Activity can show “Status changed” without a drag. */
-/**
- * Previously seeded fabricated lead status-change history into the audit
- * log so the timeline looked populated. Real history is written by actual
- * status changes, so this is now a no-op kept for its call sites.
- */
-export function ensureLeadStatusHistorySeeds() {
-  // intentionally empty
-}
+/** Live CRM/audit events only — no demo status history. */
+export function ensureLeadStatusHistorySeeds() {}
 
 function matchesLead(event: AuditEvent, leadName: string): boolean {
   const key = leadName.trim().toLowerCase();

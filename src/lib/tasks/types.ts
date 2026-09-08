@@ -305,14 +305,14 @@ export const taskColumns: TaskColumn[] = [
   {
     id: "not-started",
     title: "Not Started",
-    count: 4,
+    count: 0,
     badgeColorClass: "bg-slate-500 text-white",
     tasks: [],
   },
   {
     id: "in-progress",
     title: "In Progress",
-    count: 2,
+    count: 0,
     badgeColorClass: "bg-blue-500 text-white",
     tasks: [],
   },
@@ -320,7 +320,7 @@ export const taskColumns: TaskColumn[] = [
   {
     id: "waiting",
     title: "Waiting",
-    count: 1,
+    count: 0,
     badgeColorClass: "bg-yellow-500 text-white",
     tasks: [],
   },
@@ -328,14 +328,14 @@ export const taskColumns: TaskColumn[] = [
   {
     id: "review",
     title: "Review",
-    count: 1,
+    count: 0,
     badgeColorClass: "bg-purple-500 text-white",
     tasks: [],
   },
   {
     id: "completed",
     title: "Completed",
-    count: 2,
+    count: 0,
     badgeColorClass: "bg-emerald-500 text-white",
     tasks: [],
   },
@@ -343,7 +343,7 @@ export const taskColumns: TaskColumn[] = [
   {
     id: "cancelled",
     title: "Cancelled",
-    count: 1,
+    count: 0,
     badgeColorClass: "bg-rose-500 text-white",
     tasks: [],
   },

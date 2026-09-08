@@ -1,10 +1,11 @@
 import {
   ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
   isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import {
   type NotificationMethod,
   type Reminder,
@@ -56,7 +57,8 @@ export function relatedRemindersPath(
   parentType: string,
   parentId: string,
 ): string {
-  return `/v1/workspaces/${workspaceId}/${parentType}/${parentId}/reminders`;
+  const kind = parentType.trim().toUpperCase();
+  return `/v1/workspaces/${workspaceId}/${kind}/${parentId}/reminders`;
 }
 
 function extractRecords(data: unknown): Record<string, unknown>[] {
@@ -161,7 +163,7 @@ export function normalizeReminder(
     dateTime: formatWhen(
       raw.dueAt ?? raw.remindAt ?? raw.scheduledAt ?? raw.dateTime ?? raw.when,
     ),
-    type: mapReminderType(pickStr(raw.type, raw.kind, "CUSTOM")),
+    type: mapReminderType(pickStr(raw.reminderType, raw.type, raw.kind, "CUSTOM")),
     status: mapReminderStatus(pickStr(raw.status, raw.state, "PENDING")),
     notificationMethod: mapNotificationMethod(channel),
     owner: pickStr(
@@ -190,36 +192,78 @@ async function withSession<T>(
   return run(access, false);
 }
 
-function remindersUrl(
-  session: CrmSession | Pick<CrmSession, "baseUrl" | "accessToken">,
-  scoped: boolean,
-  suffix: string,
-) {
-  return scoped
-    ? workspaceRemindersPath((session as CrmSession).workspaceId, suffix)
-    : globalRemindersPath(suffix);
+async function remindersPath(suffix: string, query = ""): Promise<string> {
+  const scoped = await ensureCrmSession();
+  if (scoped) {
+    return `${workspaceRemindersPath(scoped.workspaceId, suffix)}${query}`;
+  }
+  return `${globalRemindersPath(suffix)}${query}`;
+}
+
+async function relatedWorkspaceId(): Promise<string | null> {
+  const scoped = await ensureCrmSession();
+  if (scoped?.workspaceId && isUuid(scoped.workspaceId)) return scoped.workspaceId;
+  const env = process.env.NEXT_PUBLIC_WORKSPACE_ID?.trim();
+  return env && isUuid(env) ? env : null;
+}
+
+async function crmRemindersFetch<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  if (isBoundCrmSession()) {
+    const scoped = await ensureCrmSession();
+    if (scoped) return crmFetch<T>(scoped, path, init);
+    const access = await ensureCrmAccess();
+    if (!access) throw new Error("Sign in to manage reminders");
+    return crmFetch<T>(access, path, init);
+  }
+  return crmBffFetch<T>(path, init);
 }
 
 async function remindersGet(suffix: string, query = ""): Promise<unknown> {
-  return withSession((session, scoped) =>
-    crmFetch(session, `${remindersUrl(session, scoped, suffix)}${query}`),
-  );
+  if (!isBoundCrmSession()) {
+    return crmBffFetch(await remindersPath(suffix, query));
+  }
+  return withSession((session, scoped) => {
+    const path = scoped
+      ? workspaceRemindersPath((session as CrmSession).workspaceId, suffix)
+      : globalRemindersPath(suffix);
+    return crmFetch(session, `${path}${query}`);
+  });
 }
 
 async function remindersMutate(
   suffix: string,
   init: RequestInit,
 ): Promise<unknown> {
-  return withSession((session, scoped) =>
-    crmFetch(session, remindersUrl(session, scoped, suffix), init),
-  );
+  if (!isBoundCrmSession()) {
+    return crmBffFetch(await remindersPath(suffix), init);
+  }
+  return withSession((session, scoped) => {
+    const path = scoped
+      ? workspaceRemindersPath((session as CrmSession).workspaceId, suffix)
+      : globalRemindersPath(suffix);
+    return crmFetch(session, path, init);
+  });
+}
+
+function compactBody(input: Record<string, unknown>) {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined || value === null || value === "") continue;
+    out[key] = value;
+  }
+  return out;
 }
 
 function asReminder(data: unknown): Reminder | null {
   const items = normalizeReminders(data);
-  if (items[0]) return items[0];
+  const first = items[0];
+  if (first && isUuid(first.id)) return first;
   if (data && typeof data === "object" && !Array.isArray(data)) {
-    return normalizeReminder(data as Record<string, unknown>, 0);
+    const mapped = normalizeReminder(data as Record<string, unknown>, 0);
+    if (mapped && isUuid(mapped.id)) return mapped;
   }
   return null;
 }
@@ -274,10 +318,21 @@ export async function getCrmReminder(id: string): Promise<Reminder | null> {
   return asReminder(await remindersGet(`/${id}`));
 }
 
+export function reminderDateTimeToIso(date: string, time: string): string {
+  const raw = `${date.trim()}T${time.trim()}`;
+  const parsed = Date.parse(raw);
+  if (!Number.isNaN(parsed)) return new Date(parsed).toISOString();
+  const fallback = Date.parse(`${date.trim()} ${time.trim()}`);
+  if (!Number.isNaN(fallback)) return new Date(fallback).toISOString();
+  throw new Error("Pick a valid reminder date and time");
+}
+
 export function toCreateReminderBody(input: {
   title: string;
   notes?: string;
-  dueAt: string;
+  dueAt?: string;
+  remindAt?: string;
+  targetUserId?: string;
   type?: ReminderType;
   notificationMethod?: NotificationMethod;
   relatedTo?: string;
@@ -285,34 +340,24 @@ export function toCreateReminderBody(input: {
   relatedId?: string;
   owner?: string;
 }): Record<string, unknown> {
-  const channel = (input.notificationMethod ?? "In-app")
-    .toUpperCase()
-    .replace(/[\s-]+/g, "_");
-  const type = (input.type ?? "Custom").toUpperCase().replace(/[\s-]+/g, "_");
-  const relatedId =
-    input.relatedId && isUuid(input.relatedId) ? input.relatedId : undefined;
-  return {
-    title: input.title,
-    subject: input.title,
-    notes: input.notes,
-    description: input.notes,
-    dueAt: input.dueAt,
-    remindAt: input.dueAt,
-    scheduledAt: input.dueAt,
-    type,
-    notificationMethod: channel,
-    channel,
-    channels: [channel],
-    relatedTo: input.relatedTo,
-    relatedType: input.relatedType,
-    relatedId,
-    ownerName: input.owner,
-  };
+  const remindAt = input.remindAt || input.dueAt;
+  return compactBody({
+    title: input.title.trim(),
+    remindAt,
+    targetUserId:
+      input.targetUserId && isUuid(input.targetUserId)
+        ? input.targetUserId
+        : undefined,
+  });
 }
 
 export async function createCrmReminder(
-  body: Record<string, unknown>,
+  input: Parameters<typeof toCreateReminderBody>[0] | Record<string, unknown>,
 ): Promise<Reminder | null> {
+  const body =
+    "remindAt" in input || "dueAt" in input || "title" in input
+      ? toCreateReminderBody(input as Parameters<typeof toCreateReminderBody>[0])
+      : compactBody(input);
   return asReminder(
     await remindersMutate("", {
       method: "POST",
@@ -325,10 +370,23 @@ export async function updateCrmReminder(
   id: string,
   patch: Record<string, unknown>,
 ): Promise<Reminder | null> {
+  const body = compactBody({
+    title: typeof patch.title === "string" ? patch.title : undefined,
+    remindAt:
+      typeof patch.remindAt === "string"
+        ? patch.remindAt
+        : typeof patch.dueAt === "string"
+          ? patch.dueAt
+          : undefined,
+    targetUserId:
+      typeof patch.targetUserId === "string" && isUuid(patch.targetUserId)
+        ? patch.targetUserId
+        : undefined,
+  });
   return asReminder(
     await remindersMutate(`/${id}`, {
       method: "PATCH",
-      body: JSON.stringify(patch),
+      body: JSON.stringify(body),
     }),
   );
 }
@@ -344,11 +402,13 @@ export async function snoozeCrmReminder(
   return asReminder(
     await remindersMutate(`/${id}/snooze`, {
       method: "POST",
-      body: JSON.stringify({
-        until,
-        snoozeUntil: until,
-        minutes: until ? undefined : 60,
-      }),
+      body: JSON.stringify(
+        compactBody({
+          until,
+          snoozeUntil: until,
+          minutes: until ? undefined : 60,
+        }),
+      ),
     }),
   );
 }
@@ -360,7 +420,7 @@ export async function rescheduleCrmReminder(
   return asReminder(
     await remindersMutate(`/${id}/reschedule`, {
       method: "POST",
-      body: JSON.stringify({ dueAt, remindAt: dueAt, scheduledAt: dueAt }),
+      body: JSON.stringify(compactBody({ remindAt: dueAt })),
     }),
   );
 }
@@ -387,12 +447,11 @@ export async function listRelatedCrmReminders(
   parentType: string,
   parentId: string,
 ): Promise<Reminder[]> {
-  const scoped = await ensureCrmSession();
-  if (!scoped) throw new Error("Sign in to load related reminders");
+  const workspaceId = await relatedWorkspaceId();
+  if (!workspaceId) throw new Error("Sign in to load related reminders");
   return normalizeReminders(
-    await crmFetch(
-      scoped,
-      relatedRemindersPath(scoped.workspaceId, parentType, parentId),
+    await crmRemindersFetch(
+      relatedRemindersPath(workspaceId, parentType, parentId),
     ),
   );
 }
@@ -400,14 +459,17 @@ export async function listRelatedCrmReminders(
 export async function createRelatedCrmReminder(
   parentType: string,
   parentId: string,
-  body: Record<string, unknown>,
+  input: Parameters<typeof toCreateReminderBody>[0] | Record<string, unknown>,
 ): Promise<Reminder | null> {
-  const scoped = await ensureCrmSession();
-  if (!scoped) throw new Error("Sign in to create a related reminder");
+  const workspaceId = await relatedWorkspaceId();
+  if (!workspaceId) throw new Error("Sign in to create a related reminder");
+  const body =
+    "title" in input
+      ? toCreateReminderBody(input as Parameters<typeof toCreateReminderBody>[0])
+      : compactBody(input);
   return asReminder(
-    await crmFetch(
-      scoped,
-      relatedRemindersPath(scoped.workspaceId, parentType, parentId),
+    await crmRemindersFetch(
+      relatedRemindersPath(workspaceId, parentType, parentId),
       { method: "POST", body: JSON.stringify(body) },
     ),
   );

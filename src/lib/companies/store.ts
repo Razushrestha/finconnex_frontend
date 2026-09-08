@@ -35,7 +35,7 @@ function emptyBoard(): CompanyGroup[] {
 }
 
 const board = createBoardStore({
-  key: "sales:companies:board:v2",
+  key: "sales:companies:board:v3",
   seed: cloneSeed,
 });
 

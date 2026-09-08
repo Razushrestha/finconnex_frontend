@@ -44,7 +44,7 @@ export type LibraryFolder = (typeof LIBRARY_FOLDERS)[number];
 
 export const libraryDocuments: LibraryDocument[] = [];
 
-const STORE_KEY = "documents:library:v1";
+const STORE_KEY = "documents:library:v2";
 
 function readStore(): LibraryDocument[] | null {
   if (typeof window === "undefined") return null;

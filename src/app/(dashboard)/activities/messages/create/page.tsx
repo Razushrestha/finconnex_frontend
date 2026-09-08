@@ -7,6 +7,7 @@ interface PageProps {
     redirect?: string;
     relatedKind?: string;
     relatedName?: string;
+    relatedId?: string;
     to?: string;
   }>;
 }
@@ -20,6 +21,7 @@ export default async function CreateMessagePage({ searchParams }: PageProps) {
       defaults={{
         relatedKind: asRelatedKind(params.relatedKind),
         relatedName: params.relatedName,
+        relatedId: params.relatedId,
         to: params.to,
       }}
     />

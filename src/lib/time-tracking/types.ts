@@ -79,48 +79,7 @@ export const TIME_STATUSES: TimeEntryStatus[] = [
 
 export const TIME_USERS: readonly string[] = [];
 
-export const RELATED_RECORD_OPTIONS: TimeRelatedTo[] = [
-  {
-    kind: "Matter",
-    name: "Anderson: refinance matter",
-    clientId: "c1",
-  },
-  {
-    kind: "Matter",
-    name: "Harbour: first-home matter",
-    clientId: "c2",
-  },
-  {
-    kind: "Deal",
-    name: "Greystone refinance package",
-    clientId: "c1",
-  },
-  {
-    kind: "Deal",
-    name: "Harbour first-home buyer",
-    clientId: "c2",
-  },
-  {
-    kind: "Ticket",
-    name: "TKT-5001: Portal login issue",
-    clientId: "c1",
-  },
-  {
-    kind: "Ticket",
-    name: "TKT-5003: Document upload failed",
-    clientId: "c3",
-  },
-  {
-    kind: "Project",
-    name: "Q3 broker enablement",
-    clientId: "c4",
-  },
-  {
-    kind: "Project",
-    name: "Agency retainer: Apex",
-    clientId: "c4",
-  },
-];
+export const RELATED_RECORD_OPTIONS: TimeRelatedTo[] = [];
 
 /**
  * Per-user billable rates. Was a demo map keyed by fake names; real rates
@@ -138,7 +97,7 @@ export const TIME_STATUS_STYLE: Record<TimeEntryStatus, string> = {
   Rejected: "bg-rose-100 text-rose-800",
 };
 
-const STORE_KEY = "time-tracking:entries:v1";
+const STORE_KEY = "time-tracking:entries:v2";
 
 export function formatTimeAt(d = new Date()) {
   return d.toLocaleString("en-AU", {
@@ -395,6 +354,9 @@ export function generateInvoiceFromTime(
 
   const client =
     FINANCE_CLIENTS.find((c) => c.id === clientId) ?? FINANCE_CLIENTS[0];
+  if (!client) {
+    return { error: "Add a finance client before invoicing time entries." };
+  }
 
   const lineItems: FinanceLineItem[] = rows.map((e) =>
     newLineItem({

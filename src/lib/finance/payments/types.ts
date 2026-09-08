@@ -49,7 +49,7 @@ export interface Payment {
   audit: FinanceAuditEvent[];
 }
 
-const STORE_KEY = "finance:payments:v1";
+const STORE_KEY = "finance:payments:v2";
 
 export const payments: Payment[] = [];
 

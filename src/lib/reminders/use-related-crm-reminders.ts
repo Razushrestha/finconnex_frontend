@@ -5,9 +5,9 @@ import {
   createRelatedCrmReminder,
   dismissCrmReminder,
   listRelatedCrmReminders,
-  toCreateReminderBody,
   tryCrmReminder,
 } from "@/lib/reminders/api";
+import { resolveCrmAssigneeUserId } from "@/lib/users/assignable";
 import {
   canUseRelatedReminders,
   reminderDueAt,
@@ -63,18 +63,13 @@ export function useRelatedCrmReminders(
 
   async function create(reminder: TaskReminder): Promise<TaskReminder> {
     if (!live) return reminder;
-    const created = await createRelatedCrmReminder(
-      parentType,
-      parentId,
-      toCreateReminderBody({
-        title: reminder.type,
-        dueAt: reminderDueAt(reminder),
-        type: reminder.type,
-        notificationMethod: reminder.notificationMethod,
-        relatedType: parentType,
-        relatedId: parentId,
-      }),
-    );
+    const targetUserId = await resolveCrmAssigneeUserId();
+    const created = await createRelatedCrmReminder(parentType, parentId, {
+      title: reminder.type,
+      dueAt: reminderDueAt(reminder),
+      remindAt: reminderDueAt(reminder),
+      targetUserId,
+    });
     const next = created ? reminderToTaskReminder(created) : reminder;
     setItems((prev) => [...prev, next]);
     return next;

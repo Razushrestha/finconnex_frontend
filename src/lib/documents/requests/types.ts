@@ -185,7 +185,7 @@ const COLUMN_COLORS: Record<DocumentRequestStatus, string> = {
   Expired: "bg-slate-400 text-white",
 };
 
-const STORE_KEY = "documents:requests:v3";
+const STORE_KEY = "documents:requests:v4";
 
 export function buildDocumentRequestColumns(
   list: DocumentRequest[],

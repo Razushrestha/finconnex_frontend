@@ -6,7 +6,7 @@ import {
   type ReminderStatus,
 } from "@/lib/reminders/types";
 
-const STORE_KEY = "activities:reminders:v1";
+const STORE_KEY = "activities:reminders:v2";
 
 const COLUMN_COLORS: Record<ReminderStatus, string> = {
   Pending: "bg-sky-500 text-white",

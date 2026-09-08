@@ -100,6 +100,9 @@ export function BottomBar() {
   const [phoneNumber, setPhoneNumber] = React.useState("");
   const [phoneName, setPhoneName] = React.useState("");
   const [phoneRelatedTo, setPhoneRelatedTo] = React.useState("");
+  const [phoneRelatedType, setPhoneRelatedType] = React.useState("");
+  const [phoneRelatedId, setPhoneRelatedId] = React.useState("");
+  const [phoneContactId, setPhoneContactId] = React.useState("");
   const [phoneAutoStart, setPhoneAutoStart] = React.useState(false);
   const [phonePlacement, setPhonePlacement] = React.useState(0);
   const [voiceOpen, setVoiceOpen] = React.useState(false);
@@ -155,6 +158,9 @@ export function BottomBar() {
       setPhoneNumber(detail.phone?.trim() ?? "");
       setPhoneName(detail.name?.trim() ?? "");
       setPhoneRelatedTo(detail.relatedTo?.trim() ?? "");
+      setPhoneRelatedType(detail.relatedType?.trim() ?? "");
+      setPhoneRelatedId(detail.relatedId?.trim() ?? "");
+      setPhoneContactId(detail.contactId?.trim() ?? "");
       setPhoneAutoStart(Boolean(detail.autoStart && detail.phone?.trim()));
       setPhonePlacement((key) => key + 1);
       setPhoneOpen(true);
@@ -519,6 +525,9 @@ export function BottomBar() {
         presetNumber={phoneNumber}
         presetName={phoneName}
         presetRelatedTo={phoneRelatedTo}
+        presetRelatedType={phoneRelatedType || undefined}
+        presetRelatedId={phoneRelatedId || undefined}
+        presetContactId={phoneContactId || undefined}
         autoStart={phoneAutoStart}
         placementKey={phonePlacement}
       />

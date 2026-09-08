@@ -26,7 +26,7 @@ const COLUMN_COLORS: Record<NoteType, string> = {
 };
 
 const store = createBoardStore({
-  key: "activities:notes:list:v2",
+  key: "activities:notes:list:v3",
   seed: () => [] as Note[],
 });
 

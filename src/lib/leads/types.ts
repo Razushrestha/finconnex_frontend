@@ -205,46 +205,6 @@ export function findLeadCardById(id: string): LeadCardData | undefined {
 }
 
 /** Session 17 — Kanban columns = mortgage pipeline stages (PDF). */
-export const LEAD_COLUMNS: KanbanColumn[] = [
-  {
-    ...emptyStageColumn("New Lead", "$4,50,000"),
-    leadCount: 1,
-    cards: [],
-  },
-  emptyStageColumn("Appointment Booked"),
-  emptyStageColumn("Appointment Missed"),
-  {
-    ...emptyStageColumn("In Conversation", "$11,10,000"),
-    leadCount: 4,
-    cards: [],
-  },
-  emptyStageColumn("Hold"),
-  emptyStageColumn("No Answer"),
-  {
-    ...emptyStageColumn("Waiting on Docs", "$9,80,000"),
-    leadCount: 3,
-    cards: [],
-  },
-  {
-    ...emptyStageColumn("Document Received", "$2,80,000"),
-    leadCount: 1,
-    cards: [],
-  },
-  emptyStageColumn("Findings"),
-  emptyStageColumn("Research & Servicing"),
-  emptyStageColumn("Servicing Completed"),
-  emptyStageColumn("Loan Proposal Presented"),
-  emptyStageColumn("Future Potential Clients"),
-  {
-    ...emptyStageColumn("Closed Won", "$5,70,000"),
-    leadCount: 2,
-    cards: [],
-  },
-  {
-    ...emptyStageColumn("Closed Lost", "$3,70,000"),
-    leadCount: 2,
-    cards: [],
-  },
-];
+export const LEAD_COLUMNS: KanbanColumn[] = MORTGAGE_PIPELINE_STAGES.map((stage) => emptyStageColumn(stage));
 
 export const OWNERS: readonly string[] = [];

@@ -20,7 +20,7 @@ function liveContacts(contacts: ContactCardData[]): ContactCardData[] {
 }
 
 const board = createBoardStore({
-  key: "sales:contacts:board:v5",
+  key: "sales:contacts:board:v6",
   seed: cloneSeed,
 });
 

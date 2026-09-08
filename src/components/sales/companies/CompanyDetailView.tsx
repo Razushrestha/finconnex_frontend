@@ -16,6 +16,7 @@ import {
 } from "@/components/shared/detail/RelatedListCard";
 import type { RelatedListItem } from "@/components/shared/detail/types";
 import { RelatedInternalNotes } from "@/components/shared/RelatedInternalNotes";
+import { RelatedCrmMessages } from "@/components/shared/RelatedCrmMessages";
 import { TimelineFeed } from "@/components/sales/entity-detail";
 import { useParentActivityTimeline } from "@/lib/activity-timeline";
 import {
@@ -31,6 +32,7 @@ import { emitRulesChange } from "@/lib/rules/storage";
 import { softDeleteRecord } from "@/lib/rules";
 import type { CompanyCardData, CompanyStatus } from "@/lib/companies/types";
 import { composeEmailsHref } from "@/lib/emails/href";
+import { composeMessagesHref } from "@/lib/messages/href";
 import { listRelatedCrmEmails, tryCrmEmail } from "@/lib/emails/api";
 import { listRelatedCrmCalls, tryCrm as tryCrmCall } from "@/lib/calls/api";
 import { listCrmTasks, tryCrmTask } from "@/lib/tasks/api";
@@ -47,6 +49,7 @@ const RELATED_LIST_CATALOG: RelatedListItem[] = [
   { id: "attachments", label: "Attachments" },
   { id: "open-activities", label: "Open Activities" },
   { id: "emails", label: "Emails" },
+  { id: "messages", label: "Messages" },
 ];
 
 const DEFAULT_VISIBLE_RELATED_IDS = [
@@ -55,12 +58,14 @@ const DEFAULT_VISIBLE_RELATED_IDS = [
   "attachments",
   "open-activities",
   "emails",
+  "messages",
 ];
 
 const RELATED_LIST_ACTIONS: Record<string, RelatedListAction> = {
   notes: { label: "Add a note", variant: "field" },
   attachments: { label: "Attach", variant: "button" },
   emails: { label: "Send Email", variant: "button" },
+  messages: { label: "New message", variant: "button" },
   "open-activities": { label: "Add", variant: "button" },
   deals: { label: "View deals", variant: "button" },
 };
@@ -337,6 +342,38 @@ export function CompanyDetailView({
       );
     }
 
+    if (item.id === "messages") {
+      return (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="text-[13px] font-semibold text-slate-800">Messages</h3>
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  composeMessagesHref({
+                    relatedKind: "Company",
+                    relatedName: company.name,
+                    relatedId: company.id,
+                  }),
+                )
+              }
+              className="text-[11px] font-semibold text-violet-700 hover:underline"
+            >
+              New message
+            </button>
+          </div>
+          <RelatedCrmMessages
+            relatedTo={relatedLabel ?? ""}
+            relatedType="COMPANY"
+            relatedId={company.id}
+            onNotify={notify}
+            compact
+          />
+        </div>
+      );
+    }
+
     if (item.id === "open-activities") {
       const items = crmEnabled ? openTasks : crmCalls.slice(0, 5);
       return (
@@ -434,7 +471,7 @@ export function CompanyDetailView({
         avatarClassName={company.avatarBgClass}
         name={company.name}
         tags={company.tags ?? []}
-        relatedTo={relatedLabel}
+        relatedTo={relatedLabel ?? ""}
         onTagsChange={(tags) => {
           updateCompany(company.id, { tags });
           setRevision((n) => n + 1);

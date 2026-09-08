@@ -42,6 +42,7 @@ export {
   syncLeadStatus,
   bindCrmLeadSession,
   bindCrmLeadFetch,
+  CrmLeadHttpError,
 } from "@/lib/leads/api/client";
 export { hydrateCrmLeadRelated } from "@/lib/leads/api/hydrate";
 export { CRM_LEAD_ENDPOINTS } from "@/lib/leads/api/catalog";

@@ -63,7 +63,7 @@ export interface Estimate {
   audit: FinanceAuditEvent[];
 }
 
-const STORE_KEY = "finance:estimates:v1";
+const STORE_KEY = "finance:estimates:v2";
 
 const seedLines = (): FinanceLineItem[] => [
   {
@@ -84,6 +84,17 @@ const seedLines = (): FinanceLineItem[] => [
     taxRate: 10,
   },
 ];
+
+function withTotals(
+  partial: Omit<Estimate, "subtotal" | "tax" | "total"> & {
+    subtotal?: number;
+    tax?: number;
+    total?: number;
+  },
+): Estimate {
+  const t = totalsFromLines(partial.lineItems);
+  return { ...partial, ...t };
+}
 
 export const estimates: Estimate[] = [];
 

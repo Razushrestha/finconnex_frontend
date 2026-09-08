@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import {
   applyCrmTokenCookies,
+  crmJwtExpiresInSeconds,
   resolveLiveCrmAuth,
 } from "@/lib/auth/crm-server";
 
@@ -13,6 +14,7 @@ export async function GET() {
     return NextResponse.json({ authenticated: false });
   }
 
+  const expiresIn = crmJwtExpiresInSeconds(live?.accessToken);
   const response = NextResponse.json({
     authenticated: true,
     accessToken: live?.accessToken ?? null,
@@ -20,7 +22,7 @@ export async function GET() {
     tenantId: session?.tenantId ?? null,
     tenantSlug: session?.tenantSlug ?? null,
     workspaceId: session?.tenantId ?? null,
-    expiresIn: null as number | null,
+    expiresIn,
   });
 
   if (live?.accessToken) {

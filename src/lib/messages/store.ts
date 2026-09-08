@@ -10,7 +10,7 @@ import { formatRulesAt, newRulesId } from "@/lib/rules/storage";
 import { emitLeadActivityChange } from "@/lib/leads/lead-extras-store";
 
 const store = createBoardStore({
-  key: "activities:messages:list:v2",
+  key: "activities:messages:list:v3",
   seed: () => [] as Message[],
 });
 

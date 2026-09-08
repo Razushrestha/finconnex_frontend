@@ -151,7 +151,7 @@ export interface Booking {
   rescheduledFrom?: string;
 }
 
-const STORE_KEY = "booking:pages:v2";
+const STORE_KEY = "booking:pages:v3";
 
   WEEKDAYS.map((day) => ({
     day,
@@ -458,7 +458,7 @@ export function getBookingPageById(id: string) {
   return bookingPages.find((p) => p.id === id);
 }
 
-const BOOKINGS_STORE_KEY = "booking:appointments:v1";
+const BOOKINGS_STORE_KEY = "booking:appointments:v2";
 
 function readBookingsStore(): Booking[] | null {
   if (typeof window === "undefined") return null;

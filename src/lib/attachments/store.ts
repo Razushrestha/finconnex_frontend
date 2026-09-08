@@ -15,7 +15,7 @@ function cloneSeed(): Attachment[] {
 }
 
 const store = createBoardStore({
-  key: "activities:attachments:list:v1",
+  key: "activities:attachments:list:v2",
   seed: cloneSeed,
 });
 

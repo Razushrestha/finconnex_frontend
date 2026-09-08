@@ -12,6 +12,7 @@
 import { createDeal, saveDealPipelines } from "@/lib/deals/store";
 import { DEAL_PIPELINE_STAGES } from "@/lib/deals/types";
 import { createLead, listLeadColumns, saveLeadColumns } from "@/lib/leads/store";
+import { createCrmUser, listCrmUsers } from "@/lib/settings/users-store";
 import { LEAD_COLUMNS } from "@/lib/leads/types";
 
 const OWNER_A = "Test Owner A";
@@ -20,7 +21,30 @@ const OWNER_B = "Test Owner B";
 /** Owners used by the fixtures, for tests that filter by owner. */
 export const FIXTURE_OWNERS = { a: OWNER_A, b: OWNER_B };
 
+/**
+ * Seeds the member directory that `listAssignableOwnersLocal()` reads, so
+ * team/owner aggregations have real members to rank. Without it they see an
+ * empty roster and every per-member total is zero.
+ *
+ * Uses the users store rather than workspace-members: the latter writes to
+ * sessionStorage, which is a no-op under the node test environment.
+ */
+function seedMembers() {
+  const existing = new Set(listCrmUsers().map((u) => u.name));
+  for (const name of [OWNER_A, OWNER_B]) {
+    if (existing.has(name)) continue;
+    createCrmUser({
+      name,
+      email: `${name.toLowerCase().replace(/\s+/g, ".")}@example.test`,
+      role: "Manager",
+      team: "Sales",
+      status: "Active",
+    });
+  }
+}
+
 function resetStores() {
+  seedMembers();
   saveLeadColumns(LEAD_COLUMNS.map((c) => ({ ...c, cards: [], leadCount: 0 })));
   const pipelines = Object.fromEntries(
     Object.entries(DEAL_PIPELINE_STAGES).map(([pipe, stages]) => [

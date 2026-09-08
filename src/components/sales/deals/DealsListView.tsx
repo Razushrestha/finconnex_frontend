@@ -142,7 +142,7 @@ const columnRenderers: Record<string, ColumnRenderer> = {
     th: "Actions",
     thClassName: "px-5 py-3.5 text-left font-semibold",
     tdClassName: "px-5 py-1 whitespace-nowrap text-right",
-    td: () => (
+    td: (deal) => (
       <div className="flex items-center justify-end gap-1">
         <button
           type="button"
@@ -154,7 +154,20 @@ const columnRenderers: Record<string, ColumnRenderer> = {
         <button
           type="button"
           aria-label="Call"
-          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          onClick={() => {
+            const linked = resolveDealContact(deal);
+            void import("@/lib/softphone/events").then(({ startCrmRecordCall }) => {
+              startCrmRecordCall({
+                phone: linked.phone,
+                name: linked.name || deal.name,
+                relatedTo: `Deal: ${deal.name}`,
+                relatedType: linked.id ? "CONTACT" : undefined,
+                relatedId: linked.id,
+                contactId: linked.id,
+              });
+            });
+          }}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-violet-700"
         >
           <PhoneCall className="h-3.5 w-3.5" />
         </button>

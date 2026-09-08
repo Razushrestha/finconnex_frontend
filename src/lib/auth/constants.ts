@@ -11,6 +11,10 @@ export const TWO_FACTOR_FLAG_COOKIE = "finconnex_2fa_enabled";
 export const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 export const REMEMBER_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 export const PENDING_2FA_MAX_AGE = 60 * 10; // 10 minutes
+/** Fallback cookie life when the CRM access JWT has no `exp` claim. */
+export const CRM_ACCESS_FALLBACK_MAX_AGE = 60 * 60; // 1 hour
+/** Refresh the CRM access JWT this long before `exp`. */
+export const CRM_TOKEN_REFRESH_SKEW_MS = 60_000;
 
 /**
  * Shared between middleware (edge) and server routes.

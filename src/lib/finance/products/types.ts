@@ -20,7 +20,7 @@ export interface FinanceProduct {
 export const PRODUCT_TYPES: ProductType[] = ["Product", "Service"];
 export const PRODUCT_STATUSES: ProductStatus[] = ["Active", "Inactive"];
 
-const STORE_KEY = "finance:products:v1";
+const STORE_KEY = "finance:products:v2";
 
 export const financeProducts: FinanceProduct[] = [];
 

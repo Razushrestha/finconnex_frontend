@@ -69,7 +69,13 @@ export interface Quotation {
   audit: FinanceAuditEvent[];
 }
 
-const STORE_KEY = "finance:quotations:v1";
+const STORE_KEY = "finance:quotations:v2";
+
+function withTotals(
+  partial: Omit<Quotation, "subtotal" | "tax" | "total">,
+): Quotation {
+  return { ...partial, ...totalsFromLines(partial.lineItems) };
+}
 
 export const quotations: Quotation[] = [];
 

@@ -47,12 +47,34 @@ export function globalMessagesPath(suffix = ""): string {
   return `/v1/messages${suffix}`;
 }
 
+export const CRM_SMS_TO_NUMBER = (
+  process.env.NEXT_PUBLIC_TWILIO_SMS_TO ?? "+61481549363"
+).replace(/\s/g, "");
+
 export function relatedMessagesPath(
   workspaceId: string,
   relatedType: string,
   relatedId: string,
 ): string {
-  return `/v1/workspaces/${workspaceId}/${relatedType}/${relatedId}/messages`;
+  return `/v1/workspaces/${workspaceId}/${relatedType.trim().toUpperCase()}/${relatedId}/messages`;
+}
+
+function messageRelatedApiFields(relatedType?: string, relatedId?: string) {
+  const id = relatedId && isUuid(relatedId) ? relatedId : undefined;
+  const kind = relatedType?.trim().toUpperCase();
+  if (!kind || !id) return {};
+  if (kind === "LEAD") return { relatedType: "LEAD", leadId: id };
+  if (kind === "CONTACT") return { relatedType: "CONTACT", contactId: id };
+  if (kind === "COMPANY") return { relatedType: "COMPANY", companyId: id };
+  if (kind === "DEAL") return { relatedType: "DEAL", dealId: id };
+  return {};
+}
+
+function apiMessageChannel(raw?: string): string | undefined {
+  const value = raw?.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (!value) return undefined;
+  if (value === "SMS" || value === "WHATSAPP" || value === "EMAIL") return value;
+  return undefined;
 }
 
 function extractRecords(data: unknown): Record<string, unknown>[] {
@@ -90,8 +112,8 @@ export function mapMessageType(raw: string): MessageType {
   return "External";
 }
 
-function apiMessageType(type: MessageType): string {
-  return type.toUpperCase();
+function apiMessageType(type: MessageType): "INTERNAL" | "EXTERNAL" {
+  return type === "Internal" ? "INTERNAL" : "EXTERNAL";
 }
 
 export function mapMessageStatus(raw: string): MessageStatus {
@@ -105,10 +127,6 @@ export function mapMessageStatus(raw: string): MessageStatus {
     return "Sent";
   }
   return "Draft";
-}
-
-function apiMessageStatus(status: MessageStatus): string {
-  return status.toUpperCase();
 }
 
 function formatWhen(raw: unknown): string | undefined {
@@ -357,25 +375,42 @@ export function toCreateMessageBody(input: {
   subject: string;
   body: string;
   from?: string;
-  to: string;
+  to?: string;
   relatedTo?: string;
   relatedType?: string;
   relatedId?: string;
   status?: MessageStatus;
   template?: string;
+  channel?: string;
+  send?: boolean;
+  toContactId?: string;
+  toUserId?: string;
 }): Record<string, unknown> {
+  const related = messageRelatedApiFields(input.relatedType, input.relatedId);
+  const messageType = apiMessageType(input.type);
+  const kind = input.relatedType?.trim().toUpperCase();
+  const toContactId =
+    messageType === "EXTERNAL" && isUuid(input.toContactId)
+      ? input.toContactId
+      : messageType === "EXTERNAL" && kind === "CONTACT" && isUuid(input.relatedId)
+        ? input.relatedId
+        : undefined;
+  const toUserId =
+    messageType === "INTERNAL" && isUuid(input.toUserId)
+      ? input.toUserId
+      : undefined;
   return compactBody({
-    type: apiMessageType(input.type),
+    messageType,
     subject: input.subject.trim(),
-    body: input.body,
-    text: input.body,
-    from: input.from,
-    to: input.to,
-    relatedTo: input.relatedTo,
-    relatedType: input.relatedType,
-    relatedId: isUuid(input.relatedId) ? input.relatedId : undefined,
-    status: input.status ? apiMessageStatus(input.status) : "DRAFT",
-    template: input.template,
+    body: input.body.trim(),
+    channel:
+      messageType === "EXTERNAL"
+        ? apiMessageChannel(input.channel) ?? "SMS"
+        : "IN_APP",
+    send: input.send ?? false,
+    toContactId,
+    toUserId,
+    ...related,
   });
 }
 
@@ -394,18 +429,12 @@ export async function updateCrmMessage(
   id: string,
   patch: Partial<Message>,
 ): Promise<Message | null> {
-  const body: Record<string, unknown> = {};
-  if (patch.subject != null) body.subject = patch.subject;
-  if (patch.body != null) {
-    body.body = patch.body;
-    body.text = patch.body;
-  }
-  if (patch.from != null) body.from = patch.from;
-  if (patch.to != null) body.to = patch.to;
-  if (patch.type) body.type = apiMessageType(patch.type);
-  if (patch.status) body.status = apiMessageStatus(patch.status);
-  if (patch.template != null) body.templateName = patch.template;
-  if (patch.relatedTo != null) body.relatedTo = patch.relatedTo;
+  const body = compactBody({
+    subject: patch.subject,
+    body: patch.body,
+    to: patch.to,
+    type: patch.type ? apiMessageType(patch.type) : undefined,
+  });
   return asMessage(
     await messagesMutate(`/${id}`, {
       method: "PATCH",

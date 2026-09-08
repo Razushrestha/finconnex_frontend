@@ -35,7 +35,7 @@ type Envelope<T> = {
   data?: T;
 };
 
-class CrmLeadHttpError extends Error {
+export class CrmLeadHttpError extends Error {
   status: number;
   constructor(status: number, message: string) {
     super(message);
@@ -63,10 +63,10 @@ function crmErrorMessage(json: unknown, status: number): string {
       ? String(raw)
       : "";
   const key = text.trim();
-  if (
-    status === 409 ||
-    /unique|duplicate|already exists|emailExists/i.test(key)
-  ) {
+  if (status === 409 || /unique|duplicate|already exists|emailExists/i.test(key)) {
+    if (/writeConflict|concurrent/i.test(key)) {
+      return "Someone else updated this lead. Refresh and try again.";
+    }
     return "A lead with this email already exists in the CRM.";
   }
   if (status === 401 || status === 403) {
@@ -76,6 +76,9 @@ function crmErrorMessage(json: unknown, status: number): string {
   }
   if (status === 404 || /ownerNotFound/i.test(key)) {
     return "The selected owner is not a member of this workspace. Pick a teammate from the list, or leave owner unset.";
+  }
+  if (/conversationPhoneRequired/i.test(key)) {
+    return "This CRM lead has no phone number, so Twilio did not send.";
   }
   if (key.startsWith("lead.error.")) {
     if (/invalid/i.test(key)) {
@@ -305,7 +308,11 @@ export async function createCrmLead(
 
   const recover = async (): Promise<CrmLead | null> => {
     try {
-      const listed = await fetchLeadList({ page: 1, limit: 100 });
+      const listed = await fetchLeadList({
+        page: 1,
+        limit: 100,
+        search: email,
+      });
       const needle = email.trim().toLowerCase();
       return (
         listed.find((row) => row.email?.trim().toLowerCase() === needle) ?? null
@@ -317,26 +324,19 @@ export async function createCrmLead(
 
   let created: CrmLead | null = null;
   try {
-    created = await postLead(compactBody({ firstName, lastName, email }));
+    created = await postLead(
+      compactBody({ firstName, lastName, email, ownerId }),
+    );
   } catch (err) {
-    created = await recover();
-    if (!created) {
-      if (ownerId) {
-        try {
-          created = await postLead(
-            compactBody({ firstName, lastName, email, ownerId }),
-          );
-        } catch {
-          created = await recover();
-        }
-      }
-    }
-    if (!created) {
-      if (err instanceof CrmLeadHttpError && err.status >= 500) {
-        return null;
-      }
+    if (err instanceof CrmLeadHttpError && err.status === 409) {
+      const existing = await recover();
+      if (existing) return existing;
       throw err;
     }
+    if (err instanceof CrmLeadHttpError && err.status >= 500) {
+      return null;
+    }
+    throw err;
   }
 
   const extras = compactBody({
@@ -563,6 +563,8 @@ export type CrmLeadConversationItem = {
   at: string;
   status?: string;
   durationSeconds?: number;
+  delivery?: string;
+  lastDeliveryError?: string | null;
 };
 
 export async function fetchLeadConversations(

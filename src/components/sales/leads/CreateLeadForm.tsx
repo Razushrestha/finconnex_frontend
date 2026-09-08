@@ -14,7 +14,7 @@ import {
 import { api } from "@/lib/api";
 import { findContactById } from "@/lib/contacts/store";
 import { findLeadByEmail, updateLead } from "@/lib/leads/store";
-import { syncCreatedLead } from "@/lib/leads/api";
+import { syncCreatedLead, CrmLeadHttpError } from "@/lib/leads/api";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import {
   assignableOwnerLabel,
@@ -336,25 +336,23 @@ export function CreateLeadForm({
         return;
       }
     } catch (err) {
-      // A duplicate email is the common case here and it is not recoverable
-      // by retrying — surface it instead of falling through to a second POST
-      // that can only fail too.
-      const status = (err as { status?: number })?.status;
-      if (status === 409) {
-        // Emails are unique across BOTH leads and contacts in a workspace, so
-        // the conflict may be either. Show the server's message rather than
-        // guessing — "a contact already uses this email" points somewhere very
-        // different from "a lead already uses it".
-        const serverMessage = (err as { message?: string })?.message?.trim();
+      // Emails are unique among leads and among contacts, so a 409 may name
+      // either. Surface the server's message rather than guessing — "a contact
+      // already uses this email" points somewhere very different.
+      const duplicate =
+        err instanceof CrmLeadHttpError
+          ? err.status === 409
+          : err instanceof Error && /already exists/i.test(err.message);
+      if (duplicate) {
         setErrors((prev) => ({
           ...prev,
           email:
-            serverMessage ||
-            "This email is already used by another record in this workspace.",
+            err instanceof Error
+              ? err.message
+              : "This email is already used by another record in this workspace.",
         }));
         return;
       }
-      /* other CRM errors still fall through to a device copy below */
     }
     const payload = {
       firstName,
