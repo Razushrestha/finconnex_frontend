@@ -157,6 +157,7 @@ const dashboardItems: NavItem[] = [
       { label: "Payments", href: "/finance/payments" },
       { label: "Items / Services", href: "/finance/products" },
       { label: "Service Agreements", href: "/finance/agreements" },
+      { label: "Equifax", href: "/finance/equifax" },
     ],
   },
   { label: "Support", href: "/support", icon: HelpCircle },

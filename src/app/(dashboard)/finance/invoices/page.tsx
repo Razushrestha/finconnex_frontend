@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
@@ -32,6 +32,7 @@ import {
 import { useCrmInvoices } from "@/lib/finance/invoices/use-crm-invoices";
 import { onRecordsChange } from "@/lib/records-sync";
 import { cn } from "@/lib/utils";
+import { PaginationBar } from "@/components/ui/pagination-bar";
 
 export function InvoicesPage() {
   const router = useRouter();
@@ -42,6 +43,9 @@ export function InvoicesPage() {
   const [agingMode, setAgingMode] = useState<"days" | "months">("days");
   const [data, setData] = useState<Invoice[]>([]);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
     if (crm.loading) return;
@@ -64,6 +68,14 @@ export function InvoicesPage() {
 
     return matchesSearch && matchesStatus;
   });
+
+  const total = filteredData.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginatedData = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filteredData.slice(start, start + pageSize);
+  }, [filteredData, safePage, pageSize]);
 
   // Calculate Metrics dynamically
   const unpaidItems = data.filter(
@@ -790,14 +802,14 @@ export function InvoicesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-sm">
-              {filteredData.length === 0 ? (
+              {paginatedData.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-8 text-center text-slate-400">
                     No invoices found matching your criteria.
                   </td>
                 </tr>
               ) : (
-                filteredData.map((item) => {
+                paginatedData.map((item) => {
                   const initials = getInitials(item.clientName);
 
                   return (
@@ -976,7 +988,7 @@ export function InvoicesPage() {
         </div>
 
         {/* Table Footer / Pagination */}
-        <div className="px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+        {/* <div className="px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
           <span className="text-xs text-slate-500">
             Showing 1 to {filteredData.length} of {data.length || 12} entries
           </span>
@@ -1016,7 +1028,15 @@ export function InvoicesPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div> */}
+        <PaginationBar
+          page={safePage}
+          pageSize={pageSize}
+          total={total}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+          entriesLabel="estimates"
+        />
       </div>
 
       {/* Bottom Row Grid (Recent Invoicing Events & Connect Bank Feed) */}
