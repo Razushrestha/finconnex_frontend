@@ -18,6 +18,7 @@ import type {
   CrmLeadStatus,
 } from "@/lib/leads/api/types";
 import { CRM_COMPANY_SIZES } from "@/lib/leads/api/types";
+import { ownerDisplayNameOr } from "@/lib/users/display-name";
 
 const AVATAR_COLORS = [
   "bg-amber-50 text-amber-600",
@@ -293,7 +294,7 @@ export function mapCrmLeadToCard(lead: CrmLead): LeadCardData {
     company: lead.companyName?.trim() || "",
     email: lead.email ?? "",
     phone: lead.phone?.trim() || lead.mobilePhone?.trim() || "",
-    owner: lead.ownerId ?? "Unassigned",
+    owner: ownerDisplayNameOr("Unassigned", lead.owner, lead.ownerName),
     ownerId: lead.ownerId ?? undefined,
     companyId: lead.companyId ?? undefined,
     leadNumber: lead.leadNumber ?? undefined,

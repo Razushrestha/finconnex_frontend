@@ -28,6 +28,7 @@ import { findCompanyById } from "@/lib/companies/store";
 import { findContactById } from "@/lib/contacts/store";
 import { findDealById } from "@/lib/deals/store";
 import { findLeadById } from "@/lib/leads/store";
+import { ownerDisplayName } from "@/lib/users/display-name";
 
 export type CrmTaskQuery = {
   page?: number;
@@ -198,25 +199,22 @@ export function toTaskIso(raw: string): string {
 }
 
 function memberDisplay(raw: unknown): string {
-  if (typeof raw === "string") return raw.trim();
+  if (typeof raw === "string") return ownerDisplayName(raw);
   if (!raw || typeof raw !== "object") return "";
   const rec = raw as Record<string, unknown>;
   const user =
     rec.user && typeof rec.user === "object"
       ? (rec.user as Record<string, unknown>)
       : rec;
-  const firstLast = [pickStr(user.firstName), pickStr(user.lastName)]
-    .filter(Boolean)
-    .join(" ");
-  return pickStr(
-    rec.name,
-    rec.fullName,
-    rec.displayName,
-    firstLast,
-    user.email,
-    rec.email,
-    rec.userId,
-    rec.id,
+  // `rec.userId` and `rec.id` used to be the last two fallbacks here, so a
+  // member with neither a name nor an email rendered as a raw UUID.
+  // ownerDisplayName rejects ids at every step instead.
+  return ownerDisplayName(
+    { name: rec.name },
+    { name: rec.fullName },
+    { name: rec.displayName },
+    user,
+    { email: rec.email },
   );
 }
 

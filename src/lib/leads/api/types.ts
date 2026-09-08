@@ -77,6 +77,16 @@ export type CrmLead = {
   convertedDealId?: string | null;
   convertedCompanyId?: string | null;
   ownerId?: string | null;
+  /** Resolved owner. Present since the API started selecting the relation. */
+  owner?: {
+    id?: string;
+    name?: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string;
+  } | null;
+  /** Flat owner label, for clients that want a single string. */
+  ownerName?: string | null;
   pipelineStage?: string;
   pipelineStageLabel?: string;
   tags?: string[];

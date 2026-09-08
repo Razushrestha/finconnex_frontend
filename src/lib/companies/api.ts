@@ -10,6 +10,7 @@ import type {
   CompanyCardData,
   CompanyStatus,
 } from "@/lib/companies/types";
+import { ownerDisplayName, ownerDisplayNameOr } from "@/lib/users/display-name";
 
 export type CrmCompanyQuery = {
   page?: number;
@@ -169,12 +170,11 @@ export function normalizeCrmCompany(
       website: pickStr(raw.website, raw.domain, raw.url),
       industry: pickStr(raw.industry, raw.sector),
       phone: pickStr(raw.phone, raw.phoneNumber, raw.primaryPhone),
-      owner: pickStr(
-        owner && pickStr(owner.name, owner.email),
-        raw.ownerName,
-        raw.assignedTo,
-        typeof raw.owner === "string" ? raw.owner : "",
+      owner: ownerDisplayNameOr(
         "—",
+        owner,
+        pickStr(raw.ownerName),
+        pickStr(raw.assignedTo),
       ),
       ownerId:
         pickStr(raw.ownerId, owner && pickStr(owner.id, owner.userId)) ||

@@ -13,6 +13,7 @@ import {
   type DealStage,
   type DealStageTitle,
 } from "@/lib/deals/types";
+import { ownerDisplayName, ownerDisplayNameOr } from "@/lib/users/display-name";
 
 export type CrmDealQuery = {
   page?: number;
@@ -250,7 +251,12 @@ export function normalizeDeal(
     currency: (pickStr(raw.currency, "AUD").toUpperCase() ||
       "AUD") as DealCurrency,
     probability: toNum(raw.probability ?? raw.winProbability) || style.deals[0]?.probability || 10,
-    owner: pickStr(raw.ownerName, raw.owner, raw.createdBy, "—"),
+    owner: ownerDisplayNameOr(
+      "—",
+      raw.owner as never,
+      pickStr(raw.ownerName),
+      pickStr(raw.createdBy),
+    ),
     closeDate: formatClose(
       raw.expectedCloseDate ?? raw.closeDate ?? raw.actualCloseDate,
     ),
