@@ -212,7 +212,7 @@ export async function smokeCompaniesMock() {
       owner: "Ada",
     });
     await updateCrmCompany(ID, { name: "Acme Updated", status: "Active" });
-    await bulkCrmCompanies({ ids: [ID], operation: "DELETE" });
+    await bulkCrmCompanies({ ids: [ID], operation: "SOFT_DELETE" });
     await importCrmCompanies({ rows: [{ name: "Import Co" }] });
     await exportCrmCompanies({ ids: [ID] });
     await mergeCrmCompanies({ survivorId: ID, sourceId: SOURCE_ID });

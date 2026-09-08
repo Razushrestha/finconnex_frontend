@@ -39,6 +39,7 @@ import {
   elevatedSelectClass,
 } from "@/components/sales/CreateEntityForm";
 import { cn } from "@/lib/utils";
+import { defaultActorName } from "@/lib/rules/actor";
 
 interface Props {
   layoutId: string;
@@ -90,7 +91,7 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
     "Tickets",
     "Invoices",
   ]);
-  const [createdBy, setCreatedBy] = useState<string>(PORTAL_OWNERS[0]);
+  const [createdBy, setCreatedBy] = useState<string>(defaultActorName());
   const [contactName, setContactName] = useState<string>(PORTAL_CLIENTS[0]?.contact ?? "");
   const [contactEmail, setContactEmail] = useState<string>(PORTAL_CLIENTS[0]?.email ?? "");
   const [contactTouched, setContactTouched] = useState(false);

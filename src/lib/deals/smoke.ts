@@ -212,7 +212,7 @@ export async function smokeDealsMock() {
     await updateCrmDeal(ID, { stage: "PROPOSAL" });
     await restoreCrmDeal(ID);
     await cloneCrmDeal(ID);
-    await bulkCrmDeals({ ids: [ID], operation: "DELETE" });
+    await bulkCrmDeals({ ids: [ID], operation: "SOFT_DELETE" });
     await listCrmDealContacts(ID);
     await addCrmDealContact(ID, { contactId: CONTACT_ID });
     await replaceCrmDealContacts(ID, [{ contactId: CONTACT_ID }]);

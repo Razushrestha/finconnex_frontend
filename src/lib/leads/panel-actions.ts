@@ -2,9 +2,8 @@
  * Persist Lead Card quick actions into live activity module stores.
  */
 
-import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import { formatRulesAt } from "@/lib/rules/storage";
-import { getRulesActor } from "@/lib/rules/actor";
+import { getRulesActor, defaultActorName } from "@/lib/rules/actor";
 import { emitLeadActivityChange } from "@/lib/leads/lead-extras-store";
 import type { LeadCardQuickActionState } from "@/lib/leads/card-types";
 import { isUuid } from "@/lib/activity-timeline/auth";
@@ -29,7 +28,7 @@ import type { AttachmentKind } from "@/lib/attachments/types";
 export type QuickActionKind = LeadCardQuickActionState["kind"];
 
 function actorName() {
-  return getRulesActor().name || ACTIVITY_OWNERS[0];
+  return getRulesActor().name || defaultActorName();
 }
 
 function toDateInputValue(d = new Date()) {

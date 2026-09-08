@@ -599,7 +599,12 @@ export async function cloneCrmDeal(
   );
 }
 
-export async function bulkCrmDeals(body: Record<string, unknown>): Promise<unknown> {
+export async function bulkCrmDeals(body: {
+  ids: string[];
+  /** Must match BulkDealOperation on the API — "DELETE" is rejected 400. */
+  operation: "ASSIGN_OWNER" | "CHANGE_STAGE" | "SOFT_DELETE";
+  [key: string]: unknown;
+}): Promise<unknown> {
   return dealsMutate("/bulk", {
     method: "POST",
     body: JSON.stringify(body),

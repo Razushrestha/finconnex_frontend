@@ -45,6 +45,7 @@ import {
   type SoftphoneRecord,
 } from "@/lib/softphone/resolve-record";
 import type { Call, CallStatus } from "@/lib/calls/types";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   SOFTPHONE_H,
   SOFTPHONE_W,
@@ -69,7 +70,7 @@ const KEYS = [
   { d: "#" },
 ] as const;
 
-const OWNER = "John Smith";
+const OWNER = defaultActorName();
 
 const DISPOSITIONS: { label: string; status: CallStatus }[] = [
   { label: "No Answer", status: "No Answer" },

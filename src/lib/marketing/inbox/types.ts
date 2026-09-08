@@ -28,13 +28,7 @@ export function inboxChannelLabel(channel: InboxChannel) {
 
 export const INBOX_STATUSES: InboxStatus[] = ["Open", "Pending", "Resolved"];
 
-export const INBOX_AGENTS = [
-  "Unassigned",
-  "John Smith",
-  "Tejas Gokhe",
-  "Shiva Kadhka",
-  "Roshna Abraham",
-] as const;
+export const INBOX_AGENTS: readonly string[] = [];
 
 export interface InboxAttachment {
   id: string;

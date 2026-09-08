@@ -203,11 +203,11 @@ function CompanyCardPreview({
 }) {
   const isCompact = settings.layout === "compact";
 
-  const companyName = company?.name || "Northwind Traders";
+  const companyName = company?.name || "Company name";
   const companyWebsite = company?.website || "northwind.com";
   const companyIndustry = company?.industry || "Wholesale";
   const companyPhone = company?.phone || "+61 2 9000 1001";
-  const companyOwner = company?.owner || "John Smith";
+  const companyOwner = company?.owner || "Unassigned";
   const companyAnnualRevenue = company?.annualRevenue || "$4.2M";
   const companyCity = company?.city || "Sydney";
 

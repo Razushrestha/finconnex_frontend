@@ -3,10 +3,10 @@
  */
 
 import { createLead, listLeadEmails } from "@/lib/leads/store";
-import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import { importCrmLeadsFromAds, refreshCrmLeadsBoard } from "@/lib/leads/api";
 import { toCrmCreateBody } from "@/lib/leads/api/map";
 import type { LeadCardData, LeadSource } from "@/lib/leads/types";
+import { defaultActorName } from "@/lib/rules/actor";
 
 export type AdsPlatform = "facebook" | "linkedin" | "tiktok" | "google";
 
@@ -131,7 +131,7 @@ export async function syncAdsLeads(
         : row.campaign,
       source: adsPlatformToSource(platform),
       status: "New",
-      owner: ACTIVITY_OWNERS[0],
+      owner: defaultActorName(),
     });
     imported.push(card);
     existing.add(row.email.toLowerCase());

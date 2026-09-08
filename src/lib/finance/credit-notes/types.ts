@@ -4,7 +4,6 @@ import {
   type FinanceAuditEvent,
   type FinanceLineItem,
   formatFinanceAt,
-  formatFinanceDate,
   totalsFromLines,
 } from "@/lib/finance/shared";
 

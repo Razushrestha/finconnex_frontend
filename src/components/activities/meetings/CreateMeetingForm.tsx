@@ -26,6 +26,7 @@ import {
 import { useCrmRelatedRecords } from "@/lib/activities/use-crm-related-records";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { createMeeting } from "@/lib/meetings/store";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   createCrmMeeting,
   isCrmMeetingId,
@@ -77,7 +78,7 @@ const initialState: FormState = {
   location: "",
   meetingLink: "",
   attendees: "",
-  organizer: "John Smith",
+  organizer: defaultActorName(),
   status: "Scheduled",
   agenda: "",
   notes: "",

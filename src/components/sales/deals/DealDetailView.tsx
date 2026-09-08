@@ -16,11 +16,11 @@ import {
 } from "lucide-react";
 import {
   DEAL_CURRENCIES,
-  OWNERS,
   type DealPipeline,
   type DealRecord,
   type DealStage,
 } from "@/lib/deals/types";
+import { listAssignableOwnersLocal } from "@/lib/users/assignable";
 import {
   findDealById,
   linkContactToDeal,
@@ -73,6 +73,9 @@ export function DealDetailView({
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [linkContactId, setLinkContactId] = useState("");
+  const [ownerNames] = useState(() =>
+    listAssignableOwnersLocal().map((o) => o.name),
+  );
   const router = useRouter();
   const back = useModuleBack("/sales/deals", "All Deals");
 
@@ -430,7 +433,7 @@ export function DealDetailView({
         }}
         stageOptions={pipelineStages.map((s) => s.title)}
         currencyOptions={DEAL_CURRENCIES}
-        ownerOptions={OWNERS}
+        ownerOptions={ownerNames}
         onSave={handleEditSave}
       />
 

@@ -217,7 +217,7 @@ export async function smokeContactsMock() {
       owner: "John",
     });
     await updateCrmContact(ID, { name: "Ada L", status: "Inactive" });
-    await bulkCrmContacts({ ids: [ID], operation: "DELETE" });
+    await bulkCrmContacts({ ids: [ID], operation: "SOFT_DELETE" });
     await importCrmContacts({ rows: [{ firstName: "Import" }] });
     await mergeCrmContacts({ survivorId: ID, sourceId: SOURCE_ID });
     await deleteCrmContact(ID);

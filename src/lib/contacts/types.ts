@@ -18,12 +18,6 @@ export const CONTACT_STATUSES = [
 ] as const;
 export type ContactStatus = (typeof CONTACT_STATUSES)[number];
 
-export const OWNERS = [
-  "John Smith",
-  "Shiva Kadhka",
-  "Tejas Gokhe",
-  "Roshna Abraham",
-] as const;
 
 export interface ContactCardData {
   id: string;

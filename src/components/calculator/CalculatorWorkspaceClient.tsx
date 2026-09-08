@@ -48,6 +48,7 @@ import {
 } from "@/lib/calculator/types";
 import { softDeleteRecord } from "@/lib/rules";
 import { cn } from "@/lib/utils";
+import { defaultActorName } from "@/lib/rules/actor";
 
 export function CalculatorWorkspaceClient() {
   const [type, setType] = useState<CalculatorType>("Loan");
@@ -58,7 +59,7 @@ export function CalculatorWorkspaceClient() {
   const [result, setResult] = useState<CalcRunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
-  const [savedBy, setSavedBy] = useState<string>(CALC_OWNERS[0]);
+  const [savedBy, setSavedBy] = useState<string>(defaultActorName());
   const [shareTarget, setShareTarget] = useState<string>(CALC_SHARE_TARGETS[1]);
   const [history, setHistory] = useState<SavedCalculation[]>(seedCalculations);
   const [toast, setToast] = useState<string | null>(null);

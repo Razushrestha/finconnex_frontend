@@ -24,6 +24,7 @@ import {
 } from "@/lib/finance/shared";
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   CreateEntityFormShell,
   Field,
@@ -42,7 +43,7 @@ export function CreateCreditNoteForm({ layoutId: _l, redirect: _r }: Props) {
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<CreditNoteStatus>("Draft");
   const [clientId, setClientId] = useState<string>(FINANCE_CLIENTS[0]?.id ?? "");
-  const [owner, setOwner] = useState<string>(FINANCE_OWNERS[0]);
+  const [owner, setOwner] = useState<string>(defaultActorName());
   const [issueDate, setIssueDate] = useState(formatFinanceDate());
   const [invoiceRef, setInvoiceRef] = useState("");
   const [reason, setReason] = useState("");

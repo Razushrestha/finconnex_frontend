@@ -47,7 +47,7 @@ import {
   elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
 import { cn } from "@/lib/utils";
-import { getRulesActor } from "@/lib/rules/actor";
+import { getRulesActor, defaultActorName } from "@/lib/rules/actor";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import {
   assignableOwnerLabel,
@@ -100,7 +100,7 @@ const initialState: FormState = {
   callFor: "",
   relatedKind: "",
   relatedName: "",
-  fromNumber: defaultCallerId("John Smith"),
+  fromNumber: defaultCallerId(defaultActorName()),
   startTime: "",
   assignedTo: defaultAssignableOwnerId(listAssignableOwnersLocal()),
   subject: "",
@@ -227,7 +227,7 @@ export function ScheduleCallForm({
     relatedKind: defaults?.relatedKind ?? "",
     relatedName: defaults?.relatedName ?? "",
     callFor: defaults?.contact ?? "",
-    fromNumber: defaultCallerId("John Smith"),
+    fromNumber: defaultCallerId(defaultActorName()),
   });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},

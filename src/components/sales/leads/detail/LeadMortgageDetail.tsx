@@ -24,7 +24,8 @@ import {
   Wallet,
 } from "lucide-react";
 import type { LeadCardData, LeadSource } from "@/lib/leads/types";
-import { LEAD_SOURCES, OWNERS } from "@/lib/leads/types";
+import { LEAD_SOURCES } from "@/lib/leads/types";
+import { listAssignableOwnersLocal } from "@/lib/users/assignable";
 import {
   daysInStage,
   leadApplicants,
@@ -268,6 +269,9 @@ export function LeadMortgageDetail({
   const [emailDraft, setEmailDraft] = useState(card.email ?? "");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [tab, setTab] = useState<LeadDetailTabId>("overview");
+  const [ownerNames] = useState(() =>
+    listAssignableOwnersLocal().map((o) => o.name),
+  );
   const callBtnRef = useRef<HTMLSpanElement>(null);
   const startCallBtnRef = useRef<HTMLButtonElement>(null);
   const callFlow = useLeadCallFlow();
@@ -523,7 +527,7 @@ export function LeadMortgageDetail({
                   onChange={(e) => onLeadPatch?.({ owner: e.target.value })}
                   className="min-w-0 flex-1 truncate bg-transparent text-[13px] font-medium text-slate-800 outline-none"
                 >
-                  {[card.owner, ...OWNERS.filter((item) => item !== card.owner)].map(
+                  {[card.owner, ...ownerNames.filter((item) => item !== card.owner)].map(
                     (owner) => (
                       <option key={owner} value={owner}>
                         {owner}

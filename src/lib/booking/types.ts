@@ -153,7 +153,6 @@ export interface Booking {
 
 const STORE_KEY = "booking:pages:v3";
 
-const defaultAvailability = (): AvailabilityRule[] =>
   WEEKDAYS.map((day) => ({
     day,
     enabled: day !== "Saturday" && day !== "Sunday",
@@ -206,44 +205,7 @@ export interface BookingConsultant {
   email: string;
 }
 
-export const BOOKING_CONSULTANTS: BookingConsultant[] = [
-  {
-    id: "c-john",
-    name: "John Smith",
-    role: "Senior Consultant",
-    email: "john.smith@finconnex.com",
-  },
-  {
-    id: "c-shiva",
-    name: "Shiva Kadhka",
-    role: "Mortgage Specialist",
-    email: "shiva.kadhka@finconnex.com",
-  },
-  {
-    id: "c-tejas",
-    name: "Tejas Gokhe",
-    role: "Product Consultant",
-    email: "tejas.gokhe@finconnex.com",
-  },
-  {
-    id: "c-roshna",
-    name: "Roshna Abraham",
-    role: "Client Success",
-    email: "roshna.abraham@finconnex.com",
-  },
-  {
-    id: "c-priya",
-    name: "Priya Shah",
-    role: "Lending Advisor",
-    email: "priya.shah@finconnex.com",
-  },
-  {
-    id: "c-marcus",
-    name: "Marcus Chen",
-    role: "Relationship Manager",
-    email: "marcus.chen@finconnex.com",
-  },
-];
+export const BOOKING_CONSULTANTS: BookingConsultant[] = [];
 
 export function consultantsAllowMultiple(mode?: ConsultationMode) {
   if (!mode) return false;

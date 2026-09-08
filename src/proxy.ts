@@ -6,6 +6,7 @@ import { getAuthSecretKey, SESSION_COOKIE } from "@/lib/auth/constants";
 /** Exact paths anyone can open (logged-out or logged-in). */
 const PUBLIC_EXACT = new Set([
   "/login",
+  "/signup",
   "/forgot-password",
   "/reset-password",
   "/verify-email",

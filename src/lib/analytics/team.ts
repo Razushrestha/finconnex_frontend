@@ -5,7 +5,7 @@ import { listEmails } from "@/lib/emails/store";
 import { listMeetings } from "@/lib/meetings/store";
 import { listReminders } from "@/lib/reminders/store";
 import { listAllTasks } from "@/lib/tasks/store";
-import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import { listAssignableOwnersLocal } from "@/lib/users/assignable";
 import {
   DASHBOARD_LOAN_TYPES,
   DASHBOARD_TEAMS,
@@ -142,8 +142,13 @@ export function defaultTeamAnalyticsFilters(): TeamAnalyticsFilters {
   return defaultFilters();
 }
 
+/** Real workspace members; ACTIVITY_OWNERS was a hardcoded demo roster. */
+function teamMemberNames(): string[] {
+  return listAssignableOwnersLocal().map((owner) => owner.name).filter(Boolean);
+}
+
 function membersFor(filters: TeamAnalyticsFilters) {
-  const all = [...ACTIVITY_OWNERS];
+  const all = teamMemberNames();
   return all.filter((name) => matchesMember(name, filters));
 }
 
@@ -533,7 +538,7 @@ export function exportTeamAnalytics(data: TeamAnalyticsData, filters: TeamAnalyt
 export function teamFilterOptions() {
   return {
     teams: DASHBOARD_TEAMS,
-    users: ["All", ...ACTIVITY_OWNERS],
+    users: ["All", ...teamMemberNames()],
     loanTypes: DASHBOARD_LOAN_TYPES,
     sources: ["All", ...new Set(loadLeads().map((lead) => lead.source))],
     pipelines: ["All", ...new Set(loadLeads().map((lead) => lead.stage))],

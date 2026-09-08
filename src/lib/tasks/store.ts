@@ -61,7 +61,7 @@ function currentActor(task?: Task): string {
     task?.modifiedBy ||
     task?.createdBy ||
     task?.assignedTo ||
-    "John Smith"
+    ""
   );
 }
 
@@ -774,7 +774,7 @@ export function addTaskActivityNote(
   if (!found) return null;
 
   const actor = getRulesActor();
-  const author = actor.name || "John Smith";
+  const author = actor.name;
   const note: TaskActivityNote = {
     id: newRulesId("task-note"),
     body: trimmed,

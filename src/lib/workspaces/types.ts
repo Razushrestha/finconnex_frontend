@@ -13,6 +13,13 @@ export type CrmWorkspaceRecord = {
 
 const STORE_KEY = "workspaces:mine:v1";
 
+/**
+ * Local-only placeholder, same pattern as the users/workspace-members
+ * SEEDs — shown only until `persistRemoteWorkspace()` (see
+ * `WorkspacesSettingsClient.tsx`) writes the real, live-fetched workspace(s)
+ * into this store. Never what a real account's workspace list shows once
+ * that fetch resolves.
+ */
 const SEED: CrmWorkspaceRecord[] = [
   {
     id: "ws-demo-1",

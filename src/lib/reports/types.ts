@@ -94,12 +94,7 @@ export const REPORT_DATE_RANGES = [
   "Custom",
 ] as const;
 
-export const REPORT_OWNERS = [
-  "John Smith",
-  "Tejas Gokhe",
-  "Roshna Abraham",
-  "Shiva Kadhka",
-] as const;
+export const REPORT_OWNERS: readonly string[] = [];
 
 export const REPORT_GROUP_BY = [
   "Status",
@@ -366,113 +361,7 @@ function previewForType(type: ReportType): ReportRow[] {
   }
 }
 
-export const savedReports: SavedReport[] = [
-  {
-    id: "rp1",
-    reportId: "RPT-6001",
-    name: "Monthly lead funnel",
-    type: "Lead",
-    status: "Ready",
-    dataSource: "leads",
-    dateRange: "Last 30 days",
-    filters: "Status ≠ Unqualified",
-    groupBy: "Status",
-    sortBy: "Count desc",
-    schedule: "Monthly",
-    createdBy: "John Smith",
-    createdAt: "01/07/2026",
-    lastRunAt: "20/07/2026 08:00",
-    sharedWith: "Sales team",
-    previewRows: previewForType("Lead"),
-    audit: [
-      { id: "a1", at: "01/07/2026 10:00", action: "Created", actor: "John Smith" },
-      { id: "a2", at: "01/07/2026 10:20", action: "Scheduled Monthly", actor: "John Smith" },
-      { id: "a3", at: "20/07/2026 08:00", action: "Run completed", actor: "System" },
-    ],
-  },
-  {
-    id: "rp2",
-    reportId: "RPT-6002",
-    name: "Q3 revenue collected",
-    type: "Revenue",
-    status: "Scheduled",
-    dataSource: "invoices",
-    dateRange: "This quarter",
-    groupBy: "Owner",
-    sortBy: "Collected desc",
-    schedule: "Weekly",
-    createdBy: "Tejas Gokhe",
-    createdAt: "10/07/2026",
-    lastRunAt: "19/07/2026 09:00",
-    previewRows: previewForType("Revenue"),
-    audit: [
-      { id: "a1", at: "10/07/2026 11:00", action: "Created", actor: "Tejas Gokhe" },
-      { id: "a2", at: "10/07/2026 11:15", action: "Scheduled Weekly", actor: "Tejas Gokhe" },
-    ],
-  },
-  {
-    id: "rp3",
-    reportId: "RPT-6003",
-    name: "Pipeline by stage",
-    type: "Pipeline",
-    status: "Ready",
-    dataSource: "deals",
-    dateRange: "This year",
-    groupBy: "Stage",
-    schedule: "None",
-    createdBy: "Roshna Abraham",
-    createdAt: "15/07/2026",
-    lastRunAt: "18/07/2026 14:30",
-    previewRows: previewForType("Pipeline"),
-    audit: [
-      { id: "a1", at: "15/07/2026 09:00", action: "Created", actor: "Roshna Abraham" },
-      { id: "a2", at: "18/07/2026 14:30", action: "Run completed", actor: "Roshna Abraham" },
-    ],
-  },
-  {
-    id: "rp4",
-    reportId: "RPT-6004",
-    name: "Support resolution draft",
-    type: "Custom",
-    status: "Draft",
-    dataSource: "tickets",
-    dateRange: "Last 30 days",
-    filters: "Status = Resolved OR Closed",
-    schedule: "None",
-    createdBy: "Shiva Kadhka",
-    createdAt: "21/07/2026",
-    previewRows: [
-      { label: "Resolved", value: 24 },
-      { label: "Closed", value: 18 },
-      { label: "Avg hours to resolve", value: 16.5 },
-      { label: "CSAT", value: "4.5 / 5" },
-    ],
-    audit: [
-      { id: "a1", at: "21/07/2026 10:00", action: "Created", actor: "Shiva Kadhka" },
-    ],
-  },
-  {
-    id: "rp5",
-    reportId: "RPT-6005",
-    name: "Activity load by owner",
-    type: "Activity",
-    status: "Ready",
-    dataSource: "activities",
-    dateRange: "Last 7 days",
-    groupBy: "Assigned To",
-    schedule: "Daily",
-    createdBy: "John Smith",
-    createdAt: "05/07/2026",
-    lastRunAt: "21/07/2026 07:00",
-    sharedWith: "Managers",
-    previewRows: previewForType("Activity"),
-    audit: [
-      { id: "a1", at: "05/07/2026 12:00", action: "Created", actor: "John Smith" },
-      { id: "a2", at: "05/07/2026 12:10", action: "Scheduled Daily", actor: "John Smith" },
-      { id: "a3", at: "21/07/2026 07:00", action: "Run completed", actor: "System" },
-    ],
-  },
-];
+export const savedReports: SavedReport[] = [];
 
 function readStore(): SavedReport[] | null {
   if (typeof window === "undefined") return null;

@@ -113,13 +113,7 @@ export const DOCUMENT_REQUEST_STATUS_PILL: Record<DocumentRequestStatus, string>
     Expired: "bg-slate-100 text-slate-600",
   };
 
-export const DOCUMENT_REQUEST_BROKERS = [
-  "John Smith",
-  "Bishnu Acharya",
-  "Shiva Kadhka",
-  "Tejas Gokhe",
-  "Roshna Abraham",
-] as const;
+export const DOCUMENT_REQUEST_BROKERS: readonly string[] = [];
 
 export interface DocumentRequest {
   id: string;

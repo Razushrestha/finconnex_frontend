@@ -19,13 +19,7 @@ export const ANALYTICS_TEAMS: AnalyticsTeam[] = [
   "Support",
 ];
 
-export const ANALYTICS_OWNERS = [
-  "All",
-  "John Smith",
-  "Tejas Gokhe",
-  "Roshna Abraham",
-  "Shiva Kadhka",
-] as const;
+export const ANALYTICS_OWNERS: readonly string[] = [];
 
 export interface AnalyticsKpi {
   id: string;
@@ -129,7 +123,7 @@ export function getAnalyticsSnapshot(opts: {
 }) {
   const f = periodFactor(opts.period) * (opts.priorScale ?? 1);
   const ownerScale =
-    opts.owner === "All" ? 1 : opts.owner === "John Smith" ? 1.15 : 0.85;
+    opts.owner === "All" ? 1 : 0.85;
   const teamScale =
     opts.team === "All"
       ? 1
@@ -350,43 +344,11 @@ export function getAnalyticsSnapshot(opts: {
     { name: "Other", value: 6 },
   ];
 
-  const revenueByOwner: OwnerSlice[] = [
-    { name: "John Smith", revenue: Math.round(620000 * f) },
-    { name: "Tejas Gokhe", revenue: Math.round(410000 * f) },
-    { name: "Roshna Abraham", revenue: Math.round(355000 * f) },
-    { name: "Shiva Kadhka", revenue: Math.round(290000 * f) },
-  ].filter((u) => opts.owner === "All" || u.name === opts.owner);
+  // Per-owner rows came from a hardcoded demo roster; real ones come from the
+  // CRM analytics API. Empty until that resolves, rather than fabricated.
+  const revenueByOwner: OwnerSlice[] = [];
 
-  const topUsers: TopUserRow[] = [
-    {
-      name: "John Smith",
-      dealsWon: Math.round(8 * f),
-      revenue: Math.round(620000 * f),
-      activities: Math.round(54 * f),
-      href: "/settings/users-and-access/users",
-    },
-    {
-      name: "Tejas Gokhe",
-      dealsWon: Math.round(6 * f),
-      revenue: Math.round(410000 * f),
-      activities: Math.round(48 * f),
-      href: "/settings/users-and-access/users",
-    },
-    {
-      name: "Roshna Abraham",
-      dealsWon: Math.round(5 * f),
-      revenue: Math.round(355000 * f),
-      activities: Math.round(61 * f),
-      href: "/settings/users-and-access/users",
-    },
-    {
-      name: "Shiva Kadhka",
-      dealsWon: Math.round(4 * f),
-      revenue: Math.round(290000 * f),
-      activities: Math.round(39 * f),
-      href: "/settings/users-and-access/users",
-    },
-  ].filter((u) => opts.owner === "All" || u.name === opts.owner);
+  const topUsers: TopUserRow[] = [];
 
   return {
     kpis,

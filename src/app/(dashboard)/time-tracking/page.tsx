@@ -37,6 +37,7 @@ import {
 } from "@/lib/time-tracking/types";
 import { formatAUD } from "@/lib/finance/shared";
 import { cn } from "@/lib/utils";
+import { defaultActorName } from "@/lib/rules/actor";
 
 export default function TimeTrackingPage() {
   const router = useRouter();
@@ -50,7 +51,7 @@ export default function TimeTrackingPage() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
-  const [timerUser, setTimerUser] = useState<string>(TIME_USERS[0]);
+  const [timerUser, setTimerUser] = useState<string>(defaultActorName());
   const [timerRelated, setTimerRelated] = useState(0);
   const [page, setPage] = useState(1);
   const pageSize = 8;
@@ -161,7 +162,7 @@ export default function TimeTrackingPage() {
     for (const id of ids) {
       const e = rows.find((r) => r.id === id);
       if (e && (e.status === "Submitted" || e.status === "Logged")) {
-        approveTimeEntry(id, "John Smith");
+        approveTimeEntry(id, defaultActorName());
         n += 1;
       }
     }
@@ -170,7 +171,7 @@ export default function TimeTrackingPage() {
   }
 
   function onInvoiceSelected() {
-    const result = generateInvoiceFromTime([...selected], "John Smith");
+    const result = generateInvoiceFromTime([...selected], defaultActorName());
     if ("error" in result) {
       flash(result.error);
       return;

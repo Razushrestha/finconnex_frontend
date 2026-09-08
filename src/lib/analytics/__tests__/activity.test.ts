@@ -1,9 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { seedCrmFixtures } from "@/test-support/crm-fixtures";
 import { computeActivityAnalytics, defaultActivityAnalyticsFilters } from "@/lib/analytics/activity";
 
 const july = new Date(2026, 6, 23, 12, 0, 0);
 
 describe("activity analytics", () => {
+  beforeEach(() => seedCrmFixtures());
+
   it("builds first-response, duration, outcome, and timeline data from CRM stores", () => {
     const data = computeActivityAnalytics(
       { ...defaultActivityAnalyticsFilters(), dateRange: "all" },

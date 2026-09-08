@@ -388,11 +388,11 @@ export default function ESignatureOverviewPage() {
                       </td>
                       <td className="py-3.5 px-4">
                         <Tooltip
-                          content={doc.relatedTo || "Lead: William Anderson"}
+                          content={doc.relatedTo || "—"}
                           fullWidth
                         >
                           <span className="block truncate font-medium text-slate-900 dark:text-white">
-                            {doc.relatedTo || "Lead: William Anderson"}
+                            {doc.relatedTo || "—"}
                           </span>
                         </Tooltip>
                       </td>

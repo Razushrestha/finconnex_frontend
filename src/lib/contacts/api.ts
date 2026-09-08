@@ -443,7 +443,8 @@ export async function deleteCrmContact(id: string): Promise<void> {
 
 export async function bulkCrmContacts(input: {
   ids: string[];
-  operation: string;
+  /** Must match BulkContactOperation on the API — "DELETE" is rejected 400. */
+  operation: "ASSIGN_OWNER" | "CHANGE_STATUS" | "SOFT_DELETE";
   payload?: Record<string, unknown>;
 }): Promise<unknown> {
   return contactsMutate("/bulk", {

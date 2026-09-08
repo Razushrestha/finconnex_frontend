@@ -36,13 +36,22 @@ export function formatCell(value: ReportCell, kind?: ReportColumnKind) {
   return String(value);
 }
 
+/**
+ * Best-effort display name for an email address.
+ *
+ * Was a lookup table mapping substrings to hardcoded demo people; now derives
+ * the name from the address itself ("jane.doe@x.com" -> "Jane Doe") so it
+ * reflects the real user instead of inventing one.
+ */
 export function ownerFromEmail(email?: string) {
-  const raw = email?.toLowerCase() ?? "";
-  if (raw.includes("john")) return "John Smith";
-  if (raw.includes("shiva")) return "Shiva Kadhka";
-  if (raw.includes("tejas")) return "Tejas Gokhe";
-  if (raw.includes("roshna")) return "Roshna Abraham";
-  return "Unassigned";
+  const local = email?.trim().toLowerCase().split("@")[0] ?? "";
+  if (!local) return "Unassigned";
+  const name = local
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+  return name || "Unassigned";
 }
 
 export function loanFromText(...parts: Array<string | undefined>) {

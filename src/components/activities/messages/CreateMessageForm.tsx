@@ -41,6 +41,7 @@ import {
   sendCrmMessage,
 } from "@/lib/messages/api";
 import { formatRulesAt } from "@/lib/rules/storage";
+import { defaultActorName } from "@/lib/rules/actor";
 
 interface CreateMessageFormProps {
   layoutId: string;
@@ -77,7 +78,7 @@ const initialState: FormState = {
   type: "External",
   subject: "",
   body: "",
-  from: "John Smith",
+  from: defaultActorName(),
   to: CRM_SMS_TO_NUMBER,
   relatedKind: "",
   relatedName: "",

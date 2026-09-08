@@ -16,6 +16,7 @@ import {
   type FormStatus,
 } from "@/lib/marketing/forms/types";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   CreateEntityFormShell,
   Field,
@@ -45,7 +46,7 @@ export function CreateMarketingFormForm({
   const [journeys, setJourneys] = useState<
     ReturnType<typeof journeyOptionsForForms>
   >([]);
-  const [createdBy, setCreatedBy] = useState<string>(ACTIVITY_OWNERS[0]);
+  const [createdBy, setCreatedBy] = useState<string>(defaultActorName());
   const [fieldDefs, setFieldDefs] = useState<FormFieldDef[]>([
     { id: "nf1", label: "Full name", type: "Text", required: true },
     { id: "nf2", label: "Email", type: "Email", required: true },

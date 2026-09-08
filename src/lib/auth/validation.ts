@@ -12,6 +12,20 @@ export const emailOnlySchema = z.object({
   email: z.string().trim().email("Enter a valid email address"),
 });
 
+export const signupSchema = z.object({
+  email: z.string().trim().email("Enter a valid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  firstName: z.string().trim().min(1).max(50).optional(),
+  lastName: z.string().trim().min(1).max(50).optional(),
+});
+
+export type SignupFormValues = z.infer<typeof signupSchema>;
+
+export const verifyOtpSchema = z.object({
+  email: z.string().trim().email("Enter a valid email address"),
+  otp: z.string().trim().min(1, "Enter your verification code").max(16),
+});
+
 export const resetPasswordSchema = z
   .object({
     token: z.string().trim().min(1, "Reset token is required"),

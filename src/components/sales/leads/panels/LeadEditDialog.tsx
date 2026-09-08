@@ -18,7 +18,7 @@ import {
   hrefForLeadActivity,
   listLeadActivityCandidates,
 } from "@/lib/leads/activity-index";
-import { getRulesActor } from "@/lib/rules/actor";
+import { getRulesActor, defaultActorName } from "@/lib/rules/actor";
 import {
   X,
   Plus,
@@ -115,7 +115,7 @@ function seedPreviousTasks(leadName: string): TaskEntry[] {
       dueLabel: "Completed Jul 18",
       status: "Done",
       priority: "Medium",
-      assignedTo: "John Smith",
+      assignedTo: defaultActorName(),
       previous: true,
     },
     {
@@ -426,7 +426,7 @@ function TasksSection({
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [assignedTo, setAssignedTo] = useState<string>(
-    ACTIVITY_OWNERS[0] ?? "",
+    defaultActorName() ?? "",
   );
   const [priority, setPriority] = useState<Priority>("Medium");
 
@@ -898,7 +898,7 @@ function AppointmentSection({
       location: location || undefined,
       meetingLink: meetingLink || undefined,
       agenda: agenda || undefined,
-      organizer: getRulesActor().name || ACTIVITY_OWNERS[0] || "Me",
+      organizer: getRulesActor().name || defaultActorName() || "Me",
     });
     setAppointments((prev) => [
       {

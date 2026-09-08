@@ -92,6 +92,7 @@ export async function POST(request: Request) {
       const response = NextResponse.json({
         requires2fa: false,
         source: "crm",
+        needsWorkspace: !scoped.workspace,
         user: {
           id: sessionFields.userId,
           email: sessionFields.email,

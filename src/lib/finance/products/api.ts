@@ -5,6 +5,7 @@ import {
 } from "@/lib/activity-timeline/auth";
 import { crmFetch } from "@/lib/crm/request";
 import { formatFinanceDate } from "@/lib/finance/shared";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   type FinanceProduct,
   type ProductStatus,
@@ -141,7 +142,7 @@ export function normalizeProduct(
     raw.createdByName,
     raw.userName,
     raw.owner,
-    "John Smith",
+    defaultActorName(),
   );
   const createdAt = formatDate(raw.createdAt ?? raw.insertedAt);
 

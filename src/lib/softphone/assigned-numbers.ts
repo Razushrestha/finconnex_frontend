@@ -1,16 +1,15 @@
-/** Outbound numbers assigned to a CRM user (demo). */
-
-const OWNER_NUMBERS: Record<string, string[]> = {
-  "John Smith": ["+61480893823", "+61480112004"],
-  "Shiva Kadhka": ["+61480112004"],
-  "Tejas Gokhe": ["+61480893823"],
-  "Roshna Abraham": ["+61480893823", "+61480999001"],
-};
+/**
+ * Outbound numbers assigned to a CRM user.
+ *
+ * Was a hardcoded demo map keyed by fake names. Real per-user numbers come
+ * from the telephony settings; until one is configured this is empty and
+ * callers fall back to the workspace default.
+ */
+const OWNER_NUMBERS: Record<string, string[]> = {};
 
 export function assignedCallerIds(owner?: string): string[] {
   const named = owner?.trim() ? OWNER_NUMBERS[owner.trim()] : undefined;
-  if (named?.length) return named;
-  return OWNER_NUMBERS["John Smith"] ?? [];
+  return named?.length ? named : [];
 }
 
 export function defaultCallerId(owner?: string): string {

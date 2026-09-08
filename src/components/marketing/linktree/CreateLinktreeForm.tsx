@@ -16,6 +16,7 @@ import {
   type LinktreeStatus,
 } from "@/lib/marketing/linktree/types";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
+import { defaultActorName } from "@/lib/rules/actor";
 import {
   CreateEntityFormShell,
   Field,
@@ -43,7 +44,7 @@ export function CreateLinktreeForm({ layoutId: _l, redirect: _r }: Props) {
   const [bookingLabel, setBookingLabel] = useState("Book a consult");
   const [accent, setAccent] = useState<LinktreeAccent>("forest");
   const [status, setStatus] = useState<LinktreeStatus>("Draft");
-  const [owner, setOwner] = useState<string>(ACTIVITY_OWNERS[0]);
+  const [owner, setOwner] = useState<string>(defaultActorName());
   const [books, setBooks] = useState<ReturnType<typeof bookingOptions>>([]);
   const [linkItems, setLinkItems] = useState<LinktreeLink[]>([
     {
@@ -123,7 +124,7 @@ export function CreateLinktreeForm({ layoutId: _l, redirect: _r }: Props) {
           <input
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="John Smith"
+            placeholder="Your name"
             className={elevatedInputClass(true)}
           />
         </InputShell>

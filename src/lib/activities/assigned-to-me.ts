@@ -22,12 +22,6 @@ export function currentUserIdentities(): Set<string> {
   addIdentity(keys, actor.name);
   addIdentity(keys, actor.email);
   addIdentity(keys, actor.id);
-  if (
-    norm(actor.email ?? "") === "admin@finconnex.com" ||
-    actor.id === "user_john"
-  ) {
-    addIdentity(keys, "John Smith");
-  }
 
   const first = actor.name.trim().split(/\s+/)[0]?.toLowerCase();
   const last = actor.name.trim().split(/\s+/).slice(-1)[0]?.toLowerCase();
@@ -44,10 +38,6 @@ export function currentUserIdentities(): Set<string> {
     if (!exact && !samePerson && !uniqueFirst) continue;
     addIdentity(keys, owner);
     addIdentity(keys, oFirst);
-    if (oFirst === "shiva") {
-      addIdentity(keys, "Shiva Khadka");
-      addIdentity(keys, "Shiva Kadhka");
-    }
   }
 
   return keys;

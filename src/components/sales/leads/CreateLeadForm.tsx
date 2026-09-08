@@ -336,6 +336,9 @@ export function CreateLeadForm({
         return;
       }
     } catch (err) {
+      // Emails are unique among leads and among contacts, so a 409 may name
+      // either. Surface the server's message rather than guessing — "a contact
+      // already uses this email" points somewhere very different.
       const duplicate =
         err instanceof CrmLeadHttpError
           ? err.status === 409
@@ -346,7 +349,7 @@ export function CreateLeadForm({
           email:
             err instanceof Error
               ? err.message
-              : "A lead with this email already exists in the CRM.",
+              : "This email is already used by another record in this workspace.",
         }));
         return;
       }

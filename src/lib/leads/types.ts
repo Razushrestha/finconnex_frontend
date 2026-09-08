@@ -207,9 +207,4 @@ export function findLeadCardById(id: string): LeadCardData | undefined {
 /** Session 17 — Kanban columns = mortgage pipeline stages (PDF). */
 export const LEAD_COLUMNS: KanbanColumn[] = MORTGAGE_PIPELINE_STAGES.map((stage) => emptyStageColumn(stage));
 
-export const OWNERS = [
-  "John Smith",
-  "Shiva Kadhka",
-  "Tejas Gokhe",
-  "Roshna Abraham",
-] as const;
+export const OWNERS: readonly string[] = [];

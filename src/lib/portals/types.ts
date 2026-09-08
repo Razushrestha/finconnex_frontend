@@ -69,12 +69,7 @@ export const PORTAL_CLIENTS: {
   email: string;
 }[] = [];
 
-export const PORTAL_OWNERS = [
-  "John Smith",
-  "Tejas Gokhe",
-  "Roshna Abraham",
-  "Shiva Kadhka",
-] as const;
+export const PORTAL_OWNERS: readonly string[] = [];
 
 const STORE_KEY = "portals:v2";
 

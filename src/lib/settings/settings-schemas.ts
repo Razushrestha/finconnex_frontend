@@ -562,58 +562,13 @@ const CURATED: Record<string, SettingsSchema> = {
   "my-preferences/profile": {
     title: "Profile",
     description: "Your display name, contact details, and job title.",
-    fields: [
-      {
-        id: "displayName",
-        label: "Display name",
-        type: "text",
-        defaultValue: "John Smith",
-      },
-      {
-        id: "email",
-        label: "Email",
-        type: "text",
-        defaultValue: "admin@finconnex.example",
-      },
-      {
-        id: "phone",
-        label: "Phone",
-        type: "text",
-        defaultValue: "+61 400 000 000",
-      },
-      {
-        id: "jobTitle",
-        label: "Job title",
-        type: "text",
-        defaultValue: "Senior Broker",
-      },
-      { id: "avatar", label: "Profile photo", type: "file" },
-    ],
+    fields: [],
   },
 
   "my-preferences/signature": {
     title: "Signature",
     description: "Personal email / message signature used in outbound sends.",
-    fields: [
-      {
-        id: "signatureHtml",
-        label: "Email signature",
-        type: "textarea",
-        defaultValue: "John Smith\nSenior Broker · FinConnex\nSydney",
-      },
-      {
-        id: "includeLogo",
-        label: "Include company logo",
-        type: "toggle",
-        defaultValue: true,
-      },
-      {
-        id: "includeMobile",
-        label: "Include mobile number",
-        type: "toggle",
-        defaultValue: true,
-      },
-    ],
+    fields: [],
   },
 
   "my-preferences/password": {

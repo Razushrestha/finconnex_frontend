@@ -52,36 +52,7 @@ export function formatWorkflowRuleAt(d = new Date()) {
   });
 }
 
-export const seedWorkflowRules: WorkflowRule[] = [
-  {
-    id: "wr-demo-1",
-    ruleId: "WR-1001",
-    name: "Assign new leads to round-robin",
-    description: "When a lead is created, assign the next available owner.",
-    trigger: "Lead Created",
-    conditions: "source is not empty",
-    actions: "Assign owner · Create follow-up task",
-    enabled: true,
-    status: "Active",
-    createdBy: "John Smith",
-    createdAt: "12/07/2026 09:10",
-    updatedAt: "20/07/2026 11:20",
-  },
-  {
-    id: "wr-demo-2",
-    ruleId: "WR-1002",
-    name: "Escalate overdue tasks",
-    description: "Notify the manager when a task is more than 24 hours overdue.",
-    trigger: "Task Overdue",
-    conditions: "overdueHours > 24",
-    actions: "Notify team · Raise priority",
-    enabled: false,
-    status: "Draft",
-    createdBy: "Tejas Gokhe",
-    createdAt: "15/07/2026 14:00",
-    updatedAt: "18/07/2026 08:40",
-  },
-];
+export const seedWorkflowRules: WorkflowRule[] = [];
 
 function readStore(): WorkflowRule[] | null {
   if (typeof window === "undefined") return null;

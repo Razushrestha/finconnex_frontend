@@ -50,6 +50,7 @@ import {
   elevatedSelectClass,
 } from "@/components/sales/CreateEntityForm";
 import { cn } from "@/lib/utils";
+import { defaultActorName } from "@/lib/rules/actor";
 
 interface Props {
   layoutId: string;
@@ -106,7 +107,7 @@ export function CreateReportForm({ layoutId: _l, redirect: _r }: Props) {
   const [groupBy, setGroupBy] = useState<string>(sourceFields[0]?.id ?? "");
   const [sortBy, setSortBy] = useState<string>(sortOptions[0]?.id ?? "");
   const [schedule, setSchedule] = useState<ReportSchedule>("None");
-  const [createdBy, setCreatedBy] = useState<string>(REPORT_OWNERS[0]);
+  const [createdBy, setCreatedBy] = useState<string>(defaultActorName());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);

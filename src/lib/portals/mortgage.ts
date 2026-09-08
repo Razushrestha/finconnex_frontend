@@ -2098,7 +2098,7 @@ function inviteSeed(
 ): MortgagePortalState {
   const { firstName, lastName } = splitName(portal.primaryContactName);
   const brokerName =
-    portal.createdBy === "John Smith" ? DEFAULT_BROKER.name : portal.createdBy;
+    portal.createdBy || DEFAULT_BROKER.name;
   const phone = card?.phone;
   const fromLead = card ? leadCustomToFactFind(card) : {};
   return {

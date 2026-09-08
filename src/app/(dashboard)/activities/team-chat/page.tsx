@@ -69,6 +69,7 @@ import {
   notifyTaskAssigned,
 } from "@/lib/rules/notify";
 import { cn } from "@/lib/utils";
+import { defaultActorName } from "@/lib/rules/actor";
 
 const EMOJIS = ["😀", "👍", "🙏", "🔥", "✅", "🎉", "😂", "❤️"];
 
@@ -1361,7 +1362,7 @@ function MessageBubble({
             own ? "bg-violet-100 text-violet-700" : avatarColor(msg.author),
           )}
         >
-          {initials(msg.author === "You" ? "Roshna Abraham" : msg.author)}
+          {initials(msg.author === "You" ? defaultActorName() : msg.author)}
         </span>
       ) : (
         <span className="w-8 shrink-0" />

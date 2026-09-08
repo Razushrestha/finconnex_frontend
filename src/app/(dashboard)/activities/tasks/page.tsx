@@ -39,12 +39,12 @@ import {
   tryCrmTask,
 } from "@/lib/tasks/api";
 import { useCrmTasks } from "@/lib/tasks/use-crm-tasks";
-import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import { downloadCsv, toCsv } from "@/lib/import/csv";
 import { emitRulesChange } from "@/lib/rules/storage";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import { BOARD_PAGE } from "@/lib/layout";
+import { defaultActorName } from "@/lib/rules/actor";
 
 const TASK_VIEW_MODE_KEY = "finconnex.tasks.view-mode";
 
@@ -211,7 +211,7 @@ export default function TasksPage() {
 
   function runBulkReassign() {
     const owner =
-      ACTIVITY_OWNERS.find((o) => o !== "John Smith") ?? ACTIVITY_OWNERS[0];
+      defaultActorName();
     let n = 0;
     for (const id of selectedTaskIds) {
       if (reassignTask(id, owner)) n += 1;

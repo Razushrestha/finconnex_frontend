@@ -1,6 +1,5 @@
 /** Companies CSV import / export. */
 
-import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import {
   autoMapHeaders,
   downloadCsv,
@@ -17,7 +16,7 @@ import {
   COMPANY_STATUSES,
   type CompanyStatus,
 } from "@/lib/companies/types";
-import { getRulesActor } from "@/lib/rules/actor";
+import { getRulesActor, defaultActorName } from "@/lib/rules/actor";
 
 export const COMPANY_INDUSTRIES = [
   "Technology",
@@ -128,7 +127,7 @@ export function defaultCompanyImportSettings(): CompanyImportSettings {
   return {
     skipDuplicates: true,
     updateExisting: false,
-    defaultOwner: getRulesActor().name || ACTIVITY_OWNERS[0],
+    defaultOwner: getRulesActor().name || defaultActorName(),
     defaultStatus: "Prospect",
     defaultSource: "Other",
   };
@@ -250,7 +249,7 @@ export function applyCompanyImport(
     const annualRevenue = cell(row, mapping, "annualRevenue") || undefined;
     const status = asStatus(cell(row, mapping, "status"), settings.defaultStatus);
     const owner =
-      cell(row, mapping, "owner") || settings.defaultOwner || ACTIVITY_OWNERS[0];
+      cell(row, mapping, "owner") || settings.defaultOwner || defaultActorName();
 
     if (result.status === "update") {
       let did = false;
@@ -370,7 +369,7 @@ export function sampleCompanyCsvTemplate() {
         "Melbourne",
         "$2.1M",
         "Prospect",
-        ACTIVITY_OWNERS[0],
+        defaultActorName(),
       ],
     ],
   );

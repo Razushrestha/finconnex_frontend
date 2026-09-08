@@ -77,21 +77,15 @@ export const TIME_STATUSES: TimeEntryStatus[] = [
   "Rejected",
 ];
 
-export const TIME_USERS = [
-  "John Smith",
-  "Tejas Gokhe",
-  "Roshna Abraham",
-  "Shiva Kadhka",
-] as const;
+export const TIME_USERS: readonly string[] = [];
 
 export const RELATED_RECORD_OPTIONS: TimeRelatedTo[] = [];
 
-export const DEFAULT_RATES: Record<string, number> = {
-  "John Smith": 280,
-  "Tejas Gokhe": 250,
-  "Roshna Abraham": 220,
-  "Shiva Kadhka": 200,
-};
+/**
+ * Per-user billable rates. Was a demo map keyed by fake names; real rates
+ * are configured per user, and callers already fall back to a default.
+ */
+export const DEFAULT_RATES: Record<string, number> = {};
 
 export const TIME_STATUS_STYLE: Record<TimeEntryStatus, string> = {
   Draft: "bg-slate-100 text-slate-700",

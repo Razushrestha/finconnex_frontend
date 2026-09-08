@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   User,
@@ -13,11 +13,18 @@ import {
 import {
   CONTACT_SOURCES,
   CONTACT_STATUSES,
-  OWNERS,
   type ContactSource,
   type ContactStatus,
 } from "@/lib/contacts/types";
-import { COMPANY_NAMES } from "@/lib/companies/types";
+import { listCompanyGroups } from "@/lib/companies/store";
+import { useCrmCompanies } from "@/lib/companies/use-crm-companies";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import {
+  assignableOwnerLabel,
+  defaultAssignableOwnerId,
+  listAssignableOwnersLocal,
+  loadAssignableOwners,
+} from "@/lib/users/assignable";
 import { createContact } from "@/lib/contacts/store";
 import {
   logCreate,
@@ -67,11 +74,42 @@ export function CreateContactForm({
   redirect,
 }: CreateContactFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(initialState);
+  const crmCompanies = useCrmCompanies();
+  const [form, setForm] = useState<FormState>(() => {
+    const owners = listAssignableOwnersLocal();
+    return { ...initialState, owner: defaultAssignableOwnerId(owners) };
+  });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
   );
   const [submitted, setSubmitted] = useState(false);
+  const [ownerOptions, setOwnerOptions] = useState(() =>
+    listAssignableOwnersLocal(),
+  );
+  const ownerLabel =
+    ownerOptions.find((o) => o.id === form.owner)?.name ?? form.owner;
+
+  const companies = useMemo(() => {
+    void crmCompanies.source;
+    return listCompanyGroups()
+      .flatMap((group) => group.companies)
+      .filter((company) => isUuid(company.id));
+  }, [crmCompanies.source, crmCompanies.loading]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadAssignableOwners().then((options) => {
+      if (cancelled || !options.length) return;
+      setOwnerOptions(options);
+      setForm((prev) => ({
+        ...prev,
+        owner: defaultAssignableOwnerId(options, prev.owner),
+      }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -111,15 +149,16 @@ export function CreateContactForm({
         email: form.email.trim(),
         phone: form.phone,
         mobile: form.mobile,
-        company: form.company,
+        companyId: form.company,
         source: form.leadSource || "Website",
         status: form.status || "Active",
-        owner: form.owner,
+        owner: ownerLabel,
+        ownerId: form.owner,
       });
       const label = contact.name;
-      logCreate("sales.contacts", form.owner, contact.id, label);
+      logCreate("sales.contacts", ownerLabel, contact.id, label);
       notifyOwnerAssigned({
-        owner: form.owner,
+        owner: ownerLabel,
         entityLabel: `Contact ${label}`,
         relatedTo: label,
         relatedHref: "/sales/contacts",
@@ -225,9 +264,9 @@ export function CreateContactForm({
             onChange={(e) => update("company", e.target.value)}
           >
             <option value="">Select company</option>
-            {COMPANY_NAMES.map((name) => (
-              <option key={name} value={name}>
-                {name}
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
               </option>
             ))}
           </select>
@@ -283,9 +322,9 @@ export function CreateContactForm({
             value={form.owner}
             onChange={(e) => update("owner", e.target.value)}
           >
-            {OWNERS.map((o) => (
-              <option key={o} value={o}>
-                {o}
+            {ownerOptions.map((o) => (
+              <option key={o.id} value={o.id}>
+                {assignableOwnerLabel(o)}
               </option>
             ))}
           </select>

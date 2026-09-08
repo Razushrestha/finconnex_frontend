@@ -1,6 +1,5 @@
 /** Deals CSV import / export + clone. */
 
-import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import {
   autoMapHeaders,
   downloadCsv,
@@ -21,7 +20,7 @@ import {
   type DealPipeline,
   type DealStageTitle,
 } from "@/lib/deals/types";
-import { getRulesActor } from "@/lib/rules/actor";
+import { getRulesActor, defaultActorName } from "@/lib/rules/actor";
 import { assertUniqueDealNameAccount } from "@/lib/rules/integrity";
 import { newRulesId } from "@/lib/rules/storage";
 
@@ -139,7 +138,7 @@ export function defaultDealImportSettings(): DealImportSettings {
   return {
     skipDuplicates: true,
     updateExisting: false,
-    defaultOwner: getRulesActor().name || ACTIVITY_OWNERS[0],
+    defaultOwner: getRulesActor().name || defaultActorName(),
     defaultStatus: "Prospecting",
     defaultSource: "AUD",
   };
@@ -283,7 +282,7 @@ export function applyDealImport(
       ? Number.parseInt(probabilityRaw.replace(/%/g, ""), 10)
       : undefined;
     const owner =
-      cell(row, mapping, "owner") || settings.defaultOwner || ACTIVITY_OWNERS[0];
+      cell(row, mapping, "owner") || settings.defaultOwner || defaultActorName();
     const closeDate = cell(row, mapping, "closeDate") || undefined;
 
     if (result.status === "update") {
@@ -431,7 +430,7 @@ export function sampleDealCsvTemplate() {
         "85000",
         "AUD",
         "20",
-        ACTIVITY_OWNERS[0],
+        defaultActorName(),
         "15 Oct 2026",
       ],
     ],

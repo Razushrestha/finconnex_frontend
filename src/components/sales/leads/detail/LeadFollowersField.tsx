@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Search, X } from "lucide-react";
 import { avatarColor, initials } from "@/lib/activities/shared";
-import { OWNERS } from "@/lib/leads/types";
 import { listCrmUsers } from "@/lib/settings/users-store";
 import { listCrmWorkspaceMembers } from "@/lib/workspace-members/api";
 import { isUuid } from "@/lib/activity-timeline/auth";
@@ -33,7 +32,7 @@ function teamMemberNames(extra: string[] = []): string[] {
     (user) => user.status !== "Inactive" && user.name.trim(),
   );
   const fromUsers = users.map((user) => user.name.trim());
-  const names = [...fromUsers, ...extra, ...OWNERS].filter(Boolean);
+  const names = [...fromUsers, ...extra].filter(Boolean);
   return [...new Set(names)];
 }
 

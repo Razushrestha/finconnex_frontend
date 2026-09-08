@@ -21,12 +21,13 @@ import {
 } from "@/components/journeys/JourneyCanvas";
 import type { JourneyStep } from "@/lib/journeys/types";
 import { cn } from "@/lib/utils";
+import { defaultActorName } from "@/lib/rules/actor";
 
 export default function CreateJourneyPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [trigger, setTrigger] = useState<JourneyTrigger>("Lead Created");
-  const [createdBy, setCreatedBy] = useState<string>(JOURNEY_OWNERS[0]);
+  const [createdBy, setCreatedBy] = useState<string>(defaultActorName());
   const [exitConditions, setExitConditions] = useState<string[]>([
     EXIT_CONDITION_PRESETS[0],
     EXIT_CONDITION_PRESETS[5],

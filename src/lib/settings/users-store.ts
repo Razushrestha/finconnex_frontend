@@ -24,45 +24,16 @@ export type CrmUser = {
   joinedAt?: string;
 };
 
-const SEED: CrmUser[] = [
-  {
-    id: "user_john",
-    name: "John Smith",
-    email: "admin@finconnex.com",
-    role: "Manager",
-    status: "Active",
-    team: "Sales",
-    lastLoginAt: new Date().toISOString(),
-    joinedAt: "2024-05-12",
-  },
-  {
-    id: "user_shiva",
-    name: "Shiva Kadhka",
-    email: "shiva@finconnex.com",
-    role: "Team Lead",
-    status: "Active",
-    team: "Sales",
-    joinedAt: "2024-06-03",
-  },
-  {
-    id: "user_tejas",
-    name: "Tejas Gokhe",
-    email: "tejas@finconnex.com",
-    role: "User",
-    status: "Active",
-    team: "Support",
-    joinedAt: "2024-07-18",
-  },
-  {
-    id: "user_roshna",
-    name: "Roshna Abraham",
-    email: "roshna@finconnex.com",
-    role: "User",
-    status: "Invited",
-    team: "Marketing",
-    joinedAt: "2024-08-01",
-  },
-];
+/**
+ * Local-only placeholder shown before the live workspace-members fetch
+ * resolves (see `loadAssignableOwners()` in `@/lib/users/assignable.ts`,
+ * which always attempts the real CRM API first and only keeps data derived
+ * from this SEED if that live fetch fails). Once any real member exists
+ * server-side — true for every real workspace, since its owner is a real
+ * member from creation — this SEED is never what a user actually sees; it
+ * only ever appears as an instant first paint or an offline/dev fallback.
+ */
+const SEED: CrmUser[] = [];
 
 function load(): CrmUser[] {
   const raw = readPersistedJson<CrmUser[]>(STORE_KEY, SEED);

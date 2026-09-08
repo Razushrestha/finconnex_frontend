@@ -86,12 +86,7 @@ export const TICKET_CATEGORIES: TicketCategory[] = [
   "General",
 ];
 
-export const SUPPORT_AGENTS = [
-  "John Smith",
-  "Tejas Gokhe",
-  "Roshna Abraham",
-  "Shiva Kadhka",
-] as const;
+export const SUPPORT_AGENTS: readonly string[] = [];
 
 export const SUPPORT_REQUESTERS: string[] = [];
 

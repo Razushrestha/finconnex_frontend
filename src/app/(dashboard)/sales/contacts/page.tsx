@@ -154,7 +154,7 @@ export default function ContactsPage() {
     setBulkFlash(`Exported ${n} selected contacts`);
   }
 
-  function runBulkDelete() {
+  async function runBulkDelete() {
     if (!selectedIds.length) return;
     const count = selectedIds.length;
     if (
@@ -164,17 +164,25 @@ export default function ContactsPage() {
     ) {
       return;
     }
+    const ids = [...selectedIds];
     let n = 0;
-    for (const id of selectedIds) {
+    for (const id of ids) {
       if (deleteContact(id, { skipCrm: true })) n += 1;
     }
-    if (n) {
-      void tryCrmContact(() =>
-        bulkCrmContacts({ ids: selectedIds, operation: "DELETE" }),
-      );
-    }
     setSelectedIds([]);
-    setBulkFlash(`Deleted ${n} contact${n === 1 ? "" : "s"}`);
+    if (!n) return;
+
+    // The rows are removed locally first, so a silently-failed server delete
+    // looks like success until the next refresh brings them all back. Await
+    // the result and say so instead of reporting a delete that did not happen.
+    const result = await tryCrmContact(() =>
+      bulkCrmContacts({ ids, operation: "SOFT_DELETE" }),
+    );
+    setBulkFlash(
+      result === null
+        ? `Could not delete on the server — ${n} contact${n === 1 ? "" : "s"} will return on refresh`
+        : `Deleted ${n} contact${n === 1 ? "" : "s"}`,
+    );
   }
 
   function toggleSelected(id: string) {

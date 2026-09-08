@@ -57,6 +57,7 @@ import { cn } from "@/lib/utils";
 import { RecordTagChip } from "@/components/shared/tags/RecordTags";
 import { BOARD_PAGE } from "@/lib/layout";
 import { softDeleteRecord } from "@/lib/rules";
+import { defaultActorName } from "@/lib/rules/actor";
 
 const ACCESS_STYLE: Record<DocumentAccessLevel, string> = {
   Private: "bg-slate-100 text-slate-600",
@@ -687,7 +688,7 @@ function UploadForm({
   const [fileName, setFileName] = useState("");
   const [uploading, setUploading] = useState(false);
   const [folder, setFolder] = useState("Clients");
-  const [owner, setOwner] = useState<string>(ACTIVITY_OWNERS[0]);
+  const [owner, setOwner] = useState<string>(defaultActorName());
   const [relatedKind, setRelatedKind] = useState<RelatedEntityKind | "">("");
   const [relatedName, setRelatedName] = useState("");
   const [tags, setTags] = useState("");

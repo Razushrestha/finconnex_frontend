@@ -2,9 +2,9 @@ import { getRulesActor } from "@/lib/rules/actor";
 import { roleLevel } from "@/lib/rules/permissions";
 
 export const REPORT_TEAMS: Record<string, string[]> = {
-  Sales: ["John Smith", "Shiva Kadhka"],
-  Operations: ["Tejas Gokhe"],
-  Support: ["Roshna Abraham"],
+  Sales: [],
+  Operations: [],
+  Support: [],
 };
 
 export function teamForOwner(owner: string) {

@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import {
   BarChart3,
   LineChart,
@@ -115,6 +116,16 @@ export default function LoginPage() {
             >
               <LoginForm />
             </Suspense>
+
+            <p className="mt-6 text-center text-sm text-gray-500">
+              Don&apos;t have an account?{" "}
+              <Link
+                href="/signup"
+                className="font-medium text-violet-600 hover:text-violet-700"
+              >
+                Sign up
+              </Link>
+            </p>
           </div>
 
           <p className="mt-6 text-center text-xs text-gray-400">

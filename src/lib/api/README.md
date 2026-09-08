@@ -39,7 +39,7 @@ const result = await api.leads.create({
   lastName: "Morgan",
   email: "alex@company.com",
   status: "New",
-  owner: "John Smith",
+  owner: "Jane Doe",
 });
 
 if (!result.ok) {

@@ -14,6 +14,7 @@ import type {
   TicketsApi,
 } from "@/lib/api/contracts";
 import { apiFail, apiOk, toApiError } from "@/lib/api/errors";
+import { toCrmCreateBody } from "@/lib/leads/api/map";
 import {
   httpDelete,
   httpGet,
@@ -184,8 +185,23 @@ const leads: LeadsApi = {
       }),
     ),
   get: (id) => wrap(() => httpGet(`/leads/${id}`)),
-  create: (input) => wrap(() => httpPost("/leads", input)),
-  update: (id, patch) => wrap(() => httpPatch(`/leads/${id}`, patch)),
+  // `LeadCreateInput` is the UI shape (company/owner/status, UI-cased source
+  // and pipeline stage). The API validates with forbidNonWhitelisted, so
+  // posting it raw is rejected with "property owner should not exist" before
+  // it ever reaches the handler. Map to the DTO shape first — the same mapper
+  // the live create path uses.
+  create: (input) => wrap(() => httpPost("/leads", toCrmCreateBody(input))),
+  update: (id, patch) =>
+    wrap(() =>
+      httpPatch(
+        `/leads/${id}`,
+        patch.firstName && patch.lastName && patch.email
+          ? toCrmCreateBody(
+              patch as Parameters<typeof toCrmCreateBody>[0],
+            )
+          : patch,
+      ),
+    ),
   setStatus: (id, input) =>
     wrap(() => httpPost(`/leads/${id}/status`, input)),
   remove: (id) => wrap(() => httpDelete(`/leads/${id}`)),
