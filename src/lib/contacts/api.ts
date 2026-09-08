@@ -10,6 +10,7 @@ import type {
   ContactSource,
   ContactStatus,
 } from "@/lib/contacts/types";
+import { ownerDisplayName, ownerDisplayNameOr } from "@/lib/users/display-name";
 
 export type CrmContactQuery = {
   page?: number;
@@ -229,11 +230,10 @@ export function normalizeCrmContact(
       email: pickStr(raw.email, raw.emailAddress, raw.primaryEmail),
       phone: pickStr(raw.phone, raw.phoneNumber, raw.primaryPhone),
       mobile: pickStr(raw.mobile, raw.mobilePhone) || undefined,
-      owner: pickStr(
-        owner && pickStr(owner.name, owner.email),
-        raw.ownerName,
-        raw.assignedTo,
-        typeof raw.owner === "string" ? raw.owner : "",
+      owner: ownerDisplayName(
+        owner,
+        pickStr(raw.ownerName),
+        pickStr(raw.assignedTo),
       ),
       ownerId: pickStr(raw.ownerId, owner && owner.id) || undefined,
       jobTitle: pickStr(raw.jobTitle) || undefined,
