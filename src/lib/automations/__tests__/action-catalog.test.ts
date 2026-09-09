@@ -91,6 +91,123 @@ describe("automation action catalog", () => {
     }
   });
 
+  /**
+   * Each action offers exactly what its own module's create DTO accepts, so a
+   * step configured in the builder maps 1:1 onto what that module's create
+   * form would send. Spot-checks the fields that were missing before — the
+   * ones that made the automation form a cut-down version of the real one.
+   */
+  it("offers the same fields as each module's own create form", () => {
+    const expected: Record<string, string[]> = {
+      // CreateTaskDto — the Create Task form's owner, collaborators,
+      // recurrence, billing and attachment fields.
+      CREATE_TASK: [
+        "subject",
+        "taskType",
+        "priority",
+        "description",
+        "assigneeIds",
+        "collaboratorIds",
+        "followerIds",
+        "dueAt",
+        "reminderAt",
+        "repeatEvery",
+        "recurrenceTimezone",
+        "recurrenceLimit",
+        "isPublic",
+        "isBillable",
+        "tags",
+        "attachmentKeys",
+        "relatedType",
+      ],
+      // Phase2CreateNoteDto — note type, pin and private were all missing.
+      CREATE_NOTE: [
+        "title",
+        "body",
+        "noteType",
+        "isPinned",
+        "isPrivate",
+        "relatedType",
+        "quoteId",
+        "estimateId",
+        "invoiceId",
+        "creditNoteId",
+      ],
+      // CreateEmailDto — the compose window's Cc, Bcc and scheduling.
+      SEND_EMAIL: [
+        "subject",
+        "body",
+        "toEmail",
+        "cc",
+        "bcc",
+        "templateId",
+        "replyToId",
+        "scheduledAt",
+      ],
+      CREATE_REMINDER: [
+        "title",
+        "remindAt",
+        "targetUserId",
+        "reminderType",
+        "notificationMethod",
+      ],
+      SCHEDULE_CALL: ["subject", "callType", "phone", "purpose", "reminderAt"],
+      CREATE_MEETING: ["title", "meetingType", "endAt", "timezone", "allDay"],
+      CREATE_LEAD: [
+        "firstName",
+        "lastName",
+        "email",
+        "companySize",
+        "pipelineStage",
+        "lifecycleStage",
+        "rating",
+        "score",
+        "tags",
+        "estimatedValue",
+      ],
+      CREATE_DEAL: ["name", "stage", "lostReason", "competitor", "pipeline"],
+      CREATE_COMPANY: ["name", "size", "employeeCount", "parentId"],
+      CREATE_CONTACT: ["email", "lifecycleStage", "source", "doNotContact"],
+    };
+    for (const [action, fields] of Object.entries(expected)) {
+      const allowed = AUTOMATION_ACTION_KEYS[action]?.allowed ?? [];
+      for (const field of fields) {
+        expect(allowed, `${action} is missing ${field}`).toContain(field);
+      }
+    }
+  });
+
+  it("uses the database enum values for every select", () => {
+    const enums: Record<string, string[]> = {
+      noteType: ["GENERAL", "CALL_SUMMARY", "MEETING_NOTES", "FOLLOW_UP", "OTHER"],
+      repeatEvery: ["DAILY", "WEEKLY", "MONTHLY", "YEARLY"],
+      priority: ["LOW", "MEDIUM", "HIGH", "URGENT"],
+      taskType: ["CALL", "EMAIL", "MEETING", "FOLLOW_UP", "DEMO", "RESEARCH", "OTHER"],
+      reminderType: ["TASK_DUE", "MEETING_START", "FOLLOW_UP", "CUSTOM"],
+      notificationMethod: ["IN_APP", "EMAIL", "PUSH", "SMS"],
+      rating: ["HOT", "WARM", "COLD"],
+      lostReason: ["PRICE", "FEATURE", "COMPETITOR", "NO_BUDGET", "NO_RESPONSE", "OTHER"],
+      size: ["MICRO", "SMALL", "MEDIUM", "LARGE", "ENTERPRISE"],
+      lifecycleStage: [
+        "SUBSCRIBER",
+        "LEAD",
+        "MQL",
+        "SQL",
+        "OPPORTUNITY",
+        "CUSTOMER",
+        "EVANGELIST",
+        "LOST",
+      ],
+    };
+    for (const [key, values] of Object.entries(enums)) {
+      const options = FIELD_META[key]?.options ?? [];
+      expect(
+        options.map((option) => option.value).sort(),
+        `${key} options drifted from the schema enum`,
+      ).toEqual([...values].sort());
+    }
+  });
+
   it("keeps only genuinely unbuilt actions in the coming-soon list", () => {
     // Everything left needs a third-party integration, a missing schema
     // field, or engine work — never merely "an executor".

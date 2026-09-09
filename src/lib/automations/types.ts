@@ -368,137 +368,172 @@ export const FLOW_CONTROL_CATALOG = {
 } as const;
 
 /** Mirrors AUTOMATION_ACTION_REGISTRY in the backend, for building the step config editor. */
+/**
+ * Mirrors AUTOMATION_ACTION_REGISTRY in the backend, for building the step
+ * config editor. Each action offers exactly the fields its own module's
+ * create DTO accepts, so a step configured here maps 1:1 onto what the
+ * module's own create form would send.
+ *
+ * Generated from the backend registry; `action-catalog.test.ts` asserts
+ * every key here has a FIELD_META widget and that required is a subset of
+ * allowed.
+ */
 export const AUTOMATION_ACTION_KEYS: Record<
   string,
   { allowed: string[]; required: string[] }
 > = {
-  UPDATE_RECORD: { allowed: ["fields"], required: ["fields"] },
-  CHANGE_STATUS: { allowed: ["field", "value"], required: ["value"] },
-  ASSIGN_OWNER: { allowed: ["ownerId"], required: ["ownerId"] },
+  UPDATE_RECORD: {
+    allowed: ["fields"],
+    required: ["fields"],
+  },
+  CHANGE_STATUS: {
+    allowed: ["field", "value"],
+    required: ["value"],
+  },
+  ASSIGN_OWNER: {
+    allowed: ["ownerId"],
+    required: ["ownerId"],
+  },
   CREATE_TASK: {
-    allowed: [
-      "subject",
-      "description",
-      "taskType",
-      "priority",
-      "startAt",
-      "startInMs",
-      "dueAt",
-      "dueInMs",
-      "assigneeIds",
-      "tags",
-    ],
-    required: ["subject", "assigneeIds"],
-  },
-  ADD_TO_WORK_QUEUE: {
-    allowed: [
-      "subject",
-      "description",
-      "priority",
-      "startAt",
-      "startInMs",
-      "dueAt",
-      "dueInMs",
-      "assigneeIds",
-      "tags",
-    ],
-    required: ["subject", "assigneeIds"],
-  },
-  CREATE_FOLLOW_UP: {
-    allowed: [
-      "subject",
-      "description",
-      "priority",
-      "startAt",
-      "startInMs",
-      "dueAt",
-      "dueInMs",
-      "assigneeIds",
-      "tags",
-    ],
+    allowed: ["subject", "description", "taskType", "priority", "startAt", "startInMs", "dueAt", "dueInMs", "reminderAt", "reminderInMs", "repeatEvery", "recurrenceTimezone", "recurrenceLimit", "isPublic", "isBillable", "assigneeIds", "followerIds", "collaboratorIds", "tags", "attachmentKeys", "relatedType", "leadId", "contactId", "companyId", "dealId"],
     required: ["subject", "assigneeIds"],
   },
   CREATE_REMINDER: {
-    allowed: ["title", "remindAt", "remindInMs", "targetUserId"],
+    allowed: ["title", "remindAt", "remindInMs", "targetUserId", "reminderType", "notificationMethod", "taskId", "callId", "meetingId", "relatedType", "leadId", "contactId", "companyId", "dealId", "quoteId", "estimateId", "invoiceId", "creditNoteId"],
     required: ["title", "targetUserId"],
   },
-  CREATE_NOTE: { allowed: ["title", "body"], required: ["body"] },
-  ADD_TAG: { allowed: ["tag"], required: ["tag"] },
-  REMOVE_TAG: { allowed: ["tag"], required: ["tag"] },
+  CREATE_NOTE: {
+    allowed: ["title", "body", "noteType", "isPinned", "isPrivate", "relatedType", "leadId", "contactId", "companyId", "dealId", "quoteId", "estimateId", "invoiceId", "creditNoteId"],
+    required: ["body"],
+  },
+  ADD_TAG: {
+    allowed: ["tag"],
+    required: ["tag"],
+  },
+  REMOVE_TAG: {
+    allowed: ["tag"],
+    required: ["tag"],
+  },
   SEND_NOTIFICATION: {
-    allowed: ["recipientId", "notificationType", "title", "message"],
+    allowed: ["recipientId", "notificationType", "title", "message", "relatedType", "leadId", "contactId", "companyId", "dealId"],
     required: ["recipientId", "title", "message"],
   },
   SEND_EMAIL: {
-    allowed: ["subject", "body", "toEmail"],
+    allowed: ["subject", "body", "toEmail", "cc", "bcc", "templateId", "replyToId", "scheduledAt", "relatedType", "leadId", "contactId", "companyId", "dealId"],
     required: ["subject", "body", "toEmail"],
   },
   SEND_MESSAGE: {
-    allowed: [
-      "messageType",
-      "channel",
-      "subject",
-      "body",
-      "toUserId",
-      "toContactId",
-    ],
+    allowed: ["messageType", "channel", "subject", "body", "toUserId", "toContactId", "templateId", "relatedType", "leadId", "contactId", "companyId", "dealId"],
     required: ["messageType", "subject", "body"],
   },
-  WEBHOOK: {
-    allowed: ["url", "method", "headers", "body", "timeoutMs"],
-    required: ["url"],
+  ADD_TO_WORK_QUEUE: {
+    allowed: ["subject", "description", "taskType", "priority", "startAt", "startInMs", "dueAt", "dueInMs", "reminderAt", "reminderInMs", "repeatEvery", "recurrenceTimezone", "recurrenceLimit", "isPublic", "isBillable", "assigneeIds", "followerIds", "collaboratorIds", "tags", "attachmentKeys", "relatedType", "leadId", "contactId", "companyId", "dealId"],
+    required: ["subject", "assigneeIds"],
+  },
+  CREATE_FOLLOW_UP: {
+    allowed: ["subject", "description", "taskType", "priority", "startAt", "startInMs", "dueAt", "dueInMs", "reminderAt", "reminderInMs", "repeatEvery", "recurrenceTimezone", "recurrenceLimit", "isPublic", "isBillable", "assigneeIds", "followerIds", "collaboratorIds", "tags", "attachmentKeys", "relatedType", "leadId", "contactId", "companyId", "dealId"],
+    required: ["subject", "assigneeIds"],
   },
   TRIGGER_AUTOMATION: {
     allowed: ["triggerType", "entityType", "entityId"],
     required: ["triggerType"],
   },
-  // LINK_RECORD links the trigger Lead to a Company, the same mutation as
-  // ASSOCIATE_CONTACT — it does not take a free entityType/entityId pair.
-  LINK_RECORD: { allowed: ["companyId"], required: ["companyId"] },
-  CANCEL_REMINDERS: { allowed: [], required: [] },
+  LINK_RECORD: {
+    allowed: ["companyId"],
+    required: ["companyId"],
+  },
+  CANCEL_REMINDERS: {
+    allowed: [],
+    required: [],
+  },
+  WEBHOOK: {
+    allowed: ["url", "method", "headers", "body", "timeoutMs"],
+    required: ["url"],
+  },
   CREATE_LEAD: {
-    allowed: ["firstName", "lastName", "email", "phone", "jobTitle", "companyId", "source", "ownerId"],
+    allowed: ["firstName", "lastName", "email", "phone", "mobilePhone", "jobTitle", "department", "linkedinUrl", "websiteUrl", "twitterUrl", "street", "city", "state", "country", "postalCode", "companyId", "companyName", "companyWebsite", "industry", "companySize", "pipelineStage", "tags", "source", "lifecycleStage", "score", "rating", "doNotContact", "productInterest", "budgetRange", "estimatedValue", "currency", "probability", "expectedCloseDate", "description", "notes", "ownerId"],
     required: ["firstName", "lastName", "email"],
   },
+  DELETE_LEAD: {
+    allowed: ["recordId"],
+    required: [],
+  },
   CREATE_CONTACT: {
-    allowed: ["firstName", "lastName", "email", "phone", "jobTitle", "companyId", "ownerId"],
+    allowed: ["firstName", "lastName", "email", "phone", "mobilePhone", "jobTitle", "department", "linkedinUrl", "lifecycleStage", "source", "doNotContact", "notes", "companyId", "ownerId"],
     required: ["email"],
   },
+  DELETE_CONTACT: {
+    allowed: ["recordId"],
+    required: [],
+  },
   CREATE_COMPANY: {
-    allowed: ["name", "website", "industry", "ownerId"],
+    allowed: ["name", "website", "industry", "size", "employeeCount", "annualRevenue", "description", "street", "city", "state", "country", "postalCode", "linkedinUrl", "twitterUrl", "phone", "parentId", "ownerId"],
     required: ["name"],
+  },
+  DELETE_COMPANY: {
+    allowed: ["recordId"],
+    required: [],
   },
   CREATE_DEAL: {
-    allowed: ["name", "stage", "value", "currency", "companyId", "ownerId", "expectedCloseDate"],
+    allowed: ["name", "stage", "value", "currency", "probability", "expectedCloseDate", "source", "description", "lostReason", "competitor", "pipeline", "companyId", "ownerId"],
     required: ["name"],
   },
-  DELETE_LEAD: { allowed: ["recordId"], required: [] },
-  DELETE_CONTACT: { allowed: ["recordId"], required: [] },
-  DELETE_COMPANY: { allowed: ["recordId"], required: [] },
-  DELETE_DEAL: { allowed: ["recordId"], required: [] },
-  ADD_FOLLOWER: { allowed: ["userId"], required: ["userId"] },
-  REMOVE_FOLLOWER: { allowed: ["userId"], required: ["userId"] },
-  // Neither key is in `required`: the backend accepts either one alone.
-  ROUND_ROBIN_ASSIGN: { allowed: ["memberUserIds", "ruleId"], required: [] },
-  ASSOCIATE_CONTACT: { allowed: ["companyId"], required: ["companyId"] },
-  REMOVE_ASSOCIATION: { allowed: [], required: [] },
+  DELETE_DEAL: {
+    allowed: ["recordId"],
+    required: [],
+  },
+  ADD_FOLLOWER: {
+    allowed: ["userId"],
+    required: ["userId"],
+  },
+  REMOVE_FOLLOWER: {
+    allowed: ["userId"],
+    required: ["userId"],
+  },
+  ROUND_ROBIN_ASSIGN: {
+    allowed: ["memberUserIds", "ruleId"],
+    required: [],
+  },
+  ASSOCIATE_CONTACT: {
+    allowed: ["companyId"],
+    required: ["companyId"],
+  },
+  REMOVE_ASSOCIATION: {
+    allowed: [],
+    required: [],
+  },
   SCHEDULE_CALL: {
-    allowed: ["subject", "callType", "callAt", "callInMs", "duration", "agenda", "notes", "assignedToId", "participantIds"],
+    allowed: ["subject", "callType", "callAt", "callInMs", "duration", "phone", "agenda", "purpose", "notes", "reminderAt", "reminderInMs", "assignedToId", "participantIds", "relatedType", "leadId", "contactId", "companyId", "dealId"],
     required: ["subject"],
   },
   CREATE_MEETING: {
-    allowed: ["title", "meetingType", "startAt", "startInMs", "durationMinutes", "location", "meetingLink", "agenda", "notes", "attendeeIds"],
+    allowed: ["title", "meetingType", "startAt", "startInMs", "endAt", "durationMinutes", "timezone", "allDay", "location", "meetingLink", "agenda", "notes", "reminderAt", "reminderInMs", "attendeeIds", "relatedType", "leadId", "contactId", "companyId", "dealId"],
     required: ["title"],
   },
-  SEND_SMS: { allowed: ["toPhone", "body"], required: ["toPhone", "body"] },
-  SEND_WHATSAPP: { allowed: ["toPhone", "body"], required: ["toPhone", "body"] },
+  SEND_SMS: {
+    allowed: ["toPhone", "body"],
+    required: ["toPhone", "body"],
+  },
+  SEND_WHATSAPP: {
+    allowed: ["toPhone", "body"],
+    required: ["toPhone", "body"],
+  },
   REQUEST_DOCUMENTS: {
-    allowed: ["title", "documentType", "requestedFromId", "dueDate", "dueInMs", "notes"],
+    allowed: ["title", "documentType", "requestedFromId", "dueDate", "dueInMs", "notes", "relatedType", "leadId", "contactId", "companyId", "dealId"],
     required: ["title", "documentType", "requestedFromId"],
   },
-  UPDATE_DOCUMENT_STATUS: { allowed: ["status"], required: ["status"] },
-  SEND_DOCUMENT_REMINDER: { allowed: ["message"], required: [] },
-  END_AUTOMATION: { allowed: ["reason"], required: [] },
+  UPDATE_DOCUMENT_STATUS: {
+    allowed: ["status"],
+    required: ["status"],
+  },
+  SEND_DOCUMENT_REMINDER: {
+    allowed: ["message"],
+    required: [],
+  },
+  END_AUTOMATION: {
+    allowed: ["reason"],
+    required: [],
+  },
 };
 
 export const AUTOMATION_FAILURE_POLICIES = [
