@@ -11,6 +11,7 @@ export type FieldWidget =
   | "tags"
   | "select"
   | "checkbox"
+  | "json"
   | "datetime";
 
 export interface FieldMeta {
@@ -22,7 +23,12 @@ export interface FieldMeta {
 }
 
 export const FIELD_META: Record<string, FieldMeta> = {
-  fields: { label: "Fields to Update (JSON)", widget: "textarea", placeholder: '{"status": "QUALIFIED"}' },
+  fields: {
+    label: "Fields to Update",
+    widget: "json",
+    placeholder: '{"status": "QUALIFIED"}',
+    helpText: "JSON object of field names to new values",
+  },
   field: { label: "Field Name", widget: "text", placeholder: "status" },
   value: { label: "New Value", widget: "text" },
   ownerId: { label: "New Owner", widget: "member" },
@@ -427,4 +433,16 @@ export const FIELD_META: Record<string, FieldMeta> = {
   estimatedValue: { label: "Estimated Value", widget: "text" },
   competitor: { label: "Competitor", widget: "text" },
   pipeline: { label: "Pipeline", widget: "text" },
+  ticketId: { label: "Related Ticket", widget: "text", helpText: "Record UUID" },
+  avatarKey: {
+    label: "Avatar",
+    widget: "text",
+    helpText: "Storage key from the upload endpoint",
+  },
+  externalAttendees: {
+    label: "External Attendees",
+    widget: "json",
+    placeholder: '[{ "email": "guest@example.com", "name": "Guest" }]',
+    helpText: "JSON array of { email, name } for people outside the workspace",
+  },
 };
