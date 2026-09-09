@@ -168,7 +168,30 @@ function BuilderInner({ id }: { id: string }) {
     };
   }
 
-  async function handleSave(): Promise<string | null> {
+  /** Publish the newest version and switch the workflow live. */
+  async function publishLatestVersion(savedId: string) {
+    const automation = await getAutomation(savedId);
+    const latest = automation.versions?.[0];
+    if (!latest) throw new Error("No version to publish");
+    await publishAutomationVersion(savedId, latest.id);
+    await enableAutomation(savedId);
+    setStatus("ENABLED");
+  }
+
+  /**
+   * `republish` keeps a live workflow live across an edit.
+   *
+   * PATCHing an ENABLED automation deliberately demotes it to DISABLED
+   * server-side: the edit creates an unpublished version, so the old one must
+   * stop running. Without republishing, pressing Save on a published workflow
+   * silently flipped the toggle back to Draft and took it offline. The toggle
+   * is the publish control, so saving while it reads Published has to leave it
+   * published. `handleTogglePublish` opts out — it publishes explicitly, and
+   * needs Save not to fight the direction it is switching to.
+   */
+  async function handleSave(
+    { republish = true }: { republish?: boolean } = {},
+  ): Promise<string | null> {
     if (!triggerType) {
       window.alert("Choose a trigger before saving.");
       return null;
@@ -183,8 +206,13 @@ function BuilderInner({ id }: { id: string }) {
         router.replace(`/automations/${created.id}`);
         return created.id;
       }
+      const wasLive = status === "ENABLED";
       const updated = await updateAutomationDraft(automationId, buildPayload());
-      setStatus(updated.status);
+      if (republish && wasLive && updated.status !== "ENABLED") {
+        await publishLatestVersion(automationId);
+      } else {
+        setStatus(updated.status);
+      }
       return automationId;
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Failed to save workflow");
@@ -195,23 +223,24 @@ function BuilderInner({ id }: { id: string }) {
   }
 
   async function handleTogglePublish(nextPublished: boolean) {
-    const savedId = await handleSave();
+    const savedId = await handleSave({ republish: false });
     if (!savedId) return;
     setSaving(true);
     try {
       if (nextPublished) {
-        const automation = await getAutomation(savedId);
-        const latest = automation.versions?.[0];
-        if (!latest) throw new Error("No version to publish");
-        await publishAutomationVersion(savedId, latest.id);
-        await enableAutomation(savedId);
-        setStatus("ENABLED");
+        await publishLatestVersion(savedId);
       } else {
         await disableAutomation(savedId);
         setStatus("DISABLED");
       }
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Failed to update workflow status");
+      // Re-read rather than assume: the save above may already have moved it.
+      try {
+        setStatus((await getAutomation(savedId)).status);
+      } catch {
+        /* leave the toggle as-is if even the re-read fails */
+      }
     } finally {
       setSaving(false);
     }
@@ -264,7 +293,7 @@ function BuilderInner({ id }: { id: string }) {
             <Play className="h-3.5 w-3.5" />
             Test Workflow
           </Button>
-          <Button variant="outline" size="sm" onClick={handleSave} disabled={saving} className="gap-1.5">
+          <Button variant="outline" size="sm" onClick={() => void handleSave()} disabled={saving} className="gap-1.5">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             Save
           </Button>
