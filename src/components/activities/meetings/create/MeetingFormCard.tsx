@@ -11,17 +11,22 @@ import {
   type ReminderRepeatRule,
 } from "@/lib/tasks/repeat-reminder";
 import { formatSlotRange } from "@/lib/booking/types";
-import { liveRelatedRecords } from "@/lib/activities/related-records";
 import {
-  RELATED_ENTITY_KINDS,
-  type RelatedEntityKind,
-} from "@/lib/activities/shared";
-import { createQuickContact } from "@/lib/contacts/store";
+  TASK_RELATED_ENTITY_KINDS,
+  liveRelatedRecords,
+  rankRelatedRecordsByContact,
+} from "@/lib/activities/related-records";
+import { type RelatedEntityKind } from "@/lib/activities/shared";
+import { QuickAddContactForm } from "@/components/shared/QuickAddContactForm";
 import {
   availableCustomLocationKinds,
   isOnlineLocationKind,
   type MeetingLocationKind,
 } from "@/lib/booking/meeting-platforms";
+import {
+  MeetingGuestPicker,
+  type MeetingGuest,
+} from "@/components/activities/meetings/create/MeetingGuestPicker";
 import { SearchablePersonSelect } from "@/components/shared/SearchablePersonSelect";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { cn } from "@/lib/utils";
@@ -70,6 +75,9 @@ interface MeetingFormCardProps {
   onAgendaChange: (val: string) => void;
   timezone?: string;
   onTimezoneChange?: (val: string) => void;
+  contactName?: string;
+  onContactNameChange?: (name: string) => void;
+  contactError?: string;
   relatedKind: RelatedEntityKind | "";
   onRelatedKindChange: (kind: RelatedEntityKind | "") => void;
   relatedName: string;
@@ -79,6 +87,8 @@ interface MeetingFormCardProps {
   repeatRule?: ReminderRepeatRule;
   onRepeatRuleChange?: (rule: ReminderRepeatRule) => void;
   compact?: boolean;
+  guests?: MeetingGuest[];
+  onGuestsChange?: (next: MeetingGuest[]) => void;
   hideRelated?: boolean;
   hideAgenda?: boolean;
   titleError?: string;
@@ -86,69 +96,115 @@ interface MeetingFormCardProps {
 }
 
 export function MeetingRelatedFields({
+  contactName = "",
+  onContactNameChange,
   relatedKind,
   onRelatedKindChange,
   relatedName,
   onRelatedNameChange,
+  contactError,
 }: {
+  contactName?: string;
+  onContactNameChange?: (name: string) => void;
   relatedKind: RelatedEntityKind | "";
   onRelatedKindChange: (kind: RelatedEntityKind | "") => void;
   relatedName: string;
   onRelatedNameChange: (name: string) => void;
+  contactError?: string;
 }) {
-  const [recordTick, setRecordTick] = useState(0);
+  const [addingContact, setAddingContact] = useState(false);
+  const [addContactQuery, setAddContactQuery] = useState("");
+  const [contactTick, setContactTick] = useState(0);
+  const contactOptions = useMemo(
+    () => liveRelatedRecords("Contact"),
+    [contactTick],
+  );
   const relatedOptions = useMemo(
     () =>
-      liveRelatedRecords(
-        relatedKind,
-        relatedKind && relatedName
-          ? { kind: relatedKind, name: relatedName }
-          : undefined,
+      rankRelatedRecordsByContact(
+        liveRelatedRecords(
+          relatedKind,
+          relatedKind && relatedName
+            ? { kind: relatedKind, name: relatedName }
+            : undefined,
+        ),
+        contactName,
       ),
-    [relatedKind, relatedName, recordTick],
+    [relatedKind, relatedName, contactName],
   );
 
   return (
     <div className="grid grid-cols-1 gap-4">
       <div>
         <label className={cn(labelClass, "mb-1.5 block")}>
-          Related Entity <span className="text-red-500">*</span>
+          Contact Name <span className="text-red-500">*</span>
         </label>
-        <select
-          className={selectClass}
-          value={relatedKind}
-          onChange={(e) => {
-            onRelatedKindChange(e.target.value as RelatedEntityKind | "");
-            onRelatedNameChange("");
-          }}
-        >
-          <option value="" disabled>
-            Select entity
-          </option>
-          {RELATED_ENTITY_KINDS.map((kind) => (
-            <option key={kind} value={kind}>
-              {kind}
-            </option>
-          ))}
-        </select>
+        {addingContact ? (
+          <QuickAddContactForm
+            initialQuery={addContactQuery}
+            onCancel={() => setAddingContact(false)}
+            onCreated={(contact) => {
+              onContactNameChange?.(contact.name);
+              setContactTick((n) => n + 1);
+              setAddingContact(false);
+            }}
+          />
+        ) : (
+          <RelatedRecordCombobox
+            value={contactName}
+            onChange={(name) => onContactNameChange?.(name)}
+            options={contactOptions}
+            placeholder="Search contact…"
+            onAddNew={(query) => {
+              setAddContactQuery(query);
+              setAddingContact(true);
+            }}
+            addNewLabel="+ Add contact"
+          />
+        )}
+        {contactError ? (
+          <p className="mt-1.5 text-[12px] font-medium text-rose-500">
+            {contactError}
+          </p>
+        ) : null}
       </div>
-      <div>
-        <label className={cn(labelClass, "mb-1.5 block")}>
-          Related Record <span className="text-red-500">*</span>
-        </label>
-        <RelatedRecordCombobox
-          value={relatedName}
-          onChange={onRelatedNameChange}
-          options={relatedOptions}
-          disabled={!relatedKind}
-          allowCustom={relatedKind === "Contact"}
-          createLabel={(name) => `Add contact “${name}”`}
-          onCreateOption={(name) => {
-            const created = createQuickContact(name);
-            onRelatedNameChange(created.name);
-            setRecordTick((tick) => tick + 1);
-          }}
-        />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className={cn(labelClass, "mb-1.5 block")}>
+            Related Entity
+          </label>
+          <select
+            className={selectClass}
+            value={relatedKind}
+            onChange={(e) => {
+              onRelatedKindChange(e.target.value as RelatedEntityKind | "");
+              onRelatedNameChange("");
+            }}
+          >
+            <option value="">None</option>
+            {TASK_RELATED_ENTITY_KINDS.map((kind) => (
+              <option key={kind} value={kind}>
+                {kind === "Company" ? "Organization" : kind}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={cn(labelClass, "mb-1.5 block")}>
+            Related Record
+          </label>
+          <RelatedRecordCombobox
+            value={relatedName}
+            onChange={onRelatedNameChange}
+            options={relatedOptions}
+            disabled={!relatedKind}
+            placeholder={
+              relatedKind
+                ? `Search ${relatedKind === "Company" ? "organization" : relatedKind.toLowerCase()}…`
+                : "Select related entity first"
+            }
+          />
+        </div>
       </div>
     </div>
   );
@@ -186,6 +242,9 @@ export const MeetingFormCard: React.FC<MeetingFormCardProps> = ({
   onAgendaChange,
   timezone,
   onTimezoneChange,
+  contactName,
+  onContactNameChange,
+  contactError,
   relatedKind,
   onRelatedKindChange,
   relatedName,
@@ -194,6 +253,8 @@ export const MeetingFormCard: React.FC<MeetingFormCardProps> = ({
   onRecurringChange,
   repeatRule = defaultReminderRepeatRule,
   onRepeatRuleChange,
+  guests,
+  onGuestsChange,
   compact = false,
   hideRelated = false,
   hideAgenda = false,
@@ -312,12 +373,19 @@ export const MeetingFormCard: React.FC<MeetingFormCardProps> = ({
 
       {hideRelated ? null : (
         <MeetingRelatedFields
+          contactName={contactName}
+          onContactNameChange={onContactNameChange}
+          contactError={contactError}
           relatedKind={relatedKind}
           onRelatedKindChange={onRelatedKindChange}
           relatedName={relatedName}
           onRelatedNameChange={onRelatedNameChange}
         />
       )}
+
+      {onGuestsChange ? (
+        <MeetingGuestPicker guests={guests ?? []} onChange={onGuestsChange} />
+      ) : null}
 
       <DateTimeSection
         timezone={timezone}

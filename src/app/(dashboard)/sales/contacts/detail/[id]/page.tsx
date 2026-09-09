@@ -34,6 +34,7 @@ import { onRulesChange } from "@/lib/rules";
 import { emitRulesChange } from "@/lib/rules/storage";
 import type { ContactCardData } from "@/lib/contacts/types";
 import { relatedToLabel } from "@/lib/related-entity";
+import { RelatedInternalNotes } from "@/components/shared/RelatedInternalNotes";
 import type { DealRecord } from "@/lib/deals/types";
 
 const RELATED_LIST_CATALOG: RelatedListItem[] = [
@@ -347,6 +348,16 @@ export default function ContactDetailPage() {
                         </ul>
                       )}
                     </div>
+                  </div>
+                );
+              }
+              if (item.id === "notes") {
+                return (
+                  <div key={item.id} id={`related-list-${item.id}`}>
+                    <RelatedInternalNotes
+                      relatedTo={relatedToLabel("Contact", contact.name) ?? `Contact: ${contact.name}`}
+                      onNotify={notify}
+                    />
                   </div>
                 );
               }

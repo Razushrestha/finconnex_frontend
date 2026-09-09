@@ -1,6 +1,6 @@
 const EVENT = "finconnex:softphone-open";
 
-export const SOFTPHONE_W = 300;
+export const SOFTPHONE_W = 336;
 export const SOFTPHONE_H = 520;
 
 export type SoftphoneOpenDetail = {

@@ -160,6 +160,7 @@ export function LeadContactPicker({
   const searchRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [seekingMore, setSeekingMore] = useState(false);
   const [query, setQuery] = useState("");
   const [tick, setTick] = useState(0);
   const [addFirstName, setAddFirstName] = useState("");
@@ -197,11 +198,12 @@ export function LeadContactPicker({
     function onDoc(event: MouseEvent) {
       if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) {
         setOpen(false);
+        if (contacts.length > 0 && !adding) setSeekingMore(false);
       }
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
+  }, [adding, contacts.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -237,6 +239,7 @@ export function LeadContactPicker({
     setQuery("");
     setOpen(false);
     setAdding(false);
+    setSeekingMore(false);
   }
 
   function removeAt(index: number) {
@@ -309,9 +312,13 @@ export function LeadContactPicker({
     setQuery("");
     setOpen(false);
     setAdding(false);
+    setSeekingMore(false);
   }
 
   const nextRole = contacts.length === 0 ? "Primary" : "Secondary";
+  const showSearch = !adding && (contacts.length === 0 || seekingMore);
+  const addMoreLabel =
+    contacts.length <= 1 ? "Add secondary contact" : "Add another contact";
 
   return (
     <div className="space-y-2" ref={wrapRef}>
@@ -364,7 +371,24 @@ export function LeadContactPicker({
         </ul>
       ) : null}
 
-      {!adding ? (
+      {contacts.length > 0 && !adding && !seekingMore ? (
+        <button
+          type="button"
+          onClick={() => {
+            setSeekingMore(true);
+            setOpen(true);
+            setQuery("");
+          }}
+          className="inline-flex items-center gap-2 text-[12px] font-medium text-[#5A32A3] hover:text-[#4a2888]"
+        >
+          <span className="flex h-6 w-6 items-center justify-center rounded-full border border-dashed border-[#5A32A3]/45">
+            <Plus className="h-3 w-3" strokeWidth={2.5} />
+          </span>
+          {addMoreLabel}
+        </button>
+      ) : null}
+
+      {showSearch ? (
         <div className="relative min-w-0">
           <InputShell icon={User} error={error && contacts.length === 0}>
             <input
@@ -523,6 +547,7 @@ export function LeadContactPicker({
               onClick={() => {
                 setAdding(false);
                 setOpen(false);
+                setSeekingMore(false);
               }}
               className="h-8 rounded-md px-3 text-[12px] font-medium text-slate-500 hover:bg-white"
             >

@@ -125,6 +125,7 @@ export function LeadScheduleMeetingModal({
     useState<MeetingLocationKind>("Office address");
   const [locationDetail, setLocationDetail] = useState("");
   const [notes, setNotes] = useState("");
+  const [contactName, setContactName] = useState("");
   const [relatedKind, setRelatedKind] = useState<RelatedEntityKind | "">("Lead");
   const [relatedName, setRelatedName] = useState(card.name);
   const [guests, setGuests] = useState<MeetingGuest[]>([]);
@@ -171,6 +172,7 @@ export function LeadScheduleMeetingModal({
     setWhenMode("default");
     setRecurring(false);
     setRepeatRule({ ...defaultReminderRepeatRule });
+    setContactName("");
     setRelatedKind("Lead");
     setRelatedName(card.name);
     setGuests([]);
@@ -240,12 +242,8 @@ export function LeadScheduleMeetingModal({
       setError("Appointment title is required");
       return;
     }
-    if (!relatedKind) {
-      setError("Choose a related entity");
-      return;
-    }
-    if (!relatedName.trim()) {
-      setError("Choose or add a related record");
+    if (!contactName.trim()) {
+      setError("Contact is required");
       return;
     }
     if (!date.trim() || !time.trim()) {
@@ -459,6 +457,13 @@ export function LeadScheduleMeetingModal({
             </div>
             <div className="space-y-5 border-t border-slate-100 bg-[#F8F9FB] px-6 py-5 lg:border-t-0">
               <MeetingRelatedFields
+                contactName={contactName}
+                onContactNameChange={setContactName}
+                contactError={
+                  attempted && !contactName.trim()
+                    ? "Contact is required"
+                    : undefined
+                }
                 relatedKind={relatedKind}
                 onRelatedKindChange={setRelatedKind}
                 relatedName={relatedName}

@@ -10,12 +10,12 @@ import {
   type MeetingLocationKind,
   type MeetingLocationMode,
 } from "@/components/activities/meetings/create/MeetingFormCard";
-import { AvailabilityCard } from "@/components/activities/meetings/create/AvailabilityCard";
+import type { MeetingGuest } from "@/components/activities/meetings/create/MeetingGuestPicker";
 import { PreparationTasksCard } from "@/components/activities/meetings/create/PreparationTasksCard";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { createMeeting, formatMeetingDateTime } from "@/lib/meetings/store";
 import {
   assignedCalendarMembers,
-  availabilityRuleForDate,
   bookingLocationLabel,
   calendarDefaultHost,
   calendarTimezoneOption,
@@ -84,12 +84,26 @@ export default function ScheduleMeetingPage() {
     useState<MeetingLocationKind>("Office address");
   const [locationDetail, setLocationDetail] = useState("");
   const [agenda, setAgenda] = useState("");
+  const relatedKindParam = asRelatedKind(params.get("relatedKind") ?? undefined);
+  const relatedNameParam = params.get("relatedName") ?? "";
+  const [contactName, setContactName] = useState(
+    relatedKindParam === "Contact" ? relatedNameParam : "",
+  );
   const [relatedKind, setRelatedKind] = useState<RelatedEntityKind | "">(
-    asRelatedKind(params.get("relatedKind") ?? undefined) ?? "",
+    relatedKindParam === "Lead" ||
+      relatedKindParam === "Deal" ||
+      relatedKindParam === "Company"
+      ? relatedKindParam
+      : "",
   );
   const [relatedName, setRelatedName] = useState(
-    params.get("relatedName") ?? "",
+    relatedKindParam === "Lead" ||
+      relatedKindParam === "Deal" ||
+      relatedKindParam === "Company"
+      ? relatedNameParam
+      : "",
   );
+  const [guests, setGuests] = useState<MeetingGuest[]>([]);
   const [attempted, setAttempted] = useState(false);
 
   const selectedCalendar = calendars.find((page) => page.id === calendarId);
@@ -101,10 +115,6 @@ export default function ScheduleMeetingPage() {
       : selectedCalendar
         ? internalSlotsForDate(selectedCalendar, date)
         : [];
-  const hours = selectedCalendar
-    ? availabilityRuleForDate(selectedCalendar, date)
-    : undefined;
-
   useEffect(() => {
     const live = listActiveConsultations();
     setCalendars(live);
@@ -148,12 +158,8 @@ export default function ScheduleMeetingPage() {
       toast.error("Appointment title is required");
       return;
     }
-    if (!relatedKind) {
-      toast.error("Choose a related entity");
-      return;
-    }
-    if (!relatedName.trim()) {
-      toast.error("Choose or add a related record");
+    if (!contactName.trim()) {
+      toast.error("Contact is required");
       return;
     }
     if (!date.trim() || !time.trim()) {
@@ -195,7 +201,9 @@ export default function ScheduleMeetingPage() {
     const relatedTo =
       relatedKind && relatedName.trim()
         ? `${relatedKind}: ${relatedName.trim()}`
-        : undefined;
+        : contactName.trim()
+          ? `Contact: ${contactName.trim()}`
+          : undefined;
     let firstCreatedId = "";
     starts.forEach((startDate) => {
       const endDate = new Date(startDate.getTime() + minutes * 60 * 1000);
@@ -219,16 +227,24 @@ export default function ScheduleMeetingPage() {
               ? meetingLink
               : undefined,
         notes: note || undefined,
-        attendees: host
-          ? [
-              {
-                id: "host",
-                name: host,
-                email: `${host.toLowerCase().replace(/\s+/g, ".")}@finconnex.com`,
-                role: "Host",
-              },
-            ]
-          : [],
+        attendees: [
+          ...(host
+            ? [
+                {
+                  id: "host",
+                  name: host,
+                  email: `${host.toLowerCase().replace(/\s+/g, ".")}@finconnex.com`,
+                  role: "Host" as const,
+                },
+              ]
+            : []),
+          ...guests.map((guest) => ({
+            id: guest.id,
+            name: guest.name,
+            email: guest.email,
+            role: "Guest" as const,
+          })),
+        ],
       });
       if (!firstCreatedId) firstCreatedId = created.id;
     });
@@ -255,6 +271,7 @@ export default function ScheduleMeetingPage() {
       <div className="mx-auto grid w-full max-w-[1920px] grid-cols-1 gap-4 px-4 py-3 pb-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,400px)] lg:gap-6 2xl:px-8">
         <div>
           <MeetingFormCard
+            hideAgenda
             calendars={calendarOptions}
             calendarId={calendarId}
             onCalendarChange={(id) => {
@@ -304,26 +321,41 @@ export default function ScheduleMeetingPage() {
             onAgendaChange={setAgenda}
             timezone={timezone}
             onTimezoneChange={setTimezone}
+            contactName={contactName}
+            onContactNameChange={setContactName}
+            contactError={
+              attempted && !contactName.trim()
+                ? "Contact is required"
+                : undefined
+            }
             relatedKind={relatedKind}
             onRelatedKindChange={setRelatedKind}
             relatedName={relatedName}
             onRelatedNameChange={setRelatedName}
+            guests={guests}
+            onGuestsChange={setGuests}
             recurring={recurring}
             onRecurringChange={setRecurring}
             repeatRule={repeatRule}
             onRepeatRuleChange={setRepeatRule}
           />
         </div>
-
         <div className="space-y-6">
-          <AvailabilityCard
-            date={date}
-            time={time}
-            duration={duration}
-            hours={hours}
-            slots={timeSlots}
-          />
           <PreparationTasksCard />
+          <div className="rounded-xl border border-border bg-white p-6 shadow-sm">
+            <label className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+              Internal note
+            </label>
+            <div className="mt-1.5">
+              <MentionNotesTextarea
+                rows={4}
+                value={agenda}
+                onChange={setAgenda}
+                placeholder="Internal notes… Type @ to mention someone."
+                className="min-h-[110px] w-full resize-y rounded-lg bg-transparent px-3 py-2.5 text-sm text-slate-800 outline-none placeholder:text-slate-400"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

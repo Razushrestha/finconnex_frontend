@@ -18,6 +18,8 @@ interface RelatedRecordComboboxProps {
   allowCustom?: boolean;
   createLabel?: (name: string) => string;
   onCreateOption?: (name: string) => void;
+  onAddNew?: (query: string) => void;
+  addNewLabel?: string;
 }
 
 export default function RelatedRecordCombobox({
@@ -29,6 +31,8 @@ export default function RelatedRecordCombobox({
   allowCustom = false,
   createLabel,
   onCreateOption,
+  onAddNew,
+  addNewLabel = "+ Add contact",
 }: RelatedRecordComboboxProps) {
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
@@ -79,6 +83,11 @@ export default function RelatedRecordCombobox({
   }
 
   function addCustomRecord() {
+    if (onAddNew) {
+      onAddNew(customName);
+      setOpen(false);
+      return;
+    }
     if (!customName) return;
     if (onCreateOption) {
       onCreateOption(customName);
@@ -88,6 +97,8 @@ export default function RelatedRecordCombobox({
     }
     selectRecord(customName);
   }
+
+  const showAddNew = Boolean(onAddNew) || canAddCustom;
 
   function clearSelection() {
     onChange("");
@@ -156,18 +167,22 @@ export default function RelatedRecordCombobox({
         </div>
       </div>
 
-      {open && !disabled && (visible.length > 0 || canAddCustom) ? (
+      {open && !disabled && (visible.length > 0 || showAddNew) ? (
         <ul className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-lg border border-slate-100 bg-white py-1 shadow-lg">
-          {canAddCustom ? (
+          {showAddNew ? (
             <li>
               <button
                 type="button"
                 onClick={addCustomRecord}
-                className="flex w-full px-3 py-2 text-left text-sm text-[#5A32A3] hover:bg-violet-50"
+                className="flex w-full px-3 py-2 text-left text-sm font-medium text-[#5A32A3] hover:bg-violet-50"
               >
-                {createLabel
-                  ? createLabel(customName)
-                  : `Add “${customName}”`}
+                {onAddNew
+                  ? customName
+                    ? `${addNewLabel} “${customName}”`
+                    : addNewLabel
+                  : createLabel
+                    ? createLabel(customName)
+                    : `Add “${customName}”`}
               </button>
             </li>
           ) : null}

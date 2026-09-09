@@ -1,6 +1,6 @@
 "use client";
 
-import { MentionTextarea } from "@/components/shared/MentionTextarea";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { NOTE_TYPES, type NoteType } from "@/lib/notes/types";
 import {
   RELATED_ENTITY_KINDS,
@@ -193,42 +193,7 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
         </div>
       </div>
 
-      {/* Formatting Toolbar */}
-      <div className="bg-muted/50 px-5 py-2.5 border-b border-border flex items-center justify-between text-muted-foreground text-sm">
-        <div className="flex items-center space-x-1">
-          <button
-            type="button"
-            className="px-2.5 py-1 hover:bg-accent hover:text-accent-foreground rounded font-bold text-foreground"
-          >
-            B
-          </button>
-          <button
-            type="button"
-            className="px-2.5 py-1 hover:bg-accent hover:text-accent-foreground rounded italic text-foreground"
-          >
-            I
-          </button>
-          <button
-            type="button"
-            className="px-2.5 py-1 hover:bg-accent hover:text-accent-foreground rounded underline text-foreground"
-          >
-            U
-          </button>
-          <span className="text-border mx-1">|</span>
-          <button
-            type="button"
-            className="px-2.5 py-1 hover:bg-accent hover:text-accent-foreground rounded text-foreground"
-          >
-            ≡ List
-          </button>
-          <button
-            type="button"
-            className="px-2.5 py-1 hover:bg-accent hover:text-accent-foreground rounded text-foreground"
-          >
-            📎 Attach
-          </button>
-        </div>
-
+      <div className="flex items-center justify-end border-b border-border bg-muted/50 px-5 py-2.5">
         <button
           type="button"
           onClick={onTogglePin}
@@ -248,14 +213,11 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
         <label className="block text-[11px] font-medium text-muted-foreground">
           Body <span className="text-destructive">*</span>
         </label>
-        <MentionTextarea
-          rows={8}
+        <MentionNotesTextarea
           value={body}
           onChange={onBodyChange}
+          error={submitted && Boolean(errors.body)}
           placeholder="Start typing your notes here... Type @ to assign someone."
-          className={`w-full text-sm text-foreground bg-transparent focus:outline-none resize-none leading-relaxed placeholder:text-muted-foreground/50 ${
-            submitted && errors.body ? "border-destructive" : ""
-          }`}
         />
         {submitted && errors.body && (
           <span className="text-[10px] text-destructive block">

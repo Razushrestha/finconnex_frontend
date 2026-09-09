@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MentionTextarea } from "@/components/shared/MentionTextarea";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -831,15 +831,14 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
                 <p className="mb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
                   Internal notes
                 </p>
-                <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white focus-within:border-violet-400 focus-within:shadow-[0_0_0_3px_rgba(139,92,246,0.12)]">
-                  <MentionTextarea
-                    value={internalNotes}
-                    onChange={setInternalNotes}
-                    onBlur={() => save({ ...request, internalNotes })}
-                    className="min-h-[88px] resize-none bg-transparent px-3 py-2.5 text-[12px] leading-relaxed text-slate-800 outline-none placeholder:text-slate-400"
-                    placeholder="Team notes only. Type @ to mention."
-                  />
-                </div>
+                <MentionNotesTextarea
+                  value={internalNotes}
+                  onChange={(next) => {
+                    setInternalNotes(next);
+                    save({ ...request, internalNotes: next });
+                  }}
+                  placeholder="Team notes only. Type @ to mention."
+                />
               </div>
 
               <div className="mt-5 flex min-h-0 flex-1 flex-col">

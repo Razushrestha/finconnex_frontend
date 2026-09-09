@@ -15,11 +15,11 @@ import {
 } from "lucide-react";
 import { CALL_OWNERS, CALL_PURPOSES } from "@/lib/calls/types";
 import { createCall, formatCallDate } from "@/lib/calls/store";
+import { type RelatedEntityKind } from "@/lib/activities/shared";
 import {
-  RELATED_ENTITY_KINDS,
-  type RelatedEntityKind,
-} from "@/lib/activities/shared";
-import { liveRelatedRecords } from "@/lib/activities/related-records";
+  TASK_RELATED_ENTITY_KINDS,
+  liveRelatedRecords,
+} from "@/lib/activities/related-records";
 import RelatedRecordCombobox from "@/components/activities/tasks/RelatedRecordComboBox";
 import {
   formatTaskTimestamp,
@@ -214,11 +214,19 @@ export function ScheduleCallForm({
   defaults,
 }: ScheduleCallFormProps) {
   const router = useRouter();
+  const relatedKindDefault =
+    defaults?.relatedKind === "Lead" ||
+    defaults?.relatedKind === "Deal" ||
+    defaults?.relatedKind === "Company"
+      ? defaults.relatedKind
+      : "";
   const [form, setForm] = useState<FormState>({
     ...initialState,
-    relatedKind: defaults?.relatedKind ?? "",
-    relatedName: defaults?.relatedName ?? "",
-    callFor: defaults?.contact ?? "",
+    relatedKind: relatedKindDefault,
+    relatedName: relatedKindDefault ? (defaults?.relatedName ?? "") : "",
+    callFor:
+      defaults?.contact ??
+      (defaults?.relatedKind === "Contact" ? (defaults.relatedName ?? "") : ""),
     fromNumber: defaultCallerId("John Smith"),
   });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
@@ -578,9 +586,9 @@ export function ScheduleCallForm({
                   }}
                 >
                   <option value="">None</option>
-                  {RELATED_ENTITY_KINDS.map((k) => (
+                  {TASK_RELATED_ENTITY_KINDS.map((k) => (
                     <option key={k} value={k}>
-                      {k}
+                      {k === "Company" ? "Organization" : k}
                     </option>
                   ))}
                 </select>

@@ -77,14 +77,30 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DashboardDateRangePicker } from "@/components/dashboard/DashboardDateRangePicker";
 import { getRulesActor } from "@/lib/rules/actor";
+import { onRulesChange } from "@/lib/rules/storage";
+import { loadSettingsValues } from "@/lib/settings/settings-store";
+import { loadUserProfile } from "@/lib/user-profile/types";
+import { buildDashboardHero, type DashboardHero } from "@/lib/dashboard/greeting";
 import { cn } from "@/lib/utils";
 import type { HierarchyLevel } from "@/lib/rules/permissions";
+import type { ExecutiveOverview as ExecutiveData } from "@/lib/dashboard/executive";
 
-function greetingName() {
-  const hour = new Date().getHours();
-  const when = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  const full = getRulesActor().name || "there";
-  return `${when}, ${full.split(" ")[0]} 👋`;
+function dashboardHero(data: ExecutiveData): DashboardHero {
+  const profile = loadUserProfile();
+  const actor = getRulesActor();
+  const prefs = loadSettingsValues("my-preferences/profile");
+  return buildDashboardHero({
+    firstName: profile.firstName,
+    displayName: actor.name || String(prefs.displayName ?? ""),
+    timeZone: typeof prefs.timezone === "string" ? prefs.timezone : "",
+    signals: {
+      overdueTasks: data.overdueTasks,
+      appointmentsToday: data.appointmentsToday,
+      urgentOpportunities: data.slaBreaches,
+      settlementValue: data.settlementValue,
+      settlementTarget: data.settlementTarget,
+    },
+  });
 }
 
 function spanClass(id: DashboardWidgetId) {
@@ -106,7 +122,6 @@ export function DashboardWorkspace() {
   const [layoutName, setLayoutName] = useState("");
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
-  const [hello, setHello] = useState("Good morning.");
   const [viewHidden, setViewHidden] = useState<string[]>([]);
   const [viewOrder, setViewOrder] = useState<string[]>([]);
   const [fullscreen, setFullscreen] = useState(false);
@@ -117,6 +132,15 @@ export function DashboardWorkspace() {
     () => computeExecutiveOverview(layout.filters),
     [layout.filters, loading],
   );
+  const [heroTick, setHeroTick] = useState(0);
+  const hero = useMemo(() => dashboardHero(executive), [executive, heroTick]);
+
+  useEffect(() => {
+    setHeroTick((n) => n + 1);
+    return onRulesChange((kind) => {
+      if (kind === "actor" || kind === "all") setHeroTick((n) => n + 1);
+    });
+  }, []);
 
   useEffect(() => {
     const stored = loadDashboardLayout();
@@ -129,7 +153,6 @@ export function DashboardWorkspace() {
     const nextRole = loadActiveDashboardRole();
     setRole(nextRole);
     setRoleLayouts(listRoleLayouts(nextRole));
-    setHello(greetingName());
     const fromUrl = searchParams.get("view");
     const initial = isDashboardViewId(fromUrl) ? fromUrl : loadDashboardView();
     setView(initial);
@@ -309,13 +332,18 @@ export function DashboardWorkspace() {
     >
       <div className="mx-auto flex w-full max-w-[1920px] flex-1 flex-col gap-3 p-4 lg:px-6 2xl:px-8 2xl:py-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+          <div className="flex items-start gap-2.5">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
               <Crown className="h-4 w-4" />
             </span>
-            <h2 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
-              {hello}
-            </h2>
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold tracking-tight text-slate-900 sm:text-xl">
+                {hero.greeting}
+              </h2>
+              <p className="mt-0.5 text-[13px] leading-snug text-slate-500">
+                {hero.status}
+              </p>
+            </div>
           </div>
           <div className="flex flex-col items-end gap-2">
             <div className="flex items-center gap-2">

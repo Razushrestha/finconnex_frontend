@@ -39,9 +39,14 @@ import {
 import { listAllContacts } from "@/lib/contacts/store";
 import { createNote } from "@/lib/notes/store";
 import {
+  findSoftphoneContact,
+  listSoftphoneRelatedOptions,
   resolveSoftphoneRecord,
   type SoftphoneRecord,
+  type SoftphoneRelatedKind,
+  type SoftphoneRelatedPick,
 } from "@/lib/softphone/resolve-record";
+import { emitRulesChange } from "@/lib/rules/storage";
 import type { Call, CallStatus } from "@/lib/calls/types";
 import {
   SOFTPHONE_H,
@@ -138,6 +143,9 @@ export function SoftphonePad({
   const [noteBody, setNoteBody] = React.useState("");
   const [noteSaved, setNoteSaved] = React.useState("");
   const [disposition, setDisposition] = React.useState<CallStatus>("Completed");
+  const [relatedKind, setRelatedKind] = React.useState<"" | SoftphoneRelatedKind>("");
+  const [relatedPick, setRelatedPick] =
+    React.useState<SoftphoneRelatedPick | null>(null);
   const callStartedAt = React.useRef<number | null>(null);
   const [tick, setTick] = React.useState(0);
   const dragRef = React.useRef<{
@@ -288,6 +296,8 @@ export function SoftphonePad({
     });
     setNoteBody("");
     setNoteSaved("");
+    setRelatedKind("");
+    setRelatedPick(null);
     setTick((v) => v + 1);
   }
 
@@ -295,22 +305,31 @@ export function SoftphonePad({
     if (!noteFor) return;
     const body = noteBody.trim();
     if (!body) return;
-    const record = resolveSoftphoneRecord({
+    const contact = findSoftphoneContact({
       phone: noteFor.number,
       name: noteFor.name,
     });
-    const relatedTo = record?.relatedTo || `Contact: ${noteFor.number}`;
+    const picked =
+      relatedKind && relatedPick && relatedPick.kind === relatedKind
+        ? relatedPick
+        : null;
+    const relatedTo = picked
+      ? `${picked.kind}: ${picked.name}`
+      : `Contact: ${contact?.name || noteFor.name || noteFor.number}`;
     createNote({
-      title: `Call note — ${record?.name || noteFor.name || noteFor.number}`,
+      title: `Call Summary — ${picked?.name || contact?.name || noteFor.name || noteFor.number}`,
       body,
       relatedTo,
+      relatedType: picked?.kind ?? "Contact",
+      relatedId: picked?.id ?? contact?.id,
       noteType: "Call Summary",
       createdBy: OWNER,
     });
+    emitRulesChange("all");
     if (noteFor.callId) {
       updateCall(noteFor.callId, {
         notes: body,
-        relatedTo: record?.relatedTo,
+        relatedTo,
         status: disposition,
         outcome: DISPOSITIONS.find((item) => item.status === disposition)?.label,
       });
@@ -318,6 +337,8 @@ export function SoftphonePad({
     setNoteFor(null);
     setNoteBody("");
     setNoteSaved("");
+    setRelatedKind("");
+    setRelatedPick(null);
     setTab("keypad");
     setTick((v) => v + 1);
   }
@@ -337,6 +358,8 @@ export function SoftphonePad({
     );
     setNoteBody("");
     setNoteSaved("");
+    setRelatedKind("");
+    setRelatedPick(null);
   }
 
   function goRecord(record: SoftphoneRecord | null) {
@@ -361,12 +384,18 @@ export function SoftphonePad({
 
   if (!mounted || !open) return null;
 
-  const width = expanded ? 360 : PHONE_W;
+  const width = expanded ? 400 : PHONE_W;
   const height = PHONE_H;
   const top = Math.min(pos.y, Math.max(8, window.innerHeight - height - 8));
   const noteTarget = noteFor
     ? resolveSoftphoneRecord({ phone: noteFor.number, name: noteFor.name })
     : null;
+  const relatedOptions = noteFor
+    ? listSoftphoneRelatedOptions({
+        phone: noteFor.number,
+        name: noteFor.name,
+      })
+    : { leads: [], deals: [], companies: [] };
 
   return createPortal(
     <div
@@ -417,13 +446,16 @@ export function SoftphonePad({
 
       <div
         className={cn(
-          "min-h-0 flex-1 px-4",
-          noteFor || tab !== "keypad"
-            ? "overflow-y-auto overscroll-contain [scrollbar-width:thin]"
-            : "overflow-hidden",
+          "flex min-h-0 flex-1 flex-col px-4",
+          noteFor
+            ? "overflow-hidden"
+            : tab !== "keypad"
+              ? "overflow-y-auto overscroll-contain [scrollbar-width:thin]"
+              : "overflow-hidden",
         )}
       >
         {noteFor ? (
+          <div className="min-h-0 flex-1">
           <CallNoteComposer
             record={noteTarget}
             number={noteFor.number}
@@ -445,17 +477,31 @@ export function SoftphonePad({
             onChange={setNoteBody}
             onSave={saveCallNote}
             onSkip={() => setNoteFor(null)}
+            hideActions
+            relatedKind={relatedKind}
+            relatedPick={relatedPick}
+            relatedOptions={relatedOptions}
+            onRelatedKind={(kind) => {
+              setRelatedKind(kind);
+              setRelatedPick((current) =>
+                current && current.kind === kind ? current : null,
+              );
+            }}
+            onRelatedPick={setRelatedPick}
           />
+          </div>
         ) : null}
 
         {!noteFor && tab === "keypad" ? (
-          <Keypad
-            dial={dial}
-            calling={calling}
-            callingLabel={contactLabel}
-            onDialChange={setDial}
-            onCall={() => (calling ? endCall() : startCall())}
-          />
+          <div className="min-h-0 flex-1">
+            <Keypad
+              dial={dial}
+              calling={calling}
+              callingLabel={contactLabel}
+              onDialChange={setDial}
+              onCall={() => (calling ? endCall() : startCall())}
+            />
+          </div>
         ) : null}
 
         {!noteFor && tab === "recents" ? (
@@ -523,6 +569,27 @@ export function SoftphonePad({
           />
         ) : null}
       </div>
+
+      {noteFor ? (
+        <div className="flex shrink-0 gap-2 border-t border-slate-100 bg-white px-4 py-2">
+          <button
+            type="button"
+            onClick={() => setNoteFor(null)}
+            className="h-9 flex-1 rounded-lg border border-slate-200 text-[13px] font-medium text-slate-600 hover:bg-slate-50"
+          >
+            Skip
+          </button>
+          <button
+            type="button"
+            disabled={!noteBody.trim()}
+            onClick={saveCallNote}
+            className="inline-flex h-9 flex-1 items-center justify-center gap-1 rounded-lg bg-[#5A32A3] text-[13px] font-semibold text-white disabled:opacity-40"
+          >
+            <StickyNote className="h-3.5 w-3.5" />
+            Save
+          </button>
+        </div>
+      ) : null}
 
       <nav className="grid shrink-0 grid-cols-4 border-t border-slate-100 bg-white px-1 py-1">
         <TabBtn
@@ -634,112 +701,116 @@ function Keypad({
   }
 
   return (
-    <div className="pb-1">
-      {calling ? (
-        <>
-          <p className="mb-2 min-h-[28px] text-center text-[15px] font-medium text-emerald-600">
-            Calling {callingLabel || dial}…
-          </p>
-          {callingLabel && callingLabel !== dial ? (
-            <p className="mb-2 text-center text-[12px] text-slate-500">{dial}</p>
-          ) : null}
-        </>
-      ) : (
-        <input
-          ref={inputRef}
-          type="tel"
-          inputMode="tel"
-          autoComplete="off"
-          spellCheck={false}
-          value={dial}
-          aria-label="Phone number"
-          placeholder=" "
-          onChange={(e) => {
-            const next = sanitizeDial(e.target.value);
-            const pos = Math.min(e.target.selectionStart ?? next.length, next.length);
-            selection.current = { start: pos, end: pos };
-            onDialChange(next);
-            requestAnimationFrame(() => {
-              inputRef.current?.setSelectionRange(pos, pos);
-            });
-          }}
-          onClick={syncSelection}
-          onKeyUp={syncSelection}
-          onSelect={syncSelection}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              onCall();
-              return;
-            }
-            if (
-              e.key === "Backspace" ||
-              e.key === "Delete" ||
-              e.key === "ArrowLeft" ||
-              e.key === "ArrowRight" ||
-              e.key === "ArrowUp" ||
-              e.key === "ArrowDown" ||
-              e.key === "Home" ||
-              e.key === "End" ||
-              e.key === "Tab" ||
-              e.metaKey ||
-              e.ctrlKey ||
-              e.altKey
-            ) {
-              return;
-            }
-            if (!DIAL_CHARS.test(e.key)) e.preventDefault();
-          }}
-          className="mb-2 h-8 w-full bg-transparent text-center font-mono text-[22px] tracking-wide text-slate-900 caret-slate-800 outline-none placeholder:text-transparent"
-        />
-      )}
-      <div className="mx-auto grid max-w-[240px] grid-cols-3 justify-items-center gap-x-4 gap-y-2">
-        {KEYS.map((key) => (
-          <button
-            key={key.d}
-            type="button"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => press(key.d)}
-            onContextMenu={(e) => {
-              if (key.d === "0") {
-                e.preventDefault();
-                press("+");
-              }
-            }}
-            className="flex h-[48px] w-[48px] flex-col items-center justify-center rounded-full bg-slate-100 text-[20px] font-medium text-slate-800 hover:bg-slate-200"
-          >
-            {key.d}
-            {"sub" in key ? (
-              <span className="-mt-0.5 text-[10px] font-semibold text-slate-500">
-                {key.sub}
-              </span>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 pt-1">
+        {calling ? (
+          <>
+            <p className="min-h-[28px] text-center text-[16px] font-medium text-emerald-600">
+              Calling {callingLabel || dial}…
+            </p>
+            {callingLabel && callingLabel !== dial ? (
+              <p className="mt-0.5 text-center text-[13px] text-slate-500">{dial}</p>
             ) : null}
-          </button>
-        ))}
+          </>
+        ) : (
+          <input
+            ref={inputRef}
+            type="tel"
+            inputMode="tel"
+            autoComplete="off"
+            spellCheck={false}
+            value={dial}
+            aria-label="Phone number"
+            placeholder=" "
+            onChange={(e) => {
+              const next = sanitizeDial(e.target.value);
+              const pos = Math.min(e.target.selectionStart ?? next.length, next.length);
+              selection.current = { start: pos, end: pos };
+              onDialChange(next);
+              requestAnimationFrame(() => {
+                inputRef.current?.setSelectionRange(pos, pos);
+              });
+            }}
+            onClick={syncSelection}
+            onKeyUp={syncSelection}
+            onSelect={syncSelection}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onCall();
+                return;
+              }
+              if (
+                e.key === "Backspace" ||
+                e.key === "Delete" ||
+                e.key === "ArrowLeft" ||
+                e.key === "ArrowRight" ||
+                e.key === "ArrowUp" ||
+                e.key === "ArrowDown" ||
+                e.key === "Home" ||
+                e.key === "End" ||
+                e.key === "Tab" ||
+                e.metaKey ||
+                e.ctrlKey ||
+                e.altKey
+              ) {
+                return;
+              }
+              if (!DIAL_CHARS.test(e.key)) e.preventDefault();
+            }}
+            className="h-9 w-full bg-transparent text-center font-mono text-[24px] tracking-wide text-slate-900 caret-slate-800 outline-none placeholder:text-transparent"
+          />
+        )}
       </div>
-      <div className="relative mx-auto mt-3 flex h-[48px] max-w-[240px] items-center justify-center">
-        <button
-          type="button"
-          aria-label={calling ? "End call" : "Call"}
-          disabled={!calling && !dial}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={onCall}
-          className={cn(
-            "flex h-[48px] w-[48px] items-center justify-center rounded-full text-white shadow-sm disabled:opacity-40",
-            calling ? "bg-rose-500 hover:bg-rose-600" : "bg-emerald-500 hover:bg-emerald-600",
-          )}
-        >
-          <Phone className="h-5 w-5" />
-        </button>
-        <button
-          type="button"
-          aria-label="Backspace"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={backspace}
-          className="absolute right-2 flex h-9 w-9 items-center justify-center rounded-md text-slate-500 hover:bg-slate-50"
-        >
-          <Delete className="h-5 w-5" />
-        </button>
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+        <div className="grid w-full max-w-[272px] grid-cols-3 justify-items-center gap-x-5 gap-y-3">
+          {KEYS.map((key) => (
+            <button
+              key={key.d}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => press(key.d)}
+              onContextMenu={(e) => {
+                if (key.d === "0") {
+                  e.preventDefault();
+                  press("+");
+                }
+              }}
+              className="flex h-14 w-14 flex-col items-center justify-center rounded-full bg-slate-100 text-[22px] font-medium text-slate-800 hover:bg-slate-200"
+            >
+              {key.d}
+              {"sub" in key ? (
+                <span className="-mt-0.5 text-[10px] font-semibold text-slate-500">
+                  {key.sub}
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+        <div className="relative mt-5 flex h-14 w-full max-w-[272px] items-center justify-center">
+          <button
+            type="button"
+            aria-label={calling ? "End call" : "Call"}
+            disabled={!calling && !dial}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onCall}
+            className={cn(
+              "flex h-14 w-14 items-center justify-center rounded-full text-white shadow-sm disabled:opacity-40",
+              calling ? "bg-rose-500 hover:bg-rose-600" : "bg-emerald-500 hover:bg-emerald-600",
+            )}
+          >
+            <Phone className="h-6 w-6" />
+          </button>
+          <button
+            type="button"
+            aria-label="Backspace"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={backspace}
+            className="absolute right-1 flex h-10 w-10 items-center justify-center rounded-md text-slate-500 hover:bg-slate-50"
+          >
+            <Delete className="h-5 w-5" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1055,6 +1126,104 @@ function VoicemailPane({
   );
 }
 
+function RelatedRecordSearch({
+  kindLabel,
+  options,
+  value,
+  onChange,
+}: {
+  kindLabel: string;
+  options: SoftphoneRelatedPick[];
+  value: SoftphoneRelatedPick | null;
+  onChange: (pick: SoftphoneRelatedPick | null) => void;
+}) {
+  const [query, setQuery] = React.useState("");
+  const [open, setOpen] = React.useState(false);
+  const wrapRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    setQuery(value?.name ?? "");
+  }, [value?.id, value?.name]);
+
+  React.useEffect(() => {
+    function onDoc(event: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) {
+        setOpen(false);
+        setQuery(value?.name ?? "");
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [value?.name]);
+
+  const matches = options.filter((item) =>
+    item.name.toLowerCase().includes(query.trim().toLowerCase()),
+  );
+
+  return (
+    <div ref={wrapRef} className="relative mt-1.5">
+      <label className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 focus-within:border-[#5A32A3]">
+        <Search className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+        <input
+          value={query}
+          onFocus={() => setOpen(true)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+            if (!e.target.value.trim()) onChange(null);
+          }}
+          placeholder={`Search ${kindLabel}…`}
+          className="min-w-0 flex-1 bg-transparent text-[12px] text-slate-800 outline-none placeholder:text-slate-400"
+        />
+        {value ? (
+          <button
+            type="button"
+            aria-label="Clear related record"
+            onClick={() => {
+              onChange(null);
+              setQuery("");
+              setOpen(true);
+            }}
+            className="text-slate-400 hover:text-slate-600"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
+      </label>
+      {open ? (
+        <div className="absolute top-[calc(100%+4px)] left-0 z-50 max-h-36 w-full overflow-y-auto rounded-lg bg-white shadow-[0_8px_24px_rgba(15,23,42,0.12)] ring-1 ring-black/5 [scrollbar-width:thin]">
+          {matches.length === 0 ? (
+            <p className="px-3 py-2 text-[12px] text-slate-400">
+              No matching {kindLabel}s
+            </p>
+          ) : (
+            matches.slice(0, 40).map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  onChange(item);
+                  setQuery(item.name);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "flex w-full px-3 py-1.5 text-left text-[12px] hover:bg-violet-50",
+                  value?.id === item.id
+                    ? "font-semibold text-[#5A32A3]"
+                    : "text-slate-700",
+                )}
+              >
+                {item.name}
+              </button>
+            ))
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function CallNoteComposer({
   record,
   number,
@@ -1067,6 +1236,12 @@ function CallNoteComposer({
   onChange,
   onSave,
   onSkip,
+  hideActions,
+  relatedKind,
+  relatedPick,
+  relatedOptions,
+  onRelatedKind,
+  onRelatedPick,
 }: {
   record: SoftphoneRecord | null;
   number: string;
@@ -1079,12 +1254,34 @@ function CallNoteComposer({
   onChange: (v: string) => void;
   onSave: () => void;
   onSkip: () => void;
+  hideActions?: boolean;
+  relatedKind: "" | SoftphoneRelatedKind;
+  relatedPick: SoftphoneRelatedPick | null;
+  relatedOptions: {
+    leads: SoftphoneRelatedPick[];
+    deals: SoftphoneRelatedPick[];
+    companies: SoftphoneRelatedPick[];
+  };
+  onRelatedKind: (kind: "" | SoftphoneRelatedKind) => void;
+  onRelatedPick: (pick: SoftphoneRelatedPick | null) => void;
 }) {
   const displayName = record?.name || name || "Unknown";
+  const kindOptions =
+    relatedKind === "Deal"
+      ? relatedOptions.deals
+      : relatedKind === "Company"
+        ? relatedOptions.companies
+        : relatedOptions.leads;
+  const kindLabel =
+    relatedKind === "Deal"
+      ? "deal"
+      : relatedKind === "Company"
+        ? "organization"
+        : "lead";
 
   return (
-    <div className="space-y-2.5 py-0.5 pb-2">
-      <div className="border-b border-slate-100 pb-2.5">
+    <div className="flex h-full min-h-0 flex-col py-0.5">
+      <div className="shrink-0 border-b border-slate-100 pb-2.5">
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#5A32A3] text-white">
             <Phone className="h-4 w-4" />
@@ -1097,21 +1294,23 @@ function CallNoteComposer({
         </div>
       </div>
 
-      <div className="border-b border-slate-100 pb-2.5 text-center">
+      <div className="shrink-0 border-b border-slate-100 pb-2.5 text-center">
         <p className="truncate text-[14px] font-semibold text-slate-900">
           {displayName}
         </p>
         <p className="text-[12px] text-slate-500">{number}</p>
-        <p className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-rose-600">
-          <PhoneOff className="h-3.5 w-3.5" />
-          Call Ended
-        </p>
-        <p className="mt-2 inline-flex rounded-lg bg-slate-100 px-3 py-1 text-[12px] font-medium text-slate-600">
-          {formatDurationClock(durationSeconds)}
-        </p>
+        <div className="mt-2 flex items-center justify-center gap-2">
+          <p className="inline-flex items-center gap-1 text-[12px] font-medium text-rose-600">
+            <PhoneOff className="h-3.5 w-3.5" />
+            Call Ended
+          </p>
+          <p className="inline-flex rounded-lg bg-slate-100 px-3 py-1 text-[12px] font-medium text-slate-600">
+            {formatDurationClock(durationSeconds)}
+          </p>
+        </div>
       </div>
 
-      <div className="border-b border-slate-100 pb-2.5">
+      <div className="shrink-0 border-b border-slate-100 py-2.5">
         <p className="mb-2 flex items-center gap-1 text-[13px] font-semibold text-slate-800">
           Custom Disposition
           <span title="How this call ended">
@@ -1140,38 +1339,67 @@ function CallNoteComposer({
         </div>
       </div>
 
-      <div>
-        <h3 className="text-[14px] font-semibold text-slate-900">Call note</h3>
+      <div className="shrink-0 border-b border-slate-100 py-2">
+        <p className="mb-1.5 text-[13px] font-semibold text-slate-800">Related to</p>
+        <select
+          value={relatedKind}
+          onChange={(e) =>
+            onRelatedKind(e.target.value as "" | SoftphoneRelatedKind)
+          }
+          className="h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-[12px] text-slate-700 outline-none focus:border-[#5A32A3]"
+        >
+          <option value="">None — contact notes</option>
+          <option value="Lead">Lead</option>
+          <option value="Deal">Deal</option>
+          <option value="Company">Organization</option>
+        </select>
+        {relatedKind ? (
+          <RelatedRecordSearch
+            kindLabel={kindLabel}
+            options={kindOptions}
+            value={relatedPick}
+            onChange={onRelatedPick}
+          />
+        ) : (
+          <p className="mt-1.5 text-[11px] text-slate-400">
+            Note saves to this contact only.
+          </p>
+        )}
+      </div>
+
+      <div className="flex min-h-[132px] flex-1 flex-col pt-2">
+        <h3 className="shrink-0 text-[14px] font-semibold text-slate-900">Call note</h3>
         <textarea
           value={body}
           onChange={(e) => onChange(e.target.value)}
-          rows={3}
           placeholder="What happened on this call?"
-          className="mt-2 w-full resize-none rounded-lg border border-violet-300 bg-white px-2.5 py-2 text-[12px] outline-none focus:ring-1 focus:ring-violet-500"
+          className="mt-1.5 min-h-[88px] w-full flex-1 resize-none overflow-y-auto overscroll-contain rounded-lg border border-violet-300 bg-white px-2.5 py-2 text-[12px] outline-none [scrollbar-width:thin] focus:ring-1 focus:ring-violet-500"
         />
         {savedTo ? (
-          <p className="mt-1 text-[11px] font-medium text-emerald-600">
+          <p className="mt-1 shrink-0 text-[11px] font-medium text-emerald-600">
             Saved on {savedTo}
           </p>
         ) : null}
-        <div className="mt-2 flex gap-2">
-          <button
-            type="button"
-            onClick={onSkip}
-            className="h-8 flex-1 rounded-lg border border-slate-200 text-[12px] font-medium text-slate-600 hover:bg-slate-50"
-          >
-            Skip
-          </button>
-          <button
-            type="button"
-            disabled={!body.trim()}
-            onClick={onSave}
-            className="inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-lg bg-[#5A32A3] text-[12px] font-semibold text-white disabled:opacity-40"
-          >
-            <StickyNote className="h-3.5 w-3.5" />
-            Save
-          </button>
-        </div>
+        {hideActions ? null : (
+          <div className="mt-2 flex shrink-0 gap-2 pb-2">
+            <button
+              type="button"
+              onClick={onSkip}
+              className="h-8 flex-1 rounded-lg border border-slate-200 text-[12px] font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Skip
+            </button>
+            <button
+              type="button"
+              disabled={!body.trim()}
+              onClick={onSave}
+              className="inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-lg bg-[#5A32A3] text-[12px] font-semibold text-white disabled:opacity-40"
+            >
+              <StickyNote className="h-3.5 w-3.5" />
+              Save
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

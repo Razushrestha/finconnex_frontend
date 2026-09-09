@@ -331,6 +331,9 @@ function FieldRenderer({
             </option>
           ))}
         </select>
+        {field.help ? (
+          <p className="text-[11px] text-slate-400">{field.help}</p>
+        ) : null}
       </label>
     );
   }
