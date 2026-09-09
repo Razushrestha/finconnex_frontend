@@ -154,6 +154,13 @@ function ActionConfigForm({
                 onChange={(e) => set(key, e.target.value ? new Date(e.target.value).toISOString() : undefined)}
               />
             )}
+            {meta.widget === "json" && (
+              <JsonField
+                value={value}
+                placeholder={meta.placeholder}
+                onChange={(next) => set(key, next)}
+              />
+            )}
             {meta.widget === "checkbox" && (
               <label className="flex items-center gap-2 text-sm text-slate-700">
                 <input
@@ -402,5 +409,54 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
         </p>
       )}
     </SlideOverPanel>
+  );
+}
+
+/**
+ * A JSON object/array field. The API expects a real object here — a plain
+ * textarea would send the string the user typed, which the executor reads as
+ * an empty object and then rejects with `noMutableFields`.
+ *
+ * Keeps its own text state so an in-progress edit is not destroyed on every
+ * keystroke, and only propagates a value once it parses.
+ */
+function JsonField({
+  value,
+  placeholder,
+  onChange,
+}: {
+  value: unknown;
+  placeholder?: string;
+  onChange: (next: unknown) => void;
+}) {
+  const [text, setText] = useState(() =>
+    value === undefined ? "" : typeof value === "string" ? value : JSON.stringify(value, null, 2),
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <>
+      <Textarea
+        value={text}
+        rows={4}
+        placeholder={placeholder}
+        onChange={(e) => {
+          const next = e.target.value;
+          setText(next);
+          if (!next.trim()) {
+            setError(null);
+            onChange(undefined);
+            return;
+          }
+          try {
+            onChange(JSON.parse(next));
+            setError(null);
+          } catch {
+            setError("Not valid JSON yet");
+          }
+        }}
+      />
+      {error && <p className="mt-1 text-xs text-amber-600">{error}</p>}
+    </>
   );
 }

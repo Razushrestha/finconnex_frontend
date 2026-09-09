@@ -415,7 +415,7 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: ["tag"],
   },
   SEND_NOTIFICATION: {
-    allowed: ["recipientId", "notificationType", "title", "message", "relatedType", "leadId", "contactId", "companyId", "dealId"],
+    allowed: ["recipientId", "notificationType", "title", "message", "taskId", "ticketId", "relatedType", "leadId", "contactId", "companyId", "dealId"],
     required: ["recipientId", "title", "message"],
   },
   SEND_EMAIL: {
@@ -451,7 +451,7 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: ["url"],
   },
   CREATE_LEAD: {
-    allowed: ["firstName", "lastName", "email", "phone", "mobilePhone", "jobTitle", "department", "linkedinUrl", "websiteUrl", "twitterUrl", "street", "city", "state", "country", "postalCode", "companyId", "companyName", "companyWebsite", "industry", "companySize", "pipelineStage", "tags", "source", "lifecycleStage", "score", "rating", "doNotContact", "productInterest", "budgetRange", "estimatedValue", "currency", "probability", "expectedCloseDate", "description", "notes", "ownerId"],
+    allowed: ["firstName", "lastName", "email", "phone", "mobilePhone", "jobTitle", "department", "linkedinUrl", "websiteUrl", "twitterUrl", "street", "city", "state", "country", "postalCode", "companyId", "companyName", "companyWebsite", "industry", "companySize", "pipelineStage", "tags", "source", "lifecycleStage", "score", "rating", "doNotContact", "productInterest", "budgetRange", "estimatedValue", "currency", "probability", "expectedCloseDate", "description", "notes", "ownerId", "avatarKey"],
     required: ["firstName", "lastName", "email"],
   },
   DELETE_LEAD: {
@@ -459,7 +459,7 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: [],
   },
   CREATE_CONTACT: {
-    allowed: ["firstName", "lastName", "email", "phone", "mobilePhone", "jobTitle", "department", "linkedinUrl", "lifecycleStage", "source", "doNotContact", "notes", "companyId", "ownerId"],
+    allowed: ["firstName", "lastName", "email", "phone", "mobilePhone", "jobTitle", "department", "linkedinUrl", "lifecycleStage", "source", "doNotContact", "notes", "companyId", "ownerId", "avatarKey"],
     required: ["email"],
   },
   DELETE_CONTACT: {
@@ -507,7 +507,7 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: ["subject"],
   },
   CREATE_MEETING: {
-    allowed: ["title", "meetingType", "startAt", "startInMs", "endAt", "durationMinutes", "timezone", "allDay", "location", "meetingLink", "agenda", "notes", "reminderAt", "reminderInMs", "attendeeIds", "relatedType", "leadId", "contactId", "companyId", "dealId"],
+    allowed: ["title", "meetingType", "startAt", "startInMs", "endAt", "durationMinutes", "timezone", "allDay", "location", "meetingLink", "agenda", "notes", "reminderAt", "reminderInMs", "attendeeIds", "externalAttendees", "relatedType", "leadId", "contactId", "companyId", "dealId"],
     required: ["title"],
   },
   SEND_SMS: {

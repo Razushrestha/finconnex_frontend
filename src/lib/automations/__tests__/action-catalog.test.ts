@@ -208,6 +208,17 @@ describe("automation action catalog", () => {
     }
   });
 
+  it("sends object-valued fields as JSON, not as text", () => {
+    // A textarea stores the raw string the user typed. The executor reads
+    // `fields` with a record guard that turns a string into {}, so Update
+    // Field then failed with noMutableFields — the config never arrived.
+    for (const key of ["fields", "externalAttendees"]) {
+      expect(FIELD_META[key]?.widget, `${key} must not be a plain textarea`).toBe(
+        "json",
+      );
+    }
+  });
+
   it("keeps only genuinely unbuilt actions in the coming-soon list", () => {
     // Everything left needs a third-party integration, a missing schema
     // field, or engine work — never merely "an executor".
