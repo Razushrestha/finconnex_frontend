@@ -154,6 +154,17 @@ function ActionConfigForm({
                 onChange={(e) => set(key, e.target.value ? new Date(e.target.value).toISOString() : undefined)}
               />
             )}
+            {meta.widget === "checkbox" && (
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300"
+                  checked={value === true}
+                  onChange={(e) => set(key, e.target.checked ? true : undefined)}
+                />
+                {meta.placeholder ?? "Yes"}
+              </label>
+            )}
             {meta.widget === "select" && (
               <Select value={typeof value === "string" ? value : null} onValueChange={(v) => v && set(key, v)}>
                 <SelectTrigger className="h-9 w-full text-sm">
