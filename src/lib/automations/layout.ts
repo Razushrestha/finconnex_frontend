@@ -22,7 +22,7 @@ export const V_GAP = 88;
 export const BRANCH_H_GAP = 48;
 
 export type BuilderNodeData =
-  | { kind: "trigger"; triggerType: string | null }
+  | { kind: "trigger"; triggerType: string | null; scopeSummary?: string }
   | { kind: "step"; step: AutomationStep; path: string }
   | { kind: "add"; path: string; branch?: "then" | "else" }
   | { kind: "end" };
@@ -164,7 +164,11 @@ function layoutColumn(
 
 export function buildWorkflowGraph(
   triggerType: string | null,
-  steps: AutomationStep[]
+  steps: AutomationStep[],
+  /** "Any lead" / "Jane Cooper" / "leads matching 2 conditions" — the trigger
+   * node's subtitle, so the canvas shows what the trigger is narrowed to
+   * without opening the panel. */
+  scopeSummary?: string
 ): { nodes: BuilderNode[]; edges: Edge[] } {
   counter = 0;
   const centerX = 0;
@@ -174,7 +178,7 @@ export function buildWorkflowGraph(
       id: triggerId,
       type: "trigger",
       position: { x: centerX - NODE_WIDTH / 2, y: 0 },
-      data: { kind: "trigger", triggerType },
+      data: { kind: "trigger", triggerType, scopeSummary },
       draggable: false,
     },
   ];

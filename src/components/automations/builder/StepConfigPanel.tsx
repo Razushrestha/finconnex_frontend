@@ -37,7 +37,9 @@ function useMembers() {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   useEffect(() => {
     let cancelled = false;
-    setStatus("loading");
+    // No setStatus("loading") here: the initial state is already "loading"
+    // and this effect runs once, so the call was redundant work inside an
+    // effect body.
     listCrmWorkspaceMembers()
       .then((list) => {
         if (cancelled) return;
@@ -72,7 +74,11 @@ function MemberSelect({
         ? "Couldn't load teammates"
         : "Select a teammate...";
   return (
-    <Select value={value || null} onValueChange={(v) => v && onChange(v)}>
+    <Select
+      items={members.map((m) => ({ label: m.name || m.email, value: m.userId }))}
+      value={value || null}
+      onValueChange={(v) => v && onChange(v)}
+    >
       <SelectTrigger className="h-9 w-full text-sm">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
@@ -173,7 +179,11 @@ function ActionConfigForm({
               </label>
             )}
             {meta.widget === "select" && (
-              <Select value={typeof value === "string" ? value : null} onValueChange={(v) => v && set(key, v)}>
+              <Select
+                items={meta.options ?? []}
+                value={typeof value === "string" ? value : null}
+                onValueChange={(v) => v && set(key, v)}
+              >
                 <SelectTrigger className="h-9 w-full text-sm">
                   <SelectValue placeholder="Select..." />
                 </SelectTrigger>
@@ -278,7 +288,11 @@ function WaitDurationForm({
         onChange={(e) => setAmount(Math.max(1, Number(e.target.value) || 1))}
         className="w-24"
       />
-      <Select value={String(unitMs)} onValueChange={(v) => setUnitMs(Number(v))}>
+      <Select
+        items={units.map(([label, ms]) => ({ label, value: String(ms) }))}
+        value={String(unitMs)}
+        onValueChange={(v) => setUnitMs(Number(v))}
+      >
         <SelectTrigger className="h-9 flex-1 text-sm">
           <SelectValue />
         </SelectTrigger>

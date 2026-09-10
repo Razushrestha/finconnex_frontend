@@ -36,6 +36,22 @@ const OPERATOR_LABEL: Record<AutomationConditionOperator, string> = {
   TAG_CONTAINS: "has tag",
 };
 
+/**
+ * Base UI's `Select.Value` renders the raw value unless the root is handed
+ * `items` to resolve the label from — so every select here passes the same
+ * list it renders, or the trigger shows "DOES_NOT_EXIST" where it should
+ * read "No reply".
+ */
+const MODE_OPTIONS = [
+  { label: "All conditions (AND)", value: "ALL" },
+  { label: "Any condition (OR)", value: "ANY" },
+];
+
+const REPLY_OPTIONS = [
+  { label: "No reply", value: "DOES_NOT_EXIST" },
+  { label: "Replied", value: "EXISTS" },
+];
+
 function operatorsFor(fieldType: string): AutomationConditionOperator[] {
   switch (fieldType) {
     case "number":
@@ -104,6 +120,7 @@ export function ConditionBuilder({ entityType, group, onChange }: Props) {
           Match
         </span>
         <Select
+          items={MODE_OPTIONS}
           value={group.mode}
           onValueChange={(mode) => onChange({ ...group, mode: mode as "ALL" | "ANY" })}
         >
@@ -111,8 +128,11 @@ export function ConditionBuilder({ entityType, group, onChange }: Props) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="ALL">All conditions (AND)</SelectItem>
-            <SelectItem value="ANY">Any condition (OR)</SelectItem>
+            {MODE_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -139,6 +159,7 @@ export function ConditionBuilder({ entityType, group, onChange }: Props) {
               </div>
               <div className="flex items-center gap-1">
                 <Select
+                  items={REPLY_OPTIONS}
                   value={item.operator}
                   onValueChange={(operator) => update(index, { operator: operator as AutomationConditionOperator })}
                 >
@@ -146,8 +167,11 @@ export function ConditionBuilder({ entityType, group, onChange }: Props) {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="DOES_NOT_EXIST">No reply</SelectItem>
-                    <SelectItem value="EXISTS">Replied</SelectItem>
+                    {REPLY_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Button variant="ghost" size="icon-sm" onClick={() => remove(index)}>
@@ -158,6 +182,7 @@ export function ConditionBuilder({ entityType, group, onChange }: Props) {
           ) : (
             <div key={index} className="flex items-center gap-1.5 rounded-lg border border-slate-200 p-2">
               <Select
+                items={Object.keys(fields).map((f) => ({ label: f, value: f }))}
                 value={item.field}
                 onValueChange={(field) => {
                   if (!field) return;
@@ -176,6 +201,10 @@ export function ConditionBuilder({ entityType, group, onChange }: Props) {
                 </SelectContent>
               </Select>
               <Select
+                items={operatorsFor(fields[item.field] ?? "string").map((op) => ({
+                  label: OPERATOR_LABEL[op],
+                  value: op,
+                }))}
                 value={item.operator}
                 onValueChange={(operator) => update(index, { operator: operator as AutomationConditionOperator })}
               >
