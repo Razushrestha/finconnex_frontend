@@ -152,3 +152,124 @@ export function labelForRecord(record: SoftphoneRecord | null, fallback?: string
   if (record) return `${record.kind}: ${record.name}`;
   return fallback || "Unlinked number";
 }
+
+export type SoftphoneRelatedKind = "Lead" | "Deal" | "Company";
+
+export type SoftphoneRelatedPick = {
+  kind: SoftphoneRelatedKind;
+  id: string;
+  name: string;
+};
+
+function leadMatchesCall(card: {
+  name: string;
+  phone?: string;
+  mobilePhone?: string;
+  custom?: Record<string, string>;
+}, phone?: string, name?: string) {
+  return (
+    phonesMatch(card.phone, phone) ||
+    phonesMatch(card.mobilePhone, phone) ||
+    phonesMatch(card.custom?.mobile, phone) ||
+    phonesMatch(card.custom?.["secondary.mobile"], phone) ||
+    phonesMatch(card.custom?.["secondary.phone"], phone) ||
+    namesMatch(card.name, name) ||
+    namesMatch(
+      [card.custom?.firstName, card.custom?.surname || card.custom?.lastName]
+        .filter(Boolean)
+        .join(" "),
+      name,
+    )
+  );
+}
+
+export function findSoftphoneContact(input: { phone?: string; name?: string }) {
+  return (
+    listAllContacts().find(
+      (c) =>
+        phonesMatch(c.phone, input.phone) ||
+        phonesMatch(c.mobile, input.phone) ||
+        namesMatch(c.name, input.name),
+    ) ?? null
+  );
+}
+
+/** Leads and deals the caller can attach this call note to. Matches first. */
+export function listSoftphoneRelatedOptions(input: {
+  phone?: string;
+  name?: string;
+}): {
+  leads: SoftphoneRelatedPick[];
+  deals: SoftphoneRelatedPick[];
+  companies: SoftphoneRelatedPick[];
+} {
+  const phone = input.phone?.trim();
+  const name = input.name?.trim();
+  const contact = findSoftphoneContact({ phone, name });
+  const linkedDealIds = new Set(contact?.dealIds ?? []);
+
+  const leadRows: Array<SoftphoneRelatedPick & { hit: boolean }> = [];
+  const seenLeads = new Set<string>();
+  for (const col of listLeadColumns()) {
+    for (const card of col.cards) {
+      if (seenLeads.has(card.id)) continue;
+      seenLeads.add(card.id);
+      leadRows.push({
+        kind: "Lead",
+        id: card.id,
+        name: card.name,
+        hit: leadMatchesCall(card, phone, name),
+      });
+    }
+  }
+  leadRows.sort((a, b) => Number(b.hit) - Number(a.hit) || a.name.localeCompare(b.name));
+
+  const dealRows = listAllDeals().map((deal) => ({
+    kind: "Deal" as const,
+    id: deal.id,
+    name: deal.name,
+    hit:
+      namesMatch(deal.contact, name) ||
+      namesMatch(deal.contact, contact?.name) ||
+      namesMatch(deal.name, name) ||
+      linkedDealIds.has(deal.id),
+  }));
+  dealRows.sort((a, b) => Number(b.hit) - Number(a.hit) || a.name.localeCompare(b.name));
+
+  const companyRows: Array<SoftphoneRelatedPick & { hit: boolean }> = [];
+  const seenCompanies = new Set<string>();
+  for (const group of listCompanyGroups()) {
+    for (const company of group.companies) {
+      if (seenCompanies.has(company.id)) continue;
+      seenCompanies.add(company.id);
+      companyRows.push({
+        kind: "Company",
+        id: company.id,
+        name: company.name,
+        hit:
+          phonesMatch(company.phone, phone) ||
+          namesMatch(company.name, name) ||
+          namesMatch(company.name, contact?.company),
+      });
+    }
+  }
+  companyRows.sort((a, b) => Number(b.hit) - Number(a.hit) || a.name.localeCompare(b.name));
+
+  return {
+    leads: leadRows.map(({ kind, id, name: leadName }) => ({
+      kind,
+      id,
+      name: leadName,
+    })),
+    deals: dealRows.map(({ kind, id, name: dealName }) => ({
+      kind,
+      id,
+      name: dealName,
+    })),
+    companies: companyRows.map(({ kind, id, name: companyName }) => ({
+      kind,
+      id,
+      name: companyName,
+    })),
+  };
+}

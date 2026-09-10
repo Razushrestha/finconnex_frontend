@@ -24,11 +24,13 @@ import {
   Pilcrow,
   Quote,
   Smile,
+  Redo2,
   Strikethrough,
   Subscript,
   Superscript,
   Table,
   Underline,
+  Undo2,
 } from "lucide-react";
 import { MentionPickerMenu } from "@/components/shared/MentionPickerMenu";
 import { useContentEditableMentions } from "@/components/shared/useContentEditableMentions";
@@ -177,6 +179,7 @@ interface TaskDescriptionEditorProps {
   belowEditor?: React.ReactNode;
   className?: string;
   fillHeight?: boolean;
+  variant?: "full" | "notes";
 }
 
 function preventFocusLoss(event: React.MouseEvent) {
@@ -1403,6 +1406,7 @@ export function TaskDescriptionEditor({
   belowEditor,
   className,
   fillHeight,
+  variant = "full",
 }: TaskDescriptionEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const lastHtmlRef = useRef(value);
@@ -1908,6 +1912,84 @@ export function TaskDescriptionEditor({
       <div className="flex w-full items-stretch rounded-t-md border-b border-slate-200 bg-slate-50/90">
         <div className="min-w-0 flex-1 overflow-x-auto no-scrollbar">
           <div className="flex h-11 min-w-max items-center gap-0.5 px-1.5">
+          {variant === "notes" ? (
+            <>
+              <ToolButton
+                title="Bold"
+                active={activeFormats.bold}
+                onClick={() => {
+                  runCommand("bold");
+                  readSelectionStyles();
+                }}
+              >
+                <Bold className="h-4 w-4" />
+              </ToolButton>
+              <ToolButton
+                title="Underline"
+                active={activeFormats.underline}
+                onClick={() => {
+                  runCommand("underline");
+                  readSelectionStyles();
+                }}
+              >
+                <Underline className="h-4 w-4" />
+              </ToolButton>
+              <ToolButton
+                title="Italic"
+                active={activeFormats.italic}
+                onClick={() => {
+                  runCommand("italic");
+                  readSelectionStyles();
+                }}
+              >
+                <Italic className="h-4 w-4" />
+              </ToolButton>
+              <ToolButton
+                title="Strikethrough"
+                active={activeFormats.strikeThrough}
+                onClick={() => {
+                  runCommand("strikeThrough");
+                  readSelectionStyles();
+                }}
+              >
+                <Strikethrough className="h-4 w-4" />
+              </ToolButton>
+              <ColorDropdown
+                title="Font color"
+                variant="font"
+                options={TEXT_COLORS}
+                currentColor={textColor}
+                onBeforeOpen={rememberSelection}
+                onPick={applyTextColor}
+              />
+              <ListSplitButton
+                kind="bullet"
+                active={activeFormats.unorderedList}
+                currentStyle={currentListStyle}
+                onToggle={() => toggleListKind(false)}
+                onPick={pickListStyle}
+                onBeforeOpen={rememberSelection}
+              />
+              <ListSplitButton
+                kind="number"
+                active={activeFormats.orderedList}
+                currentStyle={currentListStyle}
+                onToggle={() => toggleListKind(true)}
+                onPick={pickListStyle}
+                onBeforeOpen={rememberSelection}
+              />
+              <ToolButton title="Insert link" onClick={insertLink}>
+                <Link2 className="h-4 w-4" />
+              </ToolButton>
+              <ToolButton title="Undo" onClick={() => runCommand("undo")}>
+                <Undo2 className="h-4 w-4" />
+              </ToolButton>
+              <ToolButton title="Redo" onClick={() => runCommand("redo")}>
+                <Redo2 className="h-4 w-4" />
+              </ToolButton>
+            </>
+          ) : (
+            <>
           {toolbarLeading ? (
             <>
               {toolbarLeading}
@@ -2101,6 +2183,8 @@ export function TaskDescriptionEditor({
             onInsertHr={insertHr}
             onInsertQuote={insertQuote}
           />
+            </>
+          )}
           </div>
         </div>
         {toolbarTrailing ? (

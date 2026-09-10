@@ -59,7 +59,7 @@ import {
   softDeleteRecord,
 } from "@/lib/rules";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
-import { MentionTextarea } from "@/components/shared/MentionTextarea";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { cn } from "@/lib/utils";
 import { defaultActorName } from "@/lib/rules/actor";
 import {
@@ -761,8 +761,7 @@ export function TicketDetailClient({ id }: { id: string }) {
                   Public reply
                 </button>
               </div>
-              <MentionTextarea
-                className={cn(elevatedTextareaClass, "min-h-[80px] border border-slate-200 px-3 py-2")}
+              <MentionNotesTextarea
                 value={noteBody}
                 onChange={setNoteBody}
                 placeholder={

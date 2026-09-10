@@ -562,7 +562,49 @@ const CURATED: Record<string, SettingsSchema> = {
   "my-preferences/profile": {
     title: "Profile",
     description: "Your display name, contact details, and job title.",
-    fields: [],
+    fields: [
+      {
+        id: "displayName",
+        label: "Display name",
+        type: "text",
+      },
+      {
+        id: "email",
+        label: "Email",
+        type: "text",
+      },
+      {
+        id: "phone",
+        label: "Phone",
+        type: "text",
+      },
+      {
+        id: "jobTitle",
+        label: "Job title",
+        type: "text",
+      },
+      {
+        id: "timezone",
+        label: "Time zone",
+        type: "select",
+        defaultValue: "",
+        help: "Used for greetings and your local working day. Leave blank to use this device.",
+        options: [
+          { label: "Use my device time zone", value: "" },
+          { label: "Australia/Sydney", value: "Australia/Sydney" },
+          { label: "Australia/Melbourne", value: "Australia/Melbourne" },
+          { label: "Australia/Brisbane", value: "Australia/Brisbane" },
+          { label: "Australia/Adelaide", value: "Australia/Adelaide" },
+          { label: "Australia/Perth", value: "Australia/Perth" },
+          { label: "Australia/Darwin", value: "Australia/Darwin" },
+          { label: "Australia/Hobart", value: "Australia/Hobart" },
+          { label: "Pacific/Auckland", value: "Pacific/Auckland" },
+          { label: "Asia/Kathmandu", value: "Asia/Kathmandu" },
+          { label: "UTC", value: "UTC" },
+        ],
+      },
+      { id: "avatar", label: "Profile photo", type: "file" },
+    ],
   },
 
   "my-preferences/signature": {

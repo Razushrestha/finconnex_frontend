@@ -505,7 +505,7 @@ export function CreateLeadForm({
           </select>
         </InputShell>
       </Field>
-      <Field label="Followers" className="relative z-20 overflow-visible">
+      <Field label="Lead Followers" className="relative z-20 overflow-visible">
         <div className="flex h-10 items-center">
           <LeadFollowersField
             value={JSON.stringify(form.followers)}

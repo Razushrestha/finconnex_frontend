@@ -1,11 +1,8 @@
 "use client";
 
-import {
-  TextAreaShell,
-  elevatedTextareaClass,
-} from "@/components/sales/CreateEntityForm";
-import { MentionTextarea } from "@/components/shared/MentionTextarea";
+import { TaskDescriptionEditor } from "@/components/activities/tasks/TaskDescriptionEditor";
 import type { MentionPerson } from "@/lib/mentions/people";
+import { cn } from "@/lib/utils";
 import type { TextareaHTMLAttributes } from "react";
 
 interface MentionNotesTextareaProps
@@ -21,23 +18,18 @@ export function MentionNotesTextarea({
   value,
   onChange,
   onMentionSelect,
-  people,
   error,
   className,
   placeholder = "Internal notes… Type @ to assign someone.",
-  ...props
 }: MentionNotesTextareaProps) {
   return (
-    <TextAreaShell error={error}>
-      <MentionTextarea
-        value={value}
-        onChange={onChange}
-        onMentionSelect={onMentionSelect}
-        people={people}
-        className={className ?? elevatedTextareaClass}
-        placeholder={placeholder}
-        {...props}
-      />
-    </TextAreaShell>
+    <TaskDescriptionEditor
+      variant="notes"
+      value={value}
+      onChange={onChange}
+      onMentionSelect={onMentionSelect}
+      placeholder={placeholder}
+      className={cn(error && "border-rose-300", className)}
+    />
   );
 }
