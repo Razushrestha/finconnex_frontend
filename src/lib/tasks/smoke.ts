@@ -329,6 +329,24 @@ export function smokeTasksWiring() {
   ) {
     fail("normalizeTask did not map Swagger-shaped fields");
   }
+  const withFiles = normalizeTask(
+    {
+      id: ID,
+      title: "Call the broker",
+      status: "NOT_STARTED",
+      attachments: [
+        {
+          id: ATT_ID,
+          key: "workspaces/ws/uploads/brief.pdf",
+          url: "https://cdn.example.com/brief.pdf",
+        },
+      ],
+    },
+    0,
+  );
+  if (withFiles.attachments?.[0]?.name !== "brief.pdf") {
+    fail("normalizeTask did not map task attachments");
+  }
 }
 
 export async function smokeTasksMock() {

@@ -1,9 +1,9 @@
 import {
-  ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import {
   DOCUMENT_REQUEST_TYPES,
   progressForStatus,
@@ -245,42 +245,55 @@ export function normalizeDocumentRequests(data: unknown): DocumentRequest[] {
   );
 }
 
-async function withSession<T>(
-  run: (
-    session: CrmSession | Pick<CrmSession, "baseUrl" | "accessToken">,
-    scoped: boolean,
-  ) => Promise<T>,
-): Promise<T> {
-  const scoped = await ensureCrmSession();
-  if (scoped) return run(scoped, true);
-  const access = await ensureCrmAccess();
-  if (!access) throw new Error("Sign in to manage document requests");
-  return run(access, false);
+async function withSession<T>(fn: (session: CrmSession) => Promise<T>): Promise<T> {
+  const session = await ensureCrmSession();
+  if (!session) throw new Error("Sign in to manage document requests");
+  return fn(session);
 }
 
-function requestsUrl(
-  session: CrmSession | Pick<CrmSession, "baseUrl" | "accessToken">,
-  scoped: boolean,
+function isMissingCrmRoute(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  return /\(404\)|not found/i.test(message);
+}
+
+async function requestsCall(
   suffix: string,
-) {
-  return scoped
-    ? workspaceDocumentRequestsPath((session as CrmSession).workspaceId, suffix)
-    : globalDocumentRequestsPath(suffix);
+  query = "",
+  init?: RequestInit,
+): Promise<unknown> {
+  const scoped = await ensureCrmSession();
+  const paths = [
+    ...(scoped?.workspaceId
+      ? [`${workspaceDocumentRequestsPath(scoped.workspaceId, suffix)}${query}`]
+      : []),
+    `${globalDocumentRequestsPath(suffix)}${query}`,
+  ].filter((path, index, all) => all.indexOf(path) === index);
+
+  let lastError: unknown;
+  for (let i = 0; i < paths.length; i += 1) {
+    try {
+      if (isBoundCrmSession()) {
+        return await withSession((session) => crmFetch(session, paths[i], init));
+      }
+      return await crmBffFetch(paths[i], init);
+    } catch (err) {
+      lastError = err;
+      if (i < paths.length - 1 && isMissingCrmRoute(err)) continue;
+      throw err;
+    }
+  }
+  throw lastError;
 }
 
 async function requestsGet(suffix: string, query = ""): Promise<unknown> {
-  return withSession((session, scoped) =>
-    crmFetch(session, `${requestsUrl(session, scoped, suffix)}${query}`),
-  );
+  return requestsCall(suffix, query);
 }
 
 async function requestsMutate(
   suffix: string,
   init: RequestInit,
 ): Promise<unknown> {
-  return withSession((session, scoped) =>
-    crmFetch(session, requestsUrl(session, scoped, suffix), init),
-  );
+  return requestsCall(suffix, "", init);
 }
 
 function asRequest(data: unknown): DocumentRequest | null {

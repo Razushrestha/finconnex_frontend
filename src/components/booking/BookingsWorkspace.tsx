@@ -27,14 +27,22 @@ import { cn } from "@/lib/utils";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import { initials } from "@/lib/activities/shared";
 import {
-  listBookingPages,
   publicBookUrl,
   type BookingPage,
 } from "@/lib/booking/types";
+import {
+  getCalendlySummary,
+  listCalendlyAvailabilitySchedules,
+  listCalendlyHosts,
+  markCalendlyNoShow,
+  removeCalendlyNoShow,
+  updateCalendlyHost,
+  type CalendlySummary,
+} from "@/lib/booking/calendly-api";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { ConsultationsBoard } from "@/components/booking/ConsultationsBoard";
 import { NewBookingModal } from "@/components/booking/NewBookingModal";
 import {
-  DASHBOARD_CONSULTANTS,
   appointmentDateKey,
   appointmentMatchesKpi,
   bookingKpiStats,
@@ -42,13 +50,14 @@ import {
   dateKeyFromDate,
   formatApptDate,
   formatApptTime,
-  listDashboardAppointments,
   type AppointmentChannel,
   type AppointmentStatus,
   type BookingKpiKey,
   type DashboardAppointment,
+  type DashboardConsultant,
   type RelatedKind,
 } from "@/lib/booking/dashboard";
+import { useCrmBooking } from "@/lib/booking/use-crm-booking";
 
 export type BookingSection =
   | "home"
@@ -57,6 +66,32 @@ export type BookingSection =
   | "consultants";
 
 const BRAND = "#5A32A3";
+
+function ConsultantFace({
+  name,
+  photo,
+  className,
+}: {
+  name: string;
+  photo?: string;
+  className?: string;
+}) {
+  if (photo && /^https?:\/\//i.test(photo)) {
+    return (
+      <img src={photo} alt="" className={cn("rounded-full object-cover", className)} />
+    );
+  }
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center justify-center rounded-full bg-[#F3ECFB] font-bold text-[#5A32A3]",
+        className,
+      )}
+    >
+      {initials(name)}
+    </span>
+  );
+}
 
 const STATUS_STYLE: Record<AppointmentStatus, string> = {
   Confirmed: "bg-[#D1FAE5] text-[#059669]",
@@ -151,11 +186,8 @@ export function BookingsWorkspace({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [pages] = useState<BookingPage[]>(() =>
-    typeof window === "undefined" ? [] : listBookingPages(),
-  );
+  const crm = useCrmBooking();
   const [bookOpen, setBookOpen] = useState(false);
-  const [homeTick, setHomeTick] = useState(0);
 
   useEffect(() => {
     if (searchParams.get("book") === "1") setBookOpen(true);
@@ -172,7 +204,10 @@ export function BookingsWorkspace({
         <div className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col px-3 pt-4 pb-4 sm:px-5 sm:pt-5 sm:pb-5 lg:px-7 xl:pb-5">
           {section === "home" ? (
             <HomeView
-              tick={homeTick}
+              appointments={crm.appointments}
+              consultants={crm.consultants}
+              loading={crm.loading}
+              error={crm.error}
               onNewBooking={() => setBookOpen(true)}
               onViewConsultants={() => router.push("/booking/consultants")}
             />
@@ -185,7 +220,8 @@ export function BookingsWorkspace({
           {section === "schedules" ? (
             <PagesPanel
               title="Schedules"
-              pages={pages}
+              pages={crm.pages}
+              loading={crm.loading}
               onOpenPage={(id) => router.push(`/booking/${id}`)}
             />
           ) : null}
@@ -195,7 +231,7 @@ export function BookingsWorkspace({
       <NewBookingModal
         open={bookOpen}
         onClose={closeBook}
-        onCreated={() => setHomeTick((n) => n + 1)}
+        onCreated={() => crm.refresh()}
       />
     </div>
   );
@@ -215,15 +251,21 @@ function NewBookingButton({ onClick }: { onClick: () => void }) {
 }
 
 function HomeView({
-  tick,
+  appointments,
+  consultants,
+  loading,
+  error,
   onNewBooking,
   onViewConsultants,
 }: {
-  tick: number;
+  appointments: DashboardAppointment[];
+  consultants: DashboardConsultant[];
+  loading: boolean;
+  error: string | null;
   onNewBooking: () => void;
   onViewConsultants: () => void;
 }) {
-  const now = useMemo(() => new Date(), [tick]);
+  const now = useMemo(() => new Date(), [appointments]);
   const [consultantFilter, setConsultantFilter] = useState("all");
   const [kpiFilter, setKpiFilter] = useState<BookingKpiKey | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => dateKeyFromDate(new Date()));
@@ -233,12 +275,29 @@ function HomeView({
   });
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<DashboardAppointment | null>(null);
+  const [calendlySummary, setCalendlySummary] = useState<CalendlySummary | null>(
+    null,
+  );
   const pageSize = 6;
 
-  const appointments = useMemo(() => {
-    void tick;
-    return listDashboardAppointments();
-  }, [tick]);
+  useEffect(() => {
+    const from = new Date(now.getFullYear(), now.getMonth(), 1);
+    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    let alive = true;
+    void getCalendlySummary({
+      from: from.toISOString(),
+      to: to.toISOString(),
+    })
+      .then((summary) => {
+        if (alive) setCalendlySummary(summary);
+      })
+      .catch(() => {
+        if (alive) setCalendlySummary(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [now]);
 
   const kpi = useMemo(
     () => bookingKpiStats(appointments, now),
@@ -341,6 +400,13 @@ function HomeView({
           );
         })}
       </div>
+      {calendlySummary ? (
+        <p className="mb-3 text-[12px] text-slate-500">
+          Calendly this month: {calendlySummary.booked} booked ·{" "}
+          {calendlySummary.cancelled} cancelled · {calendlySummary.noShows}{" "}
+          no-shows · {calendlySummary.completed} completed
+        </p>
+      ) : null}
 
       <div className="grid min-h-0 flex-1 grid-cols-1 items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
         <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
@@ -359,7 +425,7 @@ function HomeView({
                 className="h-8 min-w-0 flex-1 rounded-lg border border-[#E5E7EB] bg-white px-2.5 text-[12px] font-medium text-slate-700 outline-none sm:flex-none"
               >
                 <option value="all">All Consultants</option>
-                {DASHBOARD_CONSULTANTS.map((c) => (
+                {consultants.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
@@ -382,8 +448,21 @@ function HomeView({
             </div>
           </div>
 
+          {error ? (
+            <p className="px-5 py-2 text-[12px] text-rose-600">{error}</p>
+          ) : null}
           <div className="min-h-0 flex-1 overflow-auto">
           <div className="divide-y divide-[#F3F4F6] lg:hidden">
+            {loading && pageRows.length === 0 ? (
+              <p className="px-4 py-10 text-center text-[13px] text-slate-400">
+                Loading appointments…
+              </p>
+            ) : null}
+            {!loading && pageRows.length === 0 ? (
+              <p className="px-4 py-10 text-center text-[13px] text-slate-400">
+                No appointments from CRM meetings yet.
+              </p>
+            ) : null}
             {pageRows.map((row) => (
               <AppointmentCard
                 key={row.id}
@@ -410,6 +489,20 @@ function HomeView({
                 </tr>
               </thead>
               <tbody>
+                {loading && pageRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-12 text-center text-[13px] text-slate-400">
+                      Loading appointments…
+                    </td>
+                  </tr>
+                ) : null}
+                {!loading && pageRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-12 text-center text-[13px] text-slate-400">
+                      No appointments from CRM meetings yet.
+                    </td>
+                  </tr>
+                ) : null}
                 {pageRows.map((row) => (
                   <AppointmentRow
                     key={row.id}
@@ -478,13 +571,16 @@ function HomeView({
               </button>
             </div>
             <div className="space-y-3">
-              {DASHBOARD_CONSULTANTS.slice(0, 4).map((c) => (
+              {consultants.length === 0 ? (
+                <p className="text-[12px] text-slate-400">
+                  {loading
+                    ? "Loading hosts…"
+                    : "No Calendly hosts yet. Connect Calendly in CRM, then refresh."}
+                </p>
+              ) : null}
+              {consultants.slice(0, 4).map((c) => (
                 <div key={c.id} className="flex items-center gap-2.5">
-                  <img
-                    src={c.photo}
-                    alt=""
-                    className="h-9 w-9 rounded-full object-cover"
-                  />
+                  <ConsultantFace name={c.name} photo={c.photo} className="h-9 w-9 text-[11px]" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13px] font-semibold text-slate-900">
                       {c.name}
@@ -592,10 +688,10 @@ function AppointmentCard({
             </p>
             {consultant ? (
               <p className="flex items-center gap-1.5">
-                <img
-                  src={consultant.photo}
-                  alt=""
-                  className="h-4 w-4 rounded-full object-cover"
+                <ConsultantFace
+                  name={consultant.name}
+                  photo={consultant.photo}
+                  className="h-4 w-4 text-[8px]"
                 />
                 <span className="truncate">{consultant.name}</span>
               </p>
@@ -679,10 +775,10 @@ function AppointmentRow({
       <td className="px-3 py-3.5">
         {consultant ? (
           <div className="flex items-center gap-2">
-            <img
-              src={consultant.photo}
-              alt=""
-              className="h-7 w-7 rounded-full object-cover"
+            <ConsultantFace
+              name={consultant.name}
+              photo={consultant.photo}
+              className="h-7 w-7 text-[10px]"
             />
             <div className="min-w-0">
               <p className="truncate text-[12px] font-semibold text-slate-800">
@@ -907,6 +1003,32 @@ function AppointmentDrawer({
             <Row label="Status" value={row.status} />
             <Row label="Channel" value={row.channel} />
           </dl>
+          {row.calendlyInviteeId && isUuid(row.calendlyInviteeId) ? (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  void markCalendlyNoShow(row.calendlyInviteeId!).catch(
+                    () => undefined,
+                  );
+                }}
+                className="h-9 rounded-lg bg-rose-600 px-3 text-[12px] font-semibold text-white"
+              >
+                Mark no-show
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void removeCalendlyNoShow(row.calendlyInviteeId!).catch(
+                    () => undefined,
+                  );
+                }}
+                className="h-9 rounded-lg border border-slate-200 px-3 text-[12px] font-semibold text-slate-700"
+              >
+                Clear no-show
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -925,10 +1047,12 @@ function Row({ label, value }: { label: string; value: string }) {
 function PagesPanel({
   title,
   pages,
+  loading,
   onOpenPage,
 }: {
   title: string;
   pages: BookingPage[];
+  loading?: boolean;
   onOpenPage: (id: string) => void;
 }) {
   return (
@@ -988,7 +1112,9 @@ function PagesPanel({
           {pages.length === 0 ? (
             <tr>
               <td colSpan={5} className="px-5 py-12 text-center text-slate-400">
-                No pages yet.
+                {loading
+                  ? "Loading Calendly event types…"
+                  : "No Calendly event types yet."}
               </td>
             </tr>
           ) : null}
@@ -1000,25 +1126,129 @@ function PagesPanel({
 }
 
 function ConsultantsPanel() {
+  const [hosts, setHosts] = useState<
+    import("@/lib/booking/calendly-api").CalendlyHost[]
+  >([]);
+  const [schedules, setSchedules] = useState<
+    Record<string, import("@/lib/booking/calendly-api").CalendlySchedule[]>
+  >({});
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    void listCalendlyHosts()
+      .then((rows) => {
+        if (!alive) return;
+        setHosts(rows);
+        return Promise.all(
+          rows.map(async (host) => {
+            try {
+              const items = await listCalendlyAvailabilitySchedules(host.id);
+              return [host.id, items] as const;
+            } catch {
+              return [host.id, [] as import("@/lib/booking/calendly-api").CalendlySchedule[]] as const;
+            }
+          }),
+        );
+      })
+      .then((pairs) => {
+        if (!alive || !pairs) return;
+        const next: Record<
+          string,
+          import("@/lib/booking/calendly-api").CalendlySchedule[]
+        > = {};
+        for (const [id, items] of pairs) next[id] = [...items];
+        setSchedules(next);
+      })
+      .catch((err) => {
+        if (alive) {
+          setError(
+            err instanceof Error ? err.message : "Could not load Calendly hosts.",
+          );
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (error) {
+    return <p className="text-[13px] text-rose-600">{error}</p>;
+  }
+
+  if (hosts.length === 0) {
+    return (
+      <p className="text-[13px] text-slate-500">
+        No Calendly hosts yet. Connect Calendly in CRM, then refresh.
+      </p>
+    );
+  }
+
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {DASHBOARD_CONSULTANTS.map((c) => (
+      {hosts.map((c) => (
         <div
           key={c.id}
-          className="flex items-center gap-3 rounded-xl border border-slate-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
+          className="flex flex-col gap-3 rounded-xl border border-slate-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
         >
-          <img
-            src={c.photo}
-            alt=""
-            className="h-12 w-12 rounded-full object-cover"
-          />
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold text-slate-900">{c.name}</p>
-            <p className="text-[12px] text-slate-500">{c.role}</p>
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F3ECFB] text-[13px] font-bold text-[#5A32A3]">
+              {initials(c.name)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-slate-900">{c.name}</p>
+              <p className="text-[12px] text-slate-500">
+                {c.email || (c.isHomeConsultant ? "Home consultant" : "Host")}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void updateCalendlyHost(c.id, {
+                  isConsultant: !c.isConsultant,
+                })
+                  .then((next) => {
+                    setHosts((prev) =>
+                      prev.map((row) => (row.id === next.id ? next : row)),
+                    );
+                  })
+                  .catch(() => undefined);
+              }}
+              className={cn(
+                "rounded-full px-2 py-1 text-[10px] font-semibold",
+                c.isConsultant
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-slate-100 text-slate-500",
+              )}
+            >
+              {c.isConsultant ? "Consultant" : "Host"}
+            </button>
           </div>
-          <span className="text-[15px] font-bold tabular-nums text-slate-800">
-            {c.bookings}
-          </span>
+          <button
+            type="button"
+            onClick={() => {
+              void updateCalendlyHost(c.id, {
+                isHomeConsultant: !c.isHomeConsultant,
+              })
+                .then((next) => {
+                  setHosts((prev) =>
+                    prev.map((row) => (row.id === next.id ? next : row)),
+                  );
+                })
+                .catch(() => undefined);
+            }}
+            className="self-start text-[11px] font-semibold text-[#5A32A3]"
+          >
+            {c.isHomeConsultant ? "Home consultant" : "Set as home consultant"}
+          </button>
+          {(schedules[c.id] ?? []).length > 0 ? (
+            <p className="text-[11px] text-slate-400">
+              {(schedules[c.id] ?? [])
+                .map((row) => row.name)
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          ) : null}
         </div>
       ))}
     </div>

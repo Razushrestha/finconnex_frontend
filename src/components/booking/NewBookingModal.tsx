@@ -11,15 +11,29 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { listAllContacts, createQuickContact } from "@/lib/contacts/store";
-import { createMeeting, formatMeetingDateTime } from "@/lib/meetings/store";
+import { formatMeetingDateTime } from "@/lib/meetings/store";
+import { createCrmMeeting } from "@/lib/meetings/api";
 import {
-  DASHBOARD_CONSULTANTS,
-  addDashboardAppointment,
   type AppointmentChannel,
   type AppointmentStatus,
   type DashboardAppointment,
 } from "@/lib/booking/dashboard";
+import {
+  calendlyCrmLinkFromRelated,
+  calendlyEventTypeToBookingPage,
+  createCalendlyBooking,
+  linkCalendlyMeetingCrm,
+  listCalendlyAvailableTimes,
+  listCalendlyBusyTimes,
+  listCalendlyEventTypes,
+  listCalendlyHosts,
+  localHHmmFromIso,
+  newCalendlyIdempotencyKey,
+  resolveCalendlyEventType,
+  type CalendlyHost,
+} from "@/lib/booking/calendly-api";
 import {
   assignedCalendarMembers,
   bookingLocationLabel,
@@ -28,7 +42,6 @@ import {
   customDaySlots,
   formatSlotRange,
   internalSlotsForDate,
-  listActiveConsultations,
   type BookingPage,
 } from "@/lib/booking/types";
 import { DEFAULT_TIMEZONE } from "@/lib/booking/timezones";
@@ -57,14 +70,6 @@ import {
 
 const LOCATIONS = ["Zoom", "Google Meet", "Phone", "Full address"] as const;
 type LocationKind = (typeof LOCATIONS)[number];
-
-const AVATARS = [
-  "bg-rose-100 text-rose-700",
-  "bg-amber-100 text-amber-800",
-  "bg-teal-100 text-teal-800",
-  "bg-sky-100 text-sky-800",
-  "bg-violet-100 text-violet-800",
-];
 
 const ROLE_STYLE: Record<MeetingAttendeeRole, string> = {
   Host: "bg-[#F3ECFB] text-[#5A32A3]",
@@ -115,14 +120,11 @@ export function NewBookingModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onCreated: (row: DashboardAppointment) => void;
+  onCreated: (row?: DashboardAppointment) => void;
 }) {
   const [recordTick, setRecordTick] = useState(0);
   const contacts = useMemo(() => listAllContacts(), [open, recordTick]);
-  const calendars = useMemo<BookingPage[]>(
-    () => (typeof window === "undefined" ? [] : listActiveConsultations()),
-    [open],
-  );
+  const [calendars, setCalendars] = useState<BookingPage[]>([]);
   const now = new Date();
   const [calendarId, setCalendarId] = useState("");
   const [title, setTitle] = useState("");
@@ -140,7 +142,7 @@ export function NewBookingModal({
   });
   const [locationMode, setLocationMode] = useState<"default" | "custom">("default");
   const [locationKind, setLocationKind] = useState<LocationKind>("Zoom");
-  const [meetingLink, setMeetingLink] = useState("https://zoom.us/j/987654321");
+  const [meetingLink, setMeetingLink] = useState("");
   const [address, setAddress] = useState("");
   const [clientId, setClientId] = useState(contacts[0]?.id ?? "");
   const [relatedKind, setRelatedKind] = useState<RelatedEntityKind | "">("");
@@ -151,6 +153,32 @@ export function NewBookingModal({
   const [showNote, setShowNote] = useState(false);
   const [status, setStatus] = useState<AppointmentStatus>("Confirmed");
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [relatedRecordId, setRelatedRecordId] = useState("");
+  const [calendlyHosts, setCalendlyHosts] = useState<CalendlyHost[]>([]);
+  const [providerSlots, setProviderSlots] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    void Promise.all([
+      listCalendlyHosts({ active: true }).catch(() => [] as CalendlyHost[]),
+      listCalendlyEventTypes().catch(() => []),
+    ]).then(([hosts, types]) => {
+      if (!alive) return;
+      setCalendlyHosts(hosts);
+      const hostName = (id: string) =>
+        hosts.find((host) => host.id === id)?.name ?? "";
+      setCalendars(
+        types.map((item) =>
+          calendlyEventTypeToBookingPage(item, hostName(item.hostId)),
+        ),
+      );
+    });
+    return () => {
+      alive = false;
+    };
+  }, [open]);
 
   const calendar = calendars.find((item) => item.id === calendarId) ?? calendars[0];
   const teamMembers = [
@@ -159,9 +187,12 @@ export function NewBookingModal({
       id: name,
       name,
     })),
+    ...calendlyHosts
+      .filter((host) => !assignedCalendarMembers(calendar).includes(host.name))
+      .map((host) => ({ id: host.id, name: host.name })),
   ];
   const slotDuration = customDuration;
-  const slots = useMemo(() => {
+  const localSlots = useMemo(() => {
     if (whenMode === "custom") {
       return customDaySlots(slotDuration).map((start) =>
         formatSlotRange(start, slotDuration),
@@ -172,6 +203,60 @@ export function NewBookingModal({
       formatSlotRange(start, slotDuration),
     );
   }, [calendar, date, slotDuration, whenMode]);
+  const slots = whenMode === "custom" ? localSlots : (providerSlots ?? localSlots);
+
+  useEffect(() => {
+    if (!open || !calendar || whenMode === "custom" || !date) {
+      setProviderSlots(null);
+      return;
+    }
+    let alive = true;
+    void (async () => {
+      try {
+        const hostId = isUuid(consultantId) ? consultantId : calendar.calendlyHostId;
+        const eventType = await resolveCalendlyEventType(calendar, hostId);
+        if (!eventType || !isUuid(eventType.id)) {
+          if (alive) setProviderSlots(null);
+          return;
+        }
+        const from = new Date(`${date}T00:00:00`);
+        const to = new Date(`${date}T23:59:59`);
+        const times = await listCalendlyAvailableTimes({
+          eventTypeId: eventType.id,
+          from: from.toISOString(),
+          to: to.toISOString(),
+        });
+        const duration = eventType.durationMinutes || slotDuration;
+        let mapped = times.map((row) =>
+          formatSlotRange(localHHmmFromIso(row.startTime), duration),
+        );
+        if (hostId && isUuid(hostId)) {
+          try {
+            const busy = await listCalendlyBusyTimes(hostId, {
+              from: from.toISOString(),
+              to: to.toISOString(),
+            });
+            mapped = mapped.filter((label) => {
+              const hhmm = slotStart(label);
+              return !busy.some((block) => {
+                const start = localHHmmFromIso(block.startTime);
+                const end = localHHmmFromIso(block.endTime);
+                return hhmm >= start && hhmm < end;
+              });
+            });
+          } catch {
+            /* available-times is already provider-authoritative */
+          }
+        }
+        if (alive) setProviderSlots(mapped);
+      } catch {
+        if (alive) setProviderSlots(null);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [open, calendar, date, whenMode, slotDuration, consultantId]);
 
   useEffect(() => {
     if (!open || calendars.length === 0) return;
@@ -235,9 +320,9 @@ export function NewBookingModal({
       ? calendarDefaultHost(calendar)
       : consultantId;
   const consultant =
-    DASHBOARD_CONSULTANTS.find((c) => c.name === hostName) ??
-    DASHBOARD_CONSULTANTS.find((c) => c.name === calendar?.owner) ??
-    DASHBOARD_CONSULTANTS[0];
+    calendlyHosts.find((host) => host.id === consultantId) ??
+    calendlyHosts.find((host) => host.name === hostName) ??
+    calendlyHosts.find((host) => host.name === calendar?.owner);
   const client = contacts.find((c) => c.id === clientId) ?? contacts[0];
   const guests = contacts.filter((c) => guestIds.includes(c.id));
   function applyCalendar(id: string, page?: BookingPage) {
@@ -261,7 +346,7 @@ export function NewBookingModal({
     );
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!title.trim()) {
       setError("Appointment title is required");
       return;
@@ -280,6 +365,10 @@ export function NewBookingModal({
     }
     if (!date || !slot) {
       setError("Date & time is required");
+      return;
+    }
+    if (!calendar) {
+      setError("No Calendly event type available to book.");
       return;
     }
     const firstStart = new Date(`${date}T${slotStart(slot)}`);
@@ -323,73 +412,76 @@ export function NewBookingModal({
           : locationKind === "Phone"
             ? "Phone call"
             : locationKind;
-    const attendees = [
-      {
-        id: consultant?.id ?? "host",
-        name: hostName,
-        email: `${hostName.toLowerCase().replace(/\s+/g, ".")}@finconnex.com`,
-        role: "Host" as const,
-      },
-      {
-        id: client.id,
-        name: client.name,
-        email: client.email,
-        role: "Main Applicant" as const,
-      },
-      ...guests.map((guest) => ({
-        id: guest.id,
-        name: guest.name,
-        email: guest.email,
-        role: "Guest" as const,
-      })),
-    ];
     const repeatNote =
       recurring && repeatRule.preset !== "none"
         ? formatTaskRepeatSummary(repeatRule)
         : "";
     const note = [internalNote.trim(), repeatNote].filter(Boolean).join("\n");
-    let firstRow: DashboardAppointment | null = null;
-    starts.forEach((startDate, index) => {
-      const endDate = new Date(startDate.getTime() + minutes * 60 * 1000);
-      const startIso = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, "0")}-${String(startDate.getDate()).padStart(2, "0")}T${String(startDate.getHours()).padStart(2, "0")}:${String(startDate.getMinutes()).padStart(2, "0")}`;
-      createMeeting({
-        title: title.trim() || "Consultation",
-        relatedTo:
-          relatedKind && relatedName.trim()
-            ? `${relatedKind}: ${relatedName.trim()}`
-            : `Contact: ${client.name}`,
-        type: meetingType,
-        startDateTime: formatMeetingDateTime(startDate),
-        endDateTime: formatMeetingDateTime(endDate),
-        status: "Scheduled",
-        organizer: hostName,
-        location,
-        meetingLink:
-          locationMode === "default"
-            ? calendar?.meetingViaDetail || calendar?.videoLink || undefined
-            : locationKind === "Zoom" || locationKind === "Google Meet"
-              ? meetingLink
-              : undefined,
-        agenda: description.trim() || undefined,
-        notes: note || undefined,
-        attendees,
-      });
-      const row = addDashboardAppointment({
-        id: `ap-${Date.now()}-${index}`,
-        guestName: client.name,
-        topic: title.trim() || "Consultation",
-        relatedKind: relatedKind || "Contact",
-        relatedId: relatedName.trim() || client.id,
-        consultantId: consultant?.id ?? DASHBOARD_CONSULTANTS[0]?.id ?? "mohit",
-        start: startIso,
-        type: "Consultation",
-        status,
-        channel,
-        avatarClass: AVATARS[client.name.length % AVATARS.length],
-      });
-      if (!firstRow) firstRow = row;
-    });
-    if (firstRow) onCreated(firstRow);
+    setSaving(true);
+    setError("");
+    try {
+      const eventType = await resolveCalendlyEventType(calendar);
+      if (eventType && isUuid(eventType.id) && client.email) {
+        const booked = await createCalendlyBooking({
+          idempotencyKey: newCalendlyIdempotencyKey(),
+          eventTypeId: eventType.id,
+          startTime: starts[0].toISOString(),
+          name: client.name,
+          email: client.email,
+          timezone,
+          ...calendlyCrmLinkFromRelated(relatedKind, relatedRecordId),
+        });
+        if (isUuid(booked.meetingId)) {
+          await linkCalendlyMeetingCrm(
+            booked.meetingId,
+            calendlyCrmLinkFromRelated(relatedKind, relatedRecordId),
+          ).catch(() => undefined);
+        }
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Calendly booking failed.",
+      );
+    }
+    try {
+      for (const startDate of starts) {
+        const endDate = new Date(startDate.getTime() + minutes * 60 * 1000);
+        await createCrmMeeting({
+          title: title.trim() || "Consultation",
+          relatedTo:
+            relatedKind && relatedName.trim()
+              ? `${relatedKind}: ${relatedName.trim()}`
+              : `Contact: ${client.name}`,
+          relatedKind: relatedKind || "",
+          relatedId: relatedRecordId || undefined,
+          type: meetingType,
+          startDateTime: formatMeetingDateTime(startDate),
+          endDateTime: formatMeetingDateTime(endDate),
+          status: "Scheduled",
+          organizer: consultant?.name || hostName,
+          location,
+          meetingLink:
+            locationMode === "default"
+              ? calendar?.meetingViaDetail || calendar?.videoLink || undefined
+              : locationKind === "Zoom" || locationKind === "Google Meet"
+                ? meetingLink
+                : undefined,
+          agenda: description.trim() || undefined,
+          notes: note || undefined,
+          timezone,
+        });
+      }
+    } catch (err) {
+      setSaving(false);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not create the CRM meeting.",
+      );
+      return;
+    }
+    setSaving(false);
+    onCreated();
     onClose();
   }
 
@@ -429,6 +521,9 @@ export function NewBookingModal({
                 onChange={(e) => applyCalendar(e.target.value)}
                 className={inputClass}
               >
+                {calendars.length === 0 ? (
+                  <option value="">No Calendly event types</option>
+                ) : null}
                 {calendars.map((page) => (
                   <option key={page.id} value={page.id}>
                     {page.title}
@@ -521,6 +616,9 @@ export function NewBookingModal({
                 <RelatedRecordCombobox
                   value={relatedName}
                   onChange={setRelatedName}
+                  onSelectOption={(option) =>
+                    setRelatedRecordId(option?.id ?? "")
+                  }
                   options={relatedOptions}
                   disabled={!relatedKind}
                   allowCustom={relatedKind === "Contact"}
@@ -805,10 +903,11 @@ export function NewBookingModal({
             </button>
             <button
               type="button"
-              onClick={handleSave}
-              className="h-9 rounded-lg bg-[#5A32A3] px-4 text-sm font-semibold text-white hover:opacity-90"
+              onClick={() => void handleSave()}
+              disabled={saving}
+              className="h-9 rounded-lg bg-[#5A32A3] px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
             >
-              Book appointment
+              {saving ? "Booking…" : "Book appointment"}
             </button>
           </div>
         </div>

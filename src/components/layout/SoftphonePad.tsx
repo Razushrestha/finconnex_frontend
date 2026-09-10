@@ -38,6 +38,7 @@ import {
 } from "@/lib/calls/store";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { placeOutboundCrmCall } from "@/lib/calls/api";
+import { requireDialablePhone } from "@/lib/contacts/phone";
 import { listAllContacts } from "@/lib/contacts/store";
 import { createNote } from "@/lib/notes/store";
 import {
@@ -247,10 +248,15 @@ export function SoftphonePad({
   ) {
     const n = number.trim();
     if (!n) return;
+    const check = requireDialablePhone(n, name || n);
+    if (!check.ok) {
+      void import("sonner").then(({ toast }) => toast.error(check.message));
+      return;
+    }
     if (calling && !force) return;
-    const record = resolveSoftphoneRecord({ phone: n, name });
-    const display = name || record?.name || n;
-    setDial(n);
+    const record = resolveSoftphoneRecord({ phone: check.e164, name });
+    const display = name || record?.name || check.e164;
+    setDial(check.e164);
     setContactLabel(display);
     setCalling(true);
     callStartedAt.current = Date.now();
@@ -261,7 +267,7 @@ export function SoftphonePad({
         subject: `Outbound call — ${display}`,
         relatedTo: relatedTo || presetRelatedTo || record?.relatedTo,
         contact: display,
-        fromNumber: n,
+        fromNumber: check.e164,
         callType: "Outbound",
         status: "Scheduled",
         date: formatCallDate(new Date()),
@@ -278,7 +284,7 @@ export function SoftphonePad({
       const relatedId = extra?.relatedId || presetRelatedId || undefined;
       const contactId = extra?.contactId || presetContactId || undefined;
       const result = await placeOutboundCrmCall({
-        phone: n,
+        phone: check.e164,
         name: display,
         subject: `Outbound call — ${display}`,
         relatedTo: relatedTo || presetRelatedTo || record?.relatedTo,

@@ -51,6 +51,14 @@ export function smokeStorageWiring() {
     fail("endpoint catalog missing /storage/upload");
   }
 
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('"storage"')) {
+    fail("BFF proxy does not allow storage uploads");
+  }
+  if (!api.includes("/api/auth/crm/storage/upload")) {
+    fail("storage client missing same-origin BFF upload path");
+  }
+
   const library = readSrc("src/app/(dashboard)/documents/library/page.tsx");
   if (!library.includes("uploadCrmStorageFile")) {
     fail("document library upload does not call uploadCrmStorageFile");

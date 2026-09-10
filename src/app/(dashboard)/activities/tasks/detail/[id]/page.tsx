@@ -3,9 +3,10 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useModuleBack } from "@/hooks/useModuleBack";
-import type { Priority, Task, TaskStatus } from "@/lib/tasks/types";
+import type { Priority, Task, TaskActionItem, TaskStatus } from "@/lib/tasks/types";
 import { findTaskById, addTaskActivityNote, patchTask, updateTaskDescription, updateTaskStatus } from "@/lib/tasks/store";
 import {
+  addCrmTaskAttachment,
   cancelCrmTask,
   completeCrmTask,
   getCrmTask,
@@ -16,6 +17,8 @@ import {
   tryCrmTask,
   updateCrmTask,
 } from "@/lib/tasks/api";
+import { uploadCrmStorageFile } from "@/lib/storage/api";
+import { formatTaskFileSize } from "@/lib/tasks/types";
 import { TaskDetailsView } from "@/components/activities/tasks/detail/TaskDetailsView";
 import { onRulesChange } from "@/lib/rules";
 
@@ -48,8 +51,9 @@ export default function TaskDetailPage({ params }: PageProps) {
       if (!isCrmTaskId(id)) return;
       const remote = await tryCrmTask(() => getCrmTask(id));
       if (cancelled || !remote) return;
-      persistRemoteTask(remote);
-      setTask(remote);
+      const stored = persistRemoteTask(remote);
+      if (cancelled || !stored) return;
+      setTask(stored);
     })();
     return () => {
       cancelled = true;
@@ -60,8 +64,8 @@ export default function TaskDetailPage({ params }: PageProps) {
   function applyRemote(run: () => Promise<Task | null>) {
     void tryCrmTask(run).then((remote) => {
       if (!remote) return;
-      persistRemoteTask(remote);
-      setTask(remote);
+      const stored = persistRemoteTask(remote);
+      if (stored) setTask(stored);
     });
   }
 
@@ -83,6 +87,66 @@ export default function TaskDetailPage({ params }: PageProps) {
   function handleAddNote(body: string) {
     const updated = addTaskActivityNote(id, body);
     if (updated) setTask(updated);
+  }
+
+  function handleChangeActionItems(items: TaskActionItem[]) {
+    const updated = findTaskById(id)?.task;
+    if (updated) setTask({ ...updated, actionItems: items });
+    applyRemote(() => updateCrmTask(id, { actionItems: items }));
+  }
+
+  async function handleAddFiles(files: File[]) {
+    const current = findTaskById(id)?.task ?? task;
+    let nextAttachments = [...(current?.attachments ?? [])];
+    for (const file of files) {
+      const localFile = {
+        name: file.name,
+        sizeLabel: formatTaskFileSize(file.size) || undefined,
+      };
+      try {
+        const stored = await uploadCrmStorageFile(file);
+        if (stored.key && isCrmTaskId(id)) {
+          const remote = await tryCrmTask(() =>
+            addCrmTaskAttachment(id, { key: stored.key, fileName: file.name }),
+          );
+          if (remote?.attachments?.length) {
+            nextAttachments = remote.attachments;
+            persistRemoteTask({
+              ...current,
+              ...remote,
+              attachments: remote.attachments,
+            });
+            setTask(findTaskById(id)?.task ?? remote);
+            continue;
+          }
+          nextAttachments = [
+            ...nextAttachments,
+            {
+              ...localFile,
+              name: stored.fileName || file.name,
+              key: stored.key,
+              url: stored.url || undefined,
+            },
+          ];
+          if (remote) {
+            persistRemoteTask({
+              ...current,
+              ...remote,
+              attachments: nextAttachments,
+            });
+          }
+        } else {
+          nextAttachments = [...nextAttachments, localFile];
+        }
+      } catch {
+        nextAttachments = [...nextAttachments, localFile];
+      }
+      const updated = patchTask(id, {
+        attachments: nextAttachments,
+        attachmentsCount: nextAttachments.length,
+      });
+      if (updated) setTask(updated);
+    }
   }
 
   function handleSaveDetails(next: {
@@ -121,6 +185,8 @@ export default function TaskDetailPage({ params }: PageProps) {
       onUpdateStatus={handleUpdateStatus}
       onUpdateDescription={handleUpdateDescription}
       onAddNote={handleAddNote}
+      onChangeActionItems={handleChangeActionItems}
+      onAddFiles={handleAddFiles}
       onSaveDetails={handleSaveDetails}
     />
   );

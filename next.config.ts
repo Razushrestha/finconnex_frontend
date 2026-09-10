@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  experimental: {
+    proxyClientMaxBodySize: "25mb",
+  },
   // Allow opening the dev app from LAN IPs (phones / other PCs)
   allowedDevOrigins: ["192.168.137.1", "192.168.1.113", "localhost"],
   images: {

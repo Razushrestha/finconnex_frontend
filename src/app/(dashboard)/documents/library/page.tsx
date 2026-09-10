@@ -8,6 +8,7 @@ import {
   Search,
   FileText,
   Download,
+  Eye,
   Tag,
   Link2,
   Share2,
@@ -29,9 +30,11 @@ import {
 import { useCrmDocuments } from "@/lib/documents/library/use-crm-documents";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
+  bulkDeleteCrmDocuments,
   createCrmDocument,
   deleteCrmDocument,
   getCrmDocumentDownload,
+  getCrmDocumentPreview,
   isCrmDocumentId,
   toCreateDocumentBody,
   tryCrmDocument,
@@ -80,6 +83,7 @@ export default function DocumentLibraryPage() {
   const [newFolderName, setNewFolderName] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
+  const [checkedIds, setCheckedIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (crm.loading) return;
@@ -90,14 +94,34 @@ export default function DocumentLibraryPage() {
     const map: Record<string, number> = { "All Files": docs.length };
     for (const f of folders) {
       if (f === "All Files") continue;
+      if (f === "My files") {
+        map[f] =
+          crm.source === "api"
+            ? crm.mine.length
+            : docs.filter((d) => d.owner === defaultActorName()).length;
+        continue;
+      }
+      if (f === "Recent") {
+        map[f] = crm.source === "api" ? crm.recent.length : docs.length;
+        continue;
+      }
       map[f] = docs.filter((d) => d.folder === f).length;
     }
     return map;
-  }, [docs, folders]);
+  }, [crm.mine.length, crm.recent.length, crm.source, docs, folders]);
 
   const filtered = useMemo(() => {
     let data = docs;
-    if (folder !== "All Files") data = data.filter((d) => d.folder === folder);
+    if (folder === "My files") {
+      data =
+        crm.source === "api"
+          ? crm.mine
+          : docs.filter((d) => d.owner === defaultActorName());
+    } else if (folder === "Recent") {
+      data = crm.source === "api" ? crm.recent : docs;
+    } else if (folder !== "All Files") {
+      data = data.filter((d) => d.folder === folder);
+    }
     if (accessFilter !== "All")
       data = data.filter((d) => d.accessLevel === accessFilter);
     if (search.trim()) {
@@ -111,7 +135,7 @@ export default function DocumentLibraryPage() {
       );
     }
     return data;
-  }, [docs, folder, accessFilter, search]);
+  }, [accessFilter, crm.mine, crm.recent, crm.source, docs, folder, search]);
 
   function flash(msg: string) {
     setToast(msg);
@@ -191,6 +215,24 @@ export default function DocumentLibraryPage() {
     setMenuId(null);
   }
 
+  function previewDoc(doc: LibraryDocument) {
+    if (isCrmDocumentId(doc.id)) {
+      void (async () => {
+        const remote = await tryCrmDocument(() => getCrmDocumentPreview(doc.id));
+        if (remote?.url) {
+          window.open(remote.url, "_blank", "noopener,noreferrer");
+          flash(`Preview ready for ${doc.fileName}`);
+          return;
+        }
+        flash(`No preview URL for ${doc.fileName}`);
+      })();
+      setMenuId(null);
+      return;
+    }
+    flash("Preview needs a live CRM document");
+    setMenuId(null);
+  }
+
   function deleteDoc(doc: LibraryDocument) {
     if (!window.confirm(`Delete ${doc.fileName}?`)) return;
     const gate = softDeleteRecord({
@@ -212,6 +254,30 @@ export default function DocumentLibraryPage() {
     }
     flash("Moved to Recycle Bin");
     setMenuId(null);
+  }
+
+  function toggleChecked(id: string) {
+    setCheckedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  }
+
+  function deleteChecked() {
+    const rows = filtered.filter((doc) => checkedIds.includes(doc.id));
+    if (rows.length === 0) return;
+    if (!window.confirm(`Delete ${rows.length} document${rows.length === 1 ? "" : "s"}?`)) {
+      return;
+    }
+    const crmIds = rows.map((doc) => doc.id).filter(isCrmDocumentId);
+    for (const doc of rows) {
+      removeLibraryDocument(doc.id);
+    }
+    setDocs((prev) => prev.filter((d) => !checkedIds.includes(d.id)));
+    setCheckedIds([]);
+    if (crmIds.length) {
+      void tryCrmDocument(() => bulkDeleteCrmDocuments(crmIds));
+    }
+    flash(`Moved ${rows.length} file${rows.length === 1 ? "" : "s"} to Recycle Bin`);
   }
 
   function handleUploaded(doc: LibraryDocument) {
@@ -268,6 +334,7 @@ export default function DocumentLibraryPage() {
               <span className="text-[10px] text-slate-500">{crm.error}</span>
             ) : null}
           </div>
+          <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setDrawer("upload")}
@@ -276,6 +343,16 @@ export default function DocumentLibraryPage() {
             <Plus className="h-3.5 w-3.5" />
             Upload
           </button>
+          {checkedIds.length > 0 ? (
+            <button
+              type="button"
+              onClick={deleteChecked}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 text-[11px] font-semibold text-rose-700 hover:bg-rose-100"
+            >
+              Delete {checkedIds.length}
+            </button>
+          ) : null}
+          </div>
         </div>
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -377,6 +454,23 @@ export default function DocumentLibraryPage() {
               <table className="w-full min-w-[900px] text-left text-[12px]">
                 <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
                   <tr>
+                    <th className="w-10 px-4 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={
+                          filtered.length > 0 &&
+                          filtered.every((doc) => checkedIds.includes(doc.id))
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setCheckedIds(filtered.map((doc) => doc.id));
+                          } else {
+                            setCheckedIds([]);
+                          }
+                        }}
+                        aria-label="Select all visible documents"
+                      />
+                    </th>
                     <th className="px-4 py-2.5">File name</th>
                     <th className="px-4 py-2.5">Folder</th>
                     <th className="px-4 py-2.5">Owner</th>
@@ -394,6 +488,14 @@ export default function DocumentLibraryPage() {
                       key={`${doc.id}-${index}`}
                       className="transition-colors hover:bg-violet-50/40"
                     >
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={checkedIds.includes(doc.id)}
+                          onChange={() => toggleChecked(doc.id)}
+                          aria-label={`Select ${doc.fileName}`}
+                        />
+                      </td>
                       <td className="max-w-[220px] px-4 py-3">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 shrink-0 text-violet-500" />
@@ -469,6 +571,11 @@ export default function DocumentLibraryPage() {
                               icon={Download}
                               label="Download"
                               onClick={() => downloadDoc(doc)}
+                            />
+                            <MenuItem
+                              icon={Eye}
+                              label="Preview"
+                              onClick={() => previewDoc(doc)}
                             />
                             <MenuItem
                               icon={History}

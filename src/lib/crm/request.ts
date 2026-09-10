@@ -57,8 +57,10 @@ const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
     "Twilio accepted the dial request, but CRM could not record the Call SID. Check the call again before retrying.",
   "call.error.invalidTransition":
     "This call is not in a state that can be started.",
-  "sms.error.notConfigured":
-    "Twilio is not configured on the CRM server.",
+  "storage.error.notConfigured":
+    "File storage is not configured on the CRM server.",
+  "storage.error.invalidFile":
+    "That file type or size is not allowed. Use PDF, Word, image, or spreadsheet files.",
   "sms.error.phoneNumberNotConfigured":
     "Twilio from-number is missing on the CRM server.",
 };

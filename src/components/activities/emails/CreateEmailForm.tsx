@@ -397,7 +397,7 @@ interface FormState {
 const initialState: FormState = {
   subject: "",
   body: "",
-  from: "bishnu@nepatronix.com",
+  from: "",
   to: [],
   cc: "",
   bcc: "",

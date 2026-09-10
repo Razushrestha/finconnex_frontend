@@ -16,7 +16,13 @@ import {
   Download,
   ExternalLink,
 } from "lucide-react";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { confirmPublicBooking } from "@/lib/booking/actions";
+import {
+  listCalendlyAvailableTimes,
+  localHHmmFromIso,
+  resolveCalendlyEventType,
+} from "@/lib/booking/calendly-api";
 import {
   getBookingByToken,
   getBookingPageBySlug,
@@ -107,6 +113,58 @@ function BookFlow({
   const [confirmed, setConfirmed] = useState<Booking | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [providerTimes, setProviderTimes] = useState<
+    { start: string; dateKey: string; label: string }[] | null
+  >(null);
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const eventType = await resolveCalendlyEventType(page);
+        if (!eventType || !isUuid(eventType.id)) {
+          if (alive) setProviderTimes(null);
+          return;
+        }
+        const from = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+        const to = new Date(
+          anchor.getFullYear(),
+          anchor.getMonth() + 1,
+          0,
+          23,
+          59,
+          59,
+        );
+        const times = await listCalendlyAvailableTimes({
+          eventTypeId: eventType.id,
+          from: from.toISOString(),
+          to: to.toISOString(),
+        });
+        if (!alive) return;
+        setProviderTimes(
+          times.map((row) => {
+            const start = localHHmmFromIso(row.startTime);
+            const date = new Date(row.startTime);
+            const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+            const hour = Number(start.slice(0, 2));
+            const minute = start.slice(3, 5);
+            const ampm = hour >= 12 ? "PM" : "AM";
+            const h12 = hour % 12 || 12;
+            return {
+              start,
+              dateKey,
+              label: `${h12}:${minute} ${ampm}`,
+            };
+          }),
+        );
+      } catch {
+        if (alive) setProviderTimes(null);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [anchor, page]);
 
   const monthDays = useMemo(() => {
     const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
@@ -129,9 +187,15 @@ function BookFlow({
     [rescheduleToken],
   );
 
-  const slots = selectedDate
+  const localSlots = selectedDate
     ? slotsForDate(page, selectedDate, slotOpts)
     : [];
+  const slots =
+    selectedDate && providerTimes
+      ? providerTimes.filter(
+          (row) => row.dateKey === toLocalDateStr(selectedDate),
+        )
+      : localSlots;
 
   function pickDate(d: Date) {
     setSelectedDate(d);
@@ -338,7 +402,10 @@ function BookFlow({
               <div className="grid grid-cols-7 gap-1">
                 {monthDays.map((d, i) => {
                   if (!d) return <span key={`e-${i}`} />;
-                  const hasSlots = slotsForDate(page, d, slotOpts).length > 0;
+                  const dateKey = toLocalDateStr(d);
+                  const hasSlots = providerTimes
+                    ? providerTimes.some((row) => row.dateKey === dateKey)
+                    : slotsForDate(page, d, slotOpts).length > 0;
                   const selected =
                     selectedDate &&
                     d.toDateString() === selectedDate.toDateString();

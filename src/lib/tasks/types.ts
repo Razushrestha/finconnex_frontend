@@ -70,6 +70,24 @@ export interface TaskActivityNote {
   createdAt: string;
 }
 
+export interface TaskFileAttachment {
+  id?: string;
+  name: string;
+  sizeLabel?: string;
+  url?: string;
+  key?: string;
+}
+
+export function formatTaskFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 export const REMINDER_NOTIFY_OPTIONS = ["Email", "Pop Up", "Both"] as const;
 export type ReminderNotifyOption = (typeof REMINDER_NOTIFY_OPTIONS)[number];
 
@@ -275,6 +293,7 @@ export interface Task {
   reminders?: TaskReminder[];
   commentsCount?: number;
   attachmentsCount?: number;
+  attachments?: TaskFileAttachment[];
   assignee: {
     initials: string;
     colorClass: string;

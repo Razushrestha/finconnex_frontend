@@ -12,12 +12,17 @@ const EMPTY_ACTION_ITEMS: TaskActionItem[] = [];
 interface TaskChecklistCardProps {
   taskId: string;
   items?: TaskActionItem[];
+  onChange?: (items: TaskActionItem[]) => void;
 }
 
 export function TaskChecklistCard({
   taskId,
   items,
+  onChange,
 }: TaskChecklistCardProps) {
+  const itemsKey = (items ?? [])
+    .map((item) => `${item.id}:${item.text}:${item.done ? "1" : "0"}`)
+    .join("|");
   const [checklist, setChecklist] = useState<TaskActionItem[]>(
     () => items ?? EMPTY_ACTION_ITEMS,
   );
@@ -25,19 +30,22 @@ export function TaskChecklistCard({
   const [editItems, setEditItems] = useState<TaskActionItem[]>([]);
 
   useEffect(() => {
-    const found = findTaskById(taskId);
-    setChecklist(found?.task.actionItems ?? EMPTY_ACTION_ITEMS);
-    return onRulesChange(() => {
-      const latest = findTaskById(taskId);
-      setChecklist(latest?.task.actionItems ?? EMPTY_ACTION_ITEMS);
-    });
-  }, [taskId]);
+    function readItems() {
+      const fromStore = findTaskById(taskId)?.task.actionItems;
+      const next =
+        fromStore?.length ? fromStore : items?.length ? items : EMPTY_ACTION_ITEMS;
+      setChecklist(next);
+    }
+    readItems();
+    return onRulesChange(readItems);
+  }, [taskId, itemsKey, items]);
 
   const completedCount = checklist.filter((item) => item.done).length;
 
   function persist(next: TaskActionItem[]) {
     setChecklist(next);
     updateTaskActionItems(taskId, next);
+    onChange?.(next);
   }
 
   function toggleItem(id: string) {

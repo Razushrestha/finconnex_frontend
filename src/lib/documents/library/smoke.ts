@@ -7,12 +7,18 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { bindCrmSession, getCrmApiBaseUrl } from "@/lib/activity-timeline";
 import {
+  bulkDeleteCrmDocuments,
+  bulkRestoreCrmDocuments,
   createCrmDocument,
   deleteCrmDocument,
   getCrmDocument,
   getCrmDocumentDownload,
+  getCrmDocumentPreview,
   globalDocumentsPath,
+  listCrmDocumentLibrary,
   listCrmDocuments,
+  listMyCrmDocuments,
+  listRecentCrmDocuments,
   normalizeLibraryDocument,
   restoreCrmDocument,
   updateCrmDocument,
@@ -38,10 +44,27 @@ const DECOY_PATH = "/v1/__no_such_module_documents_probe__";
 const LIVE_ROUTES: Array<{ method: string; path: string }> = [
   { method: "GET", path: "/v1/documents" },
   { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/documents` },
+  { method: "GET", path: "/v1/documents/library" },
+  {
+    method: "GET",
+    path: `/v1/workspaces/${SESSION.workspaceId}/documents/library`,
+  },
+  { method: "GET", path: "/v1/documents/my" },
+  { method: "GET", path: `/v1/workspaces/${SESSION.workspaceId}/documents/my` },
+  { method: "GET", path: "/v1/documents/recent" },
+  {
+    method: "GET",
+    path: `/v1/workspaces/${SESSION.workspaceId}/documents/recent`,
+  },
   { method: "GET", path: `/v1/documents/${ID}` },
   {
     method: "GET",
     path: `/v1/workspaces/${SESSION.workspaceId}/documents/${ID}`,
+  },
+  { method: "GET", path: `/v1/documents/${ID}/preview` },
+  {
+    method: "GET",
+    path: `/v1/workspaces/${SESSION.workspaceId}/documents/${ID}/preview`,
   },
   { method: "GET", path: `/v1/documents/${ID}/download` },
   {
@@ -65,6 +88,16 @@ const LIVE_ROUTES: Array<{ method: string; path: string }> = [
     method: "POST",
     path: `/v1/workspaces/${SESSION.workspaceId}/documents/${ID}/restore`,
   },
+  { method: "POST", path: "/v1/documents/bulk-delete" },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/documents/bulk-delete`,
+  },
+  { method: "POST", path: "/v1/documents/bulk-restore" },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/documents/bulk-restore`,
+  },
 ];
 
 function repoRoot() {
@@ -87,26 +120,52 @@ export function smokeDocumentsWiring() {
   }
   for (const name of [
     "listCrmDocuments",
+    "listCrmDocumentLibrary",
+    "listMyCrmDocuments",
+    "listRecentCrmDocuments",
     "getCrmDocument",
     "getCrmDocumentDownload",
+    "getCrmDocumentPreview",
     "createCrmDocument",
     "updateCrmDocument",
     "deleteCrmDocument",
     "restoreCrmDocument",
+    "bulkDeleteCrmDocuments",
+    "bulkRestoreCrmDocuments",
   ]) {
     if (!api.includes(`export async function ${name}`)) {
       fail(`documents client missing ${name}`);
     }
   }
+  if (!api.includes("crmBffFetch")) {
+    fail("documents client must call crmBffFetch in the browser");
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (
+    !bff.includes('"documents"') ||
+    !bff.includes('path.includes("documents")')
+  ) {
+    fail("BFF proxy does not allow documents");
+  }
 
   const catalog = readSrc("src/lib/api/endpoints.ts");
   for (const fragment of [
     'path: "/documents"',
+    'path: "/documents/library"',
+    'path: "/documents/my"',
+    'path: "/documents/recent"',
     'path: "/documents/:id"',
+    'path: "/documents/:id/preview"',
     'path: "/documents/:id/download"',
     'path: "/documents/:id/restore"',
+    'path: "/documents/bulk-delete"',
+    'path: "/documents/bulk-restore"',
     'path: "/workspaces/:workspaceId/documents"',
+    'path: "/workspaces/:workspaceId/documents/library"',
+    'path: "/workspaces/:workspaceId/documents/:id/preview"',
     'path: "/workspaces/:workspaceId/documents/:id/download"',
+    'path: "/workspaces/:workspaceId/documents/bulk-delete"',
   ]) {
     if (!catalog.includes(fragment)) {
       fail(`endpoint catalog missing ${fragment}`);
@@ -122,6 +181,8 @@ export function smokeDocumentsWiring() {
     "updateCrmDocument",
     "deleteCrmDocument",
     "getCrmDocumentDownload",
+    "getCrmDocumentPreview",
+    "bulkDeleteCrmDocuments",
   ]) {
     if (!page.includes(name)) {
       fail(`library page does not call ${name}`);
@@ -131,6 +192,12 @@ export function smokeDocumentsWiring() {
   const hook = readSrc("src/lib/documents/library/use-crm-documents.ts");
   if (!hook.includes("replaceLibraryDocuments")) {
     fail("documents hook does not replace the store from live CRM");
+  }
+  if (!hook.includes("listCrmDocumentLibrary")) {
+    fail("documents hook must load GET /documents/library");
+  }
+  if (!hook.includes("listMyCrmDocuments") || !hook.includes("listRecentCrmDocuments")) {
+    fail("documents hook must load /documents/my and /documents/recent");
   }
   if (!hook.includes('setSource("api")')) {
     fail("documents hook must mark a successful empty list as Live CRM");
@@ -191,21 +258,33 @@ export async function smokeDocumentsMock() {
   }) as typeof fetch;
 
   try {
+    await listCrmDocumentLibrary();
+    await listMyCrmDocuments();
+    await listRecentCrmDocuments();
     await listCrmDocuments();
     await getCrmDocument(ID);
+    await getCrmDocumentPreview(ID);
     await getCrmDocumentDownload(ID);
     await createCrmDocument({ fileName: "New.pdf" });
     await updateCrmDocument(ID, { fileName: "Updated.pdf" });
     await restoreCrmDocument(ID);
+    await bulkDeleteCrmDocuments([ID]);
+    await bulkRestoreCrmDocuments([ID]);
     await deleteCrmDocument(ID);
 
     const expected = [
+      `GET ${workspaceDocumentsPath(SESSION.workspaceId, "/library")}`,
+      `GET ${workspaceDocumentsPath(SESSION.workspaceId, "/my")}`,
+      `GET ${workspaceDocumentsPath(SESSION.workspaceId, "/recent")}`,
       `GET ${workspaceDocumentsPath(SESSION.workspaceId)}`,
       `GET ${workspaceDocumentsPath(SESSION.workspaceId, `/${ID}`)}`,
+      `GET ${workspaceDocumentsPath(SESSION.workspaceId, `/${ID}/preview`)}`,
       `GET ${workspaceDocumentsPath(SESSION.workspaceId, `/${ID}/download`)}`,
       `POST ${workspaceDocumentsPath(SESSION.workspaceId)}`,
       `PATCH ${workspaceDocumentsPath(SESSION.workspaceId, `/${ID}`)}`,
       `POST ${workspaceDocumentsPath(SESSION.workspaceId, `/${ID}/restore`)}`,
+      `POST ${workspaceDocumentsPath(SESSION.workspaceId, "/bulk-delete")}`,
+      `POST ${workspaceDocumentsPath(SESSION.workspaceId, "/bulk-restore")}`,
       `DELETE ${workspaceDocumentsPath(SESSION.workspaceId, `/${ID}`)}`,
     ];
     for (const hit of expected) {
@@ -325,7 +404,7 @@ export async function runDocumentsSmoke() {
 
   console.log("\n2) Mock fetch (workspace routes)…");
   await smokeDocumentsMock();
-  console.log("   OK — all 7 workspace-scoped Swagger operations hit");
+  console.log("   OK — all workspace-scoped Documents Swagger operations hit");
 
   console.log("\n3) Live CRM probe (decoy 404 vs documents 401)…");
   const live = await smokeDocumentsLive();

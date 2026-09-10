@@ -25,6 +25,7 @@ import { onPipelineSlaChange } from "@/lib/pipeline-sla/settings";
 import { logStatusChange, notifyStatusChanged } from "@/lib/rules";
 import type { LeadFilters } from "./FilterLeadsPanel";
 import { leadMatchesFilters } from "@/lib/filters/records";
+import { sortLeadCards } from "@/lib/leads/sort";
 import { LeadCard } from "./LeadCard";
 import {
   LeadCardPanelHost,
@@ -74,6 +75,8 @@ interface PendingLostDrop {
 
 interface LeadKanbanBoardProps {
   filters?: LeadFilters;
+  /** Header Sort By value: newest | oldest | name_asc | name_desc */
+  sortValue?: string;
   visibleColumnIds?: string[];
   onAddLead?: (columnId: string) => void;
   selectedIds: string[];
@@ -91,6 +94,7 @@ const BOARD_HEIGHT = "h-full";
 
 export function LeadKanbanBoard({
   filters,
+  sortValue,
   visibleColumnIds,
   onAddLead,
   selectedIds,
@@ -201,18 +205,21 @@ export function LeadKanbanBoard({
       )
       .map((col) => ({
         ...col,
-        cards: col.cards.filter((card) =>
-          leadMatchesFilters(
-            {
-              ...card,
-              statusTitle: col.leadStatus,
-              stageTitle: col.title,
-            },
-            filters,
+        cards: sortLeadCards(
+          col.cards.filter((card) =>
+            leadMatchesFilters(
+              {
+                ...card,
+                statusTitle: col.leadStatus,
+                stageTitle: col.title,
+              },
+              filters,
+            ),
           ),
+          sortValue,
         ),
       }));
-  }, [columns, filters, visibleColumnIds]);
+  }, [columns, filters, visibleColumnIds, sortValue]);
 
   const wonColumn = useMemo(
     () => columns.find((c) => /closed won|settled/i.test(c.title)),

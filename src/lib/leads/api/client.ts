@@ -813,6 +813,8 @@ export async function syncCreatedLead(input: {
   budgetRange?: string;
   estimatedValue?: string;
   notes?: string;
+  /** Card title from the Create Lead form (not the linked contact). */
+  name?: string;
   ownerId?: string;
   ownerName?: string;
   pipelineStage?: string;
@@ -842,9 +844,57 @@ export async function syncCreatedLead(input: {
       }
     }
   }
+  const displayName = input.name?.trim();
+  if (displayName && isUuid(lead.id)) {
+    const parts = displayName.split(/\s+/).filter(Boolean);
+    const firstName = parts[0] ?? lead.firstName;
+    const lastName = parts.slice(1).join(" ") || firstName;
+    try {
+      lead =
+        (await updateCrmLead(lead.id, { firstName, lastName })) ?? lead;
+    } catch {
+      /* keep created row */
+    }
+  }
+  if (input.ownerId && isUuid(input.ownerId) && isUuid(lead.id)) {
+    try {
+      lead = (await assignCrmLeadOwner(lead.id, input.ownerId)) ?? lead;
+    } catch {
+      /* keep created owner */
+    }
+  }
   const card = mapCrmLeadToCard(lead);
+  if (displayName) {
+    card.name = displayName;
+    card.initials =
+      displayName
+        .split(" ")
+        .filter(Boolean)
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase() || card.initials;
+    card.custom = {
+      ...card.custom,
+      leadTitle: displayName,
+    };
+  }
   if (input.ownerName && !isUuid(input.ownerName)) {
     card.owner = input.ownerName;
+    card.custom = {
+      ...card.custom,
+      leadOwnerName: input.ownerName,
+      ...(input.ownerId && isUuid(input.ownerId)
+        ? { leadOwnerId: input.ownerId }
+        : {}),
+    };
+  } else if (input.ownerId && isUuid(input.ownerId)) {
+    card.ownerId = input.ownerId;
+    card.custom = {
+      ...card.custom,
+      leadOwnerId: input.ownerId,
+      ...(input.ownerName ? { leadOwnerName: input.ownerName } : {}),
+    };
   }
   upsertLeadFromCard(card);
   emitRulesChange("all");

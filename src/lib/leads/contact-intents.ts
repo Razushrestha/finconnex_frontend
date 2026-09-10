@@ -6,13 +6,21 @@ export function normalizePhoneForTel(phone: string): string {
   return phone.replace(/[^\d+]/g, "");
 }
 
+function launchProtocolUrl(href: string) {
+  if (typeof document === "undefined") return;
+  const link = document.createElement("a");
+  link.href = href;
+  link.rel = "noopener noreferrer";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 /** Open device dialer for the lead phone. */
 export function openCallIntent(phone?: string): { ok: true } | { ok: false; message: string } {
   const tel = phone ? normalizePhoneForTel(phone) : "";
   if (!tel) return { ok: false, message: "This lead has no phone number." };
-  if (typeof window !== "undefined" && window.location) {
-    window.location.href = `tel:${tel}`;
-  }
+  launchProtocolUrl(`tel:${tel}`);
   return { ok: true };
 }
 
@@ -26,9 +34,7 @@ export function openSmsIntent(
   const params = body?.trim()
     ? `?body=${encodeURIComponent(body.trim())}`
     : "";
-  if (typeof window !== "undefined" && window.location) {
-    window.location.href = `sms:${tel}${params}`;
-  }
+  launchProtocolUrl(`sms:${tel}${params}`);
   return { ok: true };
 }
 
@@ -45,8 +51,6 @@ export function openEmailIntent(
   if (opts?.subject?.trim()) q.set("subject", opts.subject.trim());
   if (opts?.body?.trim()) q.set("body", opts.body.trim());
   const qs = q.toString();
-  if (typeof window !== "undefined" && window.location) {
-    window.location.href = `mailto:${to}${qs ? `?${qs}` : ""}`;
-  }
+  launchProtocolUrl(`mailto:${to}${qs ? `?${qs}` : ""}`);
   return { ok: true };
 }

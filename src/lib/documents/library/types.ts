@@ -34,6 +34,8 @@ export interface LibraryDocument {
 
 export const LIBRARY_FOLDERS = [
   "All Files",
+  "My files",
+  "Recent",
   "Clients",
   "Deals",
   "Templates",

@@ -21,6 +21,7 @@ import { RepeatReminderFields } from "@/components/activities/tasks/RepeatRemind
 import AttachmentUpload from "@/components/activities/tasks/AttachmentUpload";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { getUploadAdapter } from "@/lib/attachments/upload";
+import { uploadCrmStorageFile } from "@/lib/storage/api";
 import {
   RELATED_ENTITY_KINDS,
   type RelatedEntityKind,
@@ -52,11 +53,13 @@ import {
   TASK_PRIORITIES,
   TASK_STATUSES,
   TASK_TYPES,
+  formatTaskFileSize,
   notifyToMethod,
   type Priority,
   type ReminderNotifyOption,
   type Task,
   type TaskActionItem,
+  type TaskFileAttachment,
   type TaskStatus,
   type TaskType,
 } from "@/lib/tasks/types";
@@ -488,24 +491,53 @@ export function LeadCreateTaskModal({
     setSaving(true);
     setError("");
     try {
-      let attachmentsCount = 0;
+      let attachmentKeys: string[] = [];
+      const uploadedFiles: TaskFileAttachment[] = [];
       if (attachments.length > 0) {
-        const adapter = getUploadAdapter();
         for (const file of attachments) {
-          const result = await adapter.upload({
-            fileName: file.name,
-            data: await file.arrayBuffer(),
-            contentType: file.type || "application/octet-stream",
-            relatedTo: title.trim() || "Task",
-          });
-          if (!result.ok) {
-            setError(`Failed to upload "${file.name}": ${result.message}`);
-            setSaving(false);
-            return;
+          try {
+            const stored = await uploadCrmStorageFile(file);
+            if (stored.key) {
+              attachmentKeys.push(stored.key);
+              uploadedFiles.push({
+                name: stored.fileName || file.name,
+                key: stored.key,
+                url: stored.url || undefined,
+                sizeLabel: formatTaskFileSize(file.size) || undefined,
+              });
+              continue;
+            }
+          } catch (crmErr) {
+            const adapter = getUploadAdapter();
+            if (adapter.mode !== "local") {
+              setError(
+                crmErr instanceof Error
+                  ? `Failed to upload "${file.name}": ${crmErr.message}`
+                  : `Failed to upload "${file.name}"`,
+              );
+              setSaving(false);
+              return;
+            }
+            const result = await adapter.upload({
+              fileName: file.name,
+              data: await file.arrayBuffer(),
+              contentType: file.type || "application/octet-stream",
+              relatedTo: title.trim() || "Task",
+            });
+            if (!result.ok) {
+              setError(`Failed to upload "${file.name}": ${result.message}`);
+              setSaving(false);
+              return;
+            }
+            uploadedFiles.push({
+              name: result.fileName,
+              url: result.storageUrl || undefined,
+              sizeLabel: result.sizeLabel,
+            });
           }
-          attachmentsCount += 1;
         }
       }
+      const attachmentsCount = uploadedFiles.length;
 
       const related = {
         kind: "Lead" as const,
@@ -591,6 +623,7 @@ export function LeadCreateTaskModal({
         notifyBy: reminderOn
           ? (["Email", "In-app"] as Task["notifyBy"])
           : undefined,
+        attachments: uploadedFiles.length ? uploadedFiles : undefined,
         attachmentsCount: attachmentsCount || undefined,
         createdBy: getRulesActor().name || assignedTo,
       };
@@ -609,6 +642,8 @@ export function LeadCreateTaskModal({
             description: description.trim() || undefined,
             notes: combinedNotes || undefined,
             collaborators: collaborators.length ? collaborators : undefined,
+            actionItems: filledActionItems.length ? filledActionItems : undefined,
+            attachmentKeys: attachmentKeys.length ? attachmentKeys : undefined,
           }),
         );
         if (remote && remote.taskId !== task.taskId) {
@@ -617,8 +652,21 @@ export function LeadCreateTaskModal({
             ...task,
             ...remote,
             relatedTo: related,
+            actionItems: remote.actionItems?.length
+              ? remote.actionItems
+              : task.actionItems,
+            attachments: remote.attachments?.length
+              ? remote.attachments
+              : uploadedFiles.length
+                ? uploadedFiles
+                : task.attachments,
+            attachmentsCount:
+              remote.attachments?.length ??
+              uploadedFiles.length ??
+              remote.attachmentsCount ??
+              task.attachmentsCount,
           });
-          task = remote;
+          task = findTaskById(remote.taskId)?.task ?? remote;
         }
       }
       logCreate("activities.tasks", assignedTo, task.taskId, title.trim());

@@ -112,7 +112,8 @@ export function defaultAssignableOwnerId(
 ): string {
   const uuidOptions = options.filter((row) => isUuid(row.id));
   const pool = uuidOptions.length ? uuidOptions : options;
-  if (currentId && isUuid(currentId) && pool.some((row) => row.id === currentId)) {
+  if (currentId && isUuid(currentId)) return currentId;
+  if (currentId && pool.some((row) => row.id === currentId)) {
     return currentId;
   }
   const actor = getRulesActor();

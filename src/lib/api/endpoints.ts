@@ -490,6 +490,82 @@ export const ENDPOINT_CATALOG = [
     path: "/workspaces/:workspaceId/:relatedType/:relatedId/meetings",
     module: "meetings",
   },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/calendly/hosts",
+    module: "calendly",
+    notes: "List Calendly hosts and consultant mappings",
+  },
+  {
+    method: "PATCH",
+    path: "/workspaces/:workspaceId/calendly/hosts/:id",
+    module: "calendly",
+    notes: "Map a host or configure consultant flags",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/calendly/event-types",
+    module: "calendly",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/calendly/available-times",
+    module: "calendly",
+    notes: "Provider-authoritative slots (maximum 31 days)",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/calendly/hosts/:id/busy-times",
+    module: "calendly",
+    notes: "Provider busy times (maximum 7 days)",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/calendly/hosts/:id/availability-schedules",
+    module: "calendly",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/calendly/scheduling-links",
+    module: "calendly",
+    notes: "One-use scheduling link or reusable share",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/calendly/bookings",
+    module: "calendly",
+    notes: "Direct-book a Calendly invitee",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/calendly/meetings/:id/cancel",
+    module: "calendly",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/calendly/meetings/:id/reschedule-link",
+    module: "calendly",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/calendly/invitees/:id/no-show",
+    module: "calendly",
+  },
+  {
+    method: "DELETE",
+    path: "/workspaces/:workspaceId/calendly/invitees/:id/no-show",
+    module: "calendly",
+  },
+  {
+    method: "PATCH",
+    path: "/workspaces/:workspaceId/calendly/meetings/:id/crm-link",
+    module: "calendly",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/calendly/summary",
+    module: "calendly",
+  },
 
   // CRM emails (JWT; workspace-scoped URL preferred when token has workspaceId)
   { method: "GET", path: "/emails", module: "emails", notes: "List CRM email activity" },
@@ -742,19 +818,31 @@ export const ENDPOINT_CATALOG = [
 
   // Documents library (JWT; workspace-scoped URL preferred when token has workspaceId)
   { method: "GET", path: "/documents", module: "documents", notes: "List readable active documents" },
+  { method: "GET", path: "/documents/library", module: "documents", notes: "Readable document library" },
+  { method: "GET", path: "/documents/my", module: "documents", notes: "Uploaded by current member" },
+  { method: "GET", path: "/documents/recent", module: "documents", notes: "Created in the last 30 days" },
   { method: "GET", path: "/documents/:id", module: "documents" },
+  { method: "GET", path: "/documents/:id/preview", module: "documents", notes: "Authorized preview URL" },
   { method: "GET", path: "/documents/:id/download", module: "documents", notes: "Short-lived download URL" },
   { method: "POST", path: "/documents", module: "documents", notes: "Register private workspace document" },
   { method: "PATCH", path: "/documents/:id", module: "documents", notes: "Update metadata" },
   { method: "DELETE", path: "/documents/:id", module: "documents", notes: "Soft-delete metadata" },
   { method: "POST", path: "/documents/:id/restore", module: "documents" },
+  { method: "POST", path: "/documents/bulk-delete", module: "documents", notes: "Soft-delete up to 100" },
+  { method: "POST", path: "/documents/bulk-restore", module: "documents", notes: "Restore up to 100" },
   { method: "GET", path: "/workspaces/:workspaceId/documents", module: "documents" },
+  { method: "GET", path: "/workspaces/:workspaceId/documents/library", module: "documents" },
+  { method: "GET", path: "/workspaces/:workspaceId/documents/my", module: "documents" },
+  { method: "GET", path: "/workspaces/:workspaceId/documents/recent", module: "documents" },
   { method: "GET", path: "/workspaces/:workspaceId/documents/:id", module: "documents" },
+  { method: "GET", path: "/workspaces/:workspaceId/documents/:id/preview", module: "documents" },
   { method: "GET", path: "/workspaces/:workspaceId/documents/:id/download", module: "documents" },
   { method: "POST", path: "/workspaces/:workspaceId/documents", module: "documents" },
   { method: "PATCH", path: "/workspaces/:workspaceId/documents/:id", module: "documents" },
   { method: "DELETE", path: "/workspaces/:workspaceId/documents/:id", module: "documents" },
   { method: "POST", path: "/workspaces/:workspaceId/documents/:id/restore", module: "documents" },
+  { method: "POST", path: "/workspaces/:workspaceId/documents/bulk-delete", module: "documents" },
+  { method: "POST", path: "/workspaces/:workspaceId/documents/bulk-restore", module: "documents" },
 
   // Work Queue (workspace-scoped; current member, read-only)
   {

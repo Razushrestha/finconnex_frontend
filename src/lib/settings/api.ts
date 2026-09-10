@@ -5,8 +5,9 @@
 import {
   ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import type { SettingsValues } from "@/lib/settings/settings-store";
 import type { SmtpConfig } from "@/lib/comms/smtp";
 
@@ -288,6 +289,9 @@ export function smtpToSettingsPatch(
 }
 
 async function settingsGet(suffix = ""): Promise<unknown> {
+  if (!isBoundCrmSession()) {
+    return crmBffFetch(settingsPath(suffix));
+  }
   const auth = await resolveAuth();
   if (!auth) throw new Error("Sign in to load settings");
   return crmFetch(auth, settingsPath(suffix));
@@ -297,6 +301,9 @@ async function settingsMutate(
   suffix: string,
   init: RequestInit,
 ): Promise<unknown> {
+  if (!isBoundCrmSession()) {
+    return crmBffFetch(settingsPath(suffix), init);
+  }
   const auth = await resolveAuth();
   if (!auth) throw new Error("Sign in to update settings");
   return crmFetch(auth, settingsPath(suffix), init);

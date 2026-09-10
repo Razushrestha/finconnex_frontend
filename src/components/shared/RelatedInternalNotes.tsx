@@ -97,6 +97,7 @@ export function RelatedInternalNotes({
       (rows) => {
         if (cancelled || !rows) return;
         for (const row of rows) {
+          if (row.relatedId && row.relatedId !== relatedId) continue;
           persistRemoteNote({
             ...row,
             relatedTo: relatedTo || row.relatedTo,

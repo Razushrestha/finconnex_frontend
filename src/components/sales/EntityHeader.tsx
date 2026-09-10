@@ -189,6 +189,10 @@ export function EntityHeader({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const sortIsActive = Boolean(
+    activeSort &&
+      sortOptions?.some((opt) => opt.value === activeSort),
+  );
   const activeSortLabel =
     sortOptions?.find((opt) => opt.value === activeSort)?.label || "Sort";
 
@@ -279,7 +283,11 @@ export function EntityHeader({
               <button
                 type="button"
                 onClick={() => {
-                  setPendingSortField(activeSort ?? "");
+                  setPendingSortField(
+                    sortOptions?.some((opt) => opt.value === activeSort)
+                      ? (activeSort ?? "")
+                      : "",
+                  );
                   setPendingSortDirection(activeSortDirection);
                   setIsSortMenuOpen((open) => !open);
                 }}
@@ -288,7 +296,7 @@ export function EntityHeader({
                 aria-haspopup="true"
                 aria-expanded={isSortMenuOpen}
                 className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium transition-colors ${
-                  isSortMenuOpen
+                  isSortMenuOpen || sortIsActive
                     ? "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-300"
                     : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-slate-300"
                 }`}

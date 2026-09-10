@@ -63,6 +63,10 @@ import {
 } from "@/components/booking/ConsultationSetup";
 import { cn } from "@/lib/utils";
 import { defaultActorName } from "@/lib/rules/actor";
+import {
+  listCalendlyEventTypes,
+  type CalendlyEventType,
+} from "@/lib/booking/calendly-api";
 
 interface BookingPageFormProps {
   layoutId: string;
@@ -213,6 +217,34 @@ export function BookingPageForm({
   const [consultantPriorities, setConsultantPriorities] = useState<
     Record<string, ConsultantPriority>
   >(initial?.consultantPriorities ?? {});
+  const [calendlyEventTypeId, setCalendlyEventTypeId] = useState(
+    initial?.calendlyEventTypeId ?? "",
+  );
+  const [calendlyHostId, setCalendlyHostId] = useState(
+    initial?.calendlyHostId ?? "",
+  );
+  const [calendlyEventTypes, setCalendlyEventTypes] = useState<
+    CalendlyEventType[]
+  >([]);
+
+  useEffect(() => {
+    let alive = true;
+    void listCalendlyEventTypes()
+      .then((types) => {
+        if (!alive) return;
+        setCalendlyEventTypes(types);
+        setCalendlyEventTypeId((current) => {
+          if (current || !types[0]) return current;
+          setCalendlyHostId(types[0].hostId);
+          return types[0].id;
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const [durationMinutes, setDurationMinutes] = useState(
     initial?.durationMinutes ?? defaultDurationMinutes ?? 30,
   );
@@ -517,6 +549,8 @@ export function BookingPageForm({
           : undefined,
       consultants: isConsultation ? consultants : undefined,
       consultantPriorities: isConsultation ? consultantPriorities : undefined,
+      calendlyEventTypeId: calendlyEventTypeId || undefined,
+      calendlyHostId: calendlyHostId || undefined,
     };
   }
 
@@ -704,6 +738,35 @@ export function BookingPageForm({
                         </select>
                       </InputShell>
                     </Field>
+
+                    {calendlyEventTypes.length > 0 ? (
+                      <Field label="Calendly event type">
+                        <InputShell icon={CalendarClock}>
+                          <select
+                            value={calendlyEventTypeId}
+                            onChange={(e) => {
+                              const id = e.target.value;
+                              setCalendlyEventTypeId(id);
+                              const match = calendlyEventTypes.find(
+                                (item) => item.id === id,
+                              );
+                              if (match?.hostId) setCalendlyHostId(match.hostId);
+                            }}
+                            className={elevatedSelectClass(true)}
+                          >
+                            <option value="">Not linked</option>
+                            {calendlyEventTypes.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.name}
+                                {item.durationMinutes
+                                  ? ` · ${item.durationMinutes}m`
+                                  : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </InputShell>
+                      </Field>
+                    ) : null}
 
                     <Field label="Timezone">
                       <InputShell icon={Globe}>

@@ -492,6 +492,10 @@ export default function LeadsPage() {
       "leads",
       tablePreferenceFromListView("leads", normalized),
     );
+    if (normalized.sortBy) setActiveSort(normalized.sortBy);
+    if (normalized.sortDirection === "asc" || normalized.sortDirection === "desc") {
+      setActiveSortDirection(normalized.sortDirection);
+    }
     setIsListSettingsOpen(false);
   }
 
@@ -677,8 +681,23 @@ export default function LeadsPage() {
           activeSort={activeSort}
           activeSortDirection={activeSortDirection}
           onSortChange={(field, direction) => {
-            setActiveSort(field);
+            const nextField = field || "Sort";
+            setActiveSort(nextField);
             setActiveSortDirection(direction);
+            if (
+              nextField === "newest" ||
+              nextField === "oldest" ||
+              nextField === "name_asc" ||
+              nextField === "name_desc"
+            ) {
+              const next: ListViewConfig = {
+                ...listViewConfig,
+                sortBy: nextField,
+                sortDirection: direction,
+              };
+              setListViewConfig(next);
+              persistListViewConfig(next);
+            }
           }}
         />
 
@@ -781,6 +800,7 @@ export default function LeadsPage() {
           {viewMode === "kanban" ? (
             <LeadKanbanBoard
               filters={filters}
+              sortValue={activeSort}
               visibleColumnIds={visibleColumnIds}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
@@ -798,6 +818,7 @@ export default function LeadsPage() {
             <div className="h-full overflow-auto">
               <LeadListView
                 filters={filters}
+                sortValue={activeSort}
                 manageColumns={listManageColumns}
                 onManageColumnsChange={handleListManageColumnsChange}
                 pageSize={listViewConfig.pageSize}

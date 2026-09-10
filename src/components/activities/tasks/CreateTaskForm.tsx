@@ -16,10 +16,12 @@ import {
   TASK_STATUSES,
   TASK_TYPES,
   formatTaskTimestamp,
+  formatTaskFileSize,
   notifyToMethod,
   type Priority,
   type ReminderNotifyOption,
   type TaskActionItem,
+  type TaskFileAttachment,
   type TaskStatus,
   type TaskType,
 } from "@/lib/tasks/types";
@@ -33,7 +35,7 @@ import {
   createCrmTask,
   persistRemoteTask,
 } from "@/lib/tasks/api";
-import { createTask, deleteTask } from "@/lib/tasks/store";
+import { createTask, deleteTask, findTaskById } from "@/lib/tasks/store";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { listCrmCompanies, tryCrmCompany } from "@/lib/companies/api";
 import { mergeCrmCompaniesIntoBoard } from "@/lib/companies/store";
@@ -612,6 +614,13 @@ export function CreateTaskForm({
       window.alert(gate.message);
       return;
     }
+    const pendingAction = newActionItem.trim();
+    const actionItems = [
+      ...form.actionItems.filter((item) => item.text.trim().length > 0),
+      ...(pendingAction
+        ? [{ id: newActionItemId(), text: pendingAction, done: false }]
+        : []),
+    ];
     const relatedMatch =
       form.relatedKind && form.relatedName
         ? relatedOptions.find(
@@ -642,33 +651,50 @@ export function CreateTaskForm({
     );
 
     let attachmentKeys: string[] = [];
-    let attachmentsCount = 0;
+    const uploadedFiles: TaskFileAttachment[] = [];
     if (form.attachments.length > 0) {
       for (const file of form.attachments) {
         try {
           const stored = await uploadCrmStorageFile(file);
           if (stored.key) {
             attachmentKeys.push(stored.key);
-            attachmentsCount += 1;
+            uploadedFiles.push({
+              name: stored.fileName || file.name,
+              key: stored.key,
+              url: stored.url || undefined,
+              sizeLabel: formatTaskFileSize(file.size) || undefined,
+            });
             continue;
           }
-        } catch {
-          /* fall back to local metadata upload */
+        } catch (crmErr) {
+          const adapter = getUploadAdapter();
+          if (adapter.mode !== "local") {
+            window.alert(
+              crmErr instanceof Error
+                ? `Failed to upload "${file.name}": ${crmErr.message}`
+                : `Failed to upload "${file.name}"`,
+            );
+            return;
+          }
+          const result = await adapter.upload({
+            fileName: file.name,
+            data: await file.arrayBuffer(),
+            contentType: file.type || "application/octet-stream",
+            relatedTo: form.title.trim() || "Task",
+          });
+          if (!result.ok) {
+            window.alert(`Failed to upload "${file.name}": ${result.message}`);
+            return;
+          }
+          uploadedFiles.push({
+            name: result.fileName,
+            url: result.storageUrl || undefined,
+            sizeLabel: result.sizeLabel,
+          });
         }
-        const adapter = getUploadAdapter();
-        const result = await adapter.upload({
-          fileName: file.name,
-          data: await file.arrayBuffer(),
-          contentType: file.type || "application/octet-stream",
-          relatedTo: form.title.trim() || "Task",
-        });
-        if (!result.ok) {
-          window.alert(`Failed to upload "${file.name}": ${result.message}`);
-          return;
-        }
-        attachmentsCount += 1;
       }
     }
+    const attachmentsCount = uploadedFiles.length;
 
     const repeatPreset = form.taskRepeat.preset;
     const repeatEvery =
@@ -705,7 +731,7 @@ export function CreateTaskForm({
       description: form.description || undefined,
       notes: form.notes.trim() || undefined,
       collaborators: form.collaborators.length ? form.collaborators : undefined,
-      actionItems: form.actionItems.length ? form.actionItems : undefined,
+      actionItems: actionItems.length ? actionItems : undefined,
       notifyBy:
         reminderOn && form.reminderDate.trim() && form.notifyBy.length
           ? form.notifyBy
@@ -716,6 +742,7 @@ export function CreateTaskForm({
           : undefined,
       repeatEvery,
       attachmentKeys: attachmentKeys.length ? attachmentKeys : undefined,
+      attachments: uploadedFiles.length ? uploadedFiles : undefined,
       attachmentsCount: attachmentsCount || undefined,
       createdBy: actor,
     };
@@ -743,8 +770,16 @@ export function CreateTaskForm({
           actionItems: local.actionItems,
           notifyBy: local.notifyBy,
           repeatRule: local.repeatRule,
+          attachments: remote.attachments?.length
+            ? remote.attachments
+            : local.attachments,
+          attachmentsCount:
+            remote.attachments?.length ??
+            local.attachments?.length ??
+            remote.attachmentsCount ??
+            local.attachmentsCount,
         });
-        task = remote;
+        task = findTaskById(remote.taskId)?.task ?? remote;
       } else if (!remote) {
         deleteTask(local.taskId);
         window.alert("CRM did not return the new task. Please try again.");

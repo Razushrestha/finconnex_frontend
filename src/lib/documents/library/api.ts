@@ -1,9 +1,9 @@
 import {
-  ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import {
   type DocumentAccessLevel,
   type LibraryDocument,
@@ -171,39 +171,52 @@ export function normalizeLibraryDocuments(data: unknown): LibraryDocument[] {
   );
 }
 
-async function withSession<T>(
-  run: (
-    session: CrmSession | Pick<CrmSession, "baseUrl" | "accessToken">,
-    scoped: boolean,
-  ) => Promise<T>,
-): Promise<T> {
-  const scoped = await ensureCrmSession();
-  if (scoped) return run(scoped, true);
-  const access = await ensureCrmAccess();
-  if (!access) throw new Error("Sign in to manage documents");
-  return run(access, false);
+async function withSession<T>(fn: (session: CrmSession) => Promise<T>): Promise<T> {
+  const session = await ensureCrmSession();
+  if (!session) throw new Error("Sign in to manage documents");
+  return fn(session);
 }
 
-function documentsUrl(
-  session: CrmSession | Pick<CrmSession, "baseUrl" | "accessToken">,
-  scoped: boolean,
+function isMissingCrmRoute(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  return /\(404\)|not found/i.test(message);
+}
+
+async function documentsCall(
   suffix: string,
-) {
-  return scoped
-    ? workspaceDocumentsPath((session as CrmSession).workspaceId, suffix)
-    : globalDocumentsPath(suffix);
+  query = "",
+  init?: RequestInit,
+): Promise<unknown> {
+  const scoped = await ensureCrmSession();
+  const paths = [
+    ...(scoped?.workspaceId
+      ? [`${workspaceDocumentsPath(scoped.workspaceId, suffix)}${query}`]
+      : []),
+    `${globalDocumentsPath(suffix)}${query}`,
+  ].filter((path, index, all) => all.indexOf(path) === index);
+
+  let lastError: unknown;
+  for (let i = 0; i < paths.length; i += 1) {
+    try {
+      if (isBoundCrmSession()) {
+        return await withSession((session) => crmFetch(session, paths[i], init));
+      }
+      return await crmBffFetch(paths[i], init);
+    } catch (err) {
+      lastError = err;
+      if (i < paths.length - 1 && isMissingCrmRoute(err)) continue;
+      throw err;
+    }
+  }
+  throw lastError;
 }
 
 async function documentsGet(suffix: string, query = ""): Promise<unknown> {
-  return withSession((session, scoped) =>
-    crmFetch(session, `${documentsUrl(session, scoped, suffix)}${query}`),
-  );
+  return documentsCall(suffix, query);
 }
 
 async function documentsMutate(suffix: string, init: RequestInit): Promise<unknown> {
-  return withSession((session, scoped) =>
-    crmFetch(session, documentsUrl(session, scoped, suffix), init),
-  );
+  return documentsCall(suffix, "", init);
 }
 
 function asDocument(data: unknown): LibraryDocument | null {
@@ -234,6 +247,56 @@ export async function listCrmDocuments(
   );
 }
 
+export async function listCrmDocumentLibrary(
+  query: CrmDocumentQuery = {},
+): Promise<LibraryDocument[]> {
+  try {
+    return normalizeLibraryDocuments(
+      await documentsGet(
+        "/library",
+        toQuery({
+          page: query.page,
+          limit: query.limit ?? 100,
+          search: query.search,
+        }),
+      ),
+    );
+  } catch (err) {
+    if (isMissingCrmRoute(err)) return listCrmDocuments(query);
+    throw err;
+  }
+}
+
+export async function listMyCrmDocuments(
+  query: CrmDocumentQuery = {},
+): Promise<LibraryDocument[]> {
+  return normalizeLibraryDocuments(
+    await documentsGet(
+      "/my",
+      toQuery({
+        page: query.page,
+        limit: query.limit ?? 100,
+        search: query.search,
+      }),
+    ),
+  );
+}
+
+export async function listRecentCrmDocuments(
+  query: CrmDocumentQuery = {},
+): Promise<LibraryDocument[]> {
+  return normalizeLibraryDocuments(
+    await documentsGet(
+      "/recent",
+      toQuery({
+        page: query.page,
+        limit: query.limit ?? 100,
+        search: query.search,
+      }),
+    ),
+  );
+}
+
 export async function getCrmDocument(id: string): Promise<LibraryDocument | null> {
   return asDocument(await documentsGet(`/${id}`));
 }
@@ -249,6 +312,22 @@ export async function getCrmDocumentDownload(
   return {
     url:
       pickStr(rec.url, rec.downloadUrl, rec.href, rec.signedUrl, rec.location) ||
+      null,
+    raw: data,
+  };
+}
+
+export async function getCrmDocumentPreview(
+  id: string,
+): Promise<CrmDocumentDownload> {
+  const data = await documentsGet(`/${id}/preview`);
+  if (typeof data === "string" && data.trim()) {
+    return { url: data.trim(), raw: data };
+  }
+  const rec = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+  return {
+    url:
+      pickStr(rec.url, rec.previewUrl, rec.href, rec.signedUrl, rec.location) ||
       null,
     raw: data,
   };
@@ -312,6 +391,20 @@ export async function restoreCrmDocument(
   return asDocument(
     await documentsMutate(`/${id}/restore`, { method: "POST", body: "{}" }),
   );
+}
+
+export async function bulkDeleteCrmDocuments(ids: string[]): Promise<unknown> {
+  return documentsMutate("/bulk-delete", {
+    method: "POST",
+    body: JSON.stringify({ ids, documentIds: ids }),
+  });
+}
+
+export async function bulkRestoreCrmDocuments(ids: string[]): Promise<unknown> {
+  return documentsMutate("/bulk-restore", {
+    method: "POST",
+    body: JSON.stringify({ ids, documentIds: ids }),
+  });
 }
 
 export async function tryCrmDocument<T>(run: () => Promise<T>): Promise<T | null> {

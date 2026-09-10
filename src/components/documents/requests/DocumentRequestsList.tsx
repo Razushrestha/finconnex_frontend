@@ -24,8 +24,11 @@ import {
   type DocumentRequestType,
 } from "@/lib/documents/requests/types";
 import {
+  approveCrmDocumentRequest,
   expireCrmDocumentRequest,
   isCrmDocumentRequestId,
+  receiveCrmDocumentRequest,
+  rejectCrmDocumentRequest,
   sendCrmDocumentRequest,
   tryCrmDocumentRequest,
 } from "@/lib/documents/requests/api";
@@ -248,6 +251,50 @@ function RowActions({
     onToast?.(`Invitation resent to ${request.requestedFrom}`);
   }
 
+  function markReceived() {
+    upsertDocumentRequest({
+      ...request,
+      status: "Received",
+      lastUpdated: nowStamp(),
+    });
+    if (isCrmDocumentRequestId(request.id)) {
+      void tryCrmDocumentRequest(() => receiveCrmDocumentRequest(request.id));
+    }
+    setOpen(false);
+    onRefresh?.();
+    onToast?.("Marked as received");
+  }
+
+  function approveRequest() {
+    upsertDocumentRequest({
+      ...request,
+      status: "Approved",
+      lastUpdated: nowStamp(),
+    });
+    if (isCrmDocumentRequestId(request.id)) {
+      void tryCrmDocumentRequest(() => approveCrmDocumentRequest(request.id));
+    }
+    setOpen(false);
+    onRefresh?.();
+    onToast?.("Request approved");
+  }
+
+  function rejectRequest() {
+    upsertDocumentRequest({
+      ...request,
+      status: "Rejected",
+      lastUpdated: nowStamp(),
+    });
+    if (isCrmDocumentRequestId(request.id)) {
+      void tryCrmDocumentRequest(() =>
+        rejectCrmDocumentRequest(request.id, "Rejected from list"),
+      );
+    }
+    setOpen(false);
+    onRefresh?.();
+    onToast?.("Request rejected");
+  }
+
   function cancelRequest() {
     upsertDocumentRequest({
       ...request,
@@ -372,6 +419,30 @@ function RowActions({
                 onClick={resendInvite}
               >
                 Resend invitation link
+              </button>
+              <button
+                type="button"
+                disabled={closed || request.status !== "Pending"}
+                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3] disabled:opacity-40"
+                onClick={markReceived}
+              >
+                Mark received
+              </button>
+              <button
+                type="button"
+                disabled={closed || request.status !== "Received"}
+                className="w-full px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-[#F3ECFB] hover:text-[#5A32A3] disabled:opacity-40"
+                onClick={approveRequest}
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                disabled={closed || request.status !== "Received"}
+                className="w-full px-3 py-2 text-left text-[13px] text-rose-600 hover:bg-rose-50 disabled:opacity-40"
+                onClick={rejectRequest}
+              >
+                Reject
               </button>
               <button
                 type="button"

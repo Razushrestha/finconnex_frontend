@@ -21,6 +21,7 @@ import {
 import { listCompanyGroups } from "@/lib/companies/store";
 import { listAssignableOwnersLocal } from "@/lib/users/assignable";
 import { findContactById, updateContact } from "@/lib/contacts/store";
+import { optionalPhoneError } from "@/lib/contacts/phone";
 import { logEdit, requireAction, requiredFieldErrors } from "@/lib/rules";
 import { emitRulesChange } from "@/lib/rules/storage";
 import {
@@ -134,6 +135,10 @@ export function EditContactForm({ contactId }: { contactId: string }) {
         next.email = "Enter a valid email";
       }
     }
+    const phoneError = optionalPhoneError(current.phone);
+    if (phoneError) next.phone = phoneError;
+    const mobileError = optionalPhoneError(current.mobile);
+    if (mobileError) next.mobile = mobileError;
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -231,18 +236,30 @@ export function EditContactForm({ contactId }: { contactId: string }) {
           />
         </InputShell>
       </Field>
-      <Field label="Phone">
-        <InputShell icon={Phone}>
+      <Field
+        label="Phone"
+        error={submitted ? errors.phone : undefined}
+      >
+        <InputShell icon={Phone} error={!!(submitted && errors.phone)}>
           <input
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             className={elevatedInputClass(true)}
             value={form.phone}
             onChange={(e) => update("phone", e.target.value)}
           />
         </InputShell>
       </Field>
-      <Field label="Mobile">
-        <InputShell icon={Smartphone}>
+      <Field
+        label="Mobile"
+        error={submitted ? errors.mobile : undefined}
+      >
+        <InputShell icon={Smartphone} error={!!(submitted && errors.mobile)}>
           <input
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             className={elevatedInputClass(true)}
             value={form.mobile}
             onChange={(e) => update("mobile", e.target.value)}

@@ -1,3 +1,5 @@
+import { requireDialablePhone } from "@/lib/contacts/phone";
+
 const EVENT = "finconnex:softphone-open";
 
 export const SOFTPHONE_W = 336;
@@ -75,14 +77,13 @@ export function startCrmRecordCall(input: {
   contactId?: string;
   anchor?: HTMLElement | null;
 }): { ok: true } | { ok: false; message: string } {
-  const phone = (input.phone ?? "").trim();
-  if (!phone) {
-    const message = `${input.name} has no phone number.`;
-    void import("sonner").then(({ toast }) => toast.error(message));
-    return { ok: false, message };
+  const check = requireDialablePhone(input.phone, input.name);
+  if (!check.ok) {
+    void import("sonner").then(({ toast }) => toast.error(check.message));
+    return check;
   }
   openSoftphoneNear(input.anchor ?? null, {
-    phone,
+    phone: check.e164,
     name: input.name,
     relatedTo: input.relatedTo,
     relatedType: input.relatedType,

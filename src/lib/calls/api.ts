@@ -7,6 +7,7 @@ import {
 } from "@/lib/activity-timeline/auth";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import type { Call, CallStatus, CallType } from "@/lib/calls/types";
+import { toE164 } from "@/lib/contacts/phone";
 
 export type CrmCallQuery = {
   page?: number;
@@ -364,17 +365,6 @@ export type CreateCrmCallInput = {
   toNumber?: string;
 };
 
-function toE164(raw?: string): string | undefined {
-  let compact = (raw ?? "").trim().replace(/[^\d+]/g, "");
-  if (!compact) return undefined;
-  if (compact.startsWith("00")) compact = `+${compact.slice(2)}`;
-  if (/^0\d{9}$/.test(compact)) compact = `+61${compact.slice(1)}`;
-  if (/^61\d{8,10}$/.test(compact)) compact = `+${compact}`;
-  if (/^[1-9]\d{8,14}$/.test(compact)) compact = `+${compact}`;
-  if (!/^\+[1-9]\d{7,14}$/.test(compact)) return undefined;
-  return compact;
-}
-
 function fallbackVoicePhone() {
   return (
     toE164(process.env.NEXT_PUBLIC_TWILIO_SMS_TO) ||
@@ -383,7 +373,9 @@ function fallbackVoicePhone() {
 }
 
 function resolveOutboundPhone(raw?: string): string | undefined {
-  return toE164(raw) || fallbackVoicePhone();
+  const trimmed = (raw ?? "").trim();
+  if (trimmed) return toE164(trimmed);
+  return fallbackVoicePhone();
 }
 
 function durationSeconds(raw?: string): number | undefined {

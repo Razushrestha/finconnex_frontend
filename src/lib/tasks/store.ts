@@ -10,6 +10,7 @@ import {
   type Task,
   type TaskActionItem,
   type TaskActivityNote,
+  type TaskFileAttachment,
   type TaskColumn,
   type TaskReminder,
   type TaskStatus,
@@ -226,6 +227,7 @@ export function createTask(input: {
   collaborators?: string[];
   notifyBy?: Task["notifyBy"];
   attachmentsCount?: number;
+  attachments?: TaskFileAttachment[];
   createdBy?: string;
 }): Task {
   const cols = listTaskColumns();
@@ -262,7 +264,12 @@ export function createTask(input: {
       : undefined,
     collaborators: input.collaborators,
     notifyBy: input.notifyBy?.length ? [...input.notifyBy] : undefined,
-    attachmentsCount: input.attachmentsCount,
+    attachments: input.attachments?.length
+      ? input.attachments.map((file) => ({ ...file }))
+      : undefined,
+    attachmentsCount:
+      input.attachmentsCount ??
+      (input.attachments?.length ? input.attachments.length : undefined),
     createdBy: creator,
     createdOn: now,
     modifiedBy: creator,
@@ -516,6 +523,8 @@ export function patchTask(
       | "taskType"
       | "relatedTo"
       | "notifyBy"
+      | "attachments"
+      | "attachmentsCount"
     >
   >,
 ): Task | null {
@@ -858,7 +867,6 @@ export function reassignTask(
   return updated;
 }
 
-/** Push due date by N days and set reminderDate (SRS snooze). */
 function cloneTaskRow(row: Task): Task {
   return {
     ...row,
@@ -868,12 +876,41 @@ function cloneTaskRow(row: Task): Task {
     activityNotes: row.activityNotes?.map((note) => ({ ...note })),
     reminders: row.reminders?.map((reminder) => ({ ...reminder })),
     actionItems: row.actionItems?.map((item) => ({ ...item })),
+    attachments: row.attachments?.map((file) => ({ ...file })),
     notifyBy: row.notifyBy ? [...row.notifyBy] : undefined,
   };
 }
 
+function preserveLocalTaskFields(row: Task, existing?: Task): Task {
+  if (!existing) return row;
+  const attachments = row.attachments?.length
+    ? row.attachments
+    : existing.attachments;
+  return {
+    ...row,
+    attachments,
+    attachmentsCount:
+      attachments?.length ??
+      row.attachmentsCount ??
+      existing.attachmentsCount,
+    activityNotes: row.activityNotes?.length
+      ? row.activityNotes
+      : existing.activityNotes,
+    reminders: row.reminders?.length ? row.reminders : existing.reminders,
+    actionItems: row.actionItems?.length
+      ? row.actionItems
+      : existing.actionItems,
+    description: row.description || existing.description,
+    notes: row.notes || existing.notes,
+  };
+}
+
+function mergeIncomingTask(row: Task): Task {
+  return preserveLocalTaskFields(row, findTaskById(row.taskId)?.task);
+}
+
 export function upsertTask(row: Task) {
-  const next = cloneTaskRow(row);
+  const next = cloneTaskRow(mergeIncomingTask(row));
   const cols = listTaskColumns();
   const without = cols.map((c) => ({
     ...c,
@@ -898,6 +935,7 @@ export function upsertTask(row: Task) {
 export function replaceCrmTasks(remote: Task[]) {
   const cols = listTaskColumns();
   const titles = new Set(cols.map((col) => col.title));
+  const previous = new Map(listAllTasks().map((task) => [task.taskId, task]));
   const remoteIds = new Set(remote.map((row) => row.taskId));
   const extras = listAllTasks().filter((task) => {
     if (remoteIds.has(task.taskId)) return false;
@@ -910,11 +948,15 @@ export function replaceCrmTasks(remote: Task[]) {
     if (duplicate) return false;
     return true;
   });
-  const cloned = [...remote.map(cloneTaskRow), ...extras.map(cloneTaskRow)].map(
-    (task) =>
-      titles.has(task.status)
-        ? task
-        : { ...task, status: "Not Started" as TaskStatus },
+  const cloned = [
+    ...remote.map((row) =>
+      cloneTaskRow(preserveLocalTaskFields(row, previous.get(row.taskId))),
+    ),
+    ...extras.map(cloneTaskRow),
+  ].map((task) =>
+    titles.has(task.status)
+      ? task
+      : { ...task, status: "Not Started" as TaskStatus },
   );
   saveTaskColumns(
     cols.map((col) => {
@@ -924,6 +966,7 @@ export function replaceCrmTasks(remote: Task[]) {
   );
 }
 
+/** Push due date by N days and set reminderDate (SRS snooze). */
 export function snoozeTask(
   taskId: string,
   days: number,

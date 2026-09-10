@@ -1,6 +1,7 @@
 import {
   ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
 } from "@/lib/activity-timeline/auth";
 import { crmErrorMessage, unwrapCrmData } from "@/lib/crm/request";
 
@@ -30,6 +31,58 @@ function pickNum(value: unknown): number {
 
 export function storageUploadPath(): string {
   return "/v1/storage/upload";
+}
+
+export function storageUploadBffPath(): string {
+  return "/api/auth/crm/storage/upload";
+}
+
+function toFormData(file: File): FormData {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  form.append("filename", file.name);
+  form.append("name", file.name);
+  return form;
+}
+
+async function parseUploadResponse(res: Response) {
+  const text = await res.text();
+  let json: unknown = null;
+  if (text) {
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = null;
+    }
+  }
+  return { res, json };
+}
+
+async function sendDirectUpload(
+  auth: { baseUrl: string; accessToken: string },
+  form: FormData,
+) {
+  const res = await fetch(`${auth.baseUrl}${storageUploadPath()}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: `Bearer ${auth.accessToken}`,
+    },
+    body: form,
+  });
+  return parseUploadResponse(res);
+}
+
+async function sendBffUpload(form: FormData) {
+  const res = await fetch(storageUploadBffPath(), {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      Accept: "application/json",
+    },
+    body: form,
+  });
+  return parseUploadResponse(res);
 }
 
 async function resolveAuth() {
@@ -90,51 +143,44 @@ export function normalizeCrmStorageObject(
   };
 }
 
-async function sendUpload(
-  auth: { baseUrl: string; accessToken: string },
-  form: FormData,
-) {
-  const res = await fetch(`${auth.baseUrl}${storageUploadPath()}`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${auth.accessToken}`,
-    },
-    body: form,
-  });
-  const text = await res.text();
-  let json: unknown = null;
-  if (text) {
-    try {
-      json = JSON.parse(text);
-    } catch {
-      json = null;
-    }
-  }
-  return { res, json };
-}
-
 export async function uploadCrmStorageFile(
   file: File,
 ): Promise<CrmStorageObject> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to upload a file");
-  const form = new FormData();
-  form.append("file", file);
-  form.append("filename", file.name);
-  form.append("name", file.name);
+  const form = toFormData(file);
 
-  let { res, json } = await sendUpload(auth, form);
-  if ([401, 403].includes(res.status)) {
-    const retried = await resolveAuth();
-    if (retried?.accessToken && retried.accessToken !== auth.accessToken) {
-      ({ res, json } = await sendUpload(retried, form));
+  try {
+    let parsed: { res: Response; json: unknown };
+    if (isBoundCrmSession()) {
+      const auth = await resolveAuth();
+      if (!auth) throw new Error("Sign in to upload a file");
+      parsed = await sendDirectUpload(auth, form);
+      if ([401, 403].includes(parsed.res.status)) {
+        const retried = await resolveAuth();
+        if (retried?.accessToken && retried.accessToken !== auth.accessToken) {
+          parsed = await sendDirectUpload(retried, form);
+        }
+      }
+    } else {
+      parsed = await sendBffUpload(form);
     }
+
+    const { res, json } = parsed;
+    if (!res.ok) {
+      throw new Error(crmErrorMessage(json, `Upload failed (${res.status})`));
+    }
+    const stored = normalizeCrmStorageObject(unwrapCrmData(json) ?? json, file.name);
+    if (!stored.key) {
+      throw new Error("Upload succeeded but CRM did not return a storage key");
+    }
+    return stored;
+  } catch (err) {
+    if (err instanceof Error && err.message && err.message !== "Failed to fetch") {
+      throw err;
+    }
+    throw new Error(
+      "Could not upload the file to CRM storage. Stay signed in and try again.",
+    );
   }
-  if (!res.ok) {
-    throw new Error(crmErrorMessage(json, `Upload failed (${res.status})`));
-  }
-  return normalizeCrmStorageObject(unwrapCrmData(json) ?? json, file.name);
 }
 
 export async function tryCrmStorage<T>(

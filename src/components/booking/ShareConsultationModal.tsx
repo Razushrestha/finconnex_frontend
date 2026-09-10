@@ -1,9 +1,15 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Download, Pencil, RefreshCw, X } from "lucide-react";
-import { publicBookUrl } from "@/lib/booking/types";
+import { publicBookUrl, getBookingPageBySlug } from "@/lib/booking/types";
 import { saveOnceLink, saveShortLink } from "@/lib/booking/short-links";
+import {
+  createCalendlySchedulingLink,
+  listCalendlyAvailableTimes,
+  resolveCalendlyEventType,
+} from "@/lib/booking/calendly-api";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { cn } from "@/lib/utils";
 
 const BRAND = "#5A32A3";
@@ -65,10 +71,12 @@ function CopyBlock({
 export function ShareConsultationModal({
   title,
   slug,
+  eventTypeId,
   onClose,
 }: {
   title: string;
   slug: string;
+  eventTypeId?: string;
   onClose: () => void;
 }) {
   const [path, setPath] = useState(slug);
@@ -80,8 +88,14 @@ export function ShareConsultationModal({
   const [openEmbed, setOpenEmbed] = useState<EmbedId | null>(null);
   const [embedCopied, setEmbedCopied] = useState<string | null>(null);
   const [slotsCopied, setSlotsCopied] = useState(false);
+  const [apiSlots, setApiSlots] = useState<string[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState("");
   const [shortCopied, setShortCopied] = useState(false);
   const [onceCopied, setOnceCopied] = useState(false);
+  const [linkError, setLinkError] = useState("");
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [calendlyShareUrl, setCalendlyShareUrl] = useState("");
 
   const origin =
     typeof window !== "undefined" ? window.location.origin : "";
@@ -90,17 +104,72 @@ export function ShareConsultationModal({
   const shortUrl = shortCode ? `${origin}/s/${shortCode}` : null;
   const onceUrl = oneTime ? `${origin}/s/${oneTime}` : null;
   const displayUrl =
-    tab === "shorten" && shortUrl
+    calendlyShareUrl ||
+    (tab === "shorten" && shortUrl
       ? shortUrl
       : tab === "onetime" && onceUrl
         ? onceUrl
-        : bookUrl;
+        : bookUrl);
 
   const qrSrc = useMemo(
     () =>
       `https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=8&data=${encodeURIComponent(displayUrl)}`,
     [displayUrl],
   );
+
+  useEffect(() => {
+    if (tab !== "slots") return;
+    let alive = true;
+    setSlotsLoading(true);
+    setSlotsError("");
+    void (async () => {
+      const page = getBookingPageBySlug(path.trim() || slug);
+      const eventType = eventTypeId
+        ? { id: eventTypeId }
+        : await resolveCalendlyEventType(page);
+      const id = eventType && "id" in eventType ? eventType.id : "";
+      if (!id || !isUuid(id)) {
+        if (alive) {
+          setApiSlots([]);
+          setSlotsError("No Calendly event type for this page.");
+          setSlotsLoading(false);
+        }
+        return;
+      }
+      const from = new Date();
+      const to = new Date();
+      to.setDate(to.getDate() + 14);
+      const times = await listCalendlyAvailableTimes({
+        eventTypeId: id,
+        from: from.toISOString(),
+        to: to.toISOString(),
+      });
+      const labels = times.map((row) => {
+        const date = new Date(row.startTime);
+        return date.toLocaleString("en-AU", {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      });
+      if (alive) {
+        setApiSlots(labels);
+        setSlotsLoading(false);
+      }
+    })().catch((err: unknown) => {
+      if (!alive) return;
+      setApiSlots([]);
+      setSlotsError(
+        err instanceof Error ? err.message : "Could not load available times.",
+      );
+      setSlotsLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [tab, slug, path, eventTypeId]);
 
   const embedOptions: {
     id: EmbedId;
@@ -132,12 +201,7 @@ export function ShareConsultationModal({
     },
   ];
 
-  const slots = [
-    "Mon 18 Aug · 09:00 – 09:30",
-    "Mon 18 Aug · 10:00 – 10:30",
-    "Tue 19 Aug · 11:00 – 11:30",
-    "Wed 20 Aug · 14:00 – 14:30",
-  ];
+  const slots = apiSlots;
 
   async function copyText(value: string, mark: (v: boolean) => void) {
     try {
@@ -149,20 +213,70 @@ export function ShareConsultationModal({
     }
   }
 
-  function generateShort() {
+  async function generateShort() {
     const code = randomCode();
     saveShortLink(code, bookPath);
     setOneTime(null);
     setShortCopied(false);
     setShortCode(code);
+    setLinkError("");
+    setLinkBusy(true);
+    try {
+      const page = getBookingPageBySlug(path.trim() || slug);
+      const eventType =
+        eventTypeId && isUuid(eventTypeId)
+          ? { id: eventTypeId }
+          : await resolveCalendlyEventType(page);
+      if (eventType && isUuid(eventType.id)) {
+        const link = await createCalendlySchedulingLink({
+          eventTypeId: eventType.id,
+          reusable: true,
+        });
+        if (link.url) {
+          setCalendlyShareUrl(link.url);
+          await navigator.clipboard.writeText(link.url).catch(() => undefined);
+        }
+      }
+    } catch (err) {
+      setLinkError(
+        err instanceof Error ? err.message : "Could not create a Calendly share link.",
+      );
+    } finally {
+      setLinkBusy(false);
+    }
   }
 
-  function generateOnce() {
+  async function generateOnce() {
     const code = randomCode(10);
     saveOnceLink(code, bookPath);
     setShortCode(null);
     setOnceCopied(false);
     setOneTime(code);
+    setLinkError("");
+    setLinkBusy(true);
+    try {
+      const page = getBookingPageBySlug(path.trim() || slug);
+      const eventType =
+        eventTypeId && isUuid(eventTypeId)
+          ? { id: eventTypeId }
+          : await resolveCalendlyEventType(page);
+      if (eventType && isUuid(eventType.id)) {
+        const link = await createCalendlySchedulingLink({
+          eventTypeId: eventType.id,
+          reusable: false,
+        });
+        if (link.url) {
+          setCalendlyShareUrl(link.url);
+          await navigator.clipboard.writeText(link.url).catch(() => undefined);
+        }
+      }
+    } catch (err) {
+      setLinkError(
+        err instanceof Error ? err.message : "Could not create a Calendly one-time link.",
+      );
+    } finally {
+      setLinkBusy(false);
+    }
   }
 
   async function downloadQr() {
@@ -206,6 +320,14 @@ export function ShareConsultationModal({
           >
             Share - {title}
           </h2>
+          {linkError ? (
+            <p className="mt-2 text-[12px] text-rose-600">{linkError}</p>
+          ) : null}
+          {linkBusy ? (
+            <p className="mt-1 text-[11px] text-slate-400">
+              Creating Calendly scheduling link…
+            </p>
+          ) : null}
         </div>
 
         <div className="space-y-4 px-5 py-4 sm:px-6">
@@ -327,7 +449,7 @@ export function ShareConsultationModal({
               <div className="flex justify-center">
                 <button
                   type="button"
-                  onClick={generateShort}
+                  onClick={() => void generateShort()}
                   className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
                   style={{ borderColor: BRAND }}
                 >
@@ -354,7 +476,7 @@ export function ShareConsultationModal({
               <div className="flex justify-center">
                 <button
                   type="button"
-                  onClick={generateOnce}
+                  onClick={() => void generateOnce()}
                   className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
                   style={{ borderColor: BRAND }}
                 >
@@ -437,6 +559,17 @@ export function ShareConsultationModal({
 
           {tab === "slots" ? (
             <div className="space-y-3 pb-2">
+              {slotsLoading ? (
+                <p className="text-[13px] text-slate-400">Loading available times…</p>
+              ) : null}
+              {slotsError ? (
+                <p className="text-[13px] text-rose-600">{slotsError}</p>
+              ) : null}
+              {!slotsLoading && !slotsError && slots.length === 0 ? (
+                <p className="text-[13px] text-slate-400">
+                  No available times from Calendly in the next 14 days.
+                </p>
+              ) : null}
               <ul className="space-y-1.5 text-[13px] text-slate-600">
                 {slots.map((slot) => (
                   <li key={slot}>{slot}</li>
@@ -445,8 +578,9 @@ export function ShareConsultationModal({
               <div className="flex justify-center">
                 <button
                   type="button"
+                  disabled={slots.length === 0}
                   onClick={() => copyText(slots.join("\n"), setSlotsCopied)}
-                  className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
+                  className="h-10 rounded-lg border px-5 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB] disabled:opacity-40"
                   style={{ borderColor: BRAND }}
                 >
                   {slotsCopied ? "Copied" : "Copy Time Slots"}

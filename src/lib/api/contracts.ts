@@ -102,6 +102,8 @@ export interface LeadCreateInput {
   pipelineStage?: string;
   owner: string;
   estimatedValue?: string;
+  /** Display title from Create Lead (can differ from the linked contact). */
+  name?: string;
 }
 
 export interface LeadStatusChangeInput {

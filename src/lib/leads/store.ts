@@ -38,6 +38,43 @@ function isUuid(value: string | null | undefined): boolean {
   );
 }
 
+function initialsFromName(name: string, fallback: string) {
+  return (
+    name
+      .split(" ")
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || fallback
+  );
+}
+
+/**
+ * After create, the CRM list/kanban often returns the linked contact's name
+ * and an assignment-rule owner. Keep the title and owner the user saved.
+ */
+export function applyLocalLeadIdentity(
+  remote: LeadCardData,
+  local?: LeadCardData,
+): LeadCardData {
+  if (!local) return remote;
+  const title = local.custom?.leadTitle?.trim() || "";
+  const ownerName = local.custom?.leadOwnerName?.trim() || "";
+  const ownerId = local.custom?.leadOwnerId?.trim() || "";
+  const name = title || local.name || remote.name;
+  const keepOwner = Boolean(ownerName || (ownerId && isUuid(ownerId)));
+  return {
+    ...remote,
+    name,
+    initials: title ? initialsFromName(name, remote.initials) : remote.initials,
+    owner: keepOwner ? ownerName || local.owner || remote.owner : remote.owner,
+    ownerId:
+      ownerId && isUuid(ownerId) ? ownerId : remote.ownerId || local.ownerId,
+    custom: { ...remote.custom, ...local.custom },
+  };
+}
+
 function leadActor(fallback?: string) {
   return getRulesActor().name || fallback || "System";
 }
@@ -137,7 +174,14 @@ export function saveLeadColumns(cols: KanbanColumn[]) {
 
 /** Keep locally saved leads that the CRM list/kanban did not return. */
 export function mergeRemoteLeadColumns(remote: KanbanColumn[]): KanbanColumn[] {
-  const remoteNorm = normalize(remote);
+  const localCards = listLeadColumns().flatMap((col) => col.cards);
+  const localById = new Map(localCards.map((card) => [card.id, card] as const));
+  const remoteNorm = normalize(remote).map((col) => ({
+    ...col,
+    cards: col.cards.map((card) =>
+      applyLocalLeadIdentity(card, localById.get(card.id)),
+    ),
+  }));
   const remoteIds = new Set(
     remoteNorm.flatMap((col) => col.cards.map((card) => card.id)),
   );
@@ -146,15 +190,13 @@ export function mergeRemoteLeadColumns(remote: KanbanColumn[]): KanbanColumn[] {
       .flatMap((col) => col.cards.map((card) => card.email.trim().toLowerCase()))
       .filter(Boolean),
   );
-  const extras = listLeadColumns()
-    .flatMap((col) => col.cards)
-    .filter((card) => {
-      if (remoteIds.has(card.id)) return false;
-      const email = card.email.trim().toLowerCase();
-      if (email && remoteEmails.has(email)) return false;
-      if (isUuid(card.id)) return true;
-      return /^l-\d{10,}-/.test(card.id);
-    });
+  const extras = localCards.filter((card) => {
+    if (remoteIds.has(card.id)) return false;
+    const email = card.email.trim().toLowerCase();
+    if (email && remoteEmails.has(email)) return false;
+    if (isUuid(card.id)) return true;
+    return /^l-\d{10,}-/.test(card.id);
+  });
   if (!extras.length) return remoteNorm;
   const next = remoteNorm.map((col) => ({ ...col, cards: [...col.cards] }));
   for (const card of extras) {

@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Camera, Info, Search } from "lucide-react";
+import { listCalendlyHosts, updateCalendlyHost } from "@/lib/booking/calendly-api";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import {
-  BOOKING_CONSULTANTS,
   CONSULTANT_PRIORITIES,
   type ConsultantPriority,
 } from "@/lib/booking/types";
@@ -13,20 +14,6 @@ import {
 } from "@/components/booking/ConsultationDetailsStep";
 
 const BRAND = "#5A32A3";
-
-const EXTRA_CONSULTANTS = [
-  "Akshay",
-  "Admin",
-  "Pawan Regmi",
-  "Bishnu Aryal",
-];
-
-const ALL_NAMES = [
-  ...EXTRA_CONSULTANTS,
-  ...BOOKING_CONSULTANTS.map((c) => c.name).filter(
-    (n) => !EXTRA_CONSULTANTS.includes(n),
-  ),
-];
 
 function priorityLabel(priority: ConsultantPriority) {
   return `${priority} priority`;
@@ -52,12 +39,35 @@ export function AssignConsultantsStep({
     Record<string, ConsultantPriority>
   >({});
   const [error, setError] = useState("");
+  const [hostIds, setHostIds] = useState<Record<string, string>>({});
+  const [hostNames, setHostNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    void listCalendlyHosts({ active: true })
+      .then((hosts) => {
+        if (!alive) return;
+        const ids: Record<string, string> = {};
+        const names = hosts.map((host) => {
+          ids[host.name] = host.id;
+          return host.name;
+        });
+        setHostIds(ids);
+        setHostNames(names);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const allNames = useMemo(() => hostNames, [hostNames]);
 
   const names = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return ALL_NAMES;
-    return ALL_NAMES.filter((n) => n.toLowerCase().includes(q));
-  }, [query]);
+    if (!q) return allNames;
+    return allNames.filter((n) => n.toLowerCase().includes(q));
+  }, [allNames, query]);
 
   const allVisibleSelected =
     names.length > 0 && names.every((n) => selected.includes(n));
@@ -184,7 +194,9 @@ export function AssignConsultantsStep({
           })}
           {names.length === 0 ? (
             <li className="px-5 py-10 text-center text-[13px] text-slate-400">
-              No consultants match your search.
+              {hostNames.length === 0
+                ? "No Calendly hosts yet. Connect Calendly in CRM, then refresh."
+                : "No consultants match your search."}
             </li>
           ) : null}
         </ul>
@@ -229,6 +241,14 @@ export function AssignConsultantsStep({
             const next: Record<string, ConsultantPriority> = {};
             for (const name of selected) next[name] = priorityOf(name);
             onCreate(selected, next);
+            for (const name of selected) {
+              const id = hostIds[name];
+              if (id && isUuid(id)) {
+                void updateCalendlyHost(id, { isConsultant: true }).catch(
+                  () => undefined,
+                );
+              }
+            }
           }}
           className="h-10 min-w-[96px] rounded-lg px-6 text-[13px] font-semibold text-white hover:brightness-110"
           style={{ backgroundColor: BRAND }}

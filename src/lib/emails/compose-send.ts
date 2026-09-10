@@ -48,11 +48,22 @@ export async function sendCrmActivityEmail(input: {
     throw new Error("CRM did not create the email draft");
   }
   persistRemoteEmail(created);
-  const sent = await sendCrmEmail(
-    created.id,
-    input.scheduledAt ? { scheduledAt: input.scheduledAt } : {},
-  );
-  const next = persistRemoteEmail(sent ?? created);
-  if (!next) throw new Error("CRM send failed");
-  return next;
+  try {
+    const sent = await sendCrmEmail(
+      created.id,
+      input.scheduledAt ? { scheduledAt: input.scheduledAt } : {},
+    );
+    if (!sent || sent.status === "Draft" || sent.status === "Failed") {
+      persistRemoteEmail({ ...created, ...(sent ?? {}), status: "Draft" });
+      throw new Error("CRM send failed. The message was saved as a draft.");
+    }
+    const next = persistRemoteEmail(sent);
+    if (!next) throw new Error("CRM send failed. The message was saved as a draft.");
+    return next;
+  } catch (err) {
+    persistRemoteEmail({ ...created, status: "Draft" });
+    throw err instanceof Error
+      ? err
+      : new Error("CRM send failed. The message was saved as a draft.");
+  }
 }

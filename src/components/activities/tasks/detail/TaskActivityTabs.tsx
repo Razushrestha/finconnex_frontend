@@ -3,19 +3,16 @@
 import { useState, type ReactNode } from "react";
 import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import { FileText } from "lucide-react";
-import type { TaskActivityNote } from "@/lib/tasks/types";
+import type { TaskActivityNote, TaskFileAttachment } from "@/lib/tasks/types";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { listMentionPeople } from "@/lib/mentions/people";
-
-interface TaskAttachment {
-  name: string;
-  sizeLabel?: string;
-}
+import AttachmentUpload from "../AttachmentUpload";
 
 interface TaskActivityTabsProps {
   notes?: TaskActivityNote[];
-  attachments?: TaskAttachment[];
+  attachments?: TaskFileAttachment[];
   onAddNote?: (body: string) => void;
+  onAddFiles?: (files: File[]) => Promise<void> | void;
 }
 
 function renderNoteBodyWithMentions(text: string) {
@@ -57,9 +54,12 @@ export function TaskActivityTabs({
   notes = [],
   attachments = [],
   onAddNote,
+  onAddFiles,
 }: TaskActivityTabsProps) {
   const [activeTab, setActiveTab] = useState<"notes" | "attachments">("notes");
   const [newNote, setNewNote] = useState("");
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   function handleSaveNote() {
     const trimmed = newNote.trim();
@@ -156,20 +156,70 @@ export function TaskActivityTabs({
               No attachments yet.
             </p>
           ) : (
-            attachments.map((file) => (
-              <div key={file.name} className="flex items-center gap-3 py-1">
-                <FileText className="h-4 w-4 text-slate-400" />
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-medium text-slate-800">
-                    {file.name}
-                  </p>
-                  {file.sizeLabel ? (
-                    <p className="text-[10px] text-slate-400">{file.sizeLabel}</p>
-                  ) : null}
+            attachments.map((file, index) => {
+              const content = (
+                <>
+                  <FileText className="h-4 w-4 shrink-0 text-slate-400" />
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-medium text-slate-800">
+                      {file.name}
+                    </p>
+                    {file.sizeLabel ? (
+                      <p className="text-[10px] text-slate-400">
+                        {file.sizeLabel}
+                      </p>
+                    ) : null}
+                  </div>
+                </>
+              );
+              return file.url ? (
+                <a
+                  key={file.id || file.key || `${file.name}-${index}`}
+                  href={file.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-3 py-1 hover:opacity-80"
+                >
+                  {content}
+                </a>
+              ) : (
+                <div
+                  key={file.id || file.key || `${file.name}-${index}`}
+                  className="flex items-center gap-3 py-1"
+                >
+                  {content}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
+          {onAddFiles ? (
+            <div className="pt-2">
+              <AttachmentUpload
+                files={pendingFiles}
+                onChange={(files) => {
+                  const added = files.filter(
+                    (file) =>
+                      !pendingFiles.some(
+                        (existing) =>
+                          existing.name === file.name &&
+                          existing.size === file.size &&
+                          existing.lastModified === file.lastModified,
+                      ),
+                  );
+                  setPendingFiles(files);
+                  if (!added.length || uploading) return;
+                  setUploading(true);
+                  void Promise.resolve(onAddFiles(added)).finally(() => {
+                    setPendingFiles([]);
+                    setUploading(false);
+                  });
+                }}
+              />
+              {uploading ? (
+                <p className="mt-1.5 text-[10px] text-slate-400">Uploading…</p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       )}
     </section>

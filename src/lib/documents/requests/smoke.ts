@@ -132,6 +132,17 @@ export function smokeDocumentRequestsWiring() {
       fail(`document-requests client missing ${name}`);
     }
   }
+  if (!api.includes("crmBffFetch")) {
+    fail("document-requests client must call crmBffFetch in the browser");
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (
+    !bff.includes('"document-requests"') ||
+    !bff.includes('path.includes("document-requests")')
+  ) {
+    fail("BFF proxy does not allow document-requests");
+  }
 
   const catalog = readSrc("src/lib/api/endpoints.ts");
   for (const fragment of [
@@ -187,6 +198,21 @@ export function smokeDocumentRequestsWiring() {
   ]) {
     if (!detail.includes(name)) {
       fail(`document-request detail does not call ${name}`);
+    }
+  }
+
+  const list = readSrc(
+    "src/components/documents/requests/DocumentRequestsList.tsx",
+  );
+  for (const name of [
+    "sendCrmDocumentRequest",
+    "receiveCrmDocumentRequest",
+    "approveCrmDocumentRequest",
+    "rejectCrmDocumentRequest",
+    "expireCrmDocumentRequest",
+  ]) {
+    if (!list.includes(name)) {
+      fail(`document-requests list does not call ${name}`);
     }
   }
 

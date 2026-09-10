@@ -97,6 +97,14 @@ export function EmailsWorkspace({
   const [mailView, setMailView] = useState<"list" | "timeline">("list");
 
   useEffect(() => {
+    const next = new URLSearchParams(window.location.search).get("folder");
+    if (next && FOLDERS.some((item) => item.id === next)) {
+      setFolder(next as MailFolder);
+      setCustomFolderId(null);
+    }
+  }, []);
+
+  useEffect(() => {
     const offRules = onRulesChange(() => setRevision((n) => n + 1));
     const offMail = onMailboxChange(() => setRevision((n) => n + 1));
     return () => {
@@ -215,6 +223,10 @@ export function EmailsWorkspace({
     setAppliedQuery("");
     setQuery("");
     if (id === "inbox") setFocusView("all");
+    router.replace(
+      id === "inbox" ? "/activities/emails" : `/activities/emails?folder=${id}`,
+      { scroll: false },
+    );
   }
 
   function selectUserFolder(item: MailUserFolder) {

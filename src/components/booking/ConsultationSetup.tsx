@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Users,
   UserRound,
@@ -19,7 +19,6 @@ import {
   Search,
 } from "lucide-react";
 import {
-  BOOKING_CONSULTANTS,
   BOOKING_CURRENCIES,
   CONSULTANT_PRIORITIES,
   CONSULTATION_MODE_META,
@@ -31,6 +30,7 @@ import {
   type MeetingMode,
   type MeetingVia,
 } from "@/lib/booking/types";
+import { listCalendlyHosts } from "@/lib/booking/calendly-api";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import {
   Field,
@@ -41,13 +41,6 @@ import {
 import { cn } from "@/lib/utils";
 
 const BRAND = "#5A32A3";
-
-const EXTRA_CONSULTANTS = [
-  "Akshay",
-  "Admin",
-  "Pawan Regmi",
-  "Bishnu Aryal",
-];
 
 const MODE_META: Record<
   ConsultationMode,
@@ -83,16 +76,6 @@ const VIA_META: Record<
 
 const DURATION_PRESETS = [15, 30, 45, 60, 90];
 
-const ALL_CONSULTANTS = [
-  ...EXTRA_CONSULTANTS.map((name) => ({
-    id: `extra-${name}`,
-    name,
-    role: "Consultant",
-    email: "",
-  })),
-  ...BOOKING_CONSULTANTS.filter((c) => !EXTRA_CONSULTANTS.includes(c.name)),
-];
-
 export interface ConsultationSetupValue {
   consultationMode: ConsultationMode | "";
   meetingMode: MeetingMode;
@@ -126,18 +109,47 @@ export function ConsultationSetup({
     : true;
   const multi = consultantsAllowMultiple(mode || undefined);
   const [consultantQuery, setConsultantQuery] = useState("");
+  const [apiConsultants, setApiConsultants] = useState<
+    { id: string; name: string; role: string; email: string }[]
+  >([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void listCalendlyHosts()
+      .then((hosts) => {
+        if (!alive) return;
+        setApiConsultants(
+          hosts.map((host) => ({
+            id: host.id,
+            name: host.name,
+            role: host.isHomeConsultant
+              ? "Home consultant"
+              : host.isConsultant
+                ? "Consultant"
+                : "Host",
+            email: host.email,
+          })),
+        );
+      })
+      .catch(() => {
+        if (alive) setApiConsultants([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const filteredConsultants = useMemo(() => {
     const q = consultantQuery.trim().toLowerCase();
-    if (!q) return ALL_CONSULTANTS;
-    return ALL_CONSULTANTS.filter(
+    if (!q) return apiConsultants;
+    return apiConsultants.filter(
       (c) =>
         c.name.toLowerCase().includes(q) ||
         c.role.toLowerCase().includes(q) ||
         c.email.toLowerCase().includes(q),
     );
-  }, [consultantQuery]);
+  }, [consultantQuery, apiConsultants]);
 
   function selectMode(next: ConsultationMode) {
     const showFreq = CONSULTATION_MODE_META[next].showFrequency;
@@ -435,7 +447,9 @@ export function ConsultationSetup({
               <div className="mt-1.5 max-h-40 overflow-y-auto rounded-lg border border-[#E5E7EB]">
                 {filteredConsultants.length === 0 ? (
                   <p className="px-2 py-3 text-center text-[12px] text-slate-400">
-                    No matches
+                    {apiConsultants.length === 0
+                      ? "No Calendly hosts yet."
+                      : "No matches"}
                   </p>
                 ) : (
                   <ul className="divide-y divide-[#F3F4F6]">

@@ -10,13 +10,13 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
-import { getSendGateway } from "@/lib/comms/send-gateway";
 import {
   defaultQuickActionDraft,
   leadCreateHref,
   submitLeadQuickAction,
   type QuickActionKind,
 } from "@/lib/leads/panel-actions";
+import { openEmailIntent, openSmsIntent } from "@/lib/leads/contact-intents";
 import type { Priority } from "@/lib/tasks/types";
 import Link from "next/link";
 import {
@@ -53,76 +53,7 @@ interface PastRecordEntry {
   owner?: string;
 }
 
-const MOCK_PAST_RECORDS: Partial<Record<QuickActionKind, PastRecordEntry[]>> = {
-  sms: [
-    {
-      id: "sms-1",
-      title: "Follow-up reminder",
-      snippet: "Hi, just checking in on the rate lock paperwork…",
-      timestamp: "Jul 24, 2026 · 3:12 PM",
-      status: "Sent",
-      owner: "Priya Shrestha",
-    },
-    {
-      id: "sms-2",
-      title: "Appointment confirmation",
-      snippet: "Confirming our call tomorrow at 10am.",
-      timestamp: "Jul 18, 2026 · 11:05 AM",
-      status: "Sent",
-      owner: "Priya Shrestha",
-    },
-  ],
-  email: [
-    {
-      id: "email-1",
-      title: "Pre-approval next steps",
-      snippet: "Attached the checklist for your pre-approval application…",
-      timestamp: "Jul 22, 2026 · 9:40 AM",
-      status: "Sent",
-      owner: "Priya Shrestha",
-    },
-  ],
-  task: [
-    {
-      id: "task-1",
-      title: "Send disclosure documents",
-      timestamp: "Due Jul 30, 2026",
-      status: "Open",
-      owner: "Priya Shrestha",
-    },
-    {
-      id: "task-2",
-      title: "Confirm income verification",
-      timestamp: "Completed Jul 20, 2026",
-      status: "Done",
-      owner: "Priya Shrestha",
-    },
-  ],
-  note: [
-    {
-      id: "note-1",
-      title: "Call recap",
-      snippet:
-        "Client is comparing rates with two other lenders, wants to close by end of Q3.",
-      timestamp: "Jul 21, 2026 · 4:50 PM",
-      owner: "Priya Shrestha",
-    },
-  ],
-  attachment: [
-    {
-      id: "attach-1",
-      title: "rate-lock.pdf",
-      timestamp: "Jul 19, 2026 · 2:15 PM",
-      owner: "Priya Shrestha",
-    },
-    {
-      id: "attach-2",
-      title: "income-verification.pdf",
-      timestamp: "Jul 12, 2026 · 10:30 AM",
-      owner: "Priya Shrestha",
-    },
-  ],
-};
+const MOCK_PAST_RECORDS: Partial<Record<QuickActionKind, PastRecordEntry[]>> = {};
 
 const HISTORY_ICONS: Partial<Record<QuickActionKind, typeof Mail>> = {
   sms: MessageSquare,
@@ -234,43 +165,32 @@ export function LeadQuickActionDialog({
     onSuccess?.(result.message);
   }
 
-  async function runIntent() {
+  function runIntent() {
     setIntentError(null);
-    const gateway = getSendGateway();
     if (kind === "call") {
-      const { startCrmRecordCall } = await import("@/lib/softphone/events");
-      const r = startCrmRecordCall({
-        phone: leadPhone,
-        name: leadName,
-        relatedTo: `Lead: ${leadName}`,
-        relatedType: "LEAD",
-        relatedId: leadId,
+      void import("@/lib/softphone/events").then(({ startCrmRecordCall }) => {
+        const r = startCrmRecordCall({
+          phone: leadPhone,
+          name: leadName,
+          relatedTo: `Lead: ${leadName}`,
+          relatedType: "LEAD",
+          relatedId: leadId,
+        });
+        if (!r.ok) setIntentError(r.message);
       });
-      if (!r.ok) setIntentError(r.message);
       return;
     }
     if (kind === "sms") {
-      const r = await gateway.sendSms({
-        phone: leadPhone,
-        body: draft.body || draft.title,
-      });
+      const r = openSmsIntent(leadPhone, draft.body || draft.title);
       if (!r.ok) setIntentError(r.message);
       return;
     }
     if (kind === "email") {
-      const { sendCrmActivityEmail } = await import("@/lib/emails/compose-send");
-      try {
-        await sendCrmActivityEmail({
-          to: leadEmail ? [leadEmail] : [],
-          subject: draft.title || "Email",
-          body: draft.body,
-          relatedType: "LEAD",
-          relatedId: leadId,
-          relatedTo: `Lead: ${leadName}`,
-        });
-      } catch (err) {
-        setIntentError(err instanceof Error ? err.message : "Could not send email");
-      }
+      const r = openEmailIntent(leadEmail, {
+        subject: draft.title,
+        body: draft.body,
+      });
+      if (!r.ok) setIntentError(r.message);
     }
   }
 
