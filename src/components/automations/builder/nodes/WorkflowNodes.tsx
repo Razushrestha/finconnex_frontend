@@ -108,7 +108,7 @@ export function TriggerNode({ data }: NodeProps<BuilderNode>) {
       icon={meta ? <StepIcon icon={meta.icon} className="h-4.5 w-4.5 text-white" /> : <Zap className="h-4.5 w-4.5 text-white" />}
       iconClassName="bg-blue-600"
       title={meta ? meta.label : "Choose a Trigger"}
-      subtitle={meta ? "Trigger" : "Click to select what starts this workflow"}
+      subtitle={meta ? (data.scopeSummary ?? "Trigger") : "Click to select what starts this workflow"}
       selected={interactions?.selectedPath === "trigger"}
       onClick={() => interactions?.onSelectTrigger()}
       handles={{ top: false, bottom: true }}

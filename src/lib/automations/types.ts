@@ -868,7 +868,9 @@ export type CreateAutomationInput = {
   triggerType: AutomationTriggerType;
   entityType: AutomationEntityType;
   triggerConfig?: Record<string, unknown>;
-  conditions?: Record<string, unknown>;
+  /** `null` clears a saved condition group on update; omitting it keeps the
+   * stored one (automation.service.ts reads `dto.conditions ?? current`). */
+  conditions?: Record<string, unknown> | null;
   steps: AutomationStep[];
   failurePolicy?: AutomationFailurePolicy;
 };

@@ -36,10 +36,25 @@ import {
   TRIGGER_CATALOG,
   type Automation,
   type AutomationActionType,
+  type AutomationConditionGroup,
   type AutomationEntityType,
   type AutomationStep,
   type AutomationTriggerType,
 } from "@/lib/automations/types";
+import {
+  describeAutomationRecord,
+  type AutomationRecordOption,
+} from "@/lib/automations/record-search";
+import {
+  changedFieldMeta,
+  describeChangedFields,
+  describeTransition,
+  describeTriggerScope,
+  readTriggerFilter,
+  transitionMeta,
+  type TransitionOption,
+} from "@/lib/automations/trigger-scope";
+import { loadAssignableOwners } from "@/lib/users/assignable";
 
 import {
   ActionNode,
@@ -52,6 +67,7 @@ import {
 } from "./nodes/WorkflowNodes";
 import { ActionPickerPanel, TriggerPickerPanel } from "./StepPickerPanel";
 import { StepConfigPanel } from "./StepConfigPanel";
+import { TriggerConfigPanel } from "./TriggerConfigPanel";
 
 const nodeTypes = {
   trigger: TriggerNode,
@@ -65,6 +81,7 @@ const nodeTypes = {
 
 type PanelState =
   | { mode: "pick-trigger" }
+  | { mode: "configure-trigger" }
   | { mode: "pick-action"; insertPath: string }
   | { mode: "configure"; path: string };
 
@@ -106,6 +123,17 @@ function BuilderInner({ id }: { id: string }) {
   const [name, setName] = useState("Untitled Workflow");
   const [triggerType, setTriggerType] = useState<AutomationTriggerType | null>(null);
   const [entityType, setEntityType] = useState<AutomationEntityType>("LEAD");
+  /**
+   * The definition's top-level condition group. This is what narrows a
+   * trigger to one record or to a filtered set — the backend refuses a
+   * `triggerConfig` for anything but the five temporal triggers, so scope
+   * lives here (see trigger-scope.ts).
+   */
+  const [conditions, setConditions] = useState<AutomationConditionGroup | undefined>(undefined);
+  const [triggerConfig, setTriggerConfig] = useState<Record<string, unknown>>({});
+  /** The last record resolved for a RECORD-scoped trigger, kept whole so the
+   * label is only used when it still belongs to the pinned id. */
+  const [scopeRecord, setScopeRecord] = useState<AutomationRecordOption | null>(null);
   const [steps, setSteps] = useState<AutomationStep[]>([]);
   const [status, setStatus] = useState<Automation["status"]>("DRAFT");
   const [loading, setLoading] = useState(!isNew);
@@ -127,6 +155,8 @@ function BuilderInner({ id }: { id: string }) {
           (latest?.definition?.trigger?.entityType as AutomationEntityType) ?? "LEAD"
         );
         setSteps((latest?.definition?.steps as AutomationStep[]) ?? []);
+        setConditions(latest?.definition?.conditions ?? undefined);
+        setTriggerConfig(latest?.definition?.trigger?.config ?? {});
       })
       .finally(() => !cancelled && setLoading(false));
     return () => {
@@ -134,11 +164,94 @@ function BuilderInner({ id }: { id: string }) {
     };
   }, [id, isNew]);
 
-  const graph = useMemo(() => buildWorkflowGraph(triggerType, steps), [triggerType, steps]);
+  const transition = transitionMeta(triggerType);
+  const changedFields = changedFieldMeta(triggerType);
+  /**
+   * Owner-backed transitions store user ids. The canvas caption has to render
+   * names, so the same list the panel offers is loaded here too — a bare uuid
+   * on the node would be unreadable.
+   */
+  const [owners, setOwners] = useState<TransitionOption[]>([]);
+  const ownerBacked = transition?.source === "owners";
+  useEffect(() => {
+    if (!ownerBacked) return;
+    let cancelled = false;
+    loadAssignableOwners().then((rows) => {
+      if (cancelled) return;
+      setOwners(rows.map((row) => ({ label: row.name || row.email, value: row.id })));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerBacked]);
+  const filter = useMemo(
+    () => readTriggerFilter(conditions, transition?.fields ?? null),
+    [conditions, transition]
+  );
+  const scope = filter.scope;
 
-  const selectedPath = panel?.mode === "configure" ? panel.path : panel?.mode === "pick-trigger" ? "trigger" : null;
+  /** Resolve a pinned record id to its name for the canvas subtitle. */
+  const pinnedRecordId = scope.mode === "RECORD" ? scope.recordId : "";
+  useEffect(() => {
+    if (!pinnedRecordId) return;
+    let cancelled = false;
+    describeAutomationRecord(entityType, pinnedRecordId).then((option) => {
+      if (!cancelled && option) setScopeRecord(option);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [entityType, pinnedRecordId]);
 
-  const onSelectTrigger = useCallback(() => setPanel({ mode: "pick-trigger" }), []);
+  const scopeSummary = useMemo(() => {
+    if (!triggerType) return undefined;
+    const scopeText = describeTriggerScope(
+      scope,
+      entityType,
+      // Only trust the resolved label while it still names the pinned
+      // record — otherwise a stale name would caption a new selection.
+      scopeRecord?.id === pinnedRecordId ? scopeRecord.label : null
+    );
+    const detail = transition
+      ? describeTransition(filter.transition, transition, transition.options ?? owners)
+      : changedFields
+        ? describeChangedFields(filter.changedFields, changedFields)
+        : null;
+    return detail ? `${scopeText} · ${detail}` : scopeText;
+  }, [
+    triggerType,
+    scope,
+    entityType,
+    scopeRecord,
+    pinnedRecordId,
+    transition,
+    filter.transition,
+    changedFields,
+    filter.changedFields,
+    owners,
+  ]);
+
+  const graph = useMemo(
+    () => buildWorkflowGraph(triggerType, steps, scopeSummary),
+    [triggerType, steps, scopeSummary]
+  );
+
+  const selectedPath =
+    panel?.mode === "configure"
+      ? panel.path
+      : panel?.mode === "pick-trigger" || panel?.mode === "configure-trigger"
+        ? "trigger"
+        : null;
+
+  /**
+   * Clicking the trigger node goes straight to its configuration once a
+   * trigger is chosen — "Change trigger" in that panel is the way back to the
+   * list, so re-picking is deliberate instead of the only thing a click does.
+   */
+  const onSelectTrigger = useCallback(
+    () => setPanel(triggerType ? { mode: "configure-trigger" } : { mode: "pick-trigger" }),
+    [triggerType]
+  );
   const onSelectStep = useCallback((path: string) => setPanel({ mode: "configure", path }), []);
   const onDeleteStep = useCallback((path: string) => {
     setSteps((prev) => removeStepAtPath(prev, path));
@@ -163,6 +276,11 @@ function BuilderInner({ id }: { id: string }) {
       name,
       triggerType: triggerType as AutomationTriggerType,
       entityType,
+      triggerConfig,
+      // Explicitly null, never undefined: PATCH reads `dto.conditions ??
+      // current.conditions`, so an omitted key would silently keep the old
+      // scope when the user switches back to "any record".
+      conditions: conditions ?? null,
       steps,
       failurePolicy: "STOP_ON_FAILURE" as const,
     };
@@ -329,8 +447,34 @@ function BuilderInner({ id }: { id: string }) {
         <TriggerPickerPanel
           onClose={() => setPanel(null)}
           onSelect={(trigger) => {
+            const nextEntity = TRIGGER_CATALOG[trigger].entityType;
+            // Conditions name fields from AUTOMATION_FIELD_REGISTRY[entityType],
+            // so they can't survive a switch to a different entity — the
+            // backend would reject them with conditionFieldNotAllowed.
+            if (nextEntity !== entityType) {
+              setConditions(undefined);
+              setScopeRecord(null);
+            }
+            setTriggerConfig({});
             setTriggerType(trigger);
-            setEntityType(TRIGGER_CATALOG[trigger].entityType);
+            setEntityType(nextEntity);
+            setPanel({ mode: "configure-trigger" });
+          }}
+        />
+      )}
+
+      {panel?.mode === "configure-trigger" && triggerType && (
+        <TriggerConfigPanel
+          key={triggerType}
+          triggerType={triggerType}
+          entityType={entityType}
+          conditions={conditions}
+          triggerConfig={triggerConfig}
+          onBack={() => setPanel({ mode: "pick-trigger" })}
+          onClose={() => setPanel(null)}
+          onSave={(next) => {
+            setConditions(next.conditions);
+            setTriggerConfig(next.triggerConfig);
             setPanel(null);
           }}
         />
