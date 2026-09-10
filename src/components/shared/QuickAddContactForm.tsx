@@ -75,7 +75,7 @@ export function QuickAddContactForm({
     email: false,
   });
 
-  function save() {
+  async function save() {
     const first = firstName.trim();
     const middle = middleName.trim();
     const last = lastName.trim();
@@ -96,7 +96,10 @@ export function QuickAddContactForm({
       return;
     }
     const name = [first, middle, last].filter(Boolean).join(" ");
-    const created = createContact({
+    // `createContact` is async: without the await, `created` is a Promise, so
+    // `created.name` is undefined, the rename branch is always taken, and
+    // `updateContact` is called with an undefined id.
+    const created = await createContact({
       firstName: first,
       lastName: last,
       email: mail,
@@ -171,7 +174,7 @@ export function QuickAddContactForm({
         </button>
         <button
           type="button"
-          onClick={save}
+          onClick={() => void save()}
           className="h-8 rounded-md bg-[#5A32A3] px-3 text-[12px] font-semibold text-white hover:bg-[#4a2888]"
         >
           Save contact
