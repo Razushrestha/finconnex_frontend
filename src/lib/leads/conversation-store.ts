@@ -66,7 +66,12 @@ function markSeeded(leadId: string) {
   writeJsonStore(SEEDED, [...ids]);
 }
 
-function seedThread(_card: LeadCardData): ConversationItem[] {
+/**
+ * Kept as an extension point after the demo seeds were removed: a lead's
+ * thread now starts from live records alone. Takes no argument because it has
+ * nothing to read from one — an unused parameter fails the lint gate.
+ */
+function seedThread(): ConversationItem[] {
   return [];
 }
 
@@ -155,7 +160,7 @@ function importLive(card: LeadCardData): ConversationItem[] {
 export function listLeadConversation(card: LeadCardData): ConversationItem[] {
   const existing = readAll().filter((row) => row.leadId === card.id);
   if (!seededIds().includes(card.id)) {
-    const seeded = [...seedThread(card), ...importLive(card)];
+    const seeded = [...seedThread(), ...importLive(card)];
     writeAll([...readAll().filter((row) => row.leadId !== card.id), ...seeded]);
     markSeeded(card.id);
     return seeded.sort(
