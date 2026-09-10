@@ -20,10 +20,15 @@ import {
 } from "@/lib/meetings/types";
 import {
   ACTIVITY_OWNERS,
-  RELATED_ENTITY_KINDS,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
 import { useCrmRelatedRecords } from "@/lib/activities/use-crm-related-records";
+import {
+  TASK_RELATED_ENTITY_KINDS,
+  liveRelatedRecords,
+  rankRelatedRecordsByContact,
+} from "@/lib/activities/related-records";
+import RelatedRecordCombobox from "@/components/activities/tasks/RelatedRecordComboBox";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { createMeeting } from "@/lib/meetings/store";
 import { defaultActorName } from "@/lib/rules/actor";
@@ -54,6 +59,7 @@ interface CreateMeetingFormProps {
 }
 interface FormState {
   title: string;
+  contactName: string;
   relatedKind: RelatedEntityKind | "";
   relatedName: string;
   type: MeetingType | "";
@@ -70,6 +76,7 @@ interface FormState {
 
 const initialState: FormState = {
   title: "",
+  contactName: "",
   relatedKind: "",
   relatedName: "",
   type: "Video Call",
@@ -90,10 +97,18 @@ export function CreateMeetingForm({
   defaults,
 }: CreateMeetingFormProps) {
   const router = useRouter();
+  const relatedKindDefault =
+    defaults?.relatedKind === "Lead" ||
+    defaults?.relatedKind === "Deal" ||
+    defaults?.relatedKind === "Company"
+      ? defaults.relatedKind
+      : "";
   const [form, setForm] = useState<FormState>({
     ...initialState,
-    relatedKind: defaults?.relatedKind ?? "",
-    relatedName: defaults?.relatedName ?? "",
+    contactName:
+      defaults?.relatedKind === "Contact" ? (defaults.relatedName ?? "") : "",
+    relatedKind: relatedKindDefault,
+    relatedName: relatedKindDefault ? (defaults?.relatedName ?? "") : "",
   });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
@@ -113,8 +128,13 @@ export function CreateMeetingForm({
           name: form.relatedName,
         }
       : undefined;
-  const { options: relatedOptions, loading: relatedLoading } =
+  const { options: relatedRemote, loading: relatedLoading } =
     useCrmRelatedRecords(form.relatedKind, extra);
+  const contactOptions = liveRelatedRecords("Contact");
+  const relatedOptions = rankRelatedRecordsByContact(
+    relatedRemote,
+    form.contactName,
+  );
 
   function validate() {
     const next: Partial<Record<keyof FormState, string>> = {};
@@ -136,7 +156,9 @@ export function CreateMeetingForm({
     const relatedTo =
       form.relatedKind && form.relatedName
         ? `${form.relatedKind}: ${form.relatedName}`
-        : undefined;
+        : form.contactName.trim()
+          ? `Contact: ${form.contactName.trim()}`
+          : undefined;
     const draft = {
       title: form.title.trim(),
       relatedTo,
@@ -233,6 +255,16 @@ export function CreateMeetingForm({
         </InputShell>
       </Field>
 
+      <Field label="Contact Name">
+        <RelatedRecordCombobox
+          value={form.contactName}
+          onChange={(v) => update("contactName", v)}
+          options={contactOptions}
+          placeholder="Search contact…"
+          allowCustom
+          createLabel={(name) => `Use “${name}”`}
+        />
+      </Field>
       <Field label="Related Entity">
         <InputShell icon={Link2}>
           <select
@@ -244,32 +276,28 @@ export function CreateMeetingForm({
             }}
           >
             <option value="">None</option>
-            {RELATED_ENTITY_KINDS.map((k) => (
+            {TASK_RELATED_ENTITY_KINDS.map((k) => (
               <option key={k} value={k}>
-                {k}
+                {k === "Company" ? "Organization" : k}
               </option>
             ))}
           </select>
         </InputShell>
       </Field>
       <Field label="Related To">
-        <InputShell>
-          <select
-            className={elevatedSelectClass(false)}
-            value={form.relatedName}
-            onChange={(e) => update("relatedName", e.target.value)}
-            disabled={!form.relatedKind}
-          >
-            <option value="">
-              {relatedLoading ? "Loading CRM records…" : "Select record"}
-            </option>
-            {relatedOptions.map((r) => (
-              <option key={`${r.kind}-${r.id || r.name}`} value={r.name}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </InputShell>
+        <RelatedRecordCombobox
+          value={form.relatedName}
+          onChange={(v) => update("relatedName", v)}
+          options={relatedOptions}
+          disabled={!form.relatedKind}
+          placeholder={
+            relatedLoading
+              ? "Loading CRM records…"
+              : form.relatedKind
+                ? `Search ${form.relatedKind === "Company" ? "organization" : form.relatedKind.toLowerCase()}…`
+                : "Select related entity first"
+          }
+        />
       </Field>
       <Field
         label="Type"

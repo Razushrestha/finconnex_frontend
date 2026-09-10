@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { MentionTextarea } from "@/components/shared/MentionTextarea";
-import { FileText, Bold, Italic, List, Paperclip } from "lucide-react";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
+import { FileText } from "lucide-react";
 
 interface MeetingNotesProps {
   initialNotes?: string;
@@ -21,31 +21,14 @@ export function MeetingNotes({ initialNotes = "", onSave }: MeetingNotesProps) {
         </h3>
       </div>
 
-      <div className="border border-border rounded-xl bg-white overflow-hidden shadow-xs">
-        {/* Formatting Toolbar */}
-        <div className="flex items-center gap-1 px-3 py-2 border-b border-border bg-white text-muted-foreground">
-          <button className="p-1.5 rounded hover:bg-secondary hover:text-secondary-foreground transition-colors cursor-pointer">
-            <Bold className="w-3.5 h-3.5" />
-          </button>
-          <button className="p-1.5 rounded hover:bg-secondary hover:text-secondary-foreground transition-colors cursor-pointer">
-            <Italic className="w-3.5 h-3.5" />
-          </button>
-          <button className="p-1.5 rounded hover:bg-secondary hover:text-secondary-foreground transition-colors cursor-pointer">
-            <List className="w-3.5 h-3.5" />
-          </button>
-          <button className="p-1.5 rounded hover:bg-secondary hover:text-secondary-foreground transition-colors cursor-pointer">
-            <Paperclip className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {/* Text Area */}
-        <MentionTextarea
-          value={notes}
-          onChange={setNotes}
-          placeholder="Start typing collaborative notes here... Type @ to assign someone."
-          className="w-full h-32 p-4 text-sm bg-transparent text-card-foreground focus:outline-none resize-none"
-        />
-      </div>
+      <MentionNotesTextarea
+        value={notes}
+        onChange={(next) => {
+          setNotes(next);
+          onSave?.(next);
+        }}
+        placeholder="Start typing collaborative notes here... Type @ to assign someone."
+      />
     </div>
   );
 }

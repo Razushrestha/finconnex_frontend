@@ -7,12 +7,27 @@ import {
 import { listCrmCompanies, tryCrmCompany } from "@/lib/companies/api";
 import { listCompanyGroups, mergeCrmCompaniesIntoBoard } from "@/lib/companies/store";
 import { listCrmContacts, tryCrmContact } from "@/lib/contacts/api";
-import { listAllContacts, mergeCrmContactsIntoBoard } from "@/lib/contacts/store";
+import { findContactByName, listAllContacts, mergeCrmContactsIntoBoard } from "@/lib/contacts/store";
 import { listCrmDeals, tryCrmDeal } from "@/lib/deals/api";
 import { listAllDeals, mergeCrmDealsIntoBoard } from "@/lib/deals/store";
 import { fetchLeadList } from "@/lib/leads/api";
 import { mapCrmLeadToCard } from "@/lib/leads/api/map";
+import { leadApplicants } from "@/lib/leads/detail-snapshot";
 import { listLeadColumns, upsertLeadFromCard } from "@/lib/leads/store";
+import { namesEqual } from "@/lib/related-entity";
+
+export const TASK_RELATED_ENTITY_KINDS = ["Lead", "Deal", "Company"] as const;
+export type TaskRelatedEntityKind = (typeof TASK_RELATED_ENTITY_KINDS)[number];
+
+/** True when a record title belongs to the chosen contact (e.g. Mohit → Mohit - Home loans). */
+export function nameLinkedToContact(recordName: string, contactName: string) {
+  const record = recordName.trim().toLowerCase();
+  const contact = contactName.trim().toLowerCase();
+  if (!record || !contact) return false;
+  if (record.includes(contact) || contact.includes(record)) return true;
+  const first = contact.split(/\s+/).filter(Boolean)[0] ?? "";
+  return first.length >= 3 && record.includes(first);
+}
 
 function keyOf(item: RelatedTo) {
   return `${item.kind}:${(item.id || item.name).trim().toLowerCase()}`;
@@ -149,4 +164,60 @@ export function mergeRelatedRecordOptions(
     ...(extra && extra.name.trim() ? [extra] : []),
     ...preferred,
   ]);
+}
+
+export function recordMatchesContact(
+  record: RelatedTo,
+  contactName: string,
+): boolean {
+  const query = contactName.trim();
+  if (!query) return false;
+  if (nameLinkedToContact(record.name, query)) return true;
+
+  const contact = findContactByName(query);
+  if (!contact) return false;
+
+  if (record.kind === "Lead") {
+    for (const column of listLeadColumns()) {
+      const card = column.cards.find((item) =>
+        namesEqual(item.name, record.name),
+      );
+      if (!card) continue;
+      if (contact.id && card.convertedContactId === contact.id) return true;
+      if (card.email && namesEqual(card.email, contact.email)) return true;
+      if (leadApplicants(card).some((person) => nameLinkedToContact(person.name, contact.name))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  if (record.kind === "Deal") {
+    const deal = listAllDeals().find((item) => namesEqual(item.name, record.name));
+    if (!deal) return false;
+    if (contact.dealIds?.includes(deal.id)) return true;
+    if (deal.contactId && deal.contactId === contact.id) return true;
+    return Boolean(deal.contact && nameLinkedToContact(deal.contact, contact.name));
+  }
+
+  if (record.kind === "Company") {
+    return Boolean(contact.company && namesEqual(contact.company, record.name));
+  }
+
+  return false;
+}
+
+/** Put records linked to the selected contact first; still include every record of that type. */
+export function rankRelatedRecordsByContact(
+  records: RelatedTo[],
+  contactName?: string,
+): RelatedTo[] {
+  const query = contactName?.trim();
+  if (!query) return records;
+  const linked: RelatedTo[] = [];
+  const rest: RelatedTo[] = [];
+  for (const record of records) {
+    (recordMatchesContact(record, query) ? linked : rest).push(record);
+  }
+  return [...linked, ...rest];
 }

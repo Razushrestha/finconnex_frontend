@@ -209,7 +209,7 @@ function NewBookingButton({ onClick }: { onClick: () => void }) {
       className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#5A32A3] px-3 text-[12px] font-semibold text-white hover:opacity-90"
     >
       <Plus className="h-3.5 w-3.5" />
-      New Booking
+      New Meeting
     </button>
   );
 }

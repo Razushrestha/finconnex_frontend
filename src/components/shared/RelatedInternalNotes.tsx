@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Pencil, StickyNote, Trash2 } from "lucide-react";
-import { MentionTextarea } from "@/components/shared/MentionTextarea";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import {
   createCrmNote,
@@ -236,7 +236,7 @@ export function RelatedInternalNotes({
 
   function startEdit(note: Note) {
     setEditingId(note.id);
-    setDraft(plainBody(note.body));
+    setDraft(note.body);
   }
 
   async function remove(note: Note) {
@@ -266,7 +266,7 @@ export function RelatedInternalNotes({
             : "border-slate-200 bg-slate-50",
         )}
       >
-        <MentionTextarea
+        <MentionNotesTextarea
           value={draft}
           onChange={setDraft}
           placeholder={
@@ -274,12 +274,6 @@ export function RelatedInternalNotes({
               ? "Edit this note… Type @ to mention someone."
               : "Add an internal note… Type @ to mention someone."
           }
-          className={cn(
-            "min-h-[88px] w-full resize-none bg-transparent text-[12px] outline-none",
-            compact
-              ? "text-amber-950 placeholder:text-amber-700/40"
-              : "text-slate-800 placeholder:text-slate-400",
-          )}
         />
       </div>
       <div className="mt-2 flex items-center justify-end gap-2">
@@ -324,9 +318,16 @@ export function RelatedInternalNotes({
                     : "border-slate-200 bg-white",
                 )}
               >
-                <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-slate-800">
-                  {text}
-                </p>
+                {note.body.includes("<") ? (
+                  <div
+                    className="text-[12px] leading-relaxed text-slate-800 [&_a]:text-[#5A32A3] [&_a]:underline [&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5"
+                    dangerouslySetInnerHTML={{ __html: note.body }}
+                  />
+                ) : (
+                  <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-slate-800">
+                    {text}
+                  </p>
+                )}
                 <div className="mt-1.5 flex items-start justify-between gap-2">
                   <p className="min-w-0 text-[10px] leading-4 text-slate-400">
                     {note.createdBy}

@@ -23,11 +23,12 @@ import {
   type TaskStatus,
   type TaskType,
 } from "@/lib/tasks/types";
+import { type RelatedEntityKind } from "@/lib/activities/shared";
 import {
-  RELATED_ENTITY_KINDS,
-  type RelatedEntityKind,
-} from "@/lib/activities/shared";
-import { liveRelatedRecords } from "@/lib/activities/related-records";
+  TASK_RELATED_ENTITY_KINDS,
+  liveRelatedRecords,
+  rankRelatedRecordsByContact,
+} from "@/lib/activities/related-records";
 import {
   createCrmTask,
   persistRemoteTask,
@@ -95,6 +96,7 @@ interface CreateTaskFormProps {
 
 interface FormState {
   title: string;
+  contactName: string;
   relatedKind: RelatedEntityKind | "";
   relatedName: string;
   taskType: TaskType | "";
@@ -115,6 +117,7 @@ interface FormState {
 
 const initialState: FormState = {
   title: "",
+  contactName: "",
   relatedKind: "",
   relatedName: "",
   taskType: "Follow-up",
@@ -263,18 +266,32 @@ function newActionItemId() {
   return `ai-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+function formFromDefaults(
+  defaults?: CreateTaskFormProps["defaults"],
+): FormState {
+  const kind = defaults?.relatedKind ?? "";
+  const name = defaults?.relatedName ?? "";
+  const dueDate = defaults?.dueDate ?? "";
+  if (kind === "Contact") {
+    return { ...initialState, contactName: name, dueDate };
+  }
+  const relatedKind =
+    kind === "Lead" || kind === "Deal" || kind === "Company" ? kind : "";
+  return {
+    ...initialState,
+    relatedKind,
+    relatedName: relatedKind ? name : "",
+    dueDate,
+  };
+}
+
 export function CreateTaskForm({
   layoutId,
   redirect,
   defaults,
 }: CreateTaskFormProps) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>({
-    ...initialState,
-    relatedKind: defaults?.relatedKind ?? "",
-    relatedName: defaults?.relatedName ?? "",
-    dueDate: defaults?.dueDate ?? "",
-  });
+  const [form, setForm] = useState<FormState>(() => formFromDefaults(defaults));
   const [errors, setErrors] = useState<
     Partial<Record<keyof FormState, string>>
   >({});
@@ -446,22 +463,26 @@ export function CreateTaskForm({
   const minReminderDate = minDueDate;
   const hasDueDate = Boolean(form.dueDate.trim());
 
-  const relatedOptions = [
-    ...extraRelated,
-    ...liveRelatedRecords(
-      form.relatedKind,
-      form.relatedKind && form.relatedName
-        ? { kind: form.relatedKind as RelatedEntityKind, name: form.relatedName }
-        : undefined,
-    ),
-  ].filter((item, index, list) => {
-    const key = `${item.kind}:${(item.id || item.name).toLowerCase()}`;
-    return (
-      list.findIndex(
-        (row) => `${row.kind}:${(row.id || row.name).toLowerCase()}` === key,
-      ) === index
-    );
-  });
+  const contactOptions = liveRelatedRecords("Contact");
+  const relatedOptions = rankRelatedRecordsByContact(
+    [
+      ...extraRelated,
+      ...liveRelatedRecords(
+        form.relatedKind,
+        form.relatedKind && form.relatedName
+          ? { kind: form.relatedKind as RelatedEntityKind, name: form.relatedName }
+          : undefined,
+      ),
+    ].filter((item, index, list) => {
+      const key = `${item.kind}:${(item.id || item.name).toLowerCase()}`;
+      return (
+        list.findIndex(
+          (row) => `${row.kind}:${(row.id || row.name).toLowerCase()}` === key,
+        ) === index
+      );
+    }),
+    form.contactName,
+  );
 
   const actor =
     getRulesActor().name ||
@@ -605,7 +626,9 @@ export function CreateTaskForm({
             name: form.relatedName,
             id: relatedMatch?.id,
           }
-        : undefined;
+        : form.contactName.trim()
+          ? { kind: "Contact" as const, name: form.contactName.trim() }
+          : undefined;
     const ownerName = ownerDisplay(ownerOptions, form.assignedTo) || form.assignedTo;
     const assigneeUserId = await resolveCrmAssigneeUserId(form.assignedTo);
     if (!assigneeUserId) {
@@ -833,6 +856,20 @@ export function CreateTaskForm({
                   ))}
                 </select>
               </div>
+              <div className="sm:col-span-2">
+                <label className={labelClass}>Contact Name</label>
+                <RelatedRecordCombobox
+                  value={form.contactName}
+                  onChange={(v) => update("contactName", v)}
+                  options={contactOptions}
+                  placeholder="Search contact…"
+                  allowCustom
+                  createLabel={(name) => `Use “${name}”`}
+                />
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className={labelClass}>Related Entity</label>
                 <select
@@ -847,9 +884,9 @@ export function CreateTaskForm({
                   }}
                 >
                   <option value="">None</option>
-                  {RELATED_ENTITY_KINDS.map((k) => (
+                  {TASK_RELATED_ENTITY_KINDS.map((k) => (
                     <option key={k} value={k}>
-                      {k}
+                      {k === "Company" ? "Organization" : k}
                     </option>
                   ))}
                 </select>
@@ -861,6 +898,11 @@ export function CreateTaskForm({
                   onChange={(v) => update("relatedName", v)}
                   options={relatedOptions}
                   disabled={!form.relatedKind}
+                  placeholder={
+                    form.relatedKind
+                      ? `Search ${form.relatedKind === "Company" ? "organization" : form.relatedKind.toLowerCase()}…`
+                      : "Select related entity first"
+                  }
                 />
               </div>
             </div>

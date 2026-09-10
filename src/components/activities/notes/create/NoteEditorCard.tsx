@@ -1,6 +1,6 @@
 "use client";
 
-import { MentionTextarea } from "@/components/shared/MentionTextarea";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import RelatedRecordCombobox from "@/components/activities/tasks/RelatedRecordComboBox";
 import { NOTE_TYPES, type NoteType } from "@/lib/notes/types";
 import {
@@ -240,14 +240,11 @@ export const NoteEditorCard: React.FC<NoteEditorCardProps> = ({
         <label className="block text-[11px] font-medium text-muted-foreground">
           Body <span className="text-destructive">*</span>
         </label>
-        <MentionTextarea
-          rows={8}
+        <MentionNotesTextarea
           value={body}
           onChange={onBodyChange}
+          error={submitted && Boolean(errors.body)}
           placeholder="Start typing your notes here... Type @ to assign someone."
-          className={`w-full text-sm text-foreground bg-transparent focus:outline-none resize-none leading-relaxed placeholder:text-muted-foreground/50 ${
-            submitted && errors.body ? "border-destructive" : ""
-          }`}
         />
         {submitted && errors.body ? (
           <span className="text-[10px] text-destructive block">

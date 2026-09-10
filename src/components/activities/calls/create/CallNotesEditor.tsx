@@ -1,4 +1,4 @@
-import { MentionTextarea } from "@/components/shared/MentionTextarea";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 
 interface CallNotesEditorProps {
   notes: string;
@@ -10,48 +10,19 @@ export const CallNotesEditor: React.FC<CallNotesEditorProps> = ({
   onNotesChange,
 }) => {
   return (
-    <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm space-y-3">
+    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-slate-800">Call Notes</h3>
-        <div className="inline-flex items-center space-x-1.5 bg-sky-50 text-sky-700 px-2.5 py-1 rounded-full text-xs font-medium border border-sky-100">
+        <div className="inline-flex items-center space-x-1.5 rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700">
           <span>✨</span>
           <span>AI Summary Active</span>
         </div>
       </div>
 
-      {/* Formatting Toolbar */}
-      <div className="flex items-center space-x-2 border-b border-slate-100 pb-2 text-slate-500 text-sm">
-        <button
-          type="button"
-          className="px-2 py-1 hover:bg-slate-100 rounded font-bold"
-        >
-          B
-        </button>
-        <button
-          type="button"
-          className="px-2 py-1 hover:bg-slate-100 rounded italic"
-        >
-          I
-        </button>
-        <button type="button" className="px-2 py-1 hover:bg-slate-100 rounded">
-          ≡
-        </button>
-        <span className="text-slate-300">|</span>
-        <button type="button" className="px-2 py-1 hover:bg-slate-100 rounded">
-          📎
-        </button>
-        <button type="button" className="px-2 py-1 hover:bg-slate-100 rounded">
-          🤖
-        </button>
-      </div>
-
-      {/* Textarea */}
-      <MentionTextarea
-        rows={6}
+      <MentionNotesTextarea
         value={notes}
         onChange={onNotesChange}
         placeholder="Enter notes or let AI summarize automatically... Type @ to assign someone."
-        className="w-full text-sm text-slate-700 focus:outline-none resize-none leading-relaxed"
       />
     </div>
   );

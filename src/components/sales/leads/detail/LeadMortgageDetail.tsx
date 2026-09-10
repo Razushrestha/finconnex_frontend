@@ -539,7 +539,7 @@ export function LeadMortgageDetail({
             }
           />
           <div className="relative z-20 w-max min-w-[7rem] overflow-visible">
-            <Eyebrow>Followers</Eyebrow>
+            <Eyebrow>Lead Followers</Eyebrow>
             <LeadFollowersField
               value={card.custom?.[FOLLOWERS_KEY]}
               owner={card.owner}

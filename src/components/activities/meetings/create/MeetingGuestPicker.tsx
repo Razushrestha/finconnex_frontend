@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Search, X } from "lucide-react";
 import { listAllContacts } from "@/lib/contacts/store";
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { QuickAddContactForm } from "@/components/shared/QuickAddContactForm";
 
 export type MeetingGuest = {
   id: string;
@@ -20,11 +19,13 @@ export function MeetingGuestPicker({
   onChange: (next: MeetingGuest[]) => void;
 }) {
   const [adding, setAdding] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [tick, setTick] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const contacts = useMemo(() => listAllContacts(), [adding, guests.length]);
+  const contacts = useMemo(() => listAllContacts(), [adding, guests.length, tick]);
 
   const taken = useMemo(
     () => new Set(guests.map((guest) => guest.email.trim().toLowerCase())),
@@ -46,17 +47,10 @@ export function MeetingGuestPicker({
       .slice(0, 8);
   }, [contacts, query, taken]);
 
-  const typedEmail = query.trim();
-  const canAddEmail =
-    EMAIL_RE.test(typedEmail) && !taken.has(typedEmail.toLowerCase());
-  const emailAlreadyContact = contacts.some(
-    (contact) => contact.email.trim().toLowerCase() === typedEmail.toLowerCase(),
-  );
-
   useEffect(() => {
-    if (!adding) return;
+    if (!adding || creating) return;
     inputRef.current?.focus();
-  }, [adding]);
+  }, [adding, creating]);
 
   useEffect(() => {
     if (!open) return;
@@ -69,27 +63,17 @@ export function MeetingGuestPicker({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
 
-  function startAdding() {
-    setAdding(true);
+  function closeSearch() {
     setQuery("");
-    setOpen(true);
+    setOpen(false);
+    setAdding(false);
+    setCreating(false);
   }
 
   function addGuest(guest: MeetingGuest) {
     if (taken.has(guest.email.trim().toLowerCase())) return;
     onChange([...guests, guest]);
-    setQuery("");
-    setOpen(false);
-    setAdding(false);
-  }
-
-  function addTypedEmail() {
-    if (!canAddEmail) return;
-    addGuest({
-      id: `email-${typedEmail.toLowerCase()}`,
-      name: typedEmail,
-      email: typedEmail,
-    });
+    closeSearch();
   }
 
   return (
@@ -135,7 +119,24 @@ export function MeetingGuestPicker({
         </div>
       ) : null}
 
-      {adding ? (
+      {creating ? (
+        <QuickAddContactForm
+          initialQuery={query}
+          onCancel={() => {
+            setCreating(false);
+            setAdding(true);
+            setOpen(true);
+          }}
+          onCreated={(contact) => {
+            setTick((n) => n + 1);
+            addGuest({
+              id: contact.id,
+              name: contact.name,
+              email: contact.email,
+            });
+          }}
+        />
+      ) : adding ? (
         <div ref={rootRef} className="relative">
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
@@ -148,39 +149,50 @@ export function MeetingGuestPicker({
               }}
               onFocus={() => setOpen(true)}
               onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  setAdding(false);
-                  setQuery("");
-                  setOpen(false);
-                }
-                if (event.key === "Enter") {
+                if (event.key === "Escape") closeSearch();
+                if (event.key === "Enter" && matches[0]) {
                   event.preventDefault();
-                  if (matches[0]) {
-                    addGuest({
-                      id: matches[0].id,
-                      name: matches[0].name,
-                      email: matches[0].email,
-                    });
-                    return;
-                  }
-                  addTypedEmail();
+                  addGuest({
+                    id: matches[0].id,
+                    name: matches[0].name,
+                    email: matches[0].email,
+                  });
                 }
               }}
-              placeholder="Search contact or enter email"
-              className="h-10 w-full rounded-md border border-slate-200 bg-white pr-3 pl-9 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/20"
+              placeholder="Search contact…"
+              className="h-10 w-full rounded-md border border-slate-200 bg-white pr-8 pl-9 text-sm text-slate-800 outline-none placeholder:text-slate-400 focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/20"
             />
+            <button
+              type="button"
+              onClick={closeSearch}
+              className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              aria-label="Close guest search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           </div>
           {open ? (
             <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
-              {matches.length === 0 && !canAddEmail ? (
-                <p className="px-3 py-2 text-sm text-slate-400">
+              <div className="max-h-56 overflow-y-auto py-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreating(true);
+                    setOpen(false);
+                  }}
+                  className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm font-medium text-[#5A32A3] hover:bg-[#F3ECFB]"
+                >
+                  <Plus className="h-3.5 w-3.5" />
                   {query.trim()
-                    ? "No contact found. Enter an email address."
-                    : "Type a name or email"}
-                </p>
-              ) : (
-                <div className="max-h-48 overflow-y-auto py-1">
-                  {matches.map((contact) => (
+                    ? `+ Add contact “${query.trim()}”`
+                    : "+ Add contact"}
+                </button>
+                {matches.length === 0 ? (
+                  <p className="px-3 py-2 text-sm text-slate-400">
+                    No contact found
+                  </p>
+                ) : (
+                  matches.map((contact) => (
                     <button
                       key={contact.id}
                       type="button"
@@ -196,34 +208,28 @@ export function MeetingGuestPicker({
                       <span className="text-sm text-slate-800">
                         {contact.name}
                       </span>
-                      <span className="text-[11px] text-slate-500">
-                        {contact.email}
+                      <span className="text-[11px] text-slate-400">
+                        Contact
                       </span>
                     </button>
-                  ))}
-                  {canAddEmail && !emailAlreadyContact ? (
-                    <button
-                      type="button"
-                      onClick={addTypedEmail}
-                      className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-sm font-medium text-[#5A32A3] hover:bg-[#F3ECFB]"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Add {typedEmail}
-                    </button>
-                  ) : null}
-                </div>
-              )}
+                  ))
+                )}
+              </div>
             </div>
           ) : null}
         </div>
       ) : (
         <button
           type="button"
-          onClick={startAdding}
+          onClick={() => {
+            setAdding(true);
+            setQuery("");
+            setOpen(true);
+          }}
           className="inline-flex items-center gap-1 text-sm font-medium text-[#5A32A3] hover:text-[#4A2888]"
         >
           <Plus className="h-3.5 w-3.5" />
-          {guests.length === 0 ? "Add guests" : "Add guest"}
+          Add guests
         </button>
       )}
     </div>

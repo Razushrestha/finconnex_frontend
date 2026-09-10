@@ -1,7 +1,8 @@
 "use client";
 
-import { MentionTextarea } from "@/components/shared/MentionTextarea";
+import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -14,10 +15,16 @@ import type { Priority } from "@/lib/tasks/types";
 import { listTaskColumns, createTask } from "@/lib/tasks/store";
 import { listMeetings, createMeeting } from "@/lib/meetings/store";
 import { listNotes, createNote } from "@/lib/notes/store";
+import { findLeadById, listLeadColumns } from "@/lib/leads/store";
+import { leadApplicants } from "@/lib/leads/detail-snapshot";
+import type { LeadCardData } from "@/lib/leads/types";
 import {
   hrefForLeadActivity,
   listLeadActivityCandidates,
+  relatedMatchesLead,
 } from "@/lib/leads/activity-index";
+import { listAttachments } from "@/lib/attachments/store";
+import { listLibraryDocuments } from "@/lib/documents/library/types";
 import { getRulesActor, defaultActorName } from "@/lib/rules/actor";
 import {
   X,
@@ -26,7 +33,7 @@ import {
   ListFilter,
   ArrowUpDown,
   StickyNote,
-  Link2,
+  Paperclip,
   CheckSquare,
   CalendarDays,
   History,
@@ -41,11 +48,11 @@ import { cn } from "@/lib/utils";
 type SectionId = "appointment" | "detail" | "tasks" | "notes" | "associated";
 
 const SECTIONS: { id: SectionId; label: string }[] = [
-  { id: "appointment", label: "Book or update appointment" },
-  { id: "detail", label: "Client Details" },
+  { id: "detail", label: "Lead Details" },
+  { id: "appointment", label: "Meetings" },
   { id: "tasks", label: "Tasks" },
   { id: "notes", label: "Notes" },
-  { id: "associated", label: "Associated objects" },
+  { id: "associated", label: "Attachments" },
 ];
 
 interface TaskEntry {
@@ -75,12 +82,6 @@ interface AppointmentEntry {
   previous?: boolean;
 }
 
-interface AssociatedEntry {
-  id: string;
-  type: "Deal" | "Contact" | "Company";
-  label: string;
-  subtitle?: string;
-}
 
 interface ActionEntry {
   id: string;
@@ -90,16 +91,6 @@ interface ActionEntry {
   bucket: "pending" | "completed";
   href?: string | null;
 }
-
-const MOCK_ASSOCIATED: AssociatedEntry[] = [
-  {
-    id: "assoc-1",
-    type: "Deal",
-    label: "Refinance, 1204 Birch Ave",
-    subtitle: "$340,000",
-  },
-  { id: "assoc-2", type: "Company", label: "Sugimoto Holdings LLC" },
-];
 
 function matchesLead(related: string | undefined, leadName: string): boolean {
   if (!related?.trim()) return false;
@@ -313,7 +304,10 @@ interface LeadEditDialogProps {
 export function LeadEditDialog({
   open,
   onOpenChange,
+  leadId,
   leadName,
+  leadEmail,
+  leadPhone,
   initialSection = "tasks",
   onSuccess,
 }: LeadEditDialogProps) {
@@ -388,14 +382,13 @@ export function LeadEditDialog({
               <AppointmentSection leadName={leadName} onSuccess={onSuccess} />
             )}
             {activeSection === "detail" && (
-              <div className="px-6 py-4">
-                <h3 className="text-[15px] font-semibold text-slate-900">
-                  Client Details
-                </h3>
-                <p className="mt-2 text-[13px] text-slate-500">
-                  Open the full lead record to edit contact fields.
-                </p>
-              </div>
+              <ClientDetailsSection
+                leadId={leadId}
+                leadName={leadName}
+                leadEmail={leadEmail}
+                leadPhone={leadPhone}
+                onClose={() => onOpenChange(false)}
+              />
             )}
             {activeSection === "tasks" && (
               <TasksSection leadName={leadName} onSuccess={onSuccess} />
@@ -403,11 +396,201 @@ export function LeadEditDialog({
             {activeSection === "notes" && (
               <NotesSection leadName={leadName} onSuccess={onSuccess} />
             )}
-            {activeSection === "associated" && <AssociatedSection />}
+            {activeSection === "associated" && (
+              <AttachmentsSection leadId={leadId} leadName={leadName} />
+            )}
           </div>
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/* ------------------------------ Client details ----------------------------- */
+
+function findLeadCard(leadId?: string, leadName?: string): LeadCardData | null {
+  if (leadId) {
+    const found = findLeadById(leadId);
+    if (found) return found.card;
+  }
+  const needle = leadName?.trim().toLowerCase();
+  if (!needle) return null;
+  for (const col of listLeadColumns()) {
+    const card = col.cards.find((item) => item.name.trim().toLowerCase() === needle);
+    if (card) return card;
+  }
+  return null;
+}
+
+function joinAddress(...parts: Array<string | undefined>) {
+  return parts.map((part) => part?.trim()).filter(Boolean).join(", ");
+}
+
+function applicantAddress(card: LeadCardData, role: "primary" | "secondary") {
+  if (role === "secondary") {
+    return (
+      joinAddress(
+        card.custom?.["secondary.currentAddress"],
+        card.custom?.["secondary.street"],
+        card.custom?.["secondary.city"],
+        card.custom?.["secondary.state"],
+        card.custom?.["secondary.postalCode"],
+        card.custom?.["secondary.country"],
+      ) || "—"
+    );
+  }
+  return (
+    card.custom?.currentAddress?.trim() ||
+    joinAddress(card.street, card.city, card.state, card.postalCode, card.country) ||
+    "—"
+  );
+}
+
+function leadContactApplicants(
+  card: LeadCardData | null,
+  fallback: { name: string; email?: string; phone?: string },
+) {
+  if (!card) {
+    return [
+      {
+        role: "Primary" as const,
+        name: fallback.name || "—",
+        phone: fallback.phone?.trim() || "—",
+        email: fallback.email?.trim() || "—",
+        address: "—",
+      },
+    ];
+  }
+
+  const people = leadApplicants(card);
+  const hasSecondaryFields = Boolean(
+    card.custom?.["secondary.firstName"]?.trim() ||
+      card.custom?.["secondary.email"]?.trim() ||
+      card.custom?.["secondary.phone"]?.trim() ||
+      card.custom?.["secondary.mobile"]?.trim(),
+  );
+  const rows = [
+    ...(people.length > 1 || hasSecondaryFields ? people : people.slice(0, 1)),
+  ];
+  if (rows.length === 1 && hasSecondaryFields) {
+    rows.push({
+      name: [
+        card.custom?.["secondary.firstName"],
+        card.custom?.["secondary.middleName"],
+        card.custom?.["secondary.surname"] || card.custom?.["secondary.lastName"],
+      ]
+        .map((part) => part?.trim())
+        .filter(Boolean)
+        .join(" ") || "Secondary applicant",
+      role: "Secondary",
+      residency: "",
+      employment: "",
+    });
+  }
+
+  return rows.map((person, index) => {
+    const secondary = index > 0;
+    return {
+      role: person.role,
+      name: person.name,
+      phone: secondary
+        ? (
+            card.custom?.["secondary.mobile"] ||
+            card.custom?.["secondary.phone"] ||
+            ""
+          ).trim() || "—"
+        : (
+            card.phone ||
+            card.mobilePhone ||
+            card.custom?.mobile ||
+            fallback.phone ||
+            ""
+          ).trim() || "—",
+      email: secondary
+        ? (card.custom?.["secondary.email"] || "").trim() || "—"
+        : (card.email || fallback.email || "").trim() || "—",
+      address: applicantAddress(card, secondary ? "secondary" : "primary"),
+    };
+  });
+}
+
+function DetailField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[11px] font-medium text-slate-500">{label}</p>
+      <p className="mt-0.5 text-[13px] font-medium text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function ClientDetailsSection({
+  leadId,
+  leadName,
+  leadEmail,
+  leadPhone,
+  onClose,
+}: {
+  leadId?: string;
+  leadName: string;
+  leadEmail?: string;
+  leadPhone?: string;
+  onClose: () => void;
+}) {
+  const router = useRouter();
+  const card = useMemo(
+    () => findLeadCard(leadId, leadName),
+    [leadId, leadName],
+  );
+  const applicants = leadContactApplicants(card, {
+    name: leadName,
+    email: leadEmail,
+    phone: leadPhone,
+  });
+
+  function openLeadOverview() {
+    if (!card) return;
+    onClose();
+    router.push(`/sales/leads/detail/${encodeURIComponent(card.id)}`);
+  }
+
+  return (
+    <div className="px-6 py-4">
+      <h3 className="text-[15px] font-semibold text-slate-900">Lead Details</h3>
+      <p className="mt-0.5 text-[12px] text-slate-500">
+        {applicants.length === 1
+          ? "Primary applicant on this lead."
+          : "Primary and secondary applicants on this lead."}
+      </p>
+      <div className="mt-4 space-y-4">
+        {applicants.map((person) => (
+          <div
+            key={`${person.role}-${person.name}`}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50/60 p-4 text-left"
+          >
+            {applicants.length > 1 ? (
+              <p className="mb-3 text-[11px] font-semibold tracking-[0.06em] text-[#5A32A3] uppercase">
+                {person.role} applicant
+              </p>
+            ) : null}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <DetailField label="Name" value={person.name} />
+              <DetailField label="Number" value={person.phone} />
+              <DetailField label="Email" value={person.email} />
+              <DetailField label="Address" value={person.address} />
+            </div>
+            {card ? (
+              <button
+                type="button"
+                onClick={openLeadOverview}
+                className="mt-3 text-[11px] font-medium text-[#5A32A3] hover:underline"
+              >
+                View all lead details
+              </button>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -747,12 +930,10 @@ function NotesSection({
             placeholder="Subject (optional)"
             className="h-9 w-full border-b border-slate-200 bg-transparent px-0 text-[13px] outline-none focus:border-violet-500"
           />
-          <MentionTextarea
+          <MentionNotesTextarea
             value={body}
             onChange={setBody}
-            rows={3}
             placeholder="Add a note… Type @ to assign someone."
-            className="w-full resize-none border-b border-slate-200 bg-transparent px-0 py-2 text-[13px] outline-none focus:border-violet-500"
           />
           <div className="flex justify-end gap-2 pt-1">
             <Button
@@ -922,7 +1103,7 @@ function AppointmentSection({
   return (
     <div className="px-6 py-4">
       <h3 className="text-[15px] font-semibold text-slate-900">
-        Book or update appointment
+        Meetings
       </h3>
 
       <form onSubmit={handleSave} className="mt-4 flex flex-col gap-3">
@@ -1045,39 +1226,79 @@ function AppointmentListBlock({
   );
 }
 
-/* ----------------------------- Associated objects ---------------------------- */
+/* -------------------------------- Attachments ------------------------------- */
 
-function AssociatedSection() {
+function AttachmentsSection({
+  leadId,
+  leadName,
+}: {
+  leadId?: string;
+  leadName: string;
+}) {
+  const card = findLeadCard(leadId, leadName);
+  const name = card?.name || leadName;
+  const files = [
+    ...listAttachments()
+      .filter((file) => relatedMatchesLead(file.relatedTo, name))
+      .map((file) => ({
+        id: file.id,
+        name: file.fileName,
+        kind: file.kind,
+        size: file.sizeLabel || "—",
+        uploadedBy: file.uploadedBy,
+        uploadedAt: file.uploadedAt,
+      })),
+    ...listLibraryDocuments()
+      .filter((doc) => relatedMatchesLead(doc.relatedTo, name))
+      .map((doc) => ({
+        id: `lib-${doc.id}`,
+        name: doc.fileName,
+        kind: "Document",
+        size: doc.sizeLabel || "—",
+        uploadedBy: doc.owner,
+        uploadedAt: doc.uploadedAt,
+      })),
+  ].filter(
+    (file, index, all) =>
+      all.findIndex((item) => item.name === file.name && item.uploadedAt === file.uploadedAt) ===
+      index,
+  );
+
   return (
     <div className="px-6 py-4">
-      <h3 className="text-[15px] font-semibold text-slate-900">
-        Associated objects
-      </h3>
-
+      <h3 className="text-[15px] font-semibold text-slate-900">Attachments</h3>
+      <p className="mt-0.5 text-[12px] text-slate-500">
+        Documents on this lead file.
+      </p>
       <div className="mt-4">
-        {MOCK_ASSOCIATED.length === 0 ? (
+        {files.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-10 text-center">
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-violet-50 text-violet-500">
-              <Link2 className="h-5 w-5" />
+              <Paperclip className="h-5 w-5" />
             </span>
             <p className="text-[13px] font-semibold text-slate-800">
-              No associated objects
+              No documents on this lead
+            </p>
+            <p className="text-[12px] text-slate-400">
+              Files uploaded to this lead will show here.
             </p>
           </div>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {MOCK_ASSOCIATED.map((a) => (
-              <li key={a.id} className="flex items-center gap-2.5 py-2.5">
-                <span className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                  {a.type}
+            {files.map((file) => (
+              <li key={file.id} className="flex items-start gap-2.5 py-2.5">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-[#5A32A3]">
+                  <Paperclip className="h-4 w-4" />
                 </span>
-                <div>
-                  <p className="text-[13px] font-medium text-slate-800">
-                    {a.label}
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-medium text-slate-800">
+                    {file.name}
                   </p>
-                  {a.subtitle && (
-                    <p className="text-[11px] text-slate-400">{a.subtitle}</p>
-                  )}
+                  <p className="text-[11px] text-slate-400">
+                    {[file.kind, file.size, file.uploadedAt, file.uploadedBy]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
                 </div>
               </li>
             ))}
