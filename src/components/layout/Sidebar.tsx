@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { DASHBOARD_VIEWS, dashboardViewHref } from "@/lib/dashboard/views";
 import {
   Package,
   BadgePercent,
@@ -40,17 +41,46 @@ type NavItem = {
   children?: NavChildItem[];
 };
 
-function isNavActive(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
+function hrefPath(href: string): string {
+  const q = href.indexOf("?");
+  return (q === -1 ? href : href.slice(0, q)) || "/";
+}
+
+function hrefView(href: string): string | null {
+  const q = href.indexOf("?");
+  if (q === -1) return null;
+  return new URLSearchParams(href.slice(q + 1)).get("view");
+}
+
+function isNavActive(pathname: string, href: string, search = ""): boolean {
+  const targetPath = hrefPath(href);
+  const pathMatch =
+    pathname === targetPath ||
+    (targetPath !== "/" && pathname.startsWith(`${targetPath}/`));
+  if (!pathMatch) return false;
+
+  if (targetPath === "/") {
+    const targetView = hrefView(href);
+    const currentView = new URLSearchParams(
+      search.startsWith("?") ? search.slice(1) : search,
+    ).get("view");
+    if (targetView) return currentView === targetView;
+    return !currentView || currentView === "executive";
+  }
+
+  return true;
 }
 
 function isChildNavActive(
   pathname: string,
   href: string,
   siblings: NavChildItem[],
+  search = "",
 ): boolean {
-  if (!isNavActive(pathname, href)) return false;
-  const matches = siblings.filter((item) => isNavActive(pathname, item.href));
+  if (!isNavActive(pathname, href, search)) return false;
+  const matches = siblings.filter((item) =>
+    isNavActive(pathname, item.href, search),
+  );
   if (matches.length === 0) return false;
   const bestMatch = matches.reduce((longest, item) =>
     item.href.length > longest.href.length ? item : longest,
@@ -67,8 +97,15 @@ const childNavClass = (active: boolean) =>
   );
 
 const dashboardItems: NavItem[] = [
-  { label: "Dashboard", href: "/", icon: Package },
-  { label: "Work Queue", href: "/?view=work-queue", icon: Rows4 },
+  {
+    label: "Dashboard",
+    icon: Package,
+    children: DASHBOARD_VIEWS.map((item) => ({
+      label: item.label,
+      href: dashboardViewHref(item.id),
+    })),
+  },
+  { label: "Work Queue", href: "/work-queue", icon: Rows4 },
   {
     label: "Sales",
     icon: BadgePercent,
@@ -174,12 +211,14 @@ export function Sidebar({
   onToggleSidebar,
 }: SidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const search = searchParams.toString();
   const chatRef = React.useRef<HTMLInputElement>(null);
 
   const [expanded, setExpanded] = React.useState<Set<string>>(() => {
     const initial = new Set<string>();
     dashboardItems.forEach((item) => {
-      if (item.children?.some((c) => isNavActive(pathname, c.href))) {
+      if (item.children?.some((c) => isNavActive(pathname, c.href, search))) {
         initial.add(item.label);
       }
     });
@@ -190,13 +229,13 @@ export function Sidebar({
     setExpanded((prev) => {
       const next = new Set(prev);
       dashboardItems.forEach((item) => {
-        if (item.children?.some((c) => isNavActive(pathname, c.href))) {
+        if (item.children?.some((c) => isNavActive(pathname, c.href, search))) {
           next.add(item.label);
         }
       });
       return next;
     });
-  }, [pathname]);
+  }, [pathname, search]);
 
   const [internalMobileOpen, setInternalMobileOpen] = React.useState(false);
   const mobileOpen = mobileOpenProp ?? internalMobileOpen;
@@ -342,9 +381,11 @@ export function Sidebar({
             {dashboardItems.map((item) => {
               const hasChildren = !!item.children?.length;
               const isActive =
-                (item.href && isNavActive(pathname, item.href)) ||
+                (item.href && isNavActive(pathname, item.href, search)) ||
                 (hasChildren &&
-                  item.children!.some((c) => isNavActive(pathname, c.href)));
+                  item.children!.some((c) =>
+                    isNavActive(pathname, c.href, search),
+                  ));
               const isOpen = expanded.has(item.label);
               const Icon = item.icon!;
 
@@ -420,6 +461,7 @@ export function Sidebar({
                           pathname,
                           child.href,
                           item.children!,
+                          search,
                         );
                         return (
                           <Link

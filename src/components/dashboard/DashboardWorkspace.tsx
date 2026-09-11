@@ -26,7 +26,6 @@ import { computeExecutiveOverview } from "@/lib/dashboard/executive";
 import {
   DASHBOARD_VIEWS,
   isDashboardViewId,
-  loadDashboardView,
   saveDashboardView,
   type DashboardViewId,
 } from "@/lib/dashboard/views";
@@ -153,20 +152,15 @@ export function DashboardWorkspace() {
     const nextRole = loadActiveDashboardRole();
     setRole(nextRole);
     setRoleLayouts(listRoleLayouts(nextRole));
-    const fromUrl = searchParams.get("view");
-    const initial = isDashboardViewId(fromUrl) ? fromUrl : loadDashboardView();
-    setView(initial);
-    setViewHidden(loadViewHidden(initial));
-    setViewOrder(loadViewOrder(initial));
   }, []);
 
   useEffect(() => {
     const fromUrl = searchParams.get("view");
-    if (isDashboardViewId(fromUrl)) {
-      setView(fromUrl);
-      setViewHidden(loadViewHidden(fromUrl));
-      setViewOrder(loadViewOrder(fromUrl));
-    }
+    const next = isDashboardViewId(fromUrl) ? fromUrl : "executive";
+    setView(next);
+    setViewHidden(loadViewHidden(next));
+    setViewOrder(loadViewOrder(next));
+    saveDashboardView(next);
   }, [searchParams]);
 
   useEffect(() => {

@@ -7,6 +7,7 @@ import {
   Search,
   X,
   LayoutGrid,
+  Rows4,
   MessageSquareText,
   Calendar,
   Users,
@@ -43,6 +44,8 @@ interface SearchItem {
 /** Real app routes: kept in sync with Sidebar destinations. */
 const DESTINATIONS: SearchItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutGrid, keywords: ["dashboard", "home", "executive"] },
+  { label: "Work Queue", href: "/work-queue", icon: Rows4, keywords: ["work queue", "queue", "tasks"] },
+  { label: "Work Queue Dashboard", href: "/?view=work-queue", icon: LayoutGrid, keywords: ["work queue dashboard"] },
   { label: "Leads", href: "/sales/leads", icon: Users, keywords: ["leads", "sales", "prospect"] },
   { label: "Contacts", href: "/sales/contacts", icon: Users, keywords: ["contacts"] },
   { label: "Deals", href: "/sales/deals", icon: Handshake, keywords: ["deals", "pipeline"] },

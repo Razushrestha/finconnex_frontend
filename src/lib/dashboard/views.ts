@@ -17,6 +17,10 @@ export function dashboardViewLabel(id: DashboardViewId) {
   return DASHBOARD_VIEWS.find((view) => view.id === id)?.label ?? "Executive Overview";
 }
 
+export function dashboardViewHref(id: DashboardViewId) {
+  return id === "executive" ? "/" : `/?view=${id}`;
+}
+
 export function loadDashboardView(): DashboardViewId {
   if (typeof window === "undefined") return "executive";
   const stored = window.localStorage.getItem(VIEW_KEY);

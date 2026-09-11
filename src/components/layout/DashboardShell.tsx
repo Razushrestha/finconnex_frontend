@@ -48,13 +48,19 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
           document flow), so this wrapper takes up no space there: width
           only matters at md+, where the sidebar is back in normal flow. */}
       <div className="relative z-20 shrink-0">
-        <Sidebar
-          collapsed={collapsed}
-          tenantName={session.tenantName}
-          mobileOpen={mobileOpen}
-          onMobileOpenChange={setMobileOpen}
-          onToggleSidebar={() => setCollapsed((c) => !c)}
-        />
+        <Suspense
+          fallback={
+            <aside className="hidden h-screen w-64 shrink-0 md:block" />
+          }
+        >
+          <Sidebar
+            collapsed={collapsed}
+            tenantName={session.tenantName}
+            mobileOpen={mobileOpen}
+            onMobileOpenChange={setMobileOpen}
+            onToggleSidebar={() => setCollapsed((c) => !c)}
+          />
+        </Suspense>
       </div>
       <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col">
         <Suspense fallback={<div className="h-16 shrink-0 border-b border-border/60" />}>

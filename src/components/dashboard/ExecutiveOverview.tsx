@@ -493,7 +493,7 @@ export function CriticalActions({ data }: { data: ExecutiveData }) {
           </Link>
         ))}
       </div>
-      <WidgetLink href="/?view=work-queue">Go to Work Queue</WidgetLink>
+      <WidgetLink href="/work-queue">Go to Work Queue</WidgetLink>
     </section>
   );
 }
