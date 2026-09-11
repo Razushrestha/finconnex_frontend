@@ -488,7 +488,10 @@ export function EntityHeader({
               </button>
 
               {isMoreMenuOpen && (
-                <div className="absolute right-0 z-20 mt-1.5 w-56 rounded-md border border-slate-200 bg-white p-1.5 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+                <div
+                  className="absolute right-0 z-50 mt-1.5 max-h-[min(28rem,calc(100vh-6rem))] w-56 overflow-y-auto rounded-md border border-slate-200 bg-white p-1.5 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
                   {columnOptions && columnOptions.length > 0 ? (
                     <>
                       <p className="px-2 py-1 text-[13px] font-semibold tracking-wide text-slate-400 uppercase">
@@ -569,7 +572,8 @@ export function EntityHeader({
                           key={opt.id}
                           type="button"
                           disabled={opt.disabled}
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             opt.onClick();
                             setIsMoreMenuOpen(false);
                           }}
@@ -591,7 +595,8 @@ export function EntityHeader({
                             key={opt.id}
                             type="button"
                             disabled={opt.disabled}
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               opt.onClick();
                               setIsMoreMenuOpen(false);
                             }}

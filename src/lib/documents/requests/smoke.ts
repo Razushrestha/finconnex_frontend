@@ -14,6 +14,8 @@ import {
   getCrmDocumentRequest,
   globalDocumentRequestsPath,
   listCrmDocumentRequests,
+  apiDocumentRequestType,
+  toCreateDocumentRequestBody,
   normalizeDocumentRequest,
   receiveCrmDocumentRequest,
   rejectCrmDocumentRequest,
@@ -233,6 +235,23 @@ export function smokeDocumentRequestsWiring() {
     normalized.requestedFrom !== "Greystone"
   ) {
     fail("normalizeDocumentRequest did not map Swagger-shaped fields");
+  }
+  if (apiDocumentRequestType("Property purchase") !== "OTHER") {
+    fail("unsupported request types must map to OTHER for CRM create");
+  }
+  const createBody = toCreateDocumentRequestBody({
+    title: "ID pack",
+    documentType: "ID Proof",
+    requestedFromId: ID,
+    clientName: "should not be sent",
+  });
+  if (
+    createBody.requestedFromId !== ID ||
+    createBody.documentType !== "ID_PROOF" ||
+    "clientName" in createBody ||
+    "items" in createBody
+  ) {
+    fail("create body must match CreateDocumentRequestDto");
   }
 }
 

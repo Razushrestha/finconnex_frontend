@@ -153,6 +153,58 @@ export interface SignatureRequest {
 
 const STORE_KEY = "signature:requests:v3";
 const LEGACY_STORE_KEY = "signature:requests";
+/** Keep small signature scribbles; drop PDFs / data URLs that blow the 5MB quota. */
+const MAX_PERSISTED_INLINE_CHARS = 80_000;
+
+const liveFileUrls = new Map<string, Record<string, string>>();
+
+function persistableUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("blob:")) return undefined;
+  if (url.startsWith("data:application/")) return undefined;
+  if (url.startsWith("data:") && url.length > MAX_PERSISTED_INLINE_CHARS) {
+    return undefined;
+  }
+  return url;
+}
+
+function compactRequest(req: SignatureRequest): SignatureRequest {
+  return {
+    ...req,
+    documentFileUrl: persistableUrl(req.documentFileUrl),
+    documents: req.documents?.map((doc) => ({
+      ...doc,
+      fileUrl: persistableUrl(doc.fileUrl),
+    })),
+    signers: req.signers.map((signer) => ({
+      ...signer,
+      signatureData: persistableUrl(signer.signatureData),
+    })),
+  };
+}
+
+function cacheLiveFiles(req: SignatureRequest) {
+  const files = { ...(liveFileUrls.get(req.id) ?? {}) };
+  if (req.documentFileUrl) files.primary = req.documentFileUrl;
+  for (const doc of req.documents ?? []) {
+    if (doc.fileUrl) files[doc.id] = doc.fileUrl;
+  }
+  if (Object.keys(files).length > 0) liveFileUrls.set(req.id, files);
+}
+
+function applyLiveFiles(req: SignatureRequest): SignatureRequest {
+  const files = liveFileUrls.get(req.id);
+  if (!files) return req;
+  const documents = getRequestDocuments(req).map((doc) => ({
+    ...doc,
+    fileUrl: files[doc.id] || doc.fileUrl,
+  }));
+  return {
+    ...req,
+    documentFileUrl: files.primary || req.documentFileUrl,
+    documents,
+  };
+}
 
 export const SIGNER_COLORS = [
   {
@@ -400,7 +452,7 @@ function readStore(): SignatureRequest[] | null {
     if (legacy) {
       const parsed = JSON.parse(legacy) as SignatureRequest[];
       const migrated = parsed.map((r) => normalizeSignatureRequest(r));
-      localStorage.setItem(STORE_KEY, JSON.stringify(migrated));
+      writeStore(migrated);
       return migrated;
     }
     return null;
@@ -411,13 +463,51 @@ function readStore(): SignatureRequest[] | null {
 
 function writeStore(list: SignatureRequest[]) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORE_KEY, JSON.stringify(list));
+  let compact = list.map(compactRequest);
+  const save = (rows: SignatureRequest[]) => {
+    localStorage.setItem(STORE_KEY, JSON.stringify(rows));
+  };
+  try {
+    save(compact);
+  } catch {
+    while (compact.length > 0) {
+      compact = compact.slice(0, -1);
+      try {
+        save(compact);
+        break;
+      } catch {
+        if (compact.length === 0) {
+          try {
+            localStorage.removeItem(STORE_KEY);
+          } catch {
+            /* private mode */
+          }
+        }
+      }
+    }
+  }
   emitRecordsChange(STORE_KEY);
 }
 
-export function listSignatureRequests(): SignatureRequest[] {
+function loadStored(): SignatureRequest[] {
   const stored = readStore();
-  if (stored) return stored.map((r) => normalizeSignatureRequest(r));
+  if (stored) {
+    const normalized = stored.map((r) => normalizeSignatureRequest(r));
+    const bloated = stored.some(
+      (row) =>
+        row.documentFileUrl?.startsWith("data:application/") ||
+        (row.documentFileUrl?.startsWith("data:") &&
+          (row.documentFileUrl?.length ?? 0) > MAX_PERSISTED_INLINE_CHARS) ||
+        row.documents?.some(
+          (doc) =>
+            doc.fileUrl?.startsWith("data:application/") ||
+            (doc.fileUrl?.startsWith("data:") &&
+              (doc.fileUrl?.length ?? 0) > MAX_PERSISTED_INLINE_CHARS),
+        ),
+    );
+    if (bloated) writeStore(normalized);
+    return normalized;
+  }
   const seeded = signatureRequests.map((r) =>
     normalizeSignatureRequest({ ...r }),
   );
@@ -425,18 +515,23 @@ export function listSignatureRequests(): SignatureRequest[] {
   return seeded;
 }
 
+export function listSignatureRequests(): SignatureRequest[] {
+  return loadStored().map(applyLiveFiles);
+}
+
 export function upsertSignatureRequest(
   req: SignatureRequest,
   opts?: { allowEmptyFields?: boolean },
 ) {
   const normalized = normalizeSignatureRequest(req, opts);
-  const list = listSignatureRequests();
+  cacheLiveFiles(normalized);
+  const list = loadStored();
   const i = list.findIndex((r) => r.id === normalized.id);
   const withTimestamp = { ...normalized, updatedAt: new Date().toISOString() };
   if (i >= 0) list[i] = withTimestamp;
   else list.unshift(withTimestamp);
   writeStore(list);
-  return withTimestamp;
+  return applyLiveFiles(withTimestamp);
 }
 
 export function getSignatureRequestById(id: string) {
@@ -740,16 +835,31 @@ export function fieldKindLabel(kind: SignatureFieldKind): string {
 }
 
 export function deleteSignatureRequest(id: string): SignatureRequest[] {
-  const list = listSignatureRequests().filter((r) => r.id !== id);
+  liveFileUrls.delete(id);
+  const list = loadStored().filter((r) => r.id !== id);
   writeStore(list);
-  return list;
+  return list.map(applyLiveFiles);
 }
 
 /** Replace the local store with live CRM rows (empty list is a valid live result). */
 export function replaceCrmSignatureRequests(remote: SignatureRequest[]) {
-  writeStore(
-    remote.map((row) => normalizeSignatureRequest(row, { allowEmptyFields: true })),
-  );
+  const previous = loadStored();
+  const remoteIds = new Set(remote.map((row) => row.id));
+  const keep = previous.filter((row) => {
+    if (remoteIds.has(row.id)) return false;
+    if (row.recordType === "template") return true;
+    return !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      row.id,
+    );
+  });
+  writeStore([
+    ...keep.map((row) =>
+      normalizeSignatureRequest(row, { allowEmptyFields: true }),
+    ),
+    ...remote.map((row) =>
+      normalizeSignatureRequest(row, { allowEmptyFields: true }),
+    ),
+  ]);
 }
 
 export function createDocumentFromTemplate(

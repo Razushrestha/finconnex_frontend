@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ExternalLink,
@@ -12,7 +12,12 @@ import {
   X,
 } from "lucide-react";
 import { isUuid } from "@/lib/activity-timeline/auth";
-import { listAllContacts, createQuickContact } from "@/lib/contacts/store";
+import { fetchCrmRelatedRecords, liveRelatedRecords } from "@/lib/activities/related-records";
+import {
+  createQuickContact,
+  findContactById,
+  listAllContacts,
+} from "@/lib/contacts/store";
 import { formatMeetingDateTime } from "@/lib/meetings/store";
 import { createCrmMeeting } from "@/lib/meetings/api";
 import {
@@ -34,6 +39,7 @@ import {
   resolveCalendlyEventType,
   type CalendlyHost,
 } from "@/lib/booking/calendly-api";
+import { getCalendlyConnection } from "@/lib/booking/calendly-integration-api";
 import {
   assignedCalendarMembers,
   bookingLocationLabel,
@@ -44,7 +50,7 @@ import {
   internalSlotsForDate,
   type BookingPage,
 } from "@/lib/booking/types";
-import { DEFAULT_TIMEZONE } from "@/lib/booking/timezones";
+import { DEFAULT_TIMEZONE, ianaTimezoneFromLabel } from "@/lib/booking/timezones";
 import { DateTimeSection } from "@/components/booking/DateTimeSection";
 import {
   nowHHmm,
@@ -61,10 +67,10 @@ import {
   type ReminderRepeatRule,
 } from "@/lib/tasks/repeat-reminder";
 import { cn } from "@/lib/utils";
+import { useCrmRelatedRecords } from "@/lib/activities/use-crm-related-records";
 import {
   initials,
   RELATED_ENTITY_KINDS,
-  RELATED_RECORD_OPTIONS,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
 
@@ -123,7 +129,12 @@ export function NewBookingModal({
   onCreated: (row?: DashboardAppointment) => void;
 }) {
   const [recordTick, setRecordTick] = useState(0);
+  const [contactsLoading, setContactsLoading] = useState(false);
   const contacts = useMemo(() => listAllContacts(), [open, recordTick]);
+  const applicantOptions = useMemo(
+    () => liveRelatedRecords("Contact"),
+    [recordTick, open],
+  );
   const [calendars, setCalendars] = useState<BookingPage[]>([]);
   const now = new Date();
   const [calendarId, setCalendarId] = useState("");
@@ -144,7 +155,7 @@ export function NewBookingModal({
   const [locationKind, setLocationKind] = useState<LocationKind>("Zoom");
   const [meetingLink, setMeetingLink] = useState("");
   const [address, setAddress] = useState("");
-  const [clientId, setClientId] = useState(contacts[0]?.id ?? "");
+  const [clientId, setClientId] = useState("");
   const [relatedKind, setRelatedKind] = useState<RelatedEntityKind | "">("");
   const [relatedName, setRelatedName] = useState("");
   const [guestIds, setGuestIds] = useState<string[]>([]);
@@ -153,20 +164,40 @@ export function NewBookingModal({
   const [showNote, setShowNote] = useState(false);
   const [status, setStatus] = useState<AppointmentStatus>("Confirmed");
   const [error, setError] = useState("");
+  const [errorField, setErrorField] = useState("");
   const [saving, setSaving] = useState(false);
+  const formBodyRef = useRef<HTMLDivElement>(null);
+  const relatedFieldsRef = useRef<HTMLDivElement>(null);
   const [relatedRecordId, setRelatedRecordId] = useState("");
   const [calendlyHosts, setCalendlyHosts] = useState<CalendlyHost[]>([]);
   const [providerSlots, setProviderSlots] = useState<string[] | null>(null);
+  const [providerStartBySlot, setProviderStartBySlot] = useState<
+    Record<string, string>
+  >({});
+  const [calendlyConnected, setCalendlyConnected] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    setSaving(false);
+    setError("");
+    setErrorField("");
     let alive = true;
+    setContactsLoading(true);
+    void fetchCrmRelatedRecords("Contact")
+      .catch(() => [])
+      .finally(() => {
+        if (!alive) return;
+        setRecordTick((tick) => tick + 1);
+        setContactsLoading(false);
+      });
     void Promise.all([
       listCalendlyHosts({ active: true }).catch(() => [] as CalendlyHost[]),
       listCalendlyEventTypes().catch(() => []),
-    ]).then(([hosts, types]) => {
+      getCalendlyConnection().catch(() => null),
+    ]).then(([hosts, types, connection]) => {
       if (!alive) return;
       setCalendlyHosts(hosts);
+      setCalendlyConnected(Boolean(connection?.connected));
       const hostName = (id: string) =>
         hosts.find((host) => host.id === id)?.name ?? "";
       setCalendars(
@@ -192,22 +223,33 @@ export function NewBookingModal({
       .map((host) => ({ id: host.id, name: host.name })),
   ];
   const slotDuration = customDuration;
-  const localSlots = useMemo(() => {
-    if (whenMode === "custom") {
-      return customDaySlots(slotDuration).map((start) =>
+  const fallbackSlots = useMemo(
+    () =>
+      customDaySlots(slotDuration).map((start) =>
         formatSlotRange(start, slotDuration),
-      );
-    }
-    if (!calendar) return [];
-    return internalSlotsForDate(calendar, date).map((start) =>
+      ),
+    [slotDuration],
+  );
+  const localSlots = useMemo(() => {
+    if (whenMode === "custom") return fallbackSlots;
+    if (!calendar) return fallbackSlots;
+    const hours = internalSlotsForDate(calendar, date).map((start) =>
       formatSlotRange(start, slotDuration),
     );
-  }, [calendar, date, slotDuration, whenMode]);
-  const slots = whenMode === "custom" ? localSlots : (providerSlots ?? localSlots);
+    return hours.length > 0 ? hours : fallbackSlots;
+  }, [calendar, date, fallbackSlots, slotDuration, whenMode]);
+  // Empty Calendly results must not wipe the slot list — `??` treats [] as defined.
+  const slots =
+    whenMode === "custom"
+      ? localSlots
+      : providerSlots && providerSlots.length > 0
+        ? providerSlots
+        : localSlots;
 
   useEffect(() => {
     if (!open || !calendar || whenMode === "custom" || !date) {
       setProviderSlots(null);
+      setProviderStartBySlot({});
       return;
     }
     let alive = true;
@@ -216,7 +258,10 @@ export function NewBookingModal({
         const hostId = isUuid(consultantId) ? consultantId : calendar.calendlyHostId;
         const eventType = await resolveCalendlyEventType(calendar, hostId);
         if (!eventType || !isUuid(eventType.id)) {
-          if (alive) setProviderSlots(null);
+          if (alive) {
+            setProviderSlots(null);
+            setProviderStartBySlot({});
+          }
           return;
         }
         const from = new Date(`${date}T00:00:00`);
@@ -227,9 +272,15 @@ export function NewBookingModal({
           to: to.toISOString(),
         });
         const duration = eventType.durationMinutes || slotDuration;
-        let mapped = times.map((row) =>
-          formatSlotRange(localHHmmFromIso(row.startTime), duration),
-        );
+        const startsByLabel: Record<string, string> = {};
+        let mapped = times.map((row) => {
+          const label = formatSlotRange(
+            localHHmmFromIso(row.startTime),
+            duration,
+          );
+          startsByLabel[label] = row.startTime;
+          return label;
+        });
         if (hostId && isUuid(hostId)) {
           try {
             const busy = await listCalendlyBusyTimes(hostId, {
@@ -248,9 +299,19 @@ export function NewBookingModal({
             /* available-times is already provider-authoritative */
           }
         }
-        if (alive) setProviderSlots(mapped);
+        if (alive) {
+          const kept: Record<string, string> = {};
+          for (const label of mapped) {
+            if (startsByLabel[label]) kept[label] = startsByLabel[label];
+          }
+          setProviderStartBySlot(kept);
+          setProviderSlots(mapped);
+        }
       } catch {
-        if (alive) setProviderSlots(null);
+        if (alive) {
+          setProviderSlots(null);
+          setProviderStartBySlot({});
+        }
       }
     })();
     return () => {
@@ -281,37 +342,37 @@ export function NewBookingModal({
     if (!slots.includes(slot)) setSlot(slots[0]);
   }, [slot, slots, whenMode]);
 
-  const relatedOptions = useMemo(() => {
-    const seed = relatedKind
-      ? RELATED_RECORD_OPTIONS.filter((record) => record.kind === relatedKind)
-      : RELATED_RECORD_OPTIONS;
-    const live =
-      relatedKind === "Contact"
-        ? listAllContacts().map((contact) => ({
-            kind: "Contact" as const,
-            name: contact.name,
-          }))
-        : [];
-    const seen = new Set<string>();
-    const merged: { kind: RelatedEntityKind; name: string }[] = [];
-    for (const item of [...live, ...seed]) {
-      const key = item.name.trim().toLowerCase();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      merged.push(item);
+  const relatedExtra = useMemo(
+    () =>
+      relatedKind && relatedName.trim()
+        ? { kind: relatedKind, name: relatedName.trim() }
+        : undefined,
+    [relatedKind, relatedName],
+  );
+  const { options: relatedOptions, loading: relatedLoading } =
+    useCrmRelatedRecords(open ? relatedKind : "", relatedExtra);
+
+  useEffect(() => {
+    if (!open) return;
+    if (relatedKind === "Contact" && relatedRecordId) {
+      setClientId(relatedRecordId);
     }
-    if (
-      relatedKind &&
-      relatedName &&
-      !seen.has(relatedName.trim().toLowerCase())
-    ) {
-      merged.unshift({
-        kind: relatedKind as RelatedEntityKind,
-        name: relatedName,
-      });
-    }
-    return merged;
-  }, [relatedKind, relatedName, recordTick]);
+  }, [open, relatedKind, relatedRecordId]);
+
+  useEffect(() => {
+    if (!open || contactsLoading) return;
+    if (clientId && contacts.some((row) => row.id === clientId)) return;
+    if (relatedKind === "Contact" && relatedRecordId) return;
+    const first = contacts[0];
+    if (first) setClientId(first.id);
+  }, [
+    open,
+    contacts,
+    contactsLoading,
+    clientId,
+    relatedKind,
+    relatedRecordId,
+  ]);
 
   if (!open) return null;
 
@@ -323,7 +384,14 @@ export function NewBookingModal({
     calendlyHosts.find((host) => host.id === consultantId) ??
     calendlyHosts.find((host) => host.name === hostName) ??
     calendlyHosts.find((host) => host.name === calendar?.owner);
-  const client = contacts.find((c) => c.id === clientId) ?? contacts[0];
+  const client =
+    findContactById(clientId)?.contact ??
+    contacts.find((c) => c.id === clientId) ??
+    null;
+  const clientName =
+    client?.name?.trim() ||
+    applicantOptions.find((row) => row.id === clientId)?.name?.trim() ||
+    "";
   const guests = contacts.filter((c) => guestIds.includes(c.id));
   function applyCalendar(id: string, page?: BookingPage) {
     const next = page ?? calendars.find((item) => item.id === id);
@@ -346,32 +414,62 @@ export function NewBookingModal({
     );
   }
 
+  function showFormError(message: string, field: string) {
+    setSaving(false);
+    setError(message);
+    setErrorField(field);
+    const target =
+      field === "relatedKind" || field === "relatedName"
+        ? relatedFieldsRef.current
+        : null;
+    (target ?? formBodyRef.current)?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }
+
   async function handleSave() {
+    if (saving) return;
     if (!title.trim()) {
-      setError("Appointment title is required");
+      showFormError("Appointment title is required", "title");
       return;
     }
-    if (!relatedKind) {
-      setError("Choose a related entity");
+    const inferredRelatedKind: RelatedEntityKind | "" =
+      relatedKind || (client ? "Contact" : "");
+    const inferredRelatedName =
+      relatedName.trim() ||
+      (inferredRelatedKind === "Contact"
+        ? clientName.trim() || client?.name?.trim() || ""
+        : "");
+    const inferredRelatedId =
+      relatedRecordId ||
+      (inferredRelatedKind === "Contact" ? clientId : "");
+    if (!inferredRelatedKind) {
+      showFormError("Choose a related entity", "relatedKind");
       return;
     }
-    if (!relatedName.trim()) {
-      setError("Choose or add a related record");
+    if (!inferredRelatedName) {
+      showFormError("Choose or add a related record", "relatedName");
       return;
     }
     if (!client) {
-      setError("Choose a main applicant");
+      showFormError("Choose a main applicant", "client");
       return;
     }
-    if (!date || !slot) {
-      setError("Date & time is required");
+    const startHHmm = slotStart(slot);
+    if (!date || !startHHmm) {
+      showFormError("Date & time is required", "datetime");
       return;
     }
     if (!calendar) {
-      setError("No Calendly event type available to book.");
+      showFormError("No Calendly event type available to book.", "calendar");
       return;
     }
-    const firstStart = new Date(`${date}T${slotStart(slot)}`);
+    const firstStart = new Date(`${date}T${startHHmm}`);
+    if (Number.isNaN(firstStart.getTime())) {
+      showFormError("Date & time is required", "datetime");
+      return;
+    }
     const minutes =
       whenMode === "custom"
         ? slotDuration
@@ -381,7 +479,7 @@ export function NewBookingModal({
         ? listNextReminders(firstStart, repeatRule, 24)
         : [firstStart];
     if (starts.length === 0) {
-      setError("No recurring times match this schedule");
+      showFormError("No recurring times match this schedule", "repeat");
       return;
     }
     const channel: AppointmentChannel =
@@ -417,43 +515,54 @@ export function NewBookingModal({
         ? formatTaskRepeatSummary(repeatRule)
         : "";
     const note = [internalNote.trim(), repeatNote].filter(Boolean).join("\n");
+    const relatedLink = calendlyCrmLinkFromRelated(
+      inferredRelatedKind,
+      inferredRelatedId,
+    );
     setSaving(true);
     setError("");
+    setErrorField("");
+    const calendlyTimezone = ianaTimezoneFromLabel(timezone);
     try {
-      const eventType = await resolveCalendlyEventType(calendar);
-      if (eventType && isUuid(eventType.id) && client.email) {
-        const booked = await createCalendlyBooking({
-          idempotencyKey: newCalendlyIdempotencyKey(),
-          eventTypeId: eventType.id,
-          startTime: starts[0].toISOString(),
-          name: client.name,
-          email: client.email,
-          timezone,
-          ...calendlyCrmLinkFromRelated(relatedKind, relatedRecordId),
-        });
-        if (isUuid(booked.meetingId)) {
-          await linkCalendlyMeetingCrm(
-            booked.meetingId,
-            calendlyCrmLinkFromRelated(relatedKind, relatedRecordId),
-          ).catch(() => undefined);
+      try {
+        const eventType = await resolveCalendlyEventType(calendar);
+        const startTime =
+          providerStartBySlot[slot] || starts[0].toISOString();
+        if (
+          client.email &&
+          eventType &&
+          isUuid(eventType.id) &&
+          (calendlyConnected || Boolean(providerStartBySlot[slot]))
+        ) {
+          const booked = await createCalendlyBooking({
+            idempotencyKey: newCalendlyIdempotencyKey(),
+            eventTypeId: eventType.id,
+            startTime,
+            name: client.name || clientName,
+            email: client.email,
+            timezone: calendlyTimezone,
+            ...relatedLink,
+          });
+          if (isUuid(booked.meetingId)) {
+            await linkCalendlyMeetingCrm(booked.meetingId, relatedLink).catch(
+              () => undefined,
+            );
+          }
         }
+      } catch (err) {
+        showFormError(
+          err instanceof Error ? err.message : "Calendly booking failed.",
+          "calendar",
+        );
+        return;
       }
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Calendly booking failed.",
-      );
-    }
-    try {
       for (const startDate of starts) {
         const endDate = new Date(startDate.getTime() + minutes * 60 * 1000);
         await createCrmMeeting({
           title: title.trim() || "Consultation",
-          relatedTo:
-            relatedKind && relatedName.trim()
-              ? `${relatedKind}: ${relatedName.trim()}`
-              : `Contact: ${client.name}`,
-          relatedKind: relatedKind || "",
-          relatedId: relatedRecordId || undefined,
+          relatedTo: `${inferredRelatedKind}: ${inferredRelatedName}`,
+          relatedKind: inferredRelatedKind,
+          relatedId: inferredRelatedId || undefined,
           type: meetingType,
           startDateTime: formatMeetingDateTime(startDate),
           endDateTime: formatMeetingDateTime(endDate),
@@ -471,18 +580,18 @@ export function NewBookingModal({
           timezone,
         });
       }
+      onCreated();
+      onClose();
     } catch (err) {
-      setSaving(false);
-      setError(
+      showFormError(
         err instanceof Error
           ? err.message
           : "Could not create the CRM meeting.",
+        "calendar",
       );
-      return;
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    onCreated();
-    onClose();
   }
 
   return (
@@ -513,8 +622,17 @@ export function NewBookingModal({
           </button>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-auto lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div
+          ref={formBodyRef}
+          className="grid min-h-0 flex-1 grid-cols-1 overflow-auto lg:grid-cols-[minmax(0,1fr)_280px]"
+        >
           <div className="space-y-4 border-b border-slate-100 px-5 py-5 lg:border-r lg:border-b-0">
+            {!calendlyConnected ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
+                Calendly is not connected. This will save a CRM meeting only.
+                Connect Calendly on the Booking page to book a live invitee.
+              </p>
+            ) : null}
             <Field label="Calendar">
               <select
                 value={calendarId}
@@ -531,10 +649,16 @@ export function NewBookingModal({
                 ))}
               </select>
             </Field>
-            <Field label="Appointment title" required>
+            <Field label="Appointment title" required invalid={errorField === "title"}>
               <input
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (errorField === "title") {
+                    setError("");
+                    setErrorField("");
+                  }
+                }}
                 placeholder="FinConnex Financial Services | Free Finance Consultation"
                 className={inputClass}
               />
@@ -592,14 +716,25 @@ export function NewBookingModal({
                 ))}
               </select>
             </Field>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Related Entity *">
+            <div
+              ref={relatedFieldsRef}
+              className="grid grid-cols-1 gap-3 sm:grid-cols-2"
+            >
+              <Field
+                label="Related Entity *"
+                invalid={errorField === "relatedKind"}
+              >
                 <select
                   className={inputClass}
                   value={relatedKind}
                   onChange={(e) => {
                     setRelatedKind(e.target.value as RelatedEntityKind | "");
                     setRelatedName("");
+                    setRelatedRecordId("");
+                    if (errorField === "relatedKind" || errorField === "relatedName") {
+                      setError("");
+                      setErrorField("");
+                    }
                   }}
                 >
                   <option value="" disabled>
@@ -612,20 +747,39 @@ export function NewBookingModal({
                   ))}
                 </select>
               </Field>
-              <Field label="Related Record *">
+              <Field
+                label="Related Record *"
+                invalid={errorField === "relatedName"}
+              >
                 <RelatedRecordCombobox
                   value={relatedName}
-                  onChange={setRelatedName}
-                  onSelectOption={(option) =>
-                    setRelatedRecordId(option?.id ?? "")
-                  }
+                  onChange={(name) => {
+                    setRelatedName(name);
+                    if (!name) setRelatedRecordId("");
+                    if (errorField === "relatedName") {
+                      setError("");
+                      setErrorField("");
+                    }
+                  }}
+                  onSelectOption={(option) => {
+                    setRelatedRecordId(option?.id ?? "");
+                    if (relatedKind === "Contact" && option?.id) {
+                      setClientId(option.id);
+                    }
+                  }}
                   options={relatedOptions}
                   disabled={!relatedKind}
+                  placeholder={
+                    relatedLoading
+                      ? `Loading ${relatedKind.toLowerCase()}s…`
+                      : `Search ${relatedKind ? relatedKind.toLowerCase() : "record"}…`
+                  }
                   allowCustom={relatedKind === "Contact"}
                   createLabel={(name) => `Add contact “${name}”`}
                   onCreateOption={(name) => {
                     void createQuickContact(name).then((created) => {
                       setRelatedName(created.name);
+                      setRelatedRecordId(created.id);
                       setClientId(created.id);
                       setRecordTick((tick) => tick + 1);
                     });
@@ -633,6 +787,9 @@ export function NewBookingModal({
                 />
               </Field>
             </div>
+            {errorField === "relatedKind" || errorField === "relatedName" ? (
+              <p className="text-xs text-rose-600">{error}</p>
+            ) : null}
 
             <DateTimeSection
               timezone={timezone}
@@ -648,6 +805,7 @@ export function NewBookingModal({
               durationMinutes={customDuration}
               onDurationMinutesChange={setCustomDuration}
               required
+              error={errorField === "datetime" ? error : undefined}
               duration={
                 <div>
                   <label className="mb-1 block text-[13px] font-medium text-slate-600">
@@ -758,7 +916,6 @@ export function NewBookingModal({
                 </div>
               ) : null}
             </div>
-            {error ? <p className="text-xs text-rose-600">{error}</p> : null}
           </div>
 
           <div className="space-y-4 px-5 py-5">
@@ -772,9 +929,9 @@ export function NewBookingModal({
               </p>
             </div>
 
-            {client ? (
+            {client || clientName ? (
               <AttendeeCard
-                name={client.name}
+                name={clientName || "Main applicant"}
                 role="Main Applicant"
                 slot={slot}
                 dateLabel={prettyDate(date)}
@@ -783,7 +940,7 @@ export function NewBookingModal({
               />
             ) : null}
             <AttendeeCard
-              name={hostName}
+              name={hostName || "Host"}
               role="Host"
               slot={slot}
               dateLabel={prettyDate(date)}
@@ -792,7 +949,7 @@ export function NewBookingModal({
             {guests.map((guest) => (
               <AttendeeCard
                 key={guest.id}
-                name={guest.name}
+                name={guest.name?.trim() || "Guest"}
                 role="Guest"
                 slot={slot}
                 dateLabel={prettyDate(date)}
@@ -803,44 +960,66 @@ export function NewBookingModal({
               />
             ))}
 
-            <Field label="Main applicant">
-              <select
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                className={inputClass}
-              >
-                {contacts.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+            <Field label="Main applicant" invalid={errorField === "client"}>
+              <RelatedRecordCombobox
+                value={clientName}
+                onChange={(name) => {
+                  if (errorField === "client") {
+                    setError("");
+                    setErrorField("");
+                  }
+                  if (!name.trim()) {
+                    setClientId("");
+                    return;
+                  }
+                  const match = contacts.find(
+                    (row) =>
+                      (row.name ?? "").trim().toLowerCase() ===
+                      name.trim().toLowerCase(),
+                  );
+                  if (match) setClientId(match.id);
+                }}
+                onSelectOption={(option) => {
+                  setClientId(option?.id ?? "");
+                  if (relatedKind === "Contact" && option) {
+                    setRelatedName(option.name);
+                    setRelatedRecordId(option.id ?? "");
+                  }
+                }}
+                options={applicantOptions}
+                placeholder={
+                  contactsLoading
+                    ? "Loading contacts…"
+                    : "Search main applicant…"
+                }
+                allowCustom
+                createLabel={(name) => `Add contact “${name}”`}
+                onCreateOption={(name) => {
+                  void createQuickContact(name).then((created) => {
+                    setClientId(created.id);
+                    setRecordTick((tick) => tick + 1);
+                  });
+                }}
+              />
             </Field>
 
             {addingGuest ? (
               <Field label="Add guest">
-                <select
-                  defaultValue=""
-                  onChange={(e) => {
-                    if (!e.target.value) return;
+                <RelatedRecordCombobox
+                  value=""
+                  onChange={() => undefined}
+                  onSelectOption={(option) => {
+                    if (!option?.id) return;
                     setGuestIds((ids) =>
-                      ids.includes(e.target.value)
-                        ? ids
-                        : [...ids, e.target.value],
+                      ids.includes(option.id!) ? ids : [...ids, option.id!],
                     );
                     setAddingGuest(false);
                   }}
-                  className={inputClass}
-                >
-                  <option value="">Select a guest</option>
-                  {contacts
-                    .filter((c) => c.id !== clientId && !guestIds.includes(c.id))
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                </select>
+                  options={applicantOptions.filter(
+                    (row) => row.id !== clientId && !guestIds.includes(row.id ?? ""),
+                  )}
+                  placeholder="Search guest…"
+                />
               </Field>
             ) : (
               <button
@@ -893,7 +1072,12 @@ export function NewBookingModal({
               <option value="Scheduled">Scheduled</option>
             </select>
           </label>
-          <div className="flex gap-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
+            {error ? (
+              <p className="max-w-[240px] text-right text-xs font-medium text-rose-600">
+                {error}
+              </p>
+            ) : null}
             <button
               type="button"
               onClick={onClose}
@@ -922,10 +1106,12 @@ const inputClass =
 function Field({
   label,
   required,
+  invalid,
   children,
 }: {
   label: string;
   required?: boolean;
+  invalid?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -934,7 +1120,15 @@ function Field({
         {label}
         {required ? <span className="text-rose-500"> *</span> : null}
       </span>
-      {children}
+      <div
+        className={
+          invalid
+            ? "[&_input]:border-rose-400 [&_select]:border-rose-400 [&_button]:border-rose-400"
+            : undefined
+        }
+      >
+        {children}
+      </div>
     </label>
   );
 }
@@ -947,7 +1141,7 @@ function AttendeeCard({
   timezone,
   onRemove,
 }: {
-  name: string;
+  name?: string | null;
   role: MeetingAttendeeRole;
   slot: string;
   dateLabel: string;

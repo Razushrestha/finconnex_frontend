@@ -42,6 +42,7 @@ import {
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { ConsultationsBoard } from "@/components/booking/ConsultationsBoard";
 import { NewBookingModal } from "@/components/booking/NewBookingModal";
+import { CalendlyConnectionCard } from "@/components/booking/CalendlyConnectionCard";
 import {
   appointmentDateKey,
   appointmentMatchesKpi,
@@ -193,6 +194,13 @@ export function BookingsWorkspace({
     if (searchParams.get("book") === "1") setBookOpen(true);
   }, [searchParams]);
 
+  useEffect(() => {
+    if (searchParams.get("calendly") !== "connected") return;
+    void import("@/lib/booking/calendly-integration-api").then((api) =>
+      api.syncCalendlyCatalog().catch(() => undefined),
+    );
+  }, [searchParams]);
+
   function closeBook() {
     setBookOpen(false);
     if (searchParams.get("book") === "1") router.replace("/booking");
@@ -338,8 +346,11 @@ function HomeView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="mb-3 flex shrink-0 justify-end">
-        <NewBookingButton onClick={onNewBooking} />
+      <div className="mb-3 flex shrink-0 flex-col gap-3">
+        <div className="flex justify-end">
+          <NewBookingButton onClick={onNewBooking} />
+        </div>
+        <CalendlyConnectionCard />
       </div>
       <div className="mb-4 grid shrink-0 grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3 xl:mb-4 xl:grid-cols-6">
         {STATS.map((s) => {

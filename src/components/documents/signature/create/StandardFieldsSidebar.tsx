@@ -23,6 +23,7 @@ import {
   SignatureSigner,
   SIGNER_COLORS,
 } from "@/lib/documents/signature/types";
+import { setFieldDragImage } from "@/lib/documents/signature/field-placement";
 
 export const standardFields = [
   { type: "signature", label: "Signature", icon: PenTool },
@@ -110,6 +111,7 @@ export function StandardFieldsSidebar({
     }
 
     onDragStart(e, field, recipient);
+    setFieldDragImage(e.dataTransfer, field.label);
   };
 
   return (

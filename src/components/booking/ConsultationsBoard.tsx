@@ -71,6 +71,7 @@ import {
   listCalendlyHosts,
   type CalendlyHost,
 } from "@/lib/booking/calendly-api";
+import { CalendlyConnectionCard } from "@/components/booking/CalendlyConnectionCard";
 
 const BRAND = "#5A32A3";
 
@@ -508,9 +509,12 @@ export function ConsultationsBoard() {
           Loading Calendly event types…
         </p>
       ) : filtered.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-[#E5E7EB] bg-white py-16 text-center text-[13px] text-slate-400">
-          No Calendly event types yet. Connect Calendly in CRM, then refresh.
-        </p>
+        <div className="space-y-3">
+          <p className="rounded-xl border border-dashed border-[#E5E7EB] bg-white py-8 text-center text-[13px] text-slate-400">
+            No Calendly event types yet. Connect Calendly below, then sync.
+          </p>
+          <CalendlyConnectionCard compact />
+        </div>
       ) : view === "grid" ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((page) => (

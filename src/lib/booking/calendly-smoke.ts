@@ -70,6 +70,23 @@ export function smokeCalendlyWiring() {
       fail(`calendly client missing ${name}`);
     }
   }
+  const integration = readSrc("src/lib/booking/calendly-integration-api.ts");
+  for (const name of [
+    "getCalendlyConnection",
+    "connectCalendly",
+    "startCalendlyOAuth",
+    "syncCalendlyCatalog",
+    "disconnectCalendly",
+    "authorizeCalendarSync",
+    "listCalendarSyncConnections",
+  ]) {
+    if (
+      !integration.includes(`export function ${name}`) &&
+      !integration.includes(`export async function ${name}`)
+    ) {
+      fail(`calendly integration client missing ${name}`);
+    }
+  }
   if (!api.includes("crmBffFetch")) {
     fail("calendly client must call crmBffFetch in the browser");
   }
@@ -77,6 +94,9 @@ export function smokeCalendlyWiring() {
   const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
   if (!bff.includes('"calendly"') || !bff.includes('path.includes("calendly")')) {
     fail("BFF proxy does not allow calendly");
+  }
+  if (!bff.includes('"calendar-sync"') || !bff.includes('"integrations"')) {
+    fail("BFF proxy does not allow Calendly integration or calendar-sync");
   }
 
   const catalog = readSrc("src/lib/api/endpoints.ts");
@@ -94,6 +114,10 @@ export function smokeCalendlyWiring() {
     'path: "/workspaces/:workspaceId/calendly/invitees/:id/no-show"',
     'path: "/workspaces/:workspaceId/calendly/meetings/:id/crm-link"',
     'path: "/workspaces/:workspaceId/calendly/summary"',
+    'path: "/workspaces/:workspaceId/integrations/calendly"',
+    'path: "/workspaces/:workspaceId/integrations/calendly/connect"',
+    'path: "/calendar-sync/connections"',
+    'path: "/integrations/calendly/oauth/callback"',
   ]) {
     if (!catalog.includes(fragment)) fail(`endpoint catalog missing ${fragment}`);
   }

@@ -18,6 +18,7 @@ export interface RequestApplicant {
   email: string;
   name: string;
   deliverVia: ApplicantDeliverVia;
+  recordId?: string;
 }
 
 interface CrmOption {
@@ -157,6 +158,7 @@ export function RequestApplicantsSection({
                       source: e.target.value as ApplicantSource,
                       email: "",
                       name: "",
+                      recordId: undefined,
                     });
                     setActiveId(null);
                   }}
@@ -181,6 +183,7 @@ export function RequestApplicantsSection({
                     update(row.id, {
                       name,
                       email: name ? emailFromName(name) : "",
+                      recordId: undefined,
                     });
                     searchCrm(row.id, row.source, name);
                   }}
@@ -197,6 +200,7 @@ export function RequestApplicantsSection({
                           update(row.id, {
                             name: item.name,
                             email: item.email,
+                            recordId: item.id,
                           });
                           setActiveId(null);
                         }}
@@ -240,6 +244,7 @@ export function RequestApplicantsSection({
               source: "contact",
               name: contact.name,
               email: contact.email,
+              recordId: contact.id,
             });
             setTick((n) => n + 1);
             setAddingForId(null);

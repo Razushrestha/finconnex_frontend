@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyLocalLeadIdentity } from "@/lib/leads/store";
+import { applyLocalLeadIdentity, pinLeadIdentity } from "@/lib/leads/store";
 import type { LeadCardData } from "@/lib/leads/types";
 
 function card(partial: Partial<LeadCardData>): LeadCardData {
@@ -44,5 +44,30 @@ describe("applyLocalLeadIdentity", () => {
     const next = applyLocalLeadIdentity(card({}), card({ custom: { contactId: "c1" } }));
     expect(next.name).toBe("Jane Smith");
     expect(next.owner).toBe("Ramesh Pudasaini");
+  });
+
+  it("keeps a pinned title/owner even when the local card is missing after refresh", () => {
+    pinLeadIdentity(
+      card({
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        email: "harry-pin@example.com",
+        name: "Harry",
+        owner: "Binay",
+        ownerId: "22222222-2222-4222-8222-222222222222",
+        custom: {
+          leadTitle: "Harry",
+          leadOwnerName: "Binay",
+          leadOwnerId: "22222222-2222-4222-8222-222222222222",
+        },
+      }),
+    );
+    const next = applyLocalLeadIdentity(
+      card({
+        id: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA",
+        email: "harry-pin@example.com",
+      }),
+    );
+    expect(next.name).toBe("Harry");
+    expect(next.owner).toBe("Binay");
   });
 });

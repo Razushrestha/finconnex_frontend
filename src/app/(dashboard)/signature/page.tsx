@@ -14,7 +14,13 @@ import {
   isCrmSignatureRequestId,
   tryCrmSignatureRequest,
 } from "@/lib/documents/signature/api";
+import {
+  deleteCrmSignatureTemplate,
+  isCrmSignatureTemplateId,
+  tryCrmSignatureTemplate,
+} from "@/lib/documents/signature/templates-api";
 import { useCrmSignatureRequests } from "@/lib/documents/signature/use-crm-signature-requests";
+import { useCrmSignatureTemplates } from "@/lib/documents/signature/use-crm-signature-templates";
 import { RecentTabsHeader } from "@/components/documents/signature/overview/RecentTabsHeader";
 import SignatureStatsGrid from "@/components/documents/signature/overview/SignatureStatsGrid";
 import {
@@ -143,6 +149,7 @@ function RowActionsMenu({
 export default function ESignatureOverviewPage() {
   const router = useRouter();
   const crm = useCrmSignatureRequests();
+  const templatesCrm = useCrmSignatureTemplates();
   const [activeTab, setActiveTab] = useState<"documents" | "templates">(
     "documents",
   );
@@ -182,7 +189,7 @@ export default function ESignatureOverviewPage() {
     };
     refresh();
     return onRecordsChange(refresh);
-  }, [crm.source, crm.loading]);
+  }, [crm.source, crm.loading, templatesCrm.source, templatesCrm.loading]);
 
   useEffect(() => {
     documentsTable.setItems(docsSource);
@@ -225,8 +232,10 @@ export default function ESignatureOverviewPage() {
       )
     )
       return;
-    // TODO(api): DELETE /api/signature-templates/{id}
-    console.log("delete signature template", tpl.id);
+    deleteSignatureRequest(tpl.id);
+    if (isCrmSignatureTemplateId(tpl.id)) {
+      void tryCrmSignatureTemplate(() => deleteCrmSignatureTemplate(tpl.id));
+    }
     setTplsSource((prev) => prev.filter((t) => t.id !== tpl.id));
   }
 
@@ -243,7 +252,14 @@ export default function ESignatureOverviewPage() {
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden p-4 pb-3">
       <div className="shrink-0">
-        <ESignatureHeader />
+        <ESignatureHeader
+          source={crm.source}
+          templatesSource={templatesCrm.source}
+          loading={crm.loading}
+          templatesLoading={templatesCrm.loading}
+          error={crm.error}
+          templatesError={templatesCrm.error}
+        />
       </div>
 
       <div className="mt-4 shrink-0">

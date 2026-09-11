@@ -20,6 +20,7 @@ import {
   replaceCrmLeadFollowers,
   replaceCrmLeadTags,
   syncLeadStatus,
+  unassignCrmLeadOwner,
   updateCrmLead,
 } from "@/lib/leads/api";
 import { asHttpUrl, mapCrmLeadToCard } from "@/lib/leads/api/map";
@@ -312,6 +313,11 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
                 );
                 if (match && isUuid(match.userId)) {
                   const live = await assignCrmLeadOwner(card.id, match.userId);
+                  if (live) applyLive(mapCrmLeadToCard(live));
+                } else if (
+                  patch.owner.trim().toLowerCase() === "unassigned"
+                ) {
+                  const live = await unassignCrmLeadOwner(card.id);
                   if (live) applyLive(mapCrmLeadToCard(live));
                 }
               }

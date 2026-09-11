@@ -58,11 +58,15 @@ const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
   "call.error.invalidTransition":
     "This call is not in a state that can be started.",
   "storage.error.notConfigured":
-    "File storage is not configured on the CRM server.",
+    "File storage is not configured on the CRM server. Set DigitalOcean Spaces (DO_SPACES_KEY, DO_SPACES_SECRET, DO_SPACES_BUCKET) on that API.",
   "storage.error.invalidFile":
     "That file type or size is not allowed. Use PDF, Word, image, or spreadsheet files.",
   "sms.error.phoneNumberNotConfigured":
     "Twilio from-number is missing on the CRM server.",
+  "calendly.error.notConfigured":
+    "Calendly OAuth is not configured on the CRM server. Use a personal access token, or set Calendly client id/secret on that API.",
+  "calendar.error.notConfigured":
+    "Google/Outlook calendar OAuth is not configured on the CRM server.",
 };
 
 export function crmErrorMessage(json: unknown, fallback: string): string {
@@ -89,6 +93,13 @@ export function crmErrorMessage(json: unknown, fallback: string): string {
     if (base && detail && base !== detail) return `${base}: ${detail}`;
     if (detail) return detail;
     if (base) return base;
+    const status = rec.statusCode;
+    if (status === 503) {
+      return "This integration is not configured on the CRM server yet.";
+    }
+    if (status === 400) {
+      return "CRM rejected this request. Check the token or connection settings.";
+    }
   }
   return fallback;
 }

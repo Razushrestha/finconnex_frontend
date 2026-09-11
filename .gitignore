@@ -40,6 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Local backend clone (separate repo)
-multi-crm-backend-main/
+# Local file-upload fallback when CRM storage is unconfigured
+/data/uploads/
 

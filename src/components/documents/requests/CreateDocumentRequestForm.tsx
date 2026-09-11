@@ -13,7 +13,6 @@ import {
   ChevronDown,
 } from "lucide-react";
 import {
-  DOCUMENT_REQUEST_BROKERS,
   nextDocumentRequestIds,
   removeDocumentRequest,
   upsertDocumentRequest,
@@ -48,6 +47,7 @@ import {
   formatRequestDueDate,
   formatRequestRepeat,
   parseDatetimeLocal,
+  toDatetimeLocalValue,
   validateRequestSchedule,
 } from "@/components/documents/requests/RequestScheduleCard";
 import { RequestQuickReview } from "@/components/documents/requests/RequestQuickReview";
@@ -60,6 +60,103 @@ import {
   type DocumentRequestPersonSeed,
 } from "@/lib/leads/convert-actions";
 import { findLeadById } from "@/lib/leads/store";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import { createContact, findContactByEmail } from "@/lib/contacts/store";
+import {
+  assignableOwnerLabel,
+  defaultAssignableOwnerId,
+  loadAssignableOwners,
+  type AssignableOwner,
+} from "@/lib/users/assignable";
+
+function SenderOnBehalfField({
+  value,
+  options,
+  invalid,
+  onChange,
+}: {
+  value: string;
+  options: AssignableOwner[];
+  invalid?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected =
+    options.find(
+      (row) =>
+        row.id === value ||
+        row.name === value ||
+        assignableOwnerLabel(row) === value,
+    ) ?? null;
+  const label = selected
+    ? assignableOwnerLabel(selected)
+    : value.trim() || "Select teammate";
+
+  return (
+    <div className="relative z-20 mb-6">
+      <label className="block text-[13px] font-medium text-slate-700">
+        Send on behalf of:
+      </label>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className={cn(
+          "relative mt-2 flex h-11 w-full items-center rounded-lg border bg-white px-3.5 pr-10 text-left text-[14px] outline-none focus:ring-2",
+          invalid
+            ? "border-rose-500 focus:border-rose-500 focus:ring-rose-100"
+            : "border-slate-200 focus:border-[#5A32A3]/45 focus:ring-[#5A32A3]/12",
+          !selected && !value.trim() ? "text-slate-400" : "text-slate-800",
+        )}
+      >
+        <span className="truncate">{label}</span>
+        <ChevronDown className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      </button>
+      {open ? (
+        <ul
+          role="listbox"
+          className="relative z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-sm"
+        >
+          {options.length === 0 ? (
+            <li className="px-3 py-2 text-[13px] text-slate-400">
+              No teammates loaded
+            </li>
+          ) : (
+            options.map((row) => {
+              const itemLabel = assignableOwnerLabel(row);
+              const active =
+                row.id === value ||
+                row.name === value ||
+                itemLabel === value;
+              return (
+                <li key={row.id || itemLabel}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    className={cn(
+                      "flex w-full px-3 py-2 text-left text-[13px] hover:bg-violet-50",
+                      active
+                        ? "font-semibold text-[#5A32A3]"
+                        : "text-slate-800",
+                    )}
+                    onClick={() => {
+                      onChange(row.name);
+                      setOpen(false);
+                    }}
+                  >
+                    {itemLabel}
+                  </button>
+                </li>
+              );
+            })
+          )}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
 
 interface CreateDocumentRequestFormProps {
   layoutId: string;
@@ -82,6 +179,33 @@ function toRequestApplicants(
     email: person.email,
     deliverVia: "email" as const,
   }));
+}
+
+async function resolveApplicantContactId(
+  row: RequestApplicant | undefined,
+): Promise<string> {
+  if (row?.recordId && isUuid(row.recordId)) return row.recordId;
+  const email = row?.email.trim() ?? "";
+  if (email) {
+    const local = findContactByEmail(email);
+    if (local && isUuid(local.id)) return local.id;
+  }
+  const parts = (row?.name ?? "").trim().split(/\s+/).filter(Boolean);
+  const firstName = parts[0] || "Client";
+  const lastName = parts.slice(1).join(" ") || firstName;
+  const created = await createContact({
+    firstName,
+    lastName,
+    email: email || `${Date.now()}@added.finconnex.local`,
+    status: "Active",
+    owner: getRulesActor().name || "",
+  });
+  if (!isUuid(created.id)) {
+    throw new Error(
+      "Pick or add a live CRM contact before creating this document request.",
+    );
+  }
+  return created.id;
 }
 
 function resolvePrefill(props: CreateDocumentRequestFormProps): {
@@ -451,24 +575,32 @@ export function CreateDocumentRequestForm({
     }),
   );
 
-  const [sendOnBehalfOf, setSendOnBehalfOf] = useState(
-    () => getRulesActor().name.trim(),
-  );
+  const [sendOnBehalfOf, setSendOnBehalfOf] = useState("");
+  const [senders, setSenders] = useState<AssignableOwner[]>([]);
 
   useEffect(() => {
-    const name = getRulesActor().name.trim();
-    if (!name) return;
-    setSendOnBehalfOf((prev) => prev || name);
+    void loadAssignableOwners().then((rows) => {
+      setSenders(rows);
+      setSendOnBehalfOf((current) => {
+        if (
+          current &&
+          rows.some(
+            (row) =>
+              row.name === current ||
+              row.id === current ||
+              assignableOwnerLabel(row) === current,
+          )
+        ) {
+          return current;
+        }
+        const actor = getRulesActor().name.trim();
+        const match =
+          rows.find((row) => row.name === actor) ||
+          rows.find((row) => row.id === defaultAssignableOwnerId(rows));
+        return match?.name || current || actor;
+      });
+    });
   }, []);
-
-  const senderOptions = useMemo(() => {
-    const current = sendOnBehalfOf.trim() || getRulesActor().name.trim();
-    const list = [...DOCUMENT_REQUEST_BROKERS];
-    if (current && !list.includes(current as (typeof list)[number])) {
-      return [current, ...list];
-    }
-    return list;
-  }, [sendOnBehalfOf]);
   const loanType: LoanType = "Home loan";
   const purpose: Purpose = "Property purchase";
   const [applicants, setApplicants] = useState<RequestApplicant[]>(
@@ -529,7 +661,12 @@ export function CreateDocumentRequestForm({
   const [docDescOverrides, setDocDescOverrides] = useState<
     Record<string, string>
   >({});
-  const [dueDate, setDueDate] = useState("");
+  const [dueDate, setDueDate] = useState(() => {
+    const due = new Date();
+    due.setDate(due.getDate() + 7);
+    due.setHours(17, 0, 0, 0);
+    return toDatetimeLocalValue(due);
+  });
   const [reminderDate, setReminderDate] = useState("");
   const [reminderOn, setReminderOn] = useState(false);
   const [reminderRepeat, setReminderRepeat] = useState(defaultReminderRepeatRule);
@@ -715,6 +852,7 @@ export function CreateDocumentRequestForm({
   }
 
   function goNext() {
+    if (saving) return;
     if (!validateStep(step)) return;
     if (step === 1) {
       const name1 = applicant1.trim() || clientSearch.trim();
@@ -858,8 +996,38 @@ export function CreateDocumentRequestForm({
         clientName: portal?.clientName,
         clientEmail: email.trim() || portal?.primaryContactEmail,
       });
+      const relatedKindKey = (prefill.relatedKind || relatedKind || "").toLowerCase();
+      let requestedFromId = "";
+      try {
+        requestedFromId = await resolveApplicantContactId(applicants[0]);
+      } catch (err) {
+        setErrors({
+          applicants:
+            err instanceof Error
+              ? err.message
+              : "Pick or add a live CRM contact",
+        });
+        setStep(1);
+        return;
+      }
+      const parentIds = relatedKindKey.includes("contact")
+        ? { contactId: relatedId }
+        : relatedKindKey.includes("compan")
+          ? { companyId: relatedId }
+          : relatedKindKey.includes("deal")
+            ? { dealId: relatedId }
+            : relatedId
+              ? { leadId: relatedId }
+              : {};
       const remote = await tryCrmDocumentRequest(() =>
-        createCrmDocumentRequest(toCreateDocumentRequestBody(created)),
+        createCrmDocumentRequest(
+          toCreateDocumentRequestBody({
+            ...created,
+            dueDate,
+            requestedFromId,
+            ...parentIds,
+          }),
+        ),
       );
       if (remote) {
         if (remote.id !== created.id) removeDocumentRequest(created.id);
@@ -903,6 +1071,15 @@ export function CreateDocumentRequestForm({
           </button>
         </div>
       </div>
+      {errors.dueDate || errors.reminderDate || errors.docs || errors.applicants || errors.sendOnBehalfOf ? (
+        <p className="px-4 text-[12px] font-medium text-rose-600 sm:px-6 2xl:px-8">
+          {errors.dueDate ||
+            errors.reminderDate ||
+            errors.docs ||
+            errors.applicants ||
+            errors.sendOnBehalfOf}
+        </p>
+      ) : null}
 
       <div className="mx-auto flex min-h-0 w-full max-w-[1920px] flex-1 flex-col overflow-hidden px-4 pb-4 sm:px-6 2xl:px-8">
         <Stepper step={step} />
@@ -922,46 +1099,29 @@ export function CreateDocumentRequestForm({
             )}
           >
             {step === 1 ? (
-              <section className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-[0_8px_30px_rgba(90,50,163,0.08)] sm:p-6">
-                <label className="block text-[13px] font-medium text-slate-700">
-                  Send on behalf of:
-                </label>
-                <div className="relative mt-2">
-                  <select
-                    value={sendOnBehalfOf}
-                    onChange={(e) => {
-                      setSendOnBehalfOf(e.target.value);
-                      if (errors.sendOnBehalfOf) {
-                        setErrors((prev) => {
-                          const next = { ...prev };
-                          delete next.sendOnBehalfOf;
-                          return next;
-                        });
-                      }
-                    }}
-                    className={cn(
-                      "h-11 w-full appearance-none rounded-lg border bg-white px-3.5 pr-10 text-[14px] text-slate-800 outline-none focus:ring-2",
-                      errors.sendOnBehalfOf
-                        ? "border-rose-500 focus:border-rose-500 focus:ring-rose-100"
-                        : "border-slate-200 focus:border-[#5A32A3]/45 focus:ring-[#5A32A3]/12",
-                      !sendOnBehalfOf && "text-slate-400",
-                    )}
-                  >
-                    {senderOptions.map((b) => (
-                      <option key={b} value={b}>
-                        {b}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                </div>
+              <section className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl bg-white p-5 shadow-[0_8px_30px_rgba(90,50,163,0.08)] sm:p-6">
+                <SenderOnBehalfField
+                  value={sendOnBehalfOf}
+                  options={senders}
+                  invalid={Boolean(errors.sendOnBehalfOf)}
+                  onChange={(next) => {
+                    setSendOnBehalfOf(next);
+                    if (errors.sendOnBehalfOf) {
+                      setErrors((prev) => {
+                        const copy = { ...prev };
+                        delete copy.sendOnBehalfOf;
+                        return copy;
+                      });
+                    }
+                  }}
+                />
                 {errors.sendOnBehalfOf ? (
-                  <p className="mt-1 text-[12px] font-medium text-rose-500">
+                  <p className="-mt-4 mb-4 text-[12px] font-medium text-rose-500">
                     {errors.sendOnBehalfOf}
                   </p>
                 ) : null}
 
-                <div className="mt-5">
+                <div className="relative z-0 border-t border-slate-100 pt-5">
                   <RequestApplicantsSection
                     applicants={applicants}
                     onChange={(next) => {

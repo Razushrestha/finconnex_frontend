@@ -315,6 +315,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
       { title: "Gmail", slug: "gmail" },
       { title: "Google Calendar", slug: "google-calendar" },
       { title: "Outlook Calendar", slug: "outlook-calendar" },
+      { title: "Calendly", slug: "calendly", moduleHref: "/booking", moduleLabel: "Booking" },
       { title: "Zoom", slug: "zoom" },
       { title: "Microsoft Teams", slug: "microsoft-teams" },
       { title: "Twilio", slug: "twilio" },

@@ -119,8 +119,18 @@ export function mapDocumentRequestType(raw: string): DocumentRequestType {
   return "Other";
 }
 
+const CRM_DOCUMENT_REQUEST_TYPES = new Set([
+  "CONTRACT",
+  "PROPOSAL",
+  "ID_PROOF",
+  "FINANCIAL",
+  "LEGAL",
+  "OTHER",
+]);
+
 export function apiDocumentRequestType(type: DocumentRequestType): string {
-  return type.toUpperCase().replace(/ /g, "_");
+  const mapped = type.toUpperCase().replace(/ /g, "_");
+  return CRM_DOCUMENT_REQUEST_TYPES.has(mapped) ? mapped : "OTHER";
 }
 
 function formatDisplayDate(raw: unknown): string {
@@ -140,17 +150,29 @@ function formatDisplayDate(raw: unknown): string {
 function toIsoDate(raw: string | undefined): string | undefined {
   const value = raw?.trim();
   if (!value) return undefined;
-  if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
-    return value.includes("T") ? value : `${value.slice(0, 10)}T00:00:00.000Z`;
-  }
-  const au = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  const au = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (au) {
     const [, d, m, y] = au;
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}T00:00:00.000Z`;
+    const local = new Date(
+      Number(y),
+      Number(m) - 1,
+      Number(d),
+      17,
+      0,
+      0,
+      0,
+    );
+    if (local.getTime() <= Date.now()) {
+      local.setDate(local.getDate() + 1);
+    }
+    return local.toISOString();
   }
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) return value;
-  return new Date(parsed).toISOString();
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  if (parsed.getTime() <= Date.now()) {
+    parsed.setTime(Date.now() + 60 * 60 * 1000);
+  }
+  return parsed.toISOString();
 }
 
 function mapItems(raw: unknown): RequestedDocLine[] | undefined {
@@ -331,49 +353,93 @@ export async function getCrmDocumentRequest(
   return asRequest(await requestsGet(`/${id}`));
 }
 
+function compactBody(input: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(input).filter(([, value]) => {
+      if (value == null) return false;
+      if (typeof value === "string") return value.trim().length > 0;
+      if (Array.isArray(value)) return value.length > 0;
+      return true;
+    }),
+  );
+}
+
 export function toCreateDocumentRequestBody(
-  input: Partial<DocumentRequest> & { title: string },
+  input: Partial<DocumentRequest> & {
+    title: string;
+    requestedFromId?: string;
+    leadId?: string;
+    contactId?: string;
+    companyId?: string;
+    dealId?: string;
+  },
 ): Record<string, unknown> {
-  return {
-    title: input.title,
-    name: input.title,
-    requestedFrom: input.requestedFrom,
-    clientName: input.clientName ?? input.requestedFrom,
-    recipientName: input.requestedFrom,
-    clientEmail: input.clientEmail,
+  const requestedFromId = isUuid(input.requestedFromId ?? "")
+    ? input.requestedFromId
+    : undefined;
+  const parents = compactBody({
+    leadId: isUuid(input.leadId ?? "") ? input.leadId : undefined,
+    contactId: isUuid(input.contactId ?? "") ? input.contactId : undefined,
+    companyId: isUuid(input.companyId ?? "") ? input.companyId : undefined,
+    dealId: isUuid(input.dealId ?? "") ? input.dealId : undefined,
+  });
+  const parentKeys = Object.keys(parents);
+  const singleParent =
+    parentKeys.length <= 1
+      ? parents
+      : compactBody({
+          [parentKeys[0]]: parents[parentKeys[0]],
+        });
+  return compactBody({
+    title: input.title.trim(),
     documentType: input.documentType
       ? apiDocumentRequestType(input.documentType)
-      : undefined,
-    type: input.documentType
-      ? apiDocumentRequestType(input.documentType)
-      : undefined,
-    status: input.status ? apiDocumentRequestStatus(input.status) : "REQUESTED",
+      : "OTHER",
+    requestedFromId,
     dueDate: toIsoDate(input.dueDate),
-    reminderDate: toIsoDate(input.reminderDate),
-    notes: input.notes ?? input.internalNotes,
-    requestedBy: input.requestedBy,
-    ownerName: input.requestedBy,
-    priority: input.priority?.toUpperCase(),
-    relatedTo: input.relatedTo,
-    items: input.items?.map((item) => ({
-      title: item.title,
-      name: item.title,
-      description: item.description,
-      applicant: item.applicant,
-      catalogId: item.catalogId,
-    })),
-  };
+    notes: (input.notes ?? input.internalNotes)?.trim(),
+    ...singleParent,
+  });
 }
 
 export async function createCrmDocumentRequest(
   body: Record<string, unknown>,
 ): Promise<DocumentRequest | null> {
-  return asRequest(
-    await requestsMutate("", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
-  );
+  const requestedFromId =
+    typeof body.requestedFromId === "string" ? body.requestedFromId : "";
+  if (!isUuid(requestedFromId)) {
+    throw new Error(
+      "Pick or add a live CRM contact before creating this document request.",
+    );
+  }
+  try {
+    return asRequest(
+      await requestsMutate("", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    );
+  } catch (err) {
+    const fallback = compactBody({
+      title: typeof body.title === "string" ? body.title.trim() : "",
+      documentType:
+        typeof body.documentType === "string" ? body.documentType : "OTHER",
+      requestedFromId,
+    });
+    if (!fallback.title || JSON.stringify(body) === JSON.stringify(fallback)) {
+      throw err;
+    }
+    try {
+      return asRequest(
+        await requestsMutate("", {
+          method: "POST",
+          body: JSON.stringify(fallback),
+        }),
+      );
+    } catch {
+      throw err;
+    }
+  }
 }
 
 export async function updateCrmDocumentRequest(

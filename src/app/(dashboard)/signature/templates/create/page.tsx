@@ -27,7 +27,7 @@ import {
   nextSignatureIds,
   SignatureField,
   upsertSignatureRequest,
-  fileToDataUrl,
+  deleteSignatureRequest,
   type SignatureDocument,
   type SignatureSigner,
 } from "@/lib/documents/signature/types";
@@ -35,8 +35,21 @@ import type {
   PlacedField,
   DraggingFieldType,
 } from "@/components/documents/signature/create/PdfFieldEditor";
+import {
+  DEFAULT_PLACED_FIELD_HEIGHT,
+  DEFAULT_PLACED_FIELD_WIDTH,
+} from "@/lib/documents/signature/field-placement";
 import AddRecipients from "@/components/documents/signature/templates/AddRecipients";
 import { toast } from "sonner";
+import { tryCrmStorage, uploadCrmStorageFile } from "@/lib/storage/api";
+import {
+  createCrmSignatureTemplate,
+  isCrmSignatureTemplateId,
+  persistRemoteSignatureTemplate,
+  toCreateSignatureTemplateBody,
+  tryCrmSignatureTemplate,
+  updateCrmSignatureTemplate,
+} from "@/lib/documents/signature/templates-api";
 
 export default function CreateTemplatePage() {
   return (
@@ -73,6 +86,12 @@ const isDocxFile = (file: File) =>
  * - Additional files are always freshly converted (no edit-reload path for
  *   them yet).
  */
+async function persistFileUrl(file: File, fallback?: string) {
+  const stored = await tryCrmStorage(() => uploadCrmStorageFile(file));
+  if (stored?.url) return stored.url;
+  return fallback;
+}
+
 async function buildPersistableDocuments(
   documentFile: File | null,
   documentName: string,
@@ -83,7 +102,9 @@ async function buildPersistableDocuments(
   let documentFileUrl: string | undefined = existingDocumentFileUrl;
 
   if (documentFile && documentFile.size > 0) {
-    documentFileUrl = await fileToDataUrl(documentFile);
+    documentFileUrl =
+      (await persistFileUrl(documentFile, existingDocumentFileUrl)) ||
+      URL.createObjectURL(documentFile);
     documents.push({
       id: "primary",
       name: documentName || documentFile.name,
@@ -100,7 +121,8 @@ async function buildPersistableDocuments(
   }
 
   for (const doc of additionalFiles) {
-    const url = await fileToDataUrl(doc.file);
+    const url =
+      (await persistFileUrl(doc.file)) || URL.createObjectURL(doc.file);
     documents.push({
       id: doc.id,
       name: doc.name,
@@ -457,7 +479,7 @@ function CreateTemplateForm() {
           existingDocumentFileUrl,
         );
 
-      upsertSignatureRequest({
+      const saved = upsertSignatureRequest({
         id: ids.id,
         signatureRequestId: ids.signatureRequestId,
         documentName,
@@ -484,6 +506,24 @@ function CreateTemplateForm() {
           },
         ],
       });
+      const body = toCreateSignatureTemplateBody(saved);
+      if (isCrmSignatureTemplateId(saved.id)) {
+        await tryCrmSignatureTemplate(() =>
+          updateCrmSignatureTemplate(saved.id, body),
+        );
+      } else {
+        const remote = await tryCrmSignatureTemplate(() =>
+          createCrmSignatureTemplate(body),
+        );
+        if (remote) {
+          deleteSignatureRequest(saved.id);
+          persistRemoteSignatureTemplate({
+            ...saved,
+            ...remote,
+            recordType: "template",
+          });
+        }
+      }
       toast.success("Template saved successfully!", {
         description: "Redirecting to templates...",
       });
@@ -586,6 +626,8 @@ function CreateTemplateForm() {
         page,
         xPct,
         yPct,
+        width: DEFAULT_PLACED_FIELD_WIDTH,
+        height: DEFAULT_PLACED_FIELD_HEIGHT,
         recipientId: draggingFieldType.recipient?.id,
         colorIndex: draggingFieldType.recipient?.colorIndex,
       },

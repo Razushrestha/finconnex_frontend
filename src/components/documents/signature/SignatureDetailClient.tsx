@@ -34,6 +34,7 @@ import {
   getCrmSignatureRequest,
   isCrmSignatureRequestId,
   persistRemoteSignatureRequest,
+  remindCrmSignatureRequest,
   sendCrmSignatureRequest,
   tryCrmSignatureRequest,
 } from "@/lib/documents/signature/api";
@@ -174,6 +175,9 @@ export function SignatureDetailClient({ id }: { id: string }) {
         ? `Reminder sent to ${pending.length} signer(s)`
         : "No pending signers",
     );
+    if (pending.length && isCrmSignatureRequestId(req.id)) {
+      void tryCrmSignatureRequest(() => remindCrmSignatureRequest(req.id));
+    }
   }
 
   function copySignLink(token: string, name?: string) {

@@ -145,6 +145,31 @@ export async function smokeLeadClientWiring() {
   if (!page.includes("bulkCrmLeads")) {
     fail("leads page does not call bulkCrmLeads");
   }
+  if (!page.includes("CrmOfflineBanner")) {
+    fail("leads page does not render CrmOfflineBanner when CRM is down");
+  }
+  if (!page.includes("requireLiveCrm")) {
+    fail("leads page does not gate create/bulk actions with requireLiveCrm");
+  }
+  if (!page.includes("LeadBoardMassActionDialog")) {
+    fail("leads overflow menu must open LeadBoardMassActionDialog");
+  }
+
+  const banner = readFileSync(
+    path.join(repoRoot(), "src/components/sales/CrmOfflineBanner.tsx"),
+    "utf8",
+  );
+  if (!banner.includes("CRM is unavailable")) {
+    fail("CrmOfflineBanner is missing the CRM unavailable heading");
+  }
+
+  const store = readFileSync(
+    path.join(repoRoot(), "src/lib/leads/store.ts"),
+    "utf8",
+  );
+  if (!store.includes("pinLeadIdentity") || !store.includes("applyLocalLeadIdentity")) {
+    fail("lead store must pin create-form name/owner across CRM refresh");
+  }
 
   const create = readFileSync(
     path.join(repoRoot(), "src/components/sales/leads/CreateLeadForm.tsx"),

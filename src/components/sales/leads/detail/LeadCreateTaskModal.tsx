@@ -20,8 +20,6 @@ import RelatedRecordCombobox from "@/components/activities/tasks/RelatedRecordCo
 import { RepeatReminderFields } from "@/components/activities/tasks/RepeatReminderFields";
 import AttachmentUpload from "@/components/activities/tasks/AttachmentUpload";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
-import { getUploadAdapter } from "@/lib/attachments/upload";
-import { uploadCrmStorageFile } from "@/lib/storage/api";
 import {
   RELATED_ENTITY_KINDS,
   type RelatedEntityKind,
@@ -40,7 +38,14 @@ import {
 } from "@/lib/rules";
 import { getRulesActor } from "@/lib/rules/actor";
 import { isUuid } from "@/lib/activity-timeline/auth";
-import { createTask, deleteTask, findTaskById, patchTask, updateTaskStatus } from "@/lib/tasks/store";
+import {
+  addTaskActivityNote,
+  createTask,
+  deleteTask,
+  findTaskById,
+  patchTask,
+  updateTaskStatus,
+} from "@/lib/tasks/store";
 import {
   createCrmTask,
   isCrmTaskId,
@@ -48,18 +53,17 @@ import {
   tryCrmTask,
   updateCrmTask,
 } from "@/lib/tasks/api";
+import { attachFilesToTask } from "@/lib/tasks/attach-files";
 import {
   TASK_OWNERS,
   TASK_PRIORITIES,
   TASK_STATUSES,
   TASK_TYPES,
-  formatTaskFileSize,
   notifyToMethod,
   type Priority,
   type ReminderNotifyOption,
   type Task,
   type TaskActionItem,
-  type TaskFileAttachment,
   type TaskStatus,
   type TaskType,
 } from "@/lib/tasks/types";
@@ -491,54 +495,6 @@ export function LeadCreateTaskModal({
     setSaving(true);
     setError("");
     try {
-      let attachmentKeys: string[] = [];
-      const uploadedFiles: TaskFileAttachment[] = [];
-      if (attachments.length > 0) {
-        for (const file of attachments) {
-          try {
-            const stored = await uploadCrmStorageFile(file);
-            if (stored.key) {
-              attachmentKeys.push(stored.key);
-              uploadedFiles.push({
-                name: stored.fileName || file.name,
-                key: stored.key,
-                url: stored.url || undefined,
-                sizeLabel: formatTaskFileSize(file.size) || undefined,
-              });
-              continue;
-            }
-          } catch (crmErr) {
-            const adapter = getUploadAdapter();
-            if (adapter.mode !== "local") {
-              setError(
-                crmErr instanceof Error
-                  ? `Failed to upload "${file.name}": ${crmErr.message}`
-                  : `Failed to upload "${file.name}"`,
-              );
-              setSaving(false);
-              return;
-            }
-            const result = await adapter.upload({
-              fileName: file.name,
-              data: await file.arrayBuffer(),
-              contentType: file.type || "application/octet-stream",
-              relatedTo: title.trim() || "Task",
-            });
-            if (!result.ok) {
-              setError(`Failed to upload "${file.name}": ${result.message}`);
-              setSaving(false);
-              return;
-            }
-            uploadedFiles.push({
-              name: result.fileName,
-              url: result.storageUrl || undefined,
-              sizeLabel: result.sizeLabel,
-            });
-          }
-        }
-      }
-      const attachmentsCount = uploadedFiles.length;
-
       const related = {
         kind: "Lead" as const,
         name: card.name,
@@ -600,6 +556,9 @@ export function LeadCreateTaskModal({
             }),
           );
         }
+        if (attachments.length) {
+          await attachFilesToTask(editTaskId, attachments);
+        }
         emitLeadActivityChange();
         onSaved?.();
         onClose();
@@ -623,8 +582,6 @@ export function LeadCreateTaskModal({
         notifyBy: reminderOn
           ? (["Email", "In-app"] as Task["notifyBy"])
           : undefined,
-        attachments: uploadedFiles.length ? uploadedFiles : undefined,
-        attachmentsCount: attachmentsCount || undefined,
         createdBy: getRulesActor().name || assignedTo,
       };
       let task = createTask(taskInput);
@@ -643,7 +600,6 @@ export function LeadCreateTaskModal({
             notes: combinedNotes || undefined,
             collaborators: collaborators.length ? collaborators : undefined,
             actionItems: filledActionItems.length ? filledActionItems : undefined,
-            attachmentKeys: attachmentKeys.length ? attachmentKeys : undefined,
           }),
         );
         if (remote && remote.taskId !== task.taskId) {
@@ -652,21 +608,25 @@ export function LeadCreateTaskModal({
             ...task,
             ...remote,
             relatedTo: related,
+            notes: task.notes ?? remote.notes,
+            activityNotes: task.activityNotes,
             actionItems: remote.actionItems?.length
               ? remote.actionItems
               : task.actionItems,
-            attachments: remote.attachments?.length
-              ? remote.attachments
-              : uploadedFiles.length
-                ? uploadedFiles
-                : task.attachments,
-            attachmentsCount:
-              remote.attachments?.length ??
-              uploadedFiles.length ??
-              remote.attachmentsCount ??
-              task.attachmentsCount,
           });
           task = findTaskById(remote.taskId)?.task ?? remote;
+        }
+      }
+      if (attachments.length) {
+        await attachFilesToTask(task.taskId, attachments);
+      }
+      const createNote = combinedNotes.trim();
+      if (createNote) {
+        const already = (findTaskById(task.taskId)?.task.activityNotes ?? []).some(
+          (note) => note.body.trim() === createNote,
+        );
+        if (!already) {
+          addTaskActivityNote(task.taskId, createNote);
         }
       }
       logCreate("activities.tasks", assignedTo, task.taskId, title.trim());

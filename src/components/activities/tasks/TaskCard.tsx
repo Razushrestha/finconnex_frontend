@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import type { Task, TaskStatus, Priority } from "@/lib/tasks/types";
 import { TASK_STATUSES, TASK_PRIORITIES, TASK_OWNERS } from "@/lib/tasks/types";
+import { resolveAssignableOwnerName } from "@/lib/users/assignable";
 import { RelatedToLink } from "@/components/activities/RelatedToLink";
 import { ArrowTag } from "@/components/common/ArrowTag";
 import { useRouter } from "next/navigation";
@@ -102,7 +103,9 @@ export function TaskCard({
   const days = task.overdue ? overdueDays(task.dueDate) : null;
   const PriorityIcon =
     priorityIcon[task.priority as keyof typeof priorityIcon] ?? ArrowRight;
-  const collaborators = task.collaborators ?? [];
+  const collaborators = (task.collaborators ?? [])
+    .map((name) => resolveAssignableOwnerName(name) || name)
+    .filter(Boolean);
   const visibleCollaborators = collaborators.slice(0, 2);
   const extraCollaborators = collaborators.length - visibleCollaborators.length;
   const hasFooterMeta =

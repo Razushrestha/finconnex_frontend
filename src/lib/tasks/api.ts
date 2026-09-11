@@ -37,6 +37,7 @@ import { findContactById } from "@/lib/contacts/store";
 import { findDealById } from "@/lib/deals/store";
 import { findLeadById } from "@/lib/leads/store";
 import { ownerDisplayName } from "@/lib/users/display-name";
+import { resolveAssignableOwnerName } from "@/lib/users/assignable";
 
 export type CrmTaskQuery = {
   page?: number;
@@ -313,10 +314,23 @@ function relatedApiFields(relatedTo?: RelatedTo, relatedId?: string) {
 }
 
 function mapNameList(raw: unknown): string[] {
+  if (Array.isArray(raw) && raw.every((item) => typeof item === "string")) {
+    return raw
+      .map((item) => resolveAssignableOwnerName(item) || ownerDisplayName(item))
+      .filter(Boolean);
+  }
   return extractRecords(raw)
-    .map((row) =>
-      pickStr(row.name, row.fullName, row.displayName, row.email, row.userId, row.id),
-    )
+    .map((row) => {
+      const nested =
+        row.user && typeof row.user === "object"
+          ? (row.user as Record<string, unknown>)
+          : row;
+      return (
+        memberDisplay(row) ||
+        memberDisplay(nested) ||
+        resolveAssignableOwnerName(pickStr(row.userId, row.id, nested.id))
+      );
+    })
     .filter(Boolean);
 }
 
@@ -503,20 +517,16 @@ async function tasksMutate(suffix: string, init: RequestInit): Promise<unknown> 
 
 function asTask(data: unknown): Task | null {
   const items = normalizeTasks(data);
-  if (items[0] && isPersistedTask(items[0])) return items[0];
+  if (items[0] && isUuid(items[0].taskId)) return items[0];
   if (data && typeof data === "object" && !Array.isArray(data)) {
     const rec = data as Record<string, unknown>;
     if (!pickStr(rec.id, rec.uuid, rec.taskId, rec.title, rec.subject, rec.name)) {
       return null;
     }
     const mapped = normalizeTask(rec, 0);
-    return isPersistedTask(mapped) ? mapped : null;
+    return isUuid(mapped.taskId) ? mapped : null;
   }
   return null;
-}
-
-function isPersistedTask(task: Task) {
-  return Boolean(task.title.trim() && task.title !== "Untitled task" && isUuid(task.taskId));
 }
 
 export async function listCrmTasks(query: CrmTaskQuery = {}): Promise<Task[]> {
@@ -609,7 +619,7 @@ export function toCreateTaskBody(input: CreateCrmTaskInput): Record<string, unkn
       : undefined,
     description:
       encodeActionItemsInDescription(
-        input.description?.trim() || input.notes?.trim() || "",
+        input.description?.trim() || "",
         input.actionItems,
       ) || undefined,
     assigneeIds: owners,

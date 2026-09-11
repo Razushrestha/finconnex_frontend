@@ -32,6 +32,8 @@ import {
   nextAfterCompletionAt,
   type ReminderRepeatRule,
 } from "@/lib/tasks/repeat-reminder";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import { resolveAssignableOwnerName, resolveAssignableOwnerNames } from "@/lib/users/assignable";
 import {
   nextReminderOccurrence,
   parseReminderDateTime,
@@ -248,6 +250,7 @@ export function createTask(input: {
     relatedTo: input.relatedTo,
     description: input.description,
     notes: input.notes,
+    activityNotes: activityNotesFromPlain(input.notes, creator, now),
     reminderDate: input.reminderDate,
     repeatRule:
       input.repeatRule && input.repeatRule.preset !== "none"
@@ -262,7 +265,7 @@ export function createTask(input: {
     actionItems: input.actionItems?.length
       ? input.actionItems.map((item) => ({ ...item }))
       : undefined,
-    collaborators: input.collaborators,
+    collaborators: resolveAssignableOwnerNames(input.collaborators) ?? input.collaborators,
     notifyBy: input.notifyBy?.length ? [...input.notifyBy] : undefined,
     attachments: input.attachments?.length
       ? input.attachments.map((file) => ({ ...file }))
@@ -881,27 +884,74 @@ function cloneTaskRow(row: Task): Task {
   };
 }
 
+function activityNotesFromPlain(
+  body: string | undefined,
+  author: string,
+  createdAt: string,
+  seedId?: string,
+): TaskActivityNote[] | undefined {
+  const trimmed = body?.trim();
+  if (!trimmed) return undefined;
+  return [
+    {
+      id: seedId ?? newRulesId("task-note"),
+      body: trimmed,
+      author,
+      createdAt,
+    },
+  ];
+}
+
+function hydrateActivityNotes(row: Task, existing?: Task): TaskActivityNote[] | undefined {
+  if (row.activityNotes?.length) return row.activityNotes;
+  if (existing?.activityNotes?.length) return existing.activityNotes;
+  const body = row.notes || existing?.notes;
+  return activityNotesFromPlain(
+    body,
+    row.createdBy ?? existing?.createdBy ?? getRulesActor().name,
+    row.createdOn ?? existing?.createdOn ?? formatTaskTimestamp(),
+    row.taskId ? `task-note-seed-${row.taskId}` : undefined,
+  );
+}
+
+function mergeCollaboratorNames(
+  incoming?: string[],
+  existing?: string[],
+): string[] | undefined {
+  const source = incoming?.length ? incoming : existing;
+  if (!source?.length) return existing;
+  const resolved = [
+    ...new Set(
+      source
+        .map((item) => resolveAssignableOwnerName(item))
+        .filter(Boolean),
+    ),
+  ];
+  if (resolved.length) return resolved;
+  const namedExisting = existing?.filter((name) => name.trim() && !isUuid(name));
+  if (namedExisting?.length) return namedExisting;
+  return existing ?? incoming;
+}
+
 function preserveLocalTaskFields(row: Task, existing?: Task): Task {
-  if (!existing) return row;
   const attachments = row.attachments?.length
     ? row.attachments
-    : existing.attachments;
+    : existing?.attachments;
   return {
     ...row,
     attachments,
     attachmentsCount:
       attachments?.length ??
       row.attachmentsCount ??
-      existing.attachmentsCount,
-    activityNotes: row.activityNotes?.length
-      ? row.activityNotes
-      : existing.activityNotes,
-    reminders: row.reminders?.length ? row.reminders : existing.reminders,
+      existing?.attachmentsCount,
+    activityNotes: hydrateActivityNotes(row, existing),
+    collaborators: mergeCollaboratorNames(row.collaborators, existing?.collaborators),
+    reminders: row.reminders?.length ? row.reminders : existing?.reminders,
     actionItems: row.actionItems?.length
       ? row.actionItems
-      : existing.actionItems,
-    description: row.description || existing.description,
-    notes: row.notes || existing.notes,
+      : existing?.actionItems,
+    description: row.description || existing?.description,
+    notes: row.notes || existing?.notes,
   };
 }
 

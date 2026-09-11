@@ -1,13 +1,14 @@
 import {
-  ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
   isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import {
   makeSigner,
   upsertSignatureRequest,
+  deleteSignatureRequest,
   type SignatureRequest,
   type SignatureSigner,
   type SignatureStatus,
@@ -216,41 +217,56 @@ export function normalizeSignatureRequests(data: unknown): SignatureRequest[] {
 }
 
 async function withSession<T>(
-  run: (
-    session: CrmSession | Pick<CrmSession, "baseUrl" | "accessToken">,
-    scoped: boolean,
-  ) => Promise<T>,
+  run: (session: CrmSession) => Promise<T>,
 ): Promise<T> {
-  const scoped = await ensureCrmSession();
-  if (scoped) return run(scoped, true);
-  const access = await ensureCrmAccess();
-  if (!access) throw new Error("Sign in to manage signature requests");
-  return run(access, false);
+  const session = await ensureCrmSession();
+  if (!session) throw new Error("Sign in to manage signature requests");
+  return run(session);
 }
 
-function requestsUrl(
-  session: CrmSession | Pick<CrmSession, "baseUrl" | "accessToken">,
-  scoped: boolean,
+function isMissingCrmRoute(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  return /\(404\)|not found/i.test(message);
+}
+
+async function requestsCall(
   suffix: string,
-) {
-  return scoped
-    ? workspaceSignatureRequestsPath((session as CrmSession).workspaceId, suffix)
-    : globalSignatureRequestsPath(suffix);
+  query = "",
+  init?: RequestInit,
+): Promise<unknown> {
+  const scoped = await ensureCrmSession();
+  const paths = [
+    ...(scoped?.workspaceId
+      ? [`${workspaceSignatureRequestsPath(scoped.workspaceId, suffix)}${query}`]
+      : []),
+    `${globalSignatureRequestsPath(suffix)}${query}`,
+  ].filter((path, index, all) => all.indexOf(path) === index);
+
+  let lastError: unknown;
+  for (let i = 0; i < paths.length; i += 1) {
+    try {
+      if (isBoundCrmSession()) {
+        return await withSession((session) => crmFetch(session, paths[i], init));
+      }
+      return await crmBffFetch(paths[i], init);
+    } catch (err) {
+      lastError = err;
+      if (i < paths.length - 1 && isMissingCrmRoute(err)) continue;
+      throw err;
+    }
+  }
+  throw lastError;
 }
 
 async function requestsGet(suffix: string, query = ""): Promise<unknown> {
-  return withSession((session, scoped) =>
-    crmFetch(session, `${requestsUrl(session, scoped, suffix)}${query}`),
-  );
+  return requestsCall(suffix, query);
 }
 
 async function requestsMutate(
   suffix: string,
   init: RequestInit,
 ): Promise<unknown> {
-  return withSession((session, scoped) =>
-    crmFetch(session, requestsUrl(session, scoped, suffix), init),
-  );
+  return requestsCall(suffix, "", init);
 }
 
 function asRequest(data: unknown): SignatureRequest | null {
@@ -284,31 +300,54 @@ export async function getCrmSignatureRequest(
   return asRequest(await requestsGet(`/${id}`));
 }
 
+function compactBody(input: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(input).filter(([, value]) => {
+      if (value == null) return false;
+      if (typeof value === "string") return value.trim().length > 0;
+      if (Array.isArray(value)) return value.length > 0;
+      return true;
+    }),
+  );
+}
+
 export function toCreateSignatureRequestBody(
   input: SignatureRequest,
 ): Record<string, unknown> {
-  return {
-    title: input.documentName,
-    name: input.documentName,
-    documentName: input.documentName,
-    fileName: input.documentFile,
-    relatedTo: input.relatedTo,
-    expiryDate: toIsoDate(input.expiryDate),
-    expiresAt: toIsoDate(input.expiryDate),
+  return compactBody({
+    title: input.documentName.trim(),
+    documentName: input.documentName.trim(),
     signingOrder: input.signingOrder.toUpperCase(),
-    status: apiSignatureStatus(input.status),
-    signers: input.signers.map((s) => ({
-      name: s.name,
-      email: s.email,
-      role: s.role.toUpperCase(),
-      order: s.order,
-    })),
-    recipients: input.signers.map((s) => ({
-      name: s.name,
-      email: s.email,
-      role: s.role.toUpperCase(),
-      order: s.order,
-    })),
+    expiresAt: toIsoDate(input.expiryDate),
+    recipients: input.signers.map((signer) =>
+      compactBody({
+        name: signer.name.trim(),
+        email: signer.email.trim(),
+        role: signer.role.toUpperCase(),
+        order: signer.order,
+      }),
+    ),
+  });
+}
+
+export function toPlaceSignatureFieldsBody(input: SignatureRequest) {
+  return {
+    fields: input.fields.map((field) =>
+      compactBody({
+        id: field.id,
+        type: field.kind.toUpperCase(),
+        kind: field.kind.toUpperCase(),
+        label: field.label,
+        page: field.page || 1,
+        x: field.x,
+        y: field.y,
+        width: field.w,
+        height: field.h,
+        signerId: field.signerId,
+        required: field.required,
+        documentId: field.documentId,
+      }),
+    ),
   };
 }
 
@@ -401,6 +440,50 @@ export async function downloadCrmSignatureRequest(
   };
 }
 
+export async function listCrmSignatureRecipients(
+  id: string,
+): Promise<SignatureSigner[]> {
+  return mapSigners(await requestsGet(`/${id}/recipients`));
+}
+
+export async function listCrmSignatureFields(id: string) {
+  return extractRecords(await requestsGet(`/${id}/fields`));
+}
+
+export async function placeCrmSignatureFields(
+  id: string,
+  input: SignatureRequest,
+): Promise<SignatureRequest | null> {
+  return asRequest(
+    await requestsMutate(`/${id}/fields`, {
+      method: "PUT",
+      body: JSON.stringify(toPlaceSignatureFieldsBody(input)),
+    }),
+  );
+}
+
+export async function remindCrmSignatureRequest(
+  id: string,
+): Promise<SignatureRequest | null> {
+  return asRequest(
+    await requestsMutate(`/${id}/remind`, {
+      method: "POST",
+      body: "{}",
+    }),
+  );
+}
+
+export async function selfSignCrmSignatureRequest(
+  body: Record<string, unknown>,
+): Promise<SignatureRequest | null> {
+  return asRequest(
+    await requestsMutate(`/self-sign`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
 export async function tryCrmSignatureRequest<T>(
   run: () => Promise<T>,
 ): Promise<T | null> {
@@ -414,6 +497,41 @@ export async function tryCrmSignatureRequest<T>(
 export function persistRemoteSignatureRequest(row: SignatureRequest | null) {
   if (row) upsertSignatureRequest(row, { allowEmptyFields: true });
   return row;
+}
+
+export async function syncCrmSignatureDraft(
+  draft: SignatureRequest,
+): Promise<SignatureRequest> {
+  const body = toCreateSignatureRequestBody(draft);
+  if (isUuid(draft.id)) {
+    await tryCrmSignatureRequest(() =>
+      updateCrmSignatureRequest(draft.id, body),
+    );
+    if (draft.fields.length) {
+      await tryCrmSignatureRequest(() =>
+        placeCrmSignatureFields(draft.id, draft),
+      );
+    }
+    return draft;
+  }
+  const remote = await tryCrmSignatureRequest(() =>
+    createCrmSignatureRequest(body),
+  );
+  if (!remote) return draft;
+  deleteSignatureRequest(draft.id);
+  const merged = persistRemoteSignatureRequest({
+    ...draft,
+    ...remote,
+    fields: draft.fields,
+    signers: draft.signers.length ? draft.signers : remote.signers,
+    recordType: draft.recordType ?? "document",
+  });
+  if (merged && draft.fields.length) {
+    await tryCrmSignatureRequest(() =>
+      placeCrmSignatureFields(merged.id, { ...merged, fields: draft.fields }),
+    );
+  }
+  return merged ?? draft;
 }
 
 export function isCrmSignatureRequestId(id: string): boolean {

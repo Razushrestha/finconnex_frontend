@@ -112,8 +112,8 @@ function readSrc(rel: string) {
 
 export function smokeDocumentsWiring() {
   const api = readSrc("src/lib/documents/library/api.ts");
-  if (!api.includes("workspaceDocumentsPath")) {
-    fail("documents client missing workspaceDocumentsPath");
+  if (!api.includes("documentType") || !api.includes("sizeBytes") || !api.includes("key")) {
+    fail("create document body must send CRM CreateDocumentDto fields");
   }
   if (!api.includes("globalDocumentsPath")) {
     fail("documents client missing globalDocumentsPath");
@@ -172,9 +172,16 @@ export function smokeDocumentsWiring() {
     }
   }
 
-  const page = readSrc("src/app/(dashboard)/documents/library/page.tsx");
+  const page = [
+    readSrc("src/app/(dashboard)/documents/library/page.tsx"),
+    readSrc("src/app/(dashboard)/documents/library/upload/page.tsx"),
+    readSrc("src/components/documents/library/UploadLibraryFileForm.tsx"),
+  ].join("\n");
   if (!page.includes("useCrmDocuments")) {
     fail("library page does not call useCrmDocuments");
+  }
+  if (!page.includes("/documents/library/upload")) {
+    fail("library must route upload to /documents/library/upload");
   }
   for (const name of [
     "createCrmDocument",
@@ -211,20 +218,20 @@ export function smokeDocumentsWiring() {
   const normalized = normalizeLibraryDocument(
     {
       id: ID,
-      fileName: "Greystone_Proposal.pdf",
-      folder: "Deals",
-      ownerName: "Ada",
-      accessLevel: "TEAM",
-      size: 1200000,
+      name: "Greystone_Proposal.pdf",
+      documentType: "PROPOSAL",
+      sizeBytes: 1200000,
+      createdAt: "2026-09-11T00:00:00.000Z",
+      uploadedById: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     },
     0,
   );
   if (
     normalized.fileName !== "Greystone_Proposal.pdf" ||
-    normalized.accessLevel !== "Team" ||
-    normalized.owner !== "Ada"
+    normalized.folder !== "Deals" ||
+    normalized.sizeLabel !== "1.2 MB"
   ) {
-    fail("normalizeLibraryDocument did not map Swagger-shaped fields");
+    fail("normalizeLibraryDocument did not map DocumentResponseDto fields");
   }
 }
 
@@ -265,7 +272,13 @@ export async function smokeDocumentsMock() {
     await getCrmDocument(ID);
     await getCrmDocumentPreview(ID);
     await getCrmDocumentDownload(ID);
-    await createCrmDocument({ fileName: "New.pdf" });
+    await createCrmDocument({
+      name: "New.pdf",
+      documentType: "OTHER",
+      key: "workspaces/a/uploads/new.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 1200,
+    });
     await updateCrmDocument(ID, { fileName: "Updated.pdf" });
     await restoreCrmDocument(ID);
     await bulkDeleteCrmDocuments([ID]);

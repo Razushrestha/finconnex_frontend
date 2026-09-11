@@ -89,6 +89,61 @@ const LIVE_ROUTES: Array<{ method: string; path: string }> = [
     method: "POST",
     path: `/v1/workspaces/${SESSION.workspaceId}/signature-requests/${ID}/decline`,
   },
+  { method: "GET", path: `/v1/signature-requests/${ID}/recipients` },
+  {
+    method: "GET",
+    path: `/v1/workspaces/${SESSION.workspaceId}/signature-requests/${ID}/recipients`,
+  },
+  { method: "GET", path: `/v1/signature-requests/${ID}/fields` },
+  {
+    method: "GET",
+    path: `/v1/workspaces/${SESSION.workspaceId}/signature-requests/${ID}/fields`,
+  },
+  { method: "PUT", path: `/v1/signature-requests/${ID}/fields` },
+  {
+    method: "PUT",
+    path: `/v1/workspaces/${SESSION.workspaceId}/signature-requests/${ID}/fields`,
+  },
+  { method: "POST", path: "/v1/signature-requests/self-sign" },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/signature-requests/self-sign`,
+  },
+  { method: "POST", path: `/v1/signature-requests/${ID}/remind` },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/signature-requests/${ID}/remind`,
+  },
+  { method: "GET", path: "/v1/signature-templates" },
+  {
+    method: "GET",
+    path: `/v1/workspaces/${SESSION.workspaceId}/signature-templates`,
+  },
+  { method: "POST", path: "/v1/signature-templates" },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/signature-templates`,
+  },
+  { method: "GET", path: `/v1/signature-templates/${ID}` },
+  {
+    method: "GET",
+    path: `/v1/workspaces/${SESSION.workspaceId}/signature-templates/${ID}`,
+  },
+  { method: "PATCH", path: `/v1/signature-templates/${ID}` },
+  {
+    method: "PATCH",
+    path: `/v1/workspaces/${SESSION.workspaceId}/signature-templates/${ID}`,
+  },
+  { method: "DELETE", path: `/v1/signature-templates/${ID}` },
+  {
+    method: "DELETE",
+    path: `/v1/workspaces/${SESSION.workspaceId}/signature-templates/${ID}`,
+  },
+  { method: "POST", path: `/v1/signature-templates/${ID}/requests` },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/signature-templates/${ID}/requests`,
+  },
 ];
 
 function repoRoot() {
@@ -114,6 +169,10 @@ export function smokeSignatureRequestsWiring() {
     "viewCrmSignatureRequest",
     "signCrmSignatureRequest",
     "declineCrmSignatureRequest",
+    "remindCrmSignatureRequest",
+    "placeCrmSignatureFields",
+    "listCrmSignatureRecipients",
+    "selfSignCrmSignatureRequest",
   ]) {
     if (!api.includes(`export async function ${name}`)) {
       fail(`signature-requests client missing ${name}`);
@@ -135,6 +194,11 @@ export function smokeSignatureRequestsWiring() {
     'path: "/signature-requests/:id/view"',
     'path: "/signature-requests/:id/sign"',
     'path: "/signature-requests/:id/decline"',
+    'path: "/signature-requests/:id/remind"',
+    'path: "/signature-requests/:id/fields"',
+    'path: "/signature-requests/self-sign"',
+    'path: "/signature-templates"',
+    'path: "/signature-templates/:id/requests"',
     'path: "/workspaces/:workspaceId/signature-requests"',
     'path: "/workspaces/:workspaceId/signature-requests/:id/send"',
     'path: "/workspaces/:workspaceId/signature-requests/:id/decline"',
@@ -168,6 +232,30 @@ export function smokeSignatureRequestsWiring() {
     fail("create form does not call createCrmSignatureRequest");
   }
 
+  const templatesPage = readSrc("src/app/(dashboard)/signature/templates/page.tsx");
+  if (!templatesPage.includes("useCrmSignatureTemplates")) {
+    fail("templates page does not call useCrmSignatureTemplates");
+  }
+  const templatesApi = readSrc("src/lib/documents/signature/templates-api.ts");
+  for (const name of [
+    "listCrmSignatureTemplates",
+    "createCrmSignatureTemplate",
+    "deleteCrmSignatureTemplate",
+    "createCrmSignatureRequestFromTemplate",
+  ]) {
+    if (!templatesApi.includes(`export async function ${name}`)) {
+      fail(`signature-templates client missing ${name}`);
+    }
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (
+    !bff.includes('"signature-requests"') ||
+    !bff.includes('"signature-templates"')
+  ) {
+    fail("BFF proxy does not allow signature-requests or signature-templates");
+  }
+
   const detail = readSrc(
     "src/components/documents/signature/SignatureDetailClient.tsx",
   );
@@ -176,6 +264,7 @@ export function smokeSignatureRequestsWiring() {
     "sendCrmSignatureRequest",
     "deleteCrmSignatureRequest",
     "downloadCrmSignatureRequest",
+    "remindCrmSignatureRequest",
   ]) {
     if (!detail.includes(name)) {
       fail(`signature detail does not call ${name}`);

@@ -25,6 +25,7 @@ import {
   updateTaskStatus,
 } from "@/lib/tasks/store";
 import { persistRemoteTask, syncTaskStatus, tryCrmTask } from "@/lib/tasks/api";
+import { resolveAssignableOwnerName } from "@/lib/users/assignable";
 import {
   DEFAULT_TASK_LIST_COLUMNS,
   isTaskColumnSortable,
@@ -355,7 +356,9 @@ function buildColumnRenderers(): Record<string, ColumnRenderer> {
       label: "Collaborators",
       tdClassName: "px-3 py-2.5",
       td: (task) => {
-        const people = task.collaborators ?? [];
+        const people = (task.collaborators ?? [])
+          .map((name) => resolveAssignableOwnerName(name) || name)
+          .filter(Boolean);
         if (!people.length) return <span className="text-slate-300"></span>;
         const shown = people.slice(0, 3);
         const extra = people.length - shown.length;

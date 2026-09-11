@@ -1,60 +1,74 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useModuleBack } from "@/hooks/useModuleBack";
 import type { Priority, Task, TaskActionItem, TaskStatus } from "@/lib/tasks/types";
 import { findTaskById, addTaskActivityNote, patchTask, updateTaskDescription, updateTaskStatus } from "@/lib/tasks/store";
 import {
-  addCrmTaskAttachment,
   cancelCrmTask,
   completeCrmTask,
   getCrmTask,
   isCrmTaskId,
+  listCrmTasks,
   persistRemoteTask,
   reopenCrmTask,
   syncTaskStatus,
   tryCrmTask,
   updateCrmTask,
 } from "@/lib/tasks/api";
-import { uploadCrmStorageFile } from "@/lib/storage/api";
-import { formatTaskFileSize } from "@/lib/tasks/types";
+import { attachFilesToTask } from "@/lib/tasks/attach-files";
 import { TaskDetailsView } from "@/components/activities/tasks/detail/TaskDetailsView";
 import { onRulesChange } from "@/lib/rules";
 
-interface PageProps {
-  params: Promise<{ id: string }>;
-}
-
-export default function TaskDetailPage({ params }: PageProps) {
-  const { id } = use(params);
+function TaskDetailPageInner() {
+  const { id: rawId } = useParams<{ id: string }>();
+  const id = decodeURIComponent(rawId ?? "");
   const router = useRouter();
   const back = useModuleBack("/activities/tasks", "Back to Tasks");
   const [task, setTask] = useState<Task | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    function loadTask() {
+    let cancelled = false;
+
+    function readLocal() {
       const found = findTaskById(id);
       if (
         found?.task.status === "Completed" &&
         (!found.task.completedBy || !found.task.completedDate)
       ) {
-        setTask(updateTaskStatus(id, "Completed") ?? found.task);
+        return updateTaskStatus(id, "Completed") ?? found.task;
+      }
+      return found?.task ?? null;
+    }
+
+    async function loadRemote() {
+      const local = readLocal();
+      if (local) setTask(local);
+      if (!isCrmTaskId(id)) {
+        if (!cancelled) setLoading(false);
         return;
       }
-      setTask(found?.task ?? null);
+      let remote = await tryCrmTask(() => getCrmTask(id));
+      if (!remote) {
+        const listed = await tryCrmTask(() => listCrmTasks());
+        remote = listed?.find((row) => row.taskId === id) ?? null;
+      }
+      if (cancelled) return;
+      if (remote) {
+        setTask(persistRemoteTask(remote) ?? remote);
+      } else if (!local) {
+        setTask(null);
+      }
+      setLoading(false);
     }
-    loadTask();
-    const off = onRulesChange(loadTask);
-    let cancelled = false;
-    void (async () => {
-      if (!isCrmTaskId(id)) return;
-      const remote = await tryCrmTask(() => getCrmTask(id));
-      if (cancelled || !remote) return;
-      const stored = persistRemoteTask(remote);
-      if (cancelled || !stored) return;
-      setTask(stored);
-    })();
+
+    void loadRemote();
+    const off = onRulesChange(() => {
+      const next = readLocal();
+      if (next) setTask(next);
+    });
     return () => {
       cancelled = true;
       off();
@@ -96,57 +110,13 @@ export default function TaskDetailPage({ params }: PageProps) {
   }
 
   async function handleAddFiles(files: File[]) {
-    const current = findTaskById(id)?.task ?? task;
-    let nextAttachments = [...(current?.attachments ?? [])];
-    for (const file of files) {
-      const localFile = {
-        name: file.name,
-        sizeLabel: formatTaskFileSize(file.size) || undefined,
-      };
-      try {
-        const stored = await uploadCrmStorageFile(file);
-        if (stored.key && isCrmTaskId(id)) {
-          const remote = await tryCrmTask(() =>
-            addCrmTaskAttachment(id, { key: stored.key, fileName: file.name }),
-          );
-          if (remote?.attachments?.length) {
-            nextAttachments = remote.attachments;
-            persistRemoteTask({
-              ...current,
-              ...remote,
-              attachments: remote.attachments,
-            });
-            setTask(findTaskById(id)?.task ?? remote);
-            continue;
-          }
-          nextAttachments = [
-            ...nextAttachments,
-            {
-              ...localFile,
-              name: stored.fileName || file.name,
-              key: stored.key,
-              url: stored.url || undefined,
-            },
-          ];
-          if (remote) {
-            persistRemoteTask({
-              ...current,
-              ...remote,
-              attachments: nextAttachments,
-            });
-          }
-        } else {
-          nextAttachments = [...nextAttachments, localFile];
-        }
-      } catch {
-        nextAttachments = [...nextAttachments, localFile];
-      }
-      const updated = patchTask(id, {
-        attachments: nextAttachments,
-        attachmentsCount: nextAttachments.length,
-      });
-      if (updated) setTask(updated);
-    }
+    const attached = await attachFilesToTask(id, files);
+    setTask(
+      findTaskById(id)?.task ??
+        (task
+          ? { ...task, attachments: attached, attachmentsCount: attached.length }
+          : task),
+    );
   }
 
   function handleSaveDetails(next: {
@@ -158,6 +128,14 @@ export default function TaskDetailPage({ params }: PageProps) {
     const updated = patchTask(id, next);
     if (updated) setTask(updated);
     applyRemote(() => updateCrmTask(id, next));
+  }
+
+  if (loading && !task) {
+    return (
+      <div className="flex min-h-[320px] items-center justify-center px-4">
+        <p className="text-sm text-slate-500">Loading task…</p>
+      </div>
+    );
   }
 
   if (!task) {
@@ -189,5 +167,19 @@ export default function TaskDetailPage({ params }: PageProps) {
       onAddFiles={handleAddFiles}
       onSaveDetails={handleSaveDetails}
     />
+  );
+}
+
+export default function TaskDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[320px] items-center justify-center px-4">
+          <p className="text-sm text-slate-500">Loading task…</p>
+        </div>
+      }
+    >
+      <TaskDetailPageInner />
+    </Suspense>
   );
 }

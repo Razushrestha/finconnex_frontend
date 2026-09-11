@@ -652,9 +652,20 @@ import type {
   PlacedField,
   DraggingFieldType,
 } from "@/components/documents/signature/create/PdfFieldEditor";
+import {
+  DEFAULT_PLACED_FIELD_HEIGHT,
+  DEFAULT_PLACED_FIELD_WIDTH,
+} from "@/lib/documents/signature/field-placement";
 import { toast } from "sonner";
 import { getNewlyNotifiedSigners } from "@/lib/documents/signature/mock-send";
 import { notifySigners } from "@/components/documents/signature/create/Notify";
+import {
+  isCrmSignatureRequestId,
+  persistRemoteSignatureRequest,
+  sendCrmSignatureRequest,
+  syncCrmSignatureDraft,
+  tryCrmSignatureRequest,
+} from "@/lib/documents/signature/api";
 
 export default function CreateSignatureRequestPage() {
   return (
@@ -758,19 +769,6 @@ function CreateSignatureRequestForm() {
   }, [documentFile]);
 
   useEffect(() => {
-    if (!documentFile || !(documentFile instanceof File)) {
-      setPersistentFileUrl("");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      if (result) setPersistentFileUrl(result);
-    };
-    reader.readAsDataURL(documentFile);
-  }, [documentFile]);
-
-  useEffect(() => {
     return () => {
       if (fileUrl) URL.revokeObjectURL(fileUrl);
     };
@@ -854,23 +852,17 @@ function CreateSignatureRequestForm() {
         },
       }));
 
-      // Persistent copy so this document is still readable once the
-      // request is saved and opened elsewhere (recipient's browser,
-      // after a reload, etc.) — a blob: URL alone would 404 there.
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        if (!result) return;
+      void tryCrmStorage(() => uploadCrmStorageFile(doc.file)).then((stored) => {
+        if (!stored?.url) return;
         setAdditionalPreviews((prev) =>
           prev[doc.id]
             ? {
                 ...prev,
-                [doc.id]: { ...prev[doc.id], persistentFileUrl: result },
+                [doc.id]: { ...prev[doc.id], persistentFileUrl: stored.url },
               }
             : prev,
         );
-      };
-      reader.readAsDataURL(doc.file);
+      });
 
       if (isDocx) {
         doc.file
@@ -955,10 +947,8 @@ function CreateSignatureRequestForm() {
     additionalPreviews,
   ]);
 
-  // What actually gets persisted onto the request (SignatureDocument[]).
-  // Unlike `documents` above (blob: URLs, editor-preview only), this uses
-  // the data: URLs so every attached file — not just the primary PDF —
-  // survives being opened by the recipient in a different browser/tab.
+  // Persist CRM storage URLs when uploaded; otherwise a same-tab blob URL
+  // (stripped from localStorage so PDFs don't blow the quota).
   const signatureDocuments: SignatureDocument[] = useMemo(() => {
     const list: SignatureDocument[] = [];
     if (documentFile) {
@@ -966,7 +956,7 @@ function CreateSignatureRequestForm() {
         id: "primary",
         name: documentName || documentFile.name,
         fileName: renamedStoredFileName(documentName, documentFile.name),
-        fileUrl: persistentFileUrl,
+        fileUrl: persistentFileUrl || fileUrl,
       });
     }
     additionalFiles.forEach((doc) => {
@@ -975,7 +965,7 @@ function CreateSignatureRequestForm() {
         id: doc.id,
         name: doc.name,
         fileName: renamedStoredFileName(doc.name, doc.file.name),
-        fileUrl: preview?.persistentFileUrl || "",
+        fileUrl: preview?.persistentFileUrl || preview?.fileUrl || "",
       });
     });
     return list;
@@ -983,6 +973,7 @@ function CreateSignatureRequestForm() {
     documentFile,
     documentName,
     persistentFileUrl,
+    fileUrl,
     additionalFiles,
     additionalPreviews,
   ]);
@@ -1033,6 +1024,7 @@ function CreateSignatureRequestForm() {
   const handleFileChange = (file: File | null) => {
     setDocumentFile(file);
     setFileError("");
+    setPersistentFileUrl("");
     if (!file) return;
     void tryCrmStorage(() => uploadCrmStorageFile(file)).then((stored) => {
       if (stored?.url) setPersistentFileUrl(stored.url);
@@ -1164,6 +1156,8 @@ function CreateSignatureRequestForm() {
         page,
         xPct,
         yPct,
+        width: DEFAULT_PLACED_FIELD_WIDTH,
+        height: DEFAULT_PLACED_FIELD_HEIGHT,
         recipientId: draggingFieldType.recipient?.id,
         colorIndex: draggingFieldType.recipient?.colorIndex,
       },
@@ -1224,7 +1218,15 @@ function CreateSignatureRequestForm() {
       ],
     });
 
-    const sent = markRequestSent(draft, "Current User");
+    const synced = await syncCrmSignatureDraft(draft);
+    if (isCrmSignatureRequestId(synced.id)) {
+      const remote = await tryCrmSignatureRequest(() =>
+        sendCrmSignatureRequest(synced.id),
+      );
+      if (remote) persistRemoteSignatureRequest(remote);
+    }
+
+    const sent = markRequestSent(synced, "Current User");
     const notified = getNewlyNotifiedSigners(draft, sent);
     await notifySigners(sent, notified); // mock for now — logs the payload
 

@@ -16,12 +16,10 @@ import {
   TASK_STATUSES,
   TASK_TYPES,
   formatTaskTimestamp,
-  formatTaskFileSize,
   notifyToMethod,
   type Priority,
   type ReminderNotifyOption,
   type TaskActionItem,
-  type TaskFileAttachment,
   type TaskStatus,
   type TaskType,
 } from "@/lib/tasks/types";
@@ -35,7 +33,13 @@ import {
   createCrmTask,
   persistRemoteTask,
 } from "@/lib/tasks/api";
-import { createTask, deleteTask, findTaskById } from "@/lib/tasks/store";
+import { attachFilesToTask } from "@/lib/tasks/attach-files";
+import {
+  addTaskActivityNote,
+  createTask,
+  deleteTask,
+  findTaskById,
+} from "@/lib/tasks/store";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { listCrmCompanies, tryCrmCompany } from "@/lib/companies/api";
 import { mergeCrmCompaniesIntoBoard } from "@/lib/companies/store";
@@ -46,13 +50,13 @@ import { mergeCrmDealsIntoBoard } from "@/lib/deals/store";
 import { fetchLeadList } from "@/lib/leads/api";
 import { mapCrmLeadToCard } from "@/lib/leads/api/map";
 import { upsertLeadFromCard } from "@/lib/leads/store";
-import { uploadCrmStorageFile } from "@/lib/storage/api";
 import type { RelatedTo } from "@/lib/activities/shared";
 import {
   assignableOwnerLabel,
   defaultAssignableOwnerId,
   listAssignableOwnersLocal,
   loadAssignableOwners,
+  resolveAssignableOwnerName,
   resolveCrmAssigneeUserId,
   type AssignableOwner,
 } from "@/lib/users/assignable";
@@ -78,7 +82,6 @@ import {
 } from "@/components/sales/CreateEntityForm";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import AttachmentUpload from "./AttachmentUpload";
-import { getUploadAdapter } from "@/lib/attachments/upload";
 import { type NotificationMethod } from "@/lib/reminders/types";
 import {
   defaultReminderRepeatRule,
@@ -258,7 +261,7 @@ function validateTaskDates(
 
 function ownerDisplay(options: AssignableOwner[], id: string) {
   const owner = options.find((row) => row.id === id);
-  return owner?.name ?? id;
+  return owner?.name || resolveAssignableOwnerName(id);
 }
 
 function newActionItemId() {
@@ -646,55 +649,9 @@ export function CreateTaskForm({
       );
       return;
     }
-    const collaboratorNames = form.collaborators.map((id) =>
-      ownerDisplay(ownerOptions, id),
-    );
-
-    let attachmentKeys: string[] = [];
-    const uploadedFiles: TaskFileAttachment[] = [];
-    if (form.attachments.length > 0) {
-      for (const file of form.attachments) {
-        try {
-          const stored = await uploadCrmStorageFile(file);
-          if (stored.key) {
-            attachmentKeys.push(stored.key);
-            uploadedFiles.push({
-              name: stored.fileName || file.name,
-              key: stored.key,
-              url: stored.url || undefined,
-              sizeLabel: formatTaskFileSize(file.size) || undefined,
-            });
-            continue;
-          }
-        } catch (crmErr) {
-          const adapter = getUploadAdapter();
-          if (adapter.mode !== "local") {
-            window.alert(
-              crmErr instanceof Error
-                ? `Failed to upload "${file.name}": ${crmErr.message}`
-                : `Failed to upload "${file.name}"`,
-            );
-            return;
-          }
-          const result = await adapter.upload({
-            fileName: file.name,
-            data: await file.arrayBuffer(),
-            contentType: file.type || "application/octet-stream",
-            relatedTo: form.title.trim() || "Task",
-          });
-          if (!result.ok) {
-            window.alert(`Failed to upload "${file.name}": ${result.message}`);
-            return;
-          }
-          uploadedFiles.push({
-            name: result.fileName,
-            url: result.storageUrl || undefined,
-            sizeLabel: result.sizeLabel,
-          });
-        }
-      }
-    }
-    const attachmentsCount = uploadedFiles.length;
+    const collaboratorNames = form.collaborators
+      .map((id) => ownerDisplay(ownerOptions, id))
+      .filter(Boolean);
 
     const repeatPreset = form.taskRepeat.preset;
     const repeatEvery =
@@ -741,9 +698,6 @@ export function CreateTaskForm({
           ? form.taskRepeat
           : undefined,
       repeatEvery,
-      attachmentKeys: attachmentKeys.length ? attachmentKeys : undefined,
-      attachments: uploadedFiles.length ? uploadedFiles : undefined,
-      attachmentsCount: attachmentsCount || undefined,
       createdBy: actor,
     };
     const local = createTask({
@@ -766,18 +720,11 @@ export function CreateTaskForm({
           relatedTo: related ?? remote.relatedTo,
           description: local.description ?? remote.description,
           notes: local.notes ?? remote.notes,
+          activityNotes: local.activityNotes,
           reminders: local.reminders,
           actionItems: local.actionItems,
           notifyBy: local.notifyBy,
           repeatRule: local.repeatRule,
-          attachments: remote.attachments?.length
-            ? remote.attachments
-            : local.attachments,
-          attachmentsCount:
-            remote.attachments?.length ??
-            local.attachments?.length ??
-            remote.attachmentsCount ??
-            local.attachmentsCount,
         });
         task = findTaskById(remote.taskId)?.task ?? remote;
       } else if (!remote) {
@@ -791,6 +738,24 @@ export function CreateTaskForm({
         err instanceof Error ? err.message : "Could not save this task to CRM.",
       );
       return;
+    }
+    if (form.attachments.length) {
+      const attached = await attachFilesToTask(task.taskId, form.attachments);
+      task =
+        findTaskById(task.taskId)?.task ??
+        (attached.length
+          ? { ...task, attachments: attached, attachmentsCount: attached.length }
+          : task);
+    }
+    const createNote = form.notes.trim();
+    if (createNote) {
+      const already = (findTaskById(task.taskId)?.task.activityNotes ?? []).some(
+        (note) => note.body.trim() === createNote,
+      );
+      if (!already) {
+        const withNote = addTaskActivityNote(task.taskId, createNote);
+        if (withNote) task = withNote;
+      }
     }
     logCreate("activities.tasks", ownerName, task.taskId, form.title);
     notifyOwnerAssigned({
