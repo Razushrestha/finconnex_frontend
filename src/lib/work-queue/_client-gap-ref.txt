@@ -1,0 +1,45 @@
+const ACTIVITY_DEFAULT = [
+  { id: 'tasks', label: 'Tasks', count: 25, icon: 'check-circle' },
+  { id: 'calls', label: 'Calls', count: 7, icon: 'phone' },
+  { id: 'meetings', label: 'Meetings', count: 0, icon: 'calendar' },
+  { id: 'emails', label: 'Emails', count: 27, icon: 'mail' },
+  { id: 'messages', label: 'Messages', count: 6, icon: 'message' },
+  { id: 'reminders', label: 'Reminders', count: 2, icon: 'bell' },
+];
+
+const CATEGORIES_DEFAULT = [
+  { id: 'leads', label: 'Leads', checked: true, items: [
+    { id: 'my-leads', label: 'My Leads', count: 85, checked: true },
+    { id: 'new-leads', label: 'Leads assigned in last 3 hours', count: 0, checked: true },
+    { id: 'pending-tags', label: 'Pending Tags', count: 2, checked: true },
+    { id: 'stale-leads', label: 'Stale Leads', count: 9, checked: true, danger: true },
+  ]},
+  { id: 'contacts', label: 'Contacts', checked: true, items: [
+    { id: 'my-contacts', label: 'My Contacts', count: 109, checked: true },
+    { id: 'contacts-3h', label: 'Contacts assigned in last 3 hours', count: 0, checked: true },
+    { id: 'followup', label: 'Follow-up Required', count: 11, checked: true },
+  ]},
+  { id: 'deals', label: 'Deals', checked: true, items: [
+    { id: 'my-deals', label: 'My Deals', count: 70, checked: true },
+    { id: 'closing-soon', label: 'Deals Closing This Month', count: 0, checked: true },
+    { id: 'pending-deal-tags', label: 'Pending Deal Tags', count: 9, checked: true },
+    { id: 'stalled', label: 'Stalled Deals', count: 4, checked: false },
+  ]},
+  { id: 'records', label: 'Records', checked: true, items: [
+    { id: 'pending-review', label: 'Pending Review', count: 7, checked: true },
+    { id: 'missing-info', label: 'Missing Information', count: 15, checked: false },
+    { id: 'awaiting-action', label: 'Awaiting Action', count: 9, checked: true },
+  ]},
+  { id: 'approvals', label: 'Approvals', checked: true, items: [
+    { id: 'pending-approval', label: 'Pending My Approval', count: 3, checked: true },
+    { id: 'waiting-approval', label: 'Waiting for Approval', count: 5, checked: true },
+  ]},
+  { id: 'attention', label: 'Attention Required', checked: true, items: [
+    { id: 'overdue', label: 'Overdue', count: 8, checked: true, danger: true },
+    { id: 'high-priority', label: 'High Priority', count: 5, checked: true, danger: true },
+    { id: 'escalated', label: 'Escalated', count: 2, checked: true, danger: true },
+  ]},
+];
+
+const clone = (v) => JSON.parse(JSON.stringify(v));
+

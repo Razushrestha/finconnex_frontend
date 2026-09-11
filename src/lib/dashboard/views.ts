@@ -2,6 +2,7 @@ export const DASHBOARD_VIEWS = [
   { id: "executive", label: "Executive Overview" },
   { id: "sales", label: "Sales Dashboard" },
   { id: "performance", label: "Performance Dashboard" },
+  { id: "work-queue", label: "Work Queue Dashboard" },
 ] as const;
 
 export type DashboardViewId = (typeof DASHBOARD_VIEWS)[number]["id"];
@@ -14,6 +15,10 @@ export function isDashboardViewId(value: string | null | undefined): value is Da
 
 export function dashboardViewLabel(id: DashboardViewId) {
   return DASHBOARD_VIEWS.find((view) => view.id === id)?.label ?? "Executive Overview";
+}
+
+export function dashboardViewHref(id: DashboardViewId) {
+  return id === "executive" ? "/" : `/?view=${id}`;
 }
 
 export function loadDashboardView(): DashboardViewId {

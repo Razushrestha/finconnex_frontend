@@ -47,6 +47,7 @@ import {
 } from "@/lib/dashboard/view-widgets";
 import { SalesDashboardView } from "@/components/dashboard/SalesDashboardView";
 import { PerformanceDashboardView } from "@/components/dashboard/PerformanceDashboardView";
+import { WorkQueueDashboardView } from "@/components/dashboard/WorkQueueDashboardView";
 import {
   DASHBOARD_ROLES,
   listRoleLayouts,
@@ -143,10 +144,6 @@ export function DashboardWorkspace() {
   }, []);
 
   useEffect(() => {
-    if (searchParams.get("view") === "work-queue") {
-      router.replace("/work-queue");
-      return;
-    }
     const stored = loadDashboardLayout();
     const next =
       stored.filters.owner === "All"
@@ -157,11 +154,6 @@ export function DashboardWorkspace() {
     const nextRole = loadActiveDashboardRole();
     setRole(nextRole);
     setRoleLayouts(listRoleLayouts(nextRole));
-    const fromUrl = searchParams.get("view");
-    const initial = isDashboardViewId(fromUrl) ? fromUrl : loadDashboardView();
-    setView(initial);
-    setViewHidden(loadViewHidden(initial));
-    setViewOrder(loadViewOrder(initial));
 
     void (async () => {
       try {
@@ -194,11 +186,11 @@ export function DashboardWorkspace() {
 
   useEffect(() => {
     const fromUrl = searchParams.get("view");
-    if (isDashboardViewId(fromUrl)) {
-      setView(fromUrl);
-      setViewHidden(loadViewHidden(fromUrl));
-      setViewOrder(loadViewOrder(fromUrl));
-    }
+    const next = isDashboardViewId(fromUrl) ? fromUrl : loadDashboardView();
+    setView(next);
+    setViewHidden(loadViewHidden(next));
+    setViewOrder(loadViewOrder(next));
+    saveDashboardView(next);
   }, [searchParams]);
 
   useEffect(() => {
@@ -547,6 +539,12 @@ export function DashboardWorkspace() {
         ) : null}
         {view === "performance" ? (
           <PerformanceDashboardView
+            filters={layout.filters}
+            {...reorderProps}
+          />
+        ) : null}
+        {view === "work-queue" ? (
+          <WorkQueueDashboardView
             filters={layout.filters}
             {...reorderProps}
           />
