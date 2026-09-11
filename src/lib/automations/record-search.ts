@@ -6,16 +6,31 @@
  * the id goes straight into an `id EQUALS <uuid>` trigger condition.
  *
  * Only the entity types with a browsable module screen are pickable. The rest
- * (EMAIL, MESSAGE, MEETING, DOCUMENT, …) fall back to field conditions in the
- * panel: pinning a workflow to one individual email is not a thing anyone
- * means to do, and there is no picker UI for them to reuse.
+ * (EMAIL, MESSAGE, DOCUMENT, …) fall back to field conditions in the panel:
+ * pinning a workflow to one individual email is not a thing anyone means to
+ * do, and there is no picker UI for them to reuse.
+ *
+ * Meetings are the exception among the activity entities: a meeting is a
+ * scheduled thing people already talk about by name ("the Q3 kickoff"), so
+ * they are pickable — as a *set* rather than one at a time, since the same
+ * follow-up workflow usually covers several. See
+ * `MULTI_RECORD_PICKABLE_ENTITY_TYPES`.
  */
 import { fetchLeadById, fetchLeadList } from "@/lib/leads/api";
 import { getCrmContact, listCrmContacts } from "@/lib/contacts/api";
 import { getCrmCompany, listCrmCompanies } from "@/lib/companies/api";
 import { getCrmDeal, listCrmDeals } from "@/lib/deals/api";
 import { getCrmTask, listCrmTasks } from "@/lib/tasks/api";
+import { getCrmMeeting, isCrmMeetingId, listCrmMeetings } from "@/lib/meetings/api";
+import { loadAssignableOwners } from "@/lib/users/assignable";
 import type { AutomationEntityType } from "@/lib/automations/types";
+
+/**
+ * What a related-record picker points at. Teammates are not an
+ * `AutomationEntityType` — no trigger fires on a user — but a message can be
+ * addressed to one (`toUserId`), so they are pickable as a target.
+ */
+export type RelatedTarget = AutomationEntityType | "USER";
 
 export type AutomationRecordOption = {
   id: string;
@@ -31,8 +46,47 @@ export const RECORD_PICKABLE_ENTITY_TYPES = [
   "TASK",
 ] as const satisfies readonly AutomationEntityType[];
 
+/**
+ * Entities picked as a set, on a page of their own, instead of one record
+ * inline: the scope stage offers "Specific meetings", which opens a second
+ * sidebar page listing the workspace's saved meetings with checkboxes.
+ */
+export const MULTI_RECORD_PICKABLE_ENTITY_TYPES = [
+  "MEETING",
+] as const satisfies readonly AutomationEntityType[];
+
 export function supportsRecordPicker(entityType: AutomationEntityType): boolean {
   return (RECORD_PICKABLE_ENTITY_TYPES as readonly string[]).includes(entityType);
+}
+
+export function supportsMultiRecordPicker(entityType: AutomationEntityType): boolean {
+  return (MULTI_RECORD_PICKABLE_ENTITY_TYPES as readonly string[]).includes(entityType);
+}
+
+/** "12 Mar, 09:30" — enough to tell two same-titled meetings apart. */
+function meetingWhen(iso: string): string {
+  const at = new Date(iso);
+  if (!iso || Number.isNaN(at.getTime())) return "";
+  return at.toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function meetingOption(meeting: {
+  id: string;
+  title: string;
+  startDateTime: string;
+  status: string;
+}): AutomationRecordOption {
+  const when = meetingWhen(meeting.startDateTime);
+  return {
+    id: meeting.id,
+    label: clean(meeting.title) || "Untitled meeting",
+    sublabel: [when, clean(meeting.status)].filter(Boolean).join(" \u00b7 ") || undefined,
+  };
 }
 
 function clean(value: unknown): string {
@@ -42,6 +96,55 @@ function clean(value: unknown): string {
 /** Drops rows with no usable id — an option that can't be saved is noise. */
 function usable(options: AutomationRecordOption[]): AutomationRecordOption[] {
   return options.filter((option) => option.id && option.label);
+}
+
+/** Teammates, filtered client-side — the list is small and already cached. */
+async function searchWorkspaceUsers(
+  search: string,
+  limit: number,
+): Promise<AutomationRecordOption[]> {
+  const query = search.trim().toLowerCase();
+  const owners = await loadAssignableOwners();
+  return owners
+    .filter(
+      (owner) =>
+        !query ||
+        owner.name.toLowerCase().includes(query) ||
+        owner.email.toLowerCase().includes(query),
+    )
+    .slice(0, limit)
+    .map((owner) => ({
+      id: owner.id,
+      label: owner.name || owner.email,
+      sublabel: owner.email || undefined,
+    }));
+}
+
+export async function searchRelatedTargets(
+  target: RelatedTarget,
+  search: string,
+  limit = 20,
+): Promise<AutomationRecordOption[]> {
+  return target === "USER"
+    ? searchWorkspaceUsers(search, limit)
+    : searchAutomationRecords(target, search, limit);
+}
+
+export async function describeRelatedTarget(
+  target: RelatedTarget,
+  id: string,
+): Promise<AutomationRecordOption | null> {
+  if (target !== "USER") return describeAutomationRecord(target, id);
+  if (!id) return null;
+  try {
+    const owners = await loadAssignableOwners();
+    const owner = owners.find((row) => row.id === id);
+    return owner
+      ? { id, label: owner.name || owner.email, sublabel: owner.email || undefined }
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function searchAutomationRecords(
@@ -104,6 +207,12 @@ export async function searchAutomationRecords(
         })),
       );
     }
+    case "MEETING": {
+      const rows = await listCrmMeetings({ page: 1, limit, search: query || undefined });
+      // A row the API returned without an id gets a synthesized `crm-meet-N`
+      // placeholder, which would save a condition that can never match.
+      return usable(rows.filter((row) => isCrmMeetingId(row.id)).map(meetingOption));
+    }
     default:
       return [];
   }
@@ -154,6 +263,11 @@ export async function describeAutomationRecord(
         const task = await getCrmTask(id);
         if (!task) return null;
         return { id, label: clean(task.title) || id, sublabel: clean(task.status) || undefined };
+      }
+      case "MEETING": {
+        const meeting = await getCrmMeeting(id);
+        if (!meeting) return null;
+        return meetingOption({ ...meeting, id });
       }
       default:
         return null;

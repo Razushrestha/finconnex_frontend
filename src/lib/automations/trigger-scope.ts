@@ -14,6 +14,7 @@
  * TASK (AUTOMATION_FIELD_REGISTRY), so "this one lead" is exactly
  * `id EQUALS <uuid>` — no new backend surface needed.
  */
+import type { RelatedTarget } from "@/lib/automations/record-search";
 import type {
   AutomationCondition,
   AutomationConditionGroup,
@@ -26,8 +27,28 @@ export type TriggerScope =
   | { mode: "ANY" }
   /** Exactly one record, pinned by id. */
   | { mode: "RECORD"; recordId: string }
+  /**
+   * A hand-picked set of records, pinned by id. Written as `id IN_LIST [...]`,
+   * which the engine evaluates as `value.includes(snapshot.id)` — "this
+   * workflow watches these meetings and no others".
+   */
+  | { mode: "RECORDS"; recordIds: string[] }
   /** Any record matching a field-condition group. */
   | { mode: "FILTER"; group: AutomationConditionGroup };
+
+/**
+ * The backend caps an IN_LIST value at 50 entries
+ * (`automation.error.conditionValueType`), so the picker has to stop there
+ * rather than saving a group the API will reject.
+ */
+export const MAX_PINNED_RECORDS = 50;
+
+/** Ids a scope pins, whether it pins one record or a set of them. */
+export function scopeRecordIds(scope: TriggerScope): string[] {
+  if (scope.mode === "RECORD") return scope.recordId ? [scope.recordId] : [];
+  if (scope.mode === "RECORDS") return scope.recordIds.filter(Boolean);
+  return [];
+}
 
 export const EMPTY_CONDITION_GROUP: AutomationConditionGroup = {
   mode: "ALL",
@@ -72,6 +93,13 @@ export type TriggerFilter = {
   transition: TriggerTransition;
   /** Column names, for a "field changed" trigger. Empty means any field. */
   changedFields: string[];
+  /**
+   * Related-record pins, keyed by the snapshot field holding the id —
+   * `{ contactId: ["<uuid>", ...] }`. Distinct from a RECORD scope, which
+   * pins the triggering record itself: this pins what that record is *about*,
+   * and accepts several so one workflow can cover a set of contacts.
+   */
+  related: Record<string, string[]>;
 };
 
 const CHANGED_FIELDS = "changedFields";
@@ -79,6 +107,28 @@ const CHANGED_FIELDS = "changedFields";
 /** `changedFields CONTAINS "<column>"` — the shape a field selection writes. */
 function changedFieldLeaf(field: string): AutomationCondition {
   return { field: CHANGED_FIELDS, operator: "CONTAINS", value: field };
+}
+
+/**
+ * A related pin reads back from either shape: one id is written as EQUALS,
+ * several as IN_LIST (`value.includes(actual)` server-side).
+ */
+function relatedValues(
+  item: AutomationCondition | AutomationConditionGroup,
+  field: string,
+): string[] | null {
+  if (!isLeaf(item) || item.field !== field) return null;
+  if (item.operator === "EQUALS") {
+    return typeof item.value === "string" && item.value ? [item.value] : null;
+  }
+  if (item.operator === "IN_LIST") {
+    if (!Array.isArray(item.value) || item.value.length === 0) return null;
+    const ids = item.value.filter(
+      (id): id is string => typeof id === "string" && Boolean(id),
+    );
+    return ids.length === item.value.length ? ids : null;
+  }
+  return null;
 }
 
 function changedFieldValue(
@@ -116,6 +166,17 @@ function transitionValue(
 }
 
 /**
+ * One pinned id reads back as the single-record scope, several as the set —
+ * so a picker that saved one meeting reopens on that meeting rather than on a
+ * one-item list.
+ */
+function pinnedScope(recordIds: string[] | null): TriggerScope {
+  if (!recordIds || recordIds.length === 0) return { mode: "ANY" };
+  if (recordIds.length === 1) return { mode: "RECORD", recordId: recordIds[0] };
+  return { mode: "RECORDS", recordIds };
+}
+
+/**
  * Split a saved condition group back into the panel's controls.
  *
  * `fields` names the transition's two snapshot fields, and gates whether they
@@ -128,22 +189,32 @@ function transitionValue(
 export function readTriggerFilter(
   conditions: AutomationConditionGroup | null | undefined,
   fields: TransitionFields | null = null,
+  relatedFields: readonly string[] = [],
 ): TriggerFilter {
   if (!conditions || !Array.isArray(conditions.items) || conditions.items.length === 0) {
-    return { scope: { mode: "ANY" }, transition: {}, changedFields: [] };
+    return { scope: { mode: "ANY" }, transition: {}, changedFields: [], related: {} };
   }
   // An ANY group is a single indivisible predicate — pulling leaves out of it
   // would change what it means. The exception is a group that is *only*
   // changed-field checks, which is how a multi-field selection is written.
   if (conditions.mode !== "ALL") {
     const only = changedFieldGroup(conditions);
-    if (only) return { scope: { mode: "ANY" }, transition: {}, changedFields: only };
-    return { scope: { mode: "FILTER", group: conditions }, transition: {}, changedFields: [] };
+    if (only) {
+      return { scope: { mode: "ANY" }, transition: {}, changedFields: only, related: {} };
+    }
+    return {
+      scope: { mode: "FILTER", group: conditions },
+      transition: {},
+      changedFields: [],
+      related: {},
+    };
   }
 
   const transition: TriggerTransition = {};
   const changedFields: string[] = [];
-  let recordId: string | null = null;
+  const related: Record<string, string[]> = {};
+  /** Ids pinned on `id`, from either the EQUALS or the IN_LIST shape. */
+  let recordIds: string[] | null = null;
   const rest: Array<AutomationCondition | AutomationConditionGroup> = [];
 
   for (const item of conditions.items) {
@@ -173,10 +244,17 @@ export function readTriggerFilter(
         continue;
       }
     }
-    if (!recordId) {
-      const id = transitionValue(item, "id");
-      if (id && id !== TRANSITION_UNSET) {
-        recordId = id;
+    const relatedField = relatedFields.find(
+      (field) => !related[field] && relatedValues(item, field),
+    );
+    if (relatedField) {
+      related[relatedField] = relatedValues(item, relatedField) as string[];
+      continue;
+    }
+    if (!recordIds) {
+      const ids = relatedValues(item, "id");
+      if (ids) {
+        recordIds = ids;
         continue;
       }
     }
@@ -184,20 +262,17 @@ export function readTriggerFilter(
   }
 
   if (rest.length === 0) {
-    return {
-      scope: recordId ? { mode: "RECORD", recordId } : { mode: "ANY" },
-      transition,
-      changedFields,
-    };
+    return { scope: pinnedScope(recordIds), transition, changedFields, related };
   }
   // A lone nested group is the FILTER scope exactly as it was written.
-  if (rest.length === 1 && !isLeaf(rest[0]) && !recordId) {
-    return { scope: { mode: "FILTER", group: rest[0] }, transition, changedFields };
+  if (rest.length === 1 && !isLeaf(rest[0]) && !recordIds) {
+    return { scope: { mode: "FILTER", group: rest[0] }, transition, changedFields, related };
   }
   return {
     scope: { mode: "FILTER", group: { mode: "ALL", items: rest } },
     transition,
     changedFields,
+    related,
   };
 }
 
@@ -222,6 +297,17 @@ export function writeTriggerFilter(
   // One field is a plain check; several are an ANY group, since a record's
   // update touches a set of columns and matching *all* of them would almost
   // never fire.
+  for (const [field, ids] of Object.entries(filter.related)) {
+    const picked = ids.filter(Boolean);
+    if (picked.length === 1) {
+      items.push({ field, operator: "EQUALS", value: picked[0] });
+    } else if (picked.length > 1) {
+      // IN_LIST is evaluated as `value.includes(snapshot[field])`, which is
+      // exactly "the call is about any of these contacts".
+      items.push({ field, operator: "IN_LIST", value: picked });
+    }
+  }
+
   if (filter.changedFields.length === 1) {
     items.push(changedFieldLeaf(filter.changedFields[0]));
   } else if (filter.changedFields.length > 1) {
@@ -229,8 +315,11 @@ export function writeTriggerFilter(
   }
 
   const { scope } = filter;
-  if (scope.mode === "RECORD" && scope.recordId) {
-    items.push({ field: "id", operator: "EQUALS", value: scope.recordId });
+  const pinned = scopeRecordIds(scope).slice(0, MAX_PINNED_RECORDS);
+  if (pinned.length === 1) {
+    items.push({ field: "id", operator: "EQUALS", value: pinned[0] });
+  } else if (pinned.length > 1) {
+    items.push({ field: "id", operator: "IN_LIST", value: pinned });
   } else if (scope.mode === "FILTER" && scope.group.items.length > 0) {
     // Flatten an ALL group into the outer ALL; anything else has to nest to
     // keep its own mode.
@@ -254,7 +343,7 @@ export function readTriggerScope(
 export function writeTriggerScope(
   scope: TriggerScope,
 ): AutomationConditionGroup | undefined {
-  return writeTriggerFilter({ scope, transition: {}, changedFields: [] });
+  return writeTriggerFilter({ scope, transition: {}, changedFields: [], related: {} });
 }
 
 const ENTITY_NOUN: Record<AutomationEntityType, { one: string; many: string }> = {
@@ -288,6 +377,12 @@ export function describeTriggerScope(
   const noun = entityNoun(entityType);
   if (scope.mode === "ANY") return `Any ${noun.one}`;
   if (scope.mode === "RECORD") return recordLabel?.trim() || `One specific ${noun.one}`;
+  if (scope.mode === "RECORDS") {
+    const pinned = scopeRecordIds(scope);
+    if (pinned.length === 0) return `Any ${noun.one}`;
+    if (pinned.length === 1) return recordLabel?.trim() || `One specific ${noun.one}`;
+    return `${pinned.length} selected ${noun.many}`;
+  }
   const count = scope.group.items.length;
   const joiner = scope.group.mode === "ALL" ? "all" : "any";
   return count === 1
@@ -322,6 +417,44 @@ export type TransitionMeta = {
  * their own repositories before they can appear here — listing one early
  * would render a From select that silently never matches.
  */
+/**
+ * "Owner changed from X to Y", identical for every entity that has an owner:
+ * each repository captures `ownerId` into the same `previousOwnerId` snapshot
+ * field. Shared rather than copied so the three cannot drift.
+ *
+ * An owner is nullable everywhere, so "Unassigned" is always offered — it
+ * writes DOES_NOT_EXIST, since no equality against a user id matches null.
+ */
+const OWNER_TRANSITION: TransitionMeta = {
+  label: "Owner",
+  fields: { from: "previousOwnerId", to: "ownerId" },
+  source: "owners",
+  unsetLabel: "Unassigned",
+};
+
+/** prisma/schema.prisma → enum DealStage */
+const DEAL_STAGE_OPTIONS: TransitionOption[] = [
+  { label: "Prospecting", value: "PROSPECTING" },
+  { label: "Qualification", value: "QUALIFICATION" },
+  { label: "Proposal", value: "PROPOSAL" },
+  { label: "Negotiation", value: "NEGOTIATION" },
+  { label: "Contract Sent", value: "CONTRACT_SENT" },
+  { label: "Closed Won", value: "CLOSED_WON" },
+  { label: "Closed Lost", value: "CLOSED_LOST" },
+];
+
+/**
+ * Both deal triggers fire on a stage change — DEAL_UPDATED on any update,
+ * DEAL_STAGE_CHANGED only on this one — so the same transition is offered on
+ * each rather than leaving the more obvious of the two unable to express it.
+ * `stage` is NOT NULL on Deal, so neither offers an unset side.
+ */
+const DEAL_STAGE_TRANSITION: TransitionMeta = {
+  label: "Stage",
+  fields: { from: "previousStage", to: "stage" },
+  options: DEAL_STAGE_OPTIONS,
+};
+
 export const TRANSITION_TRIGGERS: Partial<
   Record<AutomationTriggerType, TransitionMeta>
 > = {
@@ -341,6 +474,8 @@ export const TRANSITION_TRIGGERS: Partial<
       { label: "Lost", value: "LOST" },
     ],
   },
+  DEAL_UPDATED: DEAL_STAGE_TRANSITION,
+  DEAL_STAGE_CHANGED: DEAL_STAGE_TRANSITION,
   LEAD_SOURCE_CHANGED: {
     label: "Source",
     fields: { from: "previousSource", to: "source" },
@@ -368,14 +503,9 @@ export const TRANSITION_TRIGGERS: Partial<
     toLabel: "Assigned to",
     source: "owners",
   },
-  LEAD_OWNER_CHANGED: {
-    label: "Owner",
-    fields: { from: "previousOwnerId", to: "ownerId" },
-    source: "owners",
-    // A lead can have no owner, and "Unassigned → someone" is the whole point
-    // of most owner-change workflows.
-    unsetLabel: "Unassigned",
-  },
+  ORGANIZATION_OWNER_CHANGED: OWNER_TRANSITION,
+  DEAL_OWNER_CHANGED: OWNER_TRANSITION,
+  LEAD_OWNER_CHANGED: OWNER_TRANSITION,
 };
 
 export function transitionMeta(
@@ -494,6 +624,158 @@ export const CHANGED_FIELD_TRIGGERS: Partial<
       },
     ],
   },
+  TASK_UPDATED: {
+    label: "Task field",
+    /**
+     * These are `UpdateTaskDto` keys, not Prisma columns: TaskService records
+     * `Object.keys(dto).sort()`.
+     *
+     * `status` is deliberately absent. Changing a task's status goes through
+     * a separate path that records `{ from, to }` and no field list, so
+     * TASK_UPDATED fires for it with an empty `changedFields` — a "status"
+     * option here would read correctly and never match. Use Task Completed or
+     * Task Cancelled for those.
+     */
+    groups: [
+      {
+        label: "Details",
+        fields: [
+          { label: "Subject", value: "subject" },
+          { label: "Description", value: "description" },
+          { label: "Task Type", value: "taskType" },
+          { label: "Priority", value: "priority" },
+        ],
+      },
+      {
+        label: "Scheduling",
+        fields: [
+          { label: "Start Date", value: "startDate" },
+          { label: "Due Date", value: "dueDate" },
+          { label: "Reminder At", value: "reminderAt" },
+        ],
+      },
+      {
+        label: "Recurrence",
+        fields: [
+          { label: "Repeat Every", value: "repeatEvery" },
+          { label: "Recurrence Timezone", value: "recurrenceTimezone" },
+          { label: "Recurrence Limit", value: "recurrenceLimit" },
+        ],
+      },
+      {
+        label: "People",
+        fields: [
+          { label: "Assignees", value: "assigneeIds" },
+          { label: "Followers", value: "followerIds" },
+          { label: "Collaborators", value: "collaboratorIds" },
+        ],
+      },
+      {
+        label: "Linked Record",
+        fields: [
+          { label: "Related Entity", value: "relatedType" },
+          { label: "Lead", value: "leadId" },
+          { label: "Contact", value: "contactId" },
+          { label: "Organization", value: "companyId" },
+          { label: "Deal", value: "dealId" },
+        ],
+      },
+      {
+        label: "Other",
+        fields: [
+          { label: "Tags", value: "tags" },
+          { label: "Attachments", value: "attachmentKeys" },
+          { label: "Public", value: "isPublic" },
+          { label: "Billable", value: "isBillable" },
+        ],
+      },
+    ],
+  },
+  ORGANIZATION_FIELD_CHANGED: {
+    label: "Organization field",
+    // The audit bridge excludes only `ownerId` here (it has its own trigger).
+    // `version` is the optimistic-lock counter, bumped on every write, so it
+    // is not offered — it would match every update.
+    groups: [
+      {
+        label: "Organization",
+        fields: [
+          { label: "Name", value: "name" },
+          { label: "Website", value: "website" },
+          { label: "Industry", value: "industry" },
+          { label: "Size", value: "size" },
+          { label: "Employee Count", value: "employeeCount" },
+          { label: "Annual Revenue", value: "annualRevenue" },
+          { label: "Status", value: "status" },
+        ],
+      },
+      {
+        label: "Address",
+        fields: [
+          { label: "Street", value: "street" },
+          { label: "City", value: "city" },
+          { label: "State", value: "state" },
+          { label: "Country", value: "country" },
+          { label: "Postal Code", value: "postalCode" },
+        ],
+      },
+      {
+        label: "Contact",
+        fields: [
+          { label: "Phone", value: "phone" },
+          { label: "LinkedIn URL", value: "linkedinUrl" },
+          { label: "Twitter URL", value: "twitterUrl" },
+        ],
+      },
+      {
+        label: "Other",
+        fields: [
+          { label: "Parent Organization", value: "parentId" },
+          { label: "Description", value: "description" },
+        ],
+      },
+    ],
+  },
+  DEAL_FIELD_CHANGED: {
+    label: "Deal field",
+    // The audit bridge excludes only `stage` and `ownerId` here, so
+    // `companyId` does raise this trigger — unlike the contact one, where it
+    // has its own association triggers.
+    groups: [
+      {
+        label: "Deal",
+        fields: [
+          { label: "Name", value: "name" },
+          { label: "Pipeline", value: "pipeline" },
+          { label: "Account", value: "companyId" },
+          { label: "Source", value: "source" },
+        ],
+      },
+      {
+        label: "Value",
+        fields: [
+          { label: "Value", value: "value" },
+          { label: "Currency", value: "currency" },
+          { label: "Probability", value: "probability" },
+        ],
+      },
+      {
+        label: "Dates",
+        fields: [
+          { label: "Expected Close Date", value: "expectedCloseDate" },
+          { label: "Actual Close Date", value: "actualCloseDate" },
+        ],
+      },
+      {
+        label: "Outcome",
+        fields: [
+          { label: "Lost Reason", value: "lostReason" },
+          { label: "Competitor", value: "competitor" },
+          { label: "Description", value: "description" },
+        ],
+      },
+    ],
+  },
   CONTACT_FIELD_CHANGED: {
     label: "Contact field",
     // Unlike the lead trigger, `status` DOES raise CONTACT_FIELD_CHANGED —
@@ -530,6 +812,90 @@ export const CHANGED_FIELD_TRIGGERS: Partial<
     ],
   },
 };
+
+/**
+ * Triggers that can be narrowed to the record they are *about*, as opposed to
+ * the record that fired them.
+ *
+ * A call is its own entity, so the scope stage's "a specific record" pins one
+ * call — almost never what anyone wants. What they mean by "when a call is
+ * scheduled for Jane" is a condition on the call's `contactId`, which is why
+ * this is a separate stage rather than part of scope.
+ */
+export type RelatedRecordEntry = {
+  label: string;
+  field: string;
+  /** "USER" picks a teammate; anything else picks a CRM record. */
+  entityType: RelatedTarget;
+};
+
+/** The customer on an inbound message: see MESSAGE_RECEIVED's note. */
+const RECEIVED_FROM: RelatedRecordEntry[] = [
+  { label: "Received from", field: "contactId", entityType: "CONTACT" },
+];
+
+/**
+ * An outbound message has two possible recipients — `toContactId` for a
+ * customer, `toUserId` for a teammate on an internal message — so both are
+ * offered and either may be left empty.
+ */
+const SENT_TO: RelatedRecordEntry[] = [
+  { label: "Sent to (contact)", field: "toContactId", entityType: "CONTACT" },
+  { label: "Sent to (teammate)", field: "toUserId", entityType: "USER" },
+];
+
+/** Emails link one counterparty; `toEmail` is free text and not linkable. */
+const EMAIL_CONTACT: RelatedRecordEntry[] = [
+  { label: "Contact", field: "contactId", entityType: "CONTACT" },
+];
+
+export const RELATED_RECORD_TRIGGERS: Partial<
+  Record<AutomationTriggerType, RelatedRecordEntry[]>
+> = {
+  CALL_CREATED: [
+    { label: "Contact", field: "contactId", entityType: "CONTACT" },
+  ],
+  // Inbound: the customer is `contactId`. `fromId` is a required User FK
+  // recording CRM-side attribution, so it is not the sender on INBOUND.
+  MESSAGE_RECEIVED: RECEIVED_FROM,
+  SMS_REPLIED: RECEIVED_FROM,
+  WHATSAPP_REPLIED: RECEIVED_FROM,
+  // Outbound: both are about who the message was addressed to.
+  MESSAGE_FAILED: SENT_TO,
+  MESSAGE_UNREAD_FOR: SENT_TO,
+  EMAIL_SENT: EMAIL_CONTACT,
+  EMAIL_FAILED: EMAIL_CONTACT,
+  EMAIL_BOUNCED: EMAIL_CONTACT,
+  EMAIL_REPLIED: EMAIL_CONTACT,
+};
+
+/**
+ * Entities whose scope stage does not offer the raw field-condition builder.
+ *
+ * A call is reached through the record it is about, which the related-record
+ * stage already asks for directly; the generic "field / operator / value"
+ * builder adds nothing there and reads as noise.
+ *
+ * Suppression is display-only: a group saved before this (or written by a
+ * template) still round-trips, and the panel keeps showing the builder for it
+ * so nothing is stranded — see `showsConditionBuilder`.
+ */
+const SCOPE_FILTER_HIDDEN: ReadonlySet<AutomationEntityType> = new Set<
+  AutomationEntityType
+>(["CALL"]);
+
+export function showsConditionBuilder(
+  entityType: AutomationEntityType,
+  currentScope: TriggerScope,
+): boolean {
+  return (
+    !SCOPE_FILTER_HIDDEN.has(entityType) || currentScope.mode === "FILTER"
+  );
+}
+
+export function relatedRecordMeta(triggerType: AutomationTriggerType | null) {
+  return triggerType ? (RELATED_RECORD_TRIGGERS[triggerType] ?? null) : null;
+}
 
 export function changedFieldMeta(triggerType: AutomationTriggerType | null) {
   return triggerType ? (CHANGED_FIELD_TRIGGERS[triggerType] ?? null) : null;

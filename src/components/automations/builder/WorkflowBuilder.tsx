@@ -50,6 +50,7 @@ import {
   describeChangedFields,
   describeTransition,
   describeTriggerScope,
+  scopeRecordIds,
   readTriggerFilter,
   transitionMeta,
   type TransitionOption,
@@ -190,8 +191,12 @@ function BuilderInner({ id }: { id: string }) {
   );
   const scope = filter.scope;
 
-  /** Resolve a pinned record id to its name for the canvas subtitle. */
-  const pinnedRecordId = scope.mode === "RECORD" ? scope.recordId : "";
+  /**
+   * Resolve a pinned record id to its name for the canvas subtitle. Only a
+   * lone pin gets a name — a set is captioned by its count.
+   */
+  const pinnedIds = scopeRecordIds(scope);
+  const pinnedRecordId = pinnedIds.length === 1 ? pinnedIds[0] : "";
   useEffect(() => {
     if (!pinnedRecordId) return;
     let cancelled = false;

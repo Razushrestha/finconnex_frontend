@@ -419,8 +419,11 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: ["recipientId", "title", "message"],
   },
   SEND_EMAIL: {
+    // `toEmail` is allowed but not required: left unset, the executor sends
+    // to the triggering record's own address (AUTOMATION_ACTION_REGISTRY says
+    // the same server-side).
     allowed: ["subject", "body", "toEmail", "cc", "bcc", "templateId", "replyToId", "scheduledAt", "relatedType", "leadId", "contactId", "companyId", "dealId"],
-    required: ["subject", "body", "toEmail"],
+    required: ["subject", "body"],
   },
   SEND_MESSAGE: {
     allowed: ["messageType", "channel", "subject", "body", "toUserId", "toContactId", "templateId", "relatedType", "leadId", "contactId", "companyId", "dealId"],

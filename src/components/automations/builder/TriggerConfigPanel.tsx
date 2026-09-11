@@ -21,14 +21,21 @@ import {
 } from "@/lib/automations/types";
 import {
   describeAutomationRecord,
-  searchAutomationRecords,
+  describeRelatedTarget,
+  searchRelatedTargets,
+  supportsMultiRecordPicker,
   supportsRecordPicker,
   type AutomationRecordOption,
+  type RelatedTarget,
 } from "@/lib/automations/record-search";
 import {
   changedFieldMeta,
   EMPTY_CONDITION_GROUP,
   entityNoun,
+  MAX_PINNED_RECORDS,
+  relatedRecordMeta,
+  scopeRecordIds,
+  showsConditionBuilder,
   readTriggerFilter,
   transitionMeta,
   TRANSITION_UNSET,
@@ -121,15 +128,23 @@ function DurationField({
 function RecordPicker({
   entityType,
   selectedId,
+  selectedIds,
   selected,
+  extra,
   onSelect,
 }: {
-  entityType: AutomationEntityType;
-  selectedId: string;
-  selected: AutomationRecordOption | null;
+  entityType: RelatedTarget;
+  /** Single-select: the one chosen id. */
+  selectedId?: string;
+  /** Multi-select: every chosen id. */
+  selectedIds?: string[];
+  selected?: AutomationRecordOption | null;
+  /** Chosen rows to keep visible even when a search excludes them. */
+  extra?: AutomationRecordOption[];
   onSelect: (option: AutomationRecordOption) => void;
 }) {
-  const noun = entityNoun(entityType);
+  const chosen = selectedIds ?? (selectedId ? [selectedId] : []);
+  const noun = relatedTargetNoun(entityType);
   const [query, setQuery] = useState("");
   const [options, setOptions] = useState<AutomationRecordOption[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -139,7 +154,7 @@ function RecordPicker({
     const timer = setTimeout(() => {
       if (cancelled) return;
       setState("loading");
-      searchAutomationRecords(entityType, query)
+      searchRelatedTargets(entityType, query)
         .then((rows) => {
           if (cancelled) return;
           setOptions(rows);
@@ -156,9 +171,14 @@ function RecordPicker({
   }, [entityType, query]);
 
   const rows = useMemo(() => {
-    if (!selected || options.some((option) => option.id === selected.id)) return options;
-    return [selected, ...options];
-  }, [options, selected]);
+    const pinned = [...(extra ?? []), ...(selected ? [selected] : [])];
+    const missing = pinned.filter(
+      (row, index) =>
+        !options.some((option) => option.id === row.id) &&
+        pinned.findIndex((item) => item.id === row.id) === index,
+    );
+    return missing.length ? [...missing, ...options] : options;
+  }, [options, selected, extra]);
 
   return (
     <div className="space-y-2">
@@ -200,7 +220,7 @@ function RecordPicker({
               onClick={() => onSelect(option)}
               className={cn(
                 "flex w-full items-center gap-2 rounded-md p-2 text-left text-sm hover:bg-slate-50",
-                option.id === selectedId && "bg-blue-50 hover:bg-blue-50",
+                chosen.includes(option.id) && "bg-blue-50 hover:bg-blue-50",
               )}
             >
               <span className="flex-1 truncate">
@@ -209,7 +229,9 @@ function RecordPicker({
                   <span className="block truncate text-xs text-slate-400">{option.sublabel}</span>
                 )}
               </span>
-              {option.id === selectedId && <Check className="h-4 w-4 shrink-0 text-blue-600" />}
+              {chosen.includes(option.id) && (
+                <Check className="h-4 w-4 shrink-0 text-blue-600" />
+              )}
             </button>
           ))}
         </div>
@@ -249,6 +271,124 @@ function ScopeOption({
         <span className="flex-1 text-sm font-medium text-slate-700">{title}</span>
       </button>
       {active && children && <div className="mt-3 pl-6.5">{children}</div>}
+    </div>
+  );
+}
+
+/**
+ * Multi-select over real workspace records, as chips plus a search list.
+ *
+ * Used for both sets a trigger can pin: the records it is *about* ("a call
+ * scheduled for these contacts") and, on its own sidebar page, the records it
+ * fires for ("these meetings"). Clearing it back to empty removes the
+ * condition rather than writing an empty one.
+ */
+/** A teammate target has no entity noun of its own; everything else does. */
+function relatedTargetNoun(target: RelatedTarget): { one: string; many: string } {
+  return target === "USER"
+    ? { one: "teammate", many: "teammates" }
+    : entityNoun(target);
+}
+
+function MultiRecordField({
+  entityType,
+  recordIds,
+  emptyHint,
+  onChange,
+}: {
+  entityType: RelatedTarget;
+  recordIds: string[];
+  /** Overrides the "Choose at least one …" line above the chips. */
+  emptyHint?: string;
+  onChange: (next: string[]) => void;
+}) {
+  // Teammates are pickable but are not an AutomationEntityType — no trigger
+  // fires on a user — so they carry their own noun.
+  const noun = relatedTargetNoun(entityType);
+  /** Resolved labels for the chosen ids, so chips never show a raw uuid. */
+  const [known, setKnown] = useState<Record<string, AutomationRecordOption>>({});
+
+  const unresolved = recordIds.filter((id) => !known[id]).join(",");
+  useEffect(() => {
+    if (!unresolved) return;
+    let cancelled = false;
+    Promise.all(
+      unresolved
+        .split(",")
+        .map((id) => describeRelatedTarget(entityType, id)),
+    ).then((options) => {
+      if (cancelled) return;
+      const found = options.filter((o): o is AutomationRecordOption => Boolean(o));
+      if (found.length === 0) return;
+      setKnown((prev) => ({
+        ...prev,
+        ...Object.fromEntries(found.map((o) => [o.id, o])),
+      }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [entityType, unresolved]);
+
+  function toggle(option: AutomationRecordOption) {
+    setKnown((prev) => ({ ...prev, [option.id]: option }));
+    if (recordIds.includes(option.id)) {
+      onChange(recordIds.filter((id) => id !== option.id));
+      return;
+    }
+    // Past the IN_LIST cap the API would reject the save, so stop here rather
+    // than let the list grow into a group that cannot be stored.
+    if (recordIds.length >= MAX_PINNED_RECORDS) return;
+    onChange([...recordIds, option.id]);
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-slate-500">
+          {recordIds.length === 0
+            ? (emptyHint ?? `Choose at least one ${noun.one}`)
+            : `${recordIds.length} selected`}
+        </span>
+        {recordIds.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={() => onChange([])}
+          >
+            Clear
+          </Button>
+        )}
+      </div>
+
+      {recordIds.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {recordIds.map((id) => (
+            <span
+              key={id}
+              className="inline-flex items-center gap-1 rounded-full bg-blue-50 py-1 pl-2.5 pr-1 text-xs text-blue-800"
+            >
+              {known[id]?.label ?? `${noun.one}\u2026`}
+              <button
+                type="button"
+                aria-label={`Remove ${known[id]?.label ?? id}`}
+                onClick={() => onChange(recordIds.filter((item) => item !== id))}
+                className="rounded-full p-0.5 text-blue-500 hover:bg-blue-100 hover:text-blue-700"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <RecordPicker
+        entityType={entityType}
+        selectedIds={recordIds}
+        extra={recordIds.map((id) => known[id]).filter(Boolean)}
+        onSelect={toggle}
+      />
     </div>
   );
 }
@@ -402,16 +542,28 @@ export function TriggerConfigPanel({
   const meta = TRIGGER_CATALOG[triggerType];
   const noun = entityNoun(entityType);
   const pickable = supportsRecordPicker(entityType);
+  const multiPickable = supportsMultiRecordPicker(entityType);
   const temporal = TEMPORAL_TRIGGERS.has(triggerType);
 
   const transition = transitionMeta(triggerType);
   const changedFields = changedFieldMeta(triggerType);
-  /** Both second stages are mutually exclusive per trigger. */
+  const relatedRecords = relatedRecordMeta(triggerType);
+  /** The second-stage kinds are mutually exclusive per trigger. */
   const hasSecondStage = Boolean(transition || changedFields);
-  const [stage, setStage] = useState<"scope" | "transition">("scope");
-  const [filter, setFilter] = useState(() =>
-    readTriggerFilter(conditions, transition?.fields ?? null),
-  );
+  const [stage, setStage] = useState<"scope" | "transition" | "records">("scope");
+  const [filter, setFilter] = useState(() => {
+    const initial = readTriggerFilter(
+      conditions,
+      transition?.fields ?? null,
+      (relatedRecords ?? []).map((entry) => entry.field),
+    );
+    // An entity picked as a set is always edited as one, even where a single
+    // id was saved: its inline one-record picker is not offered at all, so a
+    // RECORD scope would otherwise be invisible and silently dropped.
+    if (!multiPickable || initial.scope.mode !== "RECORD") return initial;
+    const scope: TriggerScope = { mode: "RECORDS", recordIds: [initial.scope.recordId] };
+    return { ...initial, scope };
+  });
   const scope = filter.scope;
   const setScope = (next: TriggerScope) => setFilter((prev) => ({ ...prev, scope: next }));
   const setTransition = (next: TriggerTransition) =>
@@ -455,6 +607,19 @@ export function TriggerConfigPanel({
   const [selectedRecord, setSelectedRecord] = useState<AutomationRecordOption | null>(null);
 
   const pinnedId = scope.mode === "RECORD" ? scope.recordId : "";
+  const pinnedIds = scope.mode === "RECORDS" ? scopeRecordIds(scope) : [];
+  /**
+   * "Selected calls" is expressed by the presence of a related key, so an
+   * empty list still means "selected, nothing picked yet" — which is what
+   * makes the Next button able to insist on at least one contact.
+   */
+  const hasRelatedPins = (relatedRecords ?? []).some(
+    (entry) => filter.related[entry.field] !== undefined,
+  );
+  const relatedPinCount = (relatedRecords ?? []).reduce(
+    (total, entry) => total + (filter.related[entry.field]?.length ?? 0),
+    0,
+  );
 
   /** Turn a saved id back into a name so reopening never shows a bare uuid. */
   useEffect(() => {
@@ -488,12 +653,37 @@ export function TriggerConfigPanel({
   if (scope.mode === "FILTER" && scope.group.items.length === 0) {
     problems.push("Add at least one condition, or switch back to any record.");
   }
+  // Only on the picking page: on the scope page this would disable the very
+  // button that opens the page where records get chosen.
+  if (scope.mode === "RECORDS" && pinnedIds.length === 0 && stage === "records") {
+    problems.push(`Choose at least one ${noun.one}, or switch back to all ${noun.many}.`);
+  }
+  if (hasRelatedPins && relatedPinCount === 0 && stage === "transition") {
+    const first = relatedRecords?.[0];
+    problems.push(
+      `Choose at least one ${first ? relatedTargetNoun(first.entityType).one : "record"}, or switch back to all ${noun.many}.`,
+    );
+  }
   if (temporal && triggerType === "SCHEDULED" && (intervalMinutes < 1 || intervalMinutes > 10_080)) {
     problems.push("Interval must be between 1 minute and 7 days.");
   }
   if (temporal && triggerType === "DATE_REACHED" && !dateField) {
     problems.push("Choose which date field to watch.");
   }
+
+  /**
+   * The page the Next button leads to, or null when this stage saves. A
+   * pinned-set scope has its own page, so the scope stage hands off to it
+   * rather than offering a Save that cannot yet be valid.
+   */
+  const nextStage: "transition" | "records" | null =
+    stage !== "scope"
+      ? null
+      : scope.mode === "RECORDS"
+        ? "records"
+        : hasSecondStage || hasRelatedPins
+          ? "transition"
+          : null;
 
   function commit() {
     onSave({
@@ -512,27 +702,29 @@ export function TriggerConfigPanel({
     <SlideOverPanel
       title={meta.label}
       subtitle={
-        stage === "transition" && changedFields
-          ? "Which fields should run this workflow?"
-          : "Configure what this trigger watches"
+        stage === "records"
+          ? `Which ${noun.many} should run this workflow?`
+          : stage === "transition" && changedFields
+            ? "Which fields should run this workflow?"
+            : "Configure what this trigger watches"
       }
       onClose={onClose}
       footer={
         <div className="flex items-center justify-between gap-2">
           <Button
             variant="ghost"
-            onClick={stage === "transition" ? () => setStage("scope") : onBack}
+            onClick={stage === "scope" ? onBack : () => setStage("scope")}
             className="gap-1"
           >
             <ChevronLeft className="h-4 w-4" />
-            {stage === "transition" ? "Back" : "Change trigger"}
+            {stage === "scope" ? "Change trigger" : "Back"}
           </Button>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            {hasSecondStage && stage === "scope" ? (
-              <Button disabled={problems.length > 0} onClick={() => setStage("transition")}>
+            {nextStage ? (
+              <Button disabled={problems.length > 0} onClick={() => setStage(nextStage)}>
                 Next
               </Button>
             ) : (
@@ -606,12 +798,77 @@ export function TriggerConfigPanel({
       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
         Which {noun.many}?
       </h3>
+
+      {/*
+        A trigger with a related-record stage asks the narrowing question
+        there instead: "all calls" versus "the calls about these contacts".
+        Pinning one individual call is not a thing anyone means, so the
+        record and condition options are not offered.
+      */}
+      {relatedRecords ? (
+        <div className="space-y-2">
+          <ScopeOption
+            active={!hasRelatedPins}
+            title={`All ${noun.many}`}
+            onClick={() =>
+              setFilter((prev) => ({ ...prev, scope: { mode: "ANY" }, related: {} }))
+            }
+          />
+          <ScopeOption
+            active={hasRelatedPins}
+            title={`Selected ${noun.many}`}
+            onClick={() =>
+              setFilter((prev) => ({
+                ...prev,
+                scope: { mode: "ANY" },
+                related: hasRelatedPins
+                  ? prev.related
+                  : Object.fromEntries(
+                      relatedRecords.map((entry) => [entry.field, [] as string[]]),
+                    ),
+              }))
+            }
+          />
+        </div>
+      ) : (
       <div className="space-y-2">
         <ScopeOption
           active={scope.mode === "ANY"}
           title={`Any ${noun.one}`}
           onClick={() => setScope({ mode: "ANY" })}
         />
+
+        {/*
+          A set of records is chosen on a page of its own rather than inline:
+          the list is long, multi-select needs room, and the scope stage stays
+          a three-line question.
+        */}
+        {multiPickable && (
+          <ScopeOption
+            active={scope.mode === "RECORDS"}
+            title={`Specific ${noun.many}`}
+            onClick={() => {
+              setScope({ mode: "RECORDS", recordIds: pinnedIds });
+              setStage("records");
+            }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-500">
+                {pinnedIds.length === 0
+                  ? `No ${noun.many} chosen yet`
+                  : `${pinnedIds.length} ${pinnedIds.length === 1 ? noun.one : noun.many} selected`}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setStage("records")}
+              >
+                {pinnedIds.length === 0 ? "Choose" : "Edit"}
+              </Button>
+            </div>
+          </ScopeOption>
+        )}
 
         {pickable && (
           <ScopeOption
@@ -631,6 +888,7 @@ export function TriggerConfigPanel({
           </ScopeOption>
         )}
 
+        {showsConditionBuilder(entityType, scope) && (
         <ScopeOption
           active={scope.mode === "FILTER"}
           title={`${noun.many[0].toUpperCase()}${noun.many.slice(1)} matching conditions`}
@@ -649,9 +907,42 @@ export function TriggerConfigPanel({
             />
           )}
         </ScopeOption>
+        )}
       </div>
+      )}
 
         </>
+      )}
+
+      {stage === "records" && (
+        <MultiRecordField
+          entityType={entityType}
+          recordIds={pinnedIds}
+          emptyHint={`Choose the ${noun.many} this workflow watches`}
+          onChange={(recordIds) => setScope({ mode: "RECORDS", recordIds })}
+        />
+      )}
+
+      {stage === "transition" && relatedRecords && (
+        <div className="space-y-5">
+          {relatedRecords.map((entry) => (
+            <div key={entry.field}>
+              <label className="mb-1.5 block text-xs font-medium text-slate-600">
+                {entry.label}
+              </label>
+              <MultiRecordField
+                entityType={entry.entityType}
+                recordIds={filter.related[entry.field] ?? []}
+                onChange={(recordIds) =>
+                  setFilter((prev) => ({
+                    ...prev,
+                    related: { ...prev.related, [entry.field]: recordIds },
+                  }))
+                }
+              />
+            </div>
+          ))}
+        </div>
       )}
 
       {stage === "transition" && changedFields && (

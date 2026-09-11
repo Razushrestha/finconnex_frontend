@@ -1,4 +1,4 @@
-import { AUTOMATION_ENTITY_TYPES, TRIGGER_CATALOG } from "./types";
+import { AUTOMATION_ENTITY_TYPES, TRIGGER_CATALOG, type AutomationActionType } from "./types";
 
 /** Per-config-key rendering hints for the step config panel — maps a raw
  * `AUTOMATION_ACTION_KEYS` key to a friendly label and input widget. */
@@ -20,6 +20,51 @@ export interface FieldMeta {
   placeholder?: string;
   options?: { label: string; value: string }[];
   helpText?: string;
+}
+
+/**
+ * Config keys an action accepts but the builder does not ask for.
+ *
+ * The relation keys (`relatedType` + the four parent ids) default to the
+ * record that triggered the run — which is what a step on that record wants —
+ * so offering them as raw UUID boxes invites a wrong answer to a question the
+ * executor already answers. `replyToId` is an existing email's uuid, which
+ * nobody can know while designing a workflow.
+ *
+ * Suppression is display-only: a value already saved (by a template, or by
+ * hand through the API) still round-trips and is still rendered, so nothing
+ * is stranded out of sight — see `visibleActionConfigKeys`.
+ */
+export const HIDDEN_ACTION_CONFIG_KEYS: Partial<
+  Record<AutomationActionType, readonly string[]>
+> = {
+  SEND_EMAIL: [
+    "replyToId",
+    "relatedType",
+    "leadId",
+    "contactId",
+    "companyId",
+    "dealId",
+  ],
+};
+
+/**
+ * The keys the step form renders, in the registry's own order. `action` is
+ * widened to string because a step read back from the API carries whatever
+ * the backend stored, which need not be an action this build knows.
+ */
+export function visibleActionConfigKeys(
+  action: string,
+  allowed: readonly string[],
+  config: Record<string, unknown>,
+): string[] {
+  const hidden = (
+    HIDDEN_ACTION_CONFIG_KEYS as Record<string, readonly string[] | undefined>
+  )[action];
+  if (!hidden) return [...allowed];
+  return allowed.filter(
+    (key) => !hidden.includes(key) || config[key] !== undefined,
+  );
 }
 
 export const FIELD_META: Record<string, FieldMeta> = {
@@ -72,7 +117,10 @@ export const FIELD_META: Record<string, FieldMeta> = {
   targetUserId: { label: "Remind", widget: "member" },
   recipientId: { label: "Recipient", widget: "member" },
   notificationType: { label: "Notification Type", widget: "text", placeholder: "GENERAL" },
-  toEmail: { label: "To Email", widget: "text", placeholder: "{{email}} or literal address", helpText: "Use {{email}} to send to the triggering record's email." },
+  // SEND_EMAIL renders To/Cc/Bcc through EmailRecipientsField instead of
+  // these generic widgets; they remain as the fallback for any other action
+  // that takes an address.
+  toEmail: { label: "To Email", widget: "text", placeholder: "name@example.com", helpText: "Leave empty to send to the triggering record's own address." },
   messageType: {
     label: "Message Type",
     widget: "select",
@@ -304,7 +352,7 @@ export const FIELD_META: Record<string, FieldMeta> = {
   isPrivate: { label: "Only visible to you (Private)", widget: "checkbox" },
   // ─── Email ────────────────────────────────────────────────────────────
   cc: { label: "Cc", widget: "text", helpText: "Comma-separated addresses" },
-  bcc: { label: "Bcc", widget: "text", helpText: "Comma-separated addresses" },
+  bcc: { label: "Bcc", widget: "text", helpText: "Comma-separated addresses, hidden from other recipients" },
   scheduledAt: { label: "Send At", widget: "datetime", helpText: "Leave empty to send immediately" },
   // ─── Reminder ─────────────────────────────────────────────────────────
   reminderType: {

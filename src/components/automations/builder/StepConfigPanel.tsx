@@ -26,7 +26,15 @@ import {
   type AutomationWaitDurationStep,
   type AutomationWaitUntilStep,
 } from "@/lib/automations/types";
-import { FIELD_META } from "@/lib/automations/field-meta";
+import { FIELD_META, visibleActionConfigKeys } from "@/lib/automations/field-meta";
+import {
+  emailRecipientProblems,
+  readEmailRecipients,
+} from "@/lib/automations/email-recipients";
+import { entityNoun } from "@/lib/automations/trigger-scope";
+
+import { EmailRecipientsField } from "./EmailRecipientsField";
+import { EmailTemplateField } from "./EmailTemplateField";
 
 import { ConditionBuilder } from "./ConditionBuilder";
 import { StepIcon } from "./nodes/icons";
@@ -93,13 +101,18 @@ function MemberSelect({
   );
 }
 
+/** The config keys SEND_EMAIL renders through its own recipients block. */
+const EMAIL_RECIPIENT_KEYS = ["toEmail", "cc", "bcc"];
+
 function ActionConfigForm({
   step,
+  entityType,
   onChange,
   members,
   membersStatus,
 }: {
   step: AutomationActionStep;
+  entityType: AutomationEntityType;
   onChange: (config: Record<string, unknown>) => void;
   members: WorkspaceMember[];
   membersStatus: "loading" | "ready" | "error";
@@ -113,6 +126,7 @@ function ActionConfigForm({
     );
   }
   const config = step.config ?? {};
+  const email = step.action === "SEND_EMAIL";
 
   function set(key: string, value: unknown) {
     onChange({ ...config, [key]: value });
@@ -120,8 +134,22 @@ function ActionConfigForm({
 
   return (
     <div className="space-y-4">
-      {keys.allowed.map((key) => {
+      {email && (
+        <EmailRecipientsField
+          entityType={entityType}
+          config={config}
+          onChange={onChange}
+        />
+      )}
+      {visibleActionConfigKeys(step.action, keys.allowed, config)
+        .filter((key) => !email || !EMAIL_RECIPIENT_KEYS.includes(key))
+        .map((key) => {
         const meta = FIELD_META[key] ?? { label: key, widget: "text" as const };
+        // Only SEND_EMAIL's templateId picks from the email templates —
+        // SEND_MESSAGE's reads the same table filtered to MESSAGE/SMS rows,
+        // which that list does not return.
+        const widget =
+          email && key === "templateId" ? "emailTemplate" : meta.widget;
         const required = keys.required.includes(key);
         const value = config[key];
         return (
@@ -130,7 +158,13 @@ function ActionConfigForm({
               {meta.label}
               {required && <span className="text-rose-500"> *</span>}
             </label>
-            {meta.widget === "textarea" && (
+            {widget === "emailTemplate" && (
+              <EmailTemplateField
+                value={typeof value === "string" ? value : ""}
+                onChange={(templateId) => set(key, templateId)}
+              />
+            )}
+            {widget === "textarea" && (
               <Textarea
                 value={typeof value === "string" ? value : value ? JSON.stringify(value) : ""}
                 onChange={(e) => set(key, e.target.value)}
@@ -138,14 +172,14 @@ function ActionConfigForm({
                 rows={3}
               />
             )}
-            {meta.widget === "text" && (
+            {widget === "text" && (
               <Input
                 value={typeof value === "string" ? value : ""}
                 onChange={(e) => set(key, e.target.value)}
                 placeholder={meta.placeholder}
               />
             )}
-            {meta.widget === "number" && (
+            {widget === "number" && (
               <Input
                 type="number"
                 value={typeof value === "number" ? value : ""}
@@ -153,21 +187,21 @@ function ActionConfigForm({
                 placeholder={meta.placeholder}
               />
             )}
-            {meta.widget === "datetime" && (
+            {widget === "datetime" && (
               <Input
                 type="datetime-local"
                 value={typeof value === "string" ? value.slice(0, 16) : ""}
                 onChange={(e) => set(key, e.target.value ? new Date(e.target.value).toISOString() : undefined)}
               />
             )}
-            {meta.widget === "json" && (
+            {widget === "json" && (
               <JsonField
                 value={value}
                 placeholder={meta.placeholder}
                 onChange={(next) => set(key, next)}
               />
             )}
-            {meta.widget === "checkbox" && (
+            {widget === "checkbox" && (
               <label className="flex items-center gap-2 text-sm text-slate-700">
                 <input
                   type="checkbox"
@@ -178,7 +212,7 @@ function ActionConfigForm({
                 {meta.placeholder ?? "Yes"}
               </label>
             )}
-            {meta.widget === "select" && (
+            {widget === "select" && (
               <Select
                 items={meta.options ?? []}
                 value={typeof value === "string" ? value : null}
@@ -196,7 +230,7 @@ function ActionConfigForm({
                 </SelectContent>
               </Select>
             )}
-            {meta.widget === "member" && (
+            {widget === "member" && (
               <MemberSelect
                 value={typeof value === "string" ? value : ""}
                 onChange={(v) => set(key, v)}
@@ -204,7 +238,7 @@ function ActionConfigForm({
                 membersStatus={membersStatus}
               />
             )}
-            {meta.widget === "members" && (
+            {widget === "members" && (
               <div className="space-y-1.5 rounded-lg border border-slate-200 p-2">
                 {membersStatus === "loading" && (
                   <p className="text-xs text-slate-400">Loading teammates...</p>
@@ -238,7 +272,7 @@ function ActionConfigForm({
                 })}
               </div>
             )}
-            {meta.widget === "tags" && (
+            {widget === "tags" && (
               <Input
                 value={Array.isArray(value) ? (value as string[]).join(", ") : ""}
                 onChange={(e) =>
@@ -345,6 +379,22 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
           : []
         : [];
 
+  /**
+   * Recipient rules the required-key check cannot express: `toEmail` is
+   * optional (unset means the trigger record's address), but a half-typed
+   * address, an entity with no address to resolve, or more than 50 mailboxes
+   * would all be rejected downstream.
+   */
+  const recipientProblems =
+    draft.type === "ACTION" && draft.action === "SEND_EMAIL"
+      ? emailRecipientProblems(
+          readEmailRecipients(draft.config ?? {}),
+          entityType,
+          entityNoun(entityType).one,
+        )
+      : [];
+  const blocked = missingRequired.length > 0 || recipientProblems.length > 0;
+
   return (
     <SlideOverPanel
       title={meta?.label ?? "Configure Step"}
@@ -359,7 +409,7 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button disabled={missingRequired.length > 0} onClick={() => onSave(draft)}>
+            <Button disabled={blocked} onClick={() => onSave(draft)}>
               Save
             </Button>
           </div>
@@ -382,6 +432,7 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
       {draft.type === "ACTION" && (
         <ActionConfigForm
           step={draft}
+          entityType={entityType}
           members={members}
           membersStatus={membersStatus}
           onChange={(config) => setDraft({ ...draft, config })}
@@ -416,10 +467,14 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
         />
       )}
 
-      {missingRequired.length > 0 && (
-        <p className="mt-3 flex items-center gap-1.5 text-xs text-amber-600">
-          <X className="h-3.5 w-3.5" />
-          {draft.type === "IF_ELSE" ? "Add at least one condition to save." : `Missing: ${missingRequired.join(", ")}`}
+      {blocked && (
+        <p className="mt-3 flex items-start gap-1.5 text-xs text-amber-600">
+          <X className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {draft.type === "IF_ELSE"
+            ? "Add at least one condition to save."
+            : missingRequired.length > 0
+              ? `Missing: ${missingRequired.join(", ")}`
+              : recipientProblems[0]}
         </p>
       )}
     </SlideOverPanel>
