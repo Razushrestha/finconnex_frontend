@@ -15,6 +15,7 @@ import {
   RotateCcw,
   Info,
 } from "lucide-react";
+import { persistCalculatorResult } from "@/lib/utils/calculatorHistory";
 
 export default function BorrowingCapacityView() {
   // Form input states
@@ -89,44 +90,47 @@ export default function BorrowingCapacityView() {
     return computedResults;
   };
 
-  const handleCalculate = () => {
+  const handleCalculate = async () => {
     const currentResults = performCalculation();
     if (!currentResults) return;
 
-    // Save calculation directly to localStorage audit trail
-    const newRecord = {
-      id: Date.now(),
-      type: "Borrowing Capacity",
-      date: new Date().toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      inputs: {
-        "Gross Income": `$${Number(grossIncome).toLocaleString()}`,
-        ...(Number(coIncome) > 0
-          ? { "Co-Borrower Income": `$${Number(coIncome).toLocaleString()}` }
-          : {}),
-        "Monthly Expenses": `$${Number(livingExpenses).toLocaleString()}`,
-        ...(Number(existingCommitments) > 0
-          ? { Commitments: `$${Number(existingCommitments).toLocaleString()}` }
-          : {}),
-        "Assessment Term": `${assessmentTerm} years`,
-      },
-      summary: `Max Capacity: $${Math.round(currentResults.maxCapacity).toLocaleString()} AUD`,
+    const summary = `Max Capacity: $${Math.round(currentResults.maxCapacity).toLocaleString()} AUD`;
+    await persistCalculatorResult({
+      title: "Capacity Profile",
+      type: "Custom",
+      currency: "AUD",
+      displayType: "Borrowing Capacity",
+      summary,
       badge: "Capacity Profile",
-    };
-
-    try {
-      const existing = localStorage.getItem("calc_history");
-      const historyArray = existing ? JSON.parse(existing) : [];
-      const updatedHistory = [newRecord, ...historyArray];
-      localStorage.setItem("calc_history", JSON.stringify(updatedHistory));
-    } catch (err) {
-      console.error("Failed to save borrowing capacity history:", err);
-    }
+      inputs: {
+        _tool: "Borrowing Capacity",
+        grossIncome,
+        coIncome,
+        livingExpenses,
+        existingCommitments,
+        dependents,
+        assessmentTerm,
+      },
+      formula: "Max loan from net monthly surplus at assessment rate 9.20% p.a.",
+      result: {
+        primaryLabel: "Max capacity",
+        primaryValue: currentResults.maxCapacity,
+        primaryFormat: "money",
+        formula: "Max loan from net monthly surplus at assessment rate 9.20% p.a.",
+        lines: [
+          {
+            label: "Max capacity",
+            value: currentResults.maxCapacity,
+            format: "money",
+          },
+          {
+            label: "Max monthly servicing",
+            value: currentResults.maxMonthlyServicing,
+            format: "money",
+          },
+        ],
+      },
+    });
   };
 
   // Reset Form & Results

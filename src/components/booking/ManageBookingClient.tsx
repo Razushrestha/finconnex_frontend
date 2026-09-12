@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import {
   cancelPublicBooking,
   markBookingRescheduleIntent,
 } from "@/lib/booking/actions";
+import { getCalendlyRescheduleLink } from "@/lib/booking/calendly-api";
 import {
   getBookingByToken,
   getBookingPageBySlug,
@@ -176,8 +178,27 @@ export function ManageBookingClient({
           <button
             type="button"
             onClick={() => {
-              markBookingRescheduleIntent(token);
-              setDone("reschedule");
+              void (async () => {
+                if (
+                  booking.calendlyMeetingId &&
+                  isUuid(booking.calendlyMeetingId)
+                ) {
+                  try {
+                    const url = await getCalendlyRescheduleLink(
+                      booking.calendlyMeetingId,
+                      booking.calendlyInviteeId,
+                    );
+                    if (url) {
+                      window.open(url, "_blank", "noopener");
+                      return;
+                    }
+                  } catch {
+                    /* Fall back to the local reschedule flow. */
+                  }
+                }
+                markBookingRescheduleIntent(token);
+                setDone("reschedule");
+              })();
             }}
             className="h-10 rounded-xl bg-violet-600 text-[13px] font-semibold text-white hover:bg-violet-700"
           >
@@ -186,9 +207,10 @@ export function ManageBookingClient({
           <button
             type="button"
             onClick={() => {
-              const cancelled = cancelPublicBooking(token);
-              if (cancelled) setBooking(cancelled);
-              setDone("cancel");
+              void cancelPublicBooking(token).then((cancelled) => {
+                if (cancelled) setBooking(cancelled);
+                setDone("cancel");
+              });
             }}
             className="h-10 rounded-xl border border-slate-200 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
           >

@@ -10,6 +10,10 @@ import {
   pickCallPhone,
   twilioVoiceFromNextEnv,
 } from "@/lib/calls/twilio-voice-fallback";
+import {
+  isStorageUnconfigured,
+  saveLocalUpload,
+} from "@/lib/storage/local-fallback";
 
 const ALLOWED_ROOTS = new Set([
   "leads",
@@ -22,11 +26,22 @@ const ALLOWED_ROOTS = new Set([
   "emails",
   "tasks",
   "meetings",
+  "calendly",
+  "calendar-sync",
+  "integrations",
+  "documents",
+  "document-requests",
   "messages",
   "notes",
   "reminders",
   "dashboard",
   "public",
+  "storage",
+  "signature-requests",
+  "signature-templates",
+  "settings",
+  "calculations",
+  "user",
 ]);
 
 function crmBaseUrl(): string | null {
@@ -47,6 +62,12 @@ function isAllowed(path: string[]): boolean {
       path.includes("emails") ||
       path.includes("tasks") ||
       path.includes("meetings") ||
+      path.includes("calendly") ||
+      path.includes("integrations") ||
+      path.includes("documents") ||
+      path.includes("document-requests") ||
+      path.includes("signature-requests") ||
+      path.includes("signature-templates") ||
       path.includes("messages") ||
       path.includes("notes") ||
       path.includes("reminders") ||
@@ -100,6 +121,12 @@ export async function proxyCrmV1(
     }
   }
 
+  const storageUpload =
+    request.method === "POST" &&
+    path[0] === "storage" &&
+    path[1] === "upload";
+  const storageFallbackReq = storageUpload ? request.clone() : null;
+
   const search = new URL(request.url).search;
   const target = `${base}/v1/${path.map(encodeURIComponent).join("/")}${search}`;
   const headers: Record<string, string> = { Accept: "application/json" };
@@ -109,19 +136,46 @@ export async function proxyCrmV1(
   const incomingType = request.headers.get("content-type");
   if (incomingType) headers["Content-Type"] = incomingType;
 
-  const body =
-    request.method === "GET" || request.method === "HEAD"
-      ? undefined
-      : await request.text();
+  const method = request.method.toUpperCase();
+  const hasBody = method !== "GET" && method !== "HEAD";
+  const isMultipart = incomingType?.includes("multipart/form-data") === true;
+  const body = !hasBody
+    ? undefined
+    : isMultipart
+      ? await request.arrayBuffer()
+      : (await request.text()) || undefined;
 
   const upstream = await fetch(target, {
     method: request.method,
     headers,
-    body: body || undefined,
+    body,
   });
 
   let text = await upstream.text();
   let status = upstream.status;
+
+  if (
+    storageFallbackReq &&
+    isStorageUnconfigured(status, text)
+  ) {
+    try {
+      const stored = await saveLocalUpload(await storageFallbackReq.formData());
+      text = JSON.stringify({
+        statusCode: 201,
+        message: "Stored on FinConnex while CRM file storage is offline.",
+        data: stored,
+      });
+      status = 201;
+    } catch (err) {
+      text = JSON.stringify({
+        message:
+          err instanceof Error
+            ? err.message
+            : "Could not store the file locally after CRM storage failed.",
+      });
+      status = 502;
+    }
+  }
 
   const dial = parseDialPath(path);
   if (request.method === "POST" && dial && status >= 500 && auth?.accessToken) {

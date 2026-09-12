@@ -9,7 +9,7 @@ describe("Documents API smoke (CI)", () => {
     smokeDocumentsWiring();
   });
 
-  it("mocks all 7 workspace-scoped Swagger operations", async () => {
+  it("mocks workspace-scoped Documents Swagger operations", async () => {
     await smokeDocumentsMock();
   });
 

@@ -1,4 +1,5 @@
 import { Phone } from "lucide-react";
+import { toE164 } from "@/lib/contacts/phone";
 import type { OverviewField } from "./types";
 
 interface OverviewCardProps {
@@ -37,16 +38,22 @@ export function OverviewCard({ fields }: OverviewCardProps) {
   );
 }
 
-/** Convenience field for phone numbers, matching the reference layout's green phone icon. */
+/** Phone row: green call icon + tel: link only when the number can actually be dialed. */
 export function phoneField(
   id: string,
   label: string,
   value: string,
 ): OverviewField {
+  const display = value.trim() || "—";
+  const e164 = toE164(value);
+  if (!e164) {
+    return { id, label, value: display };
+  }
   return {
     id,
     label,
-    value,
+    value: display,
+    href: `tel:${e164}`,
     icon: (
       <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
         <Phone className="h-2.5 w-2.5" />

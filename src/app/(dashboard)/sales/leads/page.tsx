@@ -23,7 +23,7 @@ import {
   refreshCrmLeadsBoard,
   replaceCrmLeadTags,
 } from "@/lib/leads/api";
-import { CRM_LEAD_STATUSES, type CrmLeadStatus } from "@/lib/leads/api/types";
+import type { CrmLeadStatus } from "@/lib/leads/api/types";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { exportLeadsCsv } from "@/lib/leads/import";
 import { composeEmailsHref } from "@/lib/emails/href";
@@ -37,6 +37,12 @@ import { onRulesChange } from "@/lib/rules";
 import { viewEnter } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
+import { CrmOfflineBanner } from "@/components/sales/CrmOfflineBanner";
+import {
+  LeadBoardMassActionDialog,
+  type LeadMassAction,
+} from "@/components/sales/leads/LeadBoardMassActionDialog";
+import { toast } from "sonner";
 import {
   Sparkles,
   ArrowLeftRight,
@@ -271,12 +277,6 @@ export default function LeadsPage() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  // TODO: wire these up to the actual modals/handlers once they exist.
-  const [isMassTransferOpen, setMassTransferOpen] = useState(false);
-  const [isMassDeleteOpen, setMassDeleteOpen] = useState(false);
-  const [isMassUpdateOpen, setMassUpdateOpen] = useState(false);
-  const [isManageTagsOpen, setManageTagsOpen] = useState(false);
-  const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
   const [crmSource, setCrmSource] = useState<"api" | "demo">("demo");
   const [crmLoading, setCrmLoading] = useState(true);
   const [crmError, setCrmError] = useState<string | null>(null);
@@ -284,6 +284,9 @@ export default function LeadsPage() {
   const [adsPlatform, setAdsPlatform] = useState<AdsPlatform | null>(null);
   const [sheetsOpen, setSheetsOpen] = useState(false);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
+  const [massAction, setMassAction] = useState<LeadMassAction | null>(null);
+  const [massBusy, setMassBusy] = useState(false);
+  const [massError, setMassError] = useState<string | null>(null);
 
   const [isKanbanSettingsOpen, setIsKanbanSettingsOpen] = useState(false);
   const [isListSettingsOpen, setIsListSettingsOpen] = useState(false);
@@ -310,91 +313,167 @@ export default function LeadsPage() {
 
   function exportTasks() {
     const n = exportLeadsCsv();
-    setBulkFlash(`Exported ${n} leads`);
+    notifyBoard(
+      crmOffline
+        ? `Exported ${n} leads from the local copy (CRM is offline)`
+        : `Exported ${n} leads`,
+    );
   }
 
   function exportSelected() {
     if (!selectedIds.length) return;
     const n = exportLeadsCsv({ ids: selectedIds });
-    setBulkFlash(`Exported ${n} selected leads`);
+    notifyBoard(
+      crmOffline
+        ? `Exported ${n} selected leads from the local copy (CRM is offline)`
+        : `Exported ${n} selected leads`,
+    );
   }
 
-  async function deleteSelected() {
-    if (!selectedIds.length) return;
-    if (!window.confirm(`Delete ${selectedIds.length} selected lead(s)?`)) return;
-    const liveIds = selectedIds.filter(isUuid);
-    if (liveIds.length) {
-      try {
+  function openMassAction(action: LeadMassAction) {
+    setMassError(null);
+    setMassAction(action);
+  }
+
+  async function applyMassDelete() {
+    setMassBusy(true);
+    setMassError(null);
+    try {
+      const liveIds = selectedIds.filter(isUuid);
+      if (liveIds.length) {
         await bulkCrmLeads({ ids: liveIds, operation: "SOFT_DELETE" });
         await refreshCrmLeadsBoard();
-      } catch (err) {
-        setBulkFlash(err instanceof Error ? err.message : "Delete failed");
+      }
+      const localIds = selectedIds.filter((id) => !isUuid(id));
+      const n = localIds.length ? deleteLeads(localIds) : liveIds.length;
+      setSelectedIds([]);
+      setMassAction(null);
+      notifyBoard(`Deleted ${n} lead(s)`);
+    } catch (err) {
+      setMassError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setMassBusy(false);
+    }
+  }
+
+  async function applyMassTransfer(ownerId: string, ownerName: string) {
+    setMassBusy(true);
+    setMassError(null);
+    try {
+      if (!isUuid(ownerId)) {
+        const n = updateLeadOwner(selectedIds, ownerName);
+        setMassAction(null);
+        notifyBoard(`Updated local owner on ${n} lead(s)`);
         return;
       }
-    }
-    const localIds = selectedIds.filter((id) => !isUuid(id));
-    const n = localIds.length ? deleteLeads(localIds) : liveIds.length;
-    setSelectedIds([]);
-    setBulkFlash(`Deleted ${n} lead(s)`);
-  }
-
-  async function changeOwnerSelected() {
-    if (!selectedIds.length) return;
-    const owner = window.prompt(
-      `Assign owner UUID for ${selectedIds.length} lead(s).\nPaste a workspace member user id.`,
-      "",
-    );
-    if (!owner?.trim()) return;
-    if (!isUuid(owner.trim())) {
-      const n = updateLeadOwner(selectedIds, owner.trim());
-      setBulkFlash(`Updated local owner on ${n} lead(s)`);
-      return;
-    }
-    try {
+      const liveIds = selectedIds.filter(isUuid);
+      if (!liveIds.length) {
+        setMassError("Select live CRM leads to transfer ownership.");
+        return;
+      }
       await bulkCrmLeads({
-        ids: selectedIds.filter(isUuid),
+        ids: liveIds,
         operation: "ASSIGN_OWNER",
-        ownerId: owner.trim(),
+        ownerId,
       });
       await refreshCrmLeadsBoard();
-      setBulkFlash("Owner updated");
+      setMassAction(null);
+      notifyBoard(`Transferred ${liveIds.length} lead(s) to ${ownerName}`);
     } catch (err) {
-      setBulkFlash(err instanceof Error ? err.message : "Owner update failed");
+      setMassError(err instanceof Error ? err.message : "Owner update failed");
+    } finally {
+      setMassBusy(false);
     }
   }
 
-  async function changeStatusSelected() {
-    if (!selectedIds.length) return;
-    const status = window.prompt(
-      `CRM status for ${selectedIds.length} lead(s).\nUse one of: ${CRM_LEAD_STATUSES.join(", ")}`,
-      "CONTACTED",
-    );
-    if (!status?.trim()) return;
-    const next = status.trim().toUpperCase() as CrmLeadStatus;
-    if (!CRM_LEAD_STATUSES.includes(next)) {
-      setBulkFlash("Unknown CRM status");
-      return;
-    }
-    const liveIds = selectedIds.filter(isUuid);
-    if (!liveIds.length) {
-      setBulkFlash("Select live CRM leads to change status");
-      return;
-    }
+  async function applyMassUpdate(status: CrmLeadStatus) {
+    setMassBusy(true);
+    setMassError(null);
     try {
+      const liveIds = selectedIds.filter(isUuid);
+      if (!liveIds.length) {
+        setMassError("Select live CRM leads to change status.");
+        return;
+      }
       await bulkCrmLeads({
         ids: liveIds,
         operation: "CHANGE_STATUS",
-        status: next,
+        status,
       });
       await refreshCrmLeadsBoard();
-      setBulkFlash("Status updated");
+      setMassAction(null);
+      notifyBoard("Status updated");
     } catch (err) {
-      setBulkFlash(err instanceof Error ? err.message : "Status update failed");
+      setMassError(err instanceof Error ? err.message : "Status update failed");
+    } finally {
+      setMassBusy(false);
     }
   }
 
-  function openPrintView() {
-    console.log("print view clicked");
+  async function applyMassTag(tag: string) {
+    setMassBusy(true);
+    setMassError(null);
+    try {
+      let n = 0;
+      for (const id of selectedIds) {
+        const found = findLeadById(id);
+        if (!found) continue;
+        const next = uniqueTags([...(found.card.tags ?? []), tag]);
+        if (updateLead(id, { tags: next })) n += 1;
+        if (isUuid(id)) {
+          try {
+            await replaceCrmLeadTags(id, next);
+          } catch {
+            /* keep local tag even if CRM rejects */
+          }
+        }
+      }
+      setMassAction(null);
+      notifyBoard(`Tagged ${n} lead${n === 1 ? "" : "s"} with #${tag}`);
+    } catch (err) {
+      setMassError(err instanceof Error ? err.message : "Tag update failed");
+    } finally {
+      setMassBusy(false);
+    }
+  }
+
+  function notifyBoard(message: string, kind: "ok" | "warn" = "ok") {
+    setBulkFlash(message);
+    if (kind === "warn") toast.error(message);
+    else toast.message(message);
+  }
+
+  const crmOffline = crmSource !== "api" && Boolean(crmError);
+
+  function requireLiveCrm(action: string): boolean {
+    if (crmSource === "api") return true;
+    if (crmLoading) {
+      notifyBoard("Still connecting to CRM. Try again in a moment.", "warn");
+      return false;
+    }
+    notifyBoard(
+      `Cannot ${action} while CRM is offline. Reconnect, then try again — this would not sync.`,
+      "warn",
+    );
+    return false;
+  }
+
+  async function connectCrm() {
+    setCrmLoading(true);
+    try {
+      const ok = await refreshCrmLeadsBoard();
+      setCrmSource(ok ? "api" : "demo");
+      setCrmError(
+        ok ? null : "Could not reach the CRM. Showing a local copy only.",
+      );
+      return ok;
+    } catch (err) {
+      setCrmSource("demo");
+      setCrmError(err instanceof Error ? err.message : "CRM unavailable");
+      return false;
+    } finally {
+      setCrmLoading(false);
+    }
   }
 
   function openViewSettings() {
@@ -406,6 +485,7 @@ export default function LeadsPage() {
   }
 
   function openCreateLead(stage?: string) {
+    if (!requireLiveCrm("create a lead")) return;
     setCreateStage(stage);
     setCreateOpen(true);
   }
@@ -420,26 +500,15 @@ export default function LeadsPage() {
   }, [router]);
 
   useEffect(() => {
-    let cancelled = false;
-    setCrmLoading(true);
-    setCrmError(null);
-    void (async () => {
-      try {
-        const ok = await refreshCrmLeadsBoard();
-        if (cancelled) return;
-        setCrmSource(ok ? "api" : "demo");
-        if (!ok) setCrmError("CRM unavailable — showing local board");
-      } catch (err) {
-        if (cancelled) return;
-        setCrmSource("demo");
-        setCrmError(err instanceof Error ? err.message : "CRM unavailable");
-      } finally {
-        if (!cancelled) setCrmLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    if (!createOpen || crmLoading) return;
+    if (crmSource === "api") return;
+    setCreateOpen(false);
+    setCreateStage(undefined);
+    notifyBoard("Cannot create a lead while CRM is offline.", "warn");
+  }, [createOpen, crmLoading, crmSource]);
+
+  useEffect(() => {
+    void connectCrm();
   }, []);
 
   useEffect(() => {
@@ -492,6 +561,10 @@ export default function LeadsPage() {
       "leads",
       tablePreferenceFromListView("leads", normalized),
     );
+    if (normalized.sortBy) setActiveSort(normalized.sortBy);
+    if (normalized.sortDirection === "asc" || normalized.sortDirection === "desc") {
+      setActiveSortDirection(normalized.sortDirection);
+    }
     setIsListSettingsOpen(false);
   }
 
@@ -531,38 +604,59 @@ export default function LeadsPage() {
       id: "import-leads",
       label: "Import Leads",
       badge: "New",
-      onClick: () => setImportOpen(true),
+      onClick: () => {
+        if (!requireLiveCrm("import leads")) return;
+        setImportOpen(true);
+      },
     },
     {
       id: "import-notes",
       label: "Import Notes",
       onClick: () =>
-        setBulkFlash("Notes import comes next — use Import Leads for CSV now"),
+        notifyBoard(
+          "Notes import comes next — use Import Leads for CSV now",
+          "warn",
+        ),
     },
     {
       id: "facebook-ads-sync",
       label: "Facebook Ads Sync",
-      onClick: () => setAdsPlatform("facebook"),
+      onClick: () => {
+        if (!requireLiveCrm("sync Facebook ads")) return;
+        setAdsPlatform("facebook");
+      },
     },
     {
       id: "linkedin-ads-sync",
       label: "LinkedIn Ads Sync",
-      onClick: () => setAdsPlatform("linkedin"),
+      onClick: () => {
+        if (!requireLiveCrm("sync LinkedIn ads")) return;
+        setAdsPlatform("linkedin");
+      },
     },
     {
       id: "tiktok-ads-sync",
       label: "Tiktok Ads Sync",
-      onClick: () => setAdsPlatform("tiktok"),
+      onClick: () => {
+        if (!requireLiveCrm("sync TikTok ads")) return;
+        setAdsPlatform("tiktok");
+      },
     },
     {
       id: "google-ads-sync",
       label: "Google Ads Sync",
-      onClick: () => setAdsPlatform("google"),
+      onClick: () => {
+        if (!requireLiveCrm("sync Google ads")) return;
+        setAdsPlatform("google");
+      },
     },
     {
       id: "google-sheets-import",
       label: "Google Sheets Import",
-      onClick: () => setSheetsOpen(true),
+      onClick: () => {
+        if (!requireLiveCrm("import from Google Sheets")) return;
+        setSheetsOpen(true);
+      },
     },
   ];
 
@@ -571,31 +665,31 @@ export default function LeadsPage() {
       id: "mass-transfer",
       label: "Mass Transfer",
       icon: <ArrowLeftRight className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setMassTransferOpen(true),
+      onClick: () => openMassAction("transfer"),
     },
     {
       id: "mass-delete",
       label: "Mass Delete",
       icon: <Trash2 className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setMassDeleteOpen(true),
+      onClick: () => openMassAction("delete"),
     },
     {
       id: "mass-update",
       label: "Mass Update",
       icon: <RefreshCw className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setMassUpdateOpen(true),
+      onClick: () => openMassAction("update"),
     },
     {
       id: "manage-tags",
       label: "Manage Tags",
       icon: <Tag className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setManageTagsOpen(true),
+      onClick: () => openMassAction("tags"),
     },
     {
       id: "assignment-rules",
       label: "Assignment Rules",
       icon: <ShieldCheck className="h-3.5 w-3.5 text-slate-400" />,
-      onClick: () => setAssignmentRulesOpen(true),
+      onClick: () => openMassAction("assignment-rules"),
     },
     {
       id: "export-tasks",
@@ -610,32 +704,45 @@ export default function LeadsPage() {
       id: "print-view",
       label: "Print View",
       icon: <Sparkles className="h-3.5 w-3.5 text-amber-400" />,
-      onClick: () => openPrintView(),
+      onClick: () => openMassAction("print"),
     },
   ];
 
   return (
     <div className={BOARD_PAGE}>
-      {/* <FocusHighlight /> */}
-      <div className="mb-1 flex flex-wrap items-center gap-2">
-        <span
-          className={cn(
-            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-            crmSource === "api"
-              ? "bg-emerald-50 text-emerald-700"
-              : "bg-slate-100 text-slate-500",
-          )}
+      {crmOffline ? (
+        <CrmOfflineBanner
+          entityLabel="leads"
+          message={crmError}
+          retrying={crmLoading}
+          onRetry={() => void connectCrm()}
+        />
+      ) : (
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+              crmSource === "api"
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-slate-100 text-slate-500",
+            )}
+          >
+            {crmSource === "api"
+              ? "Live CRM"
+              : crmLoading
+                ? "Connecting…"
+                : "Demo"}
+          </span>
+        </div>
+      )}
+      {bulkFlash ? (
+        <div
+          role="status"
+          className="mb-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-800 shadow-sm"
         >
-          {crmSource === "api"
-            ? "Live CRM"
-            : crmLoading
-              ? "Connecting…"
-              : "Demo"}
-        </span>
-        {crmError && crmSource === "demo" ? (
-          <span className="text-[10px] text-slate-500">{crmError}</span>
-        ) : null}
-      </div>
+          {bulkFlash}
+        </div>
+      ) : null}
       <div className="shrink-0">
         <EntityHeader
           entityLabel="Lead"
@@ -677,8 +784,23 @@ export default function LeadsPage() {
           activeSort={activeSort}
           activeSortDirection={activeSortDirection}
           onSortChange={(field, direction) => {
-            setActiveSort(field);
+            const nextField = field || "Sort";
+            setActiveSort(nextField);
             setActiveSortDirection(direction);
+            if (
+              nextField === "newest" ||
+              nextField === "oldest" ||
+              nextField === "name_asc" ||
+              nextField === "name_desc"
+            ) {
+              const next: ListViewConfig = {
+                ...listViewConfig,
+                sortBy: nextField,
+                sortDirection: direction,
+              };
+              setListViewConfig(next);
+              persistListViewConfig(next);
+            }
           }}
         />
 
@@ -719,6 +841,7 @@ export default function LeadsPage() {
               );
             }}
             onAddTag={(tag) => {
+              if (!requireLiveCrm("tag leads")) return;
               void (async () => {
                 let n = 0;
                 for (const id of selectedIds) {
@@ -737,20 +860,39 @@ export default function LeadsPage() {
                 setBulkFlash(`Tagged ${n} lead${n === 1 ? "" : "s"} with #${tag}`);
               })();
             }}
-            onRemoveTag={() => console.log("remove tag clicked")}
-            onRunMacro={() => console.log("run macro clicked")}
-            onCreateTask={() => console.log("create task clicked")}
-            onSetReminder={() => console.log("set reminder clicked")}
-            onMassUpdate={() => changeStatusSelected()}
-            onChangeOwner={() => changeOwnerSelected()}
-            onCadences={() => console.log("cadences clicked")}
-            onAddToCampaigns={() => console.log("add to campaigns clicked")}
-            onPrintMailingLabels={() =>
-              console.log("print mailing labels clicked")
+            onRemoveTag={() =>
+              notifyBoard("Remove tag is not available on this toolbar yet.", "warn")
             }
-            onMailMerge={() => console.log("mail merge clicked")}
-            onMassConvert={() => console.log("mass convert clicked")}
-            onDelete={() => deleteSelected()}
+            onRunMacro={() =>
+              notifyBoard("Macros are not available yet.", "warn")
+            }
+            onCreateTask={() => {
+              if (!requireLiveCrm("create a task")) return;
+              notifyBoard("Select a lead, then create a task from the lead card.", "warn");
+            }}
+            onSetReminder={() => {
+              if (!requireLiveCrm("set a reminder")) return;
+              notifyBoard("Set a reminder from the lead record.", "warn");
+            }}
+            onMassUpdate={() => openMassAction("update")}
+            onChangeOwner={() => openMassAction("transfer")}
+            onCadences={() =>
+              notifyBoard("Cadences are not available yet.", "warn")
+            }
+            onAddToCampaigns={() =>
+              notifyBoard("Campaigns are not available from this toolbar yet.", "warn")
+            }
+            onPrintMailingLabels={() =>
+              notifyBoard("Mailing labels are not available yet.", "warn")
+            }
+            onMailMerge={() =>
+              notifyBoard("Mail merge is not available yet.", "warn")
+            }
+            onMassConvert={() => {
+              if (!requireLiveCrm("convert leads")) return;
+              notifyBoard("Convert leads from the lead record.", "warn");
+            }}
+            onDelete={() => openMassAction("delete")}
             onExportSelectedRecords={() => exportSelected()}
           />
           </>
@@ -781,6 +923,7 @@ export default function LeadsPage() {
           {viewMode === "kanban" ? (
             <LeadKanbanBoard
               filters={filters}
+              sortValue={activeSort}
               visibleColumnIds={visibleColumnIds}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
@@ -798,6 +941,7 @@ export default function LeadsPage() {
             <div className="h-full overflow-auto">
               <LeadListView
                 filters={filters}
+                sortValue={activeSort}
                 manageColumns={listManageColumns}
                 onManageColumnsChange={handleListManageColumnsChange}
                 pageSize={listViewConfig.pageSize}
@@ -881,8 +1025,40 @@ export default function LeadsPage() {
         onCreated={() => {
           void refreshCrmLeadsBoard().then((ok) => {
             setCrmSource(ok ? "api" : "demo");
+            setCrmError(
+              ok ? null : "Could not reach the CRM. Showing a local copy only.",
+            );
           });
         }}
+      />
+
+      <LeadBoardMassActionDialog
+        action={massAction}
+        onClose={() => {
+          if (massBusy) return;
+          setMassAction(null);
+          setMassError(null);
+        }}
+        selectedCount={selectedIds.length}
+        crmLive={crmSource === "api"}
+        crmLoading={crmLoading}
+        busy={massBusy}
+        error={massError}
+        printRows={listLeadColumns()
+          .flatMap((column) => column.cards)
+          .filter((card) =>
+            selectedIds.length ? selectedIds.includes(card.id) : true,
+          )
+          .map((card) => ({
+            id: card.id,
+            name: card.name,
+            owner: card.owner,
+            email: card.email ?? "",
+          }))}
+        onTransfer={applyMassTransfer}
+        onDelete={applyMassDelete}
+        onUpdate={applyMassUpdate}
+        onAddTag={applyMassTag}
       />
 
       <SheetsImportModal

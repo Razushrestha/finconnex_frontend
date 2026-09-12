@@ -57,7 +57,6 @@ import { initials } from "@/lib/activities/shared";
 import {
   consultationModeLabel,
   deleteBookingPage,
-  listConsultationPages,
   nextBookingPageId,
   publicBookUrl,
   upsertBookingPage,
@@ -65,6 +64,14 @@ import {
   type BookingPage,
   type ConsultantPriority,
 } from "@/lib/booking/types";
+import {
+  attachCalendlyEventTypeToPage,
+  calendlyEventTypeToBookingPage,
+  listCalendlyEventTypes,
+  listCalendlyHosts,
+  type CalendlyHost,
+} from "@/lib/booking/calendly-api";
+import { CalendlyConnectionCard } from "@/components/booking/CalendlyConnectionCard";
 
 const BRAND = "#5A32A3";
 
@@ -78,6 +85,18 @@ const SECTION_FILTERS = [
 ] as const;
 
 type SectionFilter = (typeof SECTION_FILTERS)[number];
+
+async function loadConsultationPagesFromApi(): Promise<BookingPage[]> {
+  const [hosts, types] = await Promise.all([
+    listCalendlyHosts().catch(() => [] as CalendlyHost[]),
+    listCalendlyEventTypes().catch(() => []),
+  ]);
+  const hostName = (id: string) =>
+    hosts.find((host) => host.id === id)?.name ?? "";
+  return types.map((item) =>
+    calendlyEventTypeToBookingPage(item, hostName(item.hostId)),
+  );
+}
 
 function matchesSection(
   page: BookingPage,
@@ -102,9 +121,8 @@ function matchesSection(
 
 export function ConsultationsBoard() {
   const router = useRouter();
-  const [pages, setPages] = useState<BookingPage[]>(() =>
-    typeof window === "undefined" ? [] : listConsultationPages(),
-  );
+  const [pages, setPages] = useState<BookingPage[]>([]);
+  const [pagesLoading, setPagesLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [view, setView] = useState<ViewMode>("grid");
   const [sectionOpen, setSectionOpen] = useState(false);
@@ -199,14 +217,14 @@ export function ConsultationsBoard() {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "")
       .slice(0, 48);
-    upsertBookingPage({
+    const page: BookingPage = {
       id: nextBookingPageId(),
       title: detailsValues.name,
       slug: slug || `consult-${Date.now()}`,
       owner: assignedConsultants[0] ?? "Admin",
-      eventType: "Consultation",
+      eventType: "Consultation" as const,
       consultationMode: detailsChoice.mode,
-      meetingMode: "one_time",
+      meetingMode: "one_time" as const,
       durationMinutes: mapped.durationMinutes,
       bufferMinutes: mapped.bufferMinutes,
       minNoticeHours: mapped.minNoticeHours,
@@ -253,10 +271,25 @@ export function ConsultationsBoard() {
       bookingsCount: 0,
       cancelRate: 0,
       createdAt: new Date().toLocaleDateString("en-GB"),
+    };
+    upsertBookingPage(page);
+    void attachCalendlyEventTypeToPage(page).then(() => {
+      void loadConsultationPagesFromApi().then(setPages);
     });
-    setPages(listConsultationPages());
+    void loadConsultationPagesFromApi().then(setPages);
     resetWizard();
   }
+
+  function refreshPages() {
+    setPagesLoading(true);
+    void loadConsultationPagesFromApi()
+      .then(setPages)
+      .finally(() => setPagesLoading(false));
+  }
+
+  useEffect(() => {
+    refreshPages();
+  }, []);
 
   useEffect(() => {
     if (!sectionOpen) return;
@@ -471,10 +504,17 @@ export function ConsultationsBoard() {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {pagesLoading ? (
         <p className="rounded-xl border border-dashed border-[#E5E7EB] bg-white py-16 text-center text-[13px] text-slate-400">
-          No consultations in this view.
+          Loading Calendly event types…
         </p>
+      ) : filtered.length === 0 ? (
+        <div className="space-y-3">
+          <p className="rounded-xl border border-dashed border-[#E5E7EB] bg-white py-8 text-center text-[13px] text-slate-400">
+            No Calendly event types yet. Connect Calendly below, then sync.
+          </p>
+          <CalendlyConnectionCard compact />
+        </div>
       ) : view === "grid" ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((page) => (
@@ -482,7 +522,7 @@ export function ConsultationsBoard() {
               key={page.id}
               page={page}
               onOpen={() => router.push(`/booking/${page.id}`)}
-              onRefresh={() => setPages(listConsultationPages())}
+              onRefresh={refreshPages}
             />
           ))}
         </div>
@@ -493,7 +533,7 @@ export function ConsultationsBoard() {
               key={page.id}
               page={page}
               onOpen={() => router.push(`/booking/${page.id}`)}
-              onRefresh={() => setPages(listConsultationPages())}
+              onRefresh={refreshPages}
             />
           ))}
         </div>
@@ -694,7 +734,11 @@ function ConsultationCard({
       <div className="mt-8 flex items-center justify-between gap-3">
         <PeopleSlot people={people} />
         <div onClick={(e) => e.stopPropagation()}>
-          <ShareButton slug={page.slug} title={page.title} />
+          <ShareButton
+            slug={page.slug}
+            title={page.title}
+            eventTypeId={page.calendlyEventTypeId || page.id}
+          />
         </div>
       </div>
     </article>
@@ -742,7 +786,11 @@ function ConsultationRow({
         onClick={(e) => e.stopPropagation()}
       >
         <PeopleSlot people={people} />
-        <ShareButton slug={page.slug} title={page.title} />
+        <ShareButton
+          slug={page.slug}
+          title={page.title}
+          eventTypeId={page.calendlyEventTypeId || page.id}
+        />
         <CardMenu page={page} onRefresh={onRefresh} />
       </div>
     </div>
@@ -897,27 +945,6 @@ function BrandMark({ page }: { page: BookingPage }) {
       </span>
     );
   }
-  if (page.id === "bp5" || page.slug === "rate-review") {
-    return (
-      <span
-        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-[15px] font-bold text-white"
-        style={{ backgroundColor: BRAND }}
-        aria-hidden
-      >
-        F
-      </span>
-    );
-  }
-  if (page.id === "bp6" || page.slug === "test-natural-home") {
-    return (
-      <span className="flex h-12 w-[4.25rem] shrink-0 flex-col items-center justify-center rounded-md border border-slate-200 bg-white text-center leading-none">
-        <span className="text-[8px] font-extrabold tracking-wide text-slate-800">
-          NATURAL
-        </span>
-        <span className="text-[9px] font-bold text-slate-700">HOME</span>
-      </span>
-    );
-  }
   return (
     <span
       className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-[13px] font-bold text-white"
@@ -928,7 +955,15 @@ function BrandMark({ page }: { page: BookingPage }) {
   );
 }
 
-function ShareButton({ slug, title }: { slug: string; title: string }) {
+function ShareButton({
+  slug,
+  title,
+  eventTypeId,
+}: {
+  slug: string;
+  title: string;
+  eventTypeId?: string;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -949,6 +984,7 @@ function ShareButton({ slug, title }: { slug: string; title: string }) {
         <ShareConsultationModal
           title={title}
           slug={slug}
+          eventTypeId={eventTypeId}
           onClose={() => setOpen(false)}
         />
       ) : null}

@@ -126,6 +126,61 @@ export const elevatedSelectClass = (hasIcon?: boolean) =>
 export const elevatedTextareaClass =
   "min-h-[110px] w-full resize-y rounded-lg bg-transparent px-3 py-2.5 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 dark:text-slate-100";
 
+function CreateFormTip({
+  text,
+  testId,
+}: {
+  text: string;
+  testId?: string;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const rootRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    function onPointerDown(event: PointerEvent) {
+      if (rootRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative max-w-full shrink-0">
+      <button
+        type="button"
+        data-testid={testId}
+        aria-expanded={open}
+        aria-label={text}
+        title={text}
+        onClick={() => setOpen((value) => !value)}
+        className="flex max-w-full items-start gap-1.5 rounded-md bg-emerald-50 px-2.5 py-1.5 text-left text-[12px] leading-5 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-950"
+      >
+        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <span className="max-w-[min(100%,28rem)] whitespace-normal break-words">
+          {text}
+        </span>
+      </button>
+      {open ? (
+        <p
+          role="tooltip"
+          className="absolute top-full right-0 z-50 mt-1 w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-emerald-200 bg-white px-3 py-2 text-[12px] leading-5 whitespace-normal break-words text-emerald-900 shadow-lg dark:border-emerald-800 dark:bg-zinc-900 dark:text-emerald-200"
+        >
+          {text}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 interface CreateEntityFormShellProps {
   breadcrumbParent: { label: string; href: string };
   badge: string;
@@ -175,8 +230,7 @@ export function CreateEntityFormShell({
 
   return (
     <div className="flex min-h-[calc(100dvh-4rem)] w-full flex-col bg-white dark:bg-zinc-950">
-      {/* Compact single-row header */}
-      <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200/80 px-3 py-2 sm:px-4 lg:px-5 dark:border-zinc-800">
+      <header className="flex shrink-0 flex-wrap items-start gap-x-3 gap-y-2 border-b border-slate-200/80 px-3 py-2 sm:px-4 lg:px-5 dark:border-zinc-800">
         <button
           type="button"
           onClick={() => router.back()}
@@ -197,19 +251,16 @@ export function CreateEntityFormShell({
             {title}
           </h1>
         </div>
-
-        <div
-          className="hidden items-center gap-1.5 text-[11px] text-emerald-700 xl:flex dark:text-emerald-400"
-          title={tip}
-        >
-          <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
-          <span className="max-w-[220px] truncate">{tip}</span>
-        </div>
       </header>
 
       {/* Form body: fills remaining viewport */}
       <div className="min-h-0 flex-1 overflow-auto bg-slate-50/70 dark:bg-zinc-900/40">
-        <div className={cn(FORM_CANVAS, formEnter)}>{children}</div>
+        <div className={cn(FORM_CANVAS, formEnter)}>
+          <div className="col-span-full flex justify-end">
+            <CreateFormTip text={tip} testId="create-entity-tip" />
+          </div>
+          {children}
+        </div>
       </div>
 
       {/* Actions: compact sticky bar */}

@@ -394,7 +394,7 @@ export default function DealsPage() {
         activeSort={activeSort}
         activeSortDirection={activeSortDirection}
         onSortChange={(field, direction) => {
-          setActiveSort(field);
+          setActiveSort(field || "Sort");
           setActiveSortDirection(direction);
         }}
         importOptions={importOptions}
@@ -512,9 +512,16 @@ export default function DealsPage() {
               visibleColumnIds={visibleColumnIds}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
+              sortValue={activeSort}
+              sortDirection={activeSortDirection}
             />
           ) : (
-            <DealsListView pipeline={activePipeline} filters={filters} />
+            <DealsListView
+              pipeline={activePipeline}
+              filters={filters}
+              sortValue={activeSort}
+              sortDirection={activeSortDirection}
+            />
           )}
         </div>
       </div>

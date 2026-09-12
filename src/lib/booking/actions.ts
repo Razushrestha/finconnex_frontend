@@ -9,6 +9,13 @@ import {
   listNotifications,
   upsertNotification,
 } from "@/lib/notifications/types";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import {
+  cancelCalendlyMeeting,
+  createCalendlyBooking,
+  newCalendlyIdempotencyKey,
+  resolveCalendlyEventType,
+} from "@/lib/booking/calendly-api";
 import {
   bookingLocationLabel,
   formatBookingWhen,
@@ -100,6 +107,8 @@ export async function confirmPublicBooking(input: {
   let leadId = existing?.leadId;
   let contactId = existing?.contactId;
   let meetingId = existing?.meetingId;
+  let calendlyMeetingId = existing?.calendlyMeetingId;
+  let calendlyInviteeId = existing?.calendlyInviteeId;
   let createdLead = existing?.createdLead ?? false;
 
   if (!existing) {
@@ -172,6 +181,33 @@ export async function confirmPublicBooking(input: {
     }
   }
 
+  try {
+    const eventType = await resolveCalendlyEventType(page);
+    if (eventType && isUuid(eventType.id)) {
+      if (existing?.calendlyMeetingId && isUuid(existing.calendlyMeetingId)) {
+        await cancelCalendlyMeeting(
+          existing.calendlyMeetingId,
+          "Guest rescheduled",
+        ).catch(() => undefined);
+      }
+      const booked = await createCalendlyBooking({
+        idempotencyKey: newCalendlyIdempotencyKey(),
+        eventTypeId: eventType.id,
+        startTime: parseLocalDateTime(input.start).toISOString(),
+        name: input.guestName.trim(),
+        email: input.guestEmail.trim(),
+        timezone:
+          page.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+        leadId: isUuid(leadId) ? leadId : undefined,
+        contactId: isUuid(contactId) ? contactId : undefined,
+      });
+      calendlyMeetingId = booked.meetingId || calendlyMeetingId;
+      calendlyInviteeId = booked.inviteeId || calendlyInviteeId;
+    }
+  } catch {
+    /* Local booking still proceeds when Calendly is disconnected. */
+  }
+
   const confirmationMessage = renderBookingTemplate(page.confirmationTemplate, {
     name: input.guestName,
     datetime: when,
@@ -219,6 +255,8 @@ export async function confirmPublicBooking(input: {
     meetingId,
     leadId,
     contactId,
+    calendlyMeetingId,
+    calendlyInviteeId,
     confirmationMessage,
     reminderMessage,
     confirmationSentAt: nowIso,
@@ -233,9 +271,16 @@ export async function confirmPublicBooking(input: {
   return { booking, manageToken };
 }
 
-export function cancelPublicBooking(token: string): Booking | null {
+export async function cancelPublicBooking(token: string): Promise<Booking | null> {
   const booking = getBookingByToken(token);
   if (!booking) return null;
+  if (booking.calendlyMeetingId && isUuid(booking.calendlyMeetingId)) {
+    try {
+      await cancelCalendlyMeeting(booking.calendlyMeetingId, "Guest cancelled");
+    } catch {
+      /* Keep the local cancel even if the provider call fails. */
+    }
+  }
   const cancelled: Booking = {
     ...booking,
     status: "Cancelled",

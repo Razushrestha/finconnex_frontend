@@ -39,8 +39,8 @@ import {
   stripAllSignatures,
   stripSignature,
 } from "@/lib/emails/signature";
-import { canChooseFromAddress, listFromIdentities, sendAsLabel } from "@/lib/emails/send-as";
-import { formatRulesAt } from "@/lib/rules/storage";
+import { listFromIdentities, loadFromIdentities, sendAsLabel } from "@/lib/emails/send-as";
+import { formatRulesAt, onRulesChange } from "@/lib/rules/storage";
 import { relatedRecordsForPerson } from "@/lib/emails/related-records";
 import { ComposeContextRail } from "./ComposeContextRail";
 import { ComposeActionBar } from "./ComposeActionBar";
@@ -94,7 +94,7 @@ interface FormState {
 const initialState: FormState = {
   subject: "",
   body: "",
-  from: "bishnu@nepatronix.com",
+  from: "",
   to: [],
   cc: [],
   bcc: [],
@@ -135,30 +135,65 @@ export function CreateEmailForm({
 
   useEffect(() => {
     const draft = takeCompose();
-    const fromEmail = listFromIdentities()[0]?.email ?? initialState.from;
-    const profile = getSignatureProfileForEmail(fromEmail);
-    setActiveSignatureId(profile.id);
-    if (draft?.cc?.length) setShowCc(true);
-    setForm((prev) => {
-      const next = draft
-        ? {
-            ...prev,
-            to: draft.to.length ? draft.to : prev.to,
-            cc: draft.cc?.length ? draft.cc : prev.cc,
-            subject: draft.subject || prev.subject,
-            body: draft.body || prev.body,
-            relatedName: draft.relatedName || prev.relatedName,
-            template: draft.templateUsed || prev.template,
-          }
-        : prev;
-      return {
-        ...next,
-        from: fromEmail,
-        body: hasAnySignature(next.body)
-          ? next.body
-          : appendSignature(next.body, profile.body),
-      };
+    let draftApplied = false;
+    let cancelled = false;
+    function applyMailbox(identities = listFromIdentities()) {
+      const fromEmail = identities[0]?.email ?? "";
+      const profile = fromEmail
+        ? getSignatureProfileForEmail(fromEmail)
+        : undefined;
+      if (profile) setActiveSignatureId(profile.id);
+      if (draft?.cc?.length) setShowCc(true);
+      setForm((prev) => {
+        const merged =
+          !draftApplied && draft
+            ? {
+                ...prev,
+                to: draft.to.length ? draft.to : prev.to,
+                cc: draft.cc?.length ? draft.cc : prev.cc,
+                subject: draft.subject || prev.subject,
+                body: draft.body || prev.body,
+                relatedName: draft.relatedName || prev.relatedName,
+                template: draft.templateUsed || prev.template,
+              }
+            : prev;
+        draftApplied = true;
+        const nextFrom = fromEmail || prev.from;
+        const shouldSign =
+          Boolean(profile) &&
+          nextFrom === fromEmail &&
+          !hasAnySignature(merged.body);
+        return {
+          ...merged,
+          from: nextFrom,
+          body: shouldSign
+            ? appendSignature(merged.body, profile!.body)
+            : merged.body,
+        };
+      });
+    }
+    applyMailbox();
+    void loadFromIdentities()
+      .then((identities) => {
+        if (cancelled) return;
+        setFromIdentities(identities);
+        setFromLoading(false);
+        applyMailbox(identities);
+      })
+      .catch(() => {
+        if (!cancelled) setFromLoading(false);
+      });
+    const off = onRulesChange((kind) => {
+      if (kind === "actor" || kind === "all") {
+        const identities = listFromIdentities();
+        setFromIdentities(identities);
+        applyMailbox(identities);
+      }
     });
+    return () => {
+      cancelled = true;
+      off();
+    };
   }, []);
   const [showBcc, setShowBcc] = useState(false);
   const [recipientDraft, setRecipientDraft] = useState("");
@@ -171,11 +206,21 @@ export function CreateEmailForm({
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [templateQuery, setTemplateQuery] = useState("");
   const [fromOpen, setFromOpen] = useState(false);
+  const [fromIdentities, setFromIdentities] = useState(() => listFromIdentities());
+  const [fromLoading, setFromLoading] = useState(() => listFromIdentities().length === 0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const templatesRef = useRef<HTMLDivElement>(null);
   const fromRef = useRef<HTMLDivElement>(null);
-  const fromIdentities = listFromIdentities();
-  const canPickFrom = canChooseFromAddress();
+  const canPickFrom = fromIdentities.length > 1;
+  const fromIdentity =
+    fromIdentities.find((item) => item.email === form.from) ?? fromIdentities[0];
+  const fromLabel = form.from
+    ? fromIdentity
+      ? `${fromIdentity.name} <${fromIdentity.email}>`
+      : form.from
+    : fromLoading
+      ? "Loading mailbox…"
+      : "Workspace mailbox not configured";
 
   useEffect(() => {
     if (!templatesOpen && !fromOpen) return;
@@ -378,19 +423,26 @@ export function CreateEmailForm({
           current.id,
           status === "Scheduled" && at ? { scheduledAt: at.toISOString() } : {},
         );
-        if (!sent && status === "Sent") {
-          upsertEmail({ ...current, status: "Draft" });
+        const unsent =
+          !sent || sent.status === "Draft" || sent.status === "Failed";
+        if (unsent && status === "Sent") {
+          upsertEmail({ ...current, ...(sent ?? {}), status: "Draft" });
           setSending(false);
           setSendError(
-            "CRM created the draft but send failed. Open the email to retry.",
+            "The email was not sent. It is saved in Drafts so you can retry.",
           );
-          router.push(`/activities/emails/detail/${current.id}`);
+          router.push(`/activities/emails?folder=drafts&focus=${current.id}`);
           return;
         }
         current =
           persistRemoteEmail(
             sent
-              ? { ...current, ...sent, id: sent.id, status }
+              ? {
+                  ...current,
+                  ...sent,
+                  id: sent.id,
+                  status: sent.status === "Scheduled" ? "Scheduled" : status,
+                }
               : { ...current, status },
           ) ?? current;
         keptId = current.id;
@@ -398,7 +450,12 @@ export function CreateEmailForm({
     } catch (err) {
       upsertEmail({ ...local, status: "Draft" });
       setSending(false);
-      setSendError(err instanceof Error ? err.message : "Could not send via CRM");
+      setSendError(
+        err instanceof Error
+          ? err.message
+          : "Could not send. The message was saved in Drafts.",
+      );
+      router.push(`/activities/emails?folder=drafts&focus=${local.id}`);
       return;
     }
 
@@ -430,7 +487,8 @@ export function CreateEmailForm({
 
   function keepSignatureIfPresent(nextHtml: string) {
     if (!hasAnySignature(form.body)) return nextHtml;
-    return appendSignature(nextHtml, getActiveSignatureProfile().body);
+    const signature = getActiveSignatureProfile()?.body ?? "";
+    return appendSignature(nextHtml, signature);
   }
 
   function applyAiBody(nextHtml: string) {
@@ -479,7 +537,7 @@ export function CreateEmailForm({
         html = stripSignature(html, item.body);
       }
       html = html.replace(/(<p><\/p>\s*)+$/g, "").trim();
-      return { ...prev, body: appendSignature(`${html}${chunk}`, profile.body) };
+      return { ...prev, body: appendSignature(`${html}${chunk}`, profile?.body ?? "") };
     });
   }
 
@@ -562,7 +620,7 @@ export function CreateEmailForm({
                   onClick={() => setFromOpen((v) => !v)}
                   className="inline-flex max-w-full items-center gap-1.5 rounded-md py-0.5 text-sm font-medium text-foreground hover:bg-slate-50"
                 >
-                  <span className="truncate">{form.from}</span>
+                  <span className="truncate">{fromLabel}</span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
                 </button>
                 {fromOpen ? (
@@ -603,7 +661,7 @@ export function CreateEmailForm({
               </div>
             ) : (
               <span className="truncate text-sm font-medium text-foreground">
-                {form.from}
+                {fromLabel}
               </span>
             )}
           </div>

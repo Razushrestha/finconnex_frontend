@@ -11,7 +11,7 @@ export function AddApplicantContactModal({
   onCreated,
 }: {
   onClose: () => void;
-  onCreated: (contact: { name: string; email: string }) => void;
+  onCreated: (contact: { id: string; name: string; email: string }) => void;
 }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -46,7 +46,7 @@ export function AddApplicantContactModal({
           status: "Active",
           owner: getRulesActor().name,
         });
-        onCreated({ name: contact.name, email: contact.email });
+        onCreated({ id: contact.id, name: contact.name, email: contact.email });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not save contact");
       }

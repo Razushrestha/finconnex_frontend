@@ -3,8 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, UserPlus, X } from "lucide-react";
 import { initials } from "@/lib/activities/shared";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { listMentionPeople } from "@/lib/mentions/people";
 import { TASK_OWNERS } from "@/lib/tasks/types";
+import {
+  loadAssignableOwners,
+  listAssignableOwnersLocal,
+  resolveAssignableOwnerName,
+  type AssignableOwner,
+} from "@/lib/users/assignable";
 import { cn } from "@/lib/utils";
 import { useTaskSectionEdit } from "./TaskEditContext";
 
@@ -18,24 +25,41 @@ interface TaskSidebarParticipantsProps {
   collaborators?: string[];
 }
 
-function directoryNames() {
+function directoryNames(owners: AssignableOwner[]) {
   const names = new Set<string>();
   for (const person of listMentionPeople()) {
     if (person.name.trim()) names.add(person.name.trim());
+  }
+  for (const owner of owners) {
+    if (owner.name.trim()) names.add(owner.name.trim());
   }
   for (const owner of TASK_OWNERS) names.add(owner);
   return [...names].sort((a, b) => a.localeCompare(b));
 }
 
-function fromProps(owner: string, collaborators: string[]): Participant[] {
+function personLabel(value: string, owners: AssignableOwner[]): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const byId = owners.find((row) => row.id === trimmed);
+  if (byId?.name.trim()) return byId.name.trim();
+  if (!isUuid(trimmed)) return trimmed;
+  return resolveAssignableOwnerName(trimmed);
+}
+
+function fromProps(
+  owner: string,
+  collaborators: string[],
+  owners: AssignableOwner[],
+): Participant[] {
   const seen = new Set<string>();
   const people: Participant[] = [];
-  if (owner.trim()) {
-    seen.add(owner.trim().toLowerCase());
-    people.push({ name: owner.trim(), role: "Owner" });
+  const ownerName = personLabel(owner, owners);
+  if (ownerName) {
+    seen.add(ownerName.toLowerCase());
+    people.push({ name: ownerName, role: "Owner" });
   }
   for (const name of collaborators) {
-    const trimmed = name.trim();
+    const trimmed = personLabel(name, owners);
     if (!trimmed || seen.has(trimmed.toLowerCase())) continue;
     seen.add(trimmed.toLowerCase());
     people.push({ name: trimmed, role: "Collaborator" });
@@ -47,13 +71,31 @@ export function TaskSidebarParticipants({
   owner = "Alex Sterling",
   collaborators = ["Sarah Jenkins"],
 }: TaskSidebarParticipantsProps) {
+  const [owners, setOwners] = useState<AssignableOwner[]>(() =>
+    listAssignableOwnersLocal(),
+  );
   const [people, setPeople] = useState<Participant[]>(() =>
-    fromProps(owner, collaborators),
+    fromProps(owner, collaborators, listAssignableOwnersLocal()),
   );
   const [draft, setDraft] = useState<Participant[]>(people);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadAssignableOwners().then((rows) => {
+      if (cancelled || !rows.length) return;
+      setOwners(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    setPeople(fromProps(owner, collaborators, owners));
+  }, [owner, collaborators, owners]);
 
   const editing = useTaskSectionEdit({
     start() {
@@ -96,21 +138,23 @@ export function TaskSidebarParticipants({
 
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return directoryNames().filter((name) => {
+    const names = directoryNames(owners);
+    return names.filter((name) => {
       if (taken.has(name.toLowerCase())) return false;
       return !needle || name.toLowerCase().includes(needle);
     });
-  }, [query, taken]);
+  }, [query, taken, owners]);
 
   function addCollaborator(name: string) {
     const trimmed = name.trim();
     if (!trimmed || taken.has(trimmed.toLowerCase())) return;
-    const exists = directoryNames().some(
+    const names = directoryNames(owners);
+    const exists = names.some(
       (person) => person.toLowerCase() === trimmed.toLowerCase(),
     );
     if (!exists) return;
     const canonical =
-      directoryNames().find((person) => person.toLowerCase() === trimmed.toLowerCase()) ??
+      names.find((person) => person.toLowerCase() === trimmed.toLowerCase()) ??
       trimmed;
     setDraft((prev) => [...prev, { name: canonical, role: "Collaborator" }]);
     setQuery("");

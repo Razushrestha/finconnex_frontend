@@ -23,6 +23,8 @@ export interface CompanyCardData {
   tags?: string[];
   accentColorClass: string;
   avatarBgClass: string;
+  /** Optimistic-concurrency version from CRM PATCH. */
+  version?: number;
 }
 
 export interface CompanyGroup {

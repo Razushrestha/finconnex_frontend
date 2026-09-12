@@ -12,6 +12,7 @@ import {
 } from "@/lib/contacts/store";
 import type { ContactCardData, ContactSource } from "@/lib/contacts/types";
 import { listCrmContacts } from "@/lib/contacts/api";
+import { isValidPhoneInput } from "@/lib/contacts/phone";
 import { cn } from "@/lib/utils";
 import {
   elevatedInputClass,
@@ -175,6 +176,7 @@ export function LeadContactPicker({
     firstName?: boolean;
     lastName?: boolean;
     email?: boolean;
+    phone?: boolean;
   }>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -323,10 +325,12 @@ export function LeadContactPicker({
     const middleName = addMiddleName.trim();
     const lastName = addLastName.trim();
     const email = addEmail.trim();
+    const phone = addPhone.trim();
     const fieldErrors = {
       firstName: !firstName,
       lastName: !lastName,
       email: !email || !isValidEmail(email),
+      phone: !isValidPhoneInput(phone),
     };
     setAddFieldErrors(fieldErrors);
     if (fieldErrors.firstName || fieldErrors.lastName) {
@@ -341,6 +345,10 @@ export function LeadContactPicker({
       setAddError("Enter a valid email address");
       return;
     }
+    if (fieldErrors.phone) {
+      setAddError("Enter a valid phone number");
+      return;
+    }
     const existing = findContactByEmail(email);
     if (existing) {
       pick(existing);
@@ -353,7 +361,7 @@ export function LeadContactPicker({
         firstName,
         lastName,
         email,
-        phone: addPhone.trim(),
+        phone,
         status: "Active",
         owner: owner.trim() || "You",
         source: toContactSource(leadSource),
@@ -602,8 +610,11 @@ export function LeadContactPicker({
                 className={addInputClass}
               />
             </AddField>
-            <AddField label="Phone">
+            <AddField label="Phone" error={addFieldErrors.phone}>
               <input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 value={addPhone}
                 onChange={(e) => setAddPhone(e.target.value)}
                 placeholder="Optional"

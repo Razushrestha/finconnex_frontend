@@ -15,6 +15,7 @@ import { listDealPipelines } from "@/lib/deals/store";
 import { onRulesChange } from "@/lib/rules";
 import type { DealFilters } from "./FilterDealsPanel";
 import { dealMatchesFilters } from "@/lib/filters/records";
+import { sortDealCards } from "@/lib/deals/sort";
 import { StatusColorPill } from "@/components/common/StatusColorPill";
 import { ContactNameLink } from "@/components/sales/ContactNameLink";
 import { resolveDealContact } from "@/lib/sales/resolve-contact";
@@ -36,6 +37,8 @@ interface DealsListViewProps {
   pipeline: DealPipeline;
   stages?: DealStage[];
   filters?: DealFilters;
+  sortValue?: string;
+  sortDirection?: "asc" | "desc";
 }
 
 const DEFAULT_DEAL_COLUMNS: ManageColumn[] = [
@@ -201,6 +204,8 @@ export function DealsListView({
   pipeline,
   stages: stagesProp,
   filters,
+  sortValue,
+  sortDirection = "asc",
 }: DealsListViewProps) {
   const [stages, setStages] = useState<DealStage[]>(
     () => stagesProp ?? listDealPipelines()[pipeline] ?? [],
@@ -238,7 +243,7 @@ export function DealsListView({
   const allDeals = useMemo(() => {
     const hasStageFilter = !!filters?.stages.length;
 
-    return stages
+    const rows = stages
       .filter(
         (stage) => !hasStageFilter || filters!.stages.includes(stage.title),
       )
@@ -253,7 +258,8 @@ export function DealsListView({
             stageDotColor: stage.dotColorClass,
           })),
       );
-  }, [stages, filters]);
+    return sortDealCards(rows, sortValue, sortDirection);
+  }, [stages, filters, sortValue, sortDirection]);
 
   const pagedDeals = useMemo(
     () => allDeals.slice(0, pageSize),

@@ -215,7 +215,7 @@ export function normalizeCrmEmail(
     templateUsed: pickStr(raw.templateName, raw.template, raw.templateUsed) || undefined,
     status: mapEmailStatus(
       pickStr(raw.status, raw.state, raw.emailStatus, raw.deliveryStatus),
-      pickStr(raw.sentAt, raw.sentDate, raw.openedAt) ? "Sent" : "Draft",
+      "Draft",
     ),
     sentDate: formatWhen(
       raw.sentAt ?? raw.sentDate ?? raw.scheduledAt ?? raw.createdAt,
@@ -488,10 +488,7 @@ function asEmail(data: unknown, fallback?: Partial<Email>): Email | null {
     mapped && mapped.subject !== "(no subject)"
       ? mapped.subject
       : fallback?.subject || mapped?.subject || "(no subject)";
-  const status =
-    mapped && mapped.status !== "Draft"
-      ? mapped.status
-      : (fallback?.status ?? mapped?.status ?? "Draft");
+  const status = mapped?.status ?? fallback?.status ?? "Draft";
   return {
     subject,
     body: mapped?.body || fallback?.body || "",

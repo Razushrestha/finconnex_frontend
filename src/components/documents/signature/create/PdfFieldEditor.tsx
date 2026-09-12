@@ -6,6 +6,12 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { X } from "lucide-react";
 import { SIGNER_COLORS } from "@/lib/documents/signature/types";
+import {
+  DEFAULT_PLACED_FIELD_HEIGHT,
+  DEFAULT_PLACED_FIELD_WIDTH,
+  clientPointHitsPage,
+  pointerToPagePercent,
+} from "@/lib/documents/signature/field-placement";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -16,8 +22,8 @@ export interface PlacedField {
   /** Which document this field belongs to — "primary" or an AdditionalDocument id. */
   documentId: string;
   page: number; // 1-indexed, scoped to `documentId`
-  xPct: number; // % of that specific page's width
-  yPct: number; // % of that specific page's height
+  xPct: number; // % of that specific page's width (top-left)
+  yPct: number; // % of that specific page's height (top-left)
   width?: number;
   height?: number;
   recipientId?: string;
@@ -61,6 +67,14 @@ interface PdfFieldEditorProps {
   onNumPagesResolved?: (documentId: string, numPages: number) => void;
 }
 
+type ActiveDrag = {
+  id: string;
+  offsetX: number;
+  offsetY: number;
+  width: number;
+  height: number;
+};
+
 export default function PdfFieldEditor({
   documentId,
   fileUrl,
@@ -77,75 +91,123 @@ export default function PdfFieldEditor({
   const [loadError, setLoadError] = useState(false);
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const [dragOverPage, setDragOverPage] = useState<number | null>(null);
+  const [dropGhost, setDropGhost] = useState<{
+    page: number;
+    xPct: number;
+    yPct: number;
+  } | null>(null);
   const [repositioningId, setRepositioningId] = useState<string | null>(null);
+  const dragRef = useRef<ActiveDrag | null>(null);
+  const frameRef = useRef<number>(0);
+  const onRepositionRef = useRef(onRepositionField);
+  onRepositionRef.current = onRepositionField;
 
   const setPageRef = useCallback((page: number, el: HTMLDivElement | null) => {
     if (el) pageRefs.current.set(page, el);
     else pageRefs.current.delete(page);
   }, []);
 
-  // Pointer-based repositioning — works across page boundaries too, since
-  // each page div (within THIS document) is checked for cursor containment
-  // on every move. Repositioning does not cross document boundaries — each
-  // PdfFieldEditor instance only tracks its own pages.
+  const locatePage = useCallback((clientX: number, clientY: number) => {
+    for (const [page, el] of pageRefs.current.entries()) {
+      if (clientPointHitsPage(clientX, clientY, el)) {
+        return { page, el };
+      }
+    }
+    return null;
+  }, []);
+
   useEffect(() => {
     if (!repositioningId) return;
 
-    const handleMove = (e: MouseEvent) => {
-      for (const [page, el] of pageRefs.current.entries()) {
-        const rect = el.getBoundingClientRect();
-        if (
-          e.clientX >= rect.left &&
-          e.clientX <= rect.right &&
-          e.clientY >= rect.top &&
-          e.clientY <= rect.bottom
-        ) {
-          const xPct = ((e.clientX - rect.left) / rect.width) * 100;
-          const yPct = ((e.clientY - rect.top) / rect.height) * 100;
-          onRepositionField(
-            repositioningId,
-            documentId,
-            page,
-            Math.min(Math.max(xPct, 0), 100),
-            Math.min(Math.max(yPct, 0), 100),
-          );
-          break;
-        }
-      }
+    const flushMove = (e: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const hit = locatePage(e.clientX, e.clientY);
+      if (!hit) return;
+      const pos = pointerToPagePercent(e.clientX, e.clientY, hit.el, {
+        offsetX: drag.offsetX,
+        offsetY: drag.offsetY,
+        fieldWidth: drag.width,
+        fieldHeight: drag.height,
+      });
+      onRepositionRef.current(
+        drag.id,
+        documentId,
+        hit.page,
+        pos.xPct,
+        pos.yPct,
+      );
     };
 
-    const handleUp = () => setRepositioningId(null);
+    const handleMove = (e: PointerEvent) => {
+      e.preventDefault();
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = 0;
+        flushMove(e);
+      });
+    };
 
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
+    const handleUp = () => {
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      frameRef.current = 0;
+      dragRef.current = null;
+      setRepositioningId(null);
+    };
+
+    window.addEventListener("pointermove", handleMove, { passive: false });
+    window.addEventListener("pointerup", handleUp);
+    window.addEventListener("pointercancel", handleUp);
     return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      window.removeEventListener("pointercancel", handleUp);
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
     };
-  }, [repositioningId, onRepositionField, documentId]);
+  }, [repositioningId, documentId, locatePage]);
+
+  const fieldSize = (field?: PlacedField | null) => ({
+    width: field?.width || DEFAULT_PLACED_FIELD_WIDTH,
+    height: field?.height || DEFAULT_PLACED_FIELD_HEIGHT,
+  });
+
+  const updateDropGhost = (page: number, e: React.DragEvent) => {
+    const el = pageRefs.current.get(page);
+    if (!el) return;
+    const pos = pointerToPagePercent(e.clientX, e.clientY, el, {
+      fieldWidth: DEFAULT_PLACED_FIELD_WIDTH,
+      fieldHeight: DEFAULT_PLACED_FIELD_HEIGHT,
+    });
+    setDragOverPage(page);
+    setDropGhost({ page, xPct: pos.xPct, yPct: pos.yPct });
+  };
 
   const handleDragOverPage = (page: number) => (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = "copy";
-    setDragOverPage(page);
+    updateDropGhost(page, e);
   };
 
-  const handleDragLeavePage = () => setDragOverPage(null);
+  const handleDragLeavePage = (e: React.DragEvent) => {
+    const next = e.relatedTarget as Node | null;
+    if (next && e.currentTarget.contains(next)) return;
+    setDragOverPage(null);
+    setDropGhost(null);
+  };
 
   const handleDropOnPage = (page: number) => (e: React.DragEvent) => {
     e.preventDefault();
-    setDragOverPage(null);
+    e.stopPropagation();
     const el = pageRefs.current.get(page);
+    setDragOverPage(null);
+    setDropGhost(null);
     if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const xPct = ((e.clientX - rect.left) / rect.width) * 100;
-    const yPct = ((e.clientY - rect.top) / rect.height) * 100;
-    onDropField(
-      documentId,
-      page,
-      Math.min(Math.max(xPct, 0), 100),
-      Math.min(Math.max(yPct, 0), 100),
-    );
+    const pos = pointerToPagePercent(e.clientX, e.clientY, el, {
+      fieldWidth: DEFAULT_PLACED_FIELD_WIDTH,
+      fieldHeight: DEFAULT_PLACED_FIELD_HEIGHT,
+    });
+    onDropField(documentId, page, pos.xPct, pos.yPct);
   };
 
   if (loadError) {
@@ -184,7 +246,7 @@ export default function PdfFieldEditor({
           }
           onDragLeave={draggingFieldType ? handleDragLeavePage : undefined}
           onDrop={draggingFieldType ? handleDropOnPage(pageNum) : undefined}
-          className={`relative shadow-md rounded-md overflow-hidden transition-shadow ${
+          className={`relative inline-block rounded-md shadow-md transition-shadow ${
             dragOverPage === pageNum
               ? "ring-2 ring-indigo-400 ring-offset-2"
               : ""
@@ -205,31 +267,40 @@ export default function PdfFieldEditor({
                 field.colorIndex != null
                   ? SIGNER_COLORS[field.colorIndex]
                   : null;
-
-              const width = field.width || 140;
-              const height = field.height || 36;
+              const { width, height } = fieldSize(field);
 
               return (
                 <div
                   key={field.id}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
+                    if (e.button !== 0) return;
                     e.preventDefault();
                     e.stopPropagation();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    dragRef.current = {
+                      id: field.id,
+                      offsetX: e.clientX - rect.left,
+                      offsetY: e.clientY - rect.top,
+                      width,
+                      height,
+                    };
                     setRepositioningId(field.id);
+                    e.currentTarget.setPointerCapture(e.pointerId);
                   }}
                   style={{
                     left: `${field.xPct}%`,
                     top: `${field.yPct}%`,
                     width: `${width}px`,
                     height: `${height}px`,
+                    transform: "none",
                   }}
-                  className={`group absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-between gap-1.5 ${
+                  className={`group absolute flex items-center justify-between gap-1.5 ${
                     color
                       ? `${color.bg} ${color.text} border-2 border-dashed ${color.border}`
                       : "bg-indigo-600 text-white border-2 border-dashed border-indigo-300"
-                  } text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-md select-none z-10 ${
+                  } text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-md select-none z-10 touch-none ${
                     isBeingDragged
-                      ? "cursor-grabbing shadow-xl scale-105 z-20"
+                      ? "cursor-grabbing shadow-xl z-20"
                       : "cursor-grab"
                   }`}
                 >
@@ -257,7 +328,7 @@ export default function PdfFieldEditor({
                   )}
                   <button
                     type="button"
-                    onMouseDown={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => onRemoveField(field.id)}
                     className={`ml-1 opacity-0 group-hover:opacity-100 rounded-full p-0.5 transition-opacity ${
                       color ? "hover:bg-black/10" : "hover:bg-indigo-700"
@@ -267,12 +338,12 @@ export default function PdfFieldEditor({
                   </button>
                   {onResizeField && (
                     <div
-                      onMouseDown={(e) => {
+                      onPointerDown={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
                         const startX = e.clientX;
                         const startY = e.clientY;
-                        const onMove = (moveEvent: MouseEvent) => {
+                        const onMove = (moveEvent: PointerEvent) => {
                           const newWidth = Math.max(
                             80,
                             width + (moveEvent.clientX - startX),
@@ -284,11 +355,11 @@ export default function PdfFieldEditor({
                           onResizeField(field.id, newWidth, newHeight);
                         };
                         const onUp = () => {
-                          window.removeEventListener("mousemove", onMove);
-                          window.removeEventListener("mouseup", onUp);
+                          window.removeEventListener("pointermove", onMove);
+                          window.removeEventListener("pointerup", onUp);
                         };
-                        window.addEventListener("mousemove", onMove);
-                        window.addEventListener("mouseup", onUp);
+                        window.addEventListener("pointermove", onMove);
+                        window.addEventListener("pointerup", onUp);
                       }}
                       className="absolute -right-1 -bottom-1 w-3 h-3 bg-white border border-current rounded-full cursor-se-resize opacity-0 group-hover:opacity-100 z-30"
                     />
@@ -297,11 +368,26 @@ export default function PdfFieldEditor({
               );
             })}
 
+          {draggingFieldType &&
+            dropGhost?.page === pageNum && (
+              <div
+                className="absolute z-30 pointer-events-none rounded-md border-2 border-dashed border-violet-400 bg-violet-100/80 text-[11px] font-semibold text-violet-700 px-2.5 flex items-center shadow-sm"
+                style={{
+                  left: `${dropGhost.xPct}%`,
+                  top: `${dropGhost.yPct}%`,
+                  width: DEFAULT_PLACED_FIELD_WIDTH,
+                  height: DEFAULT_PLACED_FIELD_HEIGHT,
+                }}
+              >
+                {draggingFieldType.label}
+              </div>
+            )}
+
           {dragOverPage === pageNum && (
             <div className="absolute inset-0 bg-indigo-500/5 pointer-events-none" />
           )}
 
-          <div className="absolute top-2 right-2 bg-slate-900/70 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+          <div className="absolute top-2 right-2 bg-slate-900/70 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full pointer-events-none">
             Page {pageNum} / {numPages}
           </div>
         </div>

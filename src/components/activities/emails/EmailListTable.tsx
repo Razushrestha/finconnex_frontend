@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   Archive,
   CalendarPlus,
   Clock,
@@ -114,15 +115,15 @@ function emptyFolderCopy(folder: MailFolder, folderLabel: string, customFolderId
     case "trash":
       return "Trash is empty. Delete a message from Inbox or Sent and it will show here.";
     case "spam":
-      return "Spam is empty. Mark a message as spam to move it here.";
+      return "Spam is empty. Select a message and click Spam, or hover a row and report it.";
+    case "drafts":
+      return "No drafts. Unsent mail is saved here automatically so you can finish and send it.";
     case "archive":
       return "Archive is empty. Archive a message to move it here.";
     case "starred":
       return "No starred mail yet. Click the star on a message to save it here.";
     case "important":
       return "No flagged mail yet. Flag a message to save it here.";
-    case "drafts":
-      return "No drafts. Compose a message and save it to see it here.";
     case "sent":
       return "No sent mail in Live CRM yet.";
     default:
@@ -388,12 +389,13 @@ export function EmailListTable({
                 className={iconBtn}
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                Restore
+                {folder === "spam" ? "Not spam" : "Restore"}
               </button>
             ) : (
               <>
                 <button
                   type="button"
+                  disabled={selectedIds.length === 0}
                   onClick={() => move(selectedIds, "archived")}
                   className={iconBtn}
                 >
@@ -402,6 +404,7 @@ export function EmailListTable({
                 </button>
                 <button
                   type="button"
+                  disabled={selectedIds.length === 0}
                   onClick={() => move(selectedIds, "spam")}
                   className={iconBtn}
                 >
@@ -652,9 +655,11 @@ export function EmailListTable({
 
                 <div className="mt-0.5 flex items-start gap-2">
                   <p className="min-w-0 flex-1 truncate text-[13px]">
-                    {email.status === "Draft" ? (
+                    {email.status === "Draft" || email.status === "Failed" ? (
                       <>
-                        <span className="font-bold text-rose-600">Draft</span>
+                        <span className="font-bold text-rose-600">
+                          {email.status === "Failed" ? "Not sent" : "Draft"}
+                        </span>
                         <span className="text-slate-500">
                           {" "}
                           {email.subject || "(no subject)"}
@@ -700,21 +705,31 @@ export function EmailListTable({
                         {canRestore ? (
                           <button
                             type="button"
-                            title="Restore"
+                            title={folder === "spam" ? "Not spam" : "Restore"}
                             onClick={() => restoreEmails([email.id])}
                             className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[#5A32A3]"
                           >
                             <RotateCcw className="h-3.5 w-3.5" />
                           </button>
                         ) : (
-                          <button
-                            type="button"
-                            title="Archive"
-                            onClick={() => move([email.id], "archived")}
-                            className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[#5A32A3]"
-                          >
-                            <Archive className="h-3.5 w-3.5" />
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              title="Archive"
+                              onClick={() => move([email.id], "archived")}
+                              className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-[#5A32A3]"
+                            >
+                              <Archive className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              title="Report spam"
+                              onClick={() => move([email.id], "spam")}
+                              className="flex h-7 w-7 items-center justify-center rounded-full text-slate-400 hover:bg-white hover:text-rose-600"
+                            >
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                            </button>
+                          </>
                         )}
                         <button
                           type="button"

@@ -27,6 +27,7 @@ import { WorkspacesSettingsClient } from "@/components/settings/WorkspacesSettin
 import { IpRestrictionsSettingsClient } from "@/components/settings/IpRestrictionsSettingsClient";
 import { CustomObjectsSettingsClient } from "@/components/settings/CustomObjectsSettingsClient";
 import { NotificationPreferencesClient } from "@/components/settings/NotificationPreferencesClient";
+import { CalendlyConnectionCard } from "@/components/booking/CalendlyConnectionCard";
 import { cn } from "@/lib/utils";
 
 interface PageProps {
@@ -102,6 +103,10 @@ export default async function SettingsSubPage({ params }: PageProps) {
         moduleHref={item.moduleHref}
         moduleLabel={item.moduleLabel}
       />
+    ) : key === "integrations/calendly" ||
+      key === "integrations/google-calendar" ||
+      key === "integrations/outlook-calendar" ? (
+      <CalendlyConnectionCard />
     ) : null;
 
   return (

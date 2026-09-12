@@ -187,36 +187,41 @@ export function isHiddenFromFolder(flags: MailboxFlags, folder: MailFolder) {
   return false;
 }
 
+export function isUnsentStatus(status: Email["status"]) {
+  return status === "Draft" || status === "Failed";
+}
+
+export function isSuccessfullySentStatus(status: Email["status"]) {
+  return (
+    status === "Sent" || status === "Delivered" || status === "Opened"
+  );
+}
+
 export function emailMatchesFolder(
   email: Email,
   folder: MailFolder,
   flags: MailboxFlags,
 ) {
   if (isHiddenFromFolder(flags, folder)) return false;
-  if (folder === "all") return true;
+  if (folder === "all") return !isUnsentStatus(email.status);
   if (folder === "starred") return Boolean(flags.starred);
   if (folder === "important") return Boolean(flags.important);
   if (folder === "archive") return Boolean(flags.archived);
   if (folder === "trash") return Boolean(flags.trash);
   if (folder === "spam") return Boolean(flags.spam);
-  if (folder === "drafts") return email.status === "Draft";
+  if (folder === "drafts") return isUnsentStatus(email.status);
   if (folder === "scheduled") return email.status === "Scheduled";
   if (folder === "sent") {
-    return (
-      email.status !== "Draft" &&
-      email.status !== "Scheduled" &&
-      (isOutbound(email) ||
-        email.status === "Sent" ||
-        email.status === "Delivered" ||
-        email.status === "Opened" ||
-        email.status === "Failed" ||
-        email.status === "Bounced")
-    );
+    return isSuccessfullySentStatus(email.status) && isOutbound(email);
   }
   if (folder === "inbox") {
-    return email.status !== "Draft" && email.status !== "Scheduled";
+    return (
+      !isUnsentStatus(email.status) &&
+      email.status !== "Scheduled" &&
+      !isOutbound(email)
+    );
   }
-  return email.status !== "Draft" && email.status !== "Scheduled";
+  return !isUnsentStatus(email.status) && email.status !== "Scheduled";
 }
 
 export function emailMatchesCustomFolder(

@@ -79,6 +79,32 @@ export function listAssignableOwnersLocal(): AssignableOwner[] {
   return local.length ? local : fallbackOwners();
 }
 
+/** Map a stored member id (or already-resolved name) to a person label. */
+export function resolveAssignableOwnerName(idOrName: string): string {
+  const value = idOrName.trim();
+  if (!value) return "";
+  const owners = listAssignableOwnersLocal();
+  const byId = owners.find((row) => row.id === value);
+  if (byId?.name.trim()) return byId.name.trim();
+  if (!isUuid(value)) {
+    const byName = owners.find(
+      (row) => row.name.trim().toLowerCase() === value.toLowerCase(),
+    );
+    return byName?.name.trim() || value;
+  }
+  const email = byId?.email.trim();
+  if (email) return email.split("@")[0] || email;
+  return "";
+}
+
+export function resolveAssignableOwnerNames(values?: string[]): string[] | undefined {
+  if (!values?.length) return undefined;
+  const names = values
+    .map((value) => resolveAssignableOwnerName(value))
+    .filter(Boolean);
+  return names.length ? names : undefined;
+}
+
 async function listRemoteMembers(): Promise<WorkspaceMember[]> {
   try {
     const page = await listCrmWorkspaceMembersAdmin({ limit: 100 });
@@ -112,7 +138,8 @@ export function defaultAssignableOwnerId(
 ): string {
   const uuidOptions = options.filter((row) => isUuid(row.id));
   const pool = uuidOptions.length ? uuidOptions : options;
-  if (currentId && isUuid(currentId) && pool.some((row) => row.id === currentId)) {
+  if (currentId && isUuid(currentId)) return currentId;
+  if (currentId && pool.some((row) => row.id === currentId)) {
     return currentId;
   }
   const actor = getRulesActor();

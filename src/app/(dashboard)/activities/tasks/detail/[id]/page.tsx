@@ -1,56 +1,74 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { useModuleBack } from "@/hooks/useModuleBack";
-import type { Priority, Task, TaskStatus } from "@/lib/tasks/types";
+import type { Priority, Task, TaskActionItem, TaskStatus } from "@/lib/tasks/types";
 import { findTaskById, addTaskActivityNote, patchTask, updateTaskDescription, updateTaskStatus } from "@/lib/tasks/store";
 import {
   cancelCrmTask,
   completeCrmTask,
   getCrmTask,
   isCrmTaskId,
+  listCrmTasks,
   persistRemoteTask,
   reopenCrmTask,
   syncTaskStatus,
   tryCrmTask,
   updateCrmTask,
 } from "@/lib/tasks/api";
+import { attachFilesToTask } from "@/lib/tasks/attach-files";
 import { TaskDetailsView } from "@/components/activities/tasks/detail/TaskDetailsView";
 import { onRulesChange } from "@/lib/rules";
 
-interface PageProps {
-  params: Promise<{ id: string }>;
-}
-
-export default function TaskDetailPage({ params }: PageProps) {
-  const { id } = use(params);
+function TaskDetailPageInner() {
+  const { id: rawId } = useParams<{ id: string }>();
+  const id = decodeURIComponent(rawId ?? "");
   const router = useRouter();
   const back = useModuleBack("/activities/tasks", "Back to Tasks");
   const [task, setTask] = useState<Task | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    function loadTask() {
+    let cancelled = false;
+
+    function readLocal() {
       const found = findTaskById(id);
       if (
         found?.task.status === "Completed" &&
         (!found.task.completedBy || !found.task.completedDate)
       ) {
-        setTask(updateTaskStatus(id, "Completed") ?? found.task);
+        return updateTaskStatus(id, "Completed") ?? found.task;
+      }
+      return found?.task ?? null;
+    }
+
+    async function loadRemote() {
+      const local = readLocal();
+      if (local) setTask(local);
+      if (!isCrmTaskId(id)) {
+        if (!cancelled) setLoading(false);
         return;
       }
-      setTask(found?.task ?? null);
+      let remote = await tryCrmTask(() => getCrmTask(id));
+      if (!remote) {
+        const listed = await tryCrmTask(() => listCrmTasks());
+        remote = listed?.find((row) => row.taskId === id) ?? null;
+      }
+      if (cancelled) return;
+      if (remote) {
+        setTask(persistRemoteTask(remote) ?? remote);
+      } else if (!local) {
+        setTask(null);
+      }
+      setLoading(false);
     }
-    loadTask();
-    const off = onRulesChange(loadTask);
-    let cancelled = false;
-    void (async () => {
-      if (!isCrmTaskId(id)) return;
-      const remote = await tryCrmTask(() => getCrmTask(id));
-      if (cancelled || !remote) return;
-      persistRemoteTask(remote);
-      setTask(remote);
-    })();
+
+    void loadRemote();
+    const off = onRulesChange(() => {
+      const next = readLocal();
+      if (next) setTask(next);
+    });
     return () => {
       cancelled = true;
       off();
@@ -60,8 +78,8 @@ export default function TaskDetailPage({ params }: PageProps) {
   function applyRemote(run: () => Promise<Task | null>) {
     void tryCrmTask(run).then((remote) => {
       if (!remote) return;
-      persistRemoteTask(remote);
-      setTask(remote);
+      const stored = persistRemoteTask(remote);
+      if (stored) setTask(stored);
     });
   }
 
@@ -85,6 +103,22 @@ export default function TaskDetailPage({ params }: PageProps) {
     if (updated) setTask(updated);
   }
 
+  function handleChangeActionItems(items: TaskActionItem[]) {
+    const updated = findTaskById(id)?.task;
+    if (updated) setTask({ ...updated, actionItems: items });
+    applyRemote(() => updateCrmTask(id, { actionItems: items }));
+  }
+
+  async function handleAddFiles(files: File[]) {
+    const attached = await attachFilesToTask(id, files);
+    setTask(
+      findTaskById(id)?.task ??
+        (task
+          ? { ...task, attachments: attached, attachmentsCount: attached.length }
+          : task),
+    );
+  }
+
   function handleSaveDetails(next: {
     title: string;
     dueDate: string;
@@ -94,6 +128,14 @@ export default function TaskDetailPage({ params }: PageProps) {
     const updated = patchTask(id, next);
     if (updated) setTask(updated);
     applyRemote(() => updateCrmTask(id, next));
+  }
+
+  if (loading && !task) {
+    return (
+      <div className="flex min-h-[320px] items-center justify-center px-4">
+        <p className="text-sm text-slate-500">Loading task…</p>
+      </div>
+    );
   }
 
   if (!task) {
@@ -121,7 +163,23 @@ export default function TaskDetailPage({ params }: PageProps) {
       onUpdateStatus={handleUpdateStatus}
       onUpdateDescription={handleUpdateDescription}
       onAddNote={handleAddNote}
+      onChangeActionItems={handleChangeActionItems}
+      onAddFiles={handleAddFiles}
       onSaveDetails={handleSaveDetails}
     />
+  );
+}
+
+export default function TaskDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[320px] items-center justify-center px-4">
+          <p className="text-sm text-slate-500">Loading task…</p>
+        </div>
+      }
+    >
+      <TaskDetailPageInner />
+    </Suspense>
   );
 }

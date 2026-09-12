@@ -20,6 +20,14 @@ import {
   deleteSignatureRequest,
   type SignatureRequest,
 } from "@/lib/documents/signature/types";
+import { onRecordsChange } from "@/lib/records-sync";
+import { useCrmSignatureTemplates } from "@/lib/documents/signature/use-crm-signature-templates";
+import { CrmSourceBadge } from "@/components/documents/signature/CrmSourceBadge";
+import {
+  deleteCrmSignatureTemplate,
+  isCrmSignatureTemplateId,
+  tryCrmSignatureTemplate,
+} from "@/lib/documents/signature/templates-api";
 
 interface TemplateItem {
   id: string;
@@ -81,6 +89,7 @@ function mapToTemplateItem(req: SignatureRequest): TemplateItem {
 
 export default function SignatureTemplatesPage() {
   const router = useRouter();
+  const crm = useCrmSignatureTemplates();
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -99,8 +108,10 @@ export default function SignatureTemplatesPage() {
   };
 
   useEffect(() => {
+    if (crm.loading) return;
     refreshTemplates();
-  }, []);
+    return onRecordsChange(refreshTemplates);
+  }, [crm.source, crm.loading]);
 
   const {
     isMounted,
@@ -152,6 +163,9 @@ export default function SignatureTemplatesPage() {
   const handleDelete = (id: string) => {
     setOpenMenuId(null);
     deleteSignatureRequest(id);
+    if (isCrmSignatureTemplateId(id)) {
+      void tryCrmSignatureTemplate(() => deleteCrmSignatureTemplate(id));
+    }
     setTemplates((prev) => prev.filter((tpl) => tpl.id !== id));
   };
 
@@ -161,8 +175,13 @@ export default function SignatureTemplatesPage() {
     <div className="relative mx-auto flex w-full flex-col p-4 space-y-4">
       {/* Header & Controls Section */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
+        <h1 className="flex flex-wrap items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
           Signature Templates
+          <CrmSourceBadge
+            source={crm.source}
+            loading={crm.loading}
+            error={crm.error}
+          />
         </h1>
 
         <div className="flex items-center gap-3">

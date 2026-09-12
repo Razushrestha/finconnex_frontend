@@ -167,3 +167,15 @@ export function timezoneLabelFromIana(tz?: string): string {
   if (!tz) return DEFAULT_TIMEZONE;
   return IANA_TO_LABEL[tz] ?? WORLD_TIMEZONES.find((label) => label.includes(tz)) ?? tz;
 }
+
+/** Calendly / CRM APIs want IANA ids, not the GMT display labels. */
+export function ianaTimezoneFromLabel(label?: string): string {
+  const raw = label?.trim() || "";
+  if (!raw) return "Australia/Sydney";
+  if (IANA_TO_LABEL[raw]) return raw;
+  const match = Object.entries(IANA_TO_LABEL).find(([, value]) => value === raw);
+  if (match) return match[0];
+  const embedded = raw.match(/([A-Za-z]+\/[A-Za-z0-9_+\-]+)/);
+  if (embedded?.[1] && IANA_TO_LABEL[embedded[1]]) return embedded[1];
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "Australia/Sydney";
+}

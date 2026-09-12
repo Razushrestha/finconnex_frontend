@@ -9,6 +9,7 @@ import {
 import type { ContactCardData } from "@/lib/contacts/types";
 import { getRulesActor } from "@/lib/rules/actor";
 import { splitNameParts } from "@/components/sales/leads/LeadContactPicker";
+import { isValidPhoneInput } from "@/lib/contacts/phone";
 import { cn } from "@/lib/utils";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -73,6 +74,7 @@ export function QuickAddContactForm({
     firstName: false,
     lastName: false,
     email: false,
+    phone: false,
   });
 
   async function save() {
@@ -80,14 +82,20 @@ export function QuickAddContactForm({
     const middle = middleName.trim();
     const last = lastName.trim();
     const mail = email.trim();
+    const tel = phone.trim();
     const nextErrors = {
       firstName: !first,
       lastName: !last,
       email: !mail || !EMAIL_RE.test(mail),
+      phone: !isValidPhoneInput(tel),
     };
     setFieldErrors(nextErrors);
     if (nextErrors.firstName || nextErrors.lastName || nextErrors.email) {
       setError("First name, last name and email are required");
+      return;
+    }
+    if (nextErrors.phone) {
+      setError("Enter a valid phone number");
       return;
     }
     const existing = findContactByEmail(mail);
@@ -103,7 +111,7 @@ export function QuickAddContactForm({
       firstName: first,
       lastName: last,
       email: mail,
-      phone: phone.trim() || undefined,
+      phone: tel || undefined,
       status: "Active",
       owner: getRulesActor().name || "John Smith",
       source: "Other",
@@ -152,8 +160,11 @@ export function QuickAddContactForm({
             className={inputClass}
           />
         </Field>
-        <Field label="Phone">
+        <Field label="Phone" error={fieldErrors.phone}>
           <input
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="Optional"

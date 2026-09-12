@@ -1,7 +1,7 @@
 "use client";
 
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Dialog,
@@ -15,6 +15,14 @@ import type { Priority } from "@/lib/tasks/types";
 import { listTaskColumns, createTask } from "@/lib/tasks/store";
 import { listMeetings, createMeeting } from "@/lib/meetings/store";
 import { listNotes, createNote } from "@/lib/notes/store";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import {
+  createCrmNote,
+  isCrmNoteId,
+  listRelatedCrmNotes,
+  persistRemoteNote,
+  tryCrmNote,
+} from "@/lib/notes/api";
 import { findLeadById, listLeadColumns } from "@/lib/leads/store";
 import { leadApplicants } from "@/lib/leads/detail-snapshot";
 import type { LeadCardData } from "@/lib/leads/types";
@@ -93,53 +101,7 @@ interface ActionEntry {
 }
 
 function matchesLead(related: string | undefined, leadName: string): boolean {
-  if (!related?.trim()) return false;
-  const needle = leadName.trim().toLowerCase();
-  return related.toLowerCase().includes(needle);
-}
-
-function seedPreviousTasks(leadName: string): TaskEntry[] {
-  return [
-    {
-      id: `prev-task-1-${leadName}`,
-      title: "Send welcome pack",
-      dueLabel: "Completed Jul 18",
-      status: "Done",
-      priority: "Medium",
-      assignedTo: defaultActorName(),
-      previous: true,
-    },
-    {
-      id: `prev-task-2-${leadName}`,
-      title: "Confirm documents checklist",
-      dueLabel: "Completed Jul 12",
-      status: "Done",
-      priority: "High",
-      assignedTo: "Priya Shrestha",
-      previous: true,
-    },
-  ];
-}
-
-function seedPreviousAppointments(leadName: string): AppointmentEntry[] {
-  return [
-    {
-      id: `prev-appt-1-${leadName}`,
-      title: "Discovery call",
-      whenLabel: "Jul 15, 2026 · 10:00 AM",
-      status: "Completed",
-      location: "Zoom",
-      previous: true,
-    },
-    {
-      id: `prev-appt-2-${leadName}`,
-      title: "Rate review meeting",
-      whenLabel: "Jul 8, 2026 · 2:30 PM",
-      status: "Completed",
-      location: "Office",
-      previous: true,
-    },
-  ];
+  return relatedMatchesLead(related, leadName);
 }
 
 function loadLeadTasks(leadName: string): TaskEntry[] {
@@ -164,7 +126,7 @@ function loadLeadTasks(leadName: string): TaskEntry[] {
       else open.push(entry);
     }
   }
-  const previous = done.length > 0 ? done : seedPreviousTasks(leadName);
+  const previous = done;
   return [...open, ...previous];
 }
 
@@ -183,17 +145,17 @@ function loadLeadAppointments(leadName: string): AppointmentEntry[] {
         Boolean(m.startDateTime && new Date(m.startDateTime) < new Date()),
     }));
 
-  if (fromStore.length === 0) return seedPreviousAppointments(leadName);
-
-  const hasPrevious = fromStore.some((a) => a.previous);
-  return hasPrevious
-    ? fromStore
-    : [...fromStore, ...seedPreviousAppointments(leadName)];
+  return fromStore;
 }
 
-function loadLeadNotes(leadName: string): NoteEntry[] {
-  const fromStore = listNotes()
-    .filter((n) => matchesLead(n.relatedTo, leadName))
+function loadLeadNotes(leadName: string, leadId?: string): NoteEntry[] {
+  return listNotes()
+    .filter((n) => {
+      if (leadId && isUuid(leadId) && n.relatedId && isUuid(n.relatedId)) {
+        return n.relatedId === leadId;
+      }
+      return matchesLead(n.relatedTo, leadName);
+    })
     .map((n) => ({
       id: n.id,
       title: n.title,
@@ -201,18 +163,6 @@ function loadLeadNotes(leadName: string): NoteEntry[] {
       timestamp: n.createdAt,
       owner: n.createdBy,
     }));
-
-  if (fromStore.length > 0) return fromStore;
-
-  return [
-    {
-      id: `seed-note-${leadName}`,
-      title: "Call recap",
-      body: "Client is comparing rates with two other lenders, wants to close by end of Q3.",
-      timestamp: "Jul 21, 2026 · 4:50 PM",
-      owner: "Priya Shrestha",
-    },
-  ];
 }
 
 function loadPreviousActions(leadName: string): ActionEntry[] {
@@ -245,30 +195,7 @@ function loadPreviousActions(leadName: string): ActionEntry[] {
   });
 
   if (mapped.length > 0) return mapped;
-
-  return [
-    {
-      id: `action-1-${leadName}`,
-      title: "Outbound call, left voicemail",
-      kind: "calls",
-      whenLabel: "Jul 20, 2026 · 3:15 PM",
-      bucket: "completed",
-    },
-    {
-      id: `action-2-${leadName}`,
-      title: "Email: Intro & next steps",
-      kind: "emails",
-      whenLabel: "Jul 19, 2026 · 11:02 AM",
-      bucket: "completed",
-    },
-    {
-      id: `action-3-${leadName}`,
-      title: "Stage moved to New Lead",
-      kind: "leads",
-      whenLabel: "Jul 10, 2026 · 9:40 AM",
-      bucket: "completed",
-    },
-  ];
+  return [];
 }
 
 function actionIcon(kind: string) {
@@ -394,7 +321,11 @@ export function LeadEditDialog({
               <TasksSection leadName={leadName} onSuccess={onSuccess} />
             )}
             {activeSection === "notes" && (
-              <NotesSection leadName={leadName} onSuccess={onSuccess} />
+              <NotesSection
+                leadId={leadId}
+                leadName={leadName}
+                onSuccess={onSuccess}
+              />
             )}
             {activeSection === "associated" && (
               <AttachmentsSection leadId={leadId} leadName={leadName} />
@@ -838,53 +769,125 @@ function TaskListBlock({
 /* ---------------------------------- Notes ---------------------------------- */
 
 function NotesSection({
+  leadId,
   leadName,
   onSuccess,
 }: {
+  leadId?: string;
   leadName: string;
   onSuccess?: (message: string) => void;
 }) {
-  const [notes, setNotes] = useState<NoteEntry[]>(() => loadLeadNotes(leadName));
-  const [actions] = useState<ActionEntry[]>(() =>
+  const [notes, setNotes] = useState<NoteEntry[]>(() =>
+    loadLeadNotes(leadName, leadId),
+  );
+  const [actions, setActions] = useState<ActionEntry[]>(() =>
     loadPreviousActions(leadName),
   );
   const [formOpen, setFormOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
-  // Sync `notes` from `leadName` whenever it changes, per React's
-  // documented "adjusting state when a prop changes" pattern — computed
-  // during render instead of in an effect (react-hooks/set-state-in-effect).
-  const [prevNotesLeadName, setPrevNotesLeadName] = useState(leadName);
-  if (prevNotesLeadName !== leadName) {
-    setPrevNotesLeadName(leadName);
-    setNotes(loadLeadNotes(leadName));
+  const notesResetKey = `${leadId ?? ""}|${leadName}`;
+  const [prevNotesResetKey, setPrevNotesResetKey] = useState(notesResetKey);
+  if (prevNotesResetKey !== notesResetKey) {
+    setPrevNotesResetKey(notesResetKey);
+    setNotes(loadLeadNotes(leadName, leadId));
+    setActions(loadPreviousActions(leadName));
   }
 
-  function handleAddNote(e: React.FormEvent) {
-    e.preventDefault();
-    if (!body.trim()) return;
-    const actor = getRulesActor().name || "You";
-    const created = createNote({
-      title: title.trim() || "Note",
-      body: body.trim(),
-      relatedTo: `Lead: ${leadName}`,
-      createdBy: actor,
+  useEffect(() => {
+    if (!leadId || !isUuid(leadId)) return;
+    let cancelled = false;
+    void tryCrmNote(() => listRelatedCrmNotes("LEAD", leadId)).then((rows) => {
+      if (cancelled || !rows) return;
+      for (const row of rows) {
+        if (row.relatedId && row.relatedId !== leadId) continue;
+        persistRemoteNote({
+          ...row,
+          relatedTo: `Lead: ${leadName}`,
+          relatedType: "LEAD",
+          relatedId: leadId,
+        });
+      }
+      setNotes(loadLeadNotes(leadName, leadId));
+      setActions(loadPreviousActions(leadName));
     });
-    setNotes((prev) => [
-      {
-        id: created.id,
-        title: created.title,
-        body: created.body,
-        timestamp: created.createdAt,
-        owner: created.createdBy,
-      },
-      ...prev,
-    ]);
-    setTitle("");
-    setBody("");
-    setFormOpen(false);
-    onSuccess?.("Note added");
+    return () => {
+      cancelled = true;
+    };
+  }, [leadId, leadName]);
+
+  async function handleAddNote(e: React.FormEvent) {
+    e.preventDefault();
+    if (!body.trim() || saving) return;
+    const actor = getRulesActor().name || "You";
+    const relatedTo = `Lead: ${leadName}`;
+    setSaving(true);
+    setSaveError("");
+    try {
+      let createdId = "";
+      let createdTitle = title.trim() || "Note";
+      let createdBody = body.trim();
+      let createdAt = "";
+      let createdBy = actor;
+      if (leadId && isUuid(leadId)) {
+        const remote = await createCrmNote({
+          title: createdTitle,
+          body: createdBody,
+          relatedTo,
+          relatedType: "LEAD",
+          relatedId: leadId,
+          noteType: "General",
+          createdBy: actor,
+        });
+        if (!remote || !isCrmNoteId(remote.id)) {
+          throw new Error("CRM did not save the note");
+        }
+        persistRemoteNote({
+          ...remote,
+          relatedTo,
+          relatedType: "LEAD",
+          relatedId: leadId,
+        });
+        createdId = remote.id;
+        createdTitle = remote.title;
+        createdBody = remote.body;
+        createdAt = remote.createdAt;
+        createdBy = remote.createdBy;
+      } else {
+        const created = createNote({
+          title: createdTitle,
+          body: createdBody,
+          relatedTo,
+          createdBy: actor,
+        });
+        createdId = created.id;
+        createdTitle = created.title;
+        createdBody = created.body;
+        createdAt = created.createdAt;
+        createdBy = created.createdBy;
+      }
+      setNotes((prev) => [
+        {
+          id: createdId,
+          title: createdTitle,
+          body: createdBody,
+          timestamp: createdAt,
+          owner: createdBy,
+        },
+        ...prev.filter((n) => n.id !== createdId),
+      ]);
+      setTitle("");
+      setBody("");
+      setFormOpen(false);
+      onSuccess?.("Note added");
+    } catch {
+      setSaveError("Could not save this note. Try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -935,6 +938,9 @@ function NotesSection({
             onChange={setBody}
             placeholder="Add a note… Type @ to assign someone."
           />
+          {saveError ? (
+            <p className="text-[12px] text-rose-600">{saveError}</p>
+          ) : null}
           <div className="flex justify-end gap-2 pt-1">
             <Button
               type="button"
@@ -945,9 +951,10 @@ function NotesSection({
             </Button>
             <Button
               type="submit"
+              disabled={saving}
               className="bg-violet-600 text-white hover:bg-violet-700"
             >
-              Save note
+              {saving ? "Saving…" : "Save note"}
             </Button>
           </div>
         </form>

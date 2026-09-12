@@ -8,21 +8,14 @@ import {
   SIGNER_COLORS,
   DeliveryMethod,
 } from "@/lib/documents/signature/types";
+import {
+  searchSignatureCrmEntities,
+  type SignatureCrmEntityOption,
+  type SignatureCrmEntityType,
+} from "@/lib/documents/signature/search-crm-entities";
 
-export type CrmEntityType =
-  | "email"
-  | "contact"
-  | "lead"
-  | "deal"
-  | "organization";
-
-interface CrmEntityOption {
-  id: string;
-  name: string;
-  email: string;
-  type: CrmEntityType;
-  subtitle?: string;
-}
+export type CrmEntityType = SignatureCrmEntityType;
+type CrmEntityOption = SignatureCrmEntityOption;
 
 export interface CcRecipient {
   id: string;
@@ -155,6 +148,22 @@ export function RecipientsSection({
   const [ccSearchQueries, setCcSearchQueries] = useState<
     Record<string, string>
   >({});
+  const [crmSearching, setCrmSearching] = useState(false);
+  const [ccCrmSearching, setCcCrmSearching] = useState(false);
+  const signerSearchSeq = React.useRef(0);
+  const ccSearchSeq = React.useRef(0);
+  const resolveCrmSearch = searchCrmEntities ?? searchSignatureCrmEntities;
+
+  React.useEffect(() => {
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("[data-crm-suggest]")) return;
+      setActiveDropdownId(null);
+      setActiveCcDropdownId(null);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, []);
 
   // Ensure there is always at least 1 default signer if empty
   React.useEffect(() => {
@@ -250,81 +259,74 @@ export function RecipientsSection({
     );
 
     if (field === "entityType") {
-      setActiveDropdownId(null);
+      const nextType = value as CrmEntityType;
+      if (nextType === "email") {
+        setActiveDropdownId(null);
+        setCrmResults([]);
+      } else {
+        const current = signers.find((s) => s.id === id);
+        void handleSearchCrm(
+          { ...current, id, entityType: nextType },
+          "",
+          true,
+        );
+      }
     }
   };
 
-  const handleSearchCrm = async (signer: any, query: string) => {
+  const handleSearchCrm = async (
+    signer: any,
+    query: string,
+    preserve = false,
+  ) => {
+    const entityType = (signer?.entityType || "email") as CrmEntityType;
+    if (!signer?.id || entityType === "email") {
+      setActiveDropdownId(null);
+      return;
+    }
+
     setSignerSearchQueries((prevQueries) => ({
       ...(prevQueries || {}),
       [signer.id]: query,
     }));
 
-    if (!query.trim()) {
+    if (!query.trim() && !preserve) {
       onChange((prev) =>
         prev.map((s) =>
           s.id === signer.id ? { ...s, name: "", email: "" } : s,
         ),
       );
-      setCrmResults([]);
-      setActiveDropdownId(null);
-      return;
     }
 
-    if (searchCrmEntities) {
-      const results = await searchCrmEntities(signer.entityType, query);
-      setCrmResults(results);
-    } else {
-      const mockDb: CrmEntityOption[] = [
-        {
-          id: "c1",
-          name: "Sarah Connor",
-          email: "sarah@cyberdyne.io",
-          type: "contact",
-          subtitle: "Tech Contact",
-        },
-        {
-          id: "l1",
-          name: "Michael Bluth",
-          email: "mbluth@bluthcompany.com",
-          type: "lead",
-          subtitle: "Inbound Lead",
-        },
-        {
-          id: "d1",
-          name: "Acme Renewal",
-          email: "billing@acmerenewal.com",
-          type: "deal",
-          subtitle: "Q4 Deal",
-        },
-        {
-          id: "o1",
-          name: "Stark Industries",
-          email: "contracts@stark.com",
-          type: "organization",
-          subtitle: "Enterprise Account",
-        },
-      ];
-      const filtered = mockDb.filter(
-        (item) =>
-          item.type === signer.entityType &&
-          (item.name.toLowerCase().includes(query.toLowerCase()) ||
-            item.email.toLowerCase().includes(query.toLowerCase())),
-      );
-      setCrmResults(filtered);
-    }
+    const seq = ++signerSearchSeq.current;
     setActiveDropdownId(signer.id);
+    setCrmSearching(true);
+    try {
+      const results = await resolveCrmSearch(entityType, query);
+      if (seq !== signerSearchSeq.current) return;
+      setCrmResults(results);
+    } catch {
+      if (seq !== signerSearchSeq.current) return;
+      setCrmResults([]);
+    } finally {
+      if (seq === signerSearchSeq.current) setCrmSearching(false);
+    }
   };
 
   const handleSelectEntity = (signerId: string, entity: CrmEntityOption) => {
     setSignerSearchQueries((prevQueries) => ({
       ...(prevQueries || {}),
-      [signerId]: entity.email,
+      [signerId]: entity.email || entity.name,
     }));
     onChange((prev) =>
       prev.map((s) =>
         s.id === signerId
-          ? { ...s, name: entity.name, email: entity.email }
+          ? {
+              ...s,
+              name: entity.name,
+              email: entity.email,
+              phone: entity.phone || s.phone,
+            }
           : s,
       ),
     );
@@ -407,80 +409,84 @@ export function RecipientsSection({
     );
 
     if (field === "entityType") {
-      setActiveCcDropdownId(null);
+      const nextType = value as CrmEntityType;
+      if (nextType === "email") {
+        setActiveCcDropdownId(null);
+        setCcCrmResults([]);
+      } else {
+        const current = ccRecipients.find((item) => item.id === id);
+        void handleSearchCcCrm(
+          {
+            ...(current ?? {
+              id,
+              name: "",
+              email: "",
+              entityType: nextType,
+              deliveryMethod: "email",
+            }),
+            entityType: nextType,
+          },
+          "",
+          true,
+        );
+      }
     }
   };
 
-  const handleSearchCcCrm = async (cc: CcRecipient, query: string) => {
+  const handleSearchCcCrm = async (
+    cc: CcRecipient,
+    query: string,
+    preserve = false,
+  ) => {
+    const entityType = cc.entityType || "email";
+    if (entityType === "email") {
+      setActiveCcDropdownId(null);
+      return;
+    }
+
     setCcSearchQueries((prevQueries) => ({
       ...(prevQueries || {}),
       [cc.id]: query,
     }));
 
-    if (!query.trim()) {
-      setCcRecipients(
-        ccRecipients.map((item) =>
+    if (!query.trim() && !preserve) {
+      setCcRecipients((prev) =>
+        prev.map((item) =>
           item.id === cc.id ? { ...item, name: "", email: "" } : item,
         ),
       );
-      setCcCrmResults([]);
-      setActiveCcDropdownId(null);
-      return;
     }
 
-    if (searchCrmEntities) {
-      const results = await searchCrmEntities(cc.entityType, query);
-      setCcCrmResults(results);
-    } else {
-      const mockDb: CrmEntityOption[] = [
-        {
-          id: "c1",
-          name: "Sarah Connor",
-          email: "sarah@cyberdyne.io",
-          type: "contact",
-          subtitle: "Tech Contact",
-        },
-        {
-          id: "l1",
-          name: "Michael Bluth",
-          email: "mbluth@bluthcompany.com",
-          type: "lead",
-          subtitle: "Inbound Lead",
-        },
-        {
-          id: "d1",
-          name: "Acme Renewal",
-          email: "billing@acmerenewal.com",
-          type: "deal",
-          subtitle: "Q4 Deal",
-        },
-        {
-          id: "o1",
-          name: "Stark Industries",
-          email: "contracts@stark.com",
-          type: "organization",
-          subtitle: "Enterprise Account",
-        },
-      ];
-      const filtered = mockDb.filter(
-        (item) =>
-          item.type === cc.entityType &&
-          (item.name.toLowerCase().includes(query.toLowerCase()) ||
-            item.email.toLowerCase().includes(query.toLowerCase())),
-      );
-      setCcCrmResults(filtered);
-    }
+    const seq = ++ccSearchSeq.current;
     setActiveCcDropdownId(cc.id);
+    setCcCrmSearching(true);
+    try {
+      const results = await resolveCrmSearch(entityType, query);
+      if (seq !== ccSearchSeq.current) return;
+      setCcCrmResults(results);
+    } catch {
+      if (seq !== ccSearchSeq.current) return;
+      setCcCrmResults([]);
+    } finally {
+      if (seq === ccSearchSeq.current) setCcCrmSearching(false);
+    }
   };
 
   const handleSelectCcEntity = (ccId: string, entity: CrmEntityOption) => {
     setCcSearchQueries((prevQueries) => ({
       ...(prevQueries || {}),
-      [ccId]: entity.email,
+      [ccId]: entity.email || entity.name,
     }));
-    setCcRecipients(
-      ccRecipients.map((cc) =>
-        cc.id === ccId ? { ...cc, name: entity.name, email: entity.email } : cc,
+    setCcRecipients((prev) =>
+      prev.map((cc) =>
+        cc.id === ccId
+          ? {
+              ...cc,
+              name: entity.name,
+              email: entity.email,
+              phone: entity.phone || cc.phone,
+            }
+          : cc,
       ),
     );
     setActiveCcDropdownId(null);
@@ -606,7 +612,7 @@ export function RecipientsSection({
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, signer.id)}
               onDragEnd={handleDragEnd}
-              className={`flex flex-wrap items-start gap-x-3 gap-y-3 bg-slate-50/70 border rounded-xl p-3.5 transition-all relative ${
+              className={`flex flex-wrap items-start gap-x-3 gap-y-3 bg-slate-50/70 border rounded-xl p-3.5 transition-all relative overflow-visible ${
                 isDragOver
                   ? "border-violet-400 ring-2 ring-violet-200"
                   : "border-slate-200/80 hover:border-slate-300"
@@ -645,7 +651,7 @@ export function RecipientsSection({
               </div>
 
               {/* Email Address Field (Always labeled "Email Address") */}
-              <div className="flex-1 space-y-1 relative">
+              <div className="flex-1 space-y-1 relative" data-crm-suggest>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
                   Email Address
                 </label>
@@ -668,6 +674,14 @@ export function RecipientsSection({
                       handleSearchCrm(signer, e.target.value);
                     }
                   }}
+                  onFocus={() => {
+                    if (currentEntityType === "email") return;
+                    const query = hasSelectedCrmEntity
+                      ? signer.email || signer.name
+                      : (signerSearchQueries[signer.id] ?? "");
+                    void handleSearchCrm(signer, query, true);
+                  }}
+                  autoComplete="off"
                   placeholder={
                     currentEntityType === "email"
                       ? "Enter the email address"
@@ -677,33 +691,43 @@ export function RecipientsSection({
                 />
 
                 {activeDropdownId === signer.id &&
-                  crmResults.length > 0 &&
                   currentEntityType !== "email" && (
                     <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-52 overflow-y-auto divide-y divide-gray-50">
                       <div className="p-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 bg-gray-50">
                         Matching {currentEntityType}s
                       </div>
-                      {crmResults.map((result) => (
-                        <div
-                          key={result.id}
-                          onClick={() => handleSelectEntity(signer.id, result)}
-                          className="flex items-center justify-between px-3 py-2 hover:bg-violet-50 cursor-pointer transition-colors"
-                        >
-                          <div>
-                            <div className="text-xs font-semibold text-gray-800">
-                              {result.name}
-                            </div>
-                            <div className="text-[11px] text-gray-500">
-                              {result.email}
-                            </div>
-                          </div>
-                          {result.subtitle && (
-                            <div className="text-[10px] text-gray-400">
-                              {result.subtitle}
-                            </div>
-                          )}
+                      {crmSearching ? (
+                        <div className="px-3 py-2 text-xs text-gray-500">
+                          Searching…
                         </div>
-                      ))}
+                      ) : crmResults.length === 0 ? (
+                        <div className="px-3 py-2 text-xs text-gray-500">
+                          No matching {currentEntityType}s
+                        </div>
+                      ) : (
+                        crmResults.map((result) => (
+                          <div
+                            key={result.id}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => handleSelectEntity(signer.id, result)}
+                            className="flex items-center justify-between px-3 py-2 hover:bg-violet-50 cursor-pointer transition-colors"
+                          >
+                            <div>
+                              <div className="text-xs font-semibold text-gray-800">
+                                {result.name}
+                              </div>
+                              <div className="text-[11px] text-gray-500">
+                                {result.email || "No email on file"}
+                              </div>
+                            </div>
+                            {result.subtitle && (
+                              <div className="text-[10px] text-gray-400">
+                                {result.subtitle}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
                     </div>
                   )}
               </div>
@@ -867,7 +891,7 @@ export function RecipientsSection({
                     </select>
                   </div>
 
-                  <div className="flex-1 space-y-1 relative">
+                  <div className="flex-1 space-y-1 relative" data-crm-suggest>
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-gray-400">
                       Email Address
                     </label>
@@ -890,6 +914,14 @@ export function RecipientsSection({
                           handleSearchCcCrm(cc, e.target.value);
                         }
                       }}
+                      onFocus={() => {
+                        if (currentCcEntityType === "email") return;
+                        const query = hasSelectedCcCrmEntity
+                          ? cc.email || cc.name
+                          : (ccSearchQueries[cc.id] ?? "");
+                        void handleSearchCcCrm(cc, query, true);
+                      }}
+                      autoComplete="off"
                       placeholder={
                         currentCcEntityType === "email"
                           ? "Enter CC email address"
@@ -899,35 +931,45 @@ export function RecipientsSection({
                     />
 
                     {activeCcDropdownId === cc.id &&
-                      ccCrmResults.length > 0 &&
                       currentCcEntityType !== "email" && (
                         <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-52 overflow-y-auto divide-y divide-gray-50">
                           <div className="p-2 text-[10px] font-bold uppercase tracking-wider text-gray-400 bg-gray-50">
                             Matching {currentCcEntityType}s
                           </div>
-                          {ccCrmResults.map((result) => (
-                            <div
-                              key={result.id}
-                              onClick={() =>
-                                handleSelectCcEntity(cc.id, result)
-                              }
-                              className="flex items-center justify-between px-3 py-2 hover:bg-violet-50 cursor-pointer transition-colors"
-                            >
-                              <div>
-                                <div className="text-xs font-semibold text-gray-800">
-                                  {result.name}
-                                </div>
-                                <div className="text-[11px] text-gray-500">
-                                  {result.email}
-                                </div>
-                              </div>
-                              {result.subtitle && (
-                                <div className="text-[10px] text-gray-400">
-                                  {result.subtitle}
-                                </div>
-                              )}
+                          {ccCrmSearching ? (
+                            <div className="px-3 py-2 text-xs text-gray-500">
+                              Searching…
                             </div>
-                          ))}
+                          ) : ccCrmResults.length === 0 ? (
+                            <div className="px-3 py-2 text-xs text-gray-500">
+                              No matching {currentCcEntityType}s
+                            </div>
+                          ) : (
+                            ccCrmResults.map((result) => (
+                              <div
+                                key={result.id}
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() =>
+                                  handleSelectCcEntity(cc.id, result)
+                                }
+                                className="flex items-center justify-between px-3 py-2 hover:bg-violet-50 cursor-pointer transition-colors"
+                              >
+                                <div>
+                                  <div className="text-xs font-semibold text-gray-800">
+                                    {result.name}
+                                  </div>
+                                  <div className="text-[11px] text-gray-500">
+                                    {result.email || "No email on file"}
+                                  </div>
+                                </div>
+                                {result.subtitle && (
+                                  <div className="text-[10px] text-gray-400">
+                                    {result.subtitle}
+                                  </div>
+                                )}
+                              </div>
+                            ))
+                          )}
                         </div>
                       )}
                   </div>

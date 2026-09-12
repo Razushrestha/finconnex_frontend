@@ -58,6 +58,7 @@
     "smoke:workspaces": "npx tsx --tsconfig tsconfig.json src/lib/workspaces/smoke.ts",
     "smoke:chat": "npx tsx --tsconfig tsconfig.json src/lib/chat/smoke.ts",
     "smoke:settings": "npx tsx --tsconfig tsconfig.json src/lib/settings/smoke.ts",
+    "smoke:calculations": "npx tsx --tsconfig tsconfig.json src/lib/calculator/smoke.ts",
     "smoke:signature-requests": "npx tsx --tsconfig tsconfig.json src/lib/documents/signature/smoke.ts",
     "smoke:storage": "npx tsx --tsconfig tsconfig.json src/lib/storage/smoke.ts",
     "smoke:tasks": "npx tsx --tsconfig tsconfig.json src/lib/tasks/smoke.ts",

@@ -80,10 +80,10 @@ export function setActiveSignatureId(id: string) {
   }
 }
 
-export function getActiveSignatureProfile() {
+export function getActiveSignatureProfile(): SignatureProfile | undefined {
   const profiles = listSignatureProfiles();
   const id = getActiveSignatureId();
-  return profiles.find((item) => item.id === id) ?? profiles[0]!;
+  return profiles.find((item) => item.id === id) ?? profiles[0];
 }
 
 export function loadSignature() {
@@ -100,7 +100,7 @@ export function loadSignature() {
 export function saveSignature(value: string) {
   const active = getActiveSignatureProfile();
   const map = readMap();
-  map[active.email] = value;
+  if (active?.email) map[active.email] = value;
   writeMap(map);
   try {
     localStorage.setItem(LEGACY_KEY, value);
@@ -191,14 +191,16 @@ export function replaceSignatureInHtml(html: string, nextSignature: string) {
 
 export function getSignatureProfileForEmail(email: string) {
   const profiles = listSignatureProfiles();
+  const key = email.trim().toLowerCase();
   return (
-    profiles.find((item) => item.email.toLowerCase() === email.toLowerCase()) ??
+    profiles.find((item) => item.email.toLowerCase() === key) ??
     getActiveSignatureProfile()
   );
 }
 
 export function applyPersonaSignature(html: string, email: string) {
   const profile = getSignatureProfileForEmail(email);
+  if (!profile) return html;
   setActiveSignatureId(profile.id);
   return replaceSignatureInHtml(html, profile.body);
 }

@@ -17,7 +17,6 @@ import {
   overlaySecurityValues,
   overlaySettingsValues,
   patchCrmWorkspaceSettings,
-  tryCrmSettings,
   valuesToSettingsPatch,
 } from "@/lib/settings/api";
 import { useCrmSettings } from "@/lib/settings/use-crm-settings";
@@ -100,19 +99,24 @@ export function SettingsFormClient({
       if (patched) memberPrefs.setPreferences(patched);
     }
     if (crm.source === "api") {
-      const patched = await tryCrmSettings(() =>
-        patchCrmWorkspaceSettings(
+      try {
+        const patched = await patchCrmWorkspaceSettings(
           valuesToSettingsPatch(values, crm.settings?.revision),
-        ),
-      );
-      if (patched) crm.setSettings(patched);
+        );
+        crm.setSettings(patched);
+        setToast("Saved to CRM");
+      } catch (err) {
+        setToast(
+          err instanceof Error ? err.message : "CRM rejected these settings",
+        );
+        setSaving(false);
+        window.setTimeout(() => setToast(null), 2800);
+        return;
+      }
+    } else {
+      setToast(memberPrefs.source === "api" ? "Saved to CRM" : "Saved");
     }
     setSaving(false);
-    setToast(
-      crm.source === "api" || memberPrefs.source === "api"
-        ? "Saved to CRM"
-        : "Saved",
-    );
     window.setTimeout(() => setToast(null), 1800);
   }
 

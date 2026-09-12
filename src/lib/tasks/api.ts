@@ -7,14 +7,22 @@ import {
 } from "@/lib/activity-timeline/auth";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import { formatRulesAt } from "@/lib/rules/storage";
-import { upsertTask } from "@/lib/tasks/store";
+import { upsertTask, findTaskById } from "@/lib/tasks/store";
+import {
+  encodeActionItemsInDescription,
+  parseActionItemsBlock,
+  stripActionItemsBlock,
+} from "@/lib/tasks/action-items";
 import {
   TASK_PRIORITIES,
   TASK_STATUSES,
   TASK_TYPES,
   formatTaskTimestamp,
+  formatTaskFileSize,
   type Priority,
   type Task,
+  type TaskActionItem,
+  type TaskFileAttachment,
   type TaskStatus,
   type TaskType,
 } from "@/lib/tasks/types";
@@ -29,6 +37,7 @@ import { findContactById } from "@/lib/contacts/store";
 import { findDealById } from "@/lib/deals/store";
 import { findLeadById } from "@/lib/leads/store";
 import { ownerDisplayName } from "@/lib/users/display-name";
+import { resolveAssignableOwnerName } from "@/lib/users/assignable";
 
 export type CrmTaskQuery = {
   page?: number;
@@ -305,11 +314,69 @@ function relatedApiFields(relatedTo?: RelatedTo, relatedId?: string) {
 }
 
 function mapNameList(raw: unknown): string[] {
+  if (Array.isArray(raw) && raw.every((item) => typeof item === "string")) {
+    return raw
+      .map((item) => resolveAssignableOwnerName(item) || ownerDisplayName(item))
+      .filter(Boolean);
+  }
   return extractRecords(raw)
-    .map((row) =>
-      pickStr(row.name, row.fullName, row.displayName, row.email, row.userId, row.id),
-    )
+    .map((row) => {
+      const nested =
+        row.user && typeof row.user === "object"
+          ? (row.user as Record<string, unknown>)
+          : row;
+      return (
+        memberDisplay(row) ||
+        memberDisplay(nested) ||
+        resolveAssignableOwnerName(pickStr(row.userId, row.id, nested.id))
+      );
+    })
     .filter(Boolean);
+}
+
+function fileNameFromStorageKey(key: string): string {
+  const segment = key.split("/").pop()?.split("?")[0] || key;
+  const stripped = segment.replace(/^\d+-[a-z0-9]+-/i, "");
+  return stripped || segment;
+}
+
+export function mapTaskAttachments(raw: unknown): TaskFileAttachment[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((item, index): TaskFileAttachment[] => {
+    if (typeof item === "string" && item.trim()) {
+      const key = item.trim();
+      return [
+        {
+          id: key,
+          name: fileNameFromStorageKey(key),
+          key,
+        },
+      ];
+    }
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const rec = item as Record<string, unknown>;
+    const key = pickStr(rec.key, rec.storageKey, rec.objectKey);
+    const url = pickStr(rec.url, rec.href, rec.storageUrl);
+    const name =
+      pickStr(rec.fileName, rec.filename, rec.name, rec.originalName) ||
+      fileNameFromStorageKey(key || url);
+    if (!name) return [];
+    const size =
+      typeof rec.size === "number"
+        ? rec.size
+        : typeof rec.byteSize === "number"
+          ? rec.byteSize
+          : Number(rec.size) || 0;
+    return [
+      {
+        id: pickStr(rec.id, rec.uuid) || `${key || name}-${index}`,
+        name,
+        url: url || undefined,
+        key: key || undefined,
+        sizeLabel: formatTaskFileSize(size) || undefined,
+      },
+    ];
+  });
 }
 
 export function normalizeTask(raw: Record<string, unknown>, index: number): Task {
@@ -336,6 +403,8 @@ export function normalizeTask(raw: Record<string, unknown>, index: number): Task
     ? formatRulesAt(new Date(pickStr(raw.updatedAt, raw.modifiedOn, raw.modifiedAt)))
     : createdOn;
   const collaborators = mapNameList(raw.collaborators ?? raw.followers);
+  const rawDescription = pickStr(raw.description);
+  const encodedItems = parseActionItemsBlock(rawDescription);
   return {
     taskId: pickStr(raw.id, raw.uuid, raw.taskId) || `crm-task-${index}`,
     title: pickStr(raw.title, raw.subject, raw.name, "Untitled task"),
@@ -346,7 +415,7 @@ export function normalizeTask(raw: Record<string, unknown>, index: number): Task
     reminderDate: formatDueDisplay(raw.reminderAt ?? raw.reminderDate) || undefined,
     assignedTo,
     relatedTo: mapRelated(raw),
-    description: pickStr(raw.description) || undefined,
+    description: stripActionItemsBlock(rawDescription) || undefined,
     notes: pickStr(raw.notes) || undefined,
     createdBy: pickStr(
       memberDisplay(raw.createdBy),
@@ -365,6 +434,11 @@ export function normalizeTask(raw: Record<string, unknown>, index: number): Task
         ? formatDueDisplay(raw.completedAt ?? raw.completedDate) || modifiedOn
         : undefined,
     collaborators: collaborators.length ? collaborators : undefined,
+    actionItems: encodedItems,
+    attachments: (() => {
+      const files = mapTaskAttachments(raw.attachments);
+      return files.length ? files : undefined;
+    })(),
     attachmentsCount:
       typeof raw.attachmentsCount === "number"
         ? raw.attachmentsCount
@@ -443,20 +517,16 @@ async function tasksMutate(suffix: string, init: RequestInit): Promise<unknown> 
 
 function asTask(data: unknown): Task | null {
   const items = normalizeTasks(data);
-  if (items[0] && isPersistedTask(items[0])) return items[0];
+  if (items[0] && isUuid(items[0].taskId)) return items[0];
   if (data && typeof data === "object" && !Array.isArray(data)) {
     const rec = data as Record<string, unknown>;
     if (!pickStr(rec.id, rec.uuid, rec.taskId, rec.title, rec.subject, rec.name)) {
       return null;
     }
     const mapped = normalizeTask(rec, 0);
-    return isPersistedTask(mapped) ? mapped : null;
+    return isUuid(mapped.taskId) ? mapped : null;
   }
   return null;
-}
-
-function isPersistedTask(task: Task) {
-  return Boolean(task.title.trim() && task.title !== "Untitled task" && isUuid(task.taskId));
 }
 
 export async function listCrmTasks(query: CrmTaskQuery = {}): Promise<Task[]> {
@@ -527,6 +597,7 @@ export type CreateCrmTaskInput = {
   reminderDate?: string;
   startDate?: string;
   attachmentKeys?: string[];
+  actionItems?: TaskActionItem[];
   repeatEvery?: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
 };
 
@@ -546,7 +617,11 @@ export function toCreateTaskBody(input: CreateCrmTaskInput): Record<string, unkn
     reminderAt: input.reminderDate
       ? toTaskIso(input.reminderDate) || undefined
       : undefined,
-    description: input.description?.trim() || input.notes?.trim() || undefined,
+    description:
+      encodeActionItemsInDescription(
+        input.description?.trim() || "",
+        input.actionItems,
+      ) || undefined,
     assigneeIds: owners,
     collaboratorIds,
     attachmentKeys: input.attachmentKeys,
@@ -577,7 +652,30 @@ export async function createCrmTask(
       ),
     }),
   );
+  if (
+    created &&
+    input.attachmentKeys?.length &&
+    !created.attachments?.length
+  ) {
+    const linked = await linkCrmTaskAttachments(
+      created.taskId,
+      input.attachmentKeys,
+    );
+    return linked ?? created;
+  }
   return created;
+}
+
+export async function linkCrmTaskAttachments(
+  taskId: string,
+  keys: string[],
+): Promise<Task | null> {
+  if (!isUuid(taskId) || !keys.length) return null;
+  let latest: Task | null = null;
+  for (const key of keys) {
+    latest = await addCrmTaskAttachment(taskId, { key });
+  }
+  return latest;
 }
 
 export async function updateCrmTask(
@@ -598,7 +696,14 @@ export async function updateCrmTask(
   if (patch.assignedTo && isUuid(patch.assignedTo)) {
     body.assigneeIds = [patch.assignedTo];
   }
-  if (patch.description != null) body.description = patch.description;
+  if (patch.description != null || patch.actionItems) {
+    const current = findTaskById(id)?.task;
+    body.description =
+      encodeActionItemsInDescription(
+        patch.description ?? current?.description ?? "",
+        patch.actionItems ?? current?.actionItems,
+      ) ?? "";
+  }
   if (patch.relatedTo || patch.relatedId) {
     Object.assign(body, relatedApiFields(patch.relatedTo, patch.relatedId));
   }
@@ -812,8 +917,8 @@ export async function tryCrmTask<T>(run: () => Promise<T>): Promise<T | null> {
 }
 
 export function persistRemoteTask(row: Task | null) {
-  if (row) upsertTask(row);
-  return row;
+  if (!row) return row;
+  return upsertTask(row);
 }
 
 export function isCrmTaskId(id: string): boolean {

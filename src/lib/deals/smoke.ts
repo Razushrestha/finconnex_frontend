@@ -27,6 +27,7 @@ import {
   updateCrmDeal,
   updateCrmDealContactRole,
 } from "@/lib/deals/api";
+import { sortDealCards } from "@/lib/deals/sort";
 import {
   installSmokePolyfill,
   runAsCli,
@@ -159,6 +160,77 @@ export function smokeDealsWiring() {
     apiDealStage("Closed Won") !== "CLOSED_WON"
   ) {
     fail("normalizeDeal did not map Swagger-shaped fields");
+  }
+
+  const kanban = readSrc("src/components/sales/deals/DealsKanbanBoard.tsx");
+  if (!kanban.includes("sortDealCards")) {
+    fail("kanban board does not apply header sort to stage cards");
+  }
+  const list = readSrc("src/components/sales/deals/DealsListView.tsx");
+  if (!list.includes("sortDealCards")) {
+    fail("list view does not apply header sort to rows");
+  }
+  if (!page.includes("sortValue={activeSort}")) {
+    fail("deals page does not pass activeSort into the board/list");
+  }
+  if (!page.includes("sortDirection={activeSortDirection}")) {
+    fail("deals page does not pass sort direction into the board/list");
+  }
+
+  smokeDealsSort();
+}
+
+/** QA: Sales → Deals → Sort → Name (A-Z) → Apply must reorder cards. */
+export function smokeDealsSort() {
+  const cards = [
+    {
+      name: "Zenith Roof",
+      closeDate: "2026-12-01",
+      value: "$9,000",
+      owner: "Zed",
+    },
+    {
+      name: "Acme Fitout",
+      closeDate: "2026-01-15",
+      value: "$1,000",
+      owner: "Ada",
+    },
+    {
+      name: "Midtown Loan",
+      closeDate: "2026-06-01",
+      value: "$5,000",
+      owner: "Mia",
+    },
+  ];
+
+  const unsorted = sortDealCards(cards, "Sort");
+  if (
+    unsorted.map((c) => c.name).join(",") !==
+    "Zenith Roof,Acme Fitout,Midtown Loan"
+  ) {
+    fail("idle Sort must leave deal order unchanged");
+  }
+
+  const az = sortDealCards(cards, "name_asc");
+  if (
+    az.map((c) => c.name).join(",") !== "Acme Fitout,Midtown Loan,Zenith Roof"
+  ) {
+    fail("Name (A-Z) did not reorder deals");
+  }
+
+  const za = sortDealCards(cards, "name_desc");
+  if (
+    za.map((c) => c.name).join(",") !== "Zenith Roof,Midtown Loan,Acme Fitout"
+  ) {
+    fail("Name (Z-A) did not reverse deals");
+  }
+
+  const oldest = sortDealCards(cards, "oldest");
+  if (
+    oldest.map((c) => c.name).join(",") !==
+    "Acme Fitout,Midtown Loan,Zenith Roof"
+  ) {
+    fail("Oldest First did not order by close date");
   }
 }
 
@@ -343,7 +415,7 @@ export async function runDealsSmoke() {
 
   console.log("\n1) Client + UI wiring…");
   smokeDealsWiring();
-  console.log("   OK — client, catalog, deals page, store");
+  console.log("   OK — client, catalog, deals page, store, sort");
 
   console.log("\n2) Mock fetch…");
   await smokeDealsMock();

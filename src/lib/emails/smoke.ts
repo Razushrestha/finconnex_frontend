@@ -217,6 +217,9 @@ export function smokeEmailsWiring() {
   if (!create.includes("createCrmEmail") || !create.includes("sendCrmEmail")) {
     fail("create email form does not call createCrmEmail/sendCrmEmail");
   }
+  if (!create.includes("loadFromIdentities")) {
+    fail("create email form does not load the From mailbox");
+  }
   if (!api.includes("deliverQueuedCrmEmail")) {
     fail("email send does not deliver through the app SendGrid route");
   }

@@ -38,6 +38,137 @@ function isUuid(value: string | null | undefined): boolean {
   );
 }
 
+function initialsFromName(name: string, fallback: string) {
+  return (
+    name
+      .split(" ")
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || fallback
+  );
+}
+
+/**
+ * After create, the CRM list/kanban often returns the linked contact's name
+ * and an assignment-rule owner. Keep the title and owner the user saved.
+ */
+type LeadIdentityPin = {
+  name: string;
+  owner: string;
+  ownerId?: string;
+};
+
+const IDENTITY_PINS_KEY = "finconnex.leads.identity.v1";
+const identityPins = new Map<string, LeadIdentityPin>();
+
+function pinKeys(id?: string, email?: string): string[] {
+  const keys: string[] = [];
+  if (id?.trim()) keys.push(id.trim().toLowerCase());
+  const mail = email?.trim().toLowerCase();
+  if (mail) keys.push(`email:${mail}`);
+  return keys;
+}
+
+function persistIdentityPins() {
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    sessionStorage.setItem(
+      IDENTITY_PINS_KEY,
+      JSON.stringify(Object.fromEntries(identityPins)),
+    );
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function hydrateIdentityPins() {
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    const raw = sessionStorage.getItem(IDENTITY_PINS_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as Record<string, LeadIdentityPin>;
+    for (const [key, pin] of Object.entries(parsed)) {
+      if (!pin?.name && !pin?.owner) continue;
+      identityPins.set(key, pin);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+hydrateIdentityPins();
+
+/** Remember the Create Lead title/owner so a later CRM refresh cannot clobber them. */
+export function pinLeadIdentity(card: LeadCardData) {
+  const name = card.custom?.leadTitle?.trim() || "";
+  const owner = card.custom?.leadOwnerName?.trim() || "";
+  const ownerId = card.custom?.leadOwnerId?.trim() || card.ownerId;
+  if (!name && !owner) return;
+  const pin: LeadIdentityPin = {
+    name: name || card.name.trim(),
+    owner: owner || (card.owner && !isUuid(card.owner) ? card.owner : ""),
+    ownerId: ownerId && isUuid(ownerId) ? ownerId : undefined,
+  };
+  for (const key of pinKeys(card.id, card.email)) {
+    identityPins.set(key, pin);
+  }
+  persistIdentityPins();
+}
+
+function pinnedIdentityFor(card: LeadCardData): LeadIdentityPin | undefined {
+  for (const key of pinKeys(card.id, card.email)) {
+    const pin = identityPins.get(key);
+    if (pin) return pin;
+  }
+  return undefined;
+}
+
+export function applyLocalLeadIdentity(
+  remote: LeadCardData,
+  local?: LeadCardData,
+): LeadCardData {
+  const pin = pinnedIdentityFor(remote);
+  const title = local?.custom?.leadTitle?.trim() || pin?.name || "";
+  const ownerName = local?.custom?.leadOwnerName?.trim() || pin?.owner || "";
+  const ownerId =
+    local?.custom?.leadOwnerId?.trim() || pin?.ownerId || "";
+  if (!local && !title && !ownerName && !ownerId) return remote;
+  const name = title || local?.name || remote.name;
+  const keepOwner = Boolean(ownerName || (ownerId && isUuid(ownerId)));
+  const next: LeadCardData = {
+    ...remote,
+    ...(local ? { custom: { ...remote.custom, ...local.custom } } : remote.custom ? { custom: remote.custom } : {}),
+    name,
+    initials: title ? initialsFromName(name, remote.initials) : remote.initials,
+    owner: keepOwner ? ownerName || local?.owner || remote.owner : remote.owner,
+    ownerId:
+      ownerId && isUuid(ownerId) ? ownerId : remote.ownerId || local?.ownerId,
+  };
+  if (title || ownerName) {
+    next.custom = {
+      ...next.custom,
+      ...(title ? { leadTitle: title } : {}),
+      ...(ownerName ? { leadOwnerName: ownerName } : {}),
+      ...(ownerId && isUuid(ownerId) ? { leadOwnerId: ownerId } : {}),
+    };
+  }
+  return next;
+}
+
+function findLocalLeadMatch(
+  remote: LeadCardData,
+  localById: Map<string, LeadCardData>,
+  localByEmail: Map<string, LeadCardData>,
+): LeadCardData | undefined {
+  const byId = localById.get(remote.id.trim().toLowerCase());
+  if (byId) return byId;
+  const email = remote.email.trim().toLowerCase();
+  if (email) return localByEmail.get(email);
+  return undefined;
+}
+
 function leadActor(fallback?: string) {
   return getRulesActor().name || fallback || "System";
 }
@@ -137,24 +268,43 @@ export function saveLeadColumns(cols: KanbanColumn[]) {
 
 /** Keep locally saved leads that the CRM list/kanban did not return. */
 export function mergeRemoteLeadColumns(remote: KanbanColumn[]): KanbanColumn[] {
-  const remoteNorm = normalize(remote);
+  const localCards = listLeadColumns().flatMap((col) => col.cards);
+  const localById = new Map(
+    localCards.map((card) => [card.id.trim().toLowerCase(), card] as const),
+  );
+  const localByEmail = new Map<string, LeadCardData>();
+  for (const card of localCards) {
+    const email = card.email.trim().toLowerCase();
+    if (!email) continue;
+    const prev = localByEmail.get(email);
+    if (!prev || card.custom?.leadTitle || card.custom?.leadOwnerName) {
+      localByEmail.set(email, card);
+    }
+  }
+  const remoteNorm = normalize(remote).map((col) => ({
+    ...col,
+    cards: col.cards.map((card) =>
+      applyLocalLeadIdentity(
+        card,
+        findLocalLeadMatch(card, localById, localByEmail),
+      ),
+    ),
+  }));
   const remoteIds = new Set(
-    remoteNorm.flatMap((col) => col.cards.map((card) => card.id)),
+    remoteNorm.flatMap((col) => col.cards.map((card) => card.id.trim().toLowerCase())),
   );
   const remoteEmails = new Set(
     remoteNorm
       .flatMap((col) => col.cards.map((card) => card.email.trim().toLowerCase()))
       .filter(Boolean),
   );
-  const extras = listLeadColumns()
-    .flatMap((col) => col.cards)
-    .filter((card) => {
-      if (remoteIds.has(card.id)) return false;
-      const email = card.email.trim().toLowerCase();
-      if (email && remoteEmails.has(email)) return false;
-      if (isUuid(card.id)) return true;
-      return /^l-\d{10,}-/.test(card.id);
-    });
+  const extras = localCards.filter((card) => {
+    if (remoteIds.has(card.id.trim().toLowerCase())) return false;
+    const email = card.email.trim().toLowerCase();
+    if (email && remoteEmails.has(email)) return false;
+    if (isUuid(card.id)) return true;
+    return /^l-\d{10,}-/.test(card.id);
+  });
   if (!extras.length) return remoteNorm;
   const next = remoteNorm.map((col) => ({ ...col, cards: [...col.cards] }));
   for (const card of extras) {
@@ -441,6 +591,7 @@ export function updateLead(
           ? patch.custom.loanAmount
           : found.card.estimatedValue,
   };
+  pinLeadIdentity(nextCard);
 
   let cols = listLeadColumns().map((c) => ({
     ...c,
@@ -494,15 +645,30 @@ export function upsertLeadFromCard(card: LeadCardData, status?: LeadStatus) {
       : status
         ? leadStatusToPipelineStage(status)
         : "New Lead";
+  pinLeadIdentity(card);
+  const existing =
+    findLeadById(card.id)?.card ??
+    (card.email.trim() ? findLeadByEmail(card.email)?.card : undefined);
   const nextCard: LeadCardData = {
-    ...card,
+    ...applyLocalLeadIdentity(
+      {
+        ...card,
+        pipelineStage: stage,
+        accentColorClass: PIPELINE_STAGE_DOT[stage] ?? card.accentColorClass,
+      },
+      existing,
+    ),
     pipelineStage: stage,
     accentColorClass: PIPELINE_STAGE_DOT[stage] ?? card.accentColorClass,
   };
   const without = listLeadColumns().map((col) => ({
     ...col,
-    cards: col.cards.filter((c) => c.id !== card.id),
-    leadCount: col.cards.filter((c) => c.id !== card.id).length,
+    cards: col.cards.filter(
+      (c) => c.id.trim().toLowerCase() !== card.id.trim().toLowerCase(),
+    ),
+    leadCount: col.cards.filter(
+      (c) => c.id.trim().toLowerCase() !== card.id.trim().toLowerCase(),
+    ).length,
   }));
   const target = without.find((c) => c.title === stage) ?? without[0];
   if (!target) return nextCard;

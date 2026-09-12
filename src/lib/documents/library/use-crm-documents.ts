@@ -1,8 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { listCrmDocuments } from "@/lib/documents/library/api";
-import { replaceLibraryDocuments } from "@/lib/documents/library/types";
+import {
+  listCrmDocumentLibrary,
+  listMyCrmDocuments,
+  listRecentCrmDocuments,
+  tryCrmDocument,
+} from "@/lib/documents/library/api";
+import {
+  replaceLibraryDocuments,
+  type LibraryDocument,
+} from "@/lib/documents/library/types";
 
 export type DocumentsDataSource = "api" | "demo";
 
@@ -11,6 +19,8 @@ export function useCrmDocuments() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const [mine, setMine] = useState<LibraryDocument[]>([]);
+  const [recent, setRecent] = useState<LibraryDocument[]>([]);
 
   const refresh = useCallback(() => setTick((n) => n + 1), []);
 
@@ -21,13 +31,21 @@ export function useCrmDocuments() {
 
     void (async () => {
       try {
-        const remote = await listCrmDocuments();
+        const [library, myFiles, recentFiles] = await Promise.all([
+          listCrmDocumentLibrary(),
+          tryCrmDocument(() => listMyCrmDocuments()),
+          tryCrmDocument(() => listRecentCrmDocuments()),
+        ]);
         if (cancelled) return;
-        replaceLibraryDocuments(remote);
+        replaceLibraryDocuments(library);
+        setMine(myFiles ?? []);
+        setRecent(recentFiles ?? []);
         setSource("api");
       } catch (err) {
         if (cancelled) return;
         setSource("demo");
+        setMine([]);
+        setRecent([]);
         setError(err instanceof Error ? err.message : "Documents unavailable");
       } finally {
         if (!cancelled) setLoading(false);
@@ -39,5 +57,5 @@ export function useCrmDocuments() {
     };
   }, [tick]);
 
-  return { source, loading, error, refresh };
+  return { source, loading, error, refresh, mine, recent };
 }

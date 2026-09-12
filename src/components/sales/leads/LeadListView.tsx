@@ -36,6 +36,7 @@ import type { QuickActionKind } from "@/lib/leads/panel-actions";
 import { LeadSlaChip } from "@/components/sales/leads/LeadSlaChip";
 import type { LeadFilters } from "./FilterLeadsPanel";
 import { leadMatchesFilters } from "@/lib/filters/records";
+import { sortLeadCards } from "@/lib/leads/sort";
 import {
   LeadCardPanelHost,
   type LeadPanelState,
@@ -54,6 +55,7 @@ import {
 interface LeadListViewProps {
   columns?: KanbanColumn[];
   filters?: LeadFilters;
+  sortValue?: string;
   /** Controlled list columns from List View settings. */
   manageColumns?: ManageColumn[];
   onManageColumnsChange?: (cols: ManageColumn[]) => void;
@@ -333,6 +335,7 @@ function buildColumnRenderers(
 export function LeadListView({
   columns: columnsProp,
   filters,
+  sortValue,
   manageColumns: manageColumnsProp,
   onManageColumnsChange,
   pageSize: pageSizeProp,
@@ -397,7 +400,7 @@ export function LeadListView({
     const source = columnsProp ?? columns;
     const hasStatusFilter = !!filters?.statuses.length;
 
-    return source
+    const rows = source
       .filter(
         (column) =>
           !hasStatusFilter ||
@@ -423,7 +426,8 @@ export function LeadListView({
             statusDotColor: column.dotColorClass,
           })),
       );
-  }, [columns, columnsProp, filters, revision]);
+    return sortLeadCards(rows, sortValue);
+  }, [columns, columnsProp, filters, revision, sortValue]);
 
   const pagedLeads = useMemo(
     () => allLeads.slice(0, pageSize),

@@ -1,13 +1,16 @@
 import {
-  ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import {
+  type CrmDocumentType,
+  CRM_DOCUMENT_TYPES,
   type DocumentAccessLevel,
   type LibraryDocument,
 } from "@/lib/documents/library/types";
+import { isUuid } from "@/lib/activity-timeline/auth";
 
 export type CrmDocumentQuery = {
   page?: number;
@@ -88,6 +91,76 @@ export function apiDocumentAccess(level: DocumentAccessLevel): string {
   return level.toUpperCase();
 }
 
+function parseMeta(description: string) {
+  const folder = description.match(/\[folder:([^\]]+)\]/)?.[1]?.trim();
+  const relatedTo = description.match(/\[related:([^\]]+)\]/)?.[1]?.trim();
+  const tags = description.match(/\[tags:([^\]]+)\]/)?.[1];
+  return {
+    folder,
+    relatedTo,
+    tags: tags
+      ? tags.split(/[,;]+/).map((item) => item.trim()).filter(Boolean)
+      : [],
+  };
+}
+
+export function folderToDocumentType(folder?: string): CrmDocumentType {
+  switch (folder) {
+    case "Deals":
+      return "PROPOSAL";
+    case "Signed":
+      return "CONTRACT";
+    case "Templates":
+      return "OTHER";
+    case "Clients":
+      return "OTHER";
+    default:
+      return "OTHER";
+  }
+}
+
+export function documentTypeToFolder(
+  type?: string,
+  description?: string,
+): string {
+  const encoded = description ? parseMeta(description).folder : undefined;
+  if (encoded) return encoded;
+  switch (type) {
+    case "PROPOSAL":
+      return "Deals";
+    case "CONTRACT":
+    case "LEGAL":
+      return "Signed";
+    case "ID_PROOF":
+    case "FINANCIAL":
+      return "Clients";
+    default:
+      return "Clients";
+  }
+}
+
+export function encodeDocumentDescription(input: {
+  folder?: string;
+  tags?: string[];
+  relatedTo?: string;
+  notes?: string;
+}): string | undefined {
+  const lines = [
+    input.folder ? `[folder:${input.folder}]` : "",
+    input.tags?.length ? `[tags:${input.tags.join(",")}]` : "",
+    input.relatedTo ? `[related:${input.relatedTo}]` : "",
+    input.notes?.trim() ?? "",
+  ].filter(Boolean);
+  return lines.join("\n") || undefined;
+}
+
+function asDocumentType(raw: string): CrmDocumentType | undefined {
+  const value = raw.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  return CRM_DOCUMENT_TYPES.includes(value as CrmDocumentType)
+    ? (value as CrmDocumentType)
+    : undefined;
+}
+
 function formatDate(raw: unknown): string {
   const value = pickStr(raw);
   if (!value) return "";
@@ -140,19 +213,44 @@ export function normalizeLibraryDocument(
     ownerObj && pickStr(ownerObj.name, ownerObj.fullName),
     "—",
   );
-  const sizeLabel = formatSize(raw.sizeLabel ?? raw.size ?? raw.bytes);
+  const sizeBytes =
+    typeof raw.sizeBytes === "number"
+      ? raw.sizeBytes
+      : typeof raw.size === "number"
+        ? raw.size
+        : undefined;
+  const sizeLabel = formatSize(raw.sizeLabel ?? sizeBytes ?? raw.size ?? raw.bytes);
   const version = Number(raw.version ?? raw.currentVersion ?? 1) || 1;
+  const description = pickStr(raw.description, raw.note) || undefined;
+  const meta = description ? parseMeta(description) : { folder: "", relatedTo: "", tags: [] };
+  const documentType = asDocumentType(pickStr(raw.documentType, raw.type));
+  const relatedIds = {
+    leadId: pickStr(raw.leadId) || undefined,
+    contactId: pickStr(raw.contactId) || undefined,
+    companyId: pickStr(raw.companyId) || undefined,
+    dealId: pickStr(raw.dealId) || undefined,
+  };
   return {
     id: pickStr(raw.id, raw.uuid, raw.documentId) || `crm-doc-${index}`,
     fileName,
-    folder: pickStr(raw.folder, raw.category, raw.collection, "Clients"),
+    folder:
+      pickStr(raw.folder, raw.category, raw.collection, meta.folder) ||
+      documentTypeToFolder(documentType, description),
     owner,
-    relatedTo: pickStr(raw.relatedTo, raw.relatedLabel) || undefined,
+    relatedTo: pickStr(raw.relatedTo, raw.relatedLabel, meta.relatedTo) || undefined,
     version,
-    tags: mapTags(raw.tags ?? raw.labels),
+    tags: mapTags(raw.tags ?? raw.labels).length
+      ? mapTags(raw.tags ?? raw.labels)
+      : meta.tags,
     uploadedAt,
     accessLevel: mapDocumentAccess(pickStr(raw.accessLevel, raw.visibility, raw.access, "PRIVATE")),
     sizeLabel,
+    storageKey: pickStr(raw.key, raw.storageKey, raw.fileKey) || undefined,
+    mimeType: pickStr(raw.mimeType, raw.contentType) || undefined,
+    sizeBytes,
+    description,
+    documentType,
+    ...relatedIds,
     versions: [
       {
         version,
@@ -171,39 +269,52 @@ export function normalizeLibraryDocuments(data: unknown): LibraryDocument[] {
   );
 }
 
-async function withSession<T>(
-  run: (
-    session: CrmSession | Pick<CrmSession, "baseUrl" | "accessToken">,
-    scoped: boolean,
-  ) => Promise<T>,
-): Promise<T> {
-  const scoped = await ensureCrmSession();
-  if (scoped) return run(scoped, true);
-  const access = await ensureCrmAccess();
-  if (!access) throw new Error("Sign in to manage documents");
-  return run(access, false);
+async function withSession<T>(fn: (session: CrmSession) => Promise<T>): Promise<T> {
+  const session = await ensureCrmSession();
+  if (!session) throw new Error("Sign in to manage documents");
+  return fn(session);
 }
 
-function documentsUrl(
-  session: CrmSession | Pick<CrmSession, "baseUrl" | "accessToken">,
-  scoped: boolean,
+function isMissingCrmRoute(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  return /\(404\)|not found/i.test(message);
+}
+
+async function documentsCall(
   suffix: string,
-) {
-  return scoped
-    ? workspaceDocumentsPath((session as CrmSession).workspaceId, suffix)
-    : globalDocumentsPath(suffix);
+  query = "",
+  init?: RequestInit,
+): Promise<unknown> {
+  const scoped = await ensureCrmSession();
+  const paths = [
+    ...(scoped?.workspaceId
+      ? [`${workspaceDocumentsPath(scoped.workspaceId, suffix)}${query}`]
+      : []),
+    `${globalDocumentsPath(suffix)}${query}`,
+  ].filter((path, index, all) => all.indexOf(path) === index);
+
+  let lastError: unknown;
+  for (let i = 0; i < paths.length; i += 1) {
+    try {
+      if (isBoundCrmSession()) {
+        return await withSession((session) => crmFetch(session, paths[i], init));
+      }
+      return await crmBffFetch(paths[i], init);
+    } catch (err) {
+      lastError = err;
+      if (i < paths.length - 1 && isMissingCrmRoute(err)) continue;
+      throw err;
+    }
+  }
+  throw lastError;
 }
 
 async function documentsGet(suffix: string, query = ""): Promise<unknown> {
-  return withSession((session, scoped) =>
-    crmFetch(session, `${documentsUrl(session, scoped, suffix)}${query}`),
-  );
+  return documentsCall(suffix, query);
 }
 
 async function documentsMutate(suffix: string, init: RequestInit): Promise<unknown> {
-  return withSession((session, scoped) =>
-    crmFetch(session, documentsUrl(session, scoped, suffix), init),
-  );
+  return documentsCall(suffix, "", init);
 }
 
 function asDocument(data: unknown): LibraryDocument | null {
@@ -234,6 +345,56 @@ export async function listCrmDocuments(
   );
 }
 
+export async function listCrmDocumentLibrary(
+  query: CrmDocumentQuery = {},
+): Promise<LibraryDocument[]> {
+  try {
+    return normalizeLibraryDocuments(
+      await documentsGet(
+        "/library",
+        toQuery({
+          page: query.page,
+          limit: query.limit ?? 100,
+          search: query.search,
+        }),
+      ),
+    );
+  } catch (err) {
+    if (isMissingCrmRoute(err)) return listCrmDocuments(query);
+    throw err;
+  }
+}
+
+export async function listMyCrmDocuments(
+  query: CrmDocumentQuery = {},
+): Promise<LibraryDocument[]> {
+  return normalizeLibraryDocuments(
+    await documentsGet(
+      "/my",
+      toQuery({
+        page: query.page,
+        limit: query.limit ?? 100,
+        search: query.search,
+      }),
+    ),
+  );
+}
+
+export async function listRecentCrmDocuments(
+  query: CrmDocumentQuery = {},
+): Promise<LibraryDocument[]> {
+  return normalizeLibraryDocuments(
+    await documentsGet(
+      "/recent",
+      toQuery({
+        page: query.page,
+        limit: query.limit ?? 100,
+        search: query.search,
+      }),
+    ),
+  );
+}
+
 export async function getCrmDocument(id: string): Promise<LibraryDocument | null> {
   return asDocument(await documentsGet(`/${id}`));
 }
@@ -254,38 +415,91 @@ export async function getCrmDocumentDownload(
   };
 }
 
+export async function getCrmDocumentPreview(
+  id: string,
+): Promise<CrmDocumentDownload> {
+  const data = await documentsGet(`/${id}/preview`);
+  if (typeof data === "string" && data.trim()) {
+    return { url: data.trim(), raw: data };
+  }
+  const rec = data && typeof data === "object" ? (data as Record<string, unknown>) : {};
+  return {
+    url:
+      pickStr(rec.url, rec.previewUrl, rec.href, rec.signedUrl, rec.location) ||
+      null,
+    raw: data,
+  };
+}
+
 export function toCreateDocumentBody(
   input: Partial<LibraryDocument> & { fileName: string },
 ): Record<string, unknown> {
+  const related = pickRelatedIds(input);
+  const key = input.storageKey?.trim();
+  const mimeType = input.mimeType?.trim() || "application/octet-stream";
+  const sizeBytes = Number(input.sizeBytes) || 0;
   return {
-    name: input.fileName,
-    fileName: input.fileName,
-    title: input.fileName,
-    folder: input.folder,
-    category: input.folder,
-    ownerName: input.owner,
-    owner: input.owner,
-    relatedTo: input.relatedTo,
-    tags: input.tags,
-    accessLevel: input.accessLevel
-      ? apiDocumentAccess(input.accessLevel)
-      : undefined,
-    visibility: input.accessLevel
-      ? apiDocumentAccess(input.accessLevel)
-      : undefined,
-    fileKey: input.storageKey,
-    storageKey: input.storageKey,
-    url: input.storageUrl,
+    name: input.fileName.trim(),
+    documentType:
+      input.documentType || folderToDocumentType(input.folder),
+    key,
+    mimeType,
+    sizeBytes,
+    description: encodeDocumentDescription({
+      folder: input.folder,
+      tags: input.tags,
+      relatedTo: input.relatedTo,
+      notes: input.description,
+    }),
+    ...related,
   };
+}
+
+export function toUpdateDocumentBody(
+  input: Partial<LibraryDocument> & { fileName?: string },
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (input.fileName?.trim()) body.name = input.fileName.trim();
+  if (input.documentType) body.documentType = input.documentType;
+  else if (input.folder) body.documentType = folderToDocumentType(input.folder);
+  const description = encodeDocumentDescription({
+    folder: input.folder,
+    tags: input.tags,
+    relatedTo: input.relatedTo,
+    notes: input.description,
+  });
+  if (description) body.description = description;
+  Object.assign(body, pickRelatedIds(input));
+  return body;
+}
+
+function pickRelatedIds(input: Partial<LibraryDocument>): Record<string, string> {
+  const pairs: Array<[string, string | undefined]> = [
+    ["leadId", input.leadId],
+    ["contactId", input.contactId],
+    ["companyId", input.companyId],
+    ["dealId", input.dealId],
+  ];
+  const selected = pairs.find(([, value]) => value && isUuid(value));
+  return selected ? { [selected[0]]: selected[1] as string } : {};
 }
 
 export async function createCrmDocument(
   body: Record<string, unknown>,
 ): Promise<LibraryDocument | null> {
+  const payload = {
+    ...body,
+    name: pickStr(body.name, body.fileName, body.title),
+    documentType: pickStr(body.documentType) || "OTHER",
+    key: pickStr(body.key, body.storageKey, body.fileKey),
+    mimeType:
+      pickStr(body.mimeType, body.contentType) || "application/octet-stream",
+    sizeBytes: Number(body.sizeBytes) || undefined,
+  };
   return asDocument(
     await documentsMutate("", {
       method: "POST",
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
     }),
   );
 }
@@ -314,18 +528,26 @@ export async function restoreCrmDocument(
   );
 }
 
+export async function bulkDeleteCrmDocuments(ids: string[]): Promise<unknown> {
+  return documentsMutate("/bulk-delete", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+}
+
+export async function bulkRestoreCrmDocuments(ids: string[]): Promise<unknown> {
+  return documentsMutate("/bulk-restore", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+}
+
 export async function tryCrmDocument<T>(run: () => Promise<T>): Promise<T | null> {
   try {
     return await run();
   } catch {
     return null;
   }
-}
-
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
 }
 
 export function isCrmDocumentId(id: string): boolean {

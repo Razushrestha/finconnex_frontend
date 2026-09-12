@@ -29,10 +29,13 @@ export function formatRelatedTo(r?: RelatedTo | string) {
   return `${r.kind}: ${r.name}`;
 }
 
-export function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
+export function initials(name?: string | null) {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  const first = parts[0][0] ?? "";
+  const last = parts[parts.length - 1][0] ?? "";
+  return `${first}${last}`.toUpperCase() || "?";
 }
 
 export const AVATAR_COLORS = [
@@ -44,8 +47,9 @@ export const AVATAR_COLORS = [
   "bg-emerald-200 text-emerald-950 dark:bg-emerald-800 dark:text-emerald-50",
 ] as const;
 
-export function avatarColor(name: string) {
+export function avatarColor(name?: string | null) {
+  const value = name ?? "";
   let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h + name.charCodeAt(i) * 17) % 6;
+  for (let i = 0; i < value.length; i++) h = (h + value.charCodeAt(i) * 17) % 6;
   return AVATAR_COLORS[h];
 }

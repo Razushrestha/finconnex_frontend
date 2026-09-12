@@ -30,6 +30,7 @@ import {
   tryCrmSignatureRequest,
 } from "@/lib/documents/signature/api";
 import { useCrmSignatureRequests } from "@/lib/documents/signature/use-crm-signature-requests";
+import { CrmSourceBadge } from "@/components/documents/signature/CrmSourceBadge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -236,13 +237,13 @@ export default function DocumentsList() {
       {/* Header section */}
       <div className="mb-2 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">
+          <h1 className="flex flex-wrap items-center gap-2 text-lg font-semibold text-slate-900 dark:text-white">
             Signature Documents
-            {crm.source === "api" ? (
-              <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold text-emerald-700">
-                Live CRM
-              </span>
-            ) : null}
+            <CrmSourceBadge
+              source={crm.source}
+              loading={crm.loading}
+              error={crm.error}
+            />
           </h1>
         </div>
       </div>

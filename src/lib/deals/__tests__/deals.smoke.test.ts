@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { smokeDealsMock, smokeDealsWiring } from "@/lib/deals/smoke";
+import {
+  smokeDealsMock,
+  smokeDealsSort,
+  smokeDealsWiring,
+} from "@/lib/deals/smoke";
 
 describe("Deals API smoke (CI)", () => {
   it("wires client, catalog, and UI", () => {
     smokeDealsWiring();
+  });
+
+  it("reorders deals for Name (A-Z) / Name (Z-A)", () => {
+    smokeDealsSort();
   });
 
   it("mocks all 15 Swagger routes", async () => {

@@ -14,6 +14,8 @@ import {
   getCrmDocumentRequest,
   globalDocumentRequestsPath,
   listCrmDocumentRequests,
+  apiDocumentRequestType,
+  toCreateDocumentRequestBody,
   normalizeDocumentRequest,
   receiveCrmDocumentRequest,
   rejectCrmDocumentRequest,
@@ -132,6 +134,17 @@ export function smokeDocumentRequestsWiring() {
       fail(`document-requests client missing ${name}`);
     }
   }
+  if (!api.includes("crmBffFetch")) {
+    fail("document-requests client must call crmBffFetch in the browser");
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (
+    !bff.includes('"document-requests"') ||
+    !bff.includes('path.includes("document-requests")')
+  ) {
+    fail("BFF proxy does not allow document-requests");
+  }
 
   const catalog = readSrc("src/lib/api/endpoints.ts");
   for (const fragment of [
@@ -190,6 +203,21 @@ export function smokeDocumentRequestsWiring() {
     }
   }
 
+  const list = readSrc(
+    "src/components/documents/requests/DocumentRequestsList.tsx",
+  );
+  for (const name of [
+    "sendCrmDocumentRequest",
+    "receiveCrmDocumentRequest",
+    "approveCrmDocumentRequest",
+    "rejectCrmDocumentRequest",
+    "expireCrmDocumentRequest",
+  ]) {
+    if (!list.includes(name)) {
+      fail(`document-requests list does not call ${name}`);
+    }
+  }
+
   const normalized = normalizeDocumentRequest(
     {
       id: ID,
@@ -207,6 +235,23 @@ export function smokeDocumentRequestsWiring() {
     normalized.requestedFrom !== "Greystone"
   ) {
     fail("normalizeDocumentRequest did not map Swagger-shaped fields");
+  }
+  if (apiDocumentRequestType("Property purchase") !== "OTHER") {
+    fail("unsupported request types must map to OTHER for CRM create");
+  }
+  const createBody = toCreateDocumentRequestBody({
+    title: "ID pack",
+    documentType: "ID Proof",
+    requestedFromId: ID,
+    clientName: "should not be sent",
+  });
+  if (
+    createBody.requestedFromId !== ID ||
+    createBody.documentType !== "ID_PROOF" ||
+    "clientName" in createBody ||
+    "items" in createBody
+  ) {
+    fail("create body must match CreateDocumentRequestDto");
   }
 }
 

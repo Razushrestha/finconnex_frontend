@@ -7,10 +7,7 @@ import {
   saveIpAllowlist,
   type IpAllowlistConfig,
 } from "@/lib/settings/ip-allowlist";
-import {
-  patchCrmWorkspaceSettings,
-  tryCrmSettings,
-} from "@/lib/settings/api";
+import { patchCrmWorkspaceSettings } from "@/lib/settings/api";
 import { useCrmSettings } from "@/lib/settings/use-crm-settings";
 import { cn } from "@/lib/utils";
 
@@ -53,12 +50,28 @@ export function IpRestrictionsSettingsClient() {
     setCfg(saved);
     setText(saved.entries.join("\n"));
     if (crm.source === "api") {
-      void tryCrmSettings(() =>
-        patchCrmWorkspaceSettings({
-          ipAllowlist: saved.enabled ? saved.entries : [],
-          expectedRevision: crm.settings?.revision,
-        }),
-      );
+      void patchCrmWorkspaceSettings({
+        ipAllowlist: saved.enabled ? saved.entries : [],
+        expectedRevision: crm.settings?.revision,
+      })
+        .then((patched) => {
+          crm.setSettings(patched);
+          crm.setSecurity(
+            crm.security
+              ? { ...crm.security, ipAllowlist: patched.ipAllowlist ?? [] }
+              : {
+                  passwordMinLength: patched.passwordMinLength ?? 8,
+                  enforce2FA: patched.enforce2FA ?? false,
+                  ipAllowlist: patched.ipAllowlist ?? [],
+                  sessionTimeoutMinutes: patched.sessionTimeoutMinutes ?? 480,
+                },
+          );
+        })
+        .catch((err: unknown) => {
+          flash(
+            err instanceof Error ? err.message : "Could not save IP allowlist",
+          );
+        });
     }
     flash(
       saved.enabled

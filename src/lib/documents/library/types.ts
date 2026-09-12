@@ -16,6 +16,16 @@ export interface DocumentVersion {
   note?: string;
 }
 
+export const CRM_DOCUMENT_TYPES = [
+  "CONTRACT",
+  "PROPOSAL",
+  "ID_PROOF",
+  "FINANCIAL",
+  "LEGAL",
+  "OTHER",
+] as const;
+export type CrmDocumentType = (typeof CRM_DOCUMENT_TYPES)[number];
+
 export interface LibraryDocument {
   id: string;
   fileName: string;
@@ -30,10 +40,20 @@ export interface LibraryDocument {
   versions: DocumentVersion[];
   storageKey?: string;
   storageUrl?: string;
+  documentType?: CrmDocumentType;
+  mimeType?: string;
+  sizeBytes?: number;
+  description?: string;
+  leadId?: string;
+  contactId?: string;
+  companyId?: string;
+  dealId?: string;
 }
 
 export const LIBRARY_FOLDERS = [
   "All Files",
+  "My files",
+  "Recent",
   "Clients",
   "Deals",
   "Templates",
@@ -84,7 +104,12 @@ export function listLibraryDocuments(): LibraryDocument[] {
 }
 
 export function replaceLibraryDocuments(list: LibraryDocument[]) {
-  writeStore(list.map((doc) => ({ ...doc })));
+  const extras = readExtraLibraryDocs();
+  const ids = new Set(list.map((doc) => doc.id));
+  writeStore([
+    ...extras.filter((doc) => !ids.has(doc.id)),
+    ...list.map((doc) => ({ ...doc })),
+  ]);
 }
 
 export function upsertLibraryDocument(doc: LibraryDocument) {

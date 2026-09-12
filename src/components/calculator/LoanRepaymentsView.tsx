@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { persistCalculatorResult } from "@/lib/utils/calculatorHistory";
 
 export default function LoanRepaymentsView() {
   const [currency, setCurrency] = useState("AUD ($)");
@@ -118,46 +119,63 @@ export default function LoanRepaymentsView() {
     performCalculation();
   };
 
-  // Save to LocalStorage for CalculatorHistoryPage
-  const handleSaveCalculation = () => {
+  // POST /v1/calculations (falls back to local history)
+  const handleSaveCalculation = async () => {
     const currentResults = results || performCalculation();
     if (!currentResults) return;
 
     const currencySymbol = currency.split(" ")[0];
-    const newRecord = {
-      id: Date.now(),
-      type: calcType,
-      date: new Date().toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+    const code = currency.startsWith("USD") ? "USD" : "AUD";
+    const summary = `${frequency} Payment: ${currencySymbol}${currentResults.periodicPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const badge = title.trim() ? title : "Loan Scenario";
+    const saved = await persistCalculatorResult({
+      title: badge,
+      type: "Loan",
+      currency: code,
+      displayType: calcType,
+      summary,
+      badge,
       inputs: {
-        "Loan Amount": `${currencySymbol}${Number(loanAmount).toLocaleString()}`,
-        "Interest Rate": `${interestRate}%`,
-        Term: `${termYears} years`,
-        Frequency: frequency,
-        ...(Number(extraPayment) > 0
-          ? {
-              "Extra Payment": `${currencySymbol}${Number(extraPayment).toLocaleString()}`,
-            }
-          : {}),
+        _tool: calcType,
+        principal: loanAmount,
+        annualRate: interestRate,
+        termYears,
+        frequency,
+        extraPayment,
       },
-      summary: `${frequency} Payment: ${currencySymbol}${currentResults.periodicPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      badge: title.trim() ? title : "Loan Scenario",
-    };
-
-    try {
-      const existing = localStorage.getItem("calc_history");
-      const historyArray = existing ? JSON.parse(existing) : [];
-      const updatedHistory = [newRecord, ...historyArray];
-      localStorage.setItem("calc_history", JSON.stringify(updatedHistory));
-      alert("Calculation successfully saved to history audit trail!");
-    } catch (err) {
-      console.error("Failed to save calculation history:", err);
-    }
+      formula:
+        "Monthly = P × r(1+r)^n ÷ ((1+r)^n − 1); r = annual÷periods; n = years×periods",
+      result: {
+        primaryLabel: `${frequency} payment`,
+        primaryValue: currentResults.periodicPayment,
+        primaryFormat: "money",
+        formula:
+          "Monthly = P × r(1+r)^n ÷ ((1+r)^n − 1); r = annual÷periods; n = years×periods",
+        lines: [
+          {
+            label: "Periodic payment",
+            value: currentResults.periodicPayment,
+            format: "money",
+          },
+          {
+            label: "Total repayments",
+            value: currentResults.totalRepayments,
+            format: "money",
+          },
+          {
+            label: "Total interest",
+            value: currentResults.totalInterest,
+            format: "money",
+          },
+        ],
+      },
+      sharedWith: shareWith.trim() || undefined,
+    });
+    alert(
+      saved.source === "api"
+        ? "Saved to CRM calculations"
+        : "Saved locally — sign in to sync with CRM",
+    );
   };
 
   // Reset Form & Results

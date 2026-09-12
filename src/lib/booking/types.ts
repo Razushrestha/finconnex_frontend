@@ -122,6 +122,10 @@ export interface BookingPage {
   consultants?: string[];
   /** Priority per assigned consultant name. */
   consultantPriorities?: Record<string, ConsultantPriority>;
+  /** Synced Calendly event type (workspace UUID). */
+  calendlyEventTypeId?: string;
+  /** Preferred Calendly host (workspace UUID). */
+  calendlyHostId?: string;
 }
 
 export interface Booking {
@@ -147,18 +151,13 @@ export interface Booking {
   reminderQueuedAt?: string;
   cancelledAt?: string;
   createdAt?: string;
+  calendlyMeetingId?: string;
+  calendlyInviteeId?: string;
   /** When this booking replaced an earlier slot (same manage token). */
   rescheduledFrom?: string;
 }
 
 const STORE_KEY = "booking:pages:v3";
-
-  WEEKDAYS.map((day) => ({
-    day,
-    enabled: day !== "Saturday" && day !== "Sunday",
-    start: "09:00",
-    end: "17:00",
-  }));
 
 export const CONSULTATION_MODE_META: Record<
   ConsultationMode,
@@ -300,32 +299,11 @@ function writeStore(list: BookingPage[]) {
 }
 
 export function listBookingPages(): BookingPage[] {
-  const stored = readStore();
-  if (stored) return mergeMissingDemoPages(stored);
-  const seeded = bookingPages.map((p) => ({ ...p }));
-  writeStore(seeded);
-  return seeded;
-}
-
-function mergeMissingDemoPages(stored: BookingPage[]): BookingPage[] {
-  const missing = bookingPages.filter(
-    (demo) => !stored.some((p) => p.id === demo.id),
-  );
-  if (missing.length === 0) return stored;
-  const next = [...stored, ...missing];
-  writeStore(next);
-  return next;
+  return readStore() ?? [];
 }
 
 export function listConsultationPages(): BookingPage[] {
-  const order = ["bp5", "bp6", "bp4"];
-  return listBookingPages()
-    .filter((p) => p.eventType === "Consultation")
-    .sort((a, b) => {
-      const av = order.indexOf(a.id);
-      const bv = order.indexOf(b.id);
-      return (av === -1 ? 100 : av) - (bv === -1 ? 100 : bv);
-    });
+  return listBookingPages().filter((p) => p.eventType === "Consultation");
 }
 
 export function listActiveConsultations(): BookingPage[] {

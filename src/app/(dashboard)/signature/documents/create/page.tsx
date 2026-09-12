@@ -19,6 +19,18 @@ import {
 import type { PlacedField } from "@/components/documents/signature/create/PdfFieldEditor";
 import AddRecipients from "@/components/documents/signature/templates/AddRecipients";
 import { toast } from "sonner";
+import {
+  isCrmSignatureRequestId,
+  persistRemoteSignatureRequest,
+  sendCrmSignatureRequest,
+  syncCrmSignatureDraft,
+  tryCrmSignatureRequest,
+} from "@/lib/documents/signature/api";
+import {
+  createCrmSignatureRequestFromTemplate,
+  isCrmSignatureTemplateId,
+  tryCrmSignatureTemplate,
+} from "@/lib/documents/signature/templates-api";
 
 export default function CreateDocumentFromTemplatePage() {
   return (
@@ -194,7 +206,38 @@ function CreateDocumentForm() {
       audit: draft.audit,
     });
 
-    const sent = markRequestSent(saved, "Current User");
+    let live = saved;
+    if (templateId && isCrmSignatureTemplateId(templateId)) {
+      const fromTemplate = await tryCrmSignatureTemplate(() =>
+        createCrmSignatureRequestFromTemplate(templateId, {
+          recipients: recipients.map((signer) => ({
+            name: signer.name,
+            email: signer.email,
+            role: signer.role.toUpperCase(),
+            order: signer.order,
+          })),
+        }),
+      );
+      if (fromTemplate) {
+        live = persistRemoteSignatureRequest({
+          ...saved,
+          ...fromTemplate,
+          fields: saved.fields,
+          signers: saved.signers,
+          recordType: "document",
+        }) ?? saved;
+      }
+    } else {
+      live = await syncCrmSignatureDraft(saved);
+    }
+    if (isCrmSignatureRequestId(live.id)) {
+      const remote = await tryCrmSignatureRequest(() =>
+        sendCrmSignatureRequest(live.id),
+      );
+      if (remote) persistRemoteSignatureRequest(remote);
+    }
+
+    const sent = markRequestSent(live, "Current User");
     return sent.signers;
   };
 

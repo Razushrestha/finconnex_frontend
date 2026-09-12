@@ -230,6 +230,9 @@ export function CreateLeadForm({
     const stored = findContactById(primary.id)?.contact;
     const secondary = form.contacts[1];
     const custom: Record<string, string> = {
+      leadTitle: form.leadName.trim(),
+      leadOwnerName: ownerLabel,
+      ...(isUuid(form.owner) ? { leadOwnerId: form.owner } : {}),
       contactId: primary.id,
       contactName: primary.name,
       [LEAD_FIELD_KEYS.firstName]: primary.firstName,
@@ -306,13 +309,14 @@ export function CreateLeadForm({
     const pipelineStage = form.pipelineStage || "New Lead";
     const leadName = form.leadName.trim();
     const fromLead = splitPersonName(leadName);
-    const firstName = primary.firstName || fromLead.firstName;
-    const lastName = primary.lastName || fromLead.lastName;
+    const firstName = fromLead.firstName;
+    const lastName = fromLead.lastName;
 
     try {
       const live = await syncCreatedLead({
         firstName,
         lastName,
+        name: leadName,
         email: primary.email.trim(),
         phone: primary.phone,
         company: stored?.company,
@@ -357,6 +361,7 @@ export function CreateLeadForm({
     const payload = {
       firstName,
       lastName,
+      name: leadName,
       email: primary.email.trim(),
       phone: primary.phone,
       company: stored?.company,

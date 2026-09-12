@@ -1,6 +1,6 @@
 "use client";
 
-import type { Priority, Task, TaskStatus } from "@/lib/tasks/types";
+import type { Priority, Task, TaskActionItem, TaskStatus } from "@/lib/tasks/types";
 import { TaskEditProvider } from "./TaskEditContext";
 import { TaskHeader } from "./TaskHeader";
 import { TaskMetadataCard } from "./TaskMetadataCard";
@@ -19,6 +19,8 @@ interface TaskDetailsViewProps {
   onUpdateStatus: (status: TaskStatus) => void;
   onUpdateDescription?: (description: string) => void;
   onAddNote?: (body: string) => void;
+  onChangeActionItems?: (items: TaskActionItem[]) => void;
+  onAddFiles?: (files: File[]) => Promise<void> | void;
   onSaveDetails?: (next: {
     title: string;
     dueDate: string;
@@ -34,6 +36,8 @@ export function TaskDetailsView({
   onUpdateStatus,
   onUpdateDescription,
   onAddNote,
+  onChangeActionItems,
+  onAddFiles,
   onSaveDetails,
 }: TaskDetailsViewProps) {
   return (
@@ -60,11 +64,16 @@ export function TaskDetailsView({
               editable
               onSave={onUpdateDescription}
             />
-            <TaskChecklistCard taskId={task.taskId} items={task.actionItems} />
+            <TaskChecklistCard
+              taskId={task.taskId}
+              items={task.actionItems}
+              onChange={onChangeActionItems}
+            />
             <TaskActivityTabs
               notes={task.activityNotes}
-              attachments={[]}
+              attachments={task.attachments}
               onAddNote={onAddNote}
+              onAddFiles={onAddFiles}
             />
           </div>
 

@@ -18,6 +18,7 @@ import {
 } from "@/lib/rules";
 import type { DealFilters } from "./FilterDealsPanel";
 import { dealMatchesFilters } from "@/lib/filters/records";
+import { sortDealCards } from "@/lib/deals/sort";
 import { resolveDealContact } from "@/lib/sales/resolve-contact";
 import { DealRecordCard } from "./DealRecordCard";
 import type { DealQuickActionKind } from "./DealRecordCard";
@@ -71,6 +72,8 @@ interface DealsKanbanBoardProps {
   selectedIds?: string[];
   onToggleSelect?: (id: string) => void;
   onQuickAction?: (kind: DealQuickActionKind, deal: DealRecord) => void;
+  sortValue?: string;
+  sortDirection?: "asc" | "desc";
 }
 
 export function DealsKanbanBoard({
@@ -81,6 +84,8 @@ export function DealsKanbanBoard({
   selectedIds = [],
   onToggleSelect,
   onQuickAction,
+  sortValue,
+  sortDirection = "asc",
 }: DealsKanbanBoardProps) {
   const router = useRouter();
   const boardRef = useRef<HTMLDivElement>(null);
@@ -206,11 +211,15 @@ export function DealsKanbanBoard({
       .filter((s) => !hasStageFilter || filters!.stages.includes(s.title))
       .map((s) => ({
         ...s,
-        deals: s.deals.filter((deal) =>
-          dealMatchesFilters({ ...deal, stageTitle: s.title }, filters),
+        deals: sortDealCards(
+          s.deals.filter((deal) =>
+            dealMatchesFilters({ ...deal, stageTitle: s.title }, filters),
+          ),
+          sortValue,
+          sortDirection,
         ),
       }));
-  }, [stages, filters, visibleColumnIds]);
+  }, [stages, filters, visibleColumnIds, sortValue, sortDirection]);
 
   const wonStage = useMemo(
     () => stages.find((s) => /won/i.test(s.title)),

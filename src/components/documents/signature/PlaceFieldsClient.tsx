@@ -28,7 +28,9 @@ import {
 import {
   isCrmSignatureRequestId,
   persistRemoteSignatureRequest,
+  placeCrmSignatureFields,
   sendCrmSignatureRequest,
+  syncCrmSignatureDraft,
   toCreateSignatureRequestBody,
   tryCrmSignatureRequest,
   updateCrmSignatureRequest,
@@ -222,6 +224,9 @@ export function PlaceFieldsClient({ id }: { id: string }) {
     if (isCrmSignatureRequestId(withFields.id)) {
       void (async () => {
         await tryCrmSignatureRequest(() =>
+          placeCrmSignatureFields(withFields.id, withFields),
+        );
+        await tryCrmSignatureRequest(() =>
           updateCrmSignatureRequest(
             withFields.id,
             toCreateSignatureRequestBody(withFields),
@@ -231,6 +236,16 @@ export function PlaceFieldsClient({ id }: { id: string }) {
           sendCrmSignatureRequest(withFields.id),
         );
         if (remote) persistRemoteSignatureRequest(remote);
+      })();
+    } else {
+      void (async () => {
+        const synced = await syncCrmSignatureDraft(withFields);
+        if (isCrmSignatureRequestId(synced.id)) {
+          const remote = await tryCrmSignatureRequest(() =>
+            sendCrmSignatureRequest(synced.id),
+          );
+          if (remote) persistRemoteSignatureRequest(remote);
+        }
       })();
     }
     flash("Sent to signers");

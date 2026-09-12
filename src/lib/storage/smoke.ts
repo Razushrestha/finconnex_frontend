@@ -51,7 +51,22 @@ export function smokeStorageWiring() {
     fail("endpoint catalog missing /storage/upload");
   }
 
-  const library = readSrc("src/app/(dashboard)/documents/library/page.tsx");
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('"storage"')) {
+    fail("BFF proxy does not allow storage uploads");
+  }
+  if (!bff.includes("saveLocalUpload")) {
+    fail("BFF proxy does not fall back to local upload when CRM storage is down");
+  }
+  if (!api.includes("/api/auth/crm/storage/upload")) {
+    fail("storage client missing same-origin BFF upload path");
+  }
+
+  const library = [
+    readSrc("src/app/(dashboard)/documents/library/page.tsx"),
+    readSrc("src/app/(dashboard)/documents/library/upload/page.tsx"),
+    readSrc("src/components/documents/library/UploadLibraryFileForm.tsx"),
+  ].join("\n");
   if (!library.includes("uploadCrmStorageFile")) {
     fail("document library upload does not call uploadCrmStorageFile");
   }

@@ -190,13 +190,35 @@ export async function createContact(input: {
   owner: string;
   ownerId?: string;
 }): Promise<ContactCardData> {
-  const { createCrmContact, isCrmContactId } = await import("@/lib/contacts/api");
-  const remote = await createCrmContact(input);
-  if (!remote || !isCrmContactId(remote.contact.id)) {
-    throw new Error("CRM did not save the contact");
+  const existing = findContactByEmail(input.email);
+  if (existing) return existing;
+
+  const { createCrmContact, isCrmContactId, listCrmContacts } = await import(
+    "@/lib/contacts/api"
+  );
+  try {
+    const remote = await createCrmContact(input);
+    if (!remote || !isCrmContactId(remote.contact.id)) {
+      throw new Error("CRM did not save the contact");
+    }
+    mergeCrmContactsIntoBoard([remote]);
+    return remote.contact;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (!/409|already exists|conflict/i.test(message)) throw err;
+    const rows = await listCrmContacts({
+      search: input.email.trim(),
+      limit: 50,
+    });
+    const match = rows.find(
+      (row) =>
+        row.contact.email.trim().toLowerCase() ===
+        input.email.trim().toLowerCase(),
+    );
+    if (!match?.contact.id) throw err;
+    mergeCrmContactsIntoBoard([match]);
+    return match.contact;
   }
-  mergeCrmContactsIntoBoard([remote]);
-  return remote.contact;
 }
 
 export async function createQuickContact(fullName: string): Promise<ContactCardData> {

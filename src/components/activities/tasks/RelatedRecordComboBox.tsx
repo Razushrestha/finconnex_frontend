@@ -164,10 +164,28 @@ export default function RelatedRecordCombobox({
             </button>
           ) : null}
           <ChevronDown
+            role="button"
+            tabIndex={disabled ? -1 : 0}
+            aria-label="Open related records"
             className={cn(
               "h-4 w-4",
-              disabled ? "text-slate-300" : "text-slate-400",
+              disabled
+                ? "text-slate-300"
+                : "cursor-pointer text-slate-400 hover:text-slate-600",
             )}
+            onClick={() => {
+              if (disabled) return;
+              setOpen((current) => !current);
+              inputRef.current?.focus();
+            }}
+            onKeyDown={(event) => {
+              if (disabled) return;
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setOpen((current) => !current);
+                inputRef.current?.focus();
+              }
+            }}
           />
         </div>
       </div>

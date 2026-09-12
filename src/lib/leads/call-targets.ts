@@ -1,5 +1,6 @@
 import type { LeadCardData } from "@/lib/leads/types";
 import { leadApplicants } from "@/lib/leads/detail-snapshot";
+import { requireDialablePhone } from "@/lib/contacts/phone";
 import { openSoftphoneNear } from "@/lib/softphone/events";
 
 export type LeadCallTarget = {
@@ -38,15 +39,10 @@ export function startLeadApplicantCall(
   target: LeadCallTarget,
   anchor?: HTMLElement | null,
 ): { ok: true } | { ok: false; message: string } {
-  const phone = target.phone.trim();
-  if (!phone) {
-    return {
-      ok: false,
-      message: `${target.name} has no phone number.`,
-    };
-  }
+  const check = requireDialablePhone(target.phone, target.name);
+  if (!check.ok) return check;
   openSoftphoneNear(anchor ?? null, {
-    phone,
+    phone: check.e164,
     name: target.name,
     relatedTo: `Lead: ${card.name}`,
     relatedType: "LEAD",

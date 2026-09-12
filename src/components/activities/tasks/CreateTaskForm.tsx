@@ -33,7 +33,13 @@ import {
   createCrmTask,
   persistRemoteTask,
 } from "@/lib/tasks/api";
-import { createTask, deleteTask } from "@/lib/tasks/store";
+import { attachFilesToTask } from "@/lib/tasks/attach-files";
+import {
+  addTaskActivityNote,
+  createTask,
+  deleteTask,
+  findTaskById,
+} from "@/lib/tasks/store";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { listCrmCompanies, tryCrmCompany } from "@/lib/companies/api";
 import { mergeCrmCompaniesIntoBoard } from "@/lib/companies/store";
@@ -44,13 +50,13 @@ import { mergeCrmDealsIntoBoard } from "@/lib/deals/store";
 import { fetchLeadList } from "@/lib/leads/api";
 import { mapCrmLeadToCard } from "@/lib/leads/api/map";
 import { upsertLeadFromCard } from "@/lib/leads/store";
-import { uploadCrmStorageFile } from "@/lib/storage/api";
 import type { RelatedTo } from "@/lib/activities/shared";
 import {
   assignableOwnerLabel,
   defaultAssignableOwnerId,
   listAssignableOwnersLocal,
   loadAssignableOwners,
+  resolveAssignableOwnerName,
   resolveCrmAssigneeUserId,
   type AssignableOwner,
 } from "@/lib/users/assignable";
@@ -76,7 +82,6 @@ import {
 } from "@/components/sales/CreateEntityForm";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import AttachmentUpload from "./AttachmentUpload";
-import { getUploadAdapter } from "@/lib/attachments/upload";
 import { type NotificationMethod } from "@/lib/reminders/types";
 import {
   defaultReminderRepeatRule,
@@ -256,7 +261,7 @@ function validateTaskDates(
 
 function ownerDisplay(options: AssignableOwner[], id: string) {
   const owner = options.find((row) => row.id === id);
-  return owner?.name ?? id;
+  return owner?.name || resolveAssignableOwnerName(id);
 }
 
 function newActionItemId() {
@@ -612,6 +617,13 @@ export function CreateTaskForm({
       window.alert(gate.message);
       return;
     }
+    const pendingAction = newActionItem.trim();
+    const actionItems = [
+      ...form.actionItems.filter((item) => item.text.trim().length > 0),
+      ...(pendingAction
+        ? [{ id: newActionItemId(), text: pendingAction, done: false }]
+        : []),
+    ];
     const relatedMatch =
       form.relatedKind && form.relatedName
         ? relatedOptions.find(
@@ -637,38 +649,9 @@ export function CreateTaskForm({
       );
       return;
     }
-    const collaboratorNames = form.collaborators.map((id) =>
-      ownerDisplay(ownerOptions, id),
-    );
-
-    let attachmentKeys: string[] = [];
-    let attachmentsCount = 0;
-    if (form.attachments.length > 0) {
-      for (const file of form.attachments) {
-        try {
-          const stored = await uploadCrmStorageFile(file);
-          if (stored.key) {
-            attachmentKeys.push(stored.key);
-            attachmentsCount += 1;
-            continue;
-          }
-        } catch {
-          /* fall back to local metadata upload */
-        }
-        const adapter = getUploadAdapter();
-        const result = await adapter.upload({
-          fileName: file.name,
-          data: await file.arrayBuffer(),
-          contentType: file.type || "application/octet-stream",
-          relatedTo: form.title.trim() || "Task",
-        });
-        if (!result.ok) {
-          window.alert(`Failed to upload "${file.name}": ${result.message}`);
-          return;
-        }
-        attachmentsCount += 1;
-      }
-    }
+    const collaboratorNames = form.collaborators
+      .map((id) => ownerDisplay(ownerOptions, id))
+      .filter(Boolean);
 
     const repeatPreset = form.taskRepeat.preset;
     const repeatEvery =
@@ -705,7 +688,7 @@ export function CreateTaskForm({
       description: form.description || undefined,
       notes: form.notes.trim() || undefined,
       collaborators: form.collaborators.length ? form.collaborators : undefined,
-      actionItems: form.actionItems.length ? form.actionItems : undefined,
+      actionItems: actionItems.length ? actionItems : undefined,
       notifyBy:
         reminderOn && form.reminderDate.trim() && form.notifyBy.length
           ? form.notifyBy
@@ -715,8 +698,6 @@ export function CreateTaskForm({
           ? form.taskRepeat
           : undefined,
       repeatEvery,
-      attachmentKeys: attachmentKeys.length ? attachmentKeys : undefined,
-      attachmentsCount: attachmentsCount || undefined,
       createdBy: actor,
     };
     const local = createTask({
@@ -739,12 +720,13 @@ export function CreateTaskForm({
           relatedTo: related ?? remote.relatedTo,
           description: local.description ?? remote.description,
           notes: local.notes ?? remote.notes,
+          activityNotes: local.activityNotes,
           reminders: local.reminders,
           actionItems: local.actionItems,
           notifyBy: local.notifyBy,
           repeatRule: local.repeatRule,
         });
-        task = remote;
+        task = findTaskById(remote.taskId)?.task ?? remote;
       } else if (!remote) {
         deleteTask(local.taskId);
         window.alert("CRM did not return the new task. Please try again.");
@@ -756,6 +738,24 @@ export function CreateTaskForm({
         err instanceof Error ? err.message : "Could not save this task to CRM.",
       );
       return;
+    }
+    if (form.attachments.length) {
+      const attached = await attachFilesToTask(task.taskId, form.attachments);
+      task =
+        findTaskById(task.taskId)?.task ??
+        (attached.length
+          ? { ...task, attachments: attached, attachmentsCount: attached.length }
+          : task);
+    }
+    const createNote = form.notes.trim();
+    if (createNote) {
+      const already = (findTaskById(task.taskId)?.task.activityNotes ?? []).some(
+        (note) => note.body.trim() === createNote,
+      );
+      if (!already) {
+        const withNote = addTaskActivityNote(task.taskId, createNote);
+        if (withNote) task = withNote;
+      }
     }
     logCreate("activities.tasks", ownerName, task.taskId, form.title);
     notifyOwnerAssigned({

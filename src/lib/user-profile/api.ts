@@ -1,9 +1,10 @@
 import {
   ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import {
   replaceCrmUserProfile,
   type UserProfile,
@@ -90,6 +91,9 @@ async function withSession<T>(
 }
 
 export async function getCrmUserProfile(): Promise<UserProfile> {
+  if (!isBoundCrmSession()) {
+    return normalizeUserProfile(await crmBffFetch(userProfilePath()));
+  }
   return withSession(async (session) =>
     normalizeUserProfile(await crmFetch(session, userProfilePath())),
   );

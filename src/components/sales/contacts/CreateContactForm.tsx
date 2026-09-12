@@ -26,6 +26,7 @@ import {
   loadAssignableOwners,
 } from "@/lib/users/assignable";
 import { createContact } from "@/lib/contacts/store";
+import { optionalPhoneError } from "@/lib/contacts/phone";
 import {
   logCreate,
   notifyOwnerAssigned,
@@ -130,6 +131,10 @@ export function CreateContactForm({
         next.email = "Enter a valid email";
       }
     }
+    const phoneError = optionalPhoneError(form.phone);
+    if (phoneError) next.phone = phoneError;
+    const mobileError = optionalPhoneError(form.mobile);
+    if (mobileError) next.mobile = mobileError;
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -236,9 +241,15 @@ export function CreateContactForm({
           />
         </InputShell>
       </Field>
-      <Field label="Phone">
-        <InputShell icon={Phone}>
+      <Field
+        label="Phone"
+        error={submitted ? errors.phone : undefined}
+      >
+        <InputShell icon={Phone} error={!!(submitted && errors.phone)}>
           <input
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             className={elevatedInputClass(true)}
             value={form.phone}
             onChange={(e) => update("phone", e.target.value)}
@@ -246,9 +257,15 @@ export function CreateContactForm({
           />
         </InputShell>
       </Field>
-      <Field label="Mobile">
-        <InputShell icon={Smartphone}>
+      <Field
+        label="Mobile"
+        error={submitted ? errors.mobile : undefined}
+      >
+        <InputShell icon={Smartphone} error={!!(submitted && errors.mobile)}>
           <input
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             className={elevatedInputClass(true)}
             value={form.mobile}
             onChange={(e) => update("mobile", e.target.value)}

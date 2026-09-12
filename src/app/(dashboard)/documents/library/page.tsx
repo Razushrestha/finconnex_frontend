@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
     FolderOpen,
   Plus,
   Search,
   FileText,
   Download,
-  Tag,
-  Link2,
+  Eye,
   Share2,
   History,
   X,
@@ -29,29 +29,24 @@ import {
 import { useCrmDocuments } from "@/lib/documents/library/use-crm-documents";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import {
-  createCrmDocument,
+  bulkDeleteCrmDocuments,
   deleteCrmDocument,
   getCrmDocumentDownload,
+  getCrmDocumentPreview,
   isCrmDocumentId,
-  toCreateDocumentBody,
+  toUpdateDocumentBody,
   tryCrmDocument,
   updateCrmDocument,
 } from "@/lib/documents/library/api";
-import { tryCrmStorage, uploadCrmStorageFile } from "@/lib/storage/api";
 import { downloadLibraryDocument } from "@/lib/documents/signed-artifacts";
 import {
-  ACTIVITY_OWNERS,
-  RELATED_ENTITY_KINDS,
-  RELATED_RECORD_OPTIONS,
   avatarColor,
   initials,
-  type RelatedEntityKind,
 } from "@/lib/activities/shared";
 import {
   Field,
   InputShell,
   elevatedInputClass,
-  elevatedSelectClass,
 } from "@/components/sales/CreateEntityForm";
 import { cn } from "@/lib/utils";
 import { RecordTagChip } from "@/components/shared/tags/RecordTags";
@@ -66,6 +61,22 @@ const ACCESS_STYLE: Record<DocumentAccessLevel, string> = {
 };
 
 export default function DocumentLibraryPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className={`${BOARD_PAGE} text-[13px] text-slate-500`}>
+          Loading library…
+        </div>
+      }
+    >
+      <DocumentLibraryPageInner />
+    </Suspense>
+  );
+}
+
+function DocumentLibraryPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const crm = useCrmDocuments();
   const [docs, setDocs] = useState<LibraryDocument[]>([]);
   const [folders, setFolders] = useState<string[]>([...LIBRARY_FOLDERS]);
@@ -75,29 +86,85 @@ export default function DocumentLibraryPage() {
     "All",
   );
   const [selected, setSelected] = useState<LibraryDocument | null>(null);
-  const [drawer, setDrawer] = useState<"versions" | "upload" | null>(null);
+  const [drawer, setDrawer] = useState<"versions" | null>(null);
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
+  const [checkedIds, setCheckedIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (crm.loading) return;
     setDocs(listLibraryDocuments());
   }, [crm.source, crm.loading]);
 
+  useEffect(() => {
+    const nextFolder = searchParams.get("folder")?.trim();
+    if (!nextFolder) return;
+    setFolder((current) => {
+      if (current === nextFolder) return current;
+      if (folders.includes(nextFolder)) return nextFolder as LibraryFolder;
+      return current;
+    });
+  }, [folders, searchParams]);
+
+  useEffect(() => {
+    if (searchParams.get("uploaded") !== "1") return;
+    flash("File uploaded to library");
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("uploaded");
+    const query = params.toString();
+    router.replace(
+      query ? `/documents/library?${query}` : "/documents/library",
+      { scroll: false },
+    );
+  }, [router, searchParams]);
+
+  function goFolder(next: string) {
+    setFolder(next as LibraryFolder);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("uploaded");
+    if (!next || next === "All Files") params.delete("folder");
+    else params.set("folder", next);
+    const query = params.toString();
+    router.replace(
+      query ? `/documents/library?${query}` : "/documents/library",
+      { scroll: false },
+    );
+  }
+
   const folderCounts = useMemo(() => {
     const map: Record<string, number> = { "All Files": docs.length };
     for (const f of folders) {
       if (f === "All Files") continue;
+      if (f === "My files") {
+        map[f] =
+          crm.source === "api"
+            ? crm.mine.length
+            : docs.filter((d) => d.owner === defaultActorName()).length;
+        continue;
+      }
+      if (f === "Recent") {
+        map[f] = crm.source === "api" ? crm.recent.length : docs.length;
+        continue;
+      }
       map[f] = docs.filter((d) => d.folder === f).length;
     }
     return map;
-  }, [docs, folders]);
+  }, [crm.mine.length, crm.recent.length, crm.source, docs, folders]);
 
   const filtered = useMemo(() => {
     let data = docs;
-    if (folder !== "All Files") data = data.filter((d) => d.folder === folder);
+    if (folder === "My files") {
+      data =
+        crm.source === "api"
+          ? crm.mine
+          : docs.filter((d) => d.owner === defaultActorName());
+    } else if (folder === "Recent") {
+      data = crm.source === "api" ? crm.recent : docs;
+    } else if (folder !== "All Files") {
+      data = data.filter((d) => d.folder === folder);
+    }
     if (accessFilter !== "All")
       data = data.filter((d) => d.accessLevel === accessFilter);
     if (search.trim()) {
@@ -111,7 +178,7 @@ export default function DocumentLibraryPage() {
       );
     }
     return data;
-  }, [docs, folder, accessFilter, search]);
+  }, [accessFilter, crm.mine, crm.recent, crm.source, docs, folder, search]);
 
   function flash(msg: string) {
     setToast(msg);
@@ -132,7 +199,7 @@ export default function DocumentLibraryPage() {
     setDocs((prev) => prev.map((d) => (d.id === doc.id ? next : d)));
     if (isCrmDocumentId(doc.id)) {
       void tryCrmDocument(() =>
-        updateCrmDocument(doc.id, toCreateDocumentBody(next)),
+        updateCrmDocument(doc.id, toUpdateDocumentBody(next)),
       );
     }
     flash("File renamed");
@@ -149,7 +216,7 @@ export default function DocumentLibraryPage() {
     setDocs((prev) => prev.map((d) => (d.id === doc.id ? moved : d)));
     if (isCrmDocumentId(doc.id)) {
       void tryCrmDocument(() =>
-        updateCrmDocument(doc.id, toCreateDocumentBody(moved)),
+        updateCrmDocument(doc.id, toUpdateDocumentBody(moved)),
       );
     }
     flash(`Moved to ${next}`);
@@ -164,6 +231,12 @@ export default function DocumentLibraryPage() {
   }
 
   function downloadDoc(doc: LibraryDocument) {
+    if (doc.storageUrl?.startsWith("/api/auth/local-files/")) {
+      window.open(doc.storageUrl, "_blank", "noopener,noreferrer");
+      flash(`Download ready for ${doc.fileName}`);
+      setMenuId(null);
+      return;
+    }
     if (isCrmDocumentId(doc.id)) {
       void (async () => {
         const remote = await tryCrmDocument(() => getCrmDocumentDownload(doc.id));
@@ -191,6 +264,30 @@ export default function DocumentLibraryPage() {
     setMenuId(null);
   }
 
+  function previewDoc(doc: LibraryDocument) {
+    if (doc.storageUrl?.startsWith("/api/auth/local-files/")) {
+      window.open(doc.storageUrl, "_blank", "noopener,noreferrer");
+      flash(`Preview ready for ${doc.fileName}`);
+      setMenuId(null);
+      return;
+    }
+    if (isCrmDocumentId(doc.id)) {
+      void (async () => {
+        const remote = await tryCrmDocument(() => getCrmDocumentPreview(doc.id));
+        if (remote?.url) {
+          window.open(remote.url, "_blank", "noopener,noreferrer");
+          flash(`Preview ready for ${doc.fileName}`);
+          return;
+        }
+        flash(`No preview URL for ${doc.fileName}`);
+      })();
+      setMenuId(null);
+      return;
+    }
+    flash("Preview needs a live CRM document");
+    setMenuId(null);
+  }
+
   function deleteDoc(doc: LibraryDocument) {
     if (!window.confirm(`Delete ${doc.fileName}?`)) return;
     const gate = softDeleteRecord({
@@ -214,18 +311,28 @@ export default function DocumentLibraryPage() {
     setMenuId(null);
   }
 
-  function handleUploaded(doc: LibraryDocument) {
-    upsertLibraryDocument(doc);
-    setDocs((prev) => [doc, ...prev.filter((d) => d.id !== doc.id)]);
-    setDrawer(null);
-    flash("File uploaded to library");
-    void tryCrmDocument(async () => {
-      const remote = await createCrmDocument(toCreateDocumentBody(doc));
-      if (!remote) return;
-      if (remote.id !== doc.id) removeLibraryDocument(doc.id);
-      upsertLibraryDocument({ ...doc, ...remote });
-      setDocs(listLibraryDocuments());
-    });
+  function toggleChecked(id: string) {
+    setCheckedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  }
+
+  function deleteChecked() {
+    const rows = filtered.filter((doc) => checkedIds.includes(doc.id));
+    if (rows.length === 0) return;
+    if (!window.confirm(`Delete ${rows.length} document${rows.length === 1 ? "" : "s"}?`)) {
+      return;
+    }
+    const crmIds = rows.map((doc) => doc.id).filter(isCrmDocumentId);
+    for (const doc of rows) {
+      removeLibraryDocument(doc.id);
+    }
+    setDocs((prev) => prev.filter((d) => !checkedIds.includes(d.id)));
+    setCheckedIds([]);
+    if (crmIds.length) {
+      void tryCrmDocument(() => bulkDeleteCrmDocuments(crmIds));
+    }
+    flash(`Moved ${rows.length} file${rows.length === 1 ? "" : "s"} to Recycle Bin`);
   }
 
   function handleCreateFolder(e: React.FormEvent) {
@@ -268,14 +375,28 @@ export default function DocumentLibraryPage() {
               <span className="text-[10px] text-slate-500">{crm.error}</span>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={() => setDrawer("upload")}
+          <div className="flex items-center gap-2">
+          <Link
+            href={
+              folder && folder !== "All Files"
+                ? `/documents/library/upload?folder=${encodeURIComponent(folder)}`
+                : "/documents/library/upload"
+            }
             className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-md shadow-violet-600/20 hover:bg-violet-700"
           >
             <Plus className="h-3.5 w-3.5" />
             Upload
-          </button>
+          </Link>
+          {checkedIds.length > 0 ? (
+            <button
+              type="button"
+              onClick={deleteChecked}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 text-[11px] font-semibold text-rose-700 hover:bg-rose-100"
+            >
+              Delete {checkedIds.length}
+            </button>
+          ) : null}
+          </div>
         </div>
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -299,7 +420,7 @@ export default function DocumentLibraryPage() {
                 <button
                   key={f}
                   type="button"
-                  onClick={() => setFolder(f as LibraryFolder)}
+                  onClick={() => goFolder(f)}
                   className={cn(
                     "flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-[12px] font-medium transition-all",
                     folder === f
@@ -324,7 +445,7 @@ export default function DocumentLibraryPage() {
               <div className="flex items-center gap-2 sm:hidden">
                 <select
                   value={folder}
-                  onChange={(e) => setFolder(e.target.value as LibraryFolder)}
+                  onChange={(e) => goFolder(e.target.value)}
                   className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[11px]"
                 >
                   {folders.map((f) => (
@@ -377,6 +498,23 @@ export default function DocumentLibraryPage() {
               <table className="w-full min-w-[900px] text-left text-[12px]">
                 <thead className="sticky top-0 z-10 border-b border-slate-100 bg-slate-50/95 text-[11px] font-medium tracking-wide text-slate-400 uppercase">
                   <tr>
+                    <th className="w-10 px-4 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={
+                          filtered.length > 0 &&
+                          filtered.every((doc) => checkedIds.includes(doc.id))
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setCheckedIds(filtered.map((doc) => doc.id));
+                          } else {
+                            setCheckedIds([]);
+                          }
+                        }}
+                        aria-label="Select all visible documents"
+                      />
+                    </th>
                     <th className="px-4 py-2.5">File name</th>
                     <th className="px-4 py-2.5">Folder</th>
                     <th className="px-4 py-2.5">Owner</th>
@@ -394,6 +532,14 @@ export default function DocumentLibraryPage() {
                       key={`${doc.id}-${index}`}
                       className="transition-colors hover:bg-violet-50/40"
                     >
+                      <td className="px-4 py-3">
+                        <input
+                          type="checkbox"
+                          checked={checkedIds.includes(doc.id)}
+                          onChange={() => toggleChecked(doc.id)}
+                          aria-label={`Select ${doc.fileName}`}
+                        />
+                      </td>
                       <td className="max-w-[220px] px-4 py-3">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 shrink-0 text-violet-500" />
@@ -469,6 +615,11 @@ export default function DocumentLibraryPage() {
                               icon={Download}
                               label="Download"
                               onClick={() => downloadDoc(doc)}
+                            />
+                            <MenuItem
+                              icon={Eye}
+                              label="Preview"
+                              onClick={() => previewDoc(doc)}
                             />
                             <MenuItem
                               icon={History}
@@ -597,15 +748,6 @@ export default function DocumentLibraryPage() {
         </Drawer>
       ) : null}
 
-      {drawer === "upload" ? (
-        <Drawer onClose={() => setDrawer(null)} title="Upload file">
-          <UploadForm
-            onCancel={() => setDrawer(null)}
-            onSave={handleUploaded}
-          />
-        </Drawer>
-      ) : null}
-
       {toast ? (
         <div className="fixed right-4 bottom-4 z-50 rounded-xl bg-slate-900 px-4 py-2.5 text-[12px] font-medium text-white shadow-lg">
           {toast}
@@ -653,15 +795,15 @@ function Drawer({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-slate-900/20 backdrop-blur-[1px]">
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/20 backdrop-blur-[1px]">
       <button
         type="button"
         className="flex-1 cursor-default"
         aria-label="Close"
         onClick={onClose}
       />
-      <div className="flex h-full w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+      <div className="flex h-dvh max-h-dvh w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
           <h3 className="text-[14px] font-semibold text-slate-900">{title}</h3>
           <button
             type="button"
@@ -671,211 +813,9 @@ function Drawer({
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-function UploadForm({
-  onCancel,
-  onSave,
-}: {
-  onCancel: () => void;
-  onSave: (doc: LibraryDocument) => void;
-}) {
-  const [file, setFile] = useState<File | null>(null);
-  const [fileName, setFileName] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [folder, setFolder] = useState("Clients");
-  const [owner, setOwner] = useState<string>(defaultActorName());
-  const [relatedKind, setRelatedKind] = useState<RelatedEntityKind | "">("");
-  const [relatedName, setRelatedName] = useState("");
-  const [tags, setTags] = useState("");
-  const [accessLevel, setAccessLevel] = useState<DocumentAccessLevel>("Team");
-  const [error, setError] = useState("");
-
-  const relatedOptions = relatedKind
-    ? RELATED_RECORD_OPTIONS.filter((r) => r.kind === relatedKind)
-    : RELATED_RECORD_OPTIONS;
-
-  async function submit() {
-    const name = fileName.trim() || file?.name || "";
-    if (!name) {
-      setError("Choose a file or enter a file name");
-      return;
-    }
-    setUploading(true);
-    const stored = file
-      ? await tryCrmStorage(() => uploadCrmStorageFile(file))
-      : null;
-    setUploading(false);
-    const today = new Date().toLocaleDateString("en-AU");
-    const relatedTo =
-      relatedKind && relatedName ? `${relatedKind}: ${relatedName}` : undefined;
-    const sizeLabel = stored?.size
-      ? `${Math.max(1, Math.round(stored.size / 1024))} KB`
-      : "120 KB";
-    onSave({
-      id: `lib-${Date.now()}`,
-      fileName: name,
-      folder,
-      owner,
-      relatedTo,
-      version: 1,
-      tags: tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
-      uploadedAt: today,
-      accessLevel,
-      sizeLabel,
-      storageKey: stored?.key,
-      storageUrl: stored?.url,
-      versions: [
-        {
-          version: 1,
-          uploadedAt: today,
-          uploadedBy: owner,
-          sizeLabel,
-          note: stored ? "Uploaded to CRM storage" : "Uploaded",
-        },
-      ],
-    });
-  }
-
-  return (
-    <div className="space-y-3">
-      <Field label="File" required error={error}>
-        <input
-          type="file"
-          onChange={(e) => {
-            const next = e.target.files?.[0] ?? null;
-            setFile(next);
-            if (next) setFileName(next.name);
-          }}
-          className="block w-full text-[12px] text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-violet-50 file:px-3 file:py-1.5 file:text-[11px] file:font-semibold file:text-violet-700"
-        />
-      </Field>
-      <Field label="File name" required>
-        <InputShell icon={FileText} error={!!error}>
-          <input
-            value={fileName}
-            onChange={(e) => setFileName(e.target.value)}
-            placeholder="Contract.pdf"
-            className={elevatedInputClass(true)}
-          />
-        </InputShell>
-      </Field>
-      <Field label="Folder">
-        <InputShell icon={FolderOpen}>
-          <select
-            value={folder}
-            onChange={(e) => setFolder(e.target.value)}
-            className={elevatedSelectClass(true)}
-          >
-            {LIBRARY_FOLDERS.filter((f) => f !== "All Files").map((f) => (
-              <option key={f} value={f}>
-                {f}
-              </option>
-            ))}
-          </select>
-        </InputShell>
-      </Field>
-      <Field label="Owner">
-        <InputShell>
-          <select
-            value={owner}
-            onChange={(e) => setOwner(e.target.value)}
-            className={elevatedSelectClass()}
-          >
-            {ACTIVITY_OWNERS.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
-        </InputShell>
-      </Field>
-      <Field label="Related kind">
-        <InputShell icon={Link2}>
-          <select
-            value={relatedKind}
-            onChange={(e) => {
-              setRelatedKind(e.target.value as RelatedEntityKind | "");
-              setRelatedName("");
-            }}
-            className={elevatedSelectClass(true)}
-          >
-            <option value="">None</option>
-            {RELATED_ENTITY_KINDS.map((k) => (
-              <option key={k} value={k}>
-                {k}
-              </option>
-            ))}
-          </select>
-        </InputShell>
-      </Field>
-      <Field label="Related record">
-        <InputShell>
-          <select
-            value={relatedName}
-            onChange={(e) => setRelatedName(e.target.value)}
-            disabled={!relatedKind}
-            className={elevatedSelectClass()}
-          >
-            <option value="">Select…</option>
-            {relatedOptions.map((r) => (
-              <option key={r.name} value={r.name}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </InputShell>
-      </Field>
-      <Field label="Tags">
-        <InputShell icon={Tag}>
-          <input
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            placeholder="legal, kyc (comma separated)"
-            className={elevatedInputClass(true)}
-          />
-        </InputShell>
-      </Field>
-      <Field label="Access level">
-        <InputShell>
-          <select
-            value={accessLevel}
-            onChange={(e) =>
-              setAccessLevel(e.target.value as DocumentAccessLevel)
-            }
-            className={elevatedSelectClass()}
-          >
-            {ACCESS_LEVELS.map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </select>
-        </InputShell>
-      </Field>
-      <div className="flex gap-2 pt-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="h-9 flex-1 rounded-lg border border-slate-200 text-[12px] font-medium text-slate-600"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={uploading}
-          onClick={() => void submit()}
-          className="h-9 flex-1 rounded-lg bg-violet-600 text-[12px] font-semibold text-white disabled:opacity-50"
-        >
-          {uploading ? "Uploading…" : "Upload"}
-        </button>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-12">
+          {children}
+        </div>
       </div>
     </div>
   );

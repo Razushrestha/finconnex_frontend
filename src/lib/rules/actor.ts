@@ -31,7 +31,7 @@ export function setRulesActor(actor: RulesActor) {
 /** Current actor: session-backed when DashboardShell hydrated, else demo seed. */
 export function getRulesActor(): RulesActor {
   const stored = readJsonStore<RulesActor | null>(ACTOR_KEY, null);
-  if (stored?.name && stored?.role) return stored;
+  if (stored?.role && (stored.name || stored.email)) return stored;
   return { ...FALLBACK_ACTOR };
 }
 
