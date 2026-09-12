@@ -149,19 +149,12 @@ export async function uploadCrmStorageFile(
   const form = toFormData(file);
 
   try {
-    let parsed: { res: Response; json: unknown };
-    if (isBoundCrmSession()) {
+    // Always go through the same-origin BFF so Vercel can fall back to /tmp
+    // when CRM disk storage returns ENOENT (/var/task/data is read-only).
+    let parsed = await sendBffUpload(form);
+    if ([401, 403].includes(parsed.res.status) && isBoundCrmSession()) {
       const auth = await resolveAuth();
-      if (!auth) throw new Error("Sign in to upload a file");
-      parsed = await sendDirectUpload(auth, form);
-      if ([401, 403].includes(parsed.res.status)) {
-        const retried = await resolveAuth();
-        if (retried?.accessToken && retried.accessToken !== auth.accessToken) {
-          parsed = await sendDirectUpload(retried, form);
-        }
-      }
-    } else {
-      parsed = await sendBffUpload(form);
+      if (auth) parsed = await sendDirectUpload(auth, form);
     }
 
     const { res, json } = parsed;

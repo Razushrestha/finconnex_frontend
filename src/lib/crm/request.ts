@@ -92,7 +92,12 @@ export function crmErrorMessage(json: unknown, fallback: string): string {
       : null;
     if (base && detail && base !== detail) return `${base}: ${detail}`;
     if (detail) return detail;
-    if (base) return base;
+    if (base) {
+      if (/enoent|mkdir ['"]?\/var\/task|erofs|read-only file system/i.test(base)) {
+        return "File storage cannot write on this host. Retry the upload — FinConnex will keep the file without using /var/task/data.";
+      }
+      return base;
+    }
     const status = rec.statusCode;
     if (status === 503) {
       return "This integration is not configured on the CRM server yet.";

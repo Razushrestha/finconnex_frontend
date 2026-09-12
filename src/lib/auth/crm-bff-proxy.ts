@@ -159,7 +159,7 @@ export async function proxyCrmV1(
 
   if (
     storageFallbackReq &&
-    isStorageUnconfigured(status, text)
+    (isStorageUnconfigured(status, text) || (status >= 500 && status < 600))
   ) {
     try {
       const stored = await saveLocalUpload(await storageFallbackReq.formData());

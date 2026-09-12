@@ -151,7 +151,14 @@ export function UploadLibraryFileForm({
         ],
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(
+        err instanceof Error &&
+          /enoent|\/var\/task|erofs/i.test(err.message)
+          ? "Could not save this file on the server disk. Retry after the latest deploy, or ask an admin to set CRM file storage (DigitalOcean Spaces)."
+          : err instanceof Error
+            ? err.message
+            : "Upload failed",
+      );
     } finally {
       setUploading(false);
     }
