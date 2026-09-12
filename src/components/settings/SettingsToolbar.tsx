@@ -13,7 +13,6 @@ import {
   X,
 } from "lucide-react";
 import {
-  SETTINGS_CATEGORIES,
   allSettingsPaths,
 } from "@/lib/settings/settings-config";
 import {
@@ -64,9 +63,8 @@ export function SettingsToolbar() {
   return (
     <div className="relative border-b border-slate-200/80 bg-white">
       <div className="mx-auto flex w-full max-w-[1920px] flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6 2xl:px-8">
-        <p className="text-[10px] font-semibold tracking-wide text-violet-600 uppercase">
-          §27 Settings · {SETTINGS_CATEGORIES.length} sections ·{" "}
-          {paths.length} pages
+        <p className="text-[10px] font-semibold tracking-wide text-[#5A32A3] uppercase">
+          Settings
         </p>
         <div className="flex flex-wrap items-center gap-1">
           <ToolBtn

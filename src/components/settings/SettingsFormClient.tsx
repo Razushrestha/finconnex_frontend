@@ -14,10 +14,13 @@ import {
   type SettingsValues,
 } from "@/lib/settings/settings-store";
 import {
+  overlayCatalogValues,
   overlaySecurityValues,
   overlaySettingsValues,
   patchCrmWorkspaceSettings,
   valuesToSettingsPatch,
+  type CrmSecuritySettings,
+  type CrmWorkspaceSettings,
 } from "@/lib/settings/api";
 import { useCrmSettings } from "@/lib/settings/use-crm-settings";
 import {
@@ -59,14 +62,7 @@ export function SettingsFormClient({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const saved = loadSettingsValues(schemaKey);
-    let next = { ...defaultsFromSchema(schema), ...saved };
-    if (crm.settings) next = overlaySettingsValues(next, crm.settings);
-    if (crm.security) next = overlaySecurityValues(next, crm.security);
-    if (memberPrefs.preferences) {
-      next = overlayMemberPreferences(next, memberPrefs.preferences);
-    }
-    setValues(next);
+    setValues(hydrateSettingsForm(schema, schemaKey, crm, memberPrefs.preferences));
   }, [schemaKey, schema, crm.settings, crm.security, memberPrefs.preferences]);
 
   function setField(id: string, value: string | boolean | number) {
@@ -74,14 +70,7 @@ export function SettingsFormClient({
   }
 
   function onCancel() {
-    const saved = loadSettingsValues(schemaKey);
-    let next = { ...defaultsFromSchema(schema), ...saved };
-    if (crm.settings) next = overlaySettingsValues(next, crm.settings);
-    if (crm.security) next = overlaySecurityValues(next, crm.security);
-    if (memberPrefs.preferences) {
-      next = overlayMemberPreferences(next, memberPrefs.preferences);
-    }
-    setValues(next);
+    setValues(hydrateSettingsForm(schema, schemaKey, crm, memberPrefs.preferences));
     setToast("Reverted to last saved");
     window.setTimeout(() => setToast(null), 1800);
   }
@@ -100,9 +89,12 @@ export function SettingsFormClient({
     }
     if (crm.source === "api") {
       try {
-        const patched = await patchCrmWorkspaceSettings(
-          valuesToSettingsPatch(values, crm.settings?.revision),
-        );
+        const patched = await patchCrmWorkspaceSettings({
+          ...valuesToSettingsPatch(values, crm.settings?.revision),
+          ...(categorySlug === "my-preferences"
+            ? {}
+            : { catalog: { [schemaKey]: values } }),
+        });
         crm.setSettings(patched);
         setToast("Saved to CRM");
       } catch (err) {
@@ -202,6 +194,28 @@ export function SettingsFormClient({
       )}
     </div>
   );
+}
+
+function hydrateSettingsForm(
+  schema: SettingsSchema,
+  schemaKey: string,
+  crm: {
+    settings: CrmWorkspaceSettings | null;
+    security: CrmSecuritySettings | null;
+  },
+  memberPreferences: Parameters<typeof overlayMemberPreferences>[1],
+): SettingsValues {
+  const saved = loadSettingsValues(schemaKey);
+  let next = { ...defaultsFromSchema(schema), ...saved };
+  if (crm.settings) {
+    next = overlayCatalogValues(next, crm.settings, schemaKey);
+    next = overlaySettingsValues(next, crm.settings);
+  }
+  if (crm.security) next = overlaySecurityValues(next, crm.security);
+  if (memberPreferences) {
+    next = overlayMemberPreferences(next, memberPreferences);
+  }
+  return next;
 }
 
 function defaultsFromSchema(schema: SettingsSchema): SettingsValues {

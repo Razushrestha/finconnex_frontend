@@ -1071,6 +1071,9 @@ export const ENDPOINT_CATALOG = [
   { method: "GET", path: "/settings/capabilities", module: "settings", notes: "Enabled modules" },
   { method: "POST", path: "/settings/smtp-test", module: "settings", notes: "Queue SMTP connectivity test" },
   { method: "GET", path: "/settings/smtp-test/:jobId", module: "settings", notes: "SMTP test job status" },
+  { method: "GET", path: "/settings/pages", module: "settings", notes: "Full settings-hub catalog" },
+  { method: "GET", path: "/settings/pages/:category/:subpage", module: "settings", notes: "One settings-hub page" },
+  { method: "PUT", path: "/settings/pages/:category/:subpage", module: "settings", notes: "Replace one settings-hub page" },
 
   // Notification preferences (JWT; workspace-scoped URL preferred when token has workspaceId)
   {

@@ -66,8 +66,8 @@ export function SettingsSectionNav() {
               className={cn(
                 "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-medium whitespace-nowrap transition-colors",
                 active
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-600 hover:bg-slate-100",
+                  ? "bg-[#5A32A3] text-white shadow-sm shadow-[#5A32A3]/20"
+                  : "text-slate-600 hover:bg-violet-50 hover:text-[#5A32A3]",
               )}
             >
               <Icon className="h-3.5 w-3.5" />

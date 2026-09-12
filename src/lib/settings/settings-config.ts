@@ -33,29 +33,61 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
     description:
       "Company identity, regional defaults, branding, and white-label surfaces.",
     items: [
-      { title: "Company Profile", slug: "company-profile" },
-      { title: "Branding", slug: "branding" },
-      { title: "Business Information", slug: "business-information" },
-      { title: "Business Hours", slug: "business-hours" },
-      { title: "Holidays", slug: "holidays" },
-      { title: "Time Zone", slug: "time-zone" },
-      { title: "Language", slug: "language" },
-      { title: "Currency", slug: "currency" },
+      {
+        title: "Company Profile",
+        slug: "company-profile",
+        blurb: "Primary contact & address",
+      },
+      { title: "Branding", slug: "branding", blurb: "Company logo" },
+      {
+        title: "Business Information",
+        slug: "business-information",
+        blurb: "Legal entity, ABN and contacts",
+      },
+      {
+        title: "Business Hours",
+        slug: "business-hours",
+        blurb: "Set operational time slots",
+      },
+      {
+        title: "Holidays",
+        slug: "holidays",
+        blurb: "Set holidays and closures",
+      },
+      { title: "Time Zone", slug: "time-zone", blurb: "Time Zone" },
+      { title: "Language", slug: "language", blurb: "Workspace language" },
+      { title: "Currency", slug: "currency", blurb: "Default currency" },
       {
         title: "Regional Settings",
         slug: "regional-settings",
         blurb: "Date / Time / Number format",
       },
-      { title: "Multi-Currency", slug: "multi-currency" },
-      { title: "Multi-Language", slug: "multi-language" },
-      { title: "Themes", slug: "themes" },
-      { title: "Dark Mode", slug: "dark-mode" },
-      { title: "Accent Colors", slug: "accent-colors" },
-      { title: "Sidebar Layout", slug: "sidebar-layout" },
-      { title: "White Label", slug: "white-label" },
-      { title: "Email Branding", slug: "email-branding" },
-      { title: "Login Page Branding", slug: "login-page-branding" },
-      { title: "Favicon", slug: "favicon" },
+      {
+        title: "Multi-Currency",
+        slug: "multi-currency",
+        blurb: "Enabled currencies",
+      },
+      {
+        title: "Multi-Language",
+        slug: "multi-language",
+        blurb: "Workspace languages",
+      },
+      { title: "Themes", slug: "themes", blurb: "Light and dark" },
+      { title: "Dark Mode", slug: "dark-mode", blurb: "Toggle dark theme" },
+      { title: "Accent Colors", slug: "accent-colors", blurb: "Brand accents" },
+      { title: "Sidebar Layout", slug: "sidebar-layout", blurb: "Navigation layout" },
+      { title: "White Label", slug: "white-label", blurb: "Remove FinConnex branding" },
+      {
+        title: "Email Branding",
+        slug: "email-branding",
+        blurb: "Sender identity in templates",
+      },
+      {
+        title: "Login Page Branding",
+        slug: "login-page-branding",
+        blurb: "Preview",
+      },
+      { title: "Favicon", slug: "favicon", blurb: "Browser icon" },
     ],
   },
   {
@@ -508,7 +540,81 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
   },
 ];
 
-/** Top-right Settings chrome (SRS “Top Right of Settings”). */
+/** Card groups on category hubs. Organization matches the product settings mosaic. */
+
+export type SettingsHubGroupVariant = "appearance" | "experience";
+
+export interface SettingsHubGroup {
+  title: string;
+  variant?: SettingsHubGroupVariant;
+  slugs: string[];
+}
+
+/** Card groups on category hubs. Organization matches the product settings mosaic. */
+export const SETTINGS_HUB_GROUPS: Record<string, SettingsHubGroup[]> = {
+  organization: [
+    {
+      title: "Company Details",
+      slugs: [
+        "company-profile",
+        "business-information",
+        "business-hours",
+        "holidays",
+      ],
+    },
+    {
+      title: "Appearance & Branding",
+      variant: "appearance",
+      slugs: [
+        "themes",
+        "dark-mode",
+        "accent-colors",
+        "sidebar-layout",
+        "branding",
+        "favicon",
+      ],
+    },
+    {
+      title: "Localization",
+      slugs: ["time-zone", "language", "currency", "regional-settings"],
+    },
+    {
+      title: "Customer Experience",
+      variant: "experience",
+      slugs: [
+        "multi-language",
+        "multi-currency",
+        "email-branding",
+        "login-page-branding",
+      ],
+    },
+    {
+      title: "Platform Settings",
+      slugs: ["white-label"],
+    },
+  ],
+};
+
+export function hubGroupsForCategory(category: SettingsCategory): SettingsHubGroup[] {
+  const configured = SETTINGS_HUB_GROUPS[category.slug];
+  if (configured?.length) {
+    const used = new Set(configured.flatMap((group) => group.slugs));
+    const leftover = category.items
+      .map((item) => item.slug)
+      .filter((slug) => !used.has(slug));
+    if (!leftover.length) return configured;
+    return [...configured, { title: "More", slugs: leftover }];
+  }
+  const groups: SettingsHubGroup[] = [];
+  for (let i = 0; i < category.items.length; i += 4) {
+    groups.push({
+      title: i === 0 ? category.title : `${category.title} (${i / 4 + 1})`,
+      slugs: category.items.slice(i, i + 4).map((item) => item.slug),
+    });
+  }
+  return groups;
+}
+
 export const SETTINGS_TOOLBAR = [
   { id: "search", label: "Search Settings" },
   { id: "favorites", label: "Favorites" },

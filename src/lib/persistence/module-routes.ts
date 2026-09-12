@@ -59,7 +59,7 @@ export const LEAD_CARD_MODULE_ROUTES: readonly ModuleRestRoute[] = [
   {
     logicalKey: "settings:values:v1",
     collectionPath: "/v1/settings",
-    notes: "Org settings bag including Lead Card",
+    notes: "Workspace settings plus settings-hub catalog (`catalog` JSON, GET/PUT /v1/settings/pages/:category/:subpage)",
   },
   {
     logicalKey: "settings:custom-fields:v1",

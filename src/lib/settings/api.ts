@@ -37,6 +37,7 @@ export type CrmWorkspaceSettings = {
   smtpFromEmail?: string | null;
   smtpFromName?: string | null;
   revision?: number;
+  catalog?: Record<string, SettingsValues> | null;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -66,6 +67,7 @@ export type CrmSettingsPatch = {
   smtpFromEmail?: string | null;
   smtpFromName?: string | null;
   expectedRevision?: number;
+  catalog?: Record<string, SettingsValues>;
 };
 
 export type CrmSecuritySettings = {
@@ -237,6 +239,35 @@ function pickNum(value: unknown, fallback = 0): number {
   return fallback;
 }
 
+function parseSettingsCatalog(
+  raw: unknown,
+): Record<string, SettingsValues> | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const out: Record<string, SettingsValues> = {};
+  for (const [key, page] of Object.entries(asRecord(raw))) {
+    if (!/^[a-z0-9-]{1,64}\/[a-z0-9-]{1,64}$/.test(key)) continue;
+    if (!page || typeof page !== "object" || Array.isArray(page)) continue;
+    const values: SettingsValues = {};
+    for (const [id, value] of Object.entries(asRecord(page))) {
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        values[id] = value;
+      }
+    }
+    out[key] = values;
+  }
+  return out;
+}
+
+export function overlayCatalogValues(
+  values: SettingsValues,
+  settings: CrmWorkspaceSettings,
+  pageKey: string,
+): SettingsValues {
+  const page = settings.catalog?.[pageKey];
+  if (!page) return values;
+  return { ...values, ...page };
+}
+
 export function normalizeCrmWorkspaceSettings(
   raw: unknown,
 ): CrmWorkspaceSettings {
@@ -280,6 +311,7 @@ export function normalizeCrmWorkspaceSettings(
     smtpFromEmail: pickStr(rec.smtpFromEmail, rec.smtp_from_email) || null,
     smtpFromName: pickStr(rec.smtpFromName, rec.smtp_from_name) || null,
     revision: pickNum(rec.revision, 1),
+    catalog: parseSettingsCatalog(rec.catalog),
     createdAt: pickStr(rec.createdAt, rec.created_at) || undefined,
     updatedAt: pickStr(rec.updatedAt, rec.updated_at) || undefined,
   };
@@ -509,6 +541,80 @@ export async function getCrmSmtpTestStatus(
     await settingsGet(`/smtp-test/${jobId}`),
     jobId,
   );
+}
+
+export async function getCrmSettingsCatalog(): Promise<{
+  catalog: Record<string, SettingsValues>;
+  revision: number;
+}> {
+  const rec = unwrapSettingsRecord(await settingsGet("/pages"));
+  return {
+    catalog: parseSettingsCatalog(rec.catalog) ?? {},
+    revision: pickNum(rec.revision, 1),
+  };
+}
+
+export async function getCrmSettingsPage(
+  category: string,
+  subpage: string,
+): Promise<{
+  pageKey: string;
+  values: SettingsValues;
+  revision: number;
+}> {
+  const rec = unwrapSettingsRecord(
+    await settingsGet(
+      `/pages/${encodeURIComponent(category)}/${encodeURIComponent(subpage)}`,
+    ),
+  );
+  const values: SettingsValues = {};
+  for (const [id, value] of Object.entries(asRecord(rec.values))) {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
+      values[id] = value;
+    }
+  }
+  return {
+    pageKey: pickStr(rec.pageKey) || `${category}/${subpage}`,
+    values,
+    revision: pickNum(rec.revision, 1),
+  };
+}
+
+export async function putCrmSettingsPage(
+  category: string,
+  subpage: string,
+  values: SettingsValues,
+  expectedRevision?: number,
+): Promise<CrmWorkspaceSettings> {
+  const body: Record<string, unknown> = { values };
+  if (expectedRevision != null) body.expectedRevision = expectedRevision;
+  const run = () =>
+    settingsMutate(
+      `/pages/${encodeURIComponent(category)}/${encodeURIComponent(subpage)}`,
+      { method: "PUT", body: JSON.stringify(body) },
+    );
+  try {
+    return normalizeCrmWorkspaceSettings(await run());
+  } catch (err) {
+    if (!isRevisionConflict(err)) throw err;
+    const fresh = await getCrmWorkspaceSettings();
+    return normalizeCrmWorkspaceSettings(
+      await settingsMutate(
+        `/pages/${encodeURIComponent(category)}/${encodeURIComponent(subpage)}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            values,
+            expectedRevision: fresh.revision,
+          }),
+        },
+      ),
+    );
+  }
 }
 
 export async function tryCrmSettings<T>(

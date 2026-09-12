@@ -14,9 +14,13 @@ import {
   normalizeCrmCapabilities,
   normalizeCrmSecuritySettings,
   normalizeCrmWorkspaceSettings,
+  overlayCatalogValues,
   overlaySecurityValues,
   overlaySettingsValues,
   patchCrmWorkspaceSettings,
+  getCrmSettingsCatalog,
+  getCrmSettingsPage,
+  putCrmSettingsPage,
   queueCrmSmtpTest,
   settingsPath,
   smtpIdempotencyKey,
@@ -45,6 +49,9 @@ const LIVE_ROUTES: Array<{ method: string; path: string }> = [
   { method: "PATCH", path: "/v1/settings" },
   { method: "POST", path: "/v1/settings/smtp-test" },
   { method: "GET", path: `/v1/settings/smtp-test/${JOB_ID}` },
+  { method: "GET", path: "/v1/settings/pages" },
+  { method: "GET", path: "/v1/settings/pages/organization/company-profile" },
+  { method: "PUT", path: "/v1/settings/pages/organization/company-profile" },
 ];
 
 function repoRoot() {
@@ -66,6 +73,9 @@ export function smokeSettingsWiring() {
     "getCrmWorkspaceCapabilities",
     "queueCrmSmtpTest",
     "getCrmSmtpTestStatus",
+    "getCrmSettingsCatalog",
+    "getCrmSettingsPage",
+    "putCrmSettingsPage",
   ]) {
     if (!api.includes(`export async function ${name}`)) {
       fail(`settings client missing ${name}`);
@@ -82,6 +92,8 @@ export function smokeSettingsWiring() {
     'path: "/settings/capabilities"',
     'path: "/settings/smtp-test"',
     'path: "/settings/smtp-test/:jobId"',
+    'path: "/settings/pages"',
+    'path: "/settings/pages/:category/:subpage"',
   ]) {
     if (!catalog.includes(fragment)) {
       fail(`endpoint catalog missing ${fragment}`);
@@ -95,8 +107,14 @@ export function smokeSettingsWiring() {
   if (!form.includes("patchCrmWorkspaceSettings")) {
     fail("SettingsFormClient does not call patchCrmWorkspaceSettings");
   }
+  if (!form.includes("overlayCatalogValues")) {
+    fail("SettingsFormClient does not overlay catalog pages");
+  }
   if (!form.includes("overlaySecurityValues")) {
     fail("SettingsFormClient does not overlay GET /settings/security");
+  }
+  if (!form.includes("catalog:")) {
+    fail("SettingsFormClient does not PATCH catalog pages");
   }
 
   const smtp = readSrc("src/components/settings/SmtpSettingsClient.tsx");
@@ -130,6 +148,59 @@ export function smokeSettingsWiring() {
     fail("settings subpage does not mount CapabilitiesSettingsClient");
   }
 
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('"settings"')) {
+    fail("BFF proxy does not allow /v1/settings");
+  }
+
+  const docs = readSrc("docs/settings-api.md");
+  for (const fragment of [
+    "GET /v1/settings",
+    "PATCH /v1/settings",
+    "GET /v1/settings/pages",
+    "PUT /v1/settings/pages/:category/:subpage",
+  ]) {
+    if (!docs.includes(fragment)) {
+      fail(`settings API docs missing ${fragment}`);
+    }
+  }
+
+  const backendRoot = path.join(repoRoot(), "multi-crm-backend-main");
+  if (existsSync(backendRoot)) {
+    const mainCtl = readSrc(
+      "multi-crm-backend-main/src/modules/settings/controllers/settings.controller.ts",
+    );
+    const extraCtl = readSrc(
+      "multi-crm-backend-main/src/modules/settings/controllers/settings-enhancement.controller.ts",
+    );
+    if (!mainCtl.includes("@Get()") || !mainCtl.includes("@Patch()")) {
+      fail("backend SettingsController missing GET/PATCH /v1/settings");
+    }
+    if (!extraCtl.includes("@Get('pages')")) {
+      fail("backend missing GET /v1/settings/pages");
+    }
+    if (!extraCtl.includes("@Get('pages/:category/:subpage')")) {
+      fail("backend missing GET /v1/settings/pages/:category/:subpage");
+    }
+    if (!extraCtl.includes("@Put('pages/:category/:subpage')")) {
+      fail("backend missing PUT /v1/settings/pages/:category/:subpage");
+    }
+    if (!extraCtl.includes("@Get('capabilities')")) {
+      fail("backend missing GET /v1/settings/capabilities");
+    }
+    const schema = readSrc("multi-crm-backend-main/prisma/schema.prisma");
+    if (!schema.includes("catalog Json?")) {
+      fail("Prisma WorkspaceSettings is missing catalog Json");
+    }
+    const migration = path.join(
+      backendRoot,
+      "prisma/migrations/20260913013000_workspace_settings_catalog/migration.sql",
+    );
+    if (!existsSync(migration)) {
+      fail("catalog Prisma migration is missing");
+    }
+  }
+
   const settings = normalizeCrmWorkspaceSettings({
     id: "s1",
     primaryColor: "#3B82F6",
@@ -147,6 +218,19 @@ export function smokeSettingsWiring() {
   );
   if (overlaid.primaryColor !== "#3B82F6" || overlaid.minLength !== 10) {
     fail("overlaySettingsValues did not map form fields");
+  }
+  const cataloged = overlayCatalogValues(
+    { companyName: "Local" },
+    {
+      ...settings,
+      catalog: {
+        "organization/company-profile": { companyName: "Acme Brokers" },
+      },
+    },
+    "organization/company-profile",
+  );
+  if (cataloged.companyName !== "Acme Brokers") {
+    fail("overlayCatalogValues did not apply catalog page values");
   }
 
   const security = normalizeCrmSecuritySettings({
@@ -235,6 +319,43 @@ export async function smokeSettingsMock() {
         { status: 200, headers: { "Content-Type": "application/json" } },
       );
     }
+    if (parsed.pathname.endsWith("/pages")) {
+      return new Response(
+        JSON.stringify({
+          statusCode: 200,
+          data: {
+            catalog: {
+              "organization/company-profile": { companyName: "Acme Brokers" },
+            },
+            revision: 1,
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (parsed.pathname.includes("/pages/")) {
+      return new Response(
+        JSON.stringify({
+          statusCode: 200,
+          data:
+            method === "PUT"
+              ? {
+                  id: "s1",
+                  workspaceId: SESSION.workspaceId,
+                  revision: 2,
+                  catalog: {
+                    "organization/company-profile": { companyName: "Acme Brokers" },
+                  },
+                }
+              : {
+                  pageKey: "organization/company-profile",
+                  values: { companyName: "Acme Brokers" },
+                  revision: 1,
+                },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
     return new Response(
       JSON.stringify({
         statusCode: 200,
@@ -257,6 +378,11 @@ export async function smokeSettingsMock() {
     await patchCrmWorkspaceSettings({ primaryColor: "#111111" });
     await queueCrmSmtpTest("admin@example.com");
     await getCrmSmtpTestStatus(JOB_ID);
+    await getCrmSettingsCatalog();
+    await getCrmSettingsPage("organization", "company-profile");
+    await putCrmSettingsPage("organization", "company-profile", {
+      companyName: "Acme Brokers",
+    });
 
     const expected = [
       `GET ${settingsPath()}`,
@@ -265,6 +391,9 @@ export async function smokeSettingsMock() {
       `PATCH ${settingsPath()}`,
       `POST ${settingsPath("/smtp-test")}`,
       `GET ${settingsPath(`/smtp-test/${JOB_ID}`)}`,
+      `GET ${settingsPath("/pages")}`,
+      `GET ${settingsPath("/pages/organization/company-profile")}`,
+      `PUT ${settingsPath("/pages/organization/company-profile")}`,
     ];
     for (const hit of expected) {
       if (!hits.includes(hit)) {
@@ -299,7 +428,7 @@ export async function smokeSettingsLive(): Promise<{
         method: route.method,
         headers: {
           Accept: "application/json",
-          ...(route.method === "POST" || route.method === "PATCH"
+          ...(route.method === "POST" || route.method === "PATCH" || route.method === "PUT"
             ? { "Content-Type": "application/json" }
             : {}),
         },
@@ -308,7 +437,9 @@ export async function smokeSettingsLive(): Promise<{
             ? JSON.stringify({ recipient: "admin@example.com" })
             : route.method === "PATCH"
               ? "{}"
-              : undefined,
+              : route.method === "PUT"
+                ? JSON.stringify({ values: { companyName: "Acme Brokers" } })
+                : undefined,
       });
       const routed = res.status !== 404 && res.status !== 405;
       if (!routed) ok = false;
@@ -347,7 +478,7 @@ export async function runSettingsSmoke() {
 
   console.log("\n2) Mock fetch…");
   await smokeSettingsMock();
-  console.log("   OK — GET/PATCH settings + security + capabilities + smtp-test");
+  console.log("   OK — GET/PATCH settings + pages catalog + security + smtp-test");
 
   console.log("\n3) Live CRM probe…");
   const live = await smokeSettingsLive();
