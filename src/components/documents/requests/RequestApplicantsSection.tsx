@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { RELATED_RECORD_OPTIONS } from "@/lib/activities/shared";
-import { listContactGroups } from "@/lib/contacts/store";
+import { useEffect, useRef, useState } from "react";
 import {
   AddApplicantContactModal,
   AddClientButton,
 } from "@/components/documents/requests/AddApplicantContactModal";
+import {
+  searchSignatureCrmEntities,
+  type SignatureCrmEntityOption,
+} from "@/lib/documents/signature/search-crm-entities";
 
 export type ApplicantSource = "contact" | "lead" | "deal" | "organization";
 
@@ -21,60 +23,12 @@ export interface RequestApplicant {
   recordId?: string;
 }
 
-interface CrmOption {
-  id: string;
-  name: string;
-  email: string;
-  type: ApplicantSource;
-  subtitle?: string;
-}
-
-const SOURCE_TO_KIND: Record<
-  ApplicantSource,
-  "Contact" | "Lead" | "Deal" | "Company"
-> = {
-  contact: "Contact",
-  lead: "Lead",
-  deal: "Deal",
-  organization: "Company",
+const SOURCE_LABEL: Record<ApplicantSource, string> = {
+  contact: "contact",
+  lead: "lead",
+  deal: "deal",
+  organization: "organization",
 };
-
-function emailFromName(name: string) {
-  const local = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ".")
-    .replace(/^\.|\.$/g, "");
-  return `${local || "client"}@gmail.com`;
-}
-
-function relatedOptions(): CrmOption[] {
-  return RELATED_RECORD_OPTIONS.map((r, i) => ({
-    id: `${r.kind}-${i}`,
-    name: r.name,
-    email: emailFromName(r.name),
-    type:
-      r.kind === "Contact"
-        ? "contact"
-        : r.kind === "Lead"
-          ? "lead"
-          : r.kind === "Deal"
-            ? "deal"
-            : "organization",
-    subtitle: r.kind,
-  }));
-}
-
-function storedContactOptions(): CrmOption[] {
-  return listContactGroups().flatMap((group) =>
-    group.contacts.map((contact) => ({
-      id: contact.id,
-      name: contact.name,
-      email: contact.email,
-      type: "contact" as const,
-      subtitle: "Contact",
-    })),
-  );
-}
 
 export function emptyApplicant(): RequestApplicant {
   return {
@@ -96,45 +50,51 @@ export function RequestApplicantsSection({
   error?: string;
 }) {
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [results, setResults] = useState<CrmOption[]>([]);
+  const [results, setResults] = useState<SignatureCrmEntityOption[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchQueries, setSearchQueries] = useState<Record<string, string>>(
+    {},
+  );
   const [addingForId, setAddingForId] = useState<string | null>(null);
-  const [tick, setTick] = useState(0);
+  const searchSeq = useRef(0);
 
-  const allOptions = useMemo(() => {
-    const merged = [...relatedOptions(), ...storedContactOptions()];
-    const seen = new Set<string>();
-    return merged.filter((item) => {
-      const key = `${item.type}:${item.name}:${item.email}`.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [tick]);
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("[data-applicant-suggest]")) return;
+      setActiveId(null);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, []);
 
   function update(id: string, patch: Partial<RequestApplicant>) {
     onChange(applicants.map((a) => (a.id === id ? { ...a, ...patch } : a)));
   }
 
-  function searchCrm(id: string, source: ApplicantSource, query: string) {
-    if (!query.trim()) {
-      setResults([]);
-      setActiveId(null);
-      return;
-    }
-    const kind = SOURCE_TO_KIND[source];
-    const q = query.toLowerCase();
-    setResults(
-      allOptions
-        .filter(
-          (item) =>
-            item.type === source &&
-            (item.name.toLowerCase().includes(q) ||
-              item.email.toLowerCase().includes(q) ||
-              item.subtitle?.toLowerCase() === kind.toLowerCase()),
-        )
-        .slice(0, 6),
-    );
+  async function searchCrm(
+    id: string,
+    source: ApplicantSource,
+    query: string,
+  ) {
+    const seq = ++searchSeq.current;
     setActiveId(id);
+    setSearching(true);
+    try {
+      const next = await searchSignatureCrmEntities(source, query);
+      if (seq !== searchSeq.current) return;
+      setResults(next);
+    } catch {
+      if (seq !== searchSeq.current) return;
+      setResults([]);
+    } finally {
+      if (seq === searchSeq.current) setSearching(false);
+    }
+  }
+
+  function displayName(row: RequestApplicant) {
+    if (row.recordId) return row.name;
+    return searchQueries[row.id] ?? row.name;
   }
 
   return (
@@ -142,59 +102,84 @@ export function RequestApplicantsSection({
       <h3 className="text-[15px] font-bold text-slate-900">Applicants</h3>
 
       <div className="space-y-3">
-          {applicants.map((row) => (
-            <div
-              key={row.id}
-              className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5"
-            >
-              <div className="w-36 space-y-1">
-                <label className="block text-[10px] font-bold tracking-wider text-gray-400 uppercase">
-                  Recipient Source
-                </label>
-                <select
-                  value={row.source}
-                  onChange={(e) => {
-                    update(row.id, {
-                      source: e.target.value as ApplicantSource,
-                      email: "",
-                      name: "",
-                      recordId: undefined,
-                    });
-                    setActiveId(null);
-                  }}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs font-medium text-gray-800 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
-                >
-                  <option value="contact">Contact</option>
-                  <option value="lead">Lead</option>
-                  <option value="deal">Deal</option>
-                  <option value="organization">Organization</option>
-                </select>
-              </div>
+        {applicants.map((row) => (
+          <div
+            key={row.id}
+            className="flex flex-wrap items-end gap-3 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3.5"
+          >
+            <div className="w-36 space-y-1">
+              <label className="block text-[10px] font-bold tracking-wider text-gray-400 uppercase">
+                Recipient Source
+              </label>
+              <select
+                value={row.source}
+                onChange={(e) => {
+                  const source = e.target.value as ApplicantSource;
+                  update(row.id, {
+                    source,
+                    email: "",
+                    name: "",
+                    recordId: undefined,
+                  });
+                  setSearchQueries((prev) => ({ ...prev, [row.id]: "" }));
+                  void searchCrm(row.id, source, "");
+                }}
+                className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs font-medium text-gray-800 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
+              >
+                <option value="contact">Contact</option>
+                <option value="lead">Lead</option>
+                <option value="deal">Deal</option>
+                <option value="organization">Organization</option>
+              </select>
+            </div>
 
-              <div className="relative min-w-0 flex-1 space-y-1">
-                <label className="block text-[10px] font-bold tracking-wider text-gray-400 uppercase">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={row.name}
-                  onChange={(e) => {
-                    const name = e.target.value;
-                    update(row.id, {
-                      name,
-                      email: name ? emailFromName(name) : "",
-                      recordId: undefined,
-                    });
-                    searchCrm(row.id, row.source, name);
-                  }}
-                  placeholder="Search from existing client"
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
-                />
-                {activeId === row.id && results.length > 0 ? (
-                  <div className="absolute inset-x-0 top-full z-50 mt-1 max-h-52 divide-y divide-gray-50 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
-                    {results.map((item) => (
+            <div
+              className="relative min-w-0 flex-1 space-y-1"
+              data-applicant-suggest
+            >
+              <label className="block text-[10px] font-bold tracking-wider text-gray-400 uppercase">
+                Name
+              </label>
+              <input
+                type="text"
+                value={displayName(row)}
+                onChange={(e) => {
+                  const query = e.target.value;
+                  setSearchQueries((prev) => ({ ...prev, [row.id]: query }));
+                  update(row.id, {
+                    name: "",
+                    email: "",
+                    recordId: undefined,
+                  });
+                  void searchCrm(row.id, row.source, query);
+                }}
+                onFocus={() => {
+                  const query = row.recordId
+                    ? row.name
+                    : (searchQueries[row.id] ?? row.name ?? "");
+                  void searchCrm(row.id, row.source, query);
+                }}
+                autoComplete="off"
+                placeholder={`Search existing ${SOURCE_LABEL[row.source]}s by name or email`}
+                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
+              />
+              {activeId === row.id ? (
+                <div className="absolute inset-x-0 top-full z-50 mt-1 max-h-52 divide-y divide-gray-50 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-lg">
+                  <div className="bg-gray-50 px-3 py-1.5 text-[10px] font-bold tracking-wider text-gray-400 uppercase">
+                    Existing {SOURCE_LABEL[row.source]}s
+                  </div>
+                  {searching ? (
+                    <div className="px-3 py-2 text-xs text-gray-500">
+                      Loading…
+                    </div>
+                  ) : results.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-gray-500">
+                      No existing {SOURCE_LABEL[row.source]}s found
+                    </div>
+                  ) : (
+                    results.map((item) => (
                       <button
-                        key={item.id}
+                        key={`${item.type}-${item.id}`}
                         type="button"
                         onClick={() => {
                           update(row.id, {
@@ -202,6 +187,10 @@ export function RequestApplicantsSection({
                             email: item.email,
                             recordId: item.id,
                           });
+                          setSearchQueries((prev) => ({
+                            ...prev,
+                            [row.id]: item.name,
+                          }));
                           setActiveId(null);
                         }}
                         className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-violet-50"
@@ -211,26 +200,27 @@ export function RequestApplicantsSection({
                             {item.name}
                           </span>
                           <span className="block text-[11px] text-gray-500">
-                            {item.email}
+                            {item.email || item.subtitle || "No email on file"}
                           </span>
                         </span>
                         <span className="text-[10px] text-gray-400">
-                          {item.subtitle}
+                          {item.subtitle || item.type}
                         </span>
                       </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-
-              {row.source === "contact" ? (
-                <div className="pt-5">
-                  <AddClientButton onClick={() => setAddingForId(row.id)} />
+                    ))
+                  )}
                 </div>
               ) : null}
             </div>
-          ))}
-        </div>
+
+            {row.source === "contact" ? (
+              <div className="pt-5">
+                <AddClientButton onClick={() => setAddingForId(row.id)} />
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
 
       {error ? (
         <p className="text-[12px] font-medium text-rose-500">{error}</p>
@@ -246,7 +236,10 @@ export function RequestApplicantsSection({
               email: contact.email,
               recordId: contact.id,
             });
-            setTick((n) => n + 1);
+            setSearchQueries((prev) => ({
+              ...prev,
+              [addingForId]: contact.name,
+            }));
             setAddingForId(null);
           }}
         />

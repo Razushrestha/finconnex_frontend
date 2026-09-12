@@ -37,7 +37,18 @@ export type SignatureFieldKind =
   | "initials"
   | "date"
   | "name"
-  | "text";
+  | "text"
+  | "email"
+  | "stamp"
+  | "image"
+  | "company"
+  | "sign_date"
+  | "job_title"
+  | "checkbox"
+  | "dropdown"
+  | "radio"
+  | "payment"
+  | "attachment";
 
 export type DeliveryMethod = "email" | "email_sms";
 
@@ -82,6 +93,8 @@ export interface SignatureField {
   signerId: string;
   required: boolean;
   value?: string;
+  /** Choices for dropdown / radio fields. */
+  options?: string[];
   /**
    * Which document this field belongs to — matches a SignatureDocument.id.
    * Defaults to "primary" for legacy fields/requests created before
@@ -327,7 +340,12 @@ export function normalizeSignatureRequest(
 
   const hasFields = Array.isArray(raw.fields) && raw.fields.length > 0;
   const fields = hasFields
-    ? raw.fields
+    ? raw.fields.map((field) => ({
+        ...field,
+        kind: String(field.kind || "text")
+          .toLowerCase()
+          .replace(/-/g, "_") as SignatureFieldKind,
+      }))
     : opts?.allowEmptyFields ||
         (raw.status === "Draft" &&
           Array.isArray(raw.fields) &&
@@ -689,23 +707,18 @@ export function applySignerSignature(
 
   const fields = n.fields.map((f) => {
     if (f.signerId !== signerId) return f;
-    const isDate =
-      f.kind === "date" ||
-      (f as any).kind === "sign_date" ||
-      f.label?.toLowerCase().includes("date");
-    const isSig =
-      f.kind === "signature" ||
-      f.kind === "initials" ||
-      (f as any).kind === "sign" ||
-      f.label?.toLowerCase().includes("signature");
+    const kind = String(f.kind || "").toLowerCase();
+    const isDate = kind === "date" || kind === "sign_date";
+    const isSig = kind === "signature" || kind === "initials" || kind === "sign";
 
     if (isSig) return { ...f, value: signatureData };
-    if (f.kind === "name")
+    if (kind === "name" && !f.value) {
       return {
         ...f,
         value: signers.find((s) => s.id === signerId)?.name,
       };
-    if (isDate) return { ...f, value: today };
+    }
+    if (isDate && !f.value) return { ...f, value: today };
     return f;
   });
 
@@ -827,10 +840,34 @@ export function fieldKindLabel(kind: SignatureFieldKind): string {
       return "Initials";
     case "date":
       return "Date";
+    case "sign_date":
+      return "Sign date";
     case "name":
       return "Full name";
     case "text":
       return "Text";
+    case "email":
+      return "Email";
+    case "stamp":
+      return "Stamp";
+    case "image":
+      return "Image";
+    case "company":
+      return "Company";
+    case "job_title":
+      return "Job title";
+    case "checkbox":
+      return "Checkbox";
+    case "dropdown":
+      return "Dropdown";
+    case "radio":
+      return "Radio";
+    case "payment":
+      return "Payment";
+    case "attachment":
+      return "Attachment";
+    default:
+      return "Field";
   }
 }
 

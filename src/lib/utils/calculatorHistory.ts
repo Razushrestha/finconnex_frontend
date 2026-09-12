@@ -83,6 +83,7 @@ export async function persistCalculatorResult(input: {
   badge: string;
   displayType: string;
   sharedWith?: string;
+  savedBy?: string;
 }): Promise<{ record: CalculationRecord; source: "api" | "local" }> {
   const remote = await tryCrmCalculation(() =>
     createCrmCalculation(toCreateCalculationBody(input)),
@@ -102,7 +103,7 @@ export async function persistCalculatorResult(input: {
     inputs: input.inputs,
     result: input.result,
     formula: input.formula,
-    savedBy: "—",
+    savedBy: input.savedBy?.trim() || "—",
     savedAt: formatCalcAt(),
     sharedWith: input.sharedWith,
   });

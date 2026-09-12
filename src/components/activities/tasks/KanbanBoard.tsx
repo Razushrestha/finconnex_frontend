@@ -150,7 +150,9 @@ export function KanbanBoard({
     }
 
     const sourceColumn = columns.find((c) => c.id === sourceColumnId);
-    const task = sourceColumn?.tasks.find((t) => t.taskId === taskId);
+    const task =
+      sourceColumn?.tasks.find((t) => t.taskId === taskId) ??
+      columns.flatMap((c) => c.tasks).find((t) => t.taskId === taskId);
 
     if (!task) {
       handleDragEndTask();
@@ -159,45 +161,28 @@ export function KanbanBoard({
 
     const moved = { ...task, status: targetColumn.title as TaskStatus };
 
+    if (sourceColumnId !== targetColumnId) {
+      const nextStatus = targetColumn.title as TaskStatus;
+      const updated = updateTaskStatus(taskId, nextStatus);
+      if (updated) setColumns(listTaskColumns());
+      void tryCrmTask(() => syncTaskStatus(taskId, nextStatus)).then((row) => {
+        persistRemoteTask(row);
+        setColumns(listTaskColumns());
+      });
+      handleDragEndTask();
+      return;
+    }
+
     persist(
       columns.map((col) => {
-        if (col.id === sourceColumnId && col.id === targetColumnId) {
-          // Reordering within the same column
-          const tasksWithoutTask = col.tasks.filter((t) => t.taskId !== taskId);
-          const finalIndex = targetIndex ?? tasksWithoutTask.length;
-          const updatedTasks = [...tasksWithoutTask];
-          updatedTasks.splice(finalIndex, 0, moved);
-          return { ...col, tasks: updatedTasks };
-        }
-
-        if (col.id === sourceColumnId) {
-          return {
-            ...col,
-            tasks: col.tasks.filter((t) => t.taskId !== taskId),
-            count: col.count - 1,
-          };
-        }
-
-        if (col.id === targetColumnId) {
-          const updatedTasks = [...col.tasks];
-          const finalIndex = targetIndex ?? updatedTasks.length;
-          updatedTasks.splice(finalIndex, 0, moved);
-          return {
-            ...col,
-            tasks: updatedTasks,
-            count: col.count + 1,
-          };
-        }
-
-        return col;
+        if (col.id !== sourceColumnId) return col;
+        const tasksWithoutTask = col.tasks.filter((t) => t.taskId !== taskId);
+        const finalIndex = targetIndex ?? tasksWithoutTask.length;
+        const updatedTasks = [...tasksWithoutTask];
+        updatedTasks.splice(finalIndex, 0, moved);
+        return { ...col, tasks: updatedTasks };
       }),
     );
-
-    if (sourceColumnId !== targetColumnId) {
-      void tryCrmTask(() =>
-        syncTaskStatus(taskId, targetColumn.title as TaskStatus),
-      ).then(persistRemoteTask);
-    }
 
     handleDragEndTask();
   }

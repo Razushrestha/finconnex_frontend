@@ -10,6 +10,7 @@ import {
   type SignatureSigner,
 } from "@/lib/documents/signature/types";
 import { cn } from "@/lib/utils";
+import { SignatureFieldValue } from "./SignatureFieldValue";
 
 /**
  * Mirrors PdfDocViewer's props/overlay behavior so SignatureDocPreview can
@@ -25,44 +26,13 @@ function FieldIcon({ kind }: { kind: SignatureField["kind"] }) {
     case "initials":
       return <PenLine className="h-3 w-3 shrink-0" />;
     case "date":
+    case "sign_date":
       return <Calendar className="h-3 w-3 shrink-0" />;
     case "name":
       return <User className="h-3 w-3 shrink-0" />;
     default:
       return <Type className="h-3 w-3 shrink-0" />;
   }
-}
-
-function renderValue(field: SignatureField) {
-  if (!field.value) return null;
-  if (
-    (field.kind === "signature" || field.kind === "initials") &&
-    field.value.startsWith("typed:")
-  ) {
-    return (
-      <span className="font-serif text-[12px] leading-tight text-slate-800">
-        {field.value.replace(/^typed:/, "")}
-      </span>
-    );
-  }
-  if (
-    (field.kind === "signature" || field.kind === "initials") &&
-    field.value.startsWith("data:")
-  ) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={field.value}
-        alt=""
-        className="h-full max-h-8 w-full object-contain"
-      />
-    );
-  }
-  return (
-    <span className="text-[10px] font-semibold text-slate-800 truncate">
-      {field.value}
-    </span>
-  );
 }
 
 interface DocxDocViewerProps {
@@ -202,9 +172,9 @@ export default function DocxDocViewer({
                 onFieldClick?.(f.id);
               }}
             >
-              {filled ? (
-                renderValue(f)
-              ) : (
+                    {filled ? (
+                      <SignatureFieldValue field={f} />
+                    ) : (
                 <>
                   <FieldIcon kind={f.kind} />
                   <span className="truncate">

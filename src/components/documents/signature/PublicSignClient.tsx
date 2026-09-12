@@ -540,6 +540,12 @@ import { syncQuotationFromSignature } from "@/lib/finance/quotations/signatureBr
 import { persistSignedPackage } from "@/lib/documents/signed-artifacts";
 import { SignatureDocPreview } from "./SignatureDocPreview";
 import { SignatureModal } from "./SignatureModal";
+import { SigningFieldInputModal } from "./SigningFieldInputModal";
+import {
+  defaultStampValue,
+  isSignatureCaptureKind,
+  signingFieldAction,
+} from "@/lib/documents/signature/field-kinds";
 import {
   CheckCircle2,
   Clock,
@@ -557,6 +563,8 @@ export function PublicSignClient({ token }: { token: string }) {
   const [signer, setSigner] = useState<SignatureSigner | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeInputField, setActiveInputField] =
+    useState<SignatureField | null>(null);
   const [pendingSignatureData, setPendingSignatureData] = useState<
     string | null
   >(null);
@@ -620,34 +628,21 @@ export function PublicSignClient({ token }: { token: string }) {
     }
   }
 
+  function patchFieldValue(fieldId: string, value: string) {
+    if (!req) return;
+    setReq({
+      ...req,
+      fields: req.fields.map((f) => (f.id === fieldId ? { ...f, value } : f)),
+    });
+  }
+
   function handleSaveSignature(signatureData: string) {
     if (!req || !signer) return;
-    const today = new Date().toLocaleDateString("en-GB");
 
-    // Display signature and auto-update date fields live ONLY for fields assigned to current signer
     const updatedFields = req.fields.map((f) => {
       if (f.signerId !== signer.id) return f;
-
-      const isDateKind =
-        f.kind === "date" ||
-        (f as any).kind === "sign_date" ||
-        f.label?.toLowerCase().includes("date");
-      const isSigKind =
-        f.kind === "signature" ||
-        f.kind === "initials" ||
-        (f as any).kind === "sign" ||
-        f.label?.toLowerCase().includes("signature");
-      const isNameKind =
-        f.kind === "name" || f.label?.toLowerCase().includes("name");
-
-      if (isSigKind) {
+      if (isSignatureCaptureKind(f.kind)) {
         return { ...f, value: signatureData };
-      }
-      if (isDateKind) {
-        return { ...f, value: today };
-      }
-      if (isNameKind) {
-        return { ...f, value: signer.name };
       }
       return f;
     });
@@ -688,28 +683,23 @@ export function PublicSignClient({ token }: { token: string }) {
       return;
     }
 
-    const isDateKind =
-      targetField.kind === "date" ||
-      (targetField as any).kind === "sign_date" ||
-      targetField.label?.toLowerCase().includes("date");
-
-    if (isDateKind) {
-      // Auto-fill exact date for current signer's date fields only
-      const today = new Date().toLocaleDateString("en-GB");
-      const updatedFields = req.fields.map((f) =>
-        f.signerId === signer.id &&
-        (f.id === fieldId ||
-          f.kind === "date" ||
-          (f as any).kind === "sign_date" ||
-          f.label?.toLowerCase().includes("date"))
-          ? { ...f, value: today }
-          : f,
-      );
-      setReq({ ...req, fields: updatedFields });
-    } else {
-      // Open signature modal for signature or initials fields
+    const action = signingFieldAction(targetField.kind);
+    if (action === "signature") {
       setIsModalOpen(true);
+      return;
     }
+    if (action === "checkbox") {
+      patchFieldValue(
+        targetField.id,
+        targetField.value === "true" ? "" : "true",
+      );
+      return;
+    }
+    if (action === "stamp") {
+      patchFieldValue(targetField.id, defaultStampValue(signer.name));
+      return;
+    }
+    setActiveInputField(targetField);
   }
 
   function decline() {
@@ -885,11 +875,8 @@ export function PublicSignClient({ token }: { token: string }) {
             <button
               type="button"
               onClick={() => {
-                if (!hasAgreedConsent) {
-                  setConsentError(true);
-                } else {
-                  setIsModalOpen(true);
-                }
+                setHasAgreedConsent(true);
+                setConsentError(false);
               }}
               className={cn(
                 "h-9 rounded-xl px-4 text-xs font-semibold text-white shadow-sm transition-all flex items-center gap-1.5 cursor-pointer",
@@ -966,7 +953,7 @@ export function PublicSignClient({ token }: { token: string }) {
         {myFields.length ? (
           <p className="mt-2 text-center text-xs text-slate-500">
             {hasAgreedConsent
-              ? `Click on highlighted fields to sign or auto-fill · ${myFields.length} assigned to you${documents.length > 1 ? " across all documents" : ""}`
+              ? `Click each highlighted field to complete it · ${myFields.length} assigned to you${documents.length > 1 ? " across all documents" : ""}`
               : "Check consent agreement at top to enable field signing"}
           </p>
         ) : null}
@@ -1051,6 +1038,19 @@ export function PublicSignClient({ token }: { token: string }) {
         initialName={signer.name}
         onSaveSignature={handleSaveSignature}
       />
+
+      {activeInputField ? (
+        <SigningFieldInputModal
+          field={activeInputField}
+          signerName={signer.name}
+          signerEmail={signer.email}
+          onClose={() => setActiveInputField(null)}
+          onSave={(value) => {
+            patchFieldValue(activeInputField.id, value);
+            setActiveInputField(null);
+          }}
+        />
+      ) : null}
 
       {/* Electronic Record & Signature Disclosure Modal */}
       {isDisclosureModalOpen && (

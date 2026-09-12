@@ -1,7 +1,19 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { persistCalculatorResult } from "@/lib/utils/calculatorHistory";
+import {
+  calculateLoanRepayment,
+  parseLoanCalcType,
+  type LoanFrequency,
+} from "@/lib/calculator/loan-repayments";
+import {
+  assignableOwnerLabel,
+  defaultAssignableOwnerId,
+  loadAssignableOwners,
+  type AssignableOwner,
+} from "@/lib/users/assignable";
+import { getRulesActor } from "@/lib/rules/actor";
 
 export default function LoanRepaymentsView() {
   const [currency, setCurrency] = useState("AUD ($)");
@@ -13,7 +25,57 @@ export default function LoanRepaymentsView() {
   const [extraPayment, setExtraPayment] = useState("");
   const [title, setTitle] = useState("");
   const [savedBy, setSavedBy] = useState("");
+  const [savers, setSavers] = useState<AssignableOwner[]>([]);
+  const [saversReady, setSaversReady] = useState(false);
   const [shareWith, setShareWith] = useState("");
+  const [activePreset, setActivePreset] = useState<string | null>(null);
+
+  useEffect(() => {
+    void loadAssignableOwners()
+      .then((rows) => {
+        const actor = getRulesActor();
+        const next = [...rows];
+        if (
+          actor.name.trim() &&
+          !next.some(
+            (row) =>
+              row.name.trim().toLowerCase() === actor.name.trim().toLowerCase(),
+          )
+        ) {
+          next.unshift({
+            id: actor.id || "current-user",
+            name: actor.name.trim(),
+            email: actor.email || "",
+          });
+        }
+        setSavers(next);
+        setSavedBy((current) => {
+          if (
+            current &&
+            next.some(
+              (row) =>
+                row.name === current ||
+                row.id === current ||
+                assignableOwnerLabel(row) === current,
+            )
+          ) {
+            return current;
+          }
+          const match =
+            next.find((row) => row.name === actor.name.trim()) ||
+            next.find((row) => row.id === defaultAssignableOwnerId(next));
+          return match?.name || actor.name.trim() || current;
+        });
+      })
+      .finally(() => setSaversReady(true));
+  }, []);
+
+  const PRESETS = [
+    "Home Mortgage",
+    "Commercial Facility",
+    "Refinance Plus",
+    "Asset & Equipment",
+  ] as const;
 
   // Calculated results state (null until calculated)
   const [results, setResults] = useState<{
@@ -26,10 +88,13 @@ export default function LoanRepaymentsView() {
     interestSaved: number;
     periodicRate: number;
     totalPeriods: number;
+    formula: string;
   } | null>(null);
 
   // Preset handler to quickly fill fields
   const applyPreset = (type: string) => {
+    setActivePreset(type);
+    setResults(null);
     if (type === "Home Mortgage") {
       setLoanAmount("500000");
       setInterestRate("6.20");
@@ -71,45 +136,14 @@ export default function LoanRepaymentsView() {
       return null;
     }
 
-    let periodsPerYear = 12;
-    if (frequency === "Fortnightly") periodsPerYear = 26;
-    if (frequency === "Weekly") periodsPerYear = 52;
-
-    const r = annualRate / 100 / periodsPerYear;
-    const n = years * periodsPerYear;
-
-    let basePayment = 0;
-    if (r === 0) {
-      basePayment = P / n;
-    } else {
-      basePayment = (P * (r * Math.pow(1 + r, n))) / (Math.pow(1 + r, n) - 1);
-    }
-
-    const periodicPayment = basePayment + extra;
-    const totalRepayments = periodicPayment * n;
-    const totalInterest = Math.max(0, totalRepayments - P);
-
-    const principalPercentage = (P / totalRepayments) * 100;
-    const interestPercentage = (totalInterest / totalRepayments) * 100;
-
-    let interestSaved = 0;
-    let yearsSavedStr = "0 yrs";
-    if (extra > 0 && r > 0) {
-      interestSaved = extra * n * 0.35;
-      yearsSavedStr = `${(years * 0.2).toFixed(1)} yrs`;
-    }
-
-    const computedResults = {
-      periodicPayment,
-      totalRepayments,
-      totalInterest,
-      principalPercentage,
-      interestPercentage,
-      yearsSavedStr,
-      interestSaved,
-      periodicRate: r,
-      totalPeriods: n,
-    };
+    const computedResults = calculateLoanRepayment({
+      principal: P,
+      annualRatePercent: annualRate,
+      termYears: years,
+      frequency: frequency as LoanFrequency,
+      extraPayment: extra,
+      calcType,
+    });
 
     setResults(computedResults);
     return computedResults;
@@ -143,14 +177,12 @@ export default function LoanRepaymentsView() {
         frequency,
         extraPayment,
       },
-      formula:
-        "Monthly = P × r(1+r)^n ÷ ((1+r)^n − 1); r = annual÷periods; n = years×periods",
+      formula: currentResults.formula,
       result: {
         primaryLabel: `${frequency} payment`,
         primaryValue: currentResults.periodicPayment,
         primaryFormat: "money",
-        formula:
-          "Monthly = P × r(1+r)^n ÷ ((1+r)^n − 1); r = annual÷periods; n = years×periods",
+        formula: currentResults.formula,
         lines: [
           {
             label: "Periodic payment",
@@ -170,6 +202,7 @@ export default function LoanRepaymentsView() {
         ],
       },
       sharedWith: shareWith.trim() || undefined,
+      savedBy: savedBy.trim() || undefined,
     });
     alert(
       saved.source === "api"
@@ -186,6 +219,7 @@ export default function LoanRepaymentsView() {
     setExtraPayment("");
     setTitle("");
     setResults(null);
+    setActivePreset(null);
   };
 
   return (
@@ -218,30 +252,24 @@ export default function LoanRepaymentsView() {
             <span className="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap">
               Presets:
             </span>
-            <button
-              onClick={() => applyPreset("Home Mortgage")}
-              className="px-3 py-1 bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 rounded-lg text-xs font-medium cursor-pointer"
-            >
-              Home Mortgage
-            </button>
-            <button
-              onClick={() => applyPreset("Commercial Facility")}
-              className="px-3 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs cursor-pointer"
-            >
-              Commercial Facility
-            </button>
-            <button
-              onClick={() => applyPreset("Refinance Plus")}
-              className="px-3 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs cursor-pointer"
-            >
-              Refinance Plus
-            </button>
-            <button
-              onClick={() => applyPreset("Asset & Equipment")}
-              className="px-3 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs cursor-pointer"
-            >
-              Asset & Equipment
-            </button>
+            {PRESETS.map((preset) => {
+              const active = activePreset === preset;
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => applyPreset(preset)}
+                  aria-pressed={active}
+                  className={
+                    active
+                      ? "px-3 py-1 bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 rounded-lg text-xs font-medium cursor-pointer"
+                      : "px-3 py-1 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs cursor-pointer"
+                  }
+                >
+                  {preset}
+                </button>
+              );
+            })}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -251,7 +279,10 @@ export default function LoanRepaymentsView() {
               </label>
               <select
                 value={calcType}
-                onChange={(e) => setCalcType(e.target.value)}
+                onChange={(e) => {
+                  setCalcType(e.target.value);
+                  setResults(null);
+                }}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:border-purple-500 cursor-pointer"
               >
                 <option>Loan (Principal & Interest)</option>
@@ -421,11 +452,15 @@ export default function LoanRepaymentsView() {
               Formula & Logic
             </span>
             <span className="text-xs text-slate-400 dark:text-slate-500">
-              Standard Amortization Equation
+              {parseLoanCalcType(calcType) === "io"
+                ? "Interest-only (principal not amortized)"
+                : "Standard Amortization Equation"}
             </span>
           </div>
           <div className="bg-purple-50 dark:bg-purple-950/40 border border-purple-100 dark:border-purple-900/50 p-3.5 rounded-xl text-xs text-purple-800 dark:text-purple-300 font-mono mb-4">
-            Payment = P × (r(1+r)^n) ÷ ((1+r)^n - 1)
+            {parseLoanCalcType(calcType) === "io"
+              ? "Payment = P × r  (+ extra)"
+              : "Payment = P × (r(1+r)^n) ÷ ((1+r)^n - 1)"}
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200/80 dark:border-slate-700/80">
@@ -558,7 +593,9 @@ export default function LoanRepaymentsView() {
               </span>
               <span className="text-[11px] text-slate-500 dark:text-slate-400">
                 {results && Number(extraPayment) > 0
-                  ? `Saved ~${results.yearsSavedStr}`
+                  ? parseLoanCalcType(calcType) === "io"
+                    ? "Interest-only term is unchanged"
+                    : `Saved ~${results.yearsSavedStr}`
                   : "No acceleration"}
               </span>
             </div>
@@ -604,7 +641,17 @@ export default function LoanRepaymentsView() {
                 onChange={(e) => setSavedBy(e.target.value)}
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
               >
-                <option></option>
+                { !saversReady ? (
+                  <option value="">Loading team members…</option>
+                ) : savers.length === 0 ? (
+                  <option value="">No workspace members found</option>
+                ) : (
+                  savers.map((person) => (
+                    <option key={person.id || person.email || person.name} value={person.name}>
+                      {assignableOwnerLabel(person)}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
             <div>

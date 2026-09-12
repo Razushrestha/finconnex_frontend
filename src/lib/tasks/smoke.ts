@@ -214,6 +214,7 @@ export function smokeTasksWiring() {
     "replaceCrmTaskFollowers",
     "addCrmTaskTag",
     "addCrmTaskAttachment",
+    "syncTaskStatus",
   ]) {
     if (!api.includes(`export async function ${name}`)) {
       fail(`tasks client missing ${name}`);
@@ -222,8 +223,11 @@ export function smokeTasksWiring() {
   if (!api.includes("workspaceTasksPath")) {
     fail("tasks client missing workspaceTasksPath");
   }
-  if (!api.includes("crmBffFetch")) {
-    fail("tasks client must call crmBffFetch in the browser");
+  if (!api.includes("if (patch.status) body.status")) {
+    fail("updateCrmTask must persist status changes");
+  }
+  if (!api.includes("await updateCrmTask(id, { status })")) {
+    fail("syncTaskStatus must PATCH status, not only GET the current task");
   }
 
   const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");

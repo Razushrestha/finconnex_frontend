@@ -128,8 +128,8 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
 export function mapTaskStatus(raw: string): TaskStatus {
   const value = raw.toLowerCase().replace(/[_-]/g, " ");
   if (value.includes("progress")) return "In Progress";
-  if (value.includes("wait") || value.includes("defer")) return "Waiting";
   if (value.includes("review")) return "Review";
+  if (value.includes("wait") || value.includes("defer")) return "Waiting";
   if (value.includes("complete") || value.includes("done") || value.includes("closed")) {
     return "Completed";
   }
@@ -140,7 +140,8 @@ export function mapTaskStatus(raw: string): TaskStatus {
 
 function apiTaskStatus(status: TaskStatus): string {
   if (status === "In Progress") return "IN_PROGRESS";
-  if (status === "Waiting" || status === "Review") return "DEFERRED";
+  if (status === "Waiting") return "DEFERRED";
+  if (status === "Review") return "REVIEW";
   if (status === "Completed") return "COMPLETED";
   if (status === "Cancelled") return "CANCELLED";
   return "NOT_STARTED";
@@ -625,6 +626,7 @@ export function toCreateTaskBody(input: CreateCrmTaskInput): Record<string, unkn
     assigneeIds: owners,
     collaboratorIds,
     attachmentKeys: input.attachmentKeys,
+    status: apiTaskStatus(input.status),
     repeatEvery: input.repeatEvery,
     recurrenceTimezone: input.repeatEvery
       ? Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -686,6 +688,7 @@ export async function updateCrmTask(
   if (patch.title) body.subject = patch.title;
   if (patch.taskType) body.taskType = apiTaskType(patch.taskType);
   if (patch.priority) body.priority = apiTaskPriority(patch.priority);
+  if (patch.status) body.status = apiTaskStatus(patch.status);
   if (patch.dueDate) {
     const dueDate = toTaskIso(patch.dueDate);
     body.dueDate = dueDate;
@@ -894,18 +897,18 @@ export async function syncTaskStatus(
 ): Promise<Task | null> {
   if (status === "Completed") return completeCrmTask(id);
   if (status === "Cancelled") return cancelCrmTask(id);
+
   const current = await tryCrmTask(() => getCrmTask(id));
   if (
     current &&
-    (current.status === "Completed" || current.status === "Cancelled") &&
-    (status === "Not Started" ||
-      status === "In Progress" ||
-      status === "Waiting" ||
-      status === "Review")
+    (current.status === "Completed" || current.status === "Cancelled")
   ) {
-    return reopenCrmTask(id);
+    await tryCrmTask(() => reopenCrmTask(id));
   }
-  return current;
+
+  const remote = await updateCrmTask(id, { status });
+  if (!remote) return null;
+  return remote.status === status ? remote : { ...remote, status };
 }
 
 export async function tryCrmTask<T>(run: () => Promise<T>): Promise<T | null> {
