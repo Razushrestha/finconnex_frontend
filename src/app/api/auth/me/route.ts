@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/lib/auth/session";
+import { createSessionToken, getSession } from "@/lib/auth/session";
 import {
   applyCrmTokenCookies,
   crmMe,
@@ -7,14 +7,19 @@ import {
   readCrmTokens,
   sessionFromCrmUser,
 } from "@/lib/auth/crm-server";
-import { createSessionToken } from "@/lib/auth/session";
-import { getSessionCookieOptions, SESSION_COOKIE } from "@/lib/auth/constants";
+import {
+  getSessionCookieOptions,
+  SESSION_COOKIE,
+  sessionRememberMe,
+} from "@/lib/auth/constants";
 
 export async function GET() {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ authenticated: false });
   }
+
+  const remember = sessionRememberMe(session);
 
   if (isCrmAuthEnabled()) {
     const tokens = await readCrmTokens();
@@ -46,21 +51,23 @@ export async function GET() {
             name: mapped.tenantName,
           },
         });
-        if (
-          live.accessToken &&
-          live.accessToken !== tokens.accessToken
-        ) {
-          applyCrmTokenCookies(response, {
-            accessToken: live.accessToken,
+        applyCrmTokenCookies(
+          response,
+          {
+            accessToken: live.accessToken ?? tokens.accessToken,
             refreshToken: live.refreshToken ?? tokens.refreshToken,
-          });
-          const nextSession = await createSessionToken(mapped, false);
-          response.cookies.set(
-            SESSION_COOKIE,
-            nextSession,
-            getSessionCookieOptions(false),
-          );
-        }
+          },
+          remember,
+        );
+        const nextSession = await createSessionToken(
+          { ...mapped, rememberMe: remember },
+          remember,
+        );
+        response.cookies.set(
+          SESSION_COOKIE,
+          nextSession,
+          getSessionCookieOptions(remember),
+        );
         return response;
       } catch {
         /* fall through to cookie session */
@@ -68,7 +75,7 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     authenticated: true,
     source: "local",
     user: {
@@ -83,4 +90,11 @@ export async function GET() {
       name: session.tenantName,
     },
   });
+  const nextSession = await createSessionToken(session, remember);
+  response.cookies.set(
+    SESSION_COOKIE,
+    nextSession,
+    getSessionCookieOptions(remember),
+  );
+  return response;
 }

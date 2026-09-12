@@ -158,6 +158,7 @@ export function UsersSettingsClient() {
   const [draft, setDraft] = useState({
     name: "",
     email: "",
+    password: "",
     role: "User" as HierarchyLevel,
     team: "",
   });
@@ -191,7 +192,7 @@ export function UsersSettingsClient() {
   }
 
   function resetDraft() {
-    setDraft({ name: "", email: "", role: "User", team: "" });
+    setDraft({ name: "", email: "", password: "", role: "User", team: "" });
     setEditingId(null);
   }
 
@@ -266,6 +267,10 @@ export function UsersSettingsClient() {
       flash("Name and email are required");
       return;
     }
+    if (!editingId && draft.password.trim().length < 8) {
+      flash("Password must be at least 8 characters");
+      return;
+    }
     setBusy(true);
     try {
       if (live && editingId) {
@@ -300,6 +305,7 @@ export function UsersSettingsClient() {
             name: draft.name,
             role: draft.role,
             team: draft.team,
+            password: draft.password,
             joinImmediately: mode === "add",
           }),
         );
@@ -326,6 +332,7 @@ export function UsersSettingsClient() {
           name: draft.name,
           role: draft.role,
           team: draft.team,
+          password: draft.password,
         });
         flash("Invitation email sent");
       } else {
@@ -465,6 +472,7 @@ export function UsersSettingsClient() {
     setDraft({
       name: u.name,
       email: u.email,
+      password: "",
       role: u.role,
       team: u.team ?? "",
     });
@@ -477,6 +485,7 @@ export function UsersSettingsClient() {
     setDraft({
       name: row.name,
       email: row.email,
+      password: "",
       role: row.role,
       team: row.team ?? "",
     });
@@ -544,7 +553,10 @@ export function UsersSettingsClient() {
     reader.readAsText(file);
   }
 
-  const canSend = Boolean(draft.name.trim() && draft.email.trim()) && !busy;
+  const canSend =
+    Boolean(draft.name.trim() && draft.email.trim()) &&
+    (Boolean(editingId) || draft.password.trim().length >= 8) &&
+    !busy;
 
   return (
     <div className="mx-auto flex max-w-[1920px] flex-col gap-5 p-4 sm:p-5 lg:p-6">
@@ -718,7 +730,12 @@ export function UsersSettingsClient() {
               {editingId ? "Edit user" : "Invite new user"}
             </h3>
           </div>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div
+            className={cn(
+              "grid gap-3 md:grid-cols-2",
+              editingId ? "xl:grid-cols-4" : "xl:grid-cols-5",
+            )}
+          >
             <label className="block">
               <span className="mb-1.5 block text-[12px] font-medium text-slate-600">
                 Full name
@@ -746,6 +763,23 @@ export function UsersSettingsClient() {
                 className={cn(fieldClass(), "disabled:bg-slate-50")}
               />
             </label>
+            {!editingId ? (
+              <label className="block">
+                <span className="mb-1.5 block text-[12px] font-medium text-slate-600">
+                  Password
+                </span>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={draft.password}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, password: e.target.value }))
+                  }
+                  placeholder="At least 8 characters"
+                  className={fieldClass()}
+                />
+              </label>
+            ) : null}
             <label className="block">
               <span className="mb-1.5 block text-[12px] font-medium text-slate-600">
                 Role

@@ -58,6 +58,17 @@ export function smokeStorageWiring() {
   if (!bff.includes("saveLocalUpload")) {
     fail("BFF proxy does not fall back to local upload when CRM storage is down");
   }
+
+  const local = readSrc("src/lib/storage/local-fallback.ts");
+  if (!local.includes("tmpdir()") && !local.includes("isServerlessHost")) {
+    fail("local upload fallback must use /tmp on Vercel, not /var/task/data");
+  }
+  if (!local.includes("/var/task") && !local.includes("VERCEL")) {
+    fail("local upload fallback must detect serverless hosts");
+  }
+  if (!local.includes("enoent")) {
+    fail("isStorageUnconfigured must treat CRM mkdir ENOENT as unconfigured storage");
+  }
   if (!api.includes("/api/auth/crm/storage/upload")) {
     fail("storage client missing same-origin BFF upload path");
   }

@@ -31,14 +31,21 @@ export function compareDealCards(
   direction: DealSortDirection = "asc",
 ): number {
   if (!sortValue || sortValue === "Sort") return 0;
-  const flip = direction === "desc" ? -1 : 1;
-  if (sortValue === "name_asc") return flip * byName(a.name, b.name);
-  if (sortValue === "name_desc") return flip * byName(b.name, a.name);
+  // name_asc / name_desc / newest / oldest already encode direction.
+  // Do not also apply the panel's Asc/Desc flip — that cancelled A-Z sorts.
+  const encoded =
+    sortValue === "name_asc" ||
+    sortValue === "name_desc" ||
+    sortValue === "newest" ||
+    sortValue === "oldest";
+  const flip = !encoded && direction === "desc" ? -1 : 1;
+  if (sortValue === "name_asc") return byName(a.name, b.name);
+  if (sortValue === "name_desc") return byName(b.name, a.name);
   if (sortValue === "oldest") {
-    return flip * (closeStamp(a.closeDate) - closeStamp(b.closeDate));
+    return closeStamp(a.closeDate) - closeStamp(b.closeDate);
   }
   if (sortValue === "newest") {
-    return flip * (closeStamp(b.closeDate) - closeStamp(a.closeDate));
+    return closeStamp(b.closeDate) - closeStamp(a.closeDate);
   }
   if (sortValue === "value") {
     return flip * (valueAmount(a.value) - valueAmount(b.value));

@@ -214,11 +214,7 @@ export async function crmFetch<T>(
         init,
       ));
     } else if (res.status === 401) {
-      // Retrying handed back the exact same (locally-valid-looking) token —
-      // the session itself is revoked server-side, not just momentarily
-      // stale. No further retry can fix this; force a clean re-login.
-      void forceSignOutForDeadSession();
-      throw new Error("Your session has expired. Signing you out — please sign in again.");
+      throw new Error("CRM request was not authorized. Try again, or sign in again if this continues.");
     }
   }
 

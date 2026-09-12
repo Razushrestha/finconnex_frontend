@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { sessionRememberMe } from "@/lib/auth/constants";
 import {
   applyCrmTokenCookies,
   crmRevokeSession,
@@ -40,10 +41,14 @@ export async function DELETE(
       result.accessToken &&
       result.accessToken !== tokens.accessToken
     ) {
-      applyCrmTokenCookies(response, {
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken ?? tokens.refreshToken,
-      });
+      applyCrmTokenCookies(
+        response,
+        {
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken ?? tokens.refreshToken,
+        },
+        sessionRememberMe(session),
+      );
     }
     return response;
   } catch (err) {

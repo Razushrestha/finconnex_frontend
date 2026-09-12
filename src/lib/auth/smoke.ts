@@ -93,8 +93,29 @@ export function smokePublicAuthWiring() {
   if (!login.includes("/forgot-password")) {
     fail("login form does not link to forgot password");
   }
-  if (!login.includes("/api/auth/email-verification/resend")) {
-    fail("login form does not resend email verification");
+  if (!login.includes("rememberMe")) {
+    fail("login form does not send rememberMe");
+  }
+  if (!login.includes("Keep me signed in for 30 days")) {
+    fail("login form missing keep-me-signed-in label");
+  }
+
+  const me = readSrc("src/app/api/auth/me/route.ts");
+  if (me.includes("createSessionToken(mapped, false)")) {
+    fail("/api/auth/me must not remint the session as a 7-day login");
+  }
+  if (!me.includes("sessionRememberMe")) {
+    fail("/api/auth/me must preserve Keep me signed in");
+  }
+
+  const crmToken = readSrc("src/app/api/auth/crm-token/route.ts");
+  if (!crmToken.includes("sessionRememberMe")) {
+    fail("/api/auth/crm-token must preserve Keep me signed in cookie lifetime");
+  }
+
+  const crmReq = readSrc("src/lib/crm/request.ts");
+  if (crmReq.includes("forceSignOutForDeadSession();")) {
+    fail("CRM 401 must not force a full logout during normal use");
   }
 
   const forgot = readSrc("src/components/auth/ForgotPasswordForm.tsx");

@@ -148,8 +148,8 @@ export function EntityHeader({
   const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
 
-  // Sort panel is edited locally and only committed on "Apply"; "Cancel"
-  // (or clicking away) discards the pending edit.
+  // Sort options apply on click. Apply commits the highlighted option
+  // (defaults to Name A-Z when nothing is active yet).
   const [pendingSortField, setPendingSortField] = useState(activeSort ?? "");
   const [pendingSortDirection, setPendingSortDirection] =
     useState<SortDirection>(activeSortDirection);
@@ -188,6 +188,11 @@ export function EntityHeader({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  function commitSort(field: string, direction: SortDirection) {
+    onSortChange?.(field, direction);
+    setIsSortMenuOpen(false);
+  }
 
   const sortIsActive = Boolean(
     activeSort &&
@@ -283,11 +288,15 @@ export function EntityHeader({
               <button
                 type="button"
                 onClick={() => {
-                  setPendingSortField(
-                    sortOptions?.some((opt) => opt.value === activeSort)
-                      ? (activeSort ?? "")
-                      : "",
-                  );
+                  const current = sortOptions?.some(
+                    (opt) => opt.value === activeSort,
+                  )
+                    ? (activeSort ?? "")
+                    : (sortOptions?.find((opt) => opt.value === "name_asc")
+                        ?.value ??
+                      sortOptions?.[0]?.value ??
+                      "");
+                  setPendingSortField(current);
                   setPendingSortDirection(activeSortDirection);
                   setIsSortMenuOpen((open) => !open);
                 }}
@@ -311,31 +320,24 @@ export function EntityHeader({
                   <p className="mb-2 text-[12px] font-semibold text-slate-700 dark:text-slate-200">
                     Sort By
                   </p>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={pendingSortField}
-                      onChange={(e) => setPendingSortField(e.target.value)}
-                      aria-label="Sort field"
-                      className="h-8 flex-1 rounded-md border border-slate-200 bg-white px-2 text-[12px] text-slate-700 focus:border-violet-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-slate-200"
-                    >
-                      <option value="">None</option>
-                      {sortOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      value={pendingSortDirection}
-                      onChange={(e) =>
-                        setPendingSortDirection(e.target.value as SortDirection)
-                      }
-                      aria-label="Sort direction"
-                      className="h-8 w-32 shrink-0 rounded-md border border-slate-200 bg-white px-2 text-[12px] text-slate-700 focus:border-violet-400 focus:outline-none dark:border-zinc-700 dark:bg-zinc-900 dark:text-slate-200"
-                    >
-                      <option value="asc">Ascending</option>
-                      <option value="desc">Descending</option>
-                    </select>
+                  <div className="mb-2 flex flex-col gap-0.5">
+                    {sortOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          setPendingSortField(opt.value);
+                          commitSort(opt.value, pendingSortDirection);
+                        }}
+                        className={`rounded px-2.5 py-1.5 text-left text-[13px] font-medium ${
+                          opt.value === pendingSortField
+                            ? "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+                            : "text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-zinc-800"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
                   </div>
                   <div className="mt-3 flex justify-end gap-2">
                     <button
@@ -347,15 +349,14 @@ export function EntityHeader({
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        onSortChange?.(pendingSortField, pendingSortDirection);
-                        setIsSortMenuOpen(false);
-                      }}
+                      onClick={() =>
+                        commitSort(pendingSortField, pendingSortDirection)
+                      }
                       className="h-7 rounded-md bg-violet-600 px-3 text-[12px] font-semibold text-white hover:bg-violet-700"
                     >
                       Apply
                     </button>
-          </div>
+                  </div>
         </div>
               )}
             </div>

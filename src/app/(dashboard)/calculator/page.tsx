@@ -17,7 +17,8 @@ import { useRouter } from "next/navigation";
 import LoanRepaymentsView from "@/components/calculator/LoanRepaymentsView";
 import BorrowingCapacityView from "@/components/calculator/BorrowingCapacityView";
 import StampDutyFeesView from "@/components/calculator/StampDutyFeesView";
-import { Calculator, TrendingUp, FileText, History, Plus } from "lucide-react";
+import { CalculatorSourceBadge } from "@/components/calculator/CalculatorSourceBadge";
+import { Calculator, TrendingUp, FileText, History } from "lucide-react";
 
 export default function FinancialCalculatorPage() {
   const router = useRouter();
@@ -30,9 +31,15 @@ export default function FinancialCalculatorPage() {
       {/* Top Header & Breadcrumb */}
       <div className="max-w-7xl mx-auto mb-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div></div>
+          <div>
+            <h1 className="text-lg font-semibold text-slate-900">Calculator</h1>
+            <p className="mt-0.5 text-[12px] text-slate-500">
+              Loan, borrowing, and stamp duty tools
+            </p>
+          </div>
 
           <div className="flex items-center gap-3">
+            <CalculatorSourceBadge />
             <button
               onClick={() => router.push("/calculator/history")}
               className="flex items-center gap-2 px-4 py-2 text-xs font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 rounded-lg transition shadow-xs cursor-pointer"

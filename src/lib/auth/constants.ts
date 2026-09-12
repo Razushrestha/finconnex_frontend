@@ -28,6 +28,12 @@ export function getAuthSecretKey(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
+export function sessionRememberMe(
+  session: { rememberMe?: boolean } | null | undefined,
+): boolean {
+  return session?.rememberMe === true;
+}
+
 export function getSessionCookieOptions(rememberMe = false) {
   const maxAge = rememberMe ? REMEMBER_MAX_AGE : SESSION_MAX_AGE;
 

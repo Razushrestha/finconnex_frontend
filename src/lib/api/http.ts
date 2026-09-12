@@ -125,16 +125,9 @@ export async function httpRequest<T>(
       if (next?.accessToken && next.accessToken !== session?.accessToken) {
         res = await doFetch(next.accessToken, controller.signal);
       } else {
-        // Retrying handed back the exact same (locally-valid-looking) token —
-        // the session is revoked server-side, not just momentarily stale.
-        const { forceSignOutForDeadSession } = await import(
-          "@/lib/crm/request"
-        );
-        void forceSignOutForDeadSession();
         throw new ApiError(401, {
           code: "UNAUTHORIZED",
-          message:
-            "Your session has expired. Signing you out — please sign in again.",
+          message: "This request was not authorized. Try again, or sign in again if this continues.",
         });
       }
     }

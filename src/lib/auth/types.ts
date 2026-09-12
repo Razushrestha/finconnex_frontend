@@ -26,6 +26,8 @@ export interface SessionPayload {
    * as `true` so already-scoped sessions aren't sent back to onboarding.
    */
   hasWorkspace?: boolean;
+  /** Login "Keep me signed in for 30 days" — sliding cookie + JWT lifetime. */
+  rememberMe?: boolean;
 }
 
 export interface LoginCredentials {

@@ -61,6 +61,7 @@ export async function POST(request: Request) {
         tenantId: pending.tenantId,
         tenantSlug: pending.tenantSlug,
         tenantName: pending.tenantName,
+        rememberMe: pending.rememberMe,
       },
       pending.rememberMe,
     );

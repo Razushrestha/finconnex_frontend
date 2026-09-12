@@ -1,7 +1,6 @@
-import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
-import { localUploadDiskPath } from "@/lib/storage/local-fallback";
+import { readLocalUpload } from "@/lib/storage/local-fallback";
 
 type Ctx = { params: Promise<{ id: string; name: string }> };
 
@@ -16,8 +15,8 @@ export async function GET(_request: Request, ctx: Ctx) {
   }
   const fileName = decodeURIComponent(name);
   try {
-    const bytes = await readFile(localUploadDiskPath(id, fileName));
-    return new NextResponse(bytes, {
+    const bytes = await readLocalUpload(id, fileName);
+    return new NextResponse(new Uint8Array(bytes), {
       headers: {
         "Content-Type": "application/octet-stream",
         "Content-Length": String(bytes.byteLength),

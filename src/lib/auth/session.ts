@@ -28,11 +28,12 @@ export type Pending2faPayload = {
 
 export async function createSessionToken(
   payload: SessionPayload,
-  rememberMe = false,
+  rememberMe = payload.rememberMe === true,
 ): Promise<string> {
-  const maxAge = rememberMe ? REMEMBER_MAX_AGE : SESSION_MAX_AGE;
+  const persist = rememberMe || payload.rememberMe === true;
+  const maxAge = persist ? REMEMBER_MAX_AGE : SESSION_MAX_AGE;
 
-  return new SignJWT({ ...payload })
+  return new SignJWT({ ...payload, rememberMe: persist })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${maxAge}s`)

@@ -269,6 +269,7 @@ export async function inviteCrmWorkspaceMember(input: {
   name?: string;
   role: HierarchyLevel;
   team?: string;
+  password?: string;
   joinImmediately?: boolean;
 }): Promise<WorkspaceMember | null> {
   const session = await requireSession();
@@ -281,6 +282,8 @@ export async function inviteCrmWorkspaceMember(input: {
   if (name) body.name = name;
   const team = input.team?.trim();
   if (team) body.team = team;
+  const password = input.password?.trim();
+  if (password) body.password = password;
   if (input.joinImmediately === true) body.joinImmediately = true;
   return asMember(
     await membersCrm(workspaceMembersPath(session.workspaceId), {

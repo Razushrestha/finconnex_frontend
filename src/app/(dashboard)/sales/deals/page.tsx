@@ -394,8 +394,12 @@ export default function DealsPage() {
         activeSort={activeSort}
         activeSortDirection={activeSortDirection}
         onSortChange={(field, direction) => {
-          setActiveSort(field || "Sort");
+          const next = field || "Sort";
+          setActiveSort(next);
           setActiveSortDirection(direction);
+          // Kanban only reorders cards inside a column, so Name A-Z often
+          // looks like a no-op. List view sorts every visible deal.
+          if (next !== "Sort") setViewMode("list");
         }}
         importOptions={importOptions}
         actionOptions={actionOptions}

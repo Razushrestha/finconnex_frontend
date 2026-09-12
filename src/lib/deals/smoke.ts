@@ -176,6 +176,9 @@ export function smokeDealsWiring() {
   if (!page.includes("sortDirection={activeSortDirection}")) {
     fail("deals page does not pass sort direction into the board/list");
   }
+  if (!page.includes('if (next !== "Sort") setViewMode("list")')) {
+    fail("deals sort must switch to list view so Name A-Z is visible");
+  }
 
   smokeDealsSort();
 }
@@ -218,6 +221,13 @@ export function smokeDealsSort() {
     fail("Name (A-Z) did not reorder deals");
   }
 
+  const zaWithDesc = sortDealCards(cards, "name_asc", "desc");
+  if (
+    zaWithDesc.map((c) => c.name).join(",") !==
+    "Acme Fitout,Midtown Loan,Zenith Roof"
+  ) {
+    fail("Name (A-Z) must stay A-Z even if direction is desc");
+  }
   const za = sortDealCards(cards, "name_desc");
   if (
     za.map((c) => c.name).join(",") !== "Zenith Roof,Midtown Loan,Acme Fitout"

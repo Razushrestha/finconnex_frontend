@@ -88,7 +88,10 @@ export async function POST(request: Request) {
         scoped.workspace,
         scoped.accessToken,
       );
-      const token = await createSessionToken(sessionFields, rememberMe);
+      const token = await createSessionToken(
+        { ...sessionFields, rememberMe: Boolean(rememberMe) },
+        rememberMe,
+      );
       const response = NextResponse.json({
         requires2fa: false,
         source: "crm",

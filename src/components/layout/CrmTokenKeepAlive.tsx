@@ -15,8 +15,12 @@ type TokenPayload = {
 
 async function syncCrmTokens(): Promise<number> {
   const res = await fetch("/api/auth/crm-token", { credentials: "same-origin" });
+  if (res.status === 401) return MIN_WAIT_MS;
   if (!res.ok) return MIN_WAIT_MS;
   const json = (await res.json()) as TokenPayload;
+  if (json.authenticated === false) {
+    return MIN_WAIT_MS;
+  }
   if (json.accessToken) {
     persistCrmTokens({
       accessToken: json.accessToken,

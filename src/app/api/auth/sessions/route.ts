@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
+import { sessionRememberMe } from "@/lib/auth/constants";
 import {
   applyCrmTokenCookies,
   crmListSessions,
@@ -48,10 +49,14 @@ export async function GET() {
       listed.accessToken &&
       listed.accessToken !== tokens.accessToken
     ) {
-      applyCrmTokenCookies(response, {
-        accessToken: listed.accessToken,
-        refreshToken: listed.refreshToken ?? tokens.refreshToken,
-      });
+      applyCrmTokenCookies(
+        response,
+        {
+          accessToken: listed.accessToken,
+          refreshToken: listed.refreshToken ?? tokens.refreshToken,
+        },
+        sessionRememberMe(session),
+      );
     }
     return response;
   } catch (err) {

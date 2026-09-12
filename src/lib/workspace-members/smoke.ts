@@ -110,6 +110,9 @@ export function smokeWorkspaceMembersWiring() {
       fail(`workspace-members client missing ${name}`);
     }
   }
+  if (!api.includes("if (password) body.password = password")) {
+    fail("inviteCrmWorkspaceMember must send password when provided");
+  }
 
   const catalog = readSrc("src/lib/api/endpoints.ts");
   for (const fragment of [
@@ -149,6 +152,9 @@ export function smokeWorkspaceMembersWiring() {
     if (!ui.includes(name)) {
       fail(`Users settings does not call ${name}`);
     }
+  }
+  if (!ui.includes('type="password"')) {
+    fail("Users invite form missing password field");
   }
 
   const hook = readSrc("src/lib/workspace-members/use-crm-workspace-members.ts");
@@ -215,6 +221,7 @@ export async function smokeWorkspaceMembersMock() {
     await inviteCrmWorkspaceMember({
       email: "new@example.com",
       role: "User",
+      password: "secret123",
     });
     await updateCrmWorkspaceMember(MEMBER_ID, { role: "Manager" });
     await resendCrmWorkspaceInvitation(MEMBER_ID);

@@ -2,7 +2,11 @@ import "server-only";
 
 import type { NextResponse } from "next/server";
 import { createSessionToken } from "@/lib/auth/session";
-import { getSessionCookieOptions, SESSION_COOKIE } from "@/lib/auth/constants";
+import {
+  getSessionCookieOptions,
+  SESSION_COOKIE,
+  sessionRememberMe,
+} from "@/lib/auth/constants";
 import type { SessionPayload } from "@/lib/auth/types";
 import {
   applyCrmTokenCookies,
@@ -29,6 +33,7 @@ export async function remintSessionForWorkspace(
     tokens.refreshToken,
   );
 
+  const remember = sessionRememberMe(session);
   const nextSession = await createSessionToken(
     {
       ...session,
@@ -36,17 +41,22 @@ export async function remintSessionForWorkspace(
       tenantSlug: workspace.slug,
       tenantName: workspace.name,
       hasWorkspace: true,
+      rememberMe: remember,
     },
-    false,
+    remember,
   );
 
-  applyCrmTokenCookies(response, {
-    accessToken: selected.data.accessToken,
-    refreshToken: selected.refreshToken ?? tokens.refreshToken,
-  });
+  applyCrmTokenCookies(
+    response,
+    {
+      accessToken: selected.data.accessToken,
+      refreshToken: selected.refreshToken ?? tokens.refreshToken,
+    },
+    remember,
+  );
   response.cookies.set(
     SESSION_COOKIE,
     nextSession,
-    getSessionCookieOptions(false),
+    getSessionCookieOptions(remember),
   );
 }

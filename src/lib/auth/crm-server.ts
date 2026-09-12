@@ -133,12 +133,11 @@ export function applyCrmTokenCookies(
     maxAge: tokenMaxAgeSeconds(tokens.accessToken, CRM_ACCESS_FALLBACK_MAX_AGE),
   });
   if (tokens.refreshToken) {
+    const refreshFallback = rememberMe ? REMEMBER_MAX_AGE : SESSION_MAX_AGE;
+    const refreshAge = tokenMaxAgeSeconds(tokens.refreshToken, refreshFallback);
     response.cookies.set(CRM_REFRESH_COOKIE, tokens.refreshToken, {
       ...base,
-      maxAge: tokenMaxAgeSeconds(
-        tokens.refreshToken,
-        rememberMe ? REMEMBER_MAX_AGE : SESSION_MAX_AGE,
-      ),
+      maxAge: rememberMe ? Math.max(refreshAge, REMEMBER_MAX_AGE) : refreshAge,
     });
   }
 }

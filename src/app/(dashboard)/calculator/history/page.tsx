@@ -8,6 +8,7 @@ import {
   removeCalculatorRecord,
   type CalculationRecord,
 } from "@/lib/utils/calculatorHistory";
+import { CalculatorSourceBadge } from "@/components/calculator/CalculatorSourceBadge";
 import {
   getCrmCalculation,
   isCrmCalculationId,
@@ -17,7 +18,6 @@ import {
 export default function CalculatorHistoryPage() {
   const [history, setHistory] = useState<CalculationRecord[]>([]);
   const [activeFilter, setActiveFilter] = useState<string>("All");
-  const [source, setSource] = useState<"api" | "local">("local");
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<CalculationRecord | null>(null);
 
@@ -25,7 +25,6 @@ export default function CalculatorHistoryPage() {
     setLoading(true);
     const next = await loadCalculatorHistory();
     setHistory(next.records);
-    setSource(next.source);
     setLoading(false);
   }
 
@@ -100,15 +99,7 @@ export default function CalculatorHistoryPage() {
         </Link>
 
         <div className="flex items-center gap-2">
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-              source === "api"
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-slate-100 text-slate-500"
-            }`}
-          >
-            {loading ? "Connecting…" : source === "api" ? "Live CRM" : "Demo"}
-          </span>
+          <CalculatorSourceBadge />
           <button
             onClick={() => void handleClearHistory()}
             className="px-4 py-2 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-medium hover:bg-rose-100 dark:hover:bg-rose-900/50 transition shadow-xs cursor-pointer"

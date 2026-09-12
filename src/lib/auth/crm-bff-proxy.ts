@@ -4,6 +4,7 @@ import {
   applyCrmTokenCookies,
   resolveLiveCrmAuth,
 } from "@/lib/auth/crm-server";
+import { sessionRememberMe } from "@/lib/auth/constants";
 import {
   createTwilioVoiceCall,
   parseDialPath,
@@ -103,9 +104,11 @@ export async function proxyCrmV1(
 
   const isPublic = path[0] === "public";
   let auth: Awaited<ReturnType<typeof resolveLiveCrmAuth>> = null;
+  let rememberMe = false;
 
   if (!isPublic) {
     const session = await getSession();
+    rememberMe = sessionRememberMe(session);
     if (!session) {
       return NextResponse.json(
         { message: "Sign in to continue" },
@@ -166,13 +169,14 @@ export async function proxyCrmV1(
         data: stored,
       });
       status = 201;
-    } catch (err) {
-      text = JSON.stringify({
-        message:
-          err instanceof Error
-            ? err.message
-            : "Could not store the file locally after CRM storage failed.",
-      });
+      } catch (err) {
+        const raw =
+          err instanceof Error ? err.message : "Could not store the file locally after CRM storage failed.";
+        text = JSON.stringify({
+          message: /enoent|mkdir ['"]?\/var\/task|erofs/i.test(raw)
+            ? "Could not save the file on this host. Retry the upload."
+            : raw,
+        });
       status = 502;
     }
   }
@@ -239,10 +243,14 @@ export async function proxyCrmV1(
   });
 
   if (auth?.accessToken) {
-    applyCrmTokenCookies(response, {
-      accessToken: auth.accessToken,
-      refreshToken: auth.refreshToken,
-    });
+    applyCrmTokenCookies(
+      response,
+      {
+        accessToken: auth.accessToken,
+        refreshToken: auth.refreshToken,
+      },
+      rememberMe,
+    );
   }
 
   return response;

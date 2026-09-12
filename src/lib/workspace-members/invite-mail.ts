@@ -5,6 +5,7 @@ export async function sendWorkspaceInviteMail(input: {
   name?: string;
   role: string;
   team?: string;
+  password?: string;
 }): Promise<void> {
   const origin =
     typeof window !== "undefined" ? window.location.origin : "";
@@ -22,6 +23,9 @@ export async function sendWorkspaceInviteMail(input: {
       "",
       `You have been invited to FinConnex as ${input.role}.`,
       teamLine,
+      input.password?.trim()
+        ? `Temporary password: ${input.password.trim()}`
+        : "",
       "",
       "Use the secure invitation link from this workspace if you received one.",
       `You can also open: ${acceptUrl}`,

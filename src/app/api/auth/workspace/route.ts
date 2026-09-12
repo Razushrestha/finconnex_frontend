@@ -8,6 +8,7 @@ import {
   readCrmTokens,
 } from "@/lib/auth/crm-server";
 import { remintSessionForWorkspace } from "@/lib/auth/workspace-session";
+import { sessionRememberMe } from "@/lib/auth/constants";
 
 export async function GET() {
   const session = await getSession();
@@ -45,10 +46,14 @@ export async function GET() {
       listed.accessToken &&
       listed.accessToken !== tokens.accessToken
     ) {
-      applyCrmTokenCookies(response, {
-        accessToken: listed.accessToken,
-        refreshToken: listed.refreshToken ?? tokens.refreshToken,
-      });
+      applyCrmTokenCookies(
+        response,
+        {
+          accessToken: listed.accessToken,
+          refreshToken: listed.refreshToken ?? tokens.refreshToken,
+        },
+        sessionRememberMe(session),
+      );
     }
     return response;
   } catch (err) {
