@@ -10,10 +10,7 @@ import {
   regenerateBackupCodes,
   type TwoFactorConfig,
 } from "@/lib/auth/two-factor";
-import {
-  patchCrmWorkspaceSettings,
-  tryCrmSettings,
-} from "@/lib/settings/api";
+import { patchCrmWorkspaceSettings } from "@/lib/settings/api";
 import { useCrmSettings } from "@/lib/settings/use-crm-settings";
 import { cn } from "@/lib/utils";
 
@@ -106,15 +103,33 @@ export function TwoFactorSettingsClient() {
             onChange={(e) => {
               const next = e.target.checked;
               setEnforce(next);
-              void tryCrmSettings(() =>
-                patchCrmWorkspaceSettings({
-                  enforce2FA: next,
-                  expectedRevision: crm.settings?.revision,
-                }),
-              ).then((patched) => {
-                if (patched) crm.setSettings(patched);
-                flash(next ? "Workspace 2FA enforced" : "Workspace 2FA optional");
-              });
+              void patchCrmWorkspaceSettings({
+                enforce2FA: next,
+                expectedRevision: crm.settings?.revision,
+              })
+                .then((patched) => {
+                  crm.setSettings(patched);
+                  crm.setSecurity(
+                    crm.security
+                      ? { ...crm.security, enforce2FA: next }
+                      : {
+                          passwordMinLength: patched.passwordMinLength ?? 8,
+                          enforce2FA: next,
+                          ipAllowlist: patched.ipAllowlist ?? [],
+                          sessionTimeoutMinutes:
+                            patched.sessionTimeoutMinutes ?? 480,
+                        },
+                  );
+                  flash(next ? "Workspace 2FA enforced" : "Workspace 2FA optional");
+                })
+                .catch((err: unknown) => {
+                  setEnforce(!next);
+                  flash(
+                    err instanceof Error
+                      ? err.message
+                      : "Could not update 2FA policy",
+                  );
+                });
             }}
             className="h-4 w-4 rounded border-slate-300 text-violet-600"
           />

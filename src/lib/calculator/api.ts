@@ -1,9 +1,10 @@
 import {
   ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
   isUuid,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import {
   CALCULATOR_TYPES,
   formatCalcAt,
@@ -77,6 +78,12 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
 
 export function mapCalculatorType(raw: string): CalculatorType {
   const value = raw.toLowerCase().replace(/[_-]/g, " ").trim();
+  const compact = value.replace(/\s+/g, "");
+  if (compact.includes("loan") || compact.includes("repay")) return "Loan";
+  if (compact.includes("borrow") || compact.includes("capacity")) {
+    return "Custom";
+  }
+  if (compact.includes("stamp") || compact.includes("duty")) return "Tax";
   const match = CALCULATOR_TYPES.find((t) => t.toLowerCase() === value);
   return match ?? "Custom";
 }
@@ -153,6 +160,9 @@ async function calculationsRequest(
   suffix: string,
   init?: RequestInit,
 ): Promise<unknown> {
+  if (!isBoundCrmSession()) {
+    return crmBffFetch(calculationsPath(suffix), init);
+  }
   const auth = await resolveAuth();
   if (!auth) throw new Error("Sign in to manage calculations");
   return crmFetch(auth, calculationsPath(suffix), init);
@@ -226,15 +236,16 @@ export function toCreateCalculationBody(input: {
   formula: string;
   sharedWith?: string;
 }): Record<string, unknown> {
-  return {
+  const body: Record<string, unknown> = {
     title: input.title,
     type: input.type.toUpperCase(),
     currency: input.currency,
     inputs: input.inputs,
     result: input.result,
     formula: input.formula,
-    sharedWith: input.sharedWith,
   };
+  if (input.sharedWith?.trim()) body.sharedWith = input.sharedWith.trim();
+  return body;
 }
 
 export function isCrmCalculationId(id: string): boolean {

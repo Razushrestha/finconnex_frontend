@@ -16,6 +16,8 @@ describe("calculator spec helpers", () => {
   it("maps API calculator kinds", () => {
     expect(mapCalculatorType("COMMISSION")).toBe("Commission");
     expect(mapCalculatorType("loan")).toBe("Loan");
+    expect(mapCalculatorType("Loan (Principal & Interest)")).toBe("Loan");
+    expect(mapCalculatorType("Borrowing Capacity")).toBe("Custom");
     expect(mapCalculatorType("CURRENCY")).toBe("Currency");
   });
 

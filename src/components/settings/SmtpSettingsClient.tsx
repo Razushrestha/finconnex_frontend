@@ -13,13 +13,18 @@ import {
   queueCrmSmtpTest,
   smtpFromWorkspaceSettings,
   smtpToSettingsPatch,
-  tryCrmSettings,
   patchCrmWorkspaceSettings,
 } from "@/lib/settings/api";
 import { useCrmSettings } from "@/lib/settings/use-crm-settings";
 import { cn } from "@/lib/utils";
 
-const TERMINAL = new Set(["completed", "failed", "success", "error"]);
+const TERMINAL = new Set([
+  "completed",
+  "failed",
+  "success",
+  "succeeded",
+  "error",
+]);
 
 /** Settings → Communication → SMTP (`GET/PATCH /v1/settings`, SMTP test jobs). */
 export function SmtpSettingsClient() {
@@ -44,20 +49,22 @@ export function SmtpSettingsClient() {
 
   async function save() {
     setCfg(saveSmtpConfig(cfg));
-    if (crm.source === "api") {
-      const patched = await tryCrmSettings(() =>
-        patchCrmWorkspaceSettings(
-          smtpToSettingsPatch(cfg, password || undefined, crm.settings?.revision),
-        ),
-      );
-      if (patched) {
-        crm.setSettings(patched);
-        setPassword("");
-        flash("SMTP settings saved to CRM");
-        return;
-      }
+    if (crm.source !== "api") {
+      flash("SMTP settings saved");
+      return true;
     }
-    flash("SMTP settings saved");
+    try {
+      const patched = await patchCrmWorkspaceSettings(
+        smtpToSettingsPatch(cfg, password || undefined, crm.settings?.revision),
+      );
+      crm.setSettings(patched);
+      setPassword("");
+      flash("SMTP settings saved to CRM");
+      return true;
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "CRM rejected SMTP settings");
+      return false;
+    }
   }
 
   async function testSend() {
@@ -67,37 +74,46 @@ export function SmtpSettingsClient() {
       return;
     }
     setBusy(true);
-    const queued = await tryCrmSettings(() => queueCrmSmtpTest(to));
-    if (!queued) {
+    const saved = await save();
+    if (!saved && crm.source === "api") {
       setBusy(false);
-      flash("Could not queue SMTP test — sign in with a workspace session");
       return;
     }
-    const jobId = queued.jobId || queued.id;
-    if (!jobId) {
-      setBusy(false);
-      flash(`Test ${queued.state}`);
-      return;
-    }
-    flash(`Test queued (${jobId})`);
-    for (let i = 0; i < 12; i += 1) {
-      await new Promise((r) => window.setTimeout(r, 1500));
-      const status = await tryCrmSettings(() => getCrmSmtpTestStatus(jobId));
-      if (!status) break;
-      const state = status.state.toLowerCase();
-      if (TERMINAL.has(state)) {
+    try {
+      const queued = await queueCrmSmtpTest(to);
+      const jobId = queued.jobId || queued.id;
+      if (!jobId) {
+        flash(`Test ${queued.state}`);
         setBusy(false);
-        if (status.error) flash(`Test ${state}: ${status.error}`);
-        else if (status.result?.reachable === false) {
-          flash(`SMTP unreachable (${status.result.host}:${status.result.port})`);
-        } else {
-          flash(`Test ${state}`);
-        }
         return;
       }
+      flash(`Test queued (${jobId})`);
+      for (let i = 0; i < 12; i += 1) {
+        await new Promise((r) => window.setTimeout(r, 1500));
+        const status = await getCrmSmtpTestStatus(jobId);
+        const state = status.state.toLowerCase();
+        if (TERMINAL.has(state)) {
+          if (status.error) flash(`Test ${state}: ${status.error}`);
+          else if (status.result?.reachable === false) {
+            flash(
+              `SMTP unreachable (${status.result.host}:${status.result.port})`,
+            );
+          } else {
+            flash(
+              status.result?.reachable
+                ? `SMTP reachable (${status.result.host || cfg.host})`
+                : `Test ${state}`,
+            );
+          }
+          setBusy(false);
+          return;
+        }
+      }
+      flash("Test still running — check again shortly");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Could not queue SMTP test");
     }
     setBusy(false);
-    flash("Test still running — check again shortly");
   }
 
   return (

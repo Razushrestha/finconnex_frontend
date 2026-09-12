@@ -126,6 +126,96 @@ function asRecord(data: unknown): Record<string, unknown> {
   return {};
 }
 
+/** CRM envelopes sometimes nest `{ data: { settings } }` even after unwrap. */
+function unwrapSettingsRecord(raw: unknown): Record<string, unknown> {
+  let rec = asRecord(raw);
+  if (rec.data && typeof rec.data === "object" && !Array.isArray(rec.data)) {
+    rec = asRecord(rec.data);
+  }
+  if (rec.settings && typeof rec.settings === "object" && !Array.isArray(rec.settings)) {
+    rec = asRecord(rec.settings);
+  }
+  return rec;
+}
+
+function pickStrList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => {
+      if (typeof item === "string" && item.trim()) return [item.trim()];
+      const rec = asRecord(item);
+      const name = pickStr(rec.key, rec.module, rec.name, rec.id);
+      const on = rec.enabled;
+      if (name && on === false) return [];
+      return name ? [name] : [];
+    });
+  }
+  if (value && typeof value === "object") {
+    return Object.entries(asRecord(value))
+      .filter(([, on]) => on === true || on === "true" || on === 1)
+      .map(([key]) => key);
+  }
+  return [];
+}
+
+function canonModule(name: string) {
+  return name.trim().toLowerCase().replace(/[\s_]+/g, "");
+}
+
+export const SETTINGS_MODULE_FLAGS = [
+  { key: "leads", flag: "enableLeads" },
+  { key: "deals", flag: "enableDeals" },
+  { key: "projects", flag: "enableProjects" },
+  { key: "posts", flag: "enablePosts" },
+] as const;
+
+export type SettingsModuleFlag = (typeof SETTINGS_MODULE_FLAGS)[number]["flag"];
+
+export function flagsFromCapabilities(
+  caps: CrmCapabilities | null | undefined,
+  fallback?: Pick<
+    CrmWorkspaceSettings,
+    "enableLeads" | "enableDeals" | "enableProjects" | "enablePosts"
+  >,
+): Record<SettingsModuleFlag, boolean> {
+  const enabled = new Set((caps?.enabled ?? []).map(canonModule));
+  const fromList = enabled.size > 0;
+  return {
+    enableLeads: fromList
+      ? enabled.has("leads")
+      : (fallback?.enableLeads ?? true),
+    enableDeals: fromList
+      ? enabled.has("deals")
+      : (fallback?.enableDeals ?? true),
+    enableProjects: fromList
+      ? enabled.has("projects")
+      : (fallback?.enableProjects ?? true),
+    enablePosts: fromList
+      ? enabled.has("posts")
+      : (fallback?.enablePosts ?? false),
+  };
+}
+
+export function capabilitiesFromFlags(
+  flags: Record<SettingsModuleFlag, boolean>,
+  workspaceId?: string,
+  revision?: number,
+): CrmCapabilities {
+  return {
+    workspaceId,
+    enabled: SETTINGS_MODULE_FLAGS.filter((m) => flags[m.flag]).map((m) => m.key),
+    revision,
+  };
+}
+
+function isRevisionConflict(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /409|revision|conflict/i.test(msg);
+}
+
+export function smtpIdempotencyKey(recipient: string) {
+  return `smtp-test:${recipient.trim().toLowerCase()}`;
+}
+
 function pickStr(...values: unknown[]): string {
   for (const value of values) {
     if (typeof value === "string" && value.trim()) return value.trim();
@@ -150,65 +240,122 @@ function pickNum(value: unknown, fallback = 0): number {
 export function normalizeCrmWorkspaceSettings(
   raw: unknown,
 ): CrmWorkspaceSettings {
-  const rec = asRecord(raw);
-  const ip = rec.ipAllowlist;
+  const rec = unwrapSettingsRecord(raw);
+  const ip = rec.ipAllowlist ?? rec.ipWhitelist ?? rec.ip_allowlist;
   return {
     id: pickStr(rec.id) || undefined,
-    workspaceId: pickStr(rec.workspaceId) || undefined,
-    logoUrl: pickStr(rec.logoUrl) || null,
-    faviconUrl: pickStr(rec.faviconUrl) || null,
-    primaryColor: pickStr(rec.primaryColor) || null,
-    secondaryColor: pickStr(rec.secondaryColor) || null,
-    customDomain: pickStr(rec.customDomain) || null,
+    workspaceId: pickStr(rec.workspaceId, rec.workspace_id) || undefined,
+    logoUrl: pickStr(rec.logoUrl, rec.logo_url) || null,
+    faviconUrl: pickStr(rec.faviconUrl, rec.favicon_url) || null,
+    primaryColor: pickStr(rec.primaryColor, rec.primary_color) || null,
+    secondaryColor: pickStr(rec.secondaryColor, rec.secondary_color) || null,
+    customDomain: pickStr(rec.customDomain, rec.custom_domain) || null,
     timezone: pickStr(rec.timezone) || "UTC",
-    dateFormat: pickStr(rec.dateFormat) || "YYYY-MM-DD",
+    dateFormat: pickStr(rec.dateFormat, rec.date_format) || "YYYY-MM-DD",
     currency: pickStr(rec.currency) || "USD",
     language: pickStr(rec.language) || "en",
-    enableLeads: pickBool(rec.enableLeads, true),
-    enableDeals: pickBool(rec.enableDeals, true),
-    enableProjects: pickBool(rec.enableProjects, true),
-    enablePosts: pickBool(rec.enablePosts, false),
-    passwordMinLength: pickNum(rec.passwordMinLength, 8),
-    enforce2FA: pickBool(rec.enforce2FA, false),
-    ipAllowlist: Array.isArray(ip)
-      ? ip.filter((v): v is string => typeof v === "string")
-      : [],
-    sessionTimeoutMinutes: pickNum(rec.sessionTimeoutMinutes, 480),
-    smtpHost: pickStr(rec.smtpHost) || null,
-    smtpPort: rec.smtpPort == null ? null : pickNum(rec.smtpPort, 587),
-    smtpUser: pickStr(rec.smtpUser) || null,
-    smtpFromEmail: pickStr(rec.smtpFromEmail) || null,
-    smtpFromName: pickStr(rec.smtpFromName) || null,
+    enableLeads: pickBool(rec.enableLeads ?? rec.enable_leads, true),
+    enableDeals: pickBool(rec.enableDeals ?? rec.enable_deals, true),
+    enableProjects: pickBool(rec.enableProjects ?? rec.enable_projects, true),
+    enablePosts: pickBool(rec.enablePosts ?? rec.enable_posts, false),
+    passwordMinLength: pickNum(
+      rec.passwordMinLength ?? rec.password_min_length,
+      8,
+    ),
+    enforce2FA: pickBool(
+      rec.enforce2FA ?? rec.enforce2fa ?? rec.require2FA,
+      false,
+    ),
+    ipAllowlist: pickStrList(ip),
+    sessionTimeoutMinutes: pickNum(
+      rec.sessionTimeoutMinutes ?? rec.sessionTimeout ?? rec.session_timeout_minutes,
+      480,
+    ),
+    smtpHost: pickStr(rec.smtpHost, rec.smtp_host) || null,
+    smtpPort:
+      rec.smtpPort == null && rec.smtp_port == null
+        ? null
+        : pickNum(rec.smtpPort ?? rec.smtp_port, 587),
+    smtpUser: pickStr(rec.smtpUser, rec.smtp_user) || null,
+    smtpFromEmail: pickStr(rec.smtpFromEmail, rec.smtp_from_email) || null,
+    smtpFromName: pickStr(rec.smtpFromName, rec.smtp_from_name) || null,
     revision: pickNum(rec.revision, 1),
-    createdAt: pickStr(rec.createdAt) || undefined,
-    updatedAt: pickStr(rec.updatedAt) || undefined,
+    createdAt: pickStr(rec.createdAt, rec.created_at) || undefined,
+    updatedAt: pickStr(rec.updatedAt, rec.updated_at) || undefined,
   };
 }
 
 export function normalizeCrmSecuritySettings(
   raw: unknown,
 ): CrmSecuritySettings {
-  const rec = asRecord(raw);
-  const ip = rec.ipAllowlist;
+  const rec = unwrapSettingsRecord(raw);
+  const ip = rec.ipAllowlist ?? rec.ipWhitelist ?? rec.ip_allowlist;
   return {
-    passwordMinLength: pickNum(rec.passwordMinLength, 8),
-    enforce2FA: pickBool(rec.enforce2FA, false),
-    ipAllowlist: Array.isArray(ip)
-      ? ip.filter((v): v is string => typeof v === "string")
-      : [],
-    sessionTimeoutMinutes: pickNum(rec.sessionTimeoutMinutes, 480),
+    passwordMinLength: pickNum(
+      rec.passwordMinLength ?? rec.password_min_length,
+      8,
+    ),
+    enforce2FA: pickBool(
+      rec.enforce2FA ?? rec.enforce2fa ?? rec.require2FA,
+      false,
+    ),
+    ipAllowlist: pickStrList(ip),
+    sessionTimeoutMinutes: pickNum(
+      rec.sessionTimeoutMinutes ?? rec.sessionTimeout ?? rec.session_timeout_minutes,
+      480,
+    ),
   };
 }
 
 export function normalizeCrmCapabilities(raw: unknown): CrmCapabilities {
-  const rec = asRecord(raw);
-  const enabled = rec.enabled;
+  const rec = unwrapSettingsRecord(raw);
+  const enabled = pickStrList(
+    rec.enabled ?? rec.modules ?? rec.capabilities ?? rec.flags,
+  ).map((name) => {
+    const lower = canonModule(name);
+    const known = SETTINGS_MODULE_FLAGS.find((m) => m.key === lower);
+    return known?.key ?? lower;
+  });
   return {
-    workspaceId: pickStr(rec.workspaceId) || undefined,
-    enabled: Array.isArray(enabled)
-      ? enabled.filter((v): v is string => typeof v === "string")
-      : [],
+    workspaceId: pickStr(rec.workspaceId, rec.workspace_id) || undefined,
+    enabled,
     revision: pickNum(rec.revision, 1),
+  };
+}
+
+export function normalizeCrmSmtpTestJob(
+  raw: unknown,
+  fallbackId?: string,
+): CrmSmtpTestJob {
+  const rec = unwrapSettingsRecord(raw);
+  const nested = asRecord(rec.job ?? rec.result);
+  const resultRaw =
+    rec.result && typeof rec.result === "object" ? asRecord(rec.result) : nested;
+  const state = pickStr(
+    rec.state,
+    rec.status,
+    nested.state,
+    nested.status,
+    "queued",
+  ).toLowerCase();
+  return {
+    jobId: pickStr(rec.jobId, rec.id, nested.jobId, nested.id, fallbackId),
+    id: pickStr(rec.id, rec.jobId, nested.id, fallbackId),
+    state: state || "queued",
+    result: {
+      reachable:
+        typeof resultRaw.reachable === "boolean"
+          ? resultRaw.reachable
+          : undefined,
+      host: pickStr(resultRaw.host) || undefined,
+      port:
+        resultRaw.port == null ? undefined : pickNum(resultRaw.port, 0) || undefined,
+      testedAt: pickStr(resultRaw.testedAt, resultRaw.tested_at) || undefined,
+    },
+    error:
+      /fail|error/.test(state)
+        ? pickStr(rec.error, rec.message, nested.error) || undefined
+        : pickStr(rec.error, nested.error) || undefined,
   };
 }
 
@@ -250,6 +397,7 @@ export function valuesToSettingsPatch(
     if (!(field in values)) continue;
     const value = values[field];
     if (value === undefined) continue;
+    if ((key === "logoKey" || key === "faviconKey") && value === "") continue;
     (patch as Record<string, unknown>)[key] = value;
   }
   if (expectedRevision != null) patch.expectedRevision = expectedRevision;
@@ -316,12 +464,20 @@ export async function getCrmWorkspaceSettings(): Promise<CrmWorkspaceSettings> {
 export async function patchCrmWorkspaceSettings(
   patch: CrmSettingsPatch,
 ): Promise<CrmWorkspaceSettings> {
-  return normalizeCrmWorkspaceSettings(
-    await settingsMutate("", {
+  const run = (body: CrmSettingsPatch) =>
+    settingsMutate("", {
       method: "PATCH",
-      body: JSON.stringify(patch),
-    }),
-  );
+      body: JSON.stringify(body),
+    });
+  try {
+    return normalizeCrmWorkspaceSettings(await run(patch));
+  } catch (err) {
+    if (!isRevisionConflict(err)) throw err;
+    const fresh = await getCrmWorkspaceSettings();
+    return normalizeCrmWorkspaceSettings(
+      await run({ ...patch, expectedRevision: fresh.revision }),
+    );
+  }
 }
 
 export async function getCrmSecuritySettings(): Promise<CrmSecuritySettings> {
@@ -335,34 +491,24 @@ export async function getCrmWorkspaceCapabilities(): Promise<CrmCapabilities> {
 export async function queueCrmSmtpTest(
   recipient: string,
 ): Promise<CrmSmtpTestJob> {
-  const data = asRecord(
+  const to = recipient.trim();
+  const key = smtpIdempotencyKey(to);
+  return normalizeCrmSmtpTestJob(
     await settingsMutate("/smtp-test", {
       method: "POST",
-      body: JSON.stringify({ recipient }),
+      headers: { "Idempotency-Key": key },
+      body: JSON.stringify({ recipient: to }),
     }),
   );
-  return {
-    jobId: pickStr(data.jobId, data.id),
-    id: pickStr(data.id, data.jobId),
-    state: pickStr(data.state, "queued") || "queued",
-  };
 }
 
 export async function getCrmSmtpTestStatus(
   jobId: string,
 ): Promise<CrmSmtpTestJob> {
-  const data = asRecord(await settingsGet(`/smtp-test/${jobId}`));
-  const result =
-    data.result && typeof data.result === "object"
-      ? (data.result as CrmSmtpTestJob["result"])
-      : undefined;
-  return {
-    jobId: pickStr(data.jobId, data.id, jobId),
-    id: pickStr(data.id, data.jobId, jobId),
-    state: pickStr(data.state, "unknown") || "unknown",
-    result,
-    error: pickStr(data.error) || undefined,
-  };
+  return normalizeCrmSmtpTestJob(
+    await settingsGet(`/smtp-test/${jobId}`),
+    jobId,
+  );
 }
 
 export async function tryCrmSettings<T>(

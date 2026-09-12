@@ -19,6 +19,8 @@ import {
   patchCrmWorkspaceSettings,
   queueCrmSmtpTest,
   settingsPath,
+  smtpIdempotencyKey,
+  flagsFromCapabilities,
 } from "@/lib/settings/api";
 import {
   installSmokePolyfill,
@@ -101,17 +103,31 @@ export function smokeSettingsWiring() {
   if (!smtp.includes("queueCrmSmtpTest")) {
     fail("SmtpSettingsClient does not call queueCrmSmtpTest");
   }
+  if (!smtp.includes("Idempotency-Key") && !readSrc("src/lib/settings/api.ts").includes("Idempotency-Key")) {
+    fail("SMTP test is not sent as an idempotent job");
+  }
+
+  const hook = readSrc("src/lib/settings/use-crm-settings.tsx");
+  if (!hook.includes("SettingsCrmProvider")) {
+    fail("settings hook missing SettingsCrmProvider");
+  }
+  if (!hook.includes("Promise.allSettled")) {
+    fail("settings hook does not load GET settings/security/capabilities together");
+  }
+
+  const layout = readSrc("src/app/(dashboard)/settings/layout.tsx");
+  if (!layout.includes("SettingsCrmProvider")) {
+    fail("settings layout does not share one CRM settings session");
+  }
+  if (!layout.includes("SettingsCrmBadge")) {
+    fail("settings layout missing SettingsCrmBadge");
+  }
 
   const page = readSrc(
     "src/app/(dashboard)/settings/[category]/[subpage]/page.tsx",
   );
   if (!page.includes("CapabilitiesSettingsClient")) {
     fail("settings subpage does not mount CapabilitiesSettingsClient");
-  }
-
-  const layout = readSrc("src/app/(dashboard)/settings/layout.tsx");
-  if (!layout.includes("SettingsCrmBadge")) {
-    fail("settings layout missing SettingsCrmBadge");
   }
 
   const settings = normalizeCrmWorkspaceSettings({
@@ -155,11 +171,24 @@ export function smokeSettingsWiring() {
 
   const caps = normalizeCrmCapabilities({
     workspaceId: SESSION.workspaceId,
-    enabled: ["leads", "deals"],
+    enabled: ["LEADS", "deals"],
     revision: 1,
   });
-  if (!caps.enabled.includes("leads") || caps.enabled.length !== 2) {
+  if (!caps.enabled.includes("leads") || !caps.enabled.includes("deals")) {
     fail("normalizeCrmCapabilities did not map enabled modules");
+  }
+  const nested = normalizeCrmWorkspaceSettings({
+    data: { settings: { primaryColor: "#abc", ipWhitelist: ["10.0.0.1"] } },
+  });
+  if (nested.primaryColor !== "#abc" || nested.ipAllowlist?.[0] !== "10.0.0.1") {
+    fail("normalizeCrmWorkspaceSettings did not unwrap nested Swagger payloads");
+  }
+  const flags = flagsFromCapabilities(caps);
+  if (!flags.enableLeads || !flags.enableDeals || flags.enablePosts) {
+    fail("flagsFromCapabilities did not honor GET /settings/capabilities");
+  }
+  if (smtpIdempotencyKey("Admin@Example.com") !== "smtp-test:admin@example.com") {
+    fail("smtp idempotency key is not stable per recipient");
   }
 }
 

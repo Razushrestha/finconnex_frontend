@@ -9,6 +9,7 @@ import {
   Receipt,
   Info,
 } from "lucide-react";
+import { persistCalculatorResult } from "@/lib/utils/calculatorHistory";
 
 export default function StampDutyFeesView() {
   // Form input states
@@ -87,39 +88,50 @@ export default function StampDutyFeesView() {
     return computedResults;
   };
 
-  const handleCalculate = () => {
+  const handleCalculate = async () => {
     const currentResults = performCalculation();
     if (!currentResults) return;
 
-    // Save calculation directly to localStorage audit trail
-    const newRecord = {
-      id: Date.now(),
-      type: "Stamp Duty & Fees",
-      date: new Date().toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      inputs: {
-        "Purchase Price": `$${Number(purchasePrice).toLocaleString()}`,
-        State: stateTerritory.split(" - ")[0],
-        "Buyer Type": buyerType,
-        Category: propertyCategory,
-      },
-      summary: `Total Fees: $${currentResults.totalFees.toLocaleString()} AUD`,
+    const summary = `Total Fees: $${currentResults.totalFees.toLocaleString()} AUD`;
+    await persistCalculatorResult({
+      title: "Govt Charges",
+      type: "Tax",
+      currency: "AUD",
+      displayType: "Stamp Duty & Fees",
+      summary,
       badge: "Govt Charges",
-    };
-
-    try {
-      const existing = localStorage.getItem("calc_history");
-      const historyArray = existing ? JSON.parse(existing) : [];
-      const updatedHistory = [newRecord, ...historyArray];
-      localStorage.setItem("calc_history", JSON.stringify(updatedHistory));
-    } catch (err) {
-      console.error("Failed to save stamp duty history:", err);
-    }
+      inputs: {
+        _tool: "Stamp Duty & Fees",
+        purchasePrice,
+        stateTerritory,
+        buyerType,
+        propertyCategory,
+      },
+      formula: "Stamp duty + transfer fee + mortgage registration",
+      result: {
+        primaryLabel: "Total fees",
+        primaryValue: currentResults.totalFees,
+        primaryFormat: "money",
+        formula: "Stamp duty + transfer fee + mortgage registration",
+        lines: [
+          {
+            label: "Stamp duty",
+            value: currentResults.stampDuty,
+            format: "money",
+          },
+          {
+            label: "Transfer fee",
+            value: currentResults.transferFee,
+            format: "money",
+          },
+          {
+            label: "Total fees",
+            value: currentResults.totalFees,
+            format: "money",
+          },
+        ],
+      },
+    });
   };
 
   return (

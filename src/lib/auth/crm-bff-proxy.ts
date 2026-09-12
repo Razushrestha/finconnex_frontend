@@ -40,6 +40,7 @@ const ALLOWED_ROOTS = new Set([
   "signature-requests",
   "signature-templates",
   "settings",
+  "calculations",
   "user",
 ]);
 

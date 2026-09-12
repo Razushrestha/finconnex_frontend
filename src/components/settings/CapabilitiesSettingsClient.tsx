@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import {
+  capabilitiesFromFlags,
+  flagsFromCapabilities,
   patchCrmWorkspaceSettings,
-  tryCrmSettings,
 } from "@/lib/settings/api";
 import { useCrmSettings } from "@/lib/settings/use-crm-settings";
 import { cn } from "@/lib/utils";
@@ -30,41 +31,31 @@ export function CapabilitiesSettingsClient() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (crm.settings) {
-      setFlags({
-        enableLeads: crm.settings.enableLeads ?? true,
-        enableDeals: crm.settings.enableDeals ?? true,
-        enableProjects: crm.settings.enableProjects ?? true,
-        enablePosts: crm.settings.enablePosts ?? false,
-      });
-      return;
-    }
-    if (crm.capabilities) {
-      const enabled = new Set(crm.capabilities.enabled.map((m) => m.toLowerCase()));
-      setFlags({
-        enableLeads: enabled.has("leads"),
-        enableDeals: enabled.has("deals"),
-        enableProjects: enabled.has("projects"),
-        enablePosts: enabled.has("posts"),
-      });
-    }
+    setFlags(flagsFromCapabilities(crm.capabilities, crm.settings ?? undefined));
   }, [crm.settings, crm.capabilities]);
 
   async function save() {
     setSaving(true);
-    const patched = await tryCrmSettings(() =>
-      patchCrmWorkspaceSettings({
+    try {
+      const patched = await patchCrmWorkspaceSettings({
         ...flags,
         expectedRevision: crm.settings?.revision,
-      }),
-    );
-    setSaving(false);
-    if (patched) {
+      });
       crm.setSettings(patched);
+      crm.setCapabilities(
+        capabilitiesFromFlags(flags, patched.workspaceId, patched.revision),
+      );
       setMessage("Modules saved to CRM");
-    } else {
-      setMessage("Saved locally — sign in to sync modules");
+    } catch (err) {
+      setMessage(
+        crm.source === "api"
+          ? err instanceof Error
+            ? err.message
+            : "CRM rejected module changes"
+          : "Saved locally — sign in to sync modules",
+      );
     }
+    setSaving(false);
     window.setTimeout(() => setMessage(null), 2800);
   }
 
@@ -77,7 +68,8 @@ export function CapabilitiesSettingsClient() {
               Enable / disable modules
             </h2>
             <p className="mt-0.5 text-[12px] text-slate-500">
-              Workspace capabilities from GET /v1/settings/capabilities.
+              Live list from GET /v1/settings/capabilities. Saving PATCHes
+              /v1/settings module flags.
             </p>
           </div>
           <span
