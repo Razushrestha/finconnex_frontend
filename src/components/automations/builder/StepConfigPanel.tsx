@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { ChevronDown, ChevronUp, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import { listCrmWorkspaceMembers } from "@/lib/workspace-members/api";
 import type { WorkspaceMember } from "@/lib/workspace-members/types";
 import {
   ACTION_CATALOG,
+  actionScopeEntity,
   AUTOMATION_ACTION_KEYS,
   FLOW_CONTROL_CATALOG,
   type AutomationActionStep,
@@ -26,7 +27,31 @@ import {
   type AutomationWaitDurationStep,
   type AutomationWaitUntilStep,
 } from "@/lib/automations/types";
-import { FIELD_META } from "@/lib/automations/field-meta";
+import {
+  actionFieldLabel,
+  FIELD_META,
+  splitActionConfigKeys,
+  TASK_CREATING_ACTIONS,
+  visibleActionConfigKeys,
+} from "@/lib/automations/field-meta";
+import {
+  emailRecipientProblems,
+  readEmailRecipients,
+} from "@/lib/automations/email-recipients";
+import { entityNoun } from "@/lib/automations/trigger-scope";
+
+import { supportsRecordPicker } from "@/lib/automations/record-search";
+
+import { RecordField } from "./RecordField";
+import { ActionItemsField } from "./ActionItemsField";
+import {
+  encodeActionItemsInDescription,
+  parseActionItemsBlock,
+  stripActionItemsBlock,
+} from "@/lib/tasks/action-items";
+import { relatedTargetNoun } from "@/lib/automations/trigger-scope";
+import { EmailRecipientsField } from "./EmailRecipientsField";
+import { EmailTemplateField } from "./EmailTemplateField";
 
 import { ConditionBuilder } from "./ConditionBuilder";
 import { StepIcon } from "./nodes/icons";
@@ -93,17 +118,25 @@ function MemberSelect({
   );
 }
 
+/** The config keys SEND_EMAIL renders through its own recipients block. */
+const EMAIL_RECIPIENT_KEYS = ["toEmail", "cc", "bcc"];
+
 function ActionConfigForm({
   step,
+  entityType,
   onChange,
   members,
   membersStatus,
 }: {
   step: AutomationActionStep;
+  entityType: AutomationEntityType;
   onChange: (config: Record<string, unknown>) => void;
   members: WorkspaceMember[];
   membersStatus: "loading" | "ready" | "error";
 }) {
+  // Declared before the early return below: an action with no configurable
+  // fields must not change how many hooks this component calls.
+  const [showAll, setShowAll] = useState(false);
   const keys = AUTOMATION_ACTION_KEYS[step.action];
   if (!keys) {
     return (
@@ -113,150 +146,267 @@ function ActionConfigForm({
     );
   }
   const config = step.config ?? {};
+  const email = step.action === "SEND_EMAIL";
+  /**
+   * Actions that create a task. Their `description` doubles as the task's
+   * action-item checklist, so it gets a checklist editor and a textarea that
+   * shows only the prose half.
+   */
+  const taskish = (TASK_CREATING_ACTIONS as readonly string[]).includes(
+    step.action,
+  );
 
   function set(key: string, value: unknown) {
     onChange({ ...config, [key]: value });
   }
 
-  return (
-    <div className="space-y-4">
-      {keys.allowed.map((key) => {
-        const meta = FIELD_META[key] ?? { label: key, widget: "text" as const };
-        const required = keys.required.includes(key);
-        const value = config[key];
-        return (
-          <div key={key}>
-            <label className="mb-1 block text-xs font-medium text-slate-600">
-              {meta.label}
-              {required && <span className="text-rose-500"> *</span>}
+  const { primary, more } = splitActionConfigKeys(
+    step.action,
+    visibleActionConfigKeys(step.action, keys.allowed, config),
+    config,
+  );
+
+  function renderField(key: string) {
+      const base = FIELD_META[key] ?? { label: key, widget: "text" as const };
+      // An action may call the same field something else on its own form.
+      const meta = {
+        ...base,
+        label: actionFieldLabel(step.action, key) ?? base.label,
+      };
+      // `recordId` is the one key every delete action shares, so what the
+      // picker lists comes from the action's entity scope: DELETE_LEAD lists
+      // leads, DELETE_DEAL deals. Left empty it still means "the record that
+      // triggered this run", which is why the field stays optional.
+      const scoped = key === "recordId" ? actionScopeEntity(step.action) : null;
+      const recordTarget =
+        meta.target ?? (scoped && supportsRecordPicker(scoped) ? scoped : null);
+      // Only SEND_EMAIL's templateId picks from the email templates —
+      // SEND_MESSAGE's reads the same table filtered to MESSAGE/SMS rows,
+      // which that list does not return.
+      const widget =
+        email && key === "templateId"
+          ? "emailTemplate"
+          : key === "recordId" && recordTarget
+            ? "record"
+            : meta.widget;
+      const required = keys.required.includes(key);
+      const value = config[key];
+      return (
+        <div key={key}>
+          <label className="mb-1 block text-xs font-medium text-slate-600">
+            {meta.label}
+            {required && <span className="text-rose-500"> *</span>}
+          </label>
+          {widget === "emailTemplate" && (
+            <EmailTemplateField
+              value={typeof value === "string" ? value : ""}
+              onChange={(templateId) => set(key, templateId)}
+            />
+          )}
+          {widget === "textarea" && taskish && key === "description" && (
+            <Textarea
+              value={stripActionItemsBlock(
+                typeof value === "string" ? value : "",
+              )}
+              onChange={(e) =>
+                set(
+                  key,
+                  encodeActionItemsInDescription(
+                    e.target.value,
+                    parseActionItemsBlock(
+                      typeof value === "string" ? value : "",
+                    ),
+                  ),
+                )
+              }
+              placeholder={meta.placeholder}
+              rows={3}
+            />
+          )}
+          {widget === "textarea" && !(taskish && key === "description") && (
+            <Textarea
+              value={typeof value === "string" ? value : value ? JSON.stringify(value) : ""}
+              onChange={(e) => set(key, e.target.value)}
+              placeholder={meta.placeholder}
+              rows={3}
+            />
+          )}
+          {widget === "record" && (
+            <RecordField
+              target={recordTarget ?? "CONTACT"}
+              value={typeof value === "string" ? value : ""}
+              onChange={(id) => set(key, id || undefined)}
+              noun={relatedTargetNoun(recordTarget ?? "CONTACT")}
+            />
+          )}
+          {widget === "text" && (
+            <Input
+              value={typeof value === "string" ? value : ""}
+              onChange={(e) => set(key, e.target.value)}
+              placeholder={meta.placeholder}
+            />
+          )}
+          {widget === "number" && (
+            <Input
+              type="number"
+              value={typeof value === "number" ? value : ""}
+              onChange={(e) => set(key, e.target.value === "" ? undefined : Number(e.target.value))}
+              placeholder={meta.placeholder}
+            />
+          )}
+          {widget === "datetime" && (
+            <Input
+              type="datetime-local"
+              value={typeof value === "string" ? value.slice(0, 16) : ""}
+              onChange={(e) => set(key, e.target.value ? new Date(e.target.value).toISOString() : undefined)}
+            />
+          )}
+          {widget === "json" && (
+            <JsonField
+              value={value}
+              placeholder={meta.placeholder}
+              onChange={(next) => set(key, next)}
+            />
+          )}
+          {widget === "checkbox" && (
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300"
+                checked={value === true}
+                onChange={(e) => set(key, e.target.checked ? true : undefined)}
+              />
+              {meta.placeholder ?? "Yes"}
             </label>
-            {meta.widget === "textarea" && (
-              <Textarea
-                value={typeof value === "string" ? value : value ? JSON.stringify(value) : ""}
-                onChange={(e) => set(key, e.target.value)}
-                placeholder={meta.placeholder}
-                rows={3}
-              />
-            )}
-            {meta.widget === "text" && (
-              <Input
-                value={typeof value === "string" ? value : ""}
-                onChange={(e) => set(key, e.target.value)}
-                placeholder={meta.placeholder}
-              />
-            )}
-            {meta.widget === "number" && (
-              <Input
-                type="number"
-                value={typeof value === "number" ? value : ""}
-                onChange={(e) => set(key, e.target.value === "" ? undefined : Number(e.target.value))}
-                placeholder={meta.placeholder}
-              />
-            )}
-            {meta.widget === "datetime" && (
-              <Input
-                type="datetime-local"
-                value={typeof value === "string" ? value.slice(0, 16) : ""}
-                onChange={(e) => set(key, e.target.value ? new Date(e.target.value).toISOString() : undefined)}
-              />
-            )}
-            {meta.widget === "json" && (
-              <JsonField
-                value={value}
-                placeholder={meta.placeholder}
+          )}
+          {widget === "select" && (
+            <Select
+              items={meta.options ?? []}
+              value={typeof value === "string" ? value : null}
+              onValueChange={(v) => v && set(key, v)}
+            >
+              <SelectTrigger className="h-9 w-full text-sm">
+                <SelectValue placeholder="Select..." />
+              </SelectTrigger>
+              <SelectContent>
+                {meta.options?.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {widget === "member" && (
+            <MemberSelect
+              value={typeof value === "string" ? value : ""}
+              onChange={(v) => set(key, v)}
+              members={members}
+              membersStatus={membersStatus}
+            />
+          )}
+          {widget === "members" && (
+            <div className="space-y-1.5 rounded-lg border border-slate-200 p-2">
+              {membersStatus === "loading" && (
+                <p className="text-xs text-slate-400">Loading teammates...</p>
+              )}
+              {membersStatus === "error" && (
+                <p className="text-xs text-rose-500">
+                  Couldn&apos;t load teammates. Try closing and reopening this panel.
+                </p>
+              )}
+              {membersStatus === "ready" && members.length === 0 && (
+                <p className="text-xs text-slate-400">No teammates found.</p>
+              )}
+              {members.map((m) => {
+                const list = Array.isArray(value) ? (value as string[]) : [];
+                const checked = list.includes(m.userId);
+                return (
+                  <label key={m.userId} className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) =>
+                        set(
+                          key,
+                          e.target.checked ? [...list, m.userId] : list.filter((id) => id !== m.userId)
+                        )
+                      }
+                    />
+                    {m.name || m.email}
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          {widget === "tags" && (
+            <Input
+              value={Array.isArray(value) ? (value as string[]).join(", ") : ""}
+              onChange={(e) =>
+                set(
+                  key,
+                  e.target.value
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean)
+                )
+              }
+              placeholder="tag-one, tag-two"
+            />
+          )}
+          {meta.helpText && <p className="mt-1 text-[11px] text-slate-400">{meta.helpText}</p>}
+          {taskish && key === "description" && (
+            <div className="mt-3">
+              <label className="mb-1 block text-xs font-medium text-slate-600">
+                Action Items
+              </label>
+              <ActionItemsField
+                description={typeof value === "string" ? value : ""}
                 onChange={(next) => set(key, next)}
               />
+            </div>
+          )}
+        </div>
+      );
+  }
+
+  return (
+    <div className="space-y-4">
+      {email && (
+        <EmailRecipientsField
+          entityType={entityType}
+          config={config}
+          onChange={onChange}
+        />
+      )}
+      {primary
+        .filter((key) => !email || !EMAIL_RECIPIENT_KEYS.includes(key))
+        .map(renderField)}
+
+      {more.length > 0 && (
+        <div className="border-t border-slate-200 pt-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1 px-0 text-xs text-slate-500 hover:text-slate-700"
+            onClick={() => setShowAll((prev) => !prev)}
+          >
+            {showAll ? (
+              <ChevronUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
             )}
-            {meta.widget === "checkbox" && (
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300"
-                  checked={value === true}
-                  onChange={(e) => set(key, e.target.checked ? true : undefined)}
-                />
-                {meta.placeholder ?? "Yes"}
-              </label>
-            )}
-            {meta.widget === "select" && (
-              <Select
-                items={meta.options ?? []}
-                value={typeof value === "string" ? value : null}
-                onValueChange={(v) => v && set(key, v)}
-              >
-                <SelectTrigger className="h-9 w-full text-sm">
-                  <SelectValue placeholder="Select..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {meta.options?.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {meta.widget === "member" && (
-              <MemberSelect
-                value={typeof value === "string" ? value : ""}
-                onChange={(v) => set(key, v)}
-                members={members}
-                membersStatus={membersStatus}
-              />
-            )}
-            {meta.widget === "members" && (
-              <div className="space-y-1.5 rounded-lg border border-slate-200 p-2">
-                {membersStatus === "loading" && (
-                  <p className="text-xs text-slate-400">Loading teammates...</p>
-                )}
-                {membersStatus === "error" && (
-                  <p className="text-xs text-rose-500">
-                    Couldn&apos;t load teammates. Try closing and reopening this panel.
-                  </p>
-                )}
-                {membersStatus === "ready" && members.length === 0 && (
-                  <p className="text-xs text-slate-400">No teammates found.</p>
-                )}
-                {members.map((m) => {
-                  const list = Array.isArray(value) ? (value as string[]) : [];
-                  const checked = list.includes(m.userId);
-                  return (
-                    <label key={m.userId} className="flex items-center gap-2 text-sm text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) =>
-                          set(
-                            key,
-                            e.target.checked ? [...list, m.userId] : list.filter((id) => id !== m.userId)
-                          )
-                        }
-                      />
-                      {m.name || m.email}
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-            {meta.widget === "tags" && (
-              <Input
-                value={Array.isArray(value) ? (value as string[]).join(", ") : ""}
-                onChange={(e) =>
-                  set(
-                    key,
-                    e.target.value
-                      .split(",")
-                      .map((s) => s.trim())
-                      .filter(Boolean)
-                  )
-                }
-                placeholder="tag-one, tag-two"
-              />
-            )}
-            {meta.helpText && <p className="mt-1 text-[11px] text-slate-400">{meta.helpText}</p>}
-          </div>
-        );
-      })}
+            {showAll ? "Hide extra fields" : `Show all fields (${more.length} more)`}
+          </Button>
+          {showAll && (
+            <div className="mt-3 space-y-4">
+              {more
+                .filter((key) => !email || !EMAIL_RECIPIENT_KEYS.includes(key))
+                .map(renderField)}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -345,6 +495,22 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
           : []
         : [];
 
+  /**
+   * Recipient rules the required-key check cannot express: `toEmail` is
+   * optional (unset means the trigger record's address), but a half-typed
+   * address, an entity with no address to resolve, or more than 50 mailboxes
+   * would all be rejected downstream.
+   */
+  const recipientProblems =
+    draft.type === "ACTION" && draft.action === "SEND_EMAIL"
+      ? emailRecipientProblems(
+          readEmailRecipients(draft.config ?? {}),
+          entityType,
+          entityNoun(entityType).one,
+        )
+      : [];
+  const blocked = missingRequired.length > 0 || recipientProblems.length > 0;
+
   return (
     <SlideOverPanel
       title={meta?.label ?? "Configure Step"}
@@ -359,7 +525,7 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button disabled={missingRequired.length > 0} onClick={() => onSave(draft)}>
+            <Button disabled={blocked} onClick={() => onSave(draft)}>
               Save
             </Button>
           </div>
@@ -382,6 +548,7 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
       {draft.type === "ACTION" && (
         <ActionConfigForm
           step={draft}
+          entityType={entityType}
           members={members}
           membersStatus={membersStatus}
           onChange={(config) => setDraft({ ...draft, config })}
@@ -416,10 +583,14 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
         />
       )}
 
-      {missingRequired.length > 0 && (
-        <p className="mt-3 flex items-center gap-1.5 text-xs text-amber-600">
-          <X className="h-3.5 w-3.5" />
-          {draft.type === "IF_ELSE" ? "Add at least one condition to save." : `Missing: ${missingRequired.join(", ")}`}
+      {blocked && (
+        <p className="mt-3 flex items-start gap-1.5 text-xs text-amber-600">
+          <X className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {draft.type === "IF_ELSE"
+            ? "Add at least one condition to save."
+            : missingRequired.length > 0
+              ? `Missing: ${missingRequired.join(", ")}`
+              : recipientProblems[0]}
         </p>
       )}
     </SlideOverPanel>

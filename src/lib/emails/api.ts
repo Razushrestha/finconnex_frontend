@@ -295,6 +295,63 @@ async function emailsMutate(suffix: string, init: RequestInit): Promise<unknown>
   });
 }
 
+export type CrmEmailTemplate = { id: string; name: string; subject?: string };
+
+function toTemplate(row: Record<string, unknown>): CrmEmailTemplate {
+  return {
+    id: pickStr(row.id, row.templateId),
+    name: pickStr(row.name, row.title, row.subject) || "Untitled template",
+    subject: pickStr(row.subject) || undefined,
+  };
+}
+
+/**
+ * Active email templates whose name matches `search`
+ * (`GET /v1/emails/templates`). Rows without a real id are dropped — a
+ * template that cannot be referenced by `templateId` is not offerable.
+ */
+export async function listCrmEmailTemplates(
+  query: { search?: string; limit?: number } = {},
+): Promise<CrmEmailTemplate[]> {
+  const params = new URLSearchParams();
+  if (query.search?.trim()) params.set("search", query.search.trim());
+  params.set("limit", String(query.limit ?? 20));
+  const rows = extractRecords(await emailsGet("/templates", `?${params}`));
+  return rows.map(toTemplate).filter((row) => isUuid(row.id));
+}
+
+/**
+ * Unwraps a single template.
+ *
+ * `extractRecords` cannot be reused here: it only accepts a lone object when
+ * `isEmailRecord` recognises it, and a template row is not an email.
+ */
+function templateRecord(data: unknown): Record<string, unknown> | null {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const rec = data as Record<string, unknown>;
+  if (rec.data != null && rec.data !== data) return templateRecord(rec.data);
+  return pickStr(rec.id, rec.templateId) ? rec : null;
+}
+
+/**
+ * One template by id, to name a `templateId` a step already holds. Returns
+ * null when it is gone or unreadable, so the caller can say so rather than
+ * show a bare uuid.
+ */
+export async function getCrmEmailTemplate(
+  id: string,
+): Promise<CrmEmailTemplate | null> {
+  if (!isUuid(id)) return null;
+  try {
+    const row = templateRecord(await emailsGet(`/templates/${id}`));
+    if (!row) return null;
+    const template = toTemplate(row);
+    return isUuid(template.id) ? template : null;
+  } catch {
+    return null;
+  }
+}
+
 async function blobFromResponse(res: Response): Promise<Blob> {
   if (!res.ok) {
     const text = await res.text();

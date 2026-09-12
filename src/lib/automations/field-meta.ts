@@ -1,4 +1,5 @@
-import { AUTOMATION_ENTITY_TYPES, TRIGGER_CATALOG } from "./types";
+import { AUTOMATION_ENTITY_TYPES, TRIGGER_CATALOG, type AutomationActionType } from "./types";
+import type { RelatedTarget } from "./record-search";
 
 /** Per-config-key rendering hints for the step config panel — maps a raw
  * `AUTOMATION_ACTION_KEYS` key to a friendly label and input widget. */
@@ -12,14 +13,150 @@ export type FieldWidget =
   | "select"
   | "checkbox"
   | "json"
-  | "datetime";
+  | "datetime"
+  | "record";
 
 export interface FieldMeta {
   label: string;
   widget: FieldWidget;
+  /** Which list a `record` widget searches. */
+  target?: RelatedTarget;
   placeholder?: string;
   options?: { label: string; value: string }[];
   helpText?: string;
+}
+
+/**
+ * Config keys an action accepts but the builder does not ask for.
+ *
+ * The relation keys (`relatedType` + the four parent ids) default to the
+ * record that triggered the run — which is what a step on that record wants —
+ * so offering them as raw UUID boxes invites a wrong answer to a question the
+ * executor already answers. `replyToId` is an existing email's uuid, which
+ * nobody can know while designing a workflow.
+ *
+ * Suppression is display-only: a value already saved (by a template, or by
+ * hand through the API) still round-trips and is still rendered, so nothing
+ * is stranded out of sight — see `visibleActionConfigKeys`.
+ */
+/**
+ * Actions whose payload creates a Task. They share the task registry's key
+ * list, so they share the task-shaped parts of the form.
+ */
+export const TASK_CREATING_ACTIONS = [
+  "CREATE_TASK",
+  "ADD_TO_WORK_QUEUE",
+  "CREATE_FOLLOW_UP",
+] as const satisfies readonly AutomationActionType[];
+
+/**
+ * Per-action label overrides.
+ *
+ * FIELD_META is keyed by config key, so one entry serves every action that
+ * accepts that key — `ownerId` is "New Owner" because ASSIGN_OWNER asked
+ * first, which reads wrongly in a Create Lead step. These override the label
+ * where an action calls the same field something else on its own form.
+ */
+export const ACTION_FIELD_LABELS: Partial<
+  Record<AutomationActionType, Readonly<Record<string, string>>>
+> = {
+  CREATE_LEAD: {
+    ownerId: "Lead owner",
+    pipelineStage: "Lead Status",
+    source: "Lead source",
+    firstName: "First name",
+    lastName: "Last name",
+    notes: "Notes",
+    tags: "Add tags",
+  },
+};
+
+/**
+ * The keys a step shows before "Show all fields".
+ *
+ * CREATE_LEAD accepts 37 keys; the Create Lead form asks nine. Rendering all
+ * 37 in registry order buries the nine someone actually came to fill in, so
+ * these lead and the rest stay one click away. Everything remains editable —
+ * this is ordering, not suppression.
+ */
+export const PRIMARY_ACTION_FIELDS: Partial<
+  Record<AutomationActionType, readonly string[]>
+> = {
+  CREATE_LEAD: [
+    "firstName",
+    "lastName",
+    "email",
+    "phone",
+    "pipelineStage",
+    "source",
+    "ownerId",
+    "tags",
+    "notes",
+  ],
+};
+
+/**
+ * Splits an action's visible keys into the ones shown up front and the rest,
+ * preserving registry order within each half. A key already carrying a value
+ * is promoted, so a step configured through the API never hides its own data.
+ */
+export function splitActionConfigKeys(
+  action: string,
+  visible: readonly string[],
+  config: Record<string, unknown>,
+): { primary: string[]; more: string[] } {
+  const lead = (
+    PRIMARY_ACTION_FIELDS as Record<string, readonly string[] | undefined>
+  )[action];
+  if (!lead) return { primary: [...visible], more: [] };
+  const primary: string[] = [];
+  const more: string[] = [];
+  for (const key of visible) {
+    if (lead.includes(key) || config[key] !== undefined) primary.push(key);
+    else more.push(key);
+  }
+  return { primary, more };
+}
+
+export function actionFieldLabel(action: string, key: string): string | undefined {
+  return (
+    ACTION_FIELD_LABELS as Record<
+      string,
+      Readonly<Record<string, string>> | undefined
+    >
+  )[action]?.[key];
+}
+
+export const HIDDEN_ACTION_CONFIG_KEYS: Partial<
+  Record<AutomationActionType, readonly string[]>
+> = {
+  SEND_EMAIL: [
+    "replyToId",
+    "relatedType",
+    "leadId",
+    "contactId",
+    "companyId",
+    "dealId",
+  ],
+};
+
+/**
+ * The keys the step form renders, in the registry's own order. `action` is
+ * widened to string because a step read back from the API carries whatever
+ * the backend stored, which need not be an action this build knows.
+ */
+export function visibleActionConfigKeys(
+  action: string,
+  allowed: readonly string[],
+  config: Record<string, unknown>,
+): string[] {
+  const hidden = (
+    HIDDEN_ACTION_CONFIG_KEYS as Record<string, readonly string[] | undefined>
+  )[action];
+  if (!hidden) return [...allowed];
+  return allowed.filter(
+    (key) => !hidden.includes(key) || config[key] !== undefined,
+  );
 }
 
 export const FIELD_META: Record<string, FieldMeta> = {
@@ -72,7 +209,10 @@ export const FIELD_META: Record<string, FieldMeta> = {
   targetUserId: { label: "Remind", widget: "member" },
   recipientId: { label: "Recipient", widget: "member" },
   notificationType: { label: "Notification Type", widget: "text", placeholder: "GENERAL" },
-  toEmail: { label: "To Email", widget: "text", placeholder: "{{email}} or literal address", helpText: "Use {{email}} to send to the triggering record's email." },
+  // SEND_EMAIL renders To/Cc/Bcc through EmailRecipientsField instead of
+  // these generic widgets; they remain as the fallback for any other action
+  // that takes an address.
+  toEmail: { label: "To Email", widget: "text", placeholder: "name@example.com", helpText: "Leave empty to send to the triggering record's own address." },
   messageType: {
     label: "Message Type",
     widget: "select",
@@ -129,11 +269,7 @@ export const FIELD_META: Record<string, FieldMeta> = {
   email: { label: "Email", widget: "text", placeholder: "name@example.com" },
   phone: { label: "Phone", widget: "text" },
   jobTitle: { label: "Job Title", widget: "text" },
-  companyId: {
-    label: "Organization",
-    widget: "text",
-    helpText: "Organization UUID — the org this record belongs to, or the one an activity relates to",
-  },
+  companyId: { label: "Organization", widget: "record", target: "COMPANY" },
   name: { label: "Name", widget: "text" },
   website: { label: "Website", widget: "text", placeholder: "https://example.com" },
   industry: { label: "Industry", widget: "text" },
@@ -255,12 +391,12 @@ export const FIELD_META: Record<string, FieldMeta> = {
       { label: "Deal", value: "DEAL" },
     ],
   },
-  leadId: { label: "Related Lead", widget: "text", helpText: "Record UUID" },
-  contactId: { label: "Related Contact", widget: "text", helpText: "Record UUID" },
-  dealId: { label: "Related Deal", widget: "text", helpText: "Record UUID" },
-  taskId: { label: "Related Task", widget: "text", helpText: "Record UUID" },
+  leadId: { label: "Related Lead", widget: "record", target: "LEAD" },
+  contactId: { label: "Related Contact", widget: "record", target: "CONTACT" },
+  dealId: { label: "Related Deal", widget: "record", target: "DEAL" },
+  taskId: { label: "Related Task", widget: "record", target: "TASK" },
   callId: { label: "Related Call", widget: "text", helpText: "Record UUID" },
-  meetingId: { label: "Related Meeting", widget: "text", helpText: "Record UUID" },
+  meetingId: { label: "Related Meeting", widget: "record", target: "MEETING" },
   quoteId: { label: "Related Quote", widget: "text", helpText: "Record UUID" },
   estimateId: { label: "Related Estimate", widget: "text", helpText: "Record UUID" },
   invoiceId: { label: "Related Invoice", widget: "text", helpText: "Record UUID" },
@@ -304,7 +440,7 @@ export const FIELD_META: Record<string, FieldMeta> = {
   isPrivate: { label: "Only visible to you (Private)", widget: "checkbox" },
   // ─── Email ────────────────────────────────────────────────────────────
   cc: { label: "Cc", widget: "text", helpText: "Comma-separated addresses" },
-  bcc: { label: "Bcc", widget: "text", helpText: "Comma-separated addresses" },
+  bcc: { label: "Bcc", widget: "text", helpText: "Comma-separated addresses, hidden from other recipients" },
   scheduledAt: { label: "Send At", widget: "datetime", helpText: "Leave empty to send immediately" },
   // ─── Reminder ─────────────────────────────────────────────────────────
   reminderType: {

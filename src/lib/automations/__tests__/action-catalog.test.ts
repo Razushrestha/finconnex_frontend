@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { FIELD_META } from "@/lib/automations/field-meta";
+import { supportsRecordPicker } from "@/lib/automations/record-search";
 import {
   ACTION_CATALOG,
+  actionScopeEntity,
   AUTOMATION_ACTION_KEYS,
   AUTOMATION_ACTION_TYPES,
   isActionAllowedForEntity,
@@ -53,6 +55,31 @@ describe("automation action catalog", () => {
       expect(live.has(planned.label), `${planned.label} is both live and planned`).toBe(
         false,
       );
+    }
+  });
+
+  it("names the record a delete action can pick from, and nothing else", () => {
+    // The four delete actions share one `recordId` key, so the step form asks
+    // the scope which records to list; a multi-entity action has no answer
+    // and keeps its plain field.
+    expect(actionScopeEntity("DELETE_LEAD")).toBe("LEAD");
+    expect(actionScopeEntity("DELETE_CONTACT")).toBe("CONTACT");
+    expect(actionScopeEntity("DELETE_COMPANY")).toBe("COMPANY");
+    expect(actionScopeEntity("DELETE_DEAL")).toBe("DEAL");
+
+    expect(actionScopeEntity("ROUND_ROBIN_ASSIGN")).toBeNull();
+    expect(actionScopeEntity("CREATE_TASK")).toBeNull();
+    expect(actionScopeEntity("NOT_A_REAL_ACTION")).toBeNull();
+  });
+
+  it("can pick records for every action that takes a recordId", () => {
+    // Every `recordId` action resolves to a pickable entity — otherwise the
+    // field silently falls back to asking for a uuid.
+    for (const action of AUTOMATION_ACTION_TYPES) {
+      if (!AUTOMATION_ACTION_KEYS[action]?.allowed.includes("recordId")) continue;
+      const scoped = actionScopeEntity(action);
+      expect(scoped).not.toBeNull();
+      expect(supportsRecordPicker(scoped!)).toBe(true);
     }
   });
 

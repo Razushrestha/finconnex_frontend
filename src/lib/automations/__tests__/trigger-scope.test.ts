@@ -7,12 +7,16 @@ import {
   describeTriggerScope,
   readTriggerFilter,
   readTriggerScope,
+  RELATED_RECORD_TRIGGERS,
+  showsConditionBuilder,
   TRANSITION_TRIGGERS,
   TRANSITION_UNSET,
   writeTriggerFilter,
   writeTriggerScope,
 } from "@/lib/automations/trigger-scope";
+import { TRIGGER_CATALOG } from "@/lib/automations/types";
 import type { AutomationConditionGroup } from "@/lib/automations/types";
+import { supportsMultiRecordPicker } from "@/lib/automations/record-search";
 
 describe("trigger scope", () => {
   it("treats a missing or empty condition group as any record", () => {
@@ -30,7 +34,42 @@ describe("trigger scope", () => {
     expect(readTriggerScope(group)).toEqual({ mode: "RECORD", recordId: "lead-1" });
   });
 
+  it("round-trips a hand-picked set of records as an IN_LIST", () => {
+    const group = writeTriggerScope({
+      mode: "RECORDS",
+      recordIds: ["meet-1", "meet-2"],
+    });
+    expect(group).toEqual({
+      mode: "ALL",
+      items: [{ field: "id", operator: "IN_LIST", value: ["meet-1", "meet-2"] }],
+    });
+    expect(readTriggerScope(group)).toEqual({
+      mode: "RECORDS",
+      recordIds: ["meet-1", "meet-2"],
+    });
+  });
+
+  it("writes a one-record set as EQUALS and reads it back as a single pin", () => {
+    // IN_LIST of one is the same predicate written the long way, and the
+    // panel re-widens a single pin back to a set where the entity needs it.
+    const group = writeTriggerScope({ mode: "RECORDS", recordIds: ["meet-1"] });
+    expect(group).toEqual({
+      mode: "ALL",
+      items: [{ field: "id", operator: "EQUALS", value: "meet-1" }],
+    });
+    expect(readTriggerScope(group)).toEqual({ mode: "RECORD", recordId: "meet-1" });
+  });
+
+  it("caps a pinned set at the operator's 50-value limit", () => {
+    const ids = Array.from({ length: 60 }, (_, i) => `meet-${i}`);
+    const group = writeTriggerScope({ mode: "RECORDS", recordIds: ids });
+    const leaf = group?.items[0] as { value: string[] };
+    expect(leaf.value).toHaveLength(50);
+  });
+
   it("never emits an empty group", () => {
+    expect(writeTriggerScope({ mode: "RECORDS", recordIds: [] })).toBeUndefined();
+    expect(writeTriggerScope({ mode: "RECORDS", recordIds: [""] })).toBeUndefined();
     // The backend rejects `{ items: [] }` with conditionCountExceeded, so an
     // un-narrowed trigger has to omit `conditions` entirely.
     expect(writeTriggerScope({ mode: "ANY" })).toBeUndefined();
@@ -74,6 +113,12 @@ describe("trigger scope", () => {
       "One specific lead",
     );
     expect(
+      describeTriggerScope({ mode: "RECORDS", recordIds: ["a", "b", "c"] }, "MEETING"),
+    ).toBe("3 selected meetings");
+    expect(
+      describeTriggerScope({ mode: "RECORDS", recordIds: ["a"] }, "MEETING", "Q3 kickoff"),
+    ).toBe("Q3 kickoff");
+    expect(
       describeTriggerScope(
         {
           mode: "FILTER",
@@ -97,7 +142,7 @@ describe("status transitions", () => {
   it("writes from/to as previousStatus and status conditions", () => {
     expect(
       writeTriggerFilter(
-        { scope: { mode: "ANY" }, transition: { from: "NEW", to: "QUALIFIED" }, changedFields: [] },
+        { scope: { mode: "ANY" }, transition: { from: "NEW", to: "QUALIFIED" }, changedFields: [], related: {} },
         STATUS,
       ),
     ).toEqual({
@@ -112,12 +157,12 @@ describe("status transitions", () => {
   it("treats each side as optional", () => {
     expect(
       writeTriggerFilter(
-        { scope: { mode: "ANY" }, transition: { to: "LOST" }, changedFields: [] },
+        { scope: { mode: "ANY" }, transition: { to: "LOST" }, changedFields: [], related: {} },
         STATUS,
       ),
     ).toEqual({ mode: "ALL", items: [{ field: "status", operator: "EQUALS", value: "LOST" }] });
     expect(
-      writeTriggerFilter({ scope: { mode: "ANY" }, transition: {}, changedFields: [] }, STATUS),
+      writeTriggerFilter({ scope: { mode: "ANY" }, transition: {}, changedFields: [], related: {} }, STATUS),
     ).toBeUndefined();
   });
 
@@ -126,6 +171,7 @@ describe("status transitions", () => {
       scope: { mode: "RECORD" as const, recordId: "lead-1" },
       transition: { from: "NEW", to: "QUALIFIED" },
       changedFields: [],
+      related: {},
     };
     expect(readTriggerFilter(writeTriggerFilter(filter, STATUS), STATUS)).toEqual(filter);
   });
@@ -141,6 +187,7 @@ describe("status transitions", () => {
       },
       transition: { from: "NEW" },
       changedFields: [],
+      related: {},
     };
     expect(readTriggerFilter(writeTriggerFilter(filter, STATUS), STATUS)).toEqual(filter);
   });
@@ -155,7 +202,7 @@ describe("status transitions", () => {
       ],
     };
     const written = writeTriggerFilter(
-      { scope: { mode: "FILTER", group }, transition: { from: "NEW" }, changedFields: [] },
+      { scope: { mode: "FILTER", group }, transition: { from: "NEW" }, changedFields: [], related: {} },
       STATUS,
     );
     expect(written).toEqual({
@@ -166,6 +213,7 @@ describe("status transitions", () => {
       scope: { mode: "FILTER", group },
       transition: { from: "NEW" },
       changedFields: [],
+      related: {},
     });
   });
 
@@ -180,11 +228,13 @@ describe("status transitions", () => {
       scope: { mode: "FILTER", group },
       transition: {},
       changedFields: [],
+      related: {},
     });
     expect(readTriggerFilter(group, STATUS)).toEqual({
       scope: { mode: "ANY" },
       transition: { to: "NEW" },
       changedFields: [],
+      related: {},
     });
   });
 
@@ -210,6 +260,7 @@ describe("owner transitions", () => {
     scope: { mode: "ANY" as const },
     transition,
     changedFields: [] as string[],
+    related: {},
   });
 
   it("writes owner ids against the owner fields", () => {
@@ -259,6 +310,7 @@ describe("owner transitions", () => {
       scope: { mode: "FILTER", group },
       transition: {},
       changedFields: [],
+      related: {},
     });
   });
 
@@ -288,7 +340,7 @@ describe("one-sided transitions (Lead Assigned)", () => {
   it("writes only the to side", () => {
     expect(
       writeTriggerFilter(
-        { scope: { mode: "ANY" }, transition: { to: "user-b" }, changedFields: [] },
+        { scope: { mode: "ANY" }, transition: { to: "user-b" }, changedFields: [], related: {} },
         ASSIGNED,
       ),
     ).toEqual({ mode: "ALL", items: [{ field: "ownerId", operator: "EQUALS", value: "user-b" }] });
@@ -303,6 +355,7 @@ describe("one-sided transitions (Lead Assigned)", () => {
           scope: { mode: "ANY" },
           transition: { from: "user-a", to: "user-b" },
           changedFields: [],
+          related: {},
         },
         ASSIGNED,
       ),
@@ -314,6 +367,7 @@ describe("one-sided transitions (Lead Assigned)", () => {
       scope: { mode: "RECORD" as const, recordId: "lead-1" },
       transition: { to: "user-b" },
       changedFields: [],
+      related: {},
     };
     expect(readTriggerFilter(writeTriggerFilter(filter, ASSIGNED), ASSIGNED)).toEqual(filter);
   });
@@ -330,6 +384,7 @@ describe("changed-field selection (Lead Field Changed)", () => {
     scope: { mode: "ANY" as const },
     transition: {},
     changedFields: fields,
+    related: {},
   });
 
   it("writes a single field as one CONTAINS check", () => {
@@ -362,6 +417,7 @@ describe("changed-field selection (Lead Field Changed)", () => {
       scope: { mode: "RECORD" as const, recordId: "lead-1" },
       transition: {},
       changedFields: ["email", "phone"],
+      related: {},
     };
     expect(readTriggerFilter(writeTriggerFilter(filter))).toEqual(filter);
   });
@@ -383,6 +439,7 @@ describe("changed-field selection (Lead Field Changed)", () => {
       scope: { mode: "FILTER", group },
       transition: {},
       changedFields: [],
+      related: {},
     });
   });
 
@@ -423,11 +480,48 @@ describe("the changed-field catalogs", () => {
     // ...and its Contact case, which excludes only these two — `status`
     // does raise CONTACT_FIELD_CHANGED and is offered.
     ["CONTACT_FIELD_CHANGED" as const, ["ownerId", "companyId"]],
+    // ...and its Deal case, which excludes neither `companyId` nor `source`.
+    ["DEAL_FIELD_CHANGED" as const, ["stage", "ownerId"]],
+    // Tasks have no bridge exclusions, but a status change records
+    // `{ from, to }` and no field list, so `status` can never appear.
+    ["TASK_UPDATED" as const, ["status"]],
+    // Company excludes ownerId; `version` is the optimistic-lock counter,
+    // bumped on every write, so offering it would match every update.
+    ["ORGANIZATION_FIELD_CHANGED" as const, ["ownerId", "version"]],
   ])("%s omits the fields its own trigger excludes", (trigger, excluded) => {
     const fields = valuesFor(trigger);
     for (const field of excluded) expect(fields).not.toContain(field);
     expect(fields.length).toBeGreaterThan(0);
     expect(new Set(fields).size).toBe(fields.length);
+  });
+
+  it("offers exactly the UpdateTaskDto keys for tasks", () => {
+    // TaskService records `Object.keys(dto).sort()`, so these are request
+    // fields rather than Prisma columns — a column name here would never
+    // match. Mirrors src/modules/task/dtos/create-task.dto.ts.
+    expect(valuesFor("TASK_UPDATED").sort()).toEqual(
+      [
+        "subject", "taskType", "priority", "startDate", "dueDate",
+        "reminderAt", "repeatEvery", "recurrenceTimezone", "recurrenceLimit",
+        "isPublic", "isBillable", "description", "relatedType", "leadId",
+        "contactId", "companyId", "dealId", "assigneeIds", "followerIds",
+        "collaboratorIds", "tags", "attachmentKeys",
+      ].sort(),
+    );
+  });
+
+  it("offers companyId on deals but not on contacts", () => {
+    // Another real asymmetry: changing a deal's account raises
+    // DEAL_FIELD_CHANGED, while changing a contact's company raises the
+    // association triggers instead.
+    expect(valuesFor("DEAL_FIELD_CHANGED")).toContain("companyId");
+    expect(valuesFor("CONTACT_FIELD_CHANGED")).not.toContain("companyId");
+  });
+
+  it("omits derived columns a user never edits", () => {
+    // weightedValue is computed from value x probability; picking it would
+    // mean "fired because the system recalculated", not a user edit.
+    expect(valuesFor("DEAL_FIELD_CHANGED")).not.toContain("weightedValue");
   });
 
   it("offers status on contacts but not on leads", () => {
@@ -448,6 +542,47 @@ describe("the trigger transition catalog", () => {
     "PAID_AD", "EVENT", "PARTNER", "OTHER",
   ];
 
+  const DEAL_STAGES = [
+    "PROSPECTING", "QUALIFICATION", "PROPOSAL", "NEGOTIATION",
+    "CONTRACT_SENT", "CLOSED_WON", "CLOSED_LOST",
+  ];
+
+  it.each(["DEAL_UPDATED", "DEAL_STAGE_CHANGED"] as const)(
+    "%s offers every DealStage value, and nothing invented",
+    (trigger) => {
+      expect(TRANSITION_TRIGGERS[trigger]!.options!.map((o) => o.value)).toEqual(
+        DEAL_STAGES,
+      );
+    },
+  );
+
+  it("gives every owner-changed trigger the identical transition", () => {
+    // Lead, Organization and Deal all capture ownerId into the same
+    // previousOwnerId snapshot field, so the three must not drift.
+    const owner = TRANSITION_TRIGGERS.LEAD_OWNER_CHANGED;
+    expect(TRANSITION_TRIGGERS.ORGANIZATION_OWNER_CHANGED).toBe(owner);
+    expect(TRANSITION_TRIGGERS.DEAL_OWNER_CHANGED).toBe(owner);
+    expect(owner!.unsetLabel).toBe("Unassigned");
+    expect(owner!.source).toBe("owners");
+  });
+
+  it("gives both deal triggers the identical transition", () => {
+    // They fire on the same change; a workflow buildable on one must be
+    // buildable on the other.
+    expect(TRANSITION_TRIGGERS.DEAL_STAGE_CHANGED).toBe(
+      TRANSITION_TRIGGERS.DEAL_UPDATED,
+    );
+  });
+
+  it("offers no unset option for a non-nullable field", () => {
+    // Deal.stage is NOT NULL, so a "no stage" side would be unmatchable.
+    expect(TRANSITION_TRIGGERS.DEAL_UPDATED!.unsetLabel).toBeUndefined();
+    expect(TRANSITION_TRIGGERS.DEAL_STAGE_CHANGED!.unsetLabel).toBeUndefined();
+    // ...while the nullable ones do offer it.
+    expect(TRANSITION_TRIGGERS.LEAD_SOURCE_CHANGED!.unsetLabel).toBeDefined();
+    expect(TRANSITION_TRIGGERS.LEAD_OWNER_CHANGED!.unsetLabel).toBeDefined();
+  });
+
   it("offers every LeadStatus and LeadSource value, and nothing invented", () => {
     // Enum parity with prisma/schema.prisma: a value the schema does not have
     // is a condition the backend rejects; a missing one is a workflow the
@@ -463,7 +598,14 @@ describe("the trigger transition catalog", () => {
   it("names a previous* field on every two-sided transition", () => {
     // The `from` side is only answerable for fields the repository captures
     // into its audit entry — anything else silently never matches.
-    const captured = new Set(["previousStatus", "previousOwnerId", "previousSource"]);
+    // LeadRepository.update and DealRepository.update are the two that
+    // capture a `previous` block today.
+    const captured = new Set([
+      "previousStatus",
+      "previousOwnerId",
+      "previousSource",
+      "previousStage",
+    ]);
     for (const [trigger, meta] of Object.entries(TRANSITION_TRIGGERS)) {
       if (!meta?.fields.from) continue;
       expect(captured.has(meta.fields.from), `${trigger} reads ${meta.fields.from}`).toBe(true);
@@ -476,6 +618,7 @@ describe("the trigger transition catalog", () => {
       scope: { mode: "ANY" as const },
       transition: { from: TRANSITION_UNSET, to: "REFERRAL" },
       changedFields: [],
+      related: {},
     };
     const written = writeTriggerFilter(filter, SOURCE);
     expect(written).toEqual({
@@ -486,5 +629,275 @@ describe("the trigger transition catalog", () => {
       ],
     });
     expect(readTriggerFilter(written, SOURCE)).toEqual(filter);
+  });
+});
+
+describe("triggers that deliberately have no second stage", () => {
+  /**
+   * These fire on a discrete event, not on a field edit. The audit bridge
+   * raises each from a specific status or a create — MEETING_CANCELLED is
+   * "status became CANCELLED", CALL_MISSED is "status became NO_ANSWER",
+   * EMAIL_BOUNCED is "status became BOUNCED". There is no "from -> to" to
+   * choose (the destination is the trigger's identity) and no "which field"
+   * (the event names it).
+   *
+   * They may still carry a related-record pin — CALL_CREATED does, for the
+   * contact the call is about — which is a separate question from either of
+   * these and is asserted below.
+   *
+   * Pinned so a later pass does not add a field list that reads plausibly and
+   * matches nothing.
+   */
+  const EVENT_TRIGGERS = [
+    "MEETING_BOOKED",
+    "MEETING_RESCHEDULED",
+    "MEETING_CANCELLED",
+    "MEETING_COMPLETED",
+    "MEETING_NO_SHOW",
+    "CALL_CREATED",
+    "CALL_COMPLETED",
+    "CALL_MISSED",
+    "MESSAGE_RECEIVED",
+    "MESSAGE_FAILED",
+    "SMS_REPLIED",
+    "WHATSAPP_REPLIED",
+    "EMAIL_SENT",
+    "EMAIL_FAILED",
+    "EMAIL_REPLIED",
+    "EMAIL_BOUNCED",
+    "DOCUMENT_UPLOADED",
+    "DOCUMENT_REQUEST_SUBMITTED",
+    "DOCUMENT_REQUEST_COMPLETED",
+    "SIGNATURE_REQUEST_COMPLETED",
+    "TASK_COMPLETED",
+    "TASK_CANCELLED",
+    "LEAD_CREATED",
+    "CONTACT_CREATED",
+    "COMPANY_CREATED",
+    "DEAL_CREATED",
+  ] as const;
+
+  it.each(EVENT_TRIGGERS)("%s offers neither a transition nor a field list", (trigger) => {
+    expect(TRANSITION_TRIGGERS[trigger]).toBeUndefined();
+    expect(CHANGED_FIELD_TRIGGERS[trigger]).toBeUndefined();
+  });
+
+  it("allows a related-record pin only where the entity links something pinnable", () => {
+    // Calls, messages and emails carry a linkable contact; documents and
+    // signature requests carry a teammate (and, for a signature, the document
+    // it is against). Either way an event trigger can still be narrowed.
+    for (const trigger of [
+      "CALL_CREATED",
+      "MESSAGE_RECEIVED",
+      "SMS_REPLIED",
+      "WHATSAPP_REPLIED",
+      "MESSAGE_FAILED",
+      "EMAIL_SENT",
+      "EMAIL_FAILED",
+      "EMAIL_BOUNCED",
+      "EMAIL_REPLIED",
+      "DOCUMENT_UPLOADED",
+      "DOCUMENT_REQUEST_SUBMITTED",
+      "DOCUMENT_REQUEST_COMPLETED",
+      "SIGNATURE_REQUEST_COMPLETED",
+    ] as const) {
+      expect(RELATED_RECORD_TRIGGERS[trigger]).toBeDefined();
+    }
+    // A meeting is narrowed by picking the meeting itself in the scope stage,
+    // so it needs no pin.
+    expect(RELATED_RECORD_TRIGGERS.MEETING_BOOKED).toBeUndefined();
+  });
+
+  it("pins the document owner, not a contact the snapshot never carries", () => {
+    // Document has optional lead/contact/company/deal links, but the trigger
+    // snapshot selects none of them — pinning one would never match.
+    // `uploadedById` is a required User FK and is in the snapshot.
+    expect(RELATED_RECORD_TRIGGERS.DOCUMENT_UPLOADED!).toEqual([
+      { label: "Uploaded by", field: "uploadedById", entityType: "USER" },
+    ]);
+    expect(RELATED_RECORD_TRIGGERS.DOCUMENT_REQUEST_SUBMITTED![0].field).toBe(
+      "requestedById",
+    );
+  });
+
+  it("reaches the document through documentId on a signature request", () => {
+    // DOCUMENT_UPLOADED fires on the document itself, so "which document" is
+    // scope (`id`). A signature request is a different record, so its
+    // document is a related pin.
+    expect(
+      RELATED_RECORD_TRIGGERS.SIGNATURE_REQUEST_COMPLETED!.map((e) => [
+        e.field,
+        e.entityType,
+      ]),
+    ).toEqual([
+      ["documentId", "DOCUMENT"],
+      ["createdById", "USER"],
+    ]);
+    expect(TRIGGER_CATALOG.DOCUMENT_UPLOADED.entityType).toBe("DOCUMENT");
+  });
+
+  it("lets the scope stage pick which documents", () => {
+    // "Which document" on DOCUMENT_UPLOADED is answered by the scope stage,
+    // which only offers a picker for entities listed as multi-pickable.
+    expect(supportsMultiRecordPicker("DOCUMENT")).toBe(true);
+    expect(supportsMultiRecordPicker("MEETING")).toBe(true);
+    expect(supportsMultiRecordPicker("SIGNATURE_REQUEST")).toBe(false);
+  });
+
+  it("points each pin at a field its own entity actually has", () => {
+    // An inbound message's sender is `contactId`; an outbound one's recipient
+    // is `toContactId` / `toUserId`. Getting these backwards produces a
+    // filter that reads correctly and never matches.
+    expect(RELATED_RECORD_TRIGGERS.MESSAGE_RECEIVED![0].field).toBe("contactId");
+    expect(RELATED_RECORD_TRIGGERS.MESSAGE_FAILED!.map((e) => e.field)).toEqual([
+      "toContactId",
+      "toUserId",
+    ]);
+    expect(RELATED_RECORD_TRIGGERS.EMAIL_SENT![0].field).toBe("contactId");
+  });
+
+  it("offers teammates as a pickable target for internal messages", () => {
+    const teammate = RELATED_RECORD_TRIGGERS.MESSAGE_FAILED!.find(
+      (entry) => entry.entityType === "USER",
+    );
+    expect(teammate?.field).toBe("toUserId");
+  });
+});
+
+describe("related-record pins (Call Scheduled)", () => {
+  const CALL_RELATED = ["contactId"];
+  const base = (related: Record<string, string[]>) => ({
+    scope: { mode: "ANY" as const },
+    transition: {},
+    changedFields: [],
+    related,
+  });
+
+  it("writes the pin as a condition on the call's own contact field", () => {
+    expect(writeTriggerFilter(base({ contactId: ["contact-1"] }))).toEqual({
+      mode: "ALL",
+      items: [{ field: "contactId", operator: "EQUALS", value: "contact-1" }],
+    });
+  });
+
+  it("round-trips only when the trigger declares that related field", () => {
+    const written = writeTriggerFilter(base({ contactId: ["contact-1"] }));
+    expect(readTriggerFilter(written, null, CALL_RELATED)).toEqual(
+      base({ contactId: ["contact-1"] }),
+    );
+    // A trigger with no related fields must not claim the condition — it
+    // stays an ordinary filter rather than silently becoming a pin.
+    expect(readTriggerFilter(written, null, []).scope.mode).toBe("FILTER");
+  });
+
+  it("treats an empty pin as no condition at all", () => {
+    expect(writeTriggerFilter(base({ contactId: [] }))).toBeUndefined();
+  });
+
+  it("is distinct from a RECORD scope, which pins the call itself", () => {
+    // Pinning the call and pinning its contact are different questions; both
+    // must survive together.
+    const filter = {
+      scope: { mode: "RECORD" as const, recordId: "call-1" },
+      transition: {},
+      changedFields: [],
+      related: { contactId: ["contact-1"] },
+    };
+    const written = writeTriggerFilter(filter);
+    expect(written).toEqual({
+      mode: "ALL",
+      items: [
+        { field: "contactId", operator: "EQUALS", value: "contact-1" },
+        { field: "id", operator: "EQUALS", value: "call-1" },
+      ],
+    });
+    expect(readTriggerFilter(written, null, CALL_RELATED)).toEqual(filter);
+  });
+
+  it("declares Call Scheduled's contact pin", () => {
+    expect(RELATED_RECORD_TRIGGERS.CALL_CREATED).toEqual([
+      { label: "Contact", field: "contactId", entityType: "CONTACT" },
+    ]);
+  });
+});
+
+describe("the condition builder's visibility", () => {
+  const ANY = { mode: "ANY" as const };
+  const FILTER = {
+    mode: "FILTER" as const,
+    group: {
+      mode: "ALL" as const,
+      items: [{ field: "status", operator: "EQUALS" as const, value: "SCHEDULED" }],
+    },
+  };
+
+  it("is hidden on calls, where the related-record stage asks the real question", () => {
+    expect(showsConditionBuilder("CALL", ANY)).toBe(false);
+  });
+
+  it("still shows for a call that already has a saved group", () => {
+    // Suppression is display-only: hiding the control on a workflow that
+    // already uses it would strand a filter the user cannot see or edit.
+    expect(showsConditionBuilder("CALL", FILTER)).toBe(true);
+  });
+
+  it("is unaffected for every other entity", () => {
+    for (const entity of ["LEAD", "CONTACT", "COMPANY", "DEAL", "TASK"] as const) {
+      expect(showsConditionBuilder(entity, ANY)).toBe(true);
+    }
+  });
+});
+
+describe("selecting several related records", () => {
+  const CALL_RELATED = ["contactId"];
+  const base = (related: Record<string, string[]>) => ({
+    scope: { mode: "ANY" as const },
+    transition: {},
+    changedFields: [],
+    related,
+  });
+
+  it("writes several ids as IN_LIST, which the engine reads as 'any of these'", () => {
+    expect(writeTriggerFilter(base({ contactId: ["a", "b", "c"] }))).toEqual({
+      mode: "ALL",
+      items: [{ field: "contactId", operator: "IN_LIST", value: ["a", "b", "c"] }],
+    });
+  });
+
+  it("still writes a single id as EQUALS", () => {
+    // IN_LIST of one would work, but EQUALS is what the rest of the builder
+    // emits and what a reader expects to see.
+    expect(writeTriggerFilter(base({ contactId: ["a"] }))).toEqual({
+      mode: "ALL",
+      items: [{ field: "contactId", operator: "EQUALS", value: "a" }],
+    });
+  });
+
+  it("round-trips both shapes", () => {
+    for (const ids of [["a"], ["a", "b"]]) {
+      const filter = base({ contactId: ids });
+      expect(readTriggerFilter(writeTriggerFilter(filter), null, CALL_RELATED)).toEqual(
+        filter,
+      );
+    }
+  });
+
+  it("writes nothing when the selection is empty", () => {
+    // "Selected calls" with nothing picked must not save a condition that
+    // matches every call — the panel blocks it, and this is the backstop.
+    expect(writeTriggerFilter(base({ contactId: [] }))).toBeUndefined();
+  });
+
+  it("ignores an IN_LIST holding anything but ids", () => {
+    const group = {
+      mode: "ALL" as const,
+      items: [
+        { field: "contactId", operator: "IN_LIST" as const, value: ["a", 42] },
+      ],
+    };
+    // Not recognisable as a pin, so it survives as an ordinary filter rather
+    // than being silently rewritten.
+    expect(readTriggerFilter(group, null, CALL_RELATED).related).toEqual({});
+    expect(readTriggerFilter(group, null, CALL_RELATED).scope.mode).toBe("FILTER");
   });
 });
