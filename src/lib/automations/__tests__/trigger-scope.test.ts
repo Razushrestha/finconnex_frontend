@@ -14,7 +14,9 @@ import {
   writeTriggerFilter,
   writeTriggerScope,
 } from "@/lib/automations/trigger-scope";
+import { TRIGGER_CATALOG } from "@/lib/automations/types";
 import type { AutomationConditionGroup } from "@/lib/automations/types";
+import { supportsMultiRecordPicker } from "@/lib/automations/record-search";
 
 describe("trigger scope", () => {
   it("treats a missing or empty condition group as any record", () => {
@@ -680,9 +682,10 @@ describe("triggers that deliberately have no second stage", () => {
     expect(CHANGED_FIELD_TRIGGERS[trigger]).toBeUndefined();
   });
 
-  it("allows a related-record pin only where the entity links a counterparty", () => {
-    // Calls, messages and emails all carry a linkable contact, so an event
-    // trigger on them can still be narrowed to who it was with.
+  it("allows a related-record pin only where the entity links something pinnable", () => {
+    // Calls, messages and emails carry a linkable contact; documents and
+    // signature requests carry a teammate (and, for a signature, the document
+    // it is against). Either way an event trigger can still be narrowed.
     for (const trigger of [
       "CALL_CREATED",
       "MESSAGE_RECEIVED",
@@ -693,12 +696,52 @@ describe("triggers that deliberately have no second stage", () => {
       "EMAIL_FAILED",
       "EMAIL_BOUNCED",
       "EMAIL_REPLIED",
+      "DOCUMENT_UPLOADED",
+      "DOCUMENT_REQUEST_SUBMITTED",
+      "DOCUMENT_REQUEST_COMPLETED",
+      "SIGNATURE_REQUEST_COMPLETED",
     ] as const) {
       expect(RELATED_RECORD_TRIGGERS[trigger]).toBeDefined();
     }
-    // Documents and signatures link no contact, so they offer none.
-    expect(RELATED_RECORD_TRIGGERS.DOCUMENT_UPLOADED).toBeUndefined();
-    expect(RELATED_RECORD_TRIGGERS.SIGNATURE_REQUEST_COMPLETED).toBeUndefined();
+    // A meeting is narrowed by picking the meeting itself in the scope stage,
+    // so it needs no pin.
+    expect(RELATED_RECORD_TRIGGERS.MEETING_BOOKED).toBeUndefined();
+  });
+
+  it("pins the document owner, not a contact the snapshot never carries", () => {
+    // Document has optional lead/contact/company/deal links, but the trigger
+    // snapshot selects none of them — pinning one would never match.
+    // `uploadedById` is a required User FK and is in the snapshot.
+    expect(RELATED_RECORD_TRIGGERS.DOCUMENT_UPLOADED!).toEqual([
+      { label: "Uploaded by", field: "uploadedById", entityType: "USER" },
+    ]);
+    expect(RELATED_RECORD_TRIGGERS.DOCUMENT_REQUEST_SUBMITTED![0].field).toBe(
+      "requestedById",
+    );
+  });
+
+  it("reaches the document through documentId on a signature request", () => {
+    // DOCUMENT_UPLOADED fires on the document itself, so "which document" is
+    // scope (`id`). A signature request is a different record, so its
+    // document is a related pin.
+    expect(
+      RELATED_RECORD_TRIGGERS.SIGNATURE_REQUEST_COMPLETED!.map((e) => [
+        e.field,
+        e.entityType,
+      ]),
+    ).toEqual([
+      ["documentId", "DOCUMENT"],
+      ["createdById", "USER"],
+    ]);
+    expect(TRIGGER_CATALOG.DOCUMENT_UPLOADED.entityType).toBe("DOCUMENT");
+  });
+
+  it("lets the scope stage pick which documents", () => {
+    // "Which document" on DOCUMENT_UPLOADED is answered by the scope stage,
+    // which only offers a picker for entities listed as multi-pickable.
+    expect(supportsMultiRecordPicker("DOCUMENT")).toBe(true);
+    expect(supportsMultiRecordPicker("MEETING")).toBe(true);
+    expect(supportsMultiRecordPicker("SIGNATURE_REQUEST")).toBe(false);
   });
 
   it("points each pin at a field its own entity actually has", () => {

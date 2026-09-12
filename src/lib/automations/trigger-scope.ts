@@ -368,6 +368,19 @@ export function entityNoun(entityType: AutomationEntityType): { one: string; man
   return ENTITY_NOUN[entityType] ?? { one: "record", many: "records" };
 }
 
+/**
+ * Nouns for a picker target. Teammates are not an entity type, so they need
+ * their own pair; everything else is a CRM record.
+ */
+export function relatedTargetNoun(target: RelatedTarget): {
+  one: string;
+  many: string;
+} {
+  return target === "USER"
+    ? { one: "teammate", many: "teammates" }
+    : entityNoun(target);
+}
+
 /** One-line summary for the canvas node and the panel header. */
 export function describeTriggerScope(
   scope: TriggerScope,
@@ -844,6 +857,20 @@ const SENT_TO: RelatedRecordEntry[] = [
   { label: "Sent to (teammate)", field: "toUserId", entityType: "USER" },
 ];
 
+/**
+ * Who uploaded the document. `uploadedById` is a required User FK on
+ * Document, so this is always answerable — unlike the document's optional
+ * lead/contact/company/deal links, which the snapshot does not carry.
+ */
+const DOCUMENT_OWNER: RelatedRecordEntry[] = [
+  { label: "Uploaded by", field: "uploadedById", entityType: "USER" },
+];
+
+/** A request is raised by a teammate, so its "owner" is the requester. */
+const DOCUMENT_REQUEST_OWNER: RelatedRecordEntry[] = [
+  { label: "Requested by", field: "requestedById", entityType: "USER" },
+];
+
 /** Emails link one counterparty; `toEmail` is free text and not linkable. */
 const EMAIL_CONTACT: RelatedRecordEntry[] = [
   { label: "Contact", field: "contactId", entityType: "CONTACT" },
@@ -867,6 +894,18 @@ export const RELATED_RECORD_TRIGGERS: Partial<
   EMAIL_FAILED: EMAIL_CONTACT,
   EMAIL_BOUNCED: EMAIL_CONTACT,
   EMAIL_REPLIED: EMAIL_CONTACT,
+  // Documents. "Which document" for DOCUMENT_UPLOADED is the scope stage —
+  // the document is the trigger's own record, so it is pinned on `id`, not
+  // here. Only the owner needs a pin.
+  DOCUMENT_UPLOADED: DOCUMENT_OWNER,
+  DOCUMENT_REQUEST_SUBMITTED: DOCUMENT_REQUEST_OWNER,
+  DOCUMENT_REQUEST_COMPLETED: DOCUMENT_REQUEST_OWNER,
+  // A signature request is its own record, so here the document really is a
+  // separate one, reached through `documentId`.
+  SIGNATURE_REQUEST_COMPLETED: [
+    { label: "Document", field: "documentId", entityType: "DOCUMENT" },
+    { label: "Requested by", field: "createdById", entityType: "USER" },
+  ],
 };
 
 /**

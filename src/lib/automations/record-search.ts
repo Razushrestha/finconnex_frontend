@@ -22,6 +22,11 @@ import { getCrmCompany, listCrmCompanies } from "@/lib/companies/api";
 import { getCrmDeal, listCrmDeals } from "@/lib/deals/api";
 import { getCrmTask, listCrmTasks } from "@/lib/tasks/api";
 import { getCrmMeeting, isCrmMeetingId, listCrmMeetings } from "@/lib/meetings/api";
+import {
+  getCrmDocument,
+  isCrmDocumentId,
+  listCrmDocuments,
+} from "@/lib/documents/library/api";
 import { loadAssignableOwners } from "@/lib/users/assignable";
 import type { AutomationEntityType } from "@/lib/automations/types";
 
@@ -53,6 +58,7 @@ export const RECORD_PICKABLE_ENTITY_TYPES = [
  */
 export const MULTI_RECORD_PICKABLE_ENTITY_TYPES = [
   "MEETING",
+  "DOCUMENT",
 ] as const satisfies readonly AutomationEntityType[];
 
 export function supportsRecordPicker(entityType: AutomationEntityType): boolean {
@@ -86,6 +92,24 @@ function meetingOption(meeting: {
     id: meeting.id,
     label: clean(meeting.title) || "Untitled meeting",
     sublabel: [when, clean(meeting.status)].filter(Boolean).join(" \u00b7 ") || undefined,
+  };
+}
+
+function documentOption(doc: {
+  id: string;
+  fileName: string;
+  owner: string;
+  sizeLabel: string;
+}): AutomationRecordOption {
+  const owner = clean(doc.owner);
+  return {
+    id: doc.id,
+    label: clean(doc.fileName) || "Untitled document",
+    // Two files often share a name across owners, so the owner disambiguates.
+    sublabel:
+      [owner === "\u2014" ? "" : owner, clean(doc.sizeLabel)]
+        .filter(Boolean)
+        .join(" \u00b7 ") || undefined,
   };
 }
 
@@ -213,6 +237,12 @@ export async function searchAutomationRecords(
       // placeholder, which would save a condition that can never match.
       return usable(rows.filter((row) => isCrmMeetingId(row.id)).map(meetingOption));
     }
+    case "DOCUMENT": {
+      const rows = await listCrmDocuments({ page: 1, limit, search: query || undefined });
+      // Same placeholder hazard as meetings: a row with no id becomes
+      // `crm-doc-N`, which would save a condition that can never match.
+      return usable(rows.filter((row) => isCrmDocumentId(row.id)).map(documentOption));
+    }
     default:
       return [];
   }
@@ -268,6 +298,11 @@ export async function describeAutomationRecord(
         const meeting = await getCrmMeeting(id);
         if (!meeting) return null;
         return meetingOption({ ...meeting, id });
+      }
+      case "DOCUMENT": {
+        const doc = await getCrmDocument(id);
+        if (!doc) return null;
+        return documentOption({ ...doc, id });
       }
       default:
         return null;

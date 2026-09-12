@@ -32,6 +32,7 @@ import {
   changedFieldMeta,
   EMPTY_CONDITION_GROUP,
   entityNoun,
+  relatedTargetNoun,
   MAX_PINNED_RECORDS,
   relatedRecordMeta,
   scopeRecordIds,
@@ -284,11 +285,6 @@ function ScopeOption({
  * condition rather than writing an empty one.
  */
 /** A teammate target has no entity noun of its own; everything else does. */
-function relatedTargetNoun(target: RelatedTarget): { one: string; many: string } {
-  return target === "USER"
-    ? { one: "teammate", many: "teammates" }
-    : entityNoun(target);
-}
 
 function MultiRecordField({
   entityType,
@@ -676,6 +672,20 @@ export function TriggerConfigPanel({
    * pinned-set scope has its own page, so the scope stage hands off to it
    * rather than offering a Save that cannot yet be valid.
    */
+  /**
+   * "Uploaded by specific teammates" for one pin; a plain "Narrowed by ..."
+   * where a trigger offers several (a signature request pins both the
+   * document and who raised it).
+   */
+  const relatedScopeTitle = (() => {
+    const entries = relatedRecords ?? [];
+    if (entries.length === 1) {
+      const entry = entries[0];
+      return `${entry.label} specific ${relatedTargetNoun(entry.entityType).many}`;
+    }
+    return `Narrowed by ${entries.map((entry) => entry.label.toLowerCase()).join(" or ")}`;
+  })();
+
   const nextStage: "transition" | "records" | null =
     stage !== "scope"
       ? null
@@ -800,12 +810,17 @@ export function TriggerConfigPanel({
       </h3>
 
       {/*
-        A trigger with a related-record stage asks the narrowing question
-        there instead: "all calls" versus "the calls about these contacts".
-        Pinning one individual call is not a thing anyone means, so the
-        record and condition options are not offered.
+        A trigger whose own record is not worth pinning asks the narrowing
+        question through its related stage instead: "all calls" versus "the
+        calls about these contacts". Pinning one individual call is not a
+        thing anyone means, so the record and condition options are not
+        offered.
+
+        Where the record IS pickable — a document — both questions are real
+        ("which document" and "whose"), so that case falls through to the
+        standard list below, which appends the related option alongside.
       */}
-      {relatedRecords ? (
+      {relatedRecords && !multiPickable ? (
         <div className="space-y-2">
           <ScopeOption
             active={!hasRelatedPins}
@@ -833,9 +848,9 @@ export function TriggerConfigPanel({
       ) : (
       <div className="space-y-2">
         <ScopeOption
-          active={scope.mode === "ANY"}
+          active={scope.mode === "ANY" && !hasRelatedPins}
           title={`Any ${noun.one}`}
-          onClick={() => setScope({ mode: "ANY" })}
+          onClick={() => setFilter((prev) => ({ ...prev, scope: { mode: "ANY" }, related: {} }))}
         />
 
         {/*
@@ -848,7 +863,11 @@ export function TriggerConfigPanel({
             active={scope.mode === "RECORDS"}
             title={`Specific ${noun.many}`}
             onClick={() => {
-              setScope({ mode: "RECORDS", recordIds: pinnedIds });
+              setFilter((prev) => ({
+                ...prev,
+                scope: { mode: "RECORDS", recordIds: pinnedIds },
+                related: {},
+              }));
               setStage("records");
             }}
           >
@@ -865,6 +884,46 @@ export function TriggerConfigPanel({
                 onClick={() => setStage("records")}
               >
                 {pinnedIds.length === 0 ? "Choose" : "Edit"}
+              </Button>
+            </div>
+          </ScopeOption>
+        )}
+
+        {/*
+          Offered beside "specific documents", not instead of it: "which
+          document" and "whose document" are different questions and a user
+          may mean either.
+        */}
+        {relatedRecords && (
+          <ScopeOption
+            active={hasRelatedPins}
+            title={relatedScopeTitle}
+            onClick={() => {
+              setFilter((prev) => ({
+                ...prev,
+                scope: { mode: "ANY" },
+                related: hasRelatedPins
+                  ? prev.related
+                  : Object.fromEntries(
+                      relatedRecords.map((entry) => [entry.field, [] as string[]]),
+                    ),
+              }));
+              setStage("transition");
+            }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-500">
+                {relatedPinCount === 0
+                  ? "Nobody chosen yet"
+                  : `${relatedPinCount} selected`}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setStage("transition")}
+              >
+                {relatedPinCount === 0 ? "Choose" : "Edit"}
               </Button>
             </div>
           </ScopeOption>
