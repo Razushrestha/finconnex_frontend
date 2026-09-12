@@ -20,6 +20,7 @@ import {
   normalizeCrmCompany,
   updateCrmCompany,
 } from "@/lib/companies/api";
+import { sortCompanyCards } from "@/lib/companies/sort";
 import {
   installSmokePolyfill,
   runAsCli,
@@ -114,8 +115,11 @@ export function smokeCompaniesWiring() {
     fail("companies hook does not mark a successful list as Live CRM");
   }
 
-  if (!api.includes("followCompanyTransfer")) {
-    fail("companies client does not follow transfer jobs");
+  if (!api.includes("export async function changeCrmCompanyStatus")) {
+    fail("companies client missing changeCrmCompanyStatus");
+  }
+  if (api.includes("JSON.stringify({ ...input, ids })")) {
+    fail("bulkCrmCompanies still sends a nested payload wrapper");
   }
   if (!page.includes("ASSIGN_OWNER")) {
     fail("companies page does not bulk-assign owner");
@@ -148,9 +152,29 @@ export function smokeCompaniesWiring() {
   const kanban = readSrc(
     "src/components/sales/companies/CompaniesKanbanBoard.tsx",
   );
-  if (!kanban.includes("updateCrmCompany")) {
+  if (!kanban.includes("changeCrmCompanyStatus")) {
     fail("kanban board does not sync status moves to CRM");
   }
+  if (!kanban.includes("sortCompanyCards")) {
+    fail("kanban board does not apply header sort to column cards");
+  }
+  if (!kanban.includes("sortValue")) {
+    fail("kanban board missing sortValue prop");
+  }
+
+  const list = readSrc("src/components/sales/companies/CompaniesListView.tsx");
+  if (!list.includes("sortCompanyCards")) {
+    fail("list view does not apply header sort to rows");
+  }
+
+  if (!page.includes("sortValue={activeSort}")) {
+    fail("companies page does not pass activeSort into the board/list");
+  }
+  if (!page.includes("sortDirection={activeSortDirection}")) {
+    fail("companies page does not pass sort direction into the board/list");
+  }
+
+  smokeCompaniesSort();
 
   const normalized = normalizeCrmCompany(
     {
@@ -168,6 +192,35 @@ export function smokeCompaniesWiring() {
     normalized.status !== "Customer"
   ) {
     fail("normalizeCrmCompany did not map Swagger-shaped fields");
+  }
+}
+
+/** QA: Sales → Companies → Sort → Name (A-Z) → Apply must reorder cards. */
+export function smokeCompaniesSort() {
+  const cards = [
+    { name: "Zenith Labs", industry: "Health", owner: "Zed", annualRevenue: "$9" },
+    { name: "Acme Corp", industry: "Tech", owner: "Ada", annualRevenue: "$1" },
+    { name: "Midtown Co", industry: "Retail", owner: "Mia", annualRevenue: "$5" },
+  ];
+
+  const unsorted = sortCompanyCards(cards, "Sort");
+  if (unsorted.map((c) => c.name).join(",") !== "Zenith Labs,Acme Corp,Midtown Co") {
+    fail("idle Sort must leave company order unchanged");
+  }
+
+  const az = sortCompanyCards(cards, "name_asc");
+  if (az.map((c) => c.name).join(",") !== "Acme Corp,Midtown Co,Zenith Labs") {
+    fail("Name (A-Z) did not reorder companies");
+  }
+
+  const za = sortCompanyCards(cards, "name_desc");
+  if (za.map((c) => c.name).join(",") !== "Zenith Labs,Midtown Co,Acme Corp") {
+    fail("Name (Z-A) did not reverse companies");
+  }
+
+  const azDesc = sortCompanyCards(cards, "name_asc", "desc");
+  if (azDesc.map((c) => c.name).join(",") !== "Zenith Labs,Midtown Co,Acme Corp") {
+    fail("Name (A-Z) + desc did not reverse companies");
   }
 }
 
@@ -303,7 +356,7 @@ export async function runCompaniesSmoke() {
 
   console.log("\n1) Client + UI wiring…");
   smokeCompaniesWiring();
-  console.log("   OK — companies client, catalog, page, store, merge, kanban");
+  console.log("   OK — companies client, catalog, page, store, merge, kanban, sort");
 
   console.log("\n2) Mock fetch…");
   await smokeCompaniesMock();

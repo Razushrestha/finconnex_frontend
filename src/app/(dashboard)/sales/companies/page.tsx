@@ -210,7 +210,8 @@ export default function CompaniesPage() {
     }
     let n = 0;
     for (const id of selectedIds) {
-      if (updateCompany(id, { status: next })) n += 1;
+      if (updateCompany(id, { status: next }, { skipCrm: Boolean(liveIds.length) }))
+        n += 1;
     }
     setBulkFlash(`Updated status on ${n} compan${n === 1 ? "y" : "ies"}`);
   }
@@ -307,7 +308,6 @@ export default function CompaniesPage() {
   void isAssignmentRulesOpen;
   void columns;
   void setColumns;
-  void activeSortDirection;
 
   return (
     <div className={BOARD_PAGE}>
@@ -358,7 +358,7 @@ export default function CompaniesPage() {
         activeSort={activeSort}
         activeSortDirection={activeSortDirection}
         onSortChange={(field, direction) => {
-          setActiveSort(field);
+          setActiveSort(field || "Sort");
           setActiveSortDirection(direction);
         }}
         actionOptions={actionOptions}
@@ -436,9 +436,15 @@ export default function CompaniesPage() {
               onQuickAction={handleQuickAction}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelected}
+              sortValue={activeSort}
+              sortDirection={activeSortDirection}
             />
           ) : (
-            <CompaniesListView filters={filters} />
+            <CompaniesListView
+              filters={filters}
+              sortValue={activeSort}
+              sortDirection={activeSortDirection}
+            />
           )}
         </div>
       </div>

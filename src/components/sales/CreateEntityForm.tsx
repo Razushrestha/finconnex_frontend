@@ -251,8 +251,6 @@ export function CreateEntityFormShell({
             {title}
           </h1>
         </div>
-
-        <CreateFormTip text={tip} testId="create-entity-tip-header" />
       </header>
 
       {/* Form body: fills remaining viewport */}

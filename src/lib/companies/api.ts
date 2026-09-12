@@ -49,6 +49,14 @@ function pickStr(...values: unknown[]): string {
   return "";
 }
 
+function pickNum(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    const n = typeof value === "number" ? value : Number(value);
+    if (Number.isInteger(n) && n >= 1) return n;
+  }
+  return undefined;
+}
+
 function toQuery(params: Record<string, string | number | undefined>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -181,6 +189,7 @@ export function normalizeCrmCompany(
         undefined,
       annualRevenue: pickStr(raw.annualRevenue, raw.revenue) || undefined,
       city: pickStr(raw.city, raw.location, raw.addressCity) || undefined,
+      version: pickNum(raw.version, raw.expectedVersion, raw.recordVersion),
       accentColorClass: STATUS_DOT[status],
       avatarBgClass: AVATAR_COLORS[index % AVATAR_COLORS.length],
     },
@@ -356,6 +365,7 @@ export async function createCrmCompany(input: {
         : undefined,
     state: input.state,
     country: input.country,
+    status: apiStatus(input.status),
   });
 
   let data: unknown;
@@ -374,11 +384,24 @@ export async function createCrmCompany(input: {
     });
   }
   const items = normalizeCrmCompanies(data);
-  if (items[0]) return items[0];
-  if (data && typeof data === "object" && !Array.isArray(data)) {
-    return normalizeCrmCompany(data as Record<string, unknown>, 0);
+  let created =
+    items[0] ??
+    (data && typeof data === "object" && !Array.isArray(data)
+      ? normalizeCrmCompany(data as Record<string, unknown>, 0)
+      : null);
+  if (
+    created &&
+    input.status &&
+    created.status !== input.status &&
+    isUuid(created.company.id)
+  ) {
+    const patched = await updateCrmCompany(created.company.id, {
+      status: input.status,
+      expectedVersion: created.company.version,
+    });
+    if (patched) created = patched;
   }
-  return null;
+  return created;
 }
 
 export async function updateCrmCompany(
@@ -393,8 +416,10 @@ export async function updateCrmCompany(
     status: CompanyStatus;
     owner: string;
     ownerId: string;
+    expectedVersion: number;
   }>,
 ): Promise<NormalizedCrmCompany | null> {
+  if (!isUuid(id)) return null;
   const body: Record<string, unknown> = {};
   if (patch.name != null) body.name = patch.name;
   if (patch.website != null) body.website = patch.website;
@@ -409,12 +434,36 @@ export async function updateCrmCompany(
     if (isUuid(patch.owner)) body.ownerId = patch.owner;
     else body.ownerName = patch.owner;
   }
-  const data = await companiesMutate(`/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
-  const items = normalizeCrmCompanies(data);
-  return items[0] ?? null;
+
+  const send = (expectedVersion?: number) => {
+    const payload =
+      expectedVersion != null
+        ? { ...body, expectedVersion }
+        : { ...body };
+    return companiesMutate(`/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+  };
+
+  let expectedVersion = patch.expectedVersion;
+  if (expectedVersion == null) {
+    const live = await getCrmCompany(id);
+    expectedVersion = live?.company.version;
+  }
+
+  try {
+    const data = await send(expectedVersion);
+    const items = normalizeCrmCompanies(data);
+    return items[0] ?? null;
+  } catch (err) {
+    const live = await getCrmCompany(id);
+    const retryVersion = live?.company.version;
+    if (retryVersion == null || retryVersion === expectedVersion) throw err;
+    const data = await send(retryVersion);
+    const items = normalizeCrmCompanies(data);
+    return items[0] ?? live;
+  }
 }
 
 export async function deleteCrmCompany(id: string): Promise<void> {
@@ -429,9 +478,25 @@ export async function bulkCrmCompanies(input: {
 }): Promise<unknown> {
   const ids = input.ids.filter(isUuid);
   if (!ids.length) return { affected: 0 };
+  const { payload, operation } = input;
   return companiesMutate("/bulk", {
     method: "POST",
-    body: JSON.stringify({ ...input, ids }),
+    body: JSON.stringify({
+      ids,
+      operation,
+      ...(payload ?? {}),
+    }),
+  });
+}
+
+export async function changeCrmCompanyStatus(
+  ids: string[],
+  status: CompanyStatus,
+): Promise<unknown> {
+  return bulkCrmCompanies({
+    ids,
+    operation: "CHANGE_STATUS",
+    payload: { status: apiStatus(status) },
   });
 }
 

@@ -207,9 +207,9 @@ export function BookingsWorkspace({
   }
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto bg-[#F8F9FB] xl:h-full xl:overflow-hidden">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col xl:overflow-hidden">
-        <div className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col px-3 pt-4 pb-4 sm:px-5 sm:pt-5 sm:pb-5 lg:px-7 xl:pb-5">
+    <div className="flex min-h-full min-w-0 flex-1 flex-col bg-[#F8F9FB]">
+      <div className="flex min-h-full min-w-0 flex-1 flex-col">
+        <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-1 flex-col px-3 pt-4 pb-8 sm:px-5 sm:pt-5 sm:pb-10 lg:px-7">
           {section === "home" ? (
             <HomeView
               appointments={crm.appointments}
@@ -345,7 +345,7 @@ function HomeView({
   const todayKey = dateKeyFromDate(now);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex flex-col">
       <div className="mb-3 flex shrink-0 flex-col gap-3">
         <div className="flex justify-end">
           <NewBookingButton onClick={onNewBooking} />
@@ -419,8 +419,8 @@ function HomeView({
         </p>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
-        <section className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
+        <section className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
           <div className="flex flex-col gap-3 border-b border-[#E5E7EB] px-3 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
             <h2 className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
               <CalendarDays className="h-4 w-4 shrink-0" style={{ color: BRAND }} />
@@ -462,7 +462,7 @@ function HomeView({
           {error ? (
             <p className="px-5 py-2 text-[12px] text-rose-600">{error}</p>
           ) : null}
-          <div className="min-h-0 flex-1 overflow-auto">
+          <div className="min-w-0">
           <div className="divide-y divide-[#F3F4F6] lg:hidden">
             {loading && pageRows.length === 0 ? (
               <p className="px-4 py-10 text-center text-[13px] text-slate-400">
@@ -566,7 +566,7 @@ function HomeView({
           </div>
         </section>
 
-        <div className="grid min-h-0 min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-1 xl:grid-rows-[auto_minmax(0,1fr)] xl:gap-4">
+        <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-1">
           <section className="shrink-0 rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-[14px] font-bold text-slate-900">
@@ -886,7 +886,7 @@ function MiniCalendar({
   });
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+    <section className="flex min-h-[280px] flex-col rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
       <div className="mb-3 flex shrink-0 items-center justify-between">
         <h3 className="text-[14px] font-bold text-slate-900">{label}</h3>
         <div className="flex gap-1">
@@ -913,7 +913,7 @@ function MiniCalendar({
           </div>
         ))}
       </div>
-      <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-7 text-center">
+      <div className="grid auto-rows-fr grid-cols-7 text-center">
         {cells.map((day, i) => {
           if (!day) return <div key={`e-${i}`} className="min-h-9" />;
           const iso = `${year}-${String(mo + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;

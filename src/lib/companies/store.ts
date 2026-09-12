@@ -164,6 +164,7 @@ export function deleteCompany(
 export function updateCompany(
   id: string,
   patch: Partial<CompanyCardData> & { status?: CompanyStatus },
+  opts?: { skipCrm?: boolean },
 ): CompanyCardData | null {
   const found = findCompanyById(id);
   if (!found) return null;
@@ -193,20 +194,26 @@ export function updateCompany(
   );
   saveCompanyGroups(groups);
 
-  void import("@/lib/companies/api").then(({ updateCrmCompany, tryCrmCompany }) => {
-    void tryCrmCompany(() =>
-      updateCrmCompany(id, {
-        name: patch.name,
-        website: patch.website,
-        industry: patch.industry,
-        phone: patch.phone,
-        city: patch.city,
-        annualRevenue: patch.annualRevenue,
-        status: nextStatus,
-        owner: patch.owner,
-      }),
-    );
-  });
+  if (!opts?.skipCrm) {
+    void import("@/lib/companies/api").then(({ updateCrmCompany, tryCrmCompany }) => {
+      void tryCrmCompany(() =>
+        updateCrmCompany(id, {
+          name: patch.name,
+          website: patch.website,
+          industry: patch.industry,
+          phone: patch.phone,
+          city: patch.city,
+          annualRevenue: patch.annualRevenue,
+          status: nextStatus,
+          owner: patch.owner,
+          ownerId: patch.ownerId ?? found.company.ownerId,
+          expectedVersion: found.company.version,
+        }),
+      ).then((remote) => {
+        if (remote) mergeCrmCompaniesIntoBoard([remote]);
+      });
+    });
+  }
   return merged;
 }
 

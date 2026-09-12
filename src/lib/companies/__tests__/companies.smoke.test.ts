@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
   smokeCompaniesMock,
+  smokeCompaniesSort,
   smokeCompaniesWiring,
 } from "@/lib/companies/smoke";
 
 describe("Companies API smoke (CI)", () => {
   it("wires client, catalog, and UI", () => {
     smokeCompaniesWiring();
+  });
+
+  it("reorders companies for Name (A-Z) / Name (Z-A)", () => {
+    smokeCompaniesSort();
   });
 
   it("mocks list/get/create/update/bulk/import/export/merge/delete", async () => {

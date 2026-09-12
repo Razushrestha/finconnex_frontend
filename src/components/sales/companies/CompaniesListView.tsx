@@ -8,6 +8,7 @@ import { listCompanyGroups } from "@/lib/companies/store";
 import { onRulesChange } from "@/lib/rules";
 import type { CompanyFilters } from "./FilterCompaniesPanel";
 import { companyMatchesFilters } from "@/lib/filters/records";
+import { sortCompanyCards } from "@/lib/companies/sort";
 import { cn } from "@/lib/utils";
 import { StatusColorPill } from "@/components/common/StatusColorPill";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
@@ -27,6 +28,8 @@ import {
 interface CompaniesListViewProps {
   groups?: CompanyGroup[];
   filters?: CompanyFilters;
+  sortValue?: string;
+  sortDirection?: "asc" | "desc";
 }
 
 const DEFAULT_COMPANY_COLUMNS: ManageColumn[] = [
@@ -132,6 +135,8 @@ const columnRenderers: Record<string, ColumnRenderer> = {
 export function CompaniesListView({
   groups: groupsProp,
   filters,
+  sortValue,
+  sortDirection = "asc",
 }: CompaniesListViewProps) {
   const [groups, setGroups] = useState<CompanyGroup[]>(
     () => groupsProp ?? listCompanyGroups(),
@@ -167,7 +172,7 @@ export function CompaniesListView({
 
   const allCompanies = useMemo(() => {
     const hasStatusFilter = !!filters?.statuses.length;
-    return groups
+    const rows = groups
       .filter(
         (group) => !hasStatusFilter || filters!.statuses.includes(group.title),
       )
@@ -182,7 +187,8 @@ export function CompaniesListView({
             statusDotColor: group.dotColorClass,
           })),
       );
-  }, [groups, filters]);
+    return sortCompanyCards(rows, sortValue, sortDirection);
+  }, [groups, filters, sortValue, sortDirection]);
 
   const pagedCompanies = useMemo(
     () => allCompanies.slice(0, pageSize),

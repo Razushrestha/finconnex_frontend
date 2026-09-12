@@ -5,11 +5,13 @@ import { ChevronRight } from "lucide-react";
 import { type CompanyGroup, type CompanyStatus } from "@/lib/companies/types";
 import {
   listCompanyGroups,
+  mergeCrmCompaniesIntoBoard,
   saveCompanyGroups,
 } from "@/lib/companies/store";
 import { onRulesChange } from "@/lib/rules";
 import type { CompanyFilters } from "./FilterCompaniesPanel";
 import { companyMatchesFilters } from "@/lib/filters/records";
+import { sortCompanyCards } from "@/lib/companies/sort";
 import { CompanyCard } from "./CompanyCard";
 import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
 import { KanbanEmptyStage } from "@/components/common/KanbanEmptyStage";
@@ -49,6 +51,8 @@ interface CompaniesKanbanBoardProps {
   onToggleSelect?: (id: string) => void;
   onAddLead?: (columnId: string) => void;
   onQuickAction?: (kind: any, company: CompanyRecord) => void;
+  sortValue?: string;
+  sortDirection?: "asc" | "desc";
 }
 
 export function CompaniesKanbanBoard({
@@ -58,6 +62,8 @@ export function CompaniesKanbanBoard({
   onToggleSelect,
   onAddLead,
   onQuickAction,
+  sortValue,
+  sortDirection = "asc",
 }: CompaniesKanbanBoardProps) {
   const router = useRouter();
 
@@ -109,11 +115,15 @@ export function CompaniesKanbanBoard({
       .filter((g) => !hasStatusFilter || filters!.statuses.includes(g.title))
       .map((g) => ({
         ...g,
-        companies: g.companies.filter((c) =>
-          companyMatchesFilters({ ...c, statusTitle: g.title }, filters),
+        companies: sortCompanyCards(
+          g.companies.filter((c) =>
+            companyMatchesFilters({ ...c, statusTitle: g.title }, filters),
+          ),
+          sortValue,
+          sortDirection,
         ),
       }));
-  }, [groups, filters, visibleColumnIds]);
+  }, [groups, filters, visibleColumnIds, sortValue, sortDirection]);
 
   function visibleCompanyCount(group: CompanyGroup) {
     if (dragInfo && dragInfo.sourceGroupId === group.id) {
@@ -197,13 +207,31 @@ export function CompaniesKanbanBoard({
 
     moveCompany(company, sourceGroup, targetGroup, updatedCompany, targetIndex);
     if (sourceGroup.id !== targetGroup.id) {
-      void import("@/lib/companies/api").then(({ updateCrmCompany, tryCrmCompany }) => {
-        void tryCrmCompany(() =>
-          updateCrmCompany(company.id, {
-            status: targetGroup.title as CompanyStatus,
-          }),
-        );
-      });
+      void import("@/lib/companies/api").then(
+        ({
+          changeCrmCompanyStatus,
+          getCrmCompany,
+          tryCrmCompany,
+          updateCrmCompany,
+        }) => {
+          void tryCrmCompany(async () => {
+            try {
+              await changeCrmCompanyStatus(
+                [company.id],
+                targetGroup.title as CompanyStatus,
+              );
+            } catch {
+              await updateCrmCompany(company.id, {
+                status: targetGroup.title as CompanyStatus,
+                expectedVersion: company.version,
+              });
+            }
+            return getCrmCompany(company.id);
+          }).then((live) => {
+            if (live) mergeCrmCompaniesIntoBoard([live]);
+          });
+        },
+      );
     }
     setDragInfo(null);
   }
