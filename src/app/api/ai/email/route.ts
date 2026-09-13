@@ -96,9 +96,7 @@ function parseSubjectSuggestions(raw: string) {
           reason: typeof rec.reason === "string" ? rec.reason.trim() : undefined,
         };
       })
-      .filter((row): row is { text: string; recommended: boolean; reason?: string } =>
-        Boolean(row),
-      )
+      .filter((row) => row != null)
       .slice(0, 6);
   } catch {
     return [];
