@@ -75,3 +75,35 @@ export function workspaceRoleLabel(role: string | null | undefined): string {
   const known = asWorkspaceRole(role);
   return known ? LABELS[known] : (role?.trim() || "Member");
 }
+
+/**
+ * Workspace role → the `HierarchyLevel` vocabulary the permission engine in
+ * `@/lib/rules/permissions` speaks.
+ *
+ * That engine predates workspace roles and only knows "System Admin",
+ * "Org Admin", "Manager", "Team Lead", "User" and "Read Only". It was being
+ * handed `User.globalRole`, which is `USER` for everyone who signs up — so a
+ * workspace OWNER was gated as a plain user and `requireAction` refused
+ * things like `sales.contacts.create`, even though the Nest guards allow an
+ * OWNER to do them.
+ *
+ * OWNER and ADMIN both map to "Org Admin": they are the top of a tenant, and
+ * "System Admin" is reserved for platform staff (`User.globalRole`), who are
+ * not workspace members at all.
+ */
+const RULES_ROLE: Record<WorkspaceRole, string> = {
+  OWNER: "Org Admin",
+  ADMIN: "Org Admin",
+  MANAGER: "Manager",
+  TEAM_LEAD: "Team Lead",
+  MEMBER: "User",
+  VIEWER: "Read Only",
+  GUEST: "Read Only",
+};
+
+export function rulesRoleForWorkspaceRole(
+  role: string | null | undefined,
+): string | null {
+  const known = asWorkspaceRole(role);
+  return known ? RULES_ROLE[known] : null;
+}
