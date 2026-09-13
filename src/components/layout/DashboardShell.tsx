@@ -7,6 +7,8 @@ import { BottomBar } from "@/components/layout/BottomBar";
 import { CrmTokenKeepAlive } from "@/components/layout/CrmTokenKeepAlive";
 import type { SessionPayload } from "@/lib/auth/types";
 import { setRulesActor } from "@/lib/rules/actor";
+import { isPlatformAdminRole } from "@/lib/auth/platform";
+import { rulesRoleForWorkspaceRole } from "@/lib/auth/workspace-role";
 import { BOTTOM_BAR_H } from "@/lib/layout";
 import { SettingsCrmProvider, useCrmSettings } from "@/lib/settings/use-crm-settings";
 import {
@@ -52,13 +54,30 @@ function DashboardShellInner({ children, session }: DashboardShellProps) {
   );
 
   useEffect(() => {
+    /*
+     * The permission engine must be told the role held *in this workspace*.
+     * `session.role` is User.globalRole — the platform staff tier, USER for
+     * everyone who signs up — so passing it gated a workspace owner as a
+     * plain user and requireAction refused sales.contacts.create and the
+     * rest. Platform staff keep their own tier; everyone else is judged by
+     * their membership, exactly as the Nest guards judge them.
+     */
+    const role = isPlatformAdminRole(session.role)
+      ? "System Admin"
+      : (rulesRoleForWorkspaceRole(session.workspaceRole) ?? session.role);
     setRulesActor({
       id: session.userId,
       name: session.name,
       email: session.email,
-      role: session.role,
+      role,
     });
-  }, [session.userId, session.name, session.email, session.role]);
+  }, [
+    session.userId,
+    session.name,
+    session.email,
+    session.role,
+    session.workspaceRole,
+  ]);
 
   // Focus/scrollIntoView on overlays can shift this overflow-hidden shell and
   // slide the left nav off-screen. Keep the chrome pinned.
