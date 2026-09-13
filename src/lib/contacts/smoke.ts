@@ -79,6 +79,10 @@ export function smokeContactsWiring() {
       fail(`contacts client missing ${name}`);
     }
   }
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('"contacts"') || !bff.includes('path.includes("contacts")')) {
+    fail("BFF proxy does not allow workspace contacts");
+  }
   if (!api.includes("`/v1/contacts${suffix}`")) {
     fail("contacts client missing /v1/contacts path");
   }

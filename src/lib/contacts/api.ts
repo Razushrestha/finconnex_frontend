@@ -1,8 +1,10 @@
 import {
+  decodeJwtPayload,
   ensureCrmAccess,
   ensureCrmSession,
   isBoundCrmSession,
   isUuid,
+  type CrmSession,
 } from "@/lib/activity-timeline/auth";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import type {
@@ -130,7 +132,22 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
     if (out.length) return out;
   }
   if (looksLikeContactRecord(data)) return [data];
-  return [];
+  const mapped: Record<string, unknown>[] = [];
+  for (const [key, value] of Object.entries(data)) {
+    if (
+      key === "data" ||
+      key === "meta" ||
+      key === "pagination" ||
+      key === "message" ||
+      key === "statusCode"
+    ) {
+      continue;
+    }
+    if (Array.isArray(value) || isPlainRecord(value)) {
+      mapped.push(...extractRecords(value));
+    }
+  }
+  return mapped.filter(looksLikeContactRecord);
 }
 
 function unwrapContactPayload(data: unknown): Record<string, unknown> | null {
@@ -175,6 +192,77 @@ function apiSource(source: ContactSource): string {
   return source.toUpperCase().replace(/ /g, "_");
 }
 
+const CRM_CONTACT_SOURCES = new Set([
+  "WEBSITE",
+  "REFERRAL",
+  "COLD_CALL",
+  "SOCIAL_MEDIA",
+  "EMAIL_CAMPAIGN",
+  "PAID_AD",
+  "EVENT",
+  "PARTNER",
+  "OTHER",
+]);
+
+const CRM_LIFECYCLE_STAGES = new Set([
+  "SUBSCRIBER",
+  "LEAD",
+  "MQL",
+  "SQL",
+  "OPPORTUNITY",
+  "CUSTOMER",
+  "EVANGELIST",
+  "LOST",
+]);
+
+function compactContactBody(input: Record<string, unknown>) {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (value == null) continue;
+    if (typeof value === "string" && !value.trim()) continue;
+    out[key] = typeof value === "string" ? value.trim() : value;
+  }
+  return out;
+}
+
+function asCrmContactSource(source?: ContactSource): string | undefined {
+  if (!source) return undefined;
+  const value = apiSource(source);
+  return CRM_CONTACT_SOURCES.has(value) ? value : undefined;
+}
+
+function asCrmLifecycleStage(raw?: string): string | undefined {
+  const value = raw?.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  if (!value) return undefined;
+  return CRM_LIFECYCLE_STAGES.has(value) ? value : undefined;
+}
+
+async function resolveContactOwnerId(preferred?: string): Promise<string | undefined> {
+  if (preferred && isUuid(preferred)) return preferred;
+  try {
+    const access = await ensureCrmAccess();
+    const claims = access?.accessToken
+      ? decodeJwtPayload(access.accessToken)
+      : null;
+    const id = claims?.sub ?? claims?.userId ?? claims?.id;
+    if (typeof id === "string" && isUuid(id)) return id;
+  } catch {
+    /* ownerId stays optional */
+  }
+  return undefined;
+}
+
+function createdContactFromPayload(data: unknown): NormalizedCrmContact | null {
+  const items = normalizeCrmContacts(data);
+  if (items[0] && isLiveNormalizedContact(items[0])) return items[0];
+  const entity = unwrapContactPayload(data);
+  if (entity) {
+    const mapped = normalizeCrmContact(entity, 0);
+    if (isLiveNormalizedContact(mapped)) return mapped;
+  }
+  return null;
+}
+
 function initialsFromName(name: string) {
   const parts = name.trim().split(/\s+/);
   if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
@@ -209,7 +297,9 @@ export function normalizeCrmContact(
   const first = pickStr(raw.firstName, raw.givenName);
   const last = pickStr(raw.lastName, raw.familyName);
   const name = pickStr(raw.name, raw.fullName, `${first} ${last}`.trim());
-  const status = mapContactStatus(pickStr(raw.status, raw.state) || "ACTIVE");
+  const status = mapContactStatus(
+    pickStr(raw.status, raw.state, raw.lifecycleStage) || "ACTIVE",
+  );
   const id = pickStr(raw.id, raw.uuid, raw.contactId);
   const sourceRaw = pickStr(raw.source, raw.leadSource, raw.origin);
 
@@ -262,24 +352,29 @@ export function normalizeCrmContacts(data: unknown): NormalizedCrmContact[] {
     .filter((item) => isUuid(item.contact.id));
 }
 
-async function contactsCrm<T>(path: string, init?: RequestInit): Promise<T> {
+async function contactsCall(
+  suffix: string,
+  query = "",
+  init?: RequestInit,
+): Promise<unknown> {
+  const path = `${contactsPath(suffix)}${query}`;
   if (isBoundCrmSession()) {
     const auth = await resolveAuth();
     if (!auth) throw new Error("Sign in to load contacts");
-    return crmFetch(auth, path, init);
+    return crmFetch(auth as CrmSession, path, init);
   }
-  return crmBffFetch<T>(path, init);
+  return crmBffFetch(path, init);
 }
 
 async function contactsGet(suffix: string, query = ""): Promise<unknown> {
-  return contactsCrm(`${contactsPath(suffix)}${query}`);
+  return contactsCall(suffix, query);
 }
 
 async function contactsMutate(
   suffix: string,
   init: RequestInit,
 ): Promise<unknown> {
-  return contactsCrm(contactsPath(suffix), init);
+  return contactsCall(suffix, "", init);
 }
 
 export async function listCrmContactBoard(): Promise<NormalizedCrmContact[]> {
@@ -310,15 +405,31 @@ function isLiveNormalizedContact(item: NormalizedCrmContact): boolean {
 export async function loadCrmContacts(
   query: CrmContactQuery = {},
 ): Promise<NormalizedCrmContact[]> {
-  try {
-    const board = await listCrmContactBoard().then((rows) =>
-      rows.filter(isLiveNormalizedContact),
-    );
-    if (board.length) return board;
-  } catch {
-    /* list endpoint is the documented fallback */
+  const [boardResult, listResult] = await Promise.allSettled([
+    listCrmContactBoard(),
+    listCrmContacts(query),
+  ]);
+  const board =
+    boardResult.status === "fulfilled"
+      ? boardResult.value.filter(isLiveNormalizedContact)
+      : [];
+  const list =
+    listResult.status === "fulfilled"
+      ? listResult.value.filter(isLiveNormalizedContact)
+      : [];
+  if (!board.length && !list.length) {
+    if (boardResult.status === "rejected" && listResult.status === "rejected") {
+      throw boardResult.reason instanceof Error
+        ? boardResult.reason
+        : new Error("Contacts unavailable");
+    }
+    return [];
   }
-  return listCrmContacts(query);
+  const byId = new Map<string, NormalizedCrmContact>();
+  for (const row of [...list, ...board]) {
+    if (row.contact.id) byId.set(row.contact.id, row);
+  }
+  return [...byId.values()];
 }
 
 export async function getCrmContact(
@@ -352,35 +463,78 @@ export async function createCrmContact(input: {
   doNotContact?: boolean;
   notes?: string;
 }): Promise<NormalizedCrmContact | null> {
-  const body: Record<string, unknown> = {
-    firstName: input.firstName.trim(),
-    lastName: input.lastName.trim(),
-    email: input.email.trim(),
-  };
-  if (input.phone?.trim()) body.phone = input.phone.trim();
-  if (input.mobile?.trim()) body.mobilePhone = input.mobile.trim();
-  if (input.source) body.source = apiSource(input.source);
-  if (input.jobTitle?.trim()) body.jobTitle = input.jobTitle.trim();
-  if (input.department?.trim()) body.department = input.department.trim();
-  if (input.linkedinUrl?.trim()) body.linkedinUrl = input.linkedinUrl.trim();
-  if (input.lifecycleStage?.trim()) body.lifecycleStage = input.lifecycleStage.trim();
-  if (input.doNotContact != null) body.doNotContact = input.doNotContact;
-  if (input.notes?.trim()) body.notes = input.notes.trim();
-  if (input.companyId && isUuid(input.companyId)) body.companyId = input.companyId;
-  else if (input.company && isUuid(input.company)) body.companyId = input.company;
-  if (input.ownerId && isUuid(input.ownerId)) body.ownerId = input.ownerId;
-  const data = await contactsMutate("", {
-    method: "POST",
-    body: JSON.stringify(body),
+  const ownerId = await resolveContactOwnerId(input.ownerId);
+  const companyId =
+    input.companyId && isUuid(input.companyId)
+      ? input.companyId
+      : input.company && isUuid(input.company)
+        ? input.company
+        : undefined;
+  const payload = compactContactBody({
+    firstName: input.firstName,
+    lastName: input.lastName.trim() || input.firstName.trim(),
+    email: input.email,
+    phone: input.phone,
+    mobilePhone: input.mobile,
+    source: asCrmContactSource(input.source),
+    jobTitle: input.jobTitle,
+    department: input.department,
+    linkedinUrl: input.linkedinUrl,
+    lifecycleStage: asCrmLifecycleStage(input.lifecycleStage),
+    doNotContact: input.doNotContact,
+    notes: input.notes,
+    companyId,
+    ownerId,
   });
-  const items = normalizeCrmContacts(data);
-  if (items[0] && isLiveNormalizedContact(items[0])) return items[0];
-  const entity = unwrapContactPayload(data);
-  if (entity) {
-    const mapped = normalizeCrmContact(entity, 0);
-    if (isLiveNormalizedContact(mapped)) return mapped;
+
+  const post = (body: Record<string, unknown>) =>
+    contactsMutate("", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+
+  let data: unknown;
+  try {
+    data = await post(payload);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (/409|already exists|conflict|emailExists/i.test(message)) throw err;
+    const stripped = { ...payload };
+    delete stripped.ownerId;
+    delete stripped.companyId;
+    delete stripped.source;
+    delete stripped.lifecycleStage;
+    try {
+      data = await post(stripped);
+    } catch {
+      throw err;
+    }
   }
-  return null;
+
+  let created = createdContactFromPayload(data);
+  if (!created?.contact.id || !isUuid(created.contact.id)) return created;
+
+  const extras: Partial<{
+    status: ContactStatus;
+    ownerId: string | null;
+    companyId: string | null;
+    source: ContactSource;
+  }> = {};
+  if (input.status && created.status !== input.status) extras.status = input.status;
+  if (ownerId && !created.contact.ownerId) extras.ownerId = ownerId;
+  if (companyId && !created.contact.companyId) extras.companyId = companyId;
+  if (input.source && created.contact.source !== input.source) {
+    extras.source = input.source;
+  }
+  if (Object.keys(extras).length) {
+    try {
+      const patched = await updateCrmContact(created.contact.id, extras);
+      if (patched) created = patched;
+    } catch {
+      /* contact exists; extras can be set from the card later */
+    }
+  }
+  return created;
 }
 
 export async function updateCrmContact(

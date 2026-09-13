@@ -55,6 +55,7 @@ interface ContactsKanbanBoardProps {
   onAddContact?: (groupId: string) => void;
   selectedIds: string[];
   onToggleSelect: (id: string) => void;
+  refreshKey?: string;
 }
 
 export function ContactsKanbanBoard({
@@ -63,6 +64,7 @@ export function ContactsKanbanBoard({
   onAddContact,
   selectedIds = [],
   onToggleSelect,
+  refreshKey,
 }: ContactsKanbanBoardProps) {
   const router = useRouter();
 
@@ -81,7 +83,7 @@ export function ContactsKanbanBoard({
   useEffect(() => {
     setGroups(listContactGroups());
     return onRulesChange(() => setGroups(listContactGroups()));
-  }, []);
+  }, [refreshKey]);
 
   function flash(msg: string) {
     setToast(msg);

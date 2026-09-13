@@ -25,6 +25,7 @@ export type SendGateway = {
     email?: string;
     subject?: string;
     body?: string;
+    files?: File[];
   }) => Promise<SendResult>;
 };
 
@@ -118,9 +119,26 @@ export function createApiSendGateway(config: ApiSendGatewayConfig): SendGateway 
         body: body ?? "",
       });
     },
-    async sendEmail({ email, subject, body }) {
+    async sendEmail({ email, subject, body, files }) {
       if (!email?.trim() || !email.includes("@")) {
         return { ok: false, message: "This lead has no email address." };
+      }
+      if (typeof window !== "undefined") {
+        try {
+          const { sendCrmActivityEmail } = await import("@/lib/emails/compose-send");
+          const sent = await sendCrmActivityEmail({
+            to: [email.trim()],
+            subject: subject ?? "",
+            body: body ?? "",
+            files,
+          });
+          return { ok: true, mode: "gateway", providerId: sent.id };
+        } catch (err) {
+          return {
+            ok: false,
+            message: err instanceof Error ? err.message : "Could not send email",
+          };
+        }
       }
       const created = await postSend(config, "/v1/emails", {
         to: [email.trim()],
@@ -206,6 +224,7 @@ export async function sendEmailDemoLive(input: {
   relatedType?: string;
   relatedId?: string;
   relatedTo?: string;
+  files?: File[];
 }): Promise<SendResult> {
   try {
     const { sendCrmActivityEmail } = await import("@/lib/emails/compose-send");
@@ -216,6 +235,7 @@ export async function sendEmailDemoLive(input: {
       relatedType: input.relatedType,
       relatedId: input.relatedId,
       relatedTo: input.relatedTo,
+      files: input.files,
     });
     return { ok: true, mode: "gateway", providerId: sent.id };
   } catch (err) {

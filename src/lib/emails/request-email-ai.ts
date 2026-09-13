@@ -2,18 +2,22 @@ import {
   draftEmailFromPrompt,
   editEmailWithPrompt,
   rewriteEmailWithAi,
+  suggestSubjects,
   type EmailAiAction,
   type EmailTone,
+  type SubjectSuggestion,
 } from "@/lib/emails/ai-compose";
 
 export type EmailAiRequest = {
-  mode: "draft" | "rewrite" | "edit";
+  mode: "draft" | "rewrite" | "edit" | "subjects";
   prompt?: string;
   html?: string;
   tone?: EmailTone;
   action?: EmailAiAction;
   recipientName?: string;
   subject?: string;
+  dealTitle?: string;
+  dealStage?: string;
 };
 
 function localFallback(input: EmailAiRequest) {
@@ -61,4 +65,34 @@ export async function requestEmailAi(input: EmailAiRequest): Promise<string> {
   }
   if (json.html?.trim()) return json.html;
   throw new Error("Google AI returned an empty draft.");
+}
+
+export async function requestEmailSubjects(
+  input: Omit<EmailAiRequest, "mode">,
+): Promise<SubjectSuggestion[]> {
+  const fallback = suggestSubjects({
+    current: input.subject,
+    recipientName: input.recipientName,
+    dealTitle: input.dealTitle,
+    dealStage: input.dealStage,
+    prompt: input.prompt,
+  });
+  const res = await fetch("/api/ai/email", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, mode: "subjects" }),
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    subjects?: SubjectSuggestion[];
+    error?: string;
+  };
+  if (res.status === 503) return fallback;
+  if (!res.ok) {
+    throw new Error(json.error || "Google AI could not suggest subjects.");
+  }
+  const rows = Array.isArray(json.subjects)
+    ? json.subjects.filter((row) => row?.text?.trim())
+    : [];
+  return rows.length ? rows : fallback;
 }

@@ -51,6 +51,9 @@ export async function deliverQueuedCrmEmail(
   if (res.status === 503) return;
   if (!res.ok) {
     const json = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(json.error || "Could not deliver attachments with this email.");
+    throw new Error(
+      json.error ||
+        "Could not deliver this email through SendGrid. CRM still saved the send.",
+    );
   }
 }

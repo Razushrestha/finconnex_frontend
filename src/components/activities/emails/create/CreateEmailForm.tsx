@@ -404,12 +404,12 @@ export function CreateEmailForm({
         html: form.body.trim(),
         files: blobs,
       });
-      await attachFilesToCrmEmail({
-        emailId: current.id,
-        files: prepared.files,
-        relatedType: form.relatedKind ? form.relatedKind.toUpperCase() : undefined,
-        relatedId: form.relatedId || undefined,
-      });
+      if (status !== "Sent" && status !== "Scheduled" && prepared.files.length) {
+        await attachFilesToCrmEmail({
+          emailId: current.id,
+          files: prepared.files,
+        });
+      }
       if (isUuid(form.template)) {
         persistRemoteEmail(
           await tryCrmEmail(() =>
@@ -692,6 +692,7 @@ export function CreateEmailForm({
               />
               <SubjectImproveButton
                 current={form.subject}
+                body={form.body}
                 recipientName={contactName.includes("@") ? undefined : contactName}
                 dealTitle={primaryDeal?.title}
                 dealStage={primaryDeal?.stage}

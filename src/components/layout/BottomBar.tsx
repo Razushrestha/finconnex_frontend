@@ -18,6 +18,7 @@ import {
   UserPlus,
   Users,
   X,
+  Loader2,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ import { reminders } from "@/lib/reminders/types";
 import { StickyNotePad } from "@/components/layout/StickyNotePad";
 import { SoftphonePad } from "@/components/layout/SoftphonePad";
 import { VoiceAssistant } from "@/components/layout/VoiceAssistant";
+import { requestAssistantReply } from "@/lib/ai/request-assistant";
 import { subscribeSoftphoneOpen } from "@/lib/softphone/events";
 import { listStickyNotes, notePreview } from "@/lib/sticky-notes/store";
 import type { VoiceAction } from "@/lib/voice/commands";
@@ -109,6 +111,7 @@ export function BottomBar() {
   const [noteCount, setNoteCount] = React.useState(0);
   const [recent, setRecent] = React.useState<RecentItem[]>([]);
   const [aiInput, setAiInput] = React.useState("");
+  const [aiBusy, setAiBusy] = React.useState(false);
   const [aiMessages, setAiMessages] = React.useState<
     { role: "user" | "assistant"; text: string }[]
   >([
@@ -263,18 +266,33 @@ export function BottomBar() {
     router.push(href);
   }
 
-  function sendAi() {
+  async function sendAi() {
     const text = aiInput.trim();
-    if (!text) return;
+    if (!text || aiBusy) return;
+    const history = [...aiMessages, { role: "user" as const, text }];
     setAiInput("");
-    setAiMessages((prev) => [
-      ...prev,
-      { role: "user", text },
-      {
-        role: "assistant",
-        text: "I can take you to Leads, Deals, Tasks, or Reminders from Quick Add. Tell me the record type and I’ll point you to the right screen.",
-      },
-    ]);
+    setAiBusy(true);
+    setAiMessages(history);
+    try {
+      const reply = await requestAssistantReply(history);
+      setAiMessages((prev) => [...prev, { role: "assistant", text: reply.text }]);
+      if (reply.href) {
+        window.setTimeout(() => go(reply.href!), 700);
+      }
+    } catch (err) {
+      setAiMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text:
+            err instanceof Error
+              ? err.message
+              : "I could not reach Google AI just then. Try again in a moment.",
+        },
+      ]);
+    } finally {
+      setAiBusy(false);
+    }
   }
 
   function dismissReminder(id: string) {
@@ -398,25 +416,33 @@ export function BottomBar() {
                 {m.text}
               </p>
             ))}
+            {aiBusy ? (
+              <p className="max-w-[90%] rounded-xl bg-violet-50 px-2.5 py-1.5 text-[12px] text-muted-foreground dark:bg-violet-950/40">
+                Thinking…
+              </p>
+            ) : null}
           </div>
           <form
             className="flex gap-2 border-t border-border p-2"
             onSubmit={(e) => {
               e.preventDefault();
-              sendAi();
+              void sendAi();
             }}
           >
             <input
               value={aiInput}
               onChange={(e) => setAiInput(e.target.value)}
               placeholder="Ask FinConnex…"
-              className="h-8 min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 text-[12px] outline-none focus:ring-1 focus:ring-violet-500"
+              disabled={aiBusy}
+              className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[12px] text-slate-900 outline-none placeholder:text-slate-400 focus:ring-1 focus:ring-violet-500 disabled:opacity-60"
             />
             <button
               type="submit"
-              className="h-8 rounded-lg bg-[var(--brand-primary)] px-2.5 text-[11px] font-semibold text-white"
+              disabled={aiBusy || !aiInput.trim()}
+              className="inline-flex h-8 items-center gap-1 rounded-lg bg-[var(--brand-primary)] px-2.5 text-[11px] font-semibold text-white disabled:opacity-50"
             >
-              Send
+              {aiBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+              {aiBusy ? "…" : "Send"}
             </button>
           </form>
         </PanelCard>
@@ -590,7 +616,7 @@ function PanelCard({
   return (
     <div
       className={cn(
-        "absolute bottom-[calc(100%+8px)] z-50 overflow-hidden rounded-xl border border-border bg-white shadow-lg dark:bg-zinc-950",
+        "absolute bottom-[calc(100%+8px)] z-50 overflow-hidden rounded-xl border border-border bg-white text-foreground shadow-lg dark:bg-zinc-950",
         menuEnter,
         className,
       )}

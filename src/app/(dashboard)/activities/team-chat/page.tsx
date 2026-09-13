@@ -107,7 +107,7 @@ function flash(
 export default function TeamChatPage() {
   const [channels, setChannels] = useState(seedChannels);
   const [activeId, setActiveId] = useState(
-    () => seedChannels.find((c) => isDm(c))?.id ?? seedChannels[0].id,
+    () => seedChannels.find((c) => isDm(c))?.id ?? seedChannels[0]?.id ?? "",
   );
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState(chatMessages);
@@ -143,7 +143,8 @@ export default function TeamChatPage() {
     setMessages((prev) => ({ ...prev, ...crm.messages }));
   }, [crm.source, crm.messages]);
 
-  const active = channels.find((c) => c.id === activeId) ?? channels[0];
+  const active =
+    channels.find((c) => c.id === activeId) ?? channels[0] ?? null;
   const thread = (messages[activeId] ?? []).filter((m) => {
     if (!threadSearch.trim()) return true;
     return m.body.toLowerCase().includes(threadSearch.toLowerCase());
@@ -196,6 +197,7 @@ export default function TeamChatPage() {
 
   function send(body?: string, extras?: Partial<ChatMessage>) {
     const text = (body ?? draft).trim();
+    if (!activeId) return;
     if (!text && extras?.kind !== "voice") return;
 
     if (editingId) {
@@ -265,7 +267,7 @@ export default function TeamChatPage() {
         recipient: CURRENT_CHAT_USER.name,
         from: CURRENT_CHAT_USER.name,
         preview: text,
-        relatedTo: channelLabel(active),
+        relatedTo: active ? channelLabel(active) : "Team Chat",
         relatedHref: "/activities/team-chat",
       });
       flash(
@@ -317,7 +319,7 @@ export default function TeamChatPage() {
       assignedTo: CURRENT_CHAT_USER.name,
       description:
         description ??
-        `Created from team chat in ${channelLabel(active)}`,
+        `Created from team chat${active ? ` in ${channelLabel(active)}` : ""}`,
       createdBy: CURRENT_CHAT_USER.name,
     });
     notifyTaskAssigned({
@@ -369,7 +371,7 @@ export default function TeamChatPage() {
     if (label === "Create task…") {
       const title =
         draft.trim() ||
-        `Follow up in ${channelLabel(active)}`;
+        `Follow up${active ? ` in ${channelLabel(active)}` : " in Team Chat"}`;
       createTaskFromChat(title, draft.trim() || undefined);
       setDraft("");
       return;
@@ -650,6 +652,36 @@ export default function TeamChatPage() {
 
           {/* Conversation */}
           <section className="flex min-w-0 flex-1 flex-col">
+            {!active ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
+                  <MessageSquare className="h-6 w-6" />
+                </div>
+                <p className="text-[15px] font-semibold text-slate-800">
+                  {crm.loading ? "Loading conversations…" : "No conversations yet"}
+                </p>
+                <p className="max-w-sm text-[12px] text-slate-500">
+                  {crm.error
+                    ? crm.error
+                    : "Start a group from the Groups tab, or open a contact to begin a direct message."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const name = window.prompt("New group name");
+                    if (!name?.trim()) return;
+                    void startConversation({
+                      name: name.trim(),
+                      type: "GROUP",
+                    });
+                  }}
+                  className="mt-1 rounded-lg bg-violet-600 px-3 py-2 text-[12px] font-semibold text-white hover:bg-violet-700"
+                >
+                  New group
+                </button>
+              </div>
+            ) : (
+            <>
             <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -1117,6 +1149,8 @@ export default function TeamChatPage() {
                 </p>
               </div>
             </div>
+            </>
+            )}
           </section>
         </div>
       </div>

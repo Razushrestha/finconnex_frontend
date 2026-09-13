@@ -1,13 +1,8 @@
-import { isUuid } from "@/lib/activity-timeline/auth";
+import { attachCrmEmailObject } from "@/lib/emails/api";
 import {
-  createCrmDocument,
-  toCreateDocumentBody,
-} from "@/lib/documents/library/api";
-import {
-  attachCrmEmailFile,
-  attachCrmEmailObject,
-} from "@/lib/emails/api";
-import { uploadCrmStorageFile } from "@/lib/storage/api";
+  uploadCrmStorageFile,
+  type CrmStorageObject,
+} from "@/lib/storage/api";
 
 export type EmailOutboundAttachment = {
   filename: string;
@@ -17,14 +12,79 @@ export type EmailOutboundAttachment = {
   contentId?: string;
 };
 
-function relatedIds(relatedType?: string, relatedId?: string) {
-  if (!isUuid(relatedId)) return {};
-  const kind = (relatedType ?? "").trim().toUpperCase();
-  if (kind === "LEAD") return { leadId: relatedId };
-  if (kind === "CONTACT") return { contactId: relatedId };
-  if (kind === "COMPANY") return { companyId: relatedId };
-  if (kind === "DEAL") return { dealId: relatedId };
-  return {};
+/** Nest AddEmailAttachmentDto + activity MIME whitelist. */
+const CRM_EMAIL_MIME_EXT: Record<string, readonly string[]> = {
+  "image/jpeg": [".jpg", ".jpeg"],
+  "image/png": [".png"],
+  "image/webp": [".webp"],
+  "application/pdf": [".pdf"],
+  "text/csv": [".csv"],
+};
+
+const EXT_TO_MIME: Record<string, string> = {
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".pdf": "application/pdf",
+  ".csv": "text/csv",
+};
+
+function fileExtension(name: string): string {
+  const lower = name.trim().toLowerCase();
+  const index = lower.lastIndexOf(".");
+  return index >= 0 ? lower.slice(index) : "";
+}
+
+function mimeFromFilename(name: string): string {
+  return EXT_TO_MIME[fileExtension(name)] ?? "";
+}
+
+function guessMime(file: File, stored?: CrmStorageObject): string {
+  const candidates = [
+    stored?.contentType,
+    file.type,
+    mimeFromFilename(stored?.fileName || file.name),
+  ];
+  for (const raw of candidates) {
+    const value = (raw ?? "").split(";")[0].trim().toLowerCase();
+    const normalized = value === "image/jpg" ? "image/jpeg" : value;
+    if (CRM_EMAIL_MIME_EXT[normalized]) return normalized;
+  }
+  return "";
+}
+
+export function withInferredEmailFileType(file: File): File {
+  const mime = guessMime(file);
+  if (!mime || file.type === mime) return file;
+  return new File([file], file.name, { type: mime });
+}
+
+function withMatchingExtension(fileName: string, mimeType: string): string {
+  const allowed = CRM_EMAIL_MIME_EXT[mimeType];
+  if (!allowed?.length) return fileName;
+  const lower = fileName.toLowerCase();
+  if (allowed.some((ext) => lower.endsWith(ext))) return fileName;
+  const base = fileName.replace(/\.[^.]+$/, "") || fileName;
+  return `${base}${allowed[0]}`;
+}
+
+export function toCrmEmailAttachmentDto(
+  file: File,
+  stored: CrmStorageObject,
+): { key: string; name: string; mimeType: string; size: number } | null {
+  const key = stored.key.trim();
+  if (!key || key.startsWith("local/")) return null;
+  const mimeType = guessMime(file, stored);
+  if (!CRM_EMAIL_MIME_EXT[mimeType]) return null;
+  const size = Math.round(stored.size || file.size);
+  if (size < 1 || size > 10 * 1024 * 1024) return null;
+  return {
+    key,
+    name: withMatchingExtension(stored.fileName || file.name, mimeType),
+    mimeType,
+    size,
+  };
 }
 
 function dataUrlToFile(dataUrl: string, name: string): File | null {
@@ -58,7 +118,7 @@ export async function prepareEmailPayload(input: {
   files: File[];
   outbound: EmailOutboundAttachment[];
 }> {
-  const files: File[] = [...(input.files ?? [])];
+  const files: File[] = [...(input.files ?? [])].map(withInferredEmailFileType);
   let html = input.html || "";
   const outbound: EmailOutboundAttachment[] = [];
   const seen = new Set(files.map((file) => `${file.name}:${file.size}`));
@@ -96,7 +156,7 @@ export async function prepareEmailPayload(input: {
       filename: file.name,
       type: file.type || "application/octet-stream",
       content: await fileToBase64(file),
-      disposition: file.type.startsWith("image/") ? "inline" : "attachment",
+      disposition: "attachment",
     });
   }
 
@@ -108,57 +168,23 @@ export async function attachFilesToCrmEmail(input: {
   files: File[];
   relatedType?: string;
   relatedId?: string;
-}): Promise<void> {
-  if (!input.files.length) return;
-  const related = relatedIds(input.relatedType, input.relatedId);
-  const errors: string[] = [];
+}): Promise<{ attached: number; total: number }> {
+  void input.relatedType;
+  void input.relatedId;
+  const files = input.files.map(withInferredEmailFileType);
+  if (!files.length) return { attached: 0, total: 0 };
 
-  for (const file of input.files) {
+  let attached = 0;
+  for (const file of files) {
     try {
       const stored = await uploadCrmStorageFile(file);
-      let documentId = "";
-      if (stored.key) {
-        const doc = await createCrmDocument(
-          toCreateDocumentBody({
-            fileName: stored.fileName || file.name,
-            folder: "Clients",
-            documentType: "OTHER",
-            storageKey: stored.key,
-            mimeType: stored.contentType || file.type,
-            sizeBytes: stored.size || file.size,
-            relatedTo: "Email attachment",
-            ...related,
-          }),
-        );
-        documentId = doc?.id && isUuid(doc.id) ? doc.id : "";
-      }
-      if (documentId) {
-        await attachCrmEmailObject(input.emailId, {
-          objectType: "DOCUMENT",
-          objectId: documentId,
-        });
-        continue;
-      }
-      if (stored.key) {
-        await attachCrmEmailObject(input.emailId, {
-          key: stored.key,
-          name: file.name,
-          mimeType: stored.contentType || file.type || "application/octet-stream",
-          size: stored.size || file.size,
-        });
-        continue;
-      }
-      await attachCrmEmailFile(input.emailId, file);
+      const payload = toCrmEmailAttachmentDto(file, stored);
+      if (!payload) continue;
+      await attachCrmEmailObject(input.emailId, payload);
+      attached += 1;
     } catch {
-      try {
-        await attachCrmEmailFile(input.emailId, file);
-      } catch (err) {
-        errors.push(
-          `${file.name}: ${err instanceof Error ? err.message : "could not attach"}`,
-        );
-      }
+      /* CRM draft can still send; SendGrid deliver keeps a copy with files. */
     }
   }
-
-  void errors;
+  return { attached, total: files.length };
 }

@@ -487,15 +487,30 @@ function pickRelatedIds(input: Partial<LibraryDocument>): Record<string, string>
 export async function createCrmDocument(
   body: Record<string, unknown>,
 ): Promise<LibraryDocument | null> {
-  const payload = {
-    ...body,
+  const documentType = pickStr(body.documentType);
+  const sizeBytes = Math.round(Number(body.sizeBytes));
+  const payload: Record<string, unknown> = {
     name: pickStr(body.name, body.fileName, body.title),
-    documentType: pickStr(body.documentType) || "OTHER",
+    documentType: CRM_DOCUMENT_TYPES.includes(documentType as CrmDocumentType)
+      ? documentType
+      : "OTHER",
     key: pickStr(body.key, body.storageKey, body.fileKey),
-    mimeType:
-      pickStr(body.mimeType, body.contentType) || "application/octet-stream",
-    sizeBytes: Number(body.sizeBytes) || undefined,
+    mimeType: pickStr(body.mimeType, body.contentType),
+    sizeBytes,
   };
+  const description = pickStr(body.description);
+  if (description) payload.description = description;
+  for (const field of ["leadId", "contactId", "companyId", "dealId", "folderId"] as const) {
+    const value = pickStr(body[field]);
+    if (isUuid(value)) payload[field] = value;
+  }
+  const visibility = pickStr(body.visibility).toUpperCase();
+  if (visibility === "PRIVATE" || visibility === "TEAM" || visibility === "ORGANIZATION") {
+    payload.visibility = visibility;
+  }
+  if (!payload.name || !payload.key || !payload.mimeType || sizeBytes < 1) {
+    throw new Error("CRM document needs a file name, storage key, type, and size.");
+  }
   return asDocument(
     await documentsMutate("", {
       method: "POST",

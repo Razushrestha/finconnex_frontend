@@ -1,8 +1,5 @@
 import { persistRemoteEmail, createCrmEmail, sendCrmEmail } from "@/lib/emails/api";
-import {
-  attachFilesToCrmEmail,
-  prepareEmailPayload,
-} from "@/lib/emails/attach-files";
+import { prepareEmailPayload } from "@/lib/emails/attach-files";
 import type { Email } from "@/lib/emails/types";
 
 function uniqueEmails(list: Array<string | undefined>) {
@@ -58,12 +55,6 @@ export async function sendCrmActivityEmail(input: {
   }
   persistRemoteEmail(created);
   try {
-    await attachFilesToCrmEmail({
-      emailId: created.id,
-      files: prepared.files,
-      relatedType: input.relatedType,
-      relatedId: input.relatedId,
-    });
     const sent = await sendCrmEmail(created.id, {
       ...(input.scheduledAt ? { scheduledAt: input.scheduledAt } : {}),
       html: prepared.html,

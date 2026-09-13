@@ -101,6 +101,7 @@ function isAllowed(path: string[]): boolean {
       path.includes("dashboard") ||
       path.includes("pipelines") ||
       path.includes("tickets") ||
+      path.includes("contacts") ||
       path.includes("notification-preferences") ||
       path[2] === "members" ||
       path[2] === "members-summary" ||

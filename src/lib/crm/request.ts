@@ -19,6 +19,14 @@ const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
   "email.error.singleToRequired":
     "CRM allows one To address. Extra recipients must go in Cc.",
   "email.error.invalidRecipient": "Recipient is not a valid email address.",
+  "activity.error.invalidAttachmentType":
+    "CRM email attachments must be PDF, CSV, JPEG, PNG, or WebP.",
+  "activity.error.invalidAttachmentMetadata":
+    "That file's size or type does not match what CRM storage recorded.",
+  "activity.error.invalidAttachmentSize":
+    "CRM attachments must be between 1 byte and 10 MB.",
+  "document.error.fileMetadataRequired":
+    "CRM documents need a MIME type and a file size.",
   "meeting.error.relatedTypeMismatch":
     "Related entity and record do not match. Pick the record again, then send invites.",
   "meeting.error.invalidRange":

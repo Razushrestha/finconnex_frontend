@@ -232,6 +232,15 @@ export function smokeEmailsWiring() {
   if (!geminiRoute.includes("generateGeminiText") || !geminiRoute.includes("getSession")) {
     fail("POST /api/ai/email must use Gemini behind a signed-in session");
   }
+  if (!geminiRoute.includes('"subjects"')) {
+    fail("POST /api/ai/email must suggest subjects with Gemini");
+  }
+  const subjectBtn = readSrc(
+    "src/components/activities/emails/create/SubjectImproveButton.tsx",
+  );
+  if (!subjectBtn.includes("requestEmailSubjects")) {
+    fail("Improve subject does not call Gemini");
+  }
   if (!create.includes("loadFromIdentities")) {
     fail("create email form does not load the From mailbox");
   }
@@ -247,8 +256,12 @@ export function smokeEmailsWiring() {
     fail("mail deliver must send HTML attachments through SendGrid");
   }
   const composeSend = readSrc("src/lib/emails/compose-send.ts");
-  if (!composeSend.includes("files") || !composeSend.includes("attachFilesToCrmEmail")) {
+  if (!composeSend.includes("files") || !composeSend.includes("sendCrmEmail")) {
     fail("activity compose send does not attach files");
+  }
+  const sendClient = readSrc("src/lib/emails/api.ts");
+  if (!sendClient.includes("attachFilesToCrmEmail")) {
+    fail("sendCrmEmail must register CRM attachments before /send");
   }
   const leadDetail = readSrc("src/components/sales/leads/LeadDetailView.tsx");
   if (!leadDetail.includes("files: values.attachments")) {
@@ -358,7 +371,12 @@ export async function smokeEmailsMock() {
     await retryCrmEmail(ID);
     await cancelCrmEmail(ID);
     await applyCrmEmailTemplate(ID, { templateId: ID });
-    await attachCrmEmailObject(ID, { objectType: "DOCUMENT", objectId: RELATED_ID });
+    await attachCrmEmailObject(ID, {
+      key: `workspaces/${SESSION.workspaceId}/users/${ID}/uploads/note.pdf`,
+      name: "note.pdf",
+      mimeType: "application/pdf",
+      size: 4096,
+    });
     await downloadCrmEmailAttachment(ID, ATTACHMENT_ID);
     await deleteCrmEmailAttachment(ID, ATTACHMENT_ID);
     await deleteCrmEmail(ID);

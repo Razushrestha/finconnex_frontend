@@ -271,8 +271,14 @@ export default function ContactsPage() {
       <FocusHighlight />
       <div className="mb-1 flex flex-wrap items-center gap-2">
         <span
+          role="button"
+          tabIndex={0}
+          onClick={() => crm.refresh()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") crm.refresh();
+          }}
           className={cn(
-            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            "cursor-pointer rounded-full px-2 py-0.5 text-[10px] font-semibold",
             crm.source === "api"
               ? "bg-emerald-50 text-emerald-700"
               : "bg-slate-100 text-slate-500",
@@ -412,6 +418,7 @@ export default function ContactsPage() {
               sortValue={activeSort}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelected}
+              refreshKey={`${crm.source}:${crm.loading}:${totalContacts}`}
             />
           ) : (
             <ContactsListView filters={filters} sortValue={activeSort} />

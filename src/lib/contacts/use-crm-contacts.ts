@@ -25,7 +25,7 @@ export function useCrmContacts() {
         const remote = await loadCrmContacts();
         if (cancelled) return;
         replaceCrmContactsOnBoard(remote);
-        setSource(remote.length ? "api" : "empty");
+        setSource("api");
       } catch (err) {
         if (cancelled) return;
         replaceCrmContactsOnBoard([]);
