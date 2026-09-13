@@ -26,6 +26,15 @@ export interface SessionPayload {
    * as `true` so already-scoped sessions aren't sent back to onboarding.
    */
   hasWorkspace?: boolean;
+  /**
+   * The role held in `tenantId`, from Nest `WorkspaceMember.role` — OWNER for
+   * whoever created the workspace. Separate from `role`, which stays the
+   * platform tier (`User.globalRole`) and is `USER` for every self-signup;
+   * overwriting `role` with this would strip a platform admin of their
+   * console the moment they scoped into a workspace. Absent until a
+   * workspace is selected, and on sessions minted before this field existed.
+   */
+  workspaceRole?: string | null;
   /** Login "Keep me signed in for 30 days" — sliding cookie + JWT lifetime. */
   rememberMe?: boolean;
 }

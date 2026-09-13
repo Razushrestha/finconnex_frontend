@@ -29,12 +29,15 @@ import {
   isPlatformAdminRole,
   platformRoleLabel,
 } from "@/lib/auth/platform";
+import { workspaceRoleLabel } from "@/lib/auth/workspace-role";
 
 interface NavbarProps {
   onOpenMobileMenu?: () => void;
   user?: {
     name: string;
     role: string;
+    /** WorkspaceMember.role for the active workspace, when scoped to one. */
+    workspaceRole?: string | null;
     email?: string;
     tenantName?: string;
     avatarUrl?: string;
@@ -63,6 +66,15 @@ export function Navbar({
   const searchParams = useSearchParams();
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  // A platform admin keeps their platform label. Everyone else is identified
+  // by the role they hold in the workspace on screen — `user.role` is the
+  // global tier, which is USER for every self-signup and would label the
+  // owner of this workspace "USER".
+  const roleLabel = isPlatformAdminRole(user.role)
+    ? platformRoleLabel(user.role)
+    : user.workspaceRole
+      ? workspaceRoleLabel(user.workspaceRole)
+      : user.role;
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [inboxUnread, setInboxUnread] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -200,9 +212,7 @@ export function Navbar({
                   menuOpen && "rotate-180",
                 )}
               />
-              {isPlatformAdminRole(user.role)
-                ? platformRoleLabel(user.role)
-                : user.role}
+              {roleLabel}
             </span>
           </div>
           <div className="relative">
@@ -239,9 +249,7 @@ export function Navbar({
               )}
               <p className="mt-1 truncate text-xs text-violet-600 dark:text-violet-400">
                 {tenantLabel} ·{" "}
-                {isPlatformAdminRole(user.role)
-                  ? platformRoleLabel(user.role)
-                  : user.role}
+                {roleLabel}
               </p>
             </div>
             {isPlatformAdminRole(user.role) ? (

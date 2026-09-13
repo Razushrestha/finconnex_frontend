@@ -13,6 +13,7 @@ import {
 } from "@/lib/auth/constants";
 import type { SessionPayload } from "@/lib/auth/types";
 import { isPlatformAdminRole } from "@/lib/auth/platform";
+import { asWorkspaceRole } from "@/lib/auth/workspace-role";
 
 export type CrmUser = {
   id: string;
@@ -21,8 +22,16 @@ export type CrmUser = {
   lastName: string | null;
   userName: string;
   avatar: string | null;
+  /** Platform tier. `USER` for every self-signup — never the workspace role. */
   globalRole: string;
   isVerified: boolean;
+  /**
+   * Role in the workspace the CRM access token is scoped to, from
+   * `GET /v1/auth/me`. Null until a workspace is selected.
+   */
+  workspaceRole?: string | null;
+  /** The workspace the CRM access token is scoped to, if any. */
+  workspaceId?: string | null;
 };
 
 export type CrmWorkspace = {
@@ -115,11 +124,14 @@ export function sessionFromCrmUser(
     userId: user.id,
     email: user.email,
     name: displayName(user),
+    // Stays the platform tier. What someone may do *inside* a workspace is
+    // `workspaceRole` — see the note on SessionPayload.
     role: user.globalRole || "USER",
     tenantId: workspace?.id || fromJwt || user.id,
     tenantSlug: workspace?.slug || "workspace",
     tenantName: workspace?.name || "Workspace",
     hasWorkspace: !!(workspace?.id || fromJwt),
+    workspaceRole: asWorkspaceRole(user.workspaceRole),
   };
 }
 
@@ -451,6 +463,25 @@ export async function refreshCrmTokens(refreshToken: string): Promise<{
 
 export async function crmMe(accessToken: string, refreshToken?: string | null) {
   return crmFetch<CrmUser>("/auth/me", { accessToken, refreshToken });
+}
+
+/**
+ * The caller's role in the workspace their access token is scoped to.
+ *
+ * Null for an unscoped token, a membership that is no longer active, or any
+ * transport failure. Used to label and gate UI only — the Nest guards remain
+ * the authorization, and re-check the membership on every request.
+ */
+export async function crmWorkspaceRole(
+  accessToken: string,
+  refreshToken?: string | null,
+): Promise<string | null> {
+  try {
+    const me = await crmMe(accessToken, refreshToken);
+    return asWorkspaceRole(me.data?.workspaceRole);
+  } catch {
+    return null;
+  }
 }
 
 export async function crmLogout(
