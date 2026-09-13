@@ -299,7 +299,7 @@ export function BottomBar() {
     <footer
       ref={barRef}
       className={cn(
-        "relative fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-slate-200 bg-white dark:border-zinc-800 dark:bg-zinc-950",
+        "relative fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-[color-mix(in_srgb,var(--brand-on-secondary)_14%,transparent)] bg-[var(--brand-secondary)] text-[var(--brand-on-secondary)]",
         BOTTOM_BAR_H,
       )}
     >
@@ -355,7 +355,7 @@ export function BottomBar() {
           aria-expanded={panel === "quick"}
           aria-haspopup="menu"
           onClick={() => toggle("quick")}
-          className="inline-flex h-7 items-center gap-1 rounded-full bg-[#5A32A3] px-2.5 text-[11px] font-semibold text-white shadow-sm hover:bg-[#4c2a8a]"
+          className="inline-flex h-7 items-center gap-1 rounded-full bg-[var(--brand-primary)] px-2.5 text-[11px] font-semibold text-white shadow-sm hover:brightness-95"
         >
           <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
           Quick Add
@@ -414,7 +414,7 @@ export function BottomBar() {
             />
             <button
               type="submit"
-              className="h-8 rounded-lg bg-[#5A32A3] px-2.5 text-[11px] font-semibold text-white"
+              className="h-8 rounded-lg bg-[var(--brand-primary)] px-2.5 text-[11px] font-semibold text-white"
             >
               Send
             </button>
@@ -475,14 +475,14 @@ export function BottomBar() {
             <Link
               href="/activities/reminders"
               onClick={() => setPanel(null)}
-              className="flex h-8 flex-1 items-center justify-center rounded-lg text-[11px] font-semibold text-violet-600 hover:bg-violet-50"
+              className="flex h-8 flex-1 items-center justify-center rounded-lg text-[11px] font-semibold text-[var(--brand-primary)] hover:bg-[color-mix(in_srgb,var(--brand-primary)_10%,transparent)]"
             >
               View all
             </Link>
             <Link
               href="/activities/reminders/create"
               onClick={() => setPanel(null)}
-              className="flex h-8 flex-1 items-center justify-center rounded-lg bg-[#5A32A3] text-[11px] font-semibold text-white hover:bg-[#4c2a8a]"
+              className="flex h-8 flex-1 items-center justify-center rounded-lg bg-[var(--brand-primary)] text-[11px] font-semibold text-white hover:brightness-95"
             >
               Add reminder
             </Link>
@@ -560,8 +560,9 @@ function ToolButton({
       aria-expanded={active}
       onClick={onClick}
       className={cn(
-        "relative flex min-w-[52px] flex-col items-center justify-center gap-px px-1.5 text-slate-600 hover:bg-slate-50 dark:text-zinc-300 dark:hover:bg-zinc-900",
-        active && "bg-violet-50 text-[#5A32A3] dark:bg-violet-950/40",
+        "relative flex min-w-[52px] flex-col items-center justify-center gap-px px-1.5 text-[color-mix(in_srgb,var(--brand-on-secondary)_78%,transparent)] hover:bg-[color-mix(in_srgb,var(--brand-on-secondary)_10%,transparent)] hover:text-[var(--brand-on-secondary)]",
+        active &&
+          "bg-[color-mix(in_srgb,var(--brand-primary)_22%,transparent)] text-[var(--brand-primary)]",
       )}
     >
       <span className="relative">

@@ -20,13 +20,15 @@ export default function MyPreferencesPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-4">
-        <p className="text-[10px] font-semibold tracking-wide text-violet-600 uppercase">
-          Top right · My Preferences
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-[#5A32A3] uppercase">
+          Just for you
         </p>
-        <h2 className="text-[17px] font-bold text-slate-900">My Preferences</h2>
-        <p className="mt-1 text-[12px] text-slate-500">
-          Profile, signature, password, notifications, and theme: personal
-          overrides that do not change tenant-wide Settings.
+        <h2 className="mt-1 text-[26px] font-semibold tracking-tight text-slate-900">
+          My preferences
+        </h2>
+        <p className="mt-1 text-[14px] text-slate-500">
+          Profile, signature, password, notifications, and theme — they do not
+          change workspace settings.
         </p>
       </div>
 

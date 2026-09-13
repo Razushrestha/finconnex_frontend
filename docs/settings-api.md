@@ -28,7 +28,7 @@ Partial update. Unknown keys are ignored by validation.
 | Field | Notes |
 | --- | --- |
 | `logoKey`, `faviconKey` | Storage keys from `POST /v1/storage/upload`; `null` clears |
-| `primaryColor`, `secondaryColor` | Hex colours |
+| `primaryColor`, `secondaryColor` | Hex colours. Primary = buttons/nav (`#5A32A3`). Secondary = sidebar/footer background (`#0F172A`); contrast text is derived, not stored. |
 | `customDomain` | FQDN |
 | `timezone` | IANA timezone |
 | `dateFormat` | Display format string |
@@ -123,7 +123,8 @@ Content-Type: application/json
 
 | Surface | Persistence |
 | --- | --- |
-| Generic hub forms (`SettingsFormClient`) | `PATCH /v1/settings` with `catalog[category/subpage]` plus mapped first-class fields (`primaryColor`, `timezone`, `dateFormat`, `currency`, `language`, logos, password length, session timeout) |
+| Generic hub forms (`SettingsFormClient`) | Workspace catalog JSON (`PUT /v1/settings/pages/...`) plus mapped first-class fields where the field id matches (`timezone`, `currency`, branding, …). Users can save page-specific values even when there is no dedicated Nest module. |
+| CRM picklists (lost reasons, lead statuses, deal stages, lead sources) | Enum list is read-only. Preferred default + notes save to the catalog page. |
 | SMTP | `PATCH /v1/settings` SMTP columns + smtp-test jobs |
 | Modules | `GET /v1/settings/capabilities` and flag PATCH |
 | Users, workspaces, billing, recycle bin, custom fields, pipelines, workflows, tickets, notifications, Calendly | Existing module APIs (not the catalog bag) |
@@ -147,9 +148,24 @@ These hub pages call first-class Nest modules (not the catalog JSON). Browser ca
 | Data → Backup and restore | `BackupRestoreSettingsClient` | `POST/GET /v1/workspace-backups`, `GET /v1/workspace-backups/:id`, `POST .../restore` | OWNER, ADMIN (`backup.read` / `backup.manage`). Restore only when `status` is `COMPLETED`. Download is the JSON payload, not a file URL |
 | Integrations → Google / Outlook calendar | `CalendarSyncSettingsClient` | `GET /v1/calendar-sync/{google\|outlook}/authorize` returns `{ "authUrl" }`; `GET /v1/calendar-sync/connections`; `POST .../disconnect`; `POST .../sync` | OWNER, ADMIN. Nest providers are `GOOGLE_CALENDAR` / `OUTLOOK_CALENDAR`; the UI maps those to google/outlook |
 
-BFF `ALLOWED_ROOTS` for these calls: `settings`, `user`, `field-permissions`, `workspace-backups`, `security`, `audit-logs`, `calendar-sync`. Workspace SLA uses `/v1/workspaces/:id/pipelines/...` (BFF allows `pipelines` under `workspaces`).
+BFF `ALLOWED_ROOTS` for these calls: `settings`, `user`, `field-permissions`, `workspace-backups`, `security`, `audit-logs`, `calendar-sync`, `recycle-bin`, `custom-fields`, `lead-assignment-rules`, `automations`, `automation-runs`, `notification-preferences`. Workspace SLA uses `/v1/workspaces/:id/pipelines/...` and ticket SLA uses `/v1/workspaces/:id/tickets/sla` (BFF allows `pipelines` and `tickets` under `workspaces`).
 
 Calendly stays on `CalendlyConnectionCard` (`showCalendarSync={false}` on the Google/Outlook settings pages).
+
+## Control panel (FinConnex UI → Nest)
+
+Operator Settings is grouped as Workspace, People, Pipeline, Automation, Email & calendar, **Documents**, Data, Plan, My preferences. Nest details live in `multi-crm-backend-main/docs/settings-control-panel.md`.
+
+**Documents are modules, not catalog pages.** Paths must stay 1:1 with `src/lib/settings/settings-nav.ts` and Nest `settings-control-panel.const.ts`.
+
+| UI | Nest |
+| --- | --- |
+| `/documents/library` | `/v1/documents` (`/library`) |
+| `/documents/requests` | `/v1/document-requests` |
+| `/signature` | `/v1/signature-requests` |
+| `/signature/templates` | `/v1/signature-templates` |
+
+Subscription Settings is a local demo. Nest `/v1/invoices` is accounts-receivable, not tenant plan seats.
 
 ## Errors
 

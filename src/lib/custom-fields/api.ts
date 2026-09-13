@@ -1,8 +1,4 @@
-import {
-  ensureCrmAccess,
-  ensureCrmSession,
-} from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmWorkspaceFetch } from "@/lib/crm/request";
 import type {
   CustomFieldDef,
   CustomFieldEntity,
@@ -35,12 +31,6 @@ function toQuery(params: Record<string, string | number | undefined>): string {
 
 export function customFieldsPath(suffix = ""): string {
   return `/v1/custom-fields${suffix}`;
-}
-
-async function resolveAuth() {
-  const scoped = await ensureCrmSession();
-  if (scoped) return scoped;
-  return ensureCrmAccess();
 }
 
 function extractRecords(data: unknown): Record<string, unknown>[] {
@@ -80,18 +70,14 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
 }
 
 async function customFieldsGet(suffix: string, query = ""): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to load custom fields");
-  return crmFetch(auth, `${customFieldsPath(suffix)}${query}`);
+  return crmWorkspaceFetch(`${customFieldsPath(suffix)}${query}`);
 }
 
 async function customFieldsMutate(
   suffix: string,
   init: RequestInit,
 ): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to manage custom fields");
-  return crmFetch(auth, customFieldsPath(suffix), init);
+  return crmWorkspaceFetch(customFieldsPath(suffix), init);
 }
 
 export function mapCustomFieldEntity(raw: string): CustomFieldEntity {

@@ -15,10 +15,10 @@ export function SettingsCrmBadge() {
       )}
     >
       {crm.source === "api"
-        ? "Live CRM"
+        ? "Connected"
         : crm.loading
           ? "Connecting…"
-          : "Demo"}
+          : "Offline"}
     </span>
   );
 }

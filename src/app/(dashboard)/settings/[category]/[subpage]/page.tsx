@@ -4,6 +4,7 @@ import {
   SETTINGS_REDIRECTS,
   findSettingsPage,
 } from "@/lib/settings/settings-config";
+import { settingsSubnav } from "@/lib/settings/settings-nav";
 import { SettingsFormClient } from "@/components/settings/SettingsFormClient";
 import { RecycleBinSettingsClient } from "@/components/settings/RecycleBinSettingsClient";
 import { LeadCardSettingsClient } from "@/components/settings/LeadCardSettingsClient";
@@ -29,6 +30,8 @@ import { CustomObjectsSettingsClient } from "@/components/settings/CustomObjects
 import { NotificationPreferencesClient } from "@/components/settings/NotificationPreferencesClient";
 import { CalendlyConnectionCard } from "@/components/booking/CalendlyConnectionCard";
 import { CalendarSyncSettingsClient } from "@/components/settings/CalendarSyncSettingsClient";
+import { CrmPicklistSettingsClient } from "@/components/settings/CrmPicklistSettingsClient";
+import { CRM_SETTINGS_PICKLISTS } from "@/lib/settings/crm-picklists";
 import { cn } from "@/lib/utils";
 
 interface PageProps {
@@ -49,6 +52,7 @@ export default async function SettingsSubPage({ params }: PageProps) {
   const { category, item } = hit;
   const path = `/settings/${category.slug}/${item.slug}`;
   const key = `${category.slug}/${item.slug}`;
+  const picklist = CRM_SETTINGS_PICKLISTS[key];
 
   const custom =
     key === "data-management/recycle-bin" ? (
@@ -110,27 +114,45 @@ export default async function SettingsSubPage({ params }: PageProps) {
       <CalendarSyncSettingsClient provider="google" />
     ) : key === "integrations/outlook-calendar" ? (
       <CalendarSyncSettingsClient provider="outlook" />
+    ) : picklist ? (
+      <CrmPicklistSettingsClient spec={picklist} pageKey={key} />
     ) : null;
 
+  const currentHref = path;
+  const subnav = (() => {
+    const links = settingsSubnav(category.slug, currentHref);
+    if (!links.some((link) => link.href === currentHref)) {
+      return [
+        ...links,
+        {
+          title: item.title,
+          blurb: item.blurb ?? "",
+          href: currentHref,
+        },
+      ];
+    }
+    return links;
+  })();
+
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-4">
-      <aside className="lg:col-span-1">
-        <div className="sticky top-4 rounded-2xl border border-slate-200/80 bg-white p-2.5 shadow-sm">
-          <p className="mb-2 px-2 text-[9px] font-semibold tracking-wide text-slate-400 uppercase">
-            {category.section} · {category.title}
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <aside>
+        <div className="sticky top-4 overflow-hidden rounded-3xl border border-slate-100 bg-white p-2 shadow-sm ring-1 ring-slate-100">
+          <p className="px-3 pt-2 pb-1 text-[10px] font-semibold tracking-[0.14em] text-slate-400 uppercase">
+            {category.title}
           </p>
-          <nav className="max-h-[70vh] space-y-0.5 overflow-y-auto">
-            {category.items.map((navItem) => {
-              const active = navItem.slug === item.slug;
+          <nav className="space-y-0.5 pb-1">
+            {subnav.map((navItem) => {
+              const active = navItem.href === currentHref;
               return (
                 <Link
-                  key={navItem.slug}
-                  href={`/settings/${category.slug}/${navItem.slug}`}
+                  key={navItem.href}
+                  href={navItem.href}
                   className={cn(
-                    "block rounded-xl px-3 py-2 text-[12px] transition-colors",
+                    "block rounded-2xl px-3 py-2 text-[12px] transition-colors",
                     active
-                      ? "bg-violet-600 font-semibold text-white shadow-sm shadow-violet-600/20"
-                      : "font-medium text-slate-600 hover:bg-slate-50",
+                      ? "bg-[#5A32A3] font-semibold text-white shadow-sm shadow-[#5A32A3]/20"
+                      : "font-medium text-slate-600 hover:bg-[#F4F1FA] hover:text-[#5A32A3]",
                   )}
                 >
                   {navItem.title}
@@ -141,7 +163,7 @@ export default async function SettingsSubPage({ params }: PageProps) {
         </div>
       </aside>
 
-      <div className="lg:col-span-3">
+      <div>
         {custom ?? (
           <SettingsFormClient
             categorySlug={category.slug}

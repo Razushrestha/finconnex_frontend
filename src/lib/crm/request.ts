@@ -152,6 +152,33 @@ async function sendCrm(
   return { res, json };
 }
 
+/**
+ * Browser Settings/modules go through the Next BFF. Bound smoke sessions
+ * and Node still call Nest with the session token.
+ */
+export async function crmWorkspaceFetch<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  const {
+    ensureCrmAccess,
+    ensureCrmSession,
+    isBoundCrmSession,
+  } = await import("@/lib/activity-timeline/auth");
+  const scoped = await ensureCrmSession();
+  if (scoped && isBoundCrmSession()) {
+    return crmFetch<T>(scoped, path, init);
+  }
+  if (typeof window !== "undefined") {
+    return crmBffFetch<T>(path, init);
+  }
+  const session = scoped ?? (await ensureCrmAccess());
+  if (!session) {
+    throw new Error("Sign in to continue");
+  }
+  return crmFetch<T>(session, path, init);
+}
+
 export async function crmBffFetch<T>(
   path: string,
   init?: RequestInit,

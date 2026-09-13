@@ -1,5 +1,4 @@
-import { ensureCrmAccess, ensureCrmSession } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmWorkspaceFetch } from "@/lib/crm/request";
 import type {
   Automation,
   AutomationRun,
@@ -12,12 +11,6 @@ export function automationsPath(suffix = ""): string {
 
 export function automationRunsPath(suffix = ""): string {
   return `/v1/automation-runs${suffix}`;
-}
-
-async function resolveAuth() {
-  const scoped = await ensureCrmSession();
-  if (scoped) return scoped;
-  return ensureCrmAccess();
 }
 
 function toQuery(params: Record<string, string | number | undefined>): string {
@@ -48,15 +41,11 @@ async function automationsRequest(
   suffix: string,
   init?: RequestInit,
 ): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to manage automations");
-  return crmFetch(auth, automationsPath(suffix), init);
+  return crmWorkspaceFetch(automationsPath(suffix), init);
 }
 
 async function runsRequest(suffix: string, init?: RequestInit): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to manage automations");
-  return crmFetch(auth, automationRunsPath(suffix), init);
+  return crmWorkspaceFetch(automationRunsPath(suffix), init);
 }
 
 export type AutomationListQuery = {
@@ -201,6 +190,19 @@ export async function triggerAutomation(
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export async function listWorkspaceAutomationRuns(
+  query: { page?: number; limit?: number; status?: string } = {},
+): Promise<{ items: AutomationRun[]; total: number }> {
+  const data = await runsRequest(
+    toQuery({
+      page: query.page,
+      limit: query.limit ?? 50,
+      status: query.status,
+    }),
+  );
+  return extractList<AutomationRun>(data);
 }
 
 export async function listAutomationRuns(

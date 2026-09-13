@@ -16,7 +16,8 @@ export type SettingsFieldType =
   | "select"
   | "toggle"
   | "file"
-  | "number";
+  | "number"
+  | "color";
 
 export interface SettingsFieldOption {
   label: string;
@@ -57,12 +58,9 @@ function generateSchema(
   item: SettingsSubItem,
 ): SettingsSchema {
   const title = item.title;
-  const description =
-    item.blurb ??
-    `${category.section} · Configure ${title.toLowerCase()} for this tenant.`;
-  const baseId = item.slug.replace(/-/g, "_");
+  const description = `${item.blurb ?? `${category.section} · ${title} for this workspace.`} Saved here and restored when you sign in.`;
+  const extra: SettingsField[] = [];
 
-  // Integration / connect surfaces
   if (
     category.slug === "integrations" ||
     [
@@ -78,160 +76,110 @@ function generateSchema(
       "make",
     ].includes(item.slug)
   ) {
-    return {
-      title,
-      description,
-      fields: [
-        {
-          id: `${baseId}_connected`,
-          label: "Connection status",
-          type: "toggle",
-          defaultValue: false,
-          help: "Toggle to simulate connect / disconnect in this demo.",
-        },
-        {
-          id: `${baseId}_account`,
-          label: "Account / workspace",
-          type: "text",
-          placeholder: "e.g. finconnex-prod",
-        },
-        {
-          id: `${baseId}_sync`,
-          label: "Sync frequency",
-          type: "select",
-          defaultValue: "15m",
-          options: [
-            { label: "Every 5 minutes", value: "5m" },
-            { label: "Every 15 minutes", value: "15m" },
-            { label: "Hourly", value: "1h" },
-            { label: "Manual only", value: "manual" },
-          ],
-        },
-        {
-          id: `${baseId}_notes`,
-          label: "Admin notes",
-          type: "textarea",
-          placeholder: "Internal notes about this connection…",
-        },
-      ],
-    };
-  }
-
-  // Template libraries
-  if (category.slug === "templates" || item.slug.includes("template")) {
-    return {
-      title,
-      description,
-      fields: [
-        {
-          id: `${baseId}_default_name`,
-          label: "Default template name",
-          type: "text",
-          placeholder: `Default ${title}`,
-        },
-        {
-          id: `${baseId}_active`,
-          label: "Templates enabled",
-          type: "toggle",
-          defaultValue: true,
-        },
-        {
-          id: `${baseId}_locale`,
-          label: "Default language",
-          type: "select",
-          defaultValue: "en-AU",
-          options: [
-            { label: "English (AU)", value: "en-AU" },
-            { label: "English (US)", value: "en-US" },
-            { label: "English (UK)", value: "en-GB" },
-          ],
-        },
-        {
-          id: `${baseId}_body`,
-          label: "Sample body / merge fields",
-          type: "textarea",
-          placeholder: "Hi {{first_name}}, …",
-        },
-      ],
-    };
-  }
-
-  // Log / monitor / history style pages
-  if (
+    extra.push(
+      {
+        id: "connected",
+        label: "Enabled for this workspace",
+        type: "toggle",
+        defaultValue: false,
+      },
+      {
+        id: "account",
+        label: "Account / workspace id",
+        type: "text",
+        placeholder: "e.g. finconnex-prod",
+      },
+      {
+        id: "syncFrequency",
+        label: "Sync frequency",
+        type: "select",
+        defaultValue: "15m",
+        options: [
+          { label: "Every 5 minutes", value: "5m" },
+          { label: "Every 15 minutes", value: "15m" },
+          { label: "Hourly", value: "1h" },
+          { label: "Manual only", value: "manual" },
+        ],
+      },
+    );
+  } else if (category.slug === "templates" || item.slug.includes("template")) {
+    extra.push(
+      {
+        id: "defaultName",
+        label: "Default template name",
+        type: "text",
+        placeholder: `Default ${title}`,
+        defaultValue: title,
+      },
+      {
+        id: "body",
+        label: "Template body",
+        type: "textarea",
+        placeholder: "Hi {{first_name}}, …",
+      },
+    );
+  } else if (
     /log|history|monitor|queue|usage|activity|session/i.test(item.slug) ||
     /Logs|History|Monitor|Queue|Usage|Activity|Sessions/.test(title)
   ) {
-    return {
-      title,
-      description,
-      fields: [
-        {
-          id: `${baseId}_retention_days`,
-          label: "Retention (days)",
-          type: "number",
-          defaultValue: 90,
-        },
-        {
-          id: `${baseId}_level`,
-          label: "Detail level",
-          type: "select",
-          defaultValue: "standard",
-          options: [
-            { label: "Errors only", value: "errors" },
-            { label: "Standard", value: "standard" },
-            { label: "Verbose", value: "verbose" },
-          ],
-        },
-        {
-          id: `${baseId}_export`,
-          label: "Allow CSV export",
-          type: "toggle",
-          defaultValue: true,
-        },
-        {
-          id: `${baseId}_alert_email`,
-          label: "Alert email",
-          type: "text",
-          placeholder: "ops@finconnex.example",
-        },
-      ],
-    };
+    extra.push(
+      {
+        id: "retentionDays",
+        label: "Retention (days)",
+        type: "number",
+        defaultValue: 90,
+      },
+      {
+        id: "alertEmail",
+        label: "Alert email",
+        type: "text",
+        placeholder: "ops@finconnex.example",
+      },
+    );
+  } else if (
+    item.slug.includes("signature") ||
+    item.slug.includes("email") ||
+    item.slug.includes("sms")
+  ) {
+    extra.push({
+      id: "body",
+      label: `${title} text`,
+      type: "textarea",
+      placeholder: `Default ${title.toLowerCase()}…`,
+    });
+  } else {
+    extra.push({
+      id: "details",
+      label: `${title} details`,
+      type: "textarea",
+      placeholder: `Anything this workspace should remember for ${title.toLowerCase()}…`,
+    });
   }
 
-  // Generic configurable page
   return {
     title,
     description,
     fields: [
       {
-        id: `${baseId}_enabled`,
-        label: `${title} enabled`,
+        id: "enabled",
+        label: `Use ${title}`,
         type: "toggle",
         defaultValue: true,
+        help: "Workspace preference. Related CRM modules still have their own records.",
       },
       {
-        id: `${baseId}_name`,
-        label: `${title} label`,
+        id: "name",
+        label: `${title} name`,
         type: "text",
         placeholder: title,
         defaultValue: title,
       },
+      ...extra,
       {
-        id: `${baseId}_mode`,
-        label: "Mode",
-        type: "select",
-        defaultValue: "standard",
-        options: [
-          { label: "Standard", value: "standard" },
-          { label: "Strict", value: "strict" },
-          { label: "Custom", value: "custom" },
-        ],
-      },
-      {
-        id: `${baseId}_notes`,
+        id: "notes",
         label: "Notes",
         type: "textarea",
-        placeholder: `Configuration notes for ${title.toLowerCase()}…`,
+        placeholder: `Internal notes for ${title.toLowerCase()}…`,
       },
     ],
   };
@@ -609,8 +557,28 @@ const CURATED: Record<string, SettingsSchema> = {
 
   "my-preferences/signature": {
     title: "Signature",
-    description: "Personal email / message signature used in outbound sends.",
-    fields: [],
+    description:
+      "Personal email signature appended to messages you send. Also saved on this workspace.",
+    fields: [
+      {
+        id: "body",
+        label: "Signature text",
+        type: "textarea",
+        placeholder: "Your name\nRole · FinConnex\nphone · email",
+      },
+      {
+        id: "includeOnNew",
+        label: "Add to new emails",
+        type: "toggle",
+        defaultValue: true,
+      },
+      {
+        id: "includeOnReplies",
+        label: "Add to replies",
+        type: "toggle",
+        defaultValue: true,
+      },
+    ],
   },
 
   "my-preferences/password": {
@@ -894,14 +862,44 @@ const CURATED: Record<string, SettingsSchema> = {
       {
         id: "primaryColor",
         label: "Primary colour",
-        type: "text",
+        type: "color",
         defaultValue: "#7C3AED",
+        help: "Buttons, links, and highlights. Click a swatch or the picker.",
+        options: [
+          { label: "FinConnex", value: "#5A32A3" },
+          { label: "Violet", value: "#7C3AED" },
+          { label: "Indigo", value: "#4F46E5" },
+          { label: "Blue", value: "#2563EB" },
+          { label: "Sky", value: "#0EA5E9" },
+          { label: "Teal", value: "#0D9488" },
+          { label: "Green", value: "#059669" },
+          { label: "Gold", value: "#CA8A04" },
+          { label: "Orange", value: "#EA580C" },
+          { label: "Red", value: "#DC2626" },
+          { label: "Pink", value: "#DB2777" },
+          { label: "Navy", value: "#0F172A" },
+        ],
       },
       {
         id: "secondaryColor",
         label: "Secondary colour",
-        type: "text",
+        type: "color",
         defaultValue: "#0F172A",
+        help: "Sidebar and footer background. Text contrast is chosen automatically.",
+        options: [
+          { label: "Navy", value: "#0F172A" },
+          { label: "Slate", value: "#334155" },
+          { label: "Charcoal", value: "#1E293B" },
+          { label: "FinConnex", value: "#5A32A3" },
+          { label: "Violet", value: "#7C3AED" },
+          { label: "Indigo", value: "#4F46E5" },
+          { label: "Blue", value: "#2563EB" },
+          { label: "Teal", value: "#0D9488" },
+          { label: "Green", value: "#059669" },
+          { label: "Gold", value: "#CA8A04" },
+          { label: "Orange", value: "#EA580C" },
+          { label: "White", value: "#FFFFFF" },
+        ],
       },
       { id: "logoLight", label: "Logo (light backgrounds)", type: "file" },
       { id: "logoDark", label: "Logo (dark backgrounds)", type: "file" },
@@ -920,6 +918,66 @@ const CURATED: Record<string, SettingsSchema> = {
     fields: [
       { id: "favicon", label: "Favicon (.ico / .png)", type: "file" },
       { id: "appleTouch", label: "Apple touch icon", type: "file" },
+    ],
+  },
+
+  "organization/time-zone": {
+    title: "Time Zone",
+    description: "Workspace IANA timezone (WorkspaceSettings.timezone).",
+    fields: [
+      {
+        id: "timezone",
+        label: "Time zone",
+        type: "select",
+        defaultValue: "Australia/Sydney",
+        options: [
+          { label: "Australia/Sydney", value: "Australia/Sydney" },
+          { label: "Australia/Melbourne", value: "Australia/Melbourne" },
+          { label: "Pacific/Auckland", value: "Pacific/Auckland" },
+          { label: "UTC", value: "UTC" },
+          { label: "Asia/Kathmandu", value: "Asia/Kathmandu" },
+          { label: "America/New_York", value: "America/New_York" },
+          { label: "Europe/London", value: "Europe/London" },
+        ],
+      },
+    ],
+  },
+
+  "organization/language": {
+    title: "Language",
+    description: "Workspace language tag (WorkspaceSettings.language).",
+    fields: [
+      {
+        id: "language",
+        label: "Language",
+        type: "select",
+        defaultValue: "en",
+        options: [
+          { label: "English", value: "en" },
+          { label: "English (Australia)", value: "en-AU" },
+          { label: "English (UK)", value: "en-GB" },
+        ],
+      },
+    ],
+  },
+
+  "organization/currency": {
+    title: "Currency",
+    description: "Default workspace currency (WorkspaceSettings.currency).",
+    fields: [
+      {
+        id: "currency",
+        label: "Currency",
+        type: "select",
+        defaultValue: "AUD",
+        options: [
+          { label: "AUD", value: "AUD" },
+          { label: "USD", value: "USD" },
+          { label: "NZD", value: "NZD" },
+          { label: "GBP", value: "GBP" },
+          { label: "EUR", value: "EUR" },
+        ],
+      },
     ],
   },
 
@@ -952,6 +1010,45 @@ const CURATED: Record<string, SettingsSchema> = {
       },
     ],
   },
+
+  "communication/email-signatures": {
+    title: "Email Signatures",
+    description:
+      "Default signature for outbound email from this workspace. Also used when you compose mail in Activities.",
+    fields: [
+      {
+        id: "name",
+        label: "Signature name",
+        type: "text",
+        defaultValue: "Workspace default",
+      },
+      {
+        id: "body",
+        label: "Signature text",
+        type: "textarea",
+        placeholder: "Name\nMortgage broker · FinConnex\nphone · email",
+        help: "Plain text. Line breaks become the HTML signature on send.",
+      },
+      {
+        id: "includeOnNew",
+        label: "Add to new emails",
+        type: "toggle",
+        defaultValue: true,
+      },
+      {
+        id: "includeOnReplies",
+        label: "Add to replies",
+        type: "toggle",
+        defaultValue: true,
+      },
+      {
+        id: "notes",
+        label: "Notes",
+        type: "textarea",
+        placeholder: "When to use this signature…",
+      },
+    ],
+  },
 };
 
 /** Build full registry once. */
@@ -969,6 +1066,10 @@ function buildRegistry(): Record<string, SettingsSchema> {
 }
 
 export const SETTINGS_SCHEMAS = buildRegistry();
+
+export function isCuratedSettingsSchema(key: string) {
+  return Object.prototype.hasOwnProperty.call(CURATED, key);
+}
 
 export function getSettingsSchema(categorySlug: string, subpageSlug: string) {
   const key = settingsSchemaKey(categorySlug, subpageSlug);

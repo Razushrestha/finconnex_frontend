@@ -31,6 +31,10 @@ export type CrmSettingsState = {
   setSettings: (next: CrmWorkspaceSettings | null) => void;
   setSecurity: (next: CrmSecuritySettings | null) => void;
   setCapabilities: (next: CrmCapabilities | null) => void;
+  previewBrand: Partial<Pick<CrmWorkspaceSettings, "primaryColor" | "secondaryColor">> | null;
+  setPreviewBrand: (
+    next: Partial<Pick<CrmWorkspaceSettings, "primaryColor" | "secondaryColor">> | null,
+  ) => void;
 };
 
 const SettingsCrmContext = createContext<CrmSettingsState | null>(null);
@@ -44,6 +48,9 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
   const [capabilities, setCapabilities] = useState<CrmCapabilities | null>(
     null,
   );
+  const [previewBrand, setPreviewBrand] = useState<
+    Partial<Pick<CrmWorkspaceSettings, "primaryColor" | "secondaryColor">> | null
+  >(null);
   const [tick, setTick] = useState(0);
 
   const refresh = useCallback(() => setTick((n) => n + 1), []);
@@ -110,6 +117,8 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
     setSettings,
     setSecurity,
     setCapabilities,
+    previewBrand,
+    setPreviewBrand,
   };
 }
 

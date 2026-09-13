@@ -27,6 +27,7 @@ import {
   flagsFromCapabilities,
   valuesToSettingsPatch,
 } from "@/lib/settings/api";
+import { settingsControlPanelPaths } from "@/lib/settings/settings-nav";
 import {
   installSmokePolyfill,
   runAsCli,
@@ -53,6 +54,10 @@ const LIVE_ROUTES: Array<{ method: string; path: string }> = [
   { method: "GET", path: "/v1/settings/pages" },
   { method: "GET", path: "/v1/settings/pages/organization/company-profile" },
   { method: "PUT", path: "/v1/settings/pages/organization/company-profile" },
+  { method: "GET", path: "/v1/documents/library" },
+  { method: "GET", path: "/v1/document-requests" },
+  { method: "GET", path: "/v1/signature-requests" },
+  { method: "GET", path: "/v1/signature-templates" },
 ];
 
 function repoRoot() {
@@ -136,11 +141,16 @@ export function smokeSettingsWiring() {
   }
 
   const layout = readSrc("src/app/(dashboard)/settings/layout.tsx");
-  if (!layout.includes("SettingsCrmProvider")) {
-    fail("settings layout does not share one CRM settings session");
+  if (!layout.includes("SettingsControlShell")) {
+    fail("settings layout missing SettingsControlShell");
   }
-  if (!layout.includes("SettingsCrmBadge")) {
-    fail("settings layout missing SettingsCrmBadge");
+
+  const shell = readSrc("src/components/layout/DashboardShell.tsx");
+  if (!shell.includes("SettingsCrmProvider")) {
+    fail("dashboard shell does not share one CRM settings session");
+  }
+  if (!shell.includes("workspaceBrandCssVars")) {
+    fail("dashboard shell does not apply workspace brand colours");
   }
 
   const page = readSrc(
@@ -148,6 +158,12 @@ export function smokeSettingsWiring() {
   );
   if (!page.includes("CapabilitiesSettingsClient")) {
     fail("settings subpage does not mount CapabilitiesSettingsClient");
+  }
+  if (!page.includes("CrmPicklistSettingsClient")) {
+    fail("settings subpage does not mount CRM enum picklists");
+  }
+  if (!page.includes("SettingsFormClient")) {
+    fail("settings subpage does not mount catalog forms");
   }
 
   const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
@@ -161,9 +177,43 @@ export function smokeSettingsWiring() {
     "PATCH /v1/settings",
     "GET /v1/settings/pages",
     "PUT /v1/settings/pages/:category/:subpage",
+    "/v1/documents",
+    "/v1/document-requests",
+    "/v1/signature-requests",
+    "/v1/signature-templates",
   ]) {
     if (!docs.includes(fragment)) {
       fail(`settings API docs missing ${fragment}`);
+    }
+  }
+
+  const endpointCatalog = readSrc("src/lib/api/endpoints.ts");
+  for (const fragment of [
+    'path: "/documents/library"',
+    'path: "/document-requests"',
+    'path: "/signature-requests"',
+    'path: "/signature-templates"',
+  ]) {
+    if (!endpointCatalog.includes(fragment)) {
+      fail(`endpoint catalog missing documents route ${fragment}`);
+    }
+  }
+
+  const bffDocs = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  for (const root of [
+    '"documents"',
+    '"document-requests"',
+    '"signature-requests"',
+    '"signature-templates"',
+    '"recycle-bin"',
+    '"custom-fields"',
+    '"lead-assignment-rules"',
+    '"automations"',
+    '"automation-runs"',
+    '"notification-preferences"',
+  ]) {
+    if (!bffDocs.includes(root)) {
+      fail(`BFF proxy does not allow ${root}`);
     }
   }
 
@@ -201,6 +251,46 @@ export function smokeSettingsWiring() {
     if (!existsSync(migration)) {
       fail("catalog Prisma migration is missing");
     }
+
+    const panel = readSrc(
+      "multi-crm-backend-main/src/modules/settings/docs/settings-control-panel.const.ts",
+    );
+    const nestHrefs = [...panel.matchAll(/finconnexPath:\s*'([^']+)'/g)].map(
+      (match) => match[1],
+    );
+    const railHrefs = settingsControlPanelPaths();
+    const missingOnBackend = railHrefs.filter((href) => !nestHrefs.includes(href));
+    const extraOnBackend = nestHrefs.filter((href) => !railHrefs.includes(href));
+    if (missingOnBackend.length || extraOnBackend.length) {
+      fail(
+        `settings rail vs Nest map mismatch. frontend-only: ${missingOnBackend.join(", ") || "none"}; nest-only: ${extraOnBackend.join(", ") || "none"}`,
+      );
+    }
+
+    const docCtl = readSrc(
+      "multi-crm-backend-main/src/modules/document/controllers/document.controller.ts",
+    );
+    if (!docCtl.includes("path: ['documents'")) {
+      fail("DocumentController missing /v1/documents");
+    }
+    const reqCtl = readSrc(
+      "multi-crm-backend-main/src/modules/document/controllers/document-request.controller.ts",
+    );
+    if (!reqCtl.includes("document-requests")) {
+      fail("DocumentRequestController missing /v1/document-requests");
+    }
+    const sigCtl = readSrc(
+      "multi-crm-backend-main/src/modules/document/controllers/signature-request.controller.ts",
+    );
+    if (!sigCtl.includes("signature-requests")) {
+      fail("SignatureRequestController missing /v1/signature-requests");
+    }
+    const tplCtl = readSrc(
+      "multi-crm-backend-main/src/modules/document/controllers/signature-template.controller.ts",
+    );
+    if (!tplCtl.includes("signature-templates")) {
+      fail("SignatureTemplateController missing /v1/signature-templates");
+    }
   }
 
   const settings = normalizeCrmWorkspaceSettings({
@@ -237,9 +327,18 @@ export function smokeSettingsWiring() {
   const logoPatch = valuesToSettingsPatch({
     companyName: "Acme Brokers",
     logo: "office.png",
+    logoLight: "office.png",
+    logoDark: "dark.png",
   });
-  if ("logoKey" in logoPatch) {
+  if ("logoKey" in logoPatch || "logoDarkKey" in logoPatch) {
     fail("valuesToSettingsPatch must not send a filename as logoKey");
+  }
+  const storedLogo = valuesToSettingsPatch({
+    logoLight: "workspaces/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/uploads/1-logo.png",
+    logoDark: "workspaces/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/uploads/1-dark.png",
+  });
+  if (!storedLogo.logoKey || !storedLogo.logoDarkKey) {
+    fail("valuesToSettingsPatch did not map light/dark logo storage keys");
   }
 
   const security = normalizeCrmSecuritySettings({

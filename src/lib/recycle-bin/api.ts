@@ -1,8 +1,4 @@
-import {
-  ensureCrmAccess,
-  ensureCrmSession,
-} from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmWorkspaceFetch } from "@/lib/crm/request";
 import type { RecycleBinItem } from "@/lib/rules/soft-delete";
 
 export const RECYCLE_ENTITY_TYPES = [
@@ -50,12 +46,6 @@ function toQuery(params: Record<string, string | number | undefined>): string {
 
 export function recycleBinPath(suffix = ""): string {
   return `/v1/recycle-bin${suffix}`;
-}
-
-async function resolveAuth() {
-  const scoped = await ensureCrmSession();
-  if (scoped) return scoped;
-  return ensureCrmAccess();
 }
 
 function extractRecords(data: unknown): Record<string, unknown>[] {
@@ -171,10 +161,7 @@ export function normalizeRecycleBinItem(
 }
 
 async function fetchList(query: CrmRecycleBinQuery): Promise<RecycleBinItem[]> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to load the recycle bin");
-  const data = await crmFetch(
-    auth,
+  const data = await crmWorkspaceFetch(
     recycleBinPath(
       toQuery({
         page: query.page ?? 1,
@@ -224,9 +211,7 @@ export async function restoreCrmRecycleBinItem(
   entityType: string,
   id: string,
 ): Promise<void> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to restore this record");
-  await crmFetch(auth, `${recycleItemPath(entityType, id)}/restore`, {
+  await crmWorkspaceFetch(`${recycleItemPath(entityType, id)}/restore`, {
     method: "POST",
     body: "{}",
   });
@@ -236,9 +221,7 @@ export async function purgeCrmRecycleBinItem(
   entityType: string,
   id: string,
 ): Promise<void> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to permanently delete this record");
-  await crmFetch(auth, recycleItemPath(entityType, id), {
+  await crmWorkspaceFetch(recycleItemPath(entityType, id), {
     method: "DELETE",
   });
 }

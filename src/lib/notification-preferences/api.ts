@@ -1,9 +1,5 @@
-import {
-  ensureCrmAccess,
-  ensureCrmSession,
-  type CrmSession,
-} from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { ensureCrmSession } from "@/lib/activity-timeline/auth";
+import { crmWorkspaceFetch } from "@/lib/crm/request";
 import { replaceCrmNotificationPreferences } from "@/lib/notification-preferences/store";
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
@@ -162,44 +158,26 @@ export function toNotificationPreferencesBody(
   };
 }
 
-async function withSession<T>(
-  run: (
-    session: CrmSession | Pick<CrmSession, "baseUrl" | "accessToken">,
-    scoped: boolean,
-  ) => Promise<T>,
-): Promise<T> {
+async function prefsCall(init?: RequestInit): Promise<unknown> {
   const scoped = await ensureCrmSession();
-  if (scoped) return run(scoped, true);
-  const access = await ensureCrmAccess();
-  if (!access) throw new Error("Sign in to manage notification preferences");
-  return run(access, false);
-}
-
-function prefsUrl(
-  session: CrmSession | Pick<CrmSession, "baseUrl" | "accessToken">,
-  scoped: boolean,
-) {
-  return scoped
-    ? workspaceNotificationPreferencesPath((session as CrmSession).workspaceId)
+  const path = scoped?.workspaceId
+    ? workspaceNotificationPreferencesPath(scoped.workspaceId)
     : globalNotificationPreferencesPath();
+  return crmWorkspaceFetch(path, init);
 }
 
 export async function getCrmNotificationPreferences(): Promise<NotificationPreferences> {
-  return withSession(async (session, scoped) =>
-    normalizeNotificationPreferences(await crmFetch(session, prefsUrl(session, scoped))),
-  );
+  return normalizeNotificationPreferences(await prefsCall());
 }
 
 export async function updateCrmNotificationPreferences(
   patch: Partial<NotificationPreferences>,
 ): Promise<NotificationPreferences> {
-  return withSession(async (session, scoped) =>
-    normalizeNotificationPreferences(
-      await crmFetch(session, prefsUrl(session, scoped), {
-        method: "PATCH",
-        body: JSON.stringify(toNotificationPreferencesBody(patch)),
-      }),
-    ),
+  return normalizeNotificationPreferences(
+    await prefsCall({
+      method: "PATCH",
+      body: JSON.stringify(toNotificationPreferencesBody(patch)),
+    }),
   );
 }
 

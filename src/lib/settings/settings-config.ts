@@ -125,7 +125,13 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
         moduleHref: "/sales/leads",
         moduleLabel: "Open Leads board",
       },
-      { title: "Lead Statuses", slug: "lead-statuses" },
+      {
+        title: "Lead Statuses",
+        slug: "lead-statuses",
+        blurb: "CRM LeadStatus enum used on lead records",
+        moduleHref: "/sales/leads",
+        moduleLabel: "Open Leads",
+      },
       {
         title: "Lead Card",
         slug: "lead-card",
@@ -134,9 +140,27 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
         moduleHref: "/sales/leads",
         moduleLabel: "Open Leads board",
       },
-      { title: "Deal Stages", slug: "deal-stages" },
-      { title: "Lead Sources", slug: "lead-sources" },
-      { title: "Lost Reasons", slug: "lost-reasons" },
+      {
+        title: "Deal Stages",
+        slug: "deal-stages",
+        blurb: "CRM DealStage enum used on deals",
+        moduleHref: "/sales/deals",
+        moduleLabel: "Open Deals",
+      },
+      {
+        title: "Lead Sources",
+        slug: "lead-sources",
+        blurb: "CRM LeadSource enum",
+        moduleHref: "/sales/leads",
+        moduleLabel: "Open Leads",
+      },
+      {
+        title: "Lost Reasons",
+        slug: "lost-reasons",
+        blurb: "Required on Closed Lost deals (LostReason enum)",
+        moduleHref: "/sales/deals",
+        moduleLabel: "Open Deals",
+      },
       { title: "Tags", slug: "tags" },
       { title: "Labels", slug: "labels" },
       { title: "Custom Fields", slug: "custom-fields" },
@@ -209,7 +233,13 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
       { title: "Email Accounts", slug: "email-accounts" },
       { title: "SMTP", slug: "smtp" },
       { title: "IMAP", slug: "imap" },
-      { title: "Email Signatures", slug: "email-signatures" },
+      {
+        title: "Email Signatures",
+        slug: "email-signatures",
+        blurb: "Default outbound signature for this workspace",
+        moduleHref: "/activities/emails/create",
+        moduleLabel: "Compose email",
+      },
       { title: "Sender Profiles", slug: "sender-profiles" },
       { title: "Sending Domains", slug: "sending-domains" },
       { title: "Phone Numbers", slug: "phone-numbers" },
@@ -647,11 +677,90 @@ export const SETTINGS_REDIRECTS: Record<string, { category: string; subpage: str
     category: "organization",
     subpage: "regional-settings",
   },
+  "organization/time-zone": {
+    category: "organization",
+    subpage: "regional-settings",
+  },
+  "organization/language": {
+    category: "organization",
+    subpage: "regional-settings",
+  },
+  "organization/currency": {
+    category: "organization",
+    subpage: "regional-settings",
+  },
+  "organization/multi-currency": {
+    category: "organization",
+    subpage: "regional-settings",
+  },
+  "organization/multi-language": {
+    category: "organization",
+    subpage: "regional-settings",
+  },
+  "organization/themes": { category: "organization", subpage: "branding" },
+  "organization/dark-mode": { category: "organization", subpage: "branding" },
+  "organization/accent-colors": { category: "organization", subpage: "branding" },
+  "organization/sidebar-layout": { category: "organization", subpage: "branding" },
+  "organization/favicon": { category: "organization", subpage: "branding" },
+  "organization/email-branding": { category: "organization", subpage: "branding" },
+  "organization/login-page-branding": {
+    category: "organization",
+    subpage: "branding",
+  },
+  "organization/white-label": { category: "organization", subpage: "branding" },
+  "organization/business-information": {
+    category: "organization",
+    subpage: "company-profile",
+  },
   "ai/ai-usage": { category: "ai", subpage: "ai-usage-credits" },
   "ai/ai-credits": { category: "ai", subpage: "ai-usage-credits" },
   "system/email-queue": { category: "system", subpage: "queue-monitor" },
   "system/sms-queue": { category: "system", subpage: "queue-monitor" },
   "system/workflow-queue": { category: "system", subpage: "queue-monitor" },
+  "system/feature-flags": {
+    category: "system",
+    subpage: "enable-disable-modules",
+  },
+  "system/beta-features": {
+    category: "system",
+    subpage: "enable-disable-modules",
+  },
+  "system/experimental-features": {
+    category: "system",
+    subpage: "enable-disable-modules",
+  },
+  "workflow-and-automation/round-robin": {
+    category: "workflow-and-automation",
+    subpage: "assignment-rules",
+  },
+  "workflow-and-automation/escalation-rules": {
+    category: "workflow-and-automation",
+    subpage: "workflow-builder",
+  },
+  "workflow-and-automation/workflow-templates": {
+    category: "workflow-and-automation",
+    subpage: "workflow-builder",
+  },
+  "data-management/restore-points": {
+    category: "data-management",
+    subpage: "backup-and-restore",
+  },
+  "subscription-and-billing/invoices": {
+    category: "subscription-and-billing",
+    subpage: "billing",
+  },
+  "subscription-and-billing/payment-methods": {
+    category: "subscription-and-billing",
+    subpage: "billing",
+  },
+  "subscription-and-billing/add-ons": {
+    category: "subscription-and-billing",
+    subpage: "subscription-plan",
+  },
+  "security/session-timeout": {
+    category: "security",
+    subpage: "password-policy",
+  },
 };
 
 export function settingsSchemaKey(categorySlug: string, subpageSlug: string) {

@@ -36,7 +36,7 @@ export default async function RootLayout({
       style={{ colorScheme: theme }}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <Toaster />
         <Providers>{children}</Providers>
       </body>

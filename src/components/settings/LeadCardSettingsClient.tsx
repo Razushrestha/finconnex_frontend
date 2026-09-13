@@ -4,24 +4,35 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import {
+  DEFAULT_LEAD_CARD_SETTINGS,
+  LEAD_CARD_SETTINGS_KEY,
   LEAD_CARD_SETTINGS_PATH,
   MAX_DYNAMIC_FIELDS,
+  leadCardSettingsToValues,
   listLeadCardFieldOptions,
   loadLeadCardSettings,
   saveLeadCardSettings,
+  settingsValuesToLeadCard,
   type LeadCardFieldKey,
   type LeadCardSettings,
 } from "@/lib/leads/lead-card-settings";
 import { onCustomFieldsChange } from "@/lib/custom-fields/store";
 import { useCrmCustomFields } from "@/lib/custom-fields/use-crm-custom-fields";
+import {
+  overlayCatalogValues,
+  saveCrmSettingsFormPage,
+} from "@/lib/settings/api";
+import { useCrmSettings } from "@/lib/settings/use-crm-settings";
 import { cn } from "@/lib/utils";
 
 export function LeadCardSettingsClient() {
   useCrmCustomFields();
+  const crm = useCrmSettings();
   const [settings, setSettings] = useState<LeadCardSettings>(() =>
     loadLeadCardSettings(),
   );
   const [toast, setToast] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [fieldOptionsTick, setFieldOptionsTick] = useState(0);
 
   useEffect(() => {
@@ -29,6 +40,16 @@ export function LeadCardSettingsClient() {
       setFieldOptionsTick((n) => n + 1);
     });
   }, []);
+
+  useEffect(() => {
+    if (!crm.settings?.catalog?.[LEAD_CARD_SETTINGS_KEY]) return;
+    const values = overlayCatalogValues(
+      leadCardSettingsToValues(DEFAULT_LEAD_CARD_SETTINGS),
+      crm.settings,
+      LEAD_CARD_SETTINGS_KEY,
+    );
+    setSettings(settingsValuesToLeadCard(values));
+  }, [crm.settings]);
 
   const fieldOptions = useMemo(() => {
     void fieldOptionsTick;
@@ -65,10 +86,24 @@ export function LeadCardSettingsClient() {
     flash("Reverted to last saved");
   }
 
-  function onSave() {
+  async function onSave() {
     const saved = saveLeadCardSettings(settings);
     setSettings(saved);
-    flash("Saved. Leads board will refresh");
+    setSaving(true);
+    try {
+      const next = await saveCrmSettingsFormPage(
+        "crm-configuration",
+        "lead-card",
+        leadCardSettingsToValues(saved),
+        crm.settings?.revision,
+      );
+      crm.setSettings(next);
+      flash("Saved to workspace");
+    } catch {
+      flash("Saved on this device. Workspace catalog is unavailable.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const atCap = settings.dynamicFieldKeys.length >= MAX_DYNAMIC_FIELDS;
@@ -271,10 +306,11 @@ export function LeadCardSettingsClient() {
         </button>
         <button
           type="button"
-          onClick={onSave}
-          className="h-9 rounded-lg bg-violet-600 px-3 text-[12px] font-semibold text-white shadow-sm shadow-violet-600/20 hover:bg-violet-700"
+          onClick={() => void onSave()}
+          disabled={saving}
+          className="h-9 rounded-lg bg-violet-600 px-3 text-[12px] font-semibold text-white shadow-sm shadow-violet-600/20 hover:bg-violet-700 disabled:opacity-60"
         >
-          Save changes
+          {saving ? "Saving…" : "Save changes"}
         </button>
       </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Navbar from "@/components/layout/Navbar";
 import { BottomBar } from "@/components/layout/BottomBar";
@@ -8,6 +8,11 @@ import { CrmTokenKeepAlive } from "@/components/layout/CrmTokenKeepAlive";
 import type { SessionPayload } from "@/lib/auth/types";
 import { setRulesActor } from "@/lib/rules/actor";
 import { BOTTOM_BAR_H } from "@/lib/layout";
+import { SettingsCrmProvider, useCrmSettings } from "@/lib/settings/use-crm-settings";
+import {
+  resolveWorkspaceBrand,
+  workspaceBrandCssVars,
+} from "@/lib/settings/brand";
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -15,9 +20,29 @@ interface DashboardShellProps {
 }
 
 export function DashboardShell({ children, session }: DashboardShellProps) {
+  return (
+    <SettingsCrmProvider>
+      <DashboardShellInner session={session}>{children}</DashboardShellInner>
+    </SettingsCrmProvider>
+  );
+}
+
+function DashboardShellInner({ children, session }: DashboardShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
+  const crm = useCrmSettings();
+  const brand = useMemo(
+    () =>
+      resolveWorkspaceBrand({
+        ...crm.settings,
+        primaryColor:
+          crm.previewBrand?.primaryColor ?? crm.settings?.primaryColor,
+        secondaryColor:
+          crm.previewBrand?.secondaryColor ?? crm.settings?.secondaryColor,
+      }),
+    [crm.settings, crm.previewBrand],
+  );
 
   useEffect(() => {
     setRulesActor({
@@ -43,6 +68,7 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
   return (
     <div
       ref={shellRef}
+      style={workspaceBrandCssVars(brand)}
       className="flex h-screen w-full max-w-full overflow-hidden overscroll-none bg-background font-sans"
     >
       {/* On mobile the sidebar renders as a fixed off-canvas drawer (out of

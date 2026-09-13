@@ -1042,6 +1042,9 @@ export const ENDPOINT_CATALOG = [
   { method: "GET", path: "/rules/permissions/me", module: "rules" },
   { method: "GET", path: "/audit-logs", module: "audit-logs", notes: "Paginated audit trail; query: page, limit, entityType, entityId, performedById, startDate, endDate" },
   { method: "GET", path: "/audit-logs/auth-security-events", module: "audit-logs", notes: "Failed logins and other auth security events" },
+  { method: "GET", path: "/automation-runs", module: "automations", notes: "Workspace automation run log" },
+  { method: "GET", path: "/automations", module: "automations", notes: "List workspace automations" },
+  { method: "GET", path: "/lead-assignment-rules", module: "lead-assignment-rules", notes: "Round-robin and territory rules" },
 
   // Custom fields (JWT; workspace via token claim)
   { method: "GET", path: "/custom-fields", module: "custom-fields", notes: "List definitions" },

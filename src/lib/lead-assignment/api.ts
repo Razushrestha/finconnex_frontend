@@ -1,5 +1,4 @@
-import { ensureCrmAccess, ensureCrmSession } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmWorkspaceFetch } from "@/lib/crm/request";
 import type {
   CreateLeadAssignmentRuleInput,
   LeadAssignmentRule,
@@ -10,16 +9,8 @@ export function leadAssignmentRulesPath(suffix = ""): string {
   return `/v1/lead-assignment-rules${suffix}`;
 }
 
-async function resolveAuth() {
-  const scoped = await ensureCrmSession();
-  if (scoped) return scoped;
-  return ensureCrmAccess();
-}
-
 async function request(suffix: string, init?: RequestInit): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to manage lead assignment rules");
-  return crmFetch(auth, leadAssignmentRulesPath(suffix), init);
+  return crmWorkspaceFetch(leadAssignmentRulesPath(suffix), init);
 }
 
 export async function listLeadAssignmentRules(): Promise<

@@ -15,6 +15,7 @@ export type CrmWorkspaceSettings = {
   id?: string;
   workspaceId?: string;
   logoUrl?: string | null;
+  logoDarkUrl?: string | null;
   faviconUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
@@ -44,6 +45,7 @@ export type CrmWorkspaceSettings = {
 
 export type CrmSettingsPatch = {
   logoKey?: string | null;
+  logoDarkKey?: string | null;
   faviconKey?: string | null;
   primaryColor?: string;
   secondaryColor?: string;
@@ -107,7 +109,9 @@ export const SETTINGS_FIELD_MAP: Record<string, keyof CrmSettingsPatch> = {
   customDomain: "customDomain",
   minLength: "passwordMinLength",
   idleMinutes: "sessionTimeoutMinutes",
+  logoLight: "logoKey",
   logo: "logoKey",
+  logoDark: "logoDarkKey",
   favicon: "faviconKey",
 };
 
@@ -277,6 +281,7 @@ export function normalizeCrmWorkspaceSettings(
     id: pickStr(rec.id) || undefined,
     workspaceId: pickStr(rec.workspaceId, rec.workspace_id) || undefined,
     logoUrl: pickStr(rec.logoUrl, rec.logo_url) || null,
+    logoDarkUrl: pickStr(rec.logoDarkUrl, rec.logo_dark_url) || null,
     faviconUrl: pickStr(rec.faviconUrl, rec.favicon_url) || null,
     primaryColor: pickStr(rec.primaryColor, rec.primary_color) || null,
     secondaryColor: pickStr(rec.secondaryColor, rec.secondary_color) || null,
@@ -400,9 +405,11 @@ export function overlaySettingsValues(
     const raw =
       key === "logoKey"
         ? settings.logoUrl
-        : key === "faviconKey"
-          ? settings.faviconUrl
-          : settings[key as keyof CrmWorkspaceSettings];
+        : key === "logoDarkKey"
+          ? settings.logoDarkUrl
+          : key === "faviconKey"
+            ? settings.faviconUrl
+            : settings[key as keyof CrmWorkspaceSettings];
     if (raw == null || raw === "") continue;
     if (typeof raw === "boolean" || typeof raw === "number") {
       next[field] = raw;
@@ -441,7 +448,11 @@ export function valuesToSettingsPatch(
     if (!(field in values)) continue;
     const value = values[field];
     if (value === undefined) continue;
-    if (key === "logoKey" || key === "faviconKey") {
+    if (key === "logoKey" || key === "logoDarkKey" || key === "faviconKey") {
+      if (value === "" || value === null) {
+        (patch as Record<string, unknown>)[key] = null;
+        continue;
+      }
       if (!isWorkspaceStorageKey(value)) continue;
     }
     (patch as Record<string, unknown>)[key] = value;
@@ -477,7 +488,7 @@ function withCatalogPage(
 
 function catalogValuesForSave(values: SettingsValues): SettingsValues {
   const out: SettingsValues = { ...values };
-  for (const id of ["logo", "favicon"]) {
+  for (const id of ["logo", "logoLight", "logoDark", "favicon"]) {
     const value = out[id];
     if (typeof value !== "string") continue;
     if (!value || isWorkspaceStorageKey(value)) continue;

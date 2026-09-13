@@ -29,7 +29,7 @@ export function SettingsBreadcrumb() {
     const category = findSettingsCategory(categorySlug);
     if (category) {
       crumbs.push({
-        label: `${category.section} ${category.title}`,
+        label: category.title,
         href: `/settings/${category.slug}`,
       });
       if (subpageSlug) {

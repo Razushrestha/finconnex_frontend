@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_VIEWS, dashboardViewHref } from "@/lib/dashboard/views";
+import { useCrmSettings } from "@/lib/settings/use-crm-settings";
+import { resolveWorkspaceBrand } from "@/lib/settings/brand";
 import {
   Package,
   BadgePercent,
@@ -95,8 +97,8 @@ const childNavClass = (active: boolean) =>
   cn(
     "rounded-lg px-2.5 py-2 text-sm transition-colors md:py-1.5",
     active
-      ? "bg-violet-50 font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-300"
-      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+      ? "bg-[color-mix(in_srgb,var(--brand-primary)_28%,transparent)] font-medium text-[var(--brand-primary)]"
+      : "text-[color-mix(in_srgb,var(--brand-on-secondary)_70%,transparent)] hover:bg-[color-mix(in_srgb,var(--brand-on-secondary)_10%,transparent)] hover:text-[var(--brand-on-secondary)]",
   );
 
 const dashboardItems: NavItem[] = [
@@ -230,6 +232,13 @@ export function Sidebar({
   const searchParams = useSearchParams();
   const search = searchParams.toString();
   const chatRef = React.useRef<HTMLInputElement>(null);
+  const crm = useCrmSettings();
+  const brand = resolveWorkspaceBrand({
+    ...crm.settings,
+    primaryColor: crm.previewBrand?.primaryColor ?? crm.settings?.primaryColor,
+    secondaryColor:
+      crm.previewBrand?.secondaryColor ?? crm.settings?.secondaryColor,
+  });
 
   const [expanded, setExpanded] = React.useState<Set<string>>(() => {
     const initial = new Set<string>();
@@ -308,6 +317,9 @@ export function Sidebar({
   // Icon-only rail only applies on md+; the mobile drawer always shows labels.
   const hideLabel = collapsed ? "md:hidden" : undefined;
   const iconOnly = collapsed ? "md:justify-center md:px-0" : undefined;
+  const logoSrc = brand.secondaryIsLight
+    ? brand.logoLightUrl || brand.logoDarkUrl
+    : brand.logoDarkUrl || brand.logoLightUrl;
 
   return (
     <>
@@ -322,9 +334,8 @@ export function Sidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[85vw] shrink-0 flex-col overflow-hidden rounded-tr-[18px] rounded-br-[18px] bg-white px-5 py-6 transition-transform duration-200 ease-in-out dark:bg-zinc-950",
-          // Elevated rail: stronger depth + right edge
-          "border-r border-slate-200/90 shadow-[8px_0_40px_-2px_rgba(15,23,42,0.22),2px_0_12px_-2px_rgba(15,23,42,0.10)] dark:border-zinc-800 dark:shadow-[8px_0_44px_-4px_rgba(0,0,0,0.65),2px_0_14px_-2px_rgba(0,0,0,0.4)]",
+          "fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[85vw] shrink-0 flex-col overflow-hidden rounded-tr-[18px] rounded-br-[18px] bg-[var(--brand-secondary)] px-5 py-6 text-[var(--brand-on-secondary)] transition-transform duration-200 ease-in-out",
+          "border-r border-[color-mix(in_srgb,var(--brand-on-secondary)_14%,transparent)] shadow-[8px_0_40px_-2px_rgba(15,23,42,0.22),2px_0_12px_-2px_rgba(15,23,42,0.10)]",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
           "md:sticky md:top-0 md:z-20 md:w-64 md:max-w-none md:translate-x-0 md:rounded-tr-[18px] md:rounded-br-[18px] md:transition-[width,box-shadow,border-radius] md:pb-10",
           collapsed && "md:w-[72px] md:px-3",
@@ -341,21 +352,33 @@ export function Sidebar({
           <Link
             href="/"
             className={cn(
-              "text-xl font-semibold text-foreground",
+              "flex min-w-0 items-center gap-2 text-xl font-semibold text-[var(--brand-on-secondary)]",
               collapsed && "md:text-base",
             )}
           >
+            {logoSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoSrc}
+                alt=""
+                className="h-8 w-8 shrink-0 rounded-md object-contain"
+              />
+            ) : null}
             <span className={collapsed ? "md:hidden" : undefined}>
-              FinConnex
+              {brand.appName}
             </span>
-            {collapsed && <span className="hidden md:inline">FinC</span>}
+            {collapsed && (
+              <span className="hidden md:inline">
+                {brand.appName.slice(0, 4)}
+              </span>
+            )}
           </Link>
 
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
             aria-label="Close menu"
-            className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-accent md:hidden"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--brand-on-secondary)] hover:bg-[color-mix(in_srgb,var(--brand-on-secondary)_12%,transparent)] md:hidden"
           >
             <X className="h-4 w-4" />
           </button>
@@ -364,7 +387,7 @@ export function Sidebar({
             type="button"
             onClick={onToggleSidebar}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent md:flex"
+            className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--brand-on-secondary)] transition-colors hover:bg-[color-mix(in_srgb,var(--brand-on-secondary)_12%,transparent)] md:flex"
           >
             <ChevronsLeft
               className={cn(
@@ -378,18 +401,41 @@ export function Sidebar({
         {tenantName && (
           <p
             className={cn(
-              "mb-6 truncate px-1 text-xs text-muted-foreground",
+              "mb-2 truncate px-1 text-xs text-[color-mix(in_srgb,var(--brand-on-secondary)_65%,transparent)]",
               hideLabel,
             )}
           >
             {tenantName}
           </p>
         )}
-        {collapsed && <div className="hidden md:mb-6 md:block" />}
-
+        <Link
+          href="/settings/organization/branding"
+          title="Workspace brand colours"
+          className={cn(
+            "mb-6 flex items-center gap-1.5 px-1",
+            collapsed && "md:mb-6 md:justify-center md:px-0",
+          )}
+        >
+          <span
+            className="h-3.5 w-3.5 shrink-0 rounded-full border border-black/10 shadow-sm"
+            style={{ backgroundColor: brand.primary }}
+          />
+          <span
+            className="h-3.5 w-3.5 shrink-0 rounded-full border border-black/10 shadow-sm"
+            style={{ backgroundColor: brand.secondary }}
+          />
+          <span
+            className={cn(
+              "truncate text-[10px] font-semibold tracking-wide text-[color-mix(in_srgb,var(--brand-on-secondary)_55%,transparent)] uppercase",
+              hideLabel,
+            )}
+          >
+            Brand
+          </span>
+        </Link>
         {/* Dashboard section */}
         <div className={cn("mb-2 px-1", hideLabel)}>
-          <span className="text-[11px] font-semibold tracking-wider text-violet-600 dark:text-violet-400">
+          <span className="text-[11px] font-semibold tracking-wider text-[var(--brand-primary)]">
             DASHBOARD
           </span>
         </div>
@@ -418,16 +464,16 @@ export function Sidebar({
                         "flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm transition-colors md:py-2",
                         iconOnly,
                         isActive
-                          ? "text-violet-600 dark:text-violet-400 font-medium"
-                          : "text-foreground/80 hover:bg-accent",
+                          ? "font-medium text-[var(--brand-primary)]"
+                          : "text-[color-mix(in_srgb,var(--brand-on-secondary)_78%,transparent)] hover:bg-[color-mix(in_srgb,var(--brand-on-secondary)_10%,transparent)] hover:text-[var(--brand-on-secondary)]",
                       )}
                     >
                       <Icon
                         className={cn(
                           "h-[18px] w-[18px] shrink-0",
                           isActive
-                            ? "text-violet-600 dark:text-violet-400"
-                            : "text-muted-foreground",
+                            ? "text-[var(--brand-primary)]"
+                            : "text-[color-mix(in_srgb,var(--brand-on-secondary)_62%,transparent)]",
                         )}
                         strokeWidth={1.75}
                       />
@@ -436,7 +482,7 @@ export function Sidebar({
                       </span>
                       <ChevronDown
                         className={cn(
-                          "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+                          "h-3.5 w-3.5 shrink-0 text-[color-mix(in_srgb,var(--brand-on-secondary)_55%,transparent)] transition-transform",
                           isOpen && "rotate-180",
                           hideLabel,
                         )}
@@ -450,16 +496,16 @@ export function Sidebar({
                         "flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm transition-colors md:py-2",
                         iconOnly,
                         isActive
-                          ? "text-violet-600 dark:text-violet-400 font-medium"
-                          : "text-foreground/80 hover:bg-accent",
+                          ? "font-medium text-[var(--brand-primary)]"
+                          : "text-[color-mix(in_srgb,var(--brand-on-secondary)_78%,transparent)] hover:bg-[color-mix(in_srgb,var(--brand-on-secondary)_10%,transparent)] hover:text-[var(--brand-on-secondary)]",
                       )}
                     >
                       <Icon
                         className={cn(
                           "h-[18px] w-[18px] shrink-0",
                           isActive
-                            ? "text-violet-600 dark:text-violet-400"
-                            : "text-muted-foreground",
+                            ? "text-[var(--brand-primary)]"
+                            : "text-[color-mix(in_srgb,var(--brand-on-secondary)_62%,transparent)]",
                         )}
                         strokeWidth={1.75}
                       />
@@ -470,7 +516,7 @@ export function Sidebar({
                   {hasChildren && isOpen && (
                     <div
                       className={cn(
-                        "ml-[27px] flex flex-col gap-0.5 border-l border-border pl-3.5",
+                        "ml-[27px] flex flex-col gap-0.5 border-l border-[color-mix(in_srgb,var(--brand-on-secondary)_18%,transparent)] pl-3.5",
                         collapsed && "md:hidden",
                       )}
                     >
@@ -501,7 +547,7 @@ export function Sidebar({
 
         <div
           className={cn(
-            "mt-auto shrink-0 border-t border-slate-200 bg-white",
+            "mt-auto shrink-0 border-t border-[color-mix(in_srgb,var(--brand-on-secondary)_14%,transparent)] bg-[color-mix(in_srgb,var(--brand-on-secondary)_8%,transparent)]",
             collapsed && "md:hidden",
           )}
         >
@@ -509,7 +555,7 @@ export function Sidebar({
             ref={chatRef}
             type="text"
             placeholder="Here is your Smart Chat (Ctrl+Space)"
-            className="h-10 w-full border-0 bg-white px-3 text-[12px] text-slate-700 outline-none placeholder:text-slate-400"
+            className="h-10 w-full border-0 bg-transparent px-3 text-[12px] text-[var(--brand-on-secondary)] outline-none placeholder:text-[color-mix(in_srgb,var(--brand-on-secondary)_45%,transparent)]"
           />
         </div>
       </aside>
