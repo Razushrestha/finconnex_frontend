@@ -11,6 +11,7 @@ import type { SessionPayload } from "@/lib/auth/types";
 import {
   applyCrmTokenCookies,
   crmSelectWorkspace,
+  crmWorkspaceRole,
   type CrmWorkspace,
 } from "@/lib/auth/crm-server";
 
@@ -33,6 +34,18 @@ export async function remintSessionForWorkspace(
     tokens.refreshToken,
   );
 
+  // The role has to be read with the *selected* token: the workspace-scoped
+  // token carries a workspace locator and no role at all, and `session` still
+  // holds whatever the previous workspace granted. Creating a workspace makes
+  // you its OWNER, so without this a brand-new owner would keep rendering as
+  // whatever they were before — the bug this whole change exists to fix.
+  // A failure here must not sink the selection itself; the next /api/auth/me
+  // refresh will fill the role in.
+  const workspaceRole = await crmWorkspaceRole(
+    selected.data.accessToken,
+    selected.refreshToken ?? tokens.refreshToken,
+  );
+
   const remember = sessionRememberMe(session);
   const nextSession = await createSessionToken(
     {
@@ -41,6 +54,7 @@ export async function remintSessionForWorkspace(
       tenantSlug: workspace.slug,
       tenantName: workspace.name,
       hasWorkspace: true,
+      workspaceRole,
       rememberMe: remember,
     },
     remember,

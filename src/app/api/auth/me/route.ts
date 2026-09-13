@@ -43,6 +43,7 @@ export async function GET() {
             email: mapped.email,
             name: mapped.name,
             role: mapped.role,
+            workspaceRole: mapped.workspaceRole ?? null,
             avatar: live.data.avatar,
           },
           tenant: {
@@ -83,6 +84,7 @@ export async function GET() {
       email: session.email,
       name: session.name,
       role: session.role,
+      workspaceRole: session.workspaceRole ?? null,
     },
     tenant: {
       id: session.tenantId,
