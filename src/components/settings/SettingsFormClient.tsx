@@ -18,6 +18,7 @@ import {
   overlaySecurityValues,
   overlaySettingsValues,
   patchCrmWorkspaceSettings,
+  saveCrmSettingsFormPage,
   valuesToSettingsPatch,
   type CrmSecuritySettings,
   type CrmWorkspaceSettings,
@@ -89,12 +90,17 @@ export function SettingsFormClient({
     }
     if (crm.source === "api") {
       try {
-        const patched = await patchCrmWorkspaceSettings({
-          ...valuesToSettingsPatch(values, crm.settings?.revision),
-          ...(categorySlug === "my-preferences"
-            ? {}
-            : { catalog: { [schemaKey]: values } }),
-        });
+        const patched =
+          categorySlug === "my-preferences"
+            ? await patchCrmWorkspaceSettings(
+                valuesToSettingsPatch(values, crm.settings?.revision),
+              )
+            : await saveCrmSettingsFormPage(
+                categorySlug,
+                subpageSlug,
+                values,
+                crm.settings?.revision,
+              );
         crm.setSettings(patched);
         setToast("Saved to CRM");
       } catch (err) {
@@ -169,29 +175,37 @@ export function SettingsFormClient({
         ))}
       </div>
 
-      <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50/50 px-5 py-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-600 hover:bg-slate-50"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={() => void onSave()}
-          disabled={saving}
-          className="h-9 rounded-lg bg-violet-600 px-3 text-[12px] font-semibold text-white shadow-sm shadow-violet-600/20 hover:bg-violet-700 disabled:opacity-60"
-        >
-          {saving ? "Saving…" : "Save changes"}
-        </button>
-      </div>
-
-      {toast && (
-        <div className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
-          {toast}
+      <div className="sticky bottom-12 z-10 space-y-2 border-t border-slate-100 bg-slate-50/95 px-5 py-3 backdrop-blur-sm">
+        {toast ? (
+          <p
+            className={cn(
+              "text-[12px] font-medium",
+              /reject|fail|error|forbidden|permission|conflict/i.test(toast)
+                ? "text-rose-600"
+                : "text-emerald-700",
+            )}
+          >
+            {toast}
+          </p>
+        ) : null}
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => void onSave()}
+            disabled={saving}
+            className="h-9 rounded-lg bg-violet-600 px-3 text-[12px] font-semibold text-white shadow-sm shadow-violet-600/20 hover:bg-violet-700 disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Save changes"}
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -208,8 +222,8 @@ function hydrateSettingsForm(
   const saved = loadSettingsValues(schemaKey);
   let next = { ...defaultsFromSchema(schema), ...saved };
   if (crm.settings) {
-    next = overlayCatalogValues(next, crm.settings, schemaKey);
     next = overlaySettingsValues(next, crm.settings);
+    next = overlayCatalogValues(next, crm.settings, schemaKey);
   }
   if (crm.security) next = overlaySecurityValues(next, crm.security);
   if (memberPreferences) {

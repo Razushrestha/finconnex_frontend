@@ -61,6 +61,16 @@ const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
     "File storage is not configured on the CRM server. Set DigitalOcean Spaces (DO_SPACES_KEY, DO_SPACES_SECRET, DO_SPACES_BUCKET) on that API.",
   "storage.error.invalidFile":
     "That file type or size is not allowed. Use PDF, Word, image, or spreadsheet files.",
+  "settings.error.revisionConflict":
+    "Settings changed since they were loaded. Save again.",
+  "settings.error.invalidPageValues":
+    "One of these settings fields is not a plain text, number, or on/off value.",
+  "settings.error.invalidPageKey":
+    "This settings page cannot be saved on the CRM workspace.",
+  "settings.error.notFound":
+    "Workspace settings are missing on the CRM server. Ask an admin to open Settings once to create them.",
+  "auth.error.insufficientPermissions":
+    "Only a workspace owner or admin can update Company Profile and other workspace settings.",
   "sms.error.phoneNumberNotConfigured":
     "Twilio from-number is missing on the CRM server.",
   "calendly.error.notConfigured":

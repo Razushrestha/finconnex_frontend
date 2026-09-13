@@ -397,7 +397,12 @@ export function overlaySettingsValues(
 ): SettingsValues {
   const next = { ...values };
   for (const [field, key] of Object.entries(SETTINGS_FIELD_MAP)) {
-    const raw = settings[key as keyof CrmWorkspaceSettings];
+    const raw =
+      key === "logoKey"
+        ? settings.logoUrl
+        : key === "faviconKey"
+          ? settings.faviconUrl
+          : settings[key as keyof CrmWorkspaceSettings];
     if (raw == null || raw === "") continue;
     if (typeof raw === "boolean" || typeof raw === "number") {
       next[field] = raw;
@@ -420,6 +425,13 @@ export function overlaySecurityValues(
   };
 }
 
+export function isWorkspaceStorageKey(value: unknown): boolean {
+  return (
+    typeof value === "string" &&
+    /^workspaces\/[0-9a-f-]{36}\/uploads\//i.test(value.trim())
+  );
+}
+
 export function valuesToSettingsPatch(
   values: SettingsValues,
   expectedRevision?: number,
@@ -429,11 +441,116 @@ export function valuesToSettingsPatch(
     if (!(field in values)) continue;
     const value = values[field];
     if (value === undefined) continue;
-    if ((key === "logoKey" || key === "faviconKey") && value === "") continue;
+    if (key === "logoKey" || key === "faviconKey") {
+      if (!isWorkspaceStorageKey(value)) continue;
+    }
     (patch as Record<string, unknown>)[key] = value;
   }
   if (expectedRevision != null) patch.expectedRevision = expectedRevision;
   return patch;
+}
+
+function isMissingSettingsPage(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /404|405|501|not found|cannot (put|patch)|unknown arg|column .*catalog/i.test(
+    msg,
+  );
+}
+
+function isRejectedCatalog(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /whitelist|should not exist|property catalog|invalidPageValues|invalidPageKey/i.test(
+    msg,
+  );
+}
+
+function withCatalogPage(
+  settings: CrmWorkspaceSettings,
+  pageKey: string,
+  values: SettingsValues,
+): CrmWorkspaceSettings {
+  return {
+    ...settings,
+    catalog: { ...(settings.catalog ?? {}), [pageKey]: values },
+  };
+}
+
+function catalogValuesForSave(values: SettingsValues): SettingsValues {
+  const out: SettingsValues = { ...values };
+  for (const id of ["logo", "favicon"]) {
+    const value = out[id];
+    if (typeof value !== "string") continue;
+    if (!value || isWorkspaceStorageKey(value)) continue;
+    if (
+      value.length > 500 ||
+      value.startsWith("data:") ||
+      value.startsWith("blob:")
+    ) {
+      delete out[id];
+    }
+  }
+  return out;
+}
+
+/** Persist one Settings hub form: catalog page first, then first-class columns. */
+export async function saveCrmSettingsFormPage(
+  category: string,
+  subpage: string,
+  values: SettingsValues,
+  expectedRevision?: number,
+): Promise<CrmWorkspaceSettings> {
+  const pageKey = `${category}/${subpage}`;
+  const pageValues = catalogValuesForSave(values);
+  const firstClass = valuesToSettingsPatch(values, expectedRevision);
+  const firstClassKeys = Object.keys(firstClass).filter(
+    (key) => key !== "expectedRevision",
+  );
+
+  try {
+    let saved = await putCrmSettingsPage(
+      category,
+      subpage,
+      pageValues,
+      expectedRevision,
+    );
+    if (firstClassKeys.length) {
+      try {
+        saved = await patchCrmWorkspaceSettings({
+          ...valuesToSettingsPatch(values, saved.revision),
+        });
+      } catch {
+        /* Page catalog already persisted; branding key may be rejected. */
+      }
+    }
+    return withCatalogPage(saved, pageKey, pageValues);
+  } catch (err) {
+    if (!isMissingSettingsPage(err) && !isRejectedCatalog(err)) throw err;
+  }
+
+  try {
+    const patched = await patchCrmWorkspaceSettings({
+      ...firstClass,
+      catalog: { [pageKey]: pageValues },
+    });
+    return withCatalogPage(patched, pageKey, pageValues);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const catalogUnsupported =
+      isRejectedCatalog(err) ||
+      isMissingSettingsPage(err) ||
+      /400|rejected this request/i.test(msg);
+    if (!catalogUnsupported) throw err;
+    if (firstClassKeys.length) {
+      try {
+        const patched = await patchCrmWorkspaceSettings(firstClass);
+        return withCatalogPage(patched, pageKey, pageValues);
+      } catch {
+        /* First-class patch may also be empty or rejected. */
+      }
+    }
+    const current = await tryCrmSettings(() => getCrmWorkspaceSettings());
+    return withCatalogPage(current ?? {}, pageKey, pageValues);
+  }
 }
 
 export function smtpFromWorkspaceSettings(

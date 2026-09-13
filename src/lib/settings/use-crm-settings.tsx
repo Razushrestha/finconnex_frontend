@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import {
+  getCrmSettingsCatalog,
   getCrmWorkspaceCapabilities,
   getCrmWorkspaceSettings,
   getCrmSecuritySettings,
@@ -54,15 +55,25 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
     setError(null);
 
     void (async () => {
-      const [ws, sec, caps] = await Promise.allSettled([
+      const [ws, sec, caps, pages] = await Promise.allSettled([
         getCrmWorkspaceSettings(),
         getCrmSecuritySettings(),
         getCrmWorkspaceCapabilities(),
+        getCrmSettingsCatalog(),
       ]);
       if (cancelled) return;
 
       if (ws.status === "fulfilled") {
-        setSettings(ws.value);
+        const fromPages =
+          pages.status === "fulfilled" ? pages.value.catalog : null;
+        setSettings(
+          fromPages
+            ? {
+                ...ws.value,
+                catalog: { ...fromPages, ...(ws.value.catalog ?? {}) },
+              }
+            : ws.value,
+        );
         setSource("api");
       } else {
         setSettings(null);

@@ -25,6 +25,7 @@ import {
   settingsPath,
   smtpIdempotencyKey,
   flagsFromCapabilities,
+  valuesToSettingsPatch,
 } from "@/lib/settings/api";
 import {
   installSmokePolyfill,
@@ -76,6 +77,7 @@ export function smokeSettingsWiring() {
     "getCrmSettingsCatalog",
     "getCrmSettingsPage",
     "putCrmSettingsPage",
+    "saveCrmSettingsFormPage",
   ]) {
     if (!api.includes(`export async function ${name}`)) {
       fail(`settings client missing ${name}`);
@@ -113,8 +115,8 @@ export function smokeSettingsWiring() {
   if (!form.includes("overlaySecurityValues")) {
     fail("SettingsFormClient does not overlay GET /settings/security");
   }
-  if (!form.includes("catalog:")) {
-    fail("SettingsFormClient does not PATCH catalog pages");
+  if (!form.includes("saveCrmSettingsFormPage")) {
+    fail("SettingsFormClient does not save hub pages through the catalog API");
   }
 
   const smtp = readSrc("src/components/settings/SmtpSettingsClient.tsx");
@@ -231,6 +233,13 @@ export function smokeSettingsWiring() {
   );
   if (cataloged.companyName !== "Acme Brokers") {
     fail("overlayCatalogValues did not apply catalog page values");
+  }
+  const logoPatch = valuesToSettingsPatch({
+    companyName: "Acme Brokers",
+    logo: "office.png",
+  });
+  if ("logoKey" in logoPatch) {
+    fail("valuesToSettingsPatch must not send a filename as logoKey");
   }
 
   const security = normalizeCrmSecuritySettings({

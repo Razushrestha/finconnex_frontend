@@ -11,7 +11,7 @@ export default function SettingsLayout({
 }) {
   return (
     <SettingsCrmProvider>
-      <div className="relative min-h-full bg-slate-50 pb-10">
+      <div className="relative min-h-full bg-slate-50 pb-16">
       <div className="relative border-b border-slate-200 bg-white">
         <div className="mx-auto flex w-full max-w-[1920px] items-center justify-between gap-3 px-4 py-3 sm:px-6 2xl:px-8">
           <div>

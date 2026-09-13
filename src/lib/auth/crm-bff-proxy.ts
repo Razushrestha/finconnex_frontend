@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import {
   applyCrmTokenCookies,
+  decodeJwtPayload,
   resolveLiveCrmAuth,
 } from "@/lib/auth/crm-server";
 import { sessionRememberMe } from "@/lib/auth/constants";
@@ -11,6 +12,18 @@ import {
   pickCallPhone,
   twilioVoiceFromNextEnv,
 } from "@/lib/calls/twilio-voice-fallback";
+import {
+  catalogFromPatchBody,
+  mergeFallbackCatalog,
+  pagePayload,
+  pageValuesFromPutBody,
+  pagesListPayload,
+  readFallbackCatalog,
+  settingsProxyKind,
+  stripCatalogFromPatchBody,
+  withCatalogOnSettings,
+  writeFallbackPage,
+} from "@/lib/settings/catalog-fallback";
 import {
   isStorageUnconfigured,
   saveLocalUpload,
@@ -230,6 +243,101 @@ export async function proxyCrmV1(
           err instanceof Error ? err.message : "Twilio Voice fallback failed.";
         text = JSON.stringify({ message });
         status = 502;
+      }
+    }
+  }
+
+  const settingsKind = settingsProxyKind(path);
+  const workspaceId = auth?.accessToken
+    ? (() => {
+        const id = decodeJwtPayload(auth.accessToken)?.workspaceId;
+        return typeof id === "string" && id ? id : null;
+      })()
+    : null;
+
+  if (settingsKind && workspaceId && auth) {
+    const localCatalog = await readFallbackCatalog(workspaceId);
+
+    if (settingsKind.kind === "root" && method === "GET" && status < 400) {
+      text = withCatalogOnSettings(text, localCatalog);
+    }
+
+    if (settingsKind.kind === "root" && method === "PATCH") {
+      const incoming = catalogFromPatchBody(
+        typeof body === "string" ? body : undefined,
+      );
+      if (Object.keys(incoming).length) {
+        await mergeFallbackCatalog(workspaceId, incoming);
+      }
+      if (status >= 400 && Object.keys(incoming).length) {
+        const stripped = stripCatalogFromPatchBody(
+          typeof body === "string" ? body : undefined,
+        );
+        const retry = await fetch(`${base}/v1/settings`, {
+          method: "PATCH",
+          headers,
+          body: stripped,
+        });
+        const retryText = await retry.text();
+        const merged = await readFallbackCatalog(workspaceId);
+        if (retry.ok) {
+          status = retry.status;
+          text = withCatalogOnSettings(retryText, merged);
+        } else {
+          const fresh = await fetch(`${base}/v1/settings`, {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              Authorization: headers.Authorization,
+            },
+          });
+          text = withCatalogOnSettings(await fresh.text(), merged);
+          status = 200;
+        }
+      } else if (status < 400) {
+        text = withCatalogOnSettings(
+          text,
+          await readFallbackCatalog(workspaceId),
+        );
+      }
+    }
+
+    if (settingsKind.kind === "pages" && method === "GET") {
+      const merged = await readFallbackCatalog(workspaceId);
+      if (status >= 400) {
+        text = pagesListPayload(merged);
+        status = 200;
+      } else {
+        text = withCatalogOnSettings(text, merged);
+      }
+    }
+
+    if (settingsKind.kind === "page") {
+      const pageKey = `${settingsKind.category}/${settingsKind.subpage}`;
+      if (method === "GET") {
+        const merged = await readFallbackCatalog(workspaceId);
+        if (status >= 400) {
+          text = pagePayload(pageKey, merged[pageKey] ?? {});
+          status = 200;
+        }
+      }
+      if (method === "PUT" && status >= 400) {
+        const values = pageValuesFromPutBody(
+          typeof body === "string" ? body : undefined,
+        );
+        const merged = await writeFallbackPage(workspaceId, pageKey, values);
+        const fresh = await fetch(`${base}/v1/settings`, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            Authorization: headers.Authorization,
+          },
+        });
+        text = withCatalogOnSettings(await fresh.text(), merged, {
+          key: pageKey,
+          values,
+        });
+        status = 200;
       }
     }
   }
