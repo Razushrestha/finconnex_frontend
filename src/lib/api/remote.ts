@@ -24,6 +24,7 @@ import {
 import type { Page } from "@/lib/api/types";
 import type { AuditEvent } from "@/lib/rules";
 import type { SessionPayload } from "@/lib/auth/types";
+import { adoptCrmWorkspaceClient } from "@/lib/auth/adopt-workspace-client";
 
 async function wrap<T>(fn: () => Promise<T>) {
   try {
@@ -106,6 +107,7 @@ const auth: AuthApi = {
         body: JSON.stringify({ workspaceId }),
       });
       if (!res.ok) throw new Error("Could not select workspace");
+      await adoptCrmWorkspaceClient(workspaceId);
       return { workspaceId };
     }),
   forgotPassword: (email) =>

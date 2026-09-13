@@ -13,6 +13,7 @@ import {
   resolveWorkspaceBrand,
   workspaceBrandCssVars,
 } from "@/lib/settings/brand";
+import { getTenantContext, setTenantContext } from "@/lib/persistence/tenant";
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -28,6 +29,12 @@ export function DashboardShell({ children, session }: DashboardShellProps) {
 }
 
 function DashboardShellInner({ children, session }: DashboardShellProps) {
+  if (
+    session.tenantId &&
+    getTenantContext().tenantId !== session.tenantId
+  ) {
+    setTenantContext({ tenantId: session.tenantId });
+  }
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);

@@ -1,4 +1,5 @@
 import { getUserTabs, type WorkQueueUserTab } from "@/lib/work-queue/live";
+import { tenantOverlayKey } from "@/lib/persistence/tenant";
 
 const STORAGE_KEY = "finconnex.work-queue.person-tabs";
 
@@ -18,7 +19,7 @@ function defaultState(): TabState {
 function readStored(): TabState | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
+    const raw = sessionStorage.getItem(tenantOverlayKey(STORAGE_KEY));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<TabState>;
     if (!Array.isArray(parsed.tabs)) return null;
@@ -38,7 +39,7 @@ function persist() {
   if (typeof window === "undefined") return;
   try {
     sessionStorage.setItem(
-      STORAGE_KEY,
+      tenantOverlayKey(STORAGE_KEY),
       JSON.stringify({
         tabs: state.tabs,
         scope: state.scope,

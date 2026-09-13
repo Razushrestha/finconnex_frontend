@@ -18,6 +18,7 @@ import { createBoardStore } from "@/lib/rules/module-store";
 import { formatRulesAt, newRulesId } from "@/lib/rules/storage";
 import { emitLeadActivityChange } from "@/lib/leads/lead-extras-store";
 import { parseTaskDueDate } from "@/lib/dashboard/layout";
+import { tenantOverlayKey } from "@/lib/persistence/tenant";
 import { stopPendingReminders } from "@/lib/tasks/reminder-series";
 import { isAssignedToCurrentUser } from "@/lib/activities/assigned-to-me";
 import { getRulesActor } from "@/lib/rules/actor";
@@ -84,7 +85,7 @@ function hasUserCalls(cols: CallColumn[]) {
 function readCallsBackup(): CallColumn[] | null {
   if (typeof localStorage === "undefined") return null;
   try {
-    const raw = localStorage.getItem(CALLS_BOARD_BACKUP);
+    const raw = localStorage.getItem(tenantOverlayKey(CALLS_BOARD_BACKUP));
     if (!raw) return null;
     const backup = normalize(JSON.parse(raw) as CallColumn[]);
     return hasUserCalls(backup) ? backup : null;
@@ -97,7 +98,10 @@ function writeCallsBackup(cols: CallColumn[]) {
   if (typeof localStorage === "undefined") return;
   try {
     if (hasUserCalls(cols)) {
-      localStorage.setItem(CALLS_BOARD_BACKUP, JSON.stringify(cols));
+      localStorage.setItem(
+        tenantOverlayKey(CALLS_BOARD_BACKUP),
+        JSON.stringify(cols),
+      );
     }
   } catch {
     /* ignore */

@@ -14,10 +14,12 @@ import {
 import {
   activateWorkspace,
   applyCrmTokenCookies,
+  crmListMyWorkspaces,
   crmLogin,
   CrmAuthError,
   sessionFromCrmUser,
 } from "@/lib/auth/crm-server";
+import { isPlatformAdminRole } from "@/lib/auth/platform";
 
 function friendlyAuthMessage(raw: string, status?: number) {
   if (status === 502 || status === 503 || status === 504) {
@@ -66,23 +68,47 @@ export async function POST(request: Request) {
 
     const cookieHeader = request.headers.get("cookie") ?? "";
     const clientIp = clientIpFromRequest(request);
-    if (!isIpAllowed(clientIp, cookieHeader)) {
-      return NextResponse.json(
-        {
-          error: `Login blocked by IP allowlist (client ${clientIp || "unknown"})`,
-        },
-        { status: 403 },
-      );
-    }
+    const ipBlocked = !isIpAllowed(clientIp, cookieHeader);
 
     const { email, password, rememberMe } = parsed.data;
 
     try {
       const loggedIn = await crmLogin(email, password);
-      const scoped = await activateWorkspace(
-        loggedIn.accessToken,
-        loggedIn.refreshToken,
-      );
+      const platformAdmin = isPlatformAdminRole(loggedIn.user.globalRole);
+      if (ipBlocked && !platformAdmin) {
+        return NextResponse.json(
+          {
+            error: `Login blocked by IP allowlist (client ${clientIp || "unknown"})`,
+          },
+          { status: 403 },
+        );
+      }
+      const scoped = platformAdmin
+        ? await (async () => {
+            try {
+              const listed = await crmListMyWorkspaces(
+                loggedIn.accessToken,
+                loggedIn.refreshToken,
+              );
+              return {
+                accessToken: listed.accessToken ?? loggedIn.accessToken,
+                refreshToken: listed.refreshToken ?? loggedIn.refreshToken,
+                workspace: null as null,
+                workspaces: listed.workspaces,
+              };
+            } catch {
+              return {
+                accessToken: loggedIn.accessToken,
+                refreshToken: loggedIn.refreshToken,
+                workspace: null,
+                workspaces: [],
+              };
+            }
+          })()
+        : await activateWorkspace(
+            loggedIn.accessToken,
+            loggedIn.refreshToken,
+          );
       const sessionFields = sessionFromCrmUser(
         loggedIn.user,
         scoped.workspace,
@@ -95,7 +121,8 @@ export async function POST(request: Request) {
       const response = NextResponse.json({
         requires2fa: false,
         source: "crm",
-        needsWorkspace: !scoped.workspace,
+        isPlatformAdmin: platformAdmin,
+        needsWorkspace: !scoped.workspace && !platformAdmin,
         user: {
           id: sessionFields.userId,
           email: sessionFields.email,

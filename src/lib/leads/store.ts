@@ -28,6 +28,7 @@ import {
 import { getRulesActor } from "@/lib/rules/actor";
 import { formatRulesAt, newRulesId } from "@/lib/rules/storage";
 import { emitLeadActivityChange } from "@/lib/leads/lead-extras-store";
+import { tenantOverlayKey } from "@/lib/persistence/tenant";
 
 function isUuid(value: string | null | undefined): boolean {
   return (
@@ -75,7 +76,7 @@ function persistIdentityPins() {
   if (typeof sessionStorage === "undefined") return;
   try {
     sessionStorage.setItem(
-      IDENTITY_PINS_KEY,
+      tenantOverlayKey(IDENTITY_PINS_KEY),
       JSON.stringify(Object.fromEntries(identityPins)),
     );
   } catch {
@@ -86,7 +87,7 @@ function persistIdentityPins() {
 function hydrateIdentityPins() {
   if (typeof sessionStorage === "undefined") return;
   try {
-    const raw = sessionStorage.getItem(IDENTITY_PINS_KEY);
+    const raw = sessionStorage.getItem(tenantOverlayKey(IDENTITY_PINS_KEY));
     if (!raw) return;
     const parsed = JSON.parse(raw) as Record<string, LeadIdentityPin>;
     for (const [key, pin] of Object.entries(parsed)) {
@@ -243,7 +244,7 @@ export function listLeadColumns(): KanbanColumn[] {
   if (hasCards) return stored;
   if (typeof localStorage === "undefined") return stored;
   try {
-    const raw = localStorage.getItem(LEADS_BOARD_BACKUP);
+    const raw = localStorage.getItem(tenantOverlayKey(LEADS_BOARD_BACKUP));
     if (!raw) return stored;
     const backup = normalize(JSON.parse(raw) as KanbanColumn[]);
     if (backup.some((col) => col.cards.length > 0)) return backup;
@@ -259,7 +260,10 @@ export function saveLeadColumns(cols: KanbanColumn[]) {
   if (typeof localStorage === "undefined") return;
   try {
     if (next.some((col) => col.cards.length > 0)) {
-      localStorage.setItem(LEADS_BOARD_BACKUP, JSON.stringify(next));
+      localStorage.setItem(
+        tenantOverlayKey(LEADS_BOARD_BACKUP),
+        JSON.stringify(next),
+      );
     }
   } catch {
     /* quota / private mode */
@@ -302,7 +306,7 @@ export function mergeRemoteLeadColumns(remote: KanbanColumn[]): KanbanColumn[] {
     if (remoteIds.has(card.id.trim().toLowerCase())) return false;
     const email = card.email.trim().toLowerCase();
     if (email && remoteEmails.has(email)) return false;
-    if (isUuid(card.id)) return true;
+    if (isUuid(card.id)) return false;
     return /^l-\d{10,}-/.test(card.id);
   });
   if (!extras.length) return remoteNorm;

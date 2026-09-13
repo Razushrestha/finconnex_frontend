@@ -17,9 +17,11 @@
 
 import { fetchAuthBridge } from "@/lib/persistence/auth-bridge";
 
+import { CRM_WORKSPACE_STORAGE_KEY } from "@/lib/persistence/tenant";
+
 const ACCESS_KEY = "fc.crm.accessToken";
 const REFRESH_KEY = "fc.crm.refreshToken";
-const WORKSPACE_KEY = "fc.crm.workspaceId";
+const WORKSPACE_KEY = CRM_WORKSPACE_STORAGE_KEY;
 
 export type CrmSession = {
   baseUrl: string;
@@ -57,7 +59,9 @@ export function persistCrmTokens(input: {
 }) {
   writeStorage(ACCESS_KEY, input.accessToken);
   if (input.refreshToken) writeStorage(REFRESH_KEY, input.refreshToken);
-  if (input.workspaceId) writeStorage(WORKSPACE_KEY, input.workspaceId);
+  const workspaceId =
+    input.workspaceId?.trim() || workspaceIdFromToken(input.accessToken);
+  if (workspaceId) writeStorage(WORKSPACE_KEY, workspaceId);
 }
 
 export function clearCrmTokens() {
@@ -148,13 +152,24 @@ async function fetchServerCrmTokens(): Promise<{
 
 async function resolveAccessToken(): Promise<string | null> {
   const stored = readStorage(ACCESS_KEY);
-  if (stored && !isJwtExpired(stored)) return stored;
+  const preferredWorkspace = readStorage(WORKSPACE_KEY);
+  if (stored && !isJwtExpired(stored)) {
+    const jwtWorkspace = workspaceIdFromToken(stored);
+    if (
+      !preferredWorkspace ||
+      !jwtWorkspace ||
+      jwtWorkspace === preferredWorkspace
+    ) {
+      return stored;
+    }
+  }
 
   const server = await fetchServerCrmTokens();
   if (server.accessToken) {
     persistCrmTokens({
       accessToken: server.accessToken,
       refreshToken: server.refreshToken,
+      workspaceId: workspaceIdFromToken(server.accessToken),
     });
     return server.accessToken;
   }
@@ -181,6 +196,7 @@ async function refreshAccessToken(_baseUrl: string): Promise<string | null> {
       persistCrmTokens({
         accessToken: server.accessToken,
         refreshToken: server.refreshToken,
+        workspaceId: workspaceIdFromToken(server.accessToken),
       });
       if (!isJwtExpired(server.accessToken, 5_000)) return server.accessToken;
     }
@@ -285,49 +301,10 @@ async function resolveWorkspaceId(
   );
   let first = firstWorkspace(mine);
   if (!first?.id) {
-    try {
-      const admin = await crmFetchJson<unknown>(
-        baseUrl,
-        "/v1/admin/workspaces?page=1&limit=50",
-        accessToken,
-      );
-      first = firstWorkspace(admin);
-    } catch {
-      first = null;
-    }
-  }
-  if (!first?.id) {
-    try {
-      const created = await crmFetchJson<unknown>(
-        baseUrl,
-        "/v1/workspaces",
-        accessToken,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            name: "FinConnex",
-            slug: `workspace-${Date.now().toString(36)}`,
-          }),
-        },
-      );
-      first = firstWorkspace(created) ?? idFromUnknown(created);
-    } catch {
-      first = null;
-    }
-  }
-  if (!first?.id) {
     throw new Error("No workspace available for this user");
   }
   const scoped = await selectWorkspace(baseUrl, accessToken, first.id);
   return { workspaceId: first.id, accessToken: scoped };
-}
-
-function idFromUnknown(raw: unknown): { id: string } | null {
-  if (raw && typeof raw === "object" && "id" in raw) {
-    const id = (raw as { id?: unknown }).id;
-    if (typeof id === "string" && id) return { id };
-  }
-  return null;
 }
 
 function firstWorkspace(raw: unknown): { id: string } | null {

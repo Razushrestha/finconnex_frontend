@@ -20,6 +20,7 @@ import {
   type WorkQueueNavId,
   type WorkqueueCategoryDef,
 } from "@/lib/work-queue/config";
+import { tenantOverlayKey } from "@/lib/persistence/tenant";
 import {
   filterQueueRows,
   getActivityNav,
@@ -32,9 +33,18 @@ import {
   type QueueSortField,
   type WorkQueueTimeFilter,
 } from "@/lib/work-queue/live";
+import { completeCrmQueueItem } from "@/lib/work-queue/api";
 import { useCrmWorkQueue } from "@/lib/work-queue/use-crm-work-queue";
-import { mergeWorkQueueTabs, setWorkQueueScope, setWorkQueueTabs, getWorkQueueTabState } from "@/lib/work-queue/tab-store";
-import { setWorkQueueCrmDirectory } from "@/lib/work-queue/people";
+import {
+  mergeWorkQueueTabs,
+  setWorkQueueScope,
+  setWorkQueueTabs,
+} from "@/lib/work-queue/tab-store";
+import {
+  displayNameForWorkQueueId,
+  fetchWorkQueueSelfId,
+  setWorkQueueCrmDirectory,
+} from "@/lib/work-queue/people";
 import {
   listCrmWorkspaceMembers,
   tryCrmWorkspaceMembers,
@@ -58,7 +68,7 @@ const DEFAULT_FILTERS: QueueTableFilters = {
 function readStoredCategories(): WorkqueueCategoryDef[] {
   if (typeof window === "undefined") return cloneCategories();
   try {
-    const raw = sessionStorage.getItem(QUEUE_STORAGE_KEY);
+    const raw = sessionStorage.getItem(tenantOverlayKey(QUEUE_STORAGE_KEY));
     if (!raw) return cloneCategories();
     const parsed = JSON.parse(raw) as WorkqueueCategoryDef[];
     if (!Array.isArray(parsed) || parsed.length === 0) return cloneCategories();
@@ -75,7 +85,8 @@ export function WorkQueueView() {
     React.useState<WorkQueueTimeFilter>("today-overdue");
   const [specificDate, setSpecificDate] = React.useState<Date | null>(null);
   const [nameById, setNameById] = React.useState<Record<string, string>>({});
-  const [activeNav, setActiveNav] = React.useState<WorkQueueNavId>("tasks");
+  const [selfId, setSelfId] = React.useState("");
+  const [activeNav, setActiveNav] = React.useState<WorkQueueNavId>("queue");
   const [page, setPage] = React.useState(1);
   const [tick, setTick] = React.useState(0);
   const [spinning, setSpinning] = React.useState(false);
@@ -98,39 +109,56 @@ export function WorkQueueView() {
     specificDate,
     filters,
     nameById,
+    selfId,
     tick,
   });
 
   React.useEffect(() => {
     setCategories(readStoredCategories());
     mergeWorkQueueTabs(getUserTabs());
-    void tryCrmWorkspaceMembers(() => listCrmWorkspaceMembers()).then(
-      (members) => {
-        if (!members?.length) return;
-        const people = members.map((m) => ({
-          id: m.userId || m.id,
-          name: m.name,
-          role: m.role,
-          email: m.email,
-        }));
-        setWorkQueueCrmDirectory(people);
-        const names: Record<string, string> = {};
-        for (const p of people) names[p.id] = p.name;
-        setNameById(names);
-        const tabs = people.map((p, i) => ({
-          id: p.id,
-          name: p.name,
-          role: p.role || "User",
-          initials: initials(p.name),
-          color: USER_TAB_COLORS[i % USER_TAB_COLORS.length],
-        }));
-        setWorkQueueTabs(tabs);
-        const current = getWorkQueueTabState().scope;
-        if (!tabs.some((t) => t.id === current)) {
-          setWorkQueueScope(tabs[0]?.id ?? "");
-        }
-      },
-    );
+    void (async () => {
+      const meId = await fetchWorkQueueSelfId();
+      if (meId) setSelfId(meId);
+      const members = await tryCrmWorkspaceMembers(() =>
+        listCrmWorkspaceMembers(),
+      );
+      if (!members?.length) {
+        if (meId) setWorkQueueScope(meId);
+        return;
+      }
+      const people = members.map((m) => ({
+        id: m.userId || m.id,
+        name: m.name,
+        role: m.role,
+        email: m.email,
+      }));
+      setWorkQueueCrmDirectory(people);
+      const names: Record<string, string> = {};
+      for (const p of people) names[p.id] = p.name;
+      setNameById(names);
+      const ordered = [...people];
+      if (meId) {
+        ordered.sort((a, b) => Number(b.id === meId) - Number(a.id === meId));
+      }
+      const tabs = ordered.map((p, i) => ({
+        id: p.id,
+        name: p.name,
+        role: p.role || "User",
+        initials: initials(p.name),
+        color: USER_TAB_COLORS[i % USER_TAB_COLORS.length],
+      }));
+      if (meId && !tabs.some((t) => t.id === meId)) {
+        tabs.unshift({
+          id: meId,
+          name: "Me",
+          role: "User",
+          initials: "ME",
+          color: USER_TAB_COLORS[0],
+        });
+      }
+      setWorkQueueTabs(tabs);
+      setWorkQueueScope(meId || tabs[0]?.id || "");
+    })();
   }, []);
 
   React.useEffect(() => {
@@ -150,21 +178,31 @@ export function WorkQueueView() {
     };
   }, []);
 
-  const activityItems = React.useMemo(
-    () => getActivityNav(scope, timeFilter, specificDate ?? undefined),
-    [scope, timeFilter, specificDate, tick],
-  );
+  const activityItems = React.useMemo(() => {
+    const local = getActivityNav(scope, timeFilter, specificDate ?? undefined);
+    if (crm.source !== "api") return local;
+    return local.map((item) => ({
+      ...item,
+      count: crm.counts[item.id] ?? 0,
+    }));
+  }, [scope, timeFilter, specificDate, tick, crm.source, crm.counts]);
 
-  const sidebarCategories = React.useMemo(
-    () =>
-      getWorkqueueSidebar(
-        scope,
-        categories,
-        timeFilter,
-        specificDate ?? undefined,
-      ),
-    [scope, categories, timeFilter, specificDate, tick],
-  );
+  const sidebarCategories = React.useMemo(() => {
+    const cats = getWorkqueueSidebar(
+      scope,
+      categories,
+      timeFilter,
+      specificDate ?? undefined,
+    );
+    if (crm.source !== "api") return cats;
+    return cats.map((cat) => ({
+      ...cat,
+      items: cat.items.map((item) => ({
+        ...item,
+        count: crm.counts[item.id] ?? 0,
+      })),
+    }));
+  }, [scope, categories, timeFilter, specificDate, tick, crm.source, crm.counts]);
 
   const rawRows = React.useMemo(
     () =>
@@ -244,15 +282,21 @@ export function WorkQueueView() {
     router.push(row.href);
   }
 
-  function handleCompleteRow(row: QueueRow) {
-    if (findTaskById(row.id)) {
-      completeTask(row.id);
+  async function handleCompleteRow(row: QueueRow) {
+    try {
+      const message = await completeCrmQueueItem(row);
       refresh();
-      showToast("Marked complete");
-      return;
+      showToast(message);
+    } catch {
+      if (findTaskById(row.id)) {
+        completeTask(row.id);
+        refresh();
+        showToast("Marked complete");
+        return;
+      }
+      showToast("Could not complete from the queue. Opening the record…");
+      router.push(row.href);
     }
-    showToast("Opening record…");
-    router.push(row.href);
   }
 
   function handleAddNote(row: QueueRow) {
@@ -261,7 +305,10 @@ export function WorkQueueView() {
 
   function saveCategories(next: WorkqueueCategoryDef[]) {
     setCategories(next);
-    sessionStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(next));
+    sessionStorage.setItem(
+      tenantOverlayKey(QUEUE_STORAGE_KEY),
+      JSON.stringify(next),
+    );
     setManageOpen(false);
     if (!isActivityNav(activeNav)) {
       const stillVisible = next.some(
@@ -269,7 +316,7 @@ export function WorkQueueView() {
           c.checked && c.items.some((it) => it.checked && it.id === activeNav),
       );
       if (!stillVisible) {
-        setActiveNav("tasks");
+        setActiveNav("queue");
         setPage(1);
       }
     }
@@ -330,7 +377,7 @@ export function WorkQueueView() {
             onRefresh={refresh}
             spinning={spinning || crm.loading}
             source={crm.source}
-            emptyLabel={`No ${title.toLowerCase()} for ${scope || "this user"}.`}
+            emptyLabel={`No ${title.toLowerCase()} for ${displayNameForWorkQueueId(scope) || "you"} in this time range.`}
             filters={filters}
             onFiltersChange={(f) => {
               setFilters(f);

@@ -1,6 +1,7 @@
 /** Client Workqueue mock: category defaults + activity icons */
 
 export type ActivityNavId =
+  | "queue"
   | "tasks"
   | "calls"
   | "meetings"
@@ -36,6 +37,7 @@ export type WorkqueueItemId =
 export type WorkQueueNavId = ActivityNavId | WorkqueueItemId;
 
 export type ActivityIconId =
+  | "inbox"
   | "check-circle"
   | "phone"
   | "calendar"
@@ -62,6 +64,7 @@ export const ACTIVITY_DEFAULT: {
   label: string;
   icon: ActivityIconId;
 }[] = [
+  { id: "queue", label: "My day", icon: "inbox" },
   { id: "tasks", label: "Tasks", icon: "check-circle" },
   { id: "calls", label: "Calls", icon: "phone" },
   { id: "meetings", label: "Meetings", icon: "calendar" },
@@ -170,6 +173,7 @@ export function isActivityNav(id: string): id is ActivityNavId {
 }
 
 export function getActivityTitle(nav: string): string {
+  if (nav === "queue") return "My day";
   const activity = ACTIVITY_DEFAULT.find((a) => a.id === nav);
   if (activity) return activity.label;
   for (const cat of CATEGORIES_DEFAULT) {

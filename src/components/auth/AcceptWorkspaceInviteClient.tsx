@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { adoptCrmWorkspaceClient } from "@/lib/auth/adopt-workspace-client";
 
 function tokenFromLocation() {
   if (typeof window === "undefined") return "";
@@ -57,12 +58,16 @@ export function AcceptWorkspaceInviteClient() {
           error?: string;
           signedIn?: boolean;
           workspaceName?: string | null;
+          workspaceId?: string | null;
         };
         if (cancelled) return;
         if (!response.ok) {
           setStatus("error");
           setMessage(data.error ?? "This invitation could not be accepted.");
           return;
+        }
+        if (data.signedIn) {
+          await adoptCrmWorkspaceClient(data.workspaceId);
         }
         setSignedIn(Boolean(data.signedIn));
         setWorkspaceName(data.workspaceName ?? null);

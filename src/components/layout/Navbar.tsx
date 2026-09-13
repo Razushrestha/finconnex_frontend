@@ -12,6 +12,7 @@ import {
   ChevronDown,
   LogOut,
   Settings,
+  Shield,
   UserRound,
   ExternalLink,
 } from "lucide-react";
@@ -24,6 +25,10 @@ import { SearchModal } from "@/components/layout/SearchModal";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { getModuleTitle } from "@/lib/module-title";
 import { WorkQueuePersonBar } from "@/components/work-queue/WorkQueuePersonBar";
+import {
+  isPlatformAdminRole,
+  platformRoleLabel,
+} from "@/lib/auth/platform";
 
 interface NavbarProps {
   onOpenMobileMenu?: () => void;
@@ -195,7 +200,9 @@ export function Navbar({
                   menuOpen && "rotate-180",
                 )}
               />
-              {user.role}
+              {isPlatformAdminRole(user.role)
+                ? platformRoleLabel(user.role)
+                : user.role}
             </span>
           </div>
           <div className="relative">
@@ -231,9 +238,23 @@ export function Navbar({
                 </p>
               )}
               <p className="mt-1 truncate text-xs text-violet-600 dark:text-violet-400">
-                {tenantLabel} · {user.role}
+                {tenantLabel} ·{" "}
+                {isPlatformAdminRole(user.role)
+                  ? platformRoleLabel(user.role)
+                  : user.role}
               </p>
             </div>
+            {isPlatformAdminRole(user.role) ? (
+              <Link
+                href="/platform"
+                role="menuitem"
+                onClick={() => setMenuOpen(false)}
+                className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-foreground hover:bg-muted"
+              >
+                <Shield className="h-4 w-4 text-muted-foreground" />
+                Platform console
+              </Link>
+            ) : null}
             <Link
               href="/settings/my-preferences"
               role="menuitem"

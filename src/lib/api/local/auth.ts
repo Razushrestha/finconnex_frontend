@@ -3,6 +3,7 @@
 import type { AuthApi } from "@/lib/api/contracts";
 import { apiFail, apiOk, ApiError, toApiError } from "@/lib/api/errors";
 import type { SessionPayload } from "@/lib/auth/types";
+import { adoptCrmWorkspaceClient } from "@/lib/auth/adopt-workspace-client";
 
 export const localAuthApi: AuthApi = {
   async login(input) {
@@ -259,6 +260,7 @@ export const localAuthApi: AuthApi = {
           }),
         );
       }
+      await adoptCrmWorkspaceClient(workspaceId);
       return apiOk({ workspaceId });
     } catch (e) {
       return apiFail(toApiError(e));

@@ -41,6 +41,7 @@ import {
   stopPendingReminders,
 } from "@/lib/tasks/reminder-series";
 import { parseTaskDueDate } from "@/lib/dashboard/layout";
+import { tenantOverlayKey } from "@/lib/persistence/tenant";
 
 function taskLeadLabel(task: Task) {
   return task.relatedTo?.kind === "Lead" ? task.relatedTo.name : task.title;
@@ -179,7 +180,7 @@ function hasUserTasks(cols: TaskColumn[]) {
 function readTasksBackup(): TaskColumn[] | null {
   if (typeof localStorage === "undefined") return null;
   try {
-    const raw = localStorage.getItem(TASKS_BOARD_BACKUP);
+    const raw = localStorage.getItem(tenantOverlayKey(TASKS_BOARD_BACKUP));
     if (!raw) return null;
     const backup = normalize(JSON.parse(raw) as TaskColumn[]);
     return hasUserTasks(backup) ? backup : null;
@@ -192,7 +193,10 @@ function writeTasksBackup(cols: TaskColumn[]) {
   if (typeof localStorage === "undefined") return;
   try {
     if (hasUserTasks(cols)) {
-      localStorage.setItem(TASKS_BOARD_BACKUP, JSON.stringify(cols));
+      localStorage.setItem(
+        tenantOverlayKey(TASKS_BOARD_BACKUP),
+        JSON.stringify(cols),
+      );
     }
   } catch {
     /* quota / private mode */

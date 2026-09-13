@@ -7,7 +7,7 @@ import {
   isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmWorkspaceFetch } from "@/lib/crm/request";
 import type { ActivityNavId } from "@/lib/work-queue/config";
 import {
   dueColorForLabel,
@@ -83,6 +83,7 @@ export type CrmWorkQueueQuery = {
 export type CrmWorkQueuePage = {
   items: QueueRow[];
   total: number;
+  all?: QueueRow[];
 };
 
 export function workspaceWorkQueuePath(workspaceId: string, query = ""): string {
@@ -260,9 +261,20 @@ export function rangeForTimeFilter(
   return {};
 }
 
+const URGENCY_RANK: Record<CrmWorkQueueUrgency, number> = {
+  FAILED: 0,
+  OVERDUE: 1,
+  DUE_NOW: 2,
+  MENTIONED: 3,
+  UPCOMING: 4,
+  UNREAD: 5,
+  NORMAL: 6,
+};
+
 export function navToWorkQueueTypes(
   nav: string,
-): CrmWorkQueueItemType[] | null {
+): CrmWorkQueueItemType[] | "all" | null {
+  if (nav === "queue") return "all";
   if (nav === "tasks") return ["TASK"];
   if (nav === "calls") return ["CALL"];
   if (nav === "meetings") return ["MEETING", "CALENDLY_ALERT"];
@@ -354,6 +366,7 @@ export function normalizeCrmWorkQueueItem(
   const dueLabel = dueLabelForItem(item, now);
   const due = dueAt ? new Date(dueAt) : null;
   const dueMs = due && !Number.isNaN(due.getTime()) ? due.getTime() : Date.now();
+  const rank = URGENCY_RANK[item.urgency] ?? URGENCY_RANK.NORMAL;
   const ownerName =
     item.assigneeName ||
     (item.assigneeId && nameById?.[item.assigneeId]) ||
@@ -380,7 +393,10 @@ export function normalizeCrmWorkQueueItem(
     lastActivityTime: formatQueueDate(item.lastActivityAt),
     unreadCount: item.unreadCount,
     mentioned: item.mentioned,
-    sortKey: dueMs,
+    itemType: item.type,
+    urgency: item.urgency,
+    sourceId: item.sourceId || item.id,
+    sortKey: rank * 1_000_000_000_000 + dueMs,
     href: hrefFromWorkQueueDeepLink(
       item.deepLink.resource,
       item.deepLink.id,
@@ -450,7 +466,7 @@ export async function listCrmWorkQueue(
       to: query.to,
     }),
   );
-  const data = await crmFetch(session, path);
+  const data = await crmWorkspaceFetch(path);
   const page = extractPage(data);
   const now = new Date();
   return {
@@ -459,6 +475,24 @@ export async function listCrmWorkQueue(
     ),
     total: page.total,
   };
+}
+
+export function filterQueueRowsByNav(
+  rows: QueueRow[],
+  nav: string,
+): QueueRow[] {
+  const types = navToWorkQueueTypes(nav);
+  if (types === "all" || types == null) return rows;
+  const set = new Set(types);
+  return rows.filter((row) => set.has((row.itemType ?? "").toUpperCase() as CrmWorkQueueItemType));
+}
+
+export function countQueueRowsByNav(rows: QueueRow[]): Record<string, number> {
+  const counts: Record<string, number> = { queue: rows.length };
+  for (const nav of ["tasks", "calls", "meetings", "emails", "messages", "reminders"]) {
+    counts[nav] = filterQueueRowsByNav(rows, nav).length;
+  }
+  return counts;
 }
 
 export async function listCrmWorkQueueForNav(
@@ -470,36 +504,56 @@ export async function listCrmWorkQueueForNav(
     status?: string;
     priority?: string;
     nameById?: Record<string, string>;
+    selfId?: string;
   } = {},
 ): Promise<CrmWorkQueuePage> {
   const types = navToWorkQueueTypes(nav);
-  if (!types) return { items: [], total: 0 };
+  if (types == null) return { items: [], total: 0 };
   const range = rangeForTimeFilter(
     opts.timeFilter ?? "today-overdue",
     new Date(),
     opts.specificDate,
   );
-  const pages = await Promise.all(
-    types.map((type) =>
-      listCrmWorkQueue({
-        type,
-        limit: 50,
-        page: 1,
-        status: toWorkQueueApiFilter(opts.status),
-        priority: toWorkQueueApiFilter(opts.priority),
-        assigneeId: assigneeIdFromScope(opts.scope, opts.nameById),
-        from: range.from,
-        to: range.to,
-        nameById: opts.nameById,
-      }),
-    ),
-  );
-  const byId = new Map<string, QueueRow>();
-  for (const page of pages) {
-    for (const row of page.items) byId.set(row.id, row);
+  const selfId = opts.selfId && isUuid(opts.selfId) ? opts.selfId : undefined;
+  const scoped = assigneeIdFromScope(opts.scope, opts.nameById);
+  const assigneeId =
+    scoped && selfId && scoped === selfId ? undefined : scoped;
+  const page = await listCrmWorkQueue({
+    limit: 50,
+    page: 1,
+    from: range.from,
+    to: range.to,
+    assigneeId,
+    nameById: opts.nameById,
+  });
+  const items = types === "all" ? page.items : filterQueueRowsByNav(page.items, nav);
+  return { items, total: items.length, all: page.items };
+}
+
+export async function completeCrmQueueItem(row: QueueRow): Promise<string> {
+  const id = row.sourceId || row.id;
+  const type = (row.itemType ?? "").toUpperCase();
+  if (type === "TASK") {
+    const { completeCrmTask } = await import("@/lib/tasks/api");
+    await completeCrmTask(id);
+    return "Task completed";
   }
-  const items = Array.from(byId.values());
-  return { items, total: items.length };
+  if (type === "CALL") {
+    const { completeCrmCall } = await import("@/lib/calls/api");
+    await completeCrmCall(id, { outcome: "Completed from work queue" });
+    return "Call completed";
+  }
+  if (type === "REMINDER") {
+    const { completeCrmReminder } = await import("@/lib/reminders/api");
+    await completeCrmReminder(id);
+    return "Reminder completed";
+  }
+  if (type === "MEETING") {
+    const { completeCrmMeeting } = await import("@/lib/meetings/api");
+    await completeCrmMeeting(id, { outcome: "Completed from work queue" });
+    return "Meeting completed";
+  }
+  throw new Error("Open this item to finish it — the queue cannot complete that type.");
 }
 
 export async function tryCrmWorkQueue<T>(

@@ -165,14 +165,17 @@ export async function crmWorkspaceFetch<T>(
     ensureCrmSession,
     isBoundCrmSession,
   } = await import("@/lib/activity-timeline/auth");
-  const scoped = await ensureCrmSession();
-  if (scoped && isBoundCrmSession()) {
+  if (isBoundCrmSession()) {
+    const scoped = await ensureCrmSession();
+    if (!scoped) {
+      throw new Error("Sign in to continue");
+    }
     return crmFetch<T>(scoped, path, init);
   }
   if (typeof window !== "undefined") {
     return crmBffFetch<T>(path, init);
   }
-  const session = scoped ?? (await ensureCrmAccess());
+  const session = (await ensureCrmSession()) ?? (await ensureCrmAccess());
   if (!session) {
     throw new Error("Sign in to continue");
   }

@@ -855,10 +855,11 @@ export function WorkQueueTable({
                       type="button"
                       aria-label="Mark complete"
                       title="Mark complete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onCompleteRow?.(row);
-                      }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onCompleteRow?.(row);
+                        }}
                       className="flex h-8 w-8 items-center justify-center"
                     >
                       <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white transition-colors hover:bg-emerald-600">
@@ -873,9 +874,16 @@ export function WorkQueueTable({
                       return (
                         <span
                           key={col.id}
-                          className="truncate pr-3 text-[13.5px] leading-[18px] font-medium text-slate-900"
+                          className="flex min-w-0 items-center gap-2 pr-3"
                         >
-                          {text}
+                          {row.itemType ? (
+                            <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
+                              {row.itemType.replace(/_/g, " ").toLowerCase()}
+                            </span>
+                          ) : null}
+                          <span className="truncate text-[13.5px] leading-[18px] font-medium text-slate-900">
+                            {text}
+                          </span>
                         </span>
                       );
                     }

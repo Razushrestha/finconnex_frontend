@@ -73,9 +73,32 @@ export function smokeWorkQueueWiring() {
   if (!hook.includes('setSource("api")')) {
     fail("work-queue hook must mark a successful empty list as Live CRM");
   }
+  if (hook.includes("if (!activity)")) {
+    fail("work-queue must keep Live CRM when My Leads is selected");
+  }
+  if (!hook.includes("fetchLiveRecordQueues")) {
+    fail("My Leads must load live CRM records, not demo stores");
+  }
 
   if (!navToWorkQueueTypes("tasks")?.includes("TASK")) {
     fail("navToWorkQueueTypes did not map tasks");
+  }
+  if (navToWorkQueueTypes("queue") !== "all") {
+    fail("My day must load the mixed work-queue (omit type)");
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('path[2] === "work-queue"')) {
+    fail("BFF proxy does not allow workspace work-queue");
+  }
+  if (!api.includes("crmWorkspaceFetch")) {
+    fail("work-queue client should use the CRM BFF");
+  }
+  if (!api.includes("completeCrmQueueItem")) {
+    fail("work-queue client missing completeCrmQueueItem");
+  }
+  if (!view.includes('useState<WorkQueueNavId>("queue")')) {
+    fail("WorkQueueView should default to mixed My day queue");
   }
 
   const overdueRange = rangeForTimeFilter(

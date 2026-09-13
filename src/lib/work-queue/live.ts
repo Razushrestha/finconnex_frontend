@@ -81,6 +81,9 @@ export interface QueueRow {
   unreadCount?: number;
   mentioned?: boolean;
   assigneeId?: string;
+  itemType?: string;
+  urgency?: string;
+  sourceId?: string;
   sortKey: number;
   href: string;
 }
@@ -418,6 +421,21 @@ export function listActivityRows(
   specificDate?: Date,
 ): QueueRow[] {
   const rows: QueueRow[] = [];
+  if (kind === "queue") {
+    const merged = (
+      [
+        "tasks",
+        "calls",
+        "meetings",
+        "emails",
+        "messages",
+        "reminders",
+      ] as const
+    ).flatMap((item) =>
+      listActivityRows(item, scope, timeFilter, now, specificDate),
+    );
+    return merged.sort((a, b) => a.sortKey - b.sortKey);
+  }
   const stamp = (
     extras?: QueueRowExtras & { requireDue?: boolean },
   ): { requireDue?: boolean; specificDate?: Date } & QueueRowExtras => ({

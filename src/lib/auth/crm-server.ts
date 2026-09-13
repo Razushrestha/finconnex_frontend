@@ -12,6 +12,7 @@ import {
   SESSION_MAX_AGE,
 } from "@/lib/auth/constants";
 import type { SessionPayload } from "@/lib/auth/types";
+import { isPlatformAdminRole } from "@/lib/auth/platform";
 
 export type CrmUser = {
   id: string;
@@ -601,33 +602,27 @@ export async function activateWorkspace(
   const listed = await crmListMyWorkspaces(accessToken, refreshToken);
   accessToken = listed.accessToken ?? accessToken;
   refreshToken = listed.refreshToken ?? refreshToken;
-  let workspaces = listed.workspaces;
+  const workspaces = listed.workspaces;
 
-  if (!workspaces.length) {
-    try {
-      const admin = await crmListAdminWorkspaces(accessToken, refreshToken);
-      accessToken = admin.accessToken ?? accessToken;
-      refreshToken = admin.refreshToken ?? refreshToken;
-      workspaces = admin.workspaces;
-    } catch {
-      /* non-admin or route unavailable */
-    }
-  }
+  // Memberships only. Platform ADMIN must not be auto-dropped into the first
+  // tenant from GET /v1/admin/workspaces — they pick a workspace in /platform.
 
-  // Deliberately no longer auto-creates a workspace here (used to silently
-  // create one named "FinConnex" for any workspace-less login). Workspace
-  // creation is now always a deliberate, user-named step via the
-  // /create-workspace onboarding screen — see `needsWorkspace` handling in
-  // the login route.
+  const jwtRole = decodeJwtPayload(accessToken)?.globalRole;
+  const skipAutoSelect = isPlatformAdminRole(
+    typeof jwtRole === "string" ? jwtRole : "",
+  );
 
   const envId =
     preferredId?.trim() ||
-    process.env.CRM_WORKSPACE_ID?.trim() ||
-    process.env.NEXT_PUBLIC_WORKSPACE_ID?.trim() ||
-    "";
+    (skipAutoSelect
+      ? ""
+      : process.env.CRM_WORKSPACE_ID?.trim() ||
+        process.env.NEXT_PUBLIC_WORKSPACE_ID?.trim() ||
+        "");
 
-  const chosen =
-    workspaces.find((w) => w.id === envId) ?? workspaces[0] ?? null;
+  const chosen = skipAutoSelect
+    ? (workspaces.find((w) => w.id === preferredId?.trim()) ?? null)
+    : (workspaces.find((w) => w.id === envId) ?? workspaces[0] ?? null);
 
   if (!chosen) {
     return { accessToken, refreshToken, workspace: null, workspaces };

@@ -23,6 +23,7 @@ import {
   Gauge,
   Handshake,
   Hourglass,
+  Inbox,
   List,
   Mail,
   MessageSquare,
@@ -58,6 +59,7 @@ const iconMap: Record<
   ActivityIconId,
   ComponentType<{ className?: string; strokeWidth?: number }>
 > = {
+  "inbox": Inbox,
   "check-circle": CheckCircle2,
   phone: Phone,
   calendar: CalendarDays,
@@ -270,10 +272,10 @@ export function WorkQueueSidebar({
 
   return (
     <div className="relative flex">
-      <aside className="w-full shrink-0 overflow-y-auto border-b border-[var(--wq-line)] bg-white px-3 py-3 sm:px-4 lg:w-[248px] lg:border-r lg:border-b-0">
-        <div className="mb-3 flex items-center justify-between border-b border-[var(--wq-line)] pb-2">
+      <aside className="flex w-full shrink-0 flex-col overflow-hidden border-b border-[var(--wq-line)] bg-white px-3 py-3 sm:px-4 lg:h-full lg:w-[248px] lg:border-r lg:border-b-0">
+        <div className="mb-3 flex shrink-0 items-center justify-between border-b border-[var(--wq-line)] pb-2">
           <h2 className="text-[11px] font-semibold tracking-[0.08em] text-slate-400 uppercase">
-            Open activity
+            Today's work
           </h2>
           <button
             type="button"
@@ -357,6 +359,7 @@ export function WorkQueueSidebar({
           })}
         </nav>
 
+        <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mb-2.5 flex items-center justify-between border-b border-[var(--wq-line)] pb-2">
           <h2 className="text-[11px] font-semibold tracking-[0.08em] text-slate-400 uppercase">
             My queues
@@ -435,6 +438,7 @@ export function WorkQueueSidebar({
             </div>
             );
           })}
+        </div>
         </div>
       </aside>
 

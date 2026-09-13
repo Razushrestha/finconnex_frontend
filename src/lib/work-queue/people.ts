@@ -20,7 +20,21 @@ export function displayNameForWorkQueueId(id: string): string {
   if (!id) return "";
   const hit = crmDirectory.find((p) => p.id === id);
   if (hit) return hit.name;
+  if (isUuid(id)) return "this teammate";
   return id;
+}
+
+export async function fetchWorkQueueSelfId(): Promise<string | null> {
+  try {
+    const res = await fetch("/api/auth/me", { credentials: "same-origin" });
+    const json = (await res.json().catch(() => ({}))) as {
+      user?: { id?: string };
+    };
+    const id = json.user?.id?.trim();
+    return id && isUuid(id) ? id : null;
+  } catch {
+    return null;
+  }
 }
 
 export function assigneeIdForScope(scope: string | undefined): string | undefined {

@@ -1,5 +1,5 @@
-import { ensureCrmAccess } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmWorkspaceFetch } from "@/lib/crm/request";
+import { adoptCrmWorkspaceClient } from "@/lib/auth/adopt-workspace-client";
 
 export type AdminWorkspace = {
   id: string;
@@ -65,18 +65,12 @@ export async function listAdminWorkspaces(
     search?: string;
   } = {},
 ): Promise<AdminWorkspacePage> {
-  const auth = await ensureCrmAccess();
-  if (!auth) {
-    throw new Error("Sign in to load workspaces");
-  }
-
   const params = new URLSearchParams();
   params.set("page", String(query.page ?? 1));
   params.set("limit", String(query.limit ?? 20));
   if (query.search?.trim()) params.set("search", query.search.trim());
 
-  const data = await crmFetch<unknown>(
-    auth,
+  const data = await crmWorkspaceFetch<unknown>(
     `/v1/admin/workspaces?${params.toString()}`,
   );
   const items = asWorkspaces(data);
@@ -89,9 +83,29 @@ export async function listAdminWorkspaces(
 }
 
 export async function deleteAdminUser(id: string): Promise<void> {
-  const auth = await ensureCrmAccess();
-  if (!auth) {
-    throw new Error("Sign in to delete this user");
+  await crmWorkspaceFetch<unknown>(`/v1/admin/user/${id}`, {
+    method: "DELETE",
+  });
+}
+
+export async function enterWorkspace(input: {
+  id: string;
+  name?: string;
+  slug?: string;
+}): Promise<void> {
+  const res = await fetch("/api/auth/workspace", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      workspaceId: input.id,
+      name: input.name,
+      slug: input.slug,
+    }),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) {
+    throw new Error(data.error ?? "Could not enter this workspace");
   }
-  await crmFetch<unknown>(auth, `/v1/admin/user/${id}`, { method: "DELETE" });
+  await adoptCrmWorkspaceClient(input.id);
 }

@@ -78,6 +78,8 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => ({}))) as {
     workspaceId?: string;
+    name?: string;
+    slug?: string;
   };
   const workspaceId = body.workspaceId?.trim();
   if (!workspaceId) {
@@ -97,10 +99,11 @@ export async function POST(request: Request) {
       tokens.accessToken,
       tokens.refreshToken,
     );
-    const workspace = listed.workspaces.find((w) => w.id === workspaceId) ?? {
+    const fromMine = listed.workspaces.find((w) => w.id === workspaceId);
+    const workspace = fromMine ?? {
       id: workspaceId,
-      slug: session.tenantSlug,
-      name: session.tenantName,
+      slug: body.slug?.trim() || session.tenantSlug || "workspace",
+      name: body.name?.trim() || session.tenantName || "Workspace",
     };
 
     const response = NextResponse.json({

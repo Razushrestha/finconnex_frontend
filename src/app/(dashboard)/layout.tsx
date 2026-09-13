@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { DashboardShell } from "@/components/layout/DashboardShell";
+import { isPlatformAdminRole } from "@/lib/auth/platform";
 
 export default async function DashboardLayout({
   children,
@@ -16,6 +17,9 @@ export default async function DashboardLayout({
 
   // Authenticated but no real workspace yet (fresh signup) → onboarding
   if (session.hasWorkspace === false) {
+    if (isPlatformAdminRole(session.role)) {
+      redirect("/platform");
+    }
     redirect("/create-workspace");
   }
 

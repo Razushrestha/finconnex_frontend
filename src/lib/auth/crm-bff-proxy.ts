@@ -6,6 +6,7 @@ import {
   resolveLiveCrmAuth,
 } from "@/lib/auth/crm-server";
 import { sessionRememberMe } from "@/lib/auth/constants";
+import { isPlatformAdminRole } from "@/lib/auth/platform";
 import {
   createTwilioVoiceCall,
   parseDialPath,
@@ -67,6 +68,7 @@ const ALLOWED_ROOTS = new Set([
   "automation-runs",
   "notification-preferences",
   "notifications",
+  "admin",
 ]);
 
 function crmBaseUrl(): string | null {
@@ -103,7 +105,14 @@ function isAllowed(path: string[]): boolean {
       path[2] === "members" ||
       path[2] === "members-summary" ||
       path[2] === "members-admin" ||
-      path[2] === "ownership-transfer"
+      path[2] === "ownership-transfer" ||
+      path[2] === "work-queue"
+    );
+  }
+  if (root === "admin") {
+    return (
+      (path[1] === "workspaces" && path.length === 2) ||
+      (path[1] === "user" && path.length === 3)
     );
   }
   if (!ALLOWED_ROOTS.has(root)) return false;
@@ -140,6 +149,12 @@ export async function proxyCrmV1(
       return NextResponse.json(
         { message: "Sign in to continue" },
         { status: 401 },
+      );
+    }
+    if (path[0] === "admin" && !isPlatformAdminRole(session.role)) {
+      return NextResponse.json(
+        { message: "Platform admin access required" },
+        { status: 403 },
       );
     }
     auth = await resolveLiveCrmAuth();

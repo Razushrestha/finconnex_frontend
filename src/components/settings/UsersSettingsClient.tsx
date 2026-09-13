@@ -18,8 +18,6 @@ import {
   UserRound,
   Users,
 } from "lucide-react";
-import { deleteAdminUser } from "@/lib/admin/api";
-import { isUuid } from "@/lib/activity-timeline/auth";
 import {
   createCrmUser,
   deleteCrmUser,
@@ -349,16 +347,8 @@ export function UsersSettingsClient() {
   }
 
   async function removeUser(u: CrmUser) {
-    if (isUuid(u.id)) {
-      try {
-        await deleteAdminUser(u.id);
-      } catch (err) {
-        flash(err instanceof Error ? err.message : "Could not delete user");
-        return;
-      }
-    }
     const removed = deleteCrmUser(u.id);
-    if (removed || isUuid(u.id)) {
+    if (removed) {
       flash("User removed");
       refreshLocal();
       return;

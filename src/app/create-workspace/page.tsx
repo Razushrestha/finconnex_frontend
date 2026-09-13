@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
+import { isPlatformAdminRole } from "@/lib/auth/platform";
 import { CreateWorkspaceForm } from "@/components/onboarding/CreateWorkspaceForm";
 
 export const metadata: Metadata = {
@@ -12,6 +13,9 @@ export default async function CreateWorkspacePage() {
   const session = await getSession();
   if (!session) {
     redirect("/login");
+  }
+  if (isPlatformAdminRole(session.role)) {
+    redirect("/platform");
   }
   // Already scoped to a real workspace — nothing to onboard.
   if (session.hasWorkspace !== false) {

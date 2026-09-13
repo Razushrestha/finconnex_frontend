@@ -4,6 +4,7 @@ import * as React from "react";
 import { Loader2, Building2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { adoptCrmWorkspaceClient } from "@/lib/auth/adopt-workspace-client";
 
 function slugify(value: string): string {
   return value
@@ -59,6 +60,8 @@ export function CreateWorkspaceForm() {
         return;
       }
 
+      const created = data as { workspace?: { id?: string } };
+      await adoptCrmWorkspaceClient(created.workspace?.id);
       window.location.href = "/";
     } catch {
       setError("Network error. Check your connection and try again.");

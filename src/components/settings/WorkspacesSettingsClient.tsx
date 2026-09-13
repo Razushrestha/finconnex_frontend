@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import {
   listAdminWorkspaces,
   type AdminWorkspace,
@@ -179,6 +180,15 @@ export function WorkspacesSettingsClient() {
 
   return (
     <div className="space-y-4">
+      <Link
+        href="/platform/workspaces"
+        className="flex items-center justify-between rounded-2xl border border-[#5A32A3]/15 bg-white px-5 py-3 text-sm shadow-sm"
+      >
+        <span className="text-slate-600">
+          Platform directory of every tenant lives in the console.
+        </span>
+        <span className="font-semibold text-[#5A32A3]">Open console</span>
+      </Link>
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
         <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-4">
           <div className="flex flex-wrap items-center gap-2">

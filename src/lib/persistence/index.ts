@@ -8,6 +8,8 @@ export {
   getTenantContext,
   setTenantContext,
   tenantScopedKey,
+  tenantOverlayKey,
+  CRM_WORKSPACE_STORAGE_KEY,
 } from "@/lib/persistence/tenant";
 export { createSessionDriver } from "@/lib/persistence/session-driver";
 export { createApiDriver } from "@/lib/persistence/api-driver";
