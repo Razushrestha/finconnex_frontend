@@ -42,6 +42,8 @@ import { entityNoun } from "@/lib/automations/trigger-scope";
 
 import { supportsRecordPicker } from "@/lib/automations/record-search";
 
+import { FieldsEditor } from "./FieldsEditor";
+import { MemberSelect } from "./MemberSelect";
 import { RecordField } from "./RecordField";
 import { ActionItemsField } from "./ActionItemsField";
 import {
@@ -81,42 +83,6 @@ function useMembers() {
   return { members, status };
 }
 
-function MemberSelect({
-  value,
-  onChange,
-  members,
-  membersStatus,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  members: WorkspaceMember[];
-  membersStatus: "loading" | "ready" | "error";
-}) {
-  const placeholder =
-    membersStatus === "loading"
-      ? "Loading teammates..."
-      : membersStatus === "error"
-        ? "Couldn't load teammates"
-        : "Select a teammate...";
-  return (
-    <Select
-      items={members.map((m) => ({ label: m.name || m.email, value: m.userId }))}
-      value={value || null}
-      onValueChange={(v) => v && onChange(v)}
-    >
-      <SelectTrigger className="h-9 w-full text-sm">
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {members.map((m) => (
-          <SelectItem key={m.userId} value={m.userId}>
-            {m.name || m.email}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
 
 /** The config keys SEND_EMAIL renders through its own recipients block. */
 const EMAIL_RECIPIENT_KEYS = ["toEmail", "cc", "bcc"];
@@ -188,7 +154,9 @@ function ActionConfigForm({
           ? "emailTemplate"
           : key === "recordId" && recordTarget
             ? "record"
-            : meta.widget;
+            : key === "fields"
+              ? "fields"
+              : meta.widget;
       const required = keys.required.includes(key);
       const value = config[key];
       return (
@@ -259,6 +227,15 @@ function ActionConfigForm({
               type="datetime-local"
               value={typeof value === "string" ? value.slice(0, 16) : ""}
               onChange={(e) => set(key, e.target.value ? new Date(e.target.value).toISOString() : undefined)}
+            />
+          )}
+          {widget === "fields" && (
+            <FieldsEditor
+              entityType={entityType}
+              value={value}
+              onChange={(next) => set(key, next)}
+              members={members}
+              membersStatus={membersStatus}
             />
           )}
           {widget === "json" && (
