@@ -103,6 +103,7 @@ function DashboardShellInner({ children, session }: DashboardShellProps) {
             user={{
               name: session.name,
               role: session.role,
+              workspaceRole: session.workspaceRole,
               email: session.email,
               tenantName: session.tenantName,
             }}

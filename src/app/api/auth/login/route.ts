@@ -16,6 +16,7 @@ import {
   applyCrmTokenCookies,
   crmListMyWorkspaces,
   crmLogin,
+  crmWorkspaceRole,
   CrmAuthError,
   sessionFromCrmUser,
 } from "@/lib/auth/crm-server";
@@ -109,11 +110,21 @@ export async function POST(request: Request) {
             loggedIn.accessToken,
             loggedIn.refreshToken,
           );
-      const sessionFields = sessionFromCrmUser(
-        loggedIn.user,
-        scoped.workspace,
-        scoped.accessToken,
-      );
+      // The login response predates workspace selection, so it carries no
+      // workspace role. Read it against the now-scoped token, otherwise a
+      // user who owns the workspace they were just dropped into would sit in
+      // the session as their global tier (USER) until the next /api/auth/me.
+      const workspaceRole = scoped.workspace
+        ? await crmWorkspaceRole(scoped.accessToken, scoped.refreshToken)
+        : null;
+      const sessionFields = {
+        ...sessionFromCrmUser(
+          loggedIn.user,
+          scoped.workspace,
+          scoped.accessToken,
+        ),
+        workspaceRole,
+      };
       const token = await createSessionToken(
         { ...sessionFields, rememberMe: Boolean(rememberMe) },
         rememberMe,
@@ -128,6 +139,7 @@ export async function POST(request: Request) {
           email: sessionFields.email,
           name: sessionFields.name,
           role: sessionFields.role,
+          workspaceRole: sessionFields.workspaceRole,
         },
         tenant: {
           id: sessionFields.tenantId,
