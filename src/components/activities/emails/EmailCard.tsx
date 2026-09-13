@@ -1,6 +1,6 @@
 "use client";
 
-import { Mail, Clock } from "lucide-react";
+import { AlertTriangle, Clock, Mail } from "lucide-react";
 import type { Email } from "@/lib/emails/types";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion, cardSubject, entityCardBox } from "@/lib/motion";
@@ -55,6 +55,19 @@ export function EmailCard({
           {email.subject}
         </h4>
       </Link>
+
+      {/*
+        A failed send sits in Drafts alongside mail that was never sent (see
+        emailMatchesFolder), which is the right folder — it can be edited and
+        retried — but with no marker the two are indistinguishable, so a
+        message that failed to send reads as one nobody ever sent.
+      */}
+      {email.status === "Failed" && (
+        <p className="mb-1 flex items-center gap-1 text-[11px] font-medium text-rose-600">
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+          Not sent — delivery failed
+        </p>
+      )}
 
       <p className="mb-1 truncate text-xs text-slate-500">
         To: {email.to.join(", ")}

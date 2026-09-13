@@ -162,9 +162,10 @@ export function visibleActionConfigKeys(
 export const FIELD_META: Record<string, FieldMeta> = {
   fields: {
     label: "Fields to Update",
+    // Rendered by FieldsEditor, which lists the entity's updatable fields.
+    // The stored value is still the same object the executor reads.
     widget: "json",
-    placeholder: '{"status": "QUALIFIED"}',
-    helpText: "JSON object of field names to new values",
+    helpText: "Pick the fields this step should change",
   },
   field: { label: "Field Name", widget: "text", placeholder: "status" },
   value: { label: "New Value", widget: "text" },
