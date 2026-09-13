@@ -148,6 +148,9 @@ export function smokeCompaniesWiring() {
   if (!form.includes("createCrmCompany")) {
     fail("create company form does not POST to CRM");
   }
+  if (api.includes("status: apiStatus(input.status)")) {
+    fail("POST /companies must not send status (Nest CreateCompanyDto forbids it)");
+  }
 
   const kanban = readSrc(
     "src/components/sales/companies/CompaniesKanbanBoard.tsx",

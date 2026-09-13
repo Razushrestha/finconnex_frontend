@@ -12,21 +12,17 @@ import type { EmailImportance, EmailStatus } from "@/lib/emails/types";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
 import {
   applyCrmEmailTemplate,
-  attachCrmEmailObject,
   createCrmEmail,
   persistRemoteEmail,
   sendCrmEmail,
   tryCrmEmail,
 } from "@/lib/emails/api";
+import { attachFilesToCrmEmail, prepareEmailPayload } from "@/lib/emails/attach-files";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { createEmail, deleteEmail, upsertEmail } from "@/lib/emails/store";
 import { takeCompose } from "@/lib/emails/outlook";
-import {
-  editEmailWithPrompt,
-  plainTextToEmailHtml,
-  rewriteEmailWithAi,
-  type EmailTone,
-} from "@/lib/emails/ai-compose";
+import { htmlToPlainText, plainTextToEmailHtml, type EmailTone } from "@/lib/emails/ai-compose";
+import { requestEmailAi } from "@/lib/emails/request-email-ai";
 import { searchEmailTemplates, type EmailTemplate } from "@/lib/emails/templates";
 import {
   appendSignature,
@@ -68,6 +64,7 @@ interface Attachment {
   id: string;
   name: string;
   size: number;
+  file?: File;
 }
 
 function formatBytes(bytes: number) {
@@ -307,6 +304,7 @@ export function CreateEmailForm({
       id: crypto.randomUUID(),
       name: f.name,
       size: f.size,
+      file: f,
     }));
     setForm((prev) => ({
       ...prev,
@@ -399,18 +397,19 @@ export function CreateEmailForm({
         sentDate: local.sentDate,
       }) ?? remote;
       keptId = current.id;
-      for (const file of form.attachments) {
-        const key = (file as { key?: string }).key;
-        if (!key) continue;
-        await tryCrmEmail(() =>
-          attachCrmEmailObject(current.id, {
-            key,
-            name: file.name,
-            mimeType: "application/octet-stream",
-            size: file.size,
-          }),
-        );
-      }
+      const blobs = form.attachments
+        .map((item) => item.file)
+        .filter((item): item is File => item instanceof File);
+      const prepared = await prepareEmailPayload({
+        html: form.body.trim(),
+        files: blobs,
+      });
+      await attachFilesToCrmEmail({
+        emailId: current.id,
+        files: prepared.files,
+        relatedType: form.relatedKind ? form.relatedKind.toUpperCase() : undefined,
+        relatedId: form.relatedId || undefined,
+      });
       if (isUuid(form.template)) {
         persistRemoteEmail(
           await tryCrmEmail(() =>
@@ -421,7 +420,11 @@ export function CreateEmailForm({
       if (status === "Sent" || status === "Scheduled") {
         const sent = await sendCrmEmail(
           current.id,
-          status === "Scheduled" && at ? { scheduledAt: at.toISOString() } : {},
+          {
+            ...(status === "Scheduled" && at ? { scheduledAt: at.toISOString() } : {}),
+            html: prepared.html,
+            files: prepared.files,
+          },
         );
         const unsent =
           !sent || sent.status === "Draft" || sent.status === "Failed";
@@ -495,20 +498,24 @@ export function CreateEmailForm({
     update("body", keepSignatureIfPresent(nextHtml));
   }
 
-  function runAi(build: () => string) {
+  async function runAi(work: () => Promise<string>) {
     setImproving(true);
-    window.setTimeout(() => {
-      applyAiBody(build());
-      setImproving(false);
+    try {
+      applyAiBody(await work());
       setAskOpen(false);
-    }, 280);
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : "Google AI could not write this email.");
+    } finally {
+      setImproving(false);
+    }
   }
 
   const aiRecipient = contactName.includes("@") ? undefined : contactName;
 
   function writeFromPrompt(prompt: string) {
-    runAi(() =>
-      editEmailWithPrompt({
+    void runAi(() =>
+      requestEmailAi({
+        mode: htmlToPlainText(stripAllSignatures(form.body)) ? "edit" : "draft",
         html: stripAllSignatures(form.body),
         prompt,
         recipientName: aiRecipient,
@@ -518,8 +525,9 @@ export function CreateEmailForm({
   }
 
   function rewriteWith(tone: EmailTone, action?: "brief" | "clarity") {
-    runAi(() =>
-      rewriteEmailWithAi({
+    void runAi(() =>
+      requestEmailAi({
+        mode: "rewrite",
         html: stripAllSignatures(form.body),
         tone,
         action,
@@ -542,6 +550,13 @@ export function CreateEmailForm({
   }
 
   function insertImageFile(file: File) {
+    setForm((prev) => ({
+      ...prev,
+      attachments: [
+        ...prev.attachments,
+        { id: crypto.randomUUID(), name: file.name, size: file.size, file },
+      ],
+    }));
     const reader = new FileReader();
     reader.onload = () => {
       const src = String(reader.result ?? "");

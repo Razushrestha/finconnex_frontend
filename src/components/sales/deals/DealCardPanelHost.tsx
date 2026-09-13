@@ -3,9 +3,7 @@
 import { MentionTextarea } from "@/components/shared/MentionTextarea";
 import { useRef, useState } from "react";
 import { Paperclip, X } from "lucide-react";
-import { createAttachment } from "@/lib/attachments/store";
-import type { AttachmentKind } from "@/lib/attachments/types";
-import { getUploadAdapter } from "@/lib/attachments/upload";
+import { attachFileToDeal } from "@/lib/deals/attachments";
 import { createCall } from "@/lib/calls/store";
 import { createMeeting } from "@/lib/meetings/store";
 import { createNote } from "@/lib/notes/store";
@@ -106,14 +104,6 @@ export function DealCardPanelHost({
   );
 }
 
-function guessAttachmentKind(fileName: string): AttachmentKind {
-  const lower = fileName.toLowerCase();
-  if (/\.(png|jpe?g|gif|webp|heic)$/.test(lower)) return "Image";
-  if (/\.(xlsx?|csv)$/.test(lower)) return "Spreadsheet";
-  if (/\.(pdf|docx?|txt)$/.test(lower)) return "Document";
-  return "Other";
-}
-
 function AttachmentForm({
   panel,
   onCancel,
@@ -131,40 +121,22 @@ function AttachmentForm({
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit() {
-    const name = (fileName.trim() || file?.name || "").trim();
-    if (!name) {
-      setError("Choose a file or enter a file name.");
+    if (!file) {
+      setError("Choose a file to upload.");
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      const relatedTo = `Deal: ${panel.dealName}`;
-      const data = file
-        ? await file.arrayBuffer()
-        : `deal-card-upload:${name}`;
-      const uploaded = await getUploadAdapter().upload({
-        fileName: name,
-        data,
-        contentType: file?.type || "application/octet-stream",
-        relatedTo,
+      const saved = await attachFileToDeal({
+        file,
+        fileName: fileName.trim() || file.name,
+        notes,
+        dealId: panel.dealId,
+        dealName: panel.dealName,
+        owner: panel.owner,
       });
-      if (!uploaded.ok) {
-        setError(uploaded.message);
-        return;
-      }
-      createAttachment({
-        fileName: uploaded.fileName,
-        kind: guessAttachmentKind(uploaded.fileName),
-        relatedTo,
-        uploadedBy: panel.owner || "You",
-        notes: notes.trim() || undefined,
-        sizeLabel: uploaded.sizeLabel,
-        storageUrl: uploaded.storageUrl,
-        contentType: uploaded.contentType,
-        byteSize: uploaded.byteSize,
-      });
-      onSuccess(`Attachment added to ${panel.dealName}`);
+      onSuccess(`Attachment added to ${panel.dealName}: ${saved.fileName}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -243,7 +215,7 @@ function AttachmentForm({
         </button>
         <button
           type="button"
-          disabled={busy || (!file && !fileName.trim())}
+          disabled={busy || !file}
           onClick={() => void handleSubmit()}
           className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"
         >

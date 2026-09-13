@@ -4,8 +4,16 @@ type DeliverInput = {
   to: string[];
   subject: string;
   text: string;
+  html?: string;
   cc?: string[];
   bcc?: string[];
+  attachments?: Array<{
+    filename: string;
+    type?: string;
+    content: string;
+    disposition?: "attachment" | "inline";
+    contentId?: string;
+  }>;
 };
 
 function addresses(list?: string[]) {
@@ -46,18 +54,40 @@ export async function sendViaSendGrid(input: DeliverInput): Promise<void> {
   if (cc.length) personalization.cc = cc;
   if (bcc.length) personalization.bcc = bcc;
 
+  const content: Array<{ type: string; value: string }> = [
+    { type: "text/plain", value: text },
+  ];
+  const html = input.html?.trim();
+  if (html) content.push({ type: "text/html", value: html });
+
+  const attachments = (input.attachments ?? [])
+    .filter((row) => row.content && row.filename)
+    .map((row) => {
+      const item: Record<string, string> = {
+        content: row.content,
+        filename: row.filename,
+        type: row.type || "application/octet-stream",
+        disposition: row.disposition || "attachment",
+      };
+      if (row.contentId) item.content_id = row.contentId;
+      return item;
+    });
+
+  const payload: Record<string, unknown> = {
+    personalizations: [personalization],
+    from: { email: fromEmail, name: fromName },
+    subject,
+    content,
+  };
+  if (attachments.length) payload.attachments = attachments;
+
   const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      personalizations: [personalization],
-      from: { email: fromEmail, name: fromName },
-      subject,
-      content: [{ type: "text/plain", value: text }],
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (res.status === 202 || res.status === 200) return;

@@ -1,4 +1,8 @@
 import { persistRemoteEmail, createCrmEmail, sendCrmEmail } from "@/lib/emails/api";
+import {
+  attachFilesToCrmEmail,
+  prepareEmailPayload,
+} from "@/lib/emails/attach-files";
 import type { Email } from "@/lib/emails/types";
 
 function uniqueEmails(list: Array<string | undefined>) {
@@ -23,6 +27,7 @@ export async function sendCrmActivityEmail(input: {
   relatedId?: string;
   relatedTo?: string;
   scheduledAt?: string;
+  files?: File[];
 }): Promise<Email> {
   const to = uniqueEmails(input.to);
   if (!to[0]) {
@@ -33,6 +38,10 @@ export async function sendCrmActivityEmail(input: {
     throw new Error("Subject is required");
   }
   const body = input.body.trim() || subject;
+  const prepared = await prepareEmailPayload({
+    html: body,
+    files: input.files ?? [],
+  });
   const created = await createCrmEmail({
     subject,
     body,
@@ -49,10 +58,17 @@ export async function sendCrmActivityEmail(input: {
   }
   persistRemoteEmail(created);
   try {
-    const sent = await sendCrmEmail(
-      created.id,
-      input.scheduledAt ? { scheduledAt: input.scheduledAt } : {},
-    );
+    await attachFilesToCrmEmail({
+      emailId: created.id,
+      files: prepared.files,
+      relatedType: input.relatedType,
+      relatedId: input.relatedId,
+    });
+    const sent = await sendCrmEmail(created.id, {
+      ...(input.scheduledAt ? { scheduledAt: input.scheduledAt } : {}),
+      html: prepared.html,
+      files: prepared.files,
+    });
     if (!sent || sent.status === "Draft" || sent.status === "Failed") {
       persistRemoteEmail({ ...created, ...(sent ?? {}), status: "Draft" });
       throw new Error("CRM send failed. The message was saved as a draft.");

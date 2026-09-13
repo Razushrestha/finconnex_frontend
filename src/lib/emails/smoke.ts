@@ -217,21 +217,48 @@ export function smokeEmailsWiring() {
   if (!create.includes("createCrmEmail") || !create.includes("sendCrmEmail")) {
     fail("create email form does not call createCrmEmail/sendCrmEmail");
   }
+  if (!create.includes("requestEmailAi")) {
+    fail("create email form does not call requestEmailAi");
+  }
+
+  const assist = readSrc(
+    "src/components/activities/emails/create/EmailAiAssist.tsx",
+  );
+  if (!assist.includes("requestEmailAi")) {
+    fail("compose AI assist does not call requestEmailAi");
+  }
+
+  const geminiRoute = readSrc("src/app/api/ai/email/route.ts");
+  if (!geminiRoute.includes("generateGeminiText") || !geminiRoute.includes("getSession")) {
+    fail("POST /api/ai/email must use Gemini behind a signed-in session");
+  }
   if (!create.includes("loadFromIdentities")) {
     fail("create email form does not load the From mailbox");
   }
-  if (!api.includes("deliverQueuedCrmEmail")) {
-    fail("email send does not deliver through the app SendGrid route");
+  if (!api.includes("attachCrmEmailFile")) {
+    fail("emails client missing attachCrmEmailFile");
+  }
+  const attach = readSrc("src/lib/emails/attach-files.ts");
+  if (!attach.includes("attachFilesToCrmEmail") || !attach.includes("prepareEmailPayload")) {
+    fail("email attach helper missing upload/prepare");
+  }
+  const deliver = readSrc("src/lib/emails/deliver.ts");
+  if (!deliver.includes("/api/auth/mail/deliver") || !deliver.includes("attachments")) {
+    fail("mail deliver must send HTML attachments through SendGrid");
+  }
+  const composeSend = readSrc("src/lib/emails/compose-send.ts");
+  if (!composeSend.includes("files") || !composeSend.includes("attachFilesToCrmEmail")) {
+    fail("activity compose send does not attach files");
   }
   const leadDetail = readSrc("src/components/sales/leads/LeadDetailView.tsx");
-  if (!leadDetail.includes("sendCrmActivityEmail")) {
-    fail("lead detail compose does not call sendCrmActivityEmail");
+  if (!leadDetail.includes("files: values.attachments")) {
+    fail("lead detail compose does not send attachments");
   }
   const dealDetail = readSrc("src/components/sales/deals/DealDetailView.tsx");
   if (!dealDetail.includes("sendCrmActivityEmail")) {
     fail("deal detail compose does not call sendCrmActivityEmail");
   }
-  if (!create.includes("applyCrmEmailTemplate") || !create.includes("attachCrmEmailObject")) {
+  if (!create.includes("applyCrmEmailTemplate") || !create.includes("attachFilesToCrmEmail")) {
     fail("create email form does not call apply-template/attachments");
   }
 

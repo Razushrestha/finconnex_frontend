@@ -166,6 +166,14 @@ export function smokeDealsWiring() {
   if (!kanban.includes("sortDealCards")) {
     fail("kanban board does not apply header sort to stage cards");
   }
+  const host = readSrc("src/components/sales/deals/DealCardPanelHost.tsx");
+  if (!host.includes("attachFileToDeal")) {
+    fail("deal card attachment must persist the file onto the deal");
+  }
+  const detail = readSrc("src/components/sales/deals/DealDetailView.tsx");
+  if (!detail.includes("listCrmDocuments") || !detail.includes("Attachments")) {
+    fail("deal detail must list attachments");
+  }
   const list = readSrc("src/components/sales/deals/DealsListView.tsx");
   if (!list.includes("sortDealCards")) {
     fail("list view does not apply header sort to rows");

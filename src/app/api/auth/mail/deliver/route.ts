@@ -12,6 +12,14 @@ function asList(value: unknown): string[] {
   return [];
 }
 
+type AttachmentIn = {
+  filename?: string;
+  type?: string;
+  content?: string;
+  disposition?: "attachment" | "inline";
+  contentId?: string;
+};
+
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) {
@@ -27,14 +35,28 @@ export async function POST(request: Request) {
       : typeof body.body === "string"
         ? body.body
         : "";
+  const html = typeof body.html === "string" ? body.html : undefined;
+  const attachments = Array.isArray(body.attachments)
+    ? (body.attachments as AttachmentIn[])
+        .filter((row) => row?.content && row?.filename)
+        .map((row) => ({
+          filename: String(row.filename),
+          type: row.type,
+          content: String(row.content),
+          disposition: row.disposition,
+          contentId: row.contentId,
+        }))
+    : undefined;
 
   try {
     await sendViaSendGrid({
       to,
       subject,
       text,
+      html,
       cc: asList(body.cc),
       bcc: asList(body.bcc),
+      attachments,
     });
     return NextResponse.json({ ok: true, delivered: "sendgrid" });
   } catch (error) {

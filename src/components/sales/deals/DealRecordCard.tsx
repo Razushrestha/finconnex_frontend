@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Building2,
   DollarSign,
@@ -18,6 +19,8 @@ import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion, cardSubject, entityCardBox } from "@/lib/motion";
 import Link from "next/link";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
+import { listLocalDealAttachments } from "@/lib/deals/attachments";
+import { onRulesChange } from "@/lib/rules/storage";
 
 export type DealQuickActionKind =
   | "call"
@@ -82,12 +85,27 @@ export function DealRecordCard({
   isSelected = false,
   onSelect,
 }: DealRecordCardProps) {
+  const [attachCount, setAttachCount] = useState(0);
+
+  useEffect(() => {
+    const refresh = () =>
+      setAttachCount(listLocalDealAttachments(deal.id, deal.name).length);
+    refresh();
+    return onRulesChange(refresh);
+  }, [deal.id, deal.name]);
+
   const weighted =
     deal.probability > 0 ? `Weighted ${deal.probability}%` : "Lost";
 
   const actions =
     (deal as DealRecord & { quickActions?: { kind: DealQuickActionKind; badgeCount?: number }[] })
       .quickActions ?? DEFAULT_DEAL_QUICK_ACTIONS;
+
+  const actionsWithCounts = actions.map((action) =>
+    action.kind === "attachment"
+      ? { ...action, badgeCount: attachCount }
+      : action,
+  );
 
   return (
     <div
@@ -169,16 +187,13 @@ export function DealRecordCard({
         role="toolbar"
         aria-label={`Quick actions for ${deal.name}`}
       >
-        {actions.map((action) => {
+        {actionsWithCounts.map((action) => {
           const kind = typeof action === "string" ? action : action.kind;
           const Icon = QUICK_ICONS[kind];
           const label = QUICK_LABELS[kind] || kind;
-          const badge =
-            typeof action !== "string" &&
-            action.badgeCount &&
-            action.badgeCount >= 2
-              ? String(action.badgeCount)
-              : null;
+          const count =
+            typeof action !== "string" ? action.badgeCount ?? 0 : 0;
+          const badge = count >= 1 ? String(count) : null;
 
           if (!Icon) return null;
 

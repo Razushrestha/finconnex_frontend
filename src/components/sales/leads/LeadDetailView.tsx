@@ -389,6 +389,7 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
                 relatedId: card.id,
                 relatedTo: `Lead: ${card.name}`,
                 scheduledAt: values.sendAt,
+                files: values.attachments,
               });
               setIsComposeOpen(false);
               notify(

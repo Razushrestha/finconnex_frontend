@@ -13,6 +13,7 @@ import {
   User,
   Percent,
   XCircle,
+  Paperclip,
 } from "lucide-react";
 import {
   DEAL_CURRENCIES,
@@ -48,10 +49,17 @@ import { relatedToLabel } from "@/lib/related-entity";
 import { EditDealModal, type EditDealFormValues } from "./EditDealModal";
 import { ComposeEmailModal } from "../ComposeEmailModal";
 import { sendCrmActivityEmail } from "@/lib/emails/compose-send";
-import { emitRulesChange } from "@/lib/rules/storage";
+import { emitRulesChange, onRulesChange } from "@/lib/rules/storage";
 import { logEdit, notifyDealClosed } from "@/lib/rules";
 import { listDealPipelines } from "@/lib/deals/store";
 import { resolveDealContact } from "@/lib/sales/resolve-contact";
+import {
+  listCrmDocuments,
+  tryCrmDocument,
+} from "@/lib/documents/library/api";
+import type { LibraryDocument } from "@/lib/documents/library/types";
+import { listLocalDealAttachments } from "@/lib/deals/attachments";
+import { isUuid } from "@/lib/activity-timeline/auth";
 
 export function DealDetailView({
   deal: initialDeal,
@@ -73,6 +81,8 @@ export function DealDetailView({
   const [isComposeOpen, setIsComposeOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null);
   const [linkContactId, setLinkContactId] = useState("");
+  const [docs, setDocs] = useState<LibraryDocument[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
   const [ownerNames] = useState(() =>
     listAssignableOwnersLocal().map((o) => o.name),
   );
@@ -92,6 +102,92 @@ export function DealDetailView({
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deal.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDocs() {
+      setDocsLoading(true);
+      const remote =
+        isUuid(deal.id)
+          ? await tryCrmDocument(() =>
+              listCrmDocuments({ dealId: deal.id, limit: 50 }),
+            )
+          : [];
+      const local = listLocalDealAttachments(deal.id, deal.name).map(
+        (row) =>
+          ({
+            id: row.id,
+            fileName: row.fileName,
+            folder: "Deals",
+            owner: row.uploadedBy,
+            relatedTo: row.relatedTo,
+            version: 1,
+            tags: [],
+            uploadedAt: row.uploadedAt,
+            accessLevel: "Team",
+            sizeLabel: row.sizeLabel ?? "",
+            versions: [],
+            storageUrl: row.storageUrl,
+            dealId: deal.id,
+          }) satisfies LibraryDocument,
+      );
+      if (cancelled) return;
+      const merged = [...(remote ?? [])];
+      for (const row of local) {
+        if (
+          !merged.some(
+            (doc) =>
+              doc.id === row.id ||
+              doc.fileName.toLowerCase() === row.fileName.toLowerCase(),
+          )
+        ) {
+          merged.unshift(row);
+        }
+      }
+      setDocs(merged);
+      setDocsLoading(false);
+    }
+    void loadDocs();
+    return () => {
+      cancelled = true;
+    };
+  }, [deal.id, deal.name]);
+
+  useEffect(() => {
+    return onRulesChange(() => {
+      const local = listLocalDealAttachments(deal.id, deal.name);
+      setDocs((prev) => {
+        const next = [...prev];
+        for (const row of local) {
+          if (
+            next.some(
+              (doc) =>
+                doc.id === row.id ||
+                doc.fileName.toLowerCase() === row.fileName.toLowerCase(),
+            )
+          ) {
+            continue;
+          }
+          next.unshift({
+            id: row.id,
+            fileName: row.fileName,
+            folder: "Deals",
+            owner: row.uploadedBy,
+            relatedTo: row.relatedTo,
+            version: 1,
+            tags: [],
+            uploadedAt: row.uploadedAt,
+            accessLevel: "Team",
+            sizeLabel: row.sizeLabel ?? "",
+            versions: [],
+            storageUrl: row.storageUrl,
+            dealId: deal.id,
+          });
+        }
+        return next;
+      });
+    });
+  }, [deal.id, deal.name]);
 
   function notify(msg: string) {
     setFlash(msg);
@@ -328,6 +424,47 @@ export function DealDetailView({
               { label: "Stage", value: stage.title },
             ]}
           />
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+            <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+              <Paperclip className="h-3.5 w-3.5" />
+              Attachments ({docs.length})
+            </h3>
+            {docsLoading && docs.length === 0 ? (
+              <p className="py-4 text-center text-[12px] text-slate-400">
+                Loading files…
+              </p>
+            ) : docs.length === 0 ? (
+              <p className="py-4 text-center text-[12px] text-slate-400">
+                No files on this deal yet. Use the paperclip on the deal card.
+              </p>
+            ) : (
+              <ul className="divide-y divide-slate-50">
+                {docs.map((doc) => (
+                  <li key={doc.id} className="py-2">
+                    {doc.storageUrl ? (
+                      <a
+                        href={doc.storageUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[13px] font-semibold text-violet-700 hover:underline"
+                      >
+                        {doc.fileName}
+                      </a>
+                    ) : (
+                      <p className="text-[13px] font-semibold text-slate-800">
+                        {doc.fileName}
+                      </p>
+                    )}
+                    <p className="text-[11px] text-slate-500">
+                      {[doc.sizeLabel, doc.uploadedAt, doc.owner]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
           <RelatedContactsCard
             title="Stakeholders"
             contacts={
@@ -466,6 +603,7 @@ export function DealDetailView({
                   relatedId: deal.id,
                   relatedTo: `Deal: ${deal.name}`,
                   scheduledAt: values.sendAt,
+                  files: values.attachments,
                 });
                 setIsComposeOpen(false);
                 notify("Email sent");

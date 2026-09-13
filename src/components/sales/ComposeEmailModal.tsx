@@ -682,7 +682,23 @@ export function ComposeEmailModal({
                 multiple
                 className="hidden"
                 onChange={(e) => {
-                  addFiles(e.target.files);
+                  const list = e.target.files;
+                  if (list) {
+                    addFiles(list);
+                    Array.from(list).forEach((file) => {
+                      if (!file.type.startsWith("image/")) return;
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        const src = String(reader.result ?? "");
+                        if (!src) return;
+                        setBody(
+                          (prev) =>
+                            `${prev}<p><img src="${src}" alt="${file.name}" style="max-width:100%;height:auto;border-radius:4px;" /></p>`,
+                        );
+                      };
+                      reader.readAsDataURL(file);
+                    });
+                  }
                   e.target.value = "";
                 }}
               />

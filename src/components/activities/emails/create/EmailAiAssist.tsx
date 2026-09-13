@@ -3,12 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Mic, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  draftEmailFromPrompt,
-  EMAIL_TONES,
-  rewriteEmailWithAi,
-  type EmailTone,
-} from "@/lib/emails/ai-compose";
+import { EMAIL_TONES, htmlToPlainText, type EmailTone } from "@/lib/emails/ai-compose";
+import { requestEmailAi } from "@/lib/emails/request-email-ai";
 
 interface EmailAiAssistProps {
   html: string;
@@ -17,16 +13,24 @@ interface EmailAiAssistProps {
   subject?: string;
 }
 
+type SpeechResultList = ArrayLike<{ isFinal?: boolean } & ArrayLike<{ transcript: string }>>;
+
 type SpeechRec = {
   start: () => void;
   stop: () => void;
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onresult:
+    | ((event: { resultIndex: number; results: SpeechResultList }) => void)
+    | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onspeechstart: (() => void) | null;
+  onspeechend: (() => void) | null;
   continuous: boolean;
   interimResults: boolean;
   lang: string;
 };
+
+const VOICE_PAUSE_MS = 2000;
 
 function getSpeechRecognition(): (new () => SpeechRec) | null {
   if (typeof window === "undefined") return null;
@@ -59,9 +63,25 @@ export function EmailAiAssist({
   const [prompt, setPrompt] = useState("");
   const [flash, setFlash] = useState<string | null>(null);
   const recRef = useRef<SpeechRec | null>(null);
+  const listeningRef = useRef(false);
+  const stopRequestedRef = useRef(false);
+  const transcriptRef = useRef("");
+  const committedRef = useRef("");
+  const pauseTimerRef = useRef<number | null>(null);
+  const lastHeardAtRef = useRef(0);
+
+  function clearPauseTimer() {
+    if (pauseTimerRef.current != null) {
+      window.clearTimeout(pauseTimerRef.current);
+      pauseTimerRef.current = null;
+    }
+  }
 
   useEffect(() => {
     return () => {
+      stopRequestedRef.current = true;
+      listeningRef.current = false;
+      clearPauseTimer();
       recRef.current?.stop();
     };
   }, []);
@@ -71,30 +91,35 @@ export function EmailAiAssist({
     window.setTimeout(() => setFlash(null), 2200);
   }
 
-  function writeFromPrompt(text: string) {
+  async function writeFromPrompt(text: string) {
     const next = text.trim();
     if (!next) return;
     setBusy(true);
-    window.setTimeout(() => {
-      onChange(
-        draftEmailFromPrompt({
-          prompt: next,
-          tone,
-          recipientName,
-          subject,
-        }),
-      );
-      setBusy(false);
+    try {
+      const drafted = await requestEmailAi({
+        mode: htmlToPlainText(html) ? "edit" : "draft",
+        prompt: next,
+        html,
+        tone,
+        recipientName,
+        subject,
+      });
+      onChange(drafted);
       setOpen(false);
       notice("Draft written");
-    }, 380);
+    } catch (err) {
+      notice(err instanceof Error ? err.message : "Could not write this email");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  function shorten() {
+  async function shorten() {
     setBusy(true);
-    window.setTimeout(() => {
+    try {
       onChange(
-        rewriteEmailWithAi({
+        await requestEmailAi({
+          mode: "rewrite",
           html,
           tone,
           action: "brief",
@@ -102,9 +127,46 @@ export function EmailAiAssist({
           subject,
         }),
       );
-      setBusy(false);
       notice("Shortened");
-    }, 380);
+    } catch (err) {
+      notice(err instanceof Error ? err.message : "Could not shorten this email");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function finishVoice() {
+    stopRequestedRef.current = true;
+    listeningRef.current = false;
+    clearPauseTimer();
+    recRef.current?.stop();
+    recRef.current = null;
+    setListening(false);
+    const said = transcriptRef.current.trim();
+    transcriptRef.current = "";
+    committedRef.current = "";
+    if (said) {
+      notice("Writing email…");
+      void writeFromPrompt(said);
+    } else {
+      notice("No speech heard");
+    }
+  }
+
+  function markHeard() {
+    lastHeardAtRef.current = Date.now();
+    armPauseTimer();
+  }
+
+  function stillInPauseWindow() {
+    return Date.now() - lastHeardAtRef.current < VOICE_PAUSE_MS;
+  }
+
+  function armPauseTimer() {
+    clearPauseTimer();
+    pauseTimerRef.current = window.setTimeout(() => {
+      finishVoice();
+    }, VOICE_PAUSE_MS);
   }
 
   function toggleVoice() {
@@ -113,25 +175,67 @@ export function EmailAiAssist({
       notice("Voice is not supported in this browser");
       return;
     }
-    if (listening) {
-      recRef.current?.stop();
-      setListening(false);
+    if (listeningRef.current) {
+      finishVoice();
       return;
     }
+
+    stopRequestedRef.current = false;
+    transcriptRef.current = "";
+    committedRef.current = "";
     const rec = new Ctor();
-    rec.continuous = false;
-    rec.interimResults = false;
+    rec.continuous = true;
+    rec.interimResults = true;
     rec.lang = "en-AU";
     rec.onresult = (event) => {
-      const said = event.results[0]?.[0]?.transcript?.trim();
-      if (said) writeFromPrompt(said);
+      let finals = "";
+      let interim = "";
+      for (let i = 0; i < event.results.length; i += 1) {
+        const row = event.results[i];
+        const text = row[0]?.transcript ?? "";
+        if (row.isFinal) finals += `${text} `;
+        else interim = text;
+      }
+      const next = `${committedRef.current} ${finals}${interim}`
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!next) return;
+      transcriptRef.current = next;
+      markHeard();
     };
-    rec.onerror = () => setListening(false);
-    rec.onend = () => setListening(false);
+    rec.onspeechstart = () => markHeard();
+    rec.onspeechend = () => armPauseTimer();
+    rec.onerror = (event) => {
+      if (event.error === "aborted") return;
+      if (event.error === "no-speech") {
+        if (!stillInPauseWindow()) finishVoice();
+        return;
+      }
+      stopRequestedRef.current = true;
+      listeningRef.current = false;
+      clearPauseTimer();
+      setListening(false);
+    };
+    rec.onend = () => {
+      if (stopRequestedRef.current || !listeningRef.current) return;
+      if (!stillInPauseWindow()) {
+        finishVoice();
+        return;
+      }
+      committedRef.current = transcriptRef.current;
+      try {
+        rec.start();
+      } catch {
+        armPauseTimer();
+      }
+    };
     recRef.current = rec;
+    listeningRef.current = true;
+    lastHeardAtRef.current = Date.now();
     rec.start();
     setListening(true);
-    notice("Listening…");
+    armPauseTimer();
+    notice("Listening… stop after 2s silence");
   }
 
   return (

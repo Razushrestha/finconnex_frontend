@@ -113,7 +113,7 @@ export function crmErrorMessage(json: unknown, fallback: string): string {
       return "This integration is not configured on the CRM server yet.";
     }
     if (status === 400) {
-      return "CRM rejected this request. Check the token or connection settings.";
+      return "The CRM could not save this. One of the fields is not allowed or is the wrong type.";
     }
   }
   return fallback;
@@ -126,17 +126,22 @@ export function unwrapCrmData<T>(json: unknown): T {
   return json as T;
 }
 
+function isFormDataBody(body: unknown): body is FormData {
+  return typeof FormData !== "undefined" && body instanceof FormData;
+}
+
 async function sendCrm(
   session: Pick<CrmSession, "baseUrl" | "accessToken">,
   path: string,
   init?: RequestInit,
 ) {
+  const form = isFormDataBody(init?.body);
   const res = await fetch(`${session.baseUrl}${path}`, {
     ...init,
     headers: {
       Accept: "application/json",
       Authorization: `Bearer ${session.accessToken}`,
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.body && !form ? { "Content-Type": "application/json" } : {}),
       ...(init?.headers ?? {}),
     },
   });
@@ -189,12 +194,13 @@ export async function crmBffFetch<T>(
   if (!path.startsWith("/v1/")) {
     throw new Error(`CRM path must start with /v1/: ${path}`);
   }
+  const form = isFormDataBody(init?.body);
   const res = await fetch(`/api/auth/crm${path.slice(3)}`, {
     ...init,
     credentials: "same-origin",
     headers: {
       Accept: "application/json",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.body && !form ? { "Content-Type": "application/json" } : {}),
       ...(init?.headers ?? {}),
     },
   });

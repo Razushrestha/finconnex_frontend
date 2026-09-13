@@ -1,20 +1,56 @@
 import type { Email } from "@/lib/emails/types";
+import { htmlToPlainText } from "@/lib/emails/ai-compose";
+import {
+  prepareEmailPayload,
+  type EmailOutboundAttachment,
+} from "@/lib/emails/attach-files";
 
 /**
- * Delivery is the backend's job.
- *
- * This used to POST to `/api/auth/mail/deliver`, which sends through the
- * Next.js app's *own* SendGrid credentials (`SENDGRID_API_KEY` in
- * `.env.local`) — a second delivery path running alongside the backend's.
- * With no key set on this app it threw "SendGrid is not configured on this
- * app", surfacing as a failure on actions that had already succeeded
- * server-side: `POST /workspaces/:id/members` and `POST /workspaces/:id/emails`
- * both return 201 and the backend queues its own delivery job.
- *
- * Kept as a no-op so the call sites in `@/lib/emails/api` keep their shape.
- * Restore a real implementation only if the app is meant to deliver mail
- * itself, which would mean sending every message twice.
+ * Sends the MIME message (HTML + files) through this app's mail route.
+ * CRM `/send` still records the email; this path is what actually includes
+ * attachments and inline images.
  */
-export async function deliverQueuedCrmEmail(email: Email | null) {
-  void email;
+export async function deliverQueuedCrmEmail(
+  email: Email | null,
+  extra?: { html?: string; files?: File[] },
+): Promise<void> {
+  if (!email?.to[0]) return;
+  if (typeof window === "undefined") return;
+  const html = extra?.html?.trim() || email.body || "";
+  const files = extra?.files ?? [];
+  const hasRich =
+    files.length > 0 ||
+    /<img\b/i.test(html) ||
+    /data:image\//i.test(html);
+  if (!hasRich) return;
+
+  let outbound: EmailOutboundAttachment[] = [];
+  let nextHtml = html;
+  try {
+    const prepared = await prepareEmailPayload({ html, files });
+    outbound = prepared.outbound;
+    nextHtml = prepared.html;
+  } catch {
+    outbound = [];
+  }
+
+  const res = await fetch("/api/auth/mail/deliver", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      to: email.to,
+      cc: email.cc,
+      bcc: email.bcc,
+      subject: email.subject,
+      text: htmlToPlainText(html) || email.body,
+      html: nextHtml,
+      attachments: outbound,
+    }),
+  });
+  if (res.status === 503) return;
+  if (!res.ok) {
+    const json = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(json.error || "Could not deliver attachments with this email.");
+  }
 }

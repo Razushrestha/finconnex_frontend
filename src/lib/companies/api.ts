@@ -11,6 +11,7 @@ import type {
   CompanyStatus,
 } from "@/lib/companies/types";
 import { ownerDisplayName, ownerDisplayNameOr } from "@/lib/users/display-name";
+import { uiCompanySizeToCrm } from "@/lib/leads/api/map";
 
 export type CrmCompanyQuery = {
   page?: number;
@@ -288,21 +289,13 @@ function asDecimalMoney(raw?: string): string | undefined {
 }
 
 function asCompanySize(raw?: string): string | undefined {
-  const value = raw?.trim().toUpperCase().replace(/[\s-]+/g, "_") ?? "";
-  if (
-    value === "SMALL" ||
-    value === "MEDIUM" ||
-    value === "LARGE" ||
-    value === "ENTERPRISE" ||
-    value === "MICRO"
-  ) {
-    return value;
-  }
-  return undefined;
+  return uiCompanySizeToCrm(raw);
 }
 
 function asEmployeeCount(raw?: string): number | undefined {
-  const n = Number(raw?.match(/\d+/)?.[0]);
+  const value = raw?.trim() ?? "";
+  if (!/^\d+$/.test(value)) return undefined;
+  const n = Number(value);
   return Number.isFinite(n) ? n : undefined;
 }
 
@@ -365,7 +358,7 @@ export async function createCrmCompany(input: {
         : undefined,
     state: input.state,
     country: input.country,
-    status: apiStatus(input.status),
+    // Nest CreateCompanyDto forbids `status` on POST (always starts ACTIVE).
   });
 
   let data: unknown;

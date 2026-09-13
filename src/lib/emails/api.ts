@@ -623,7 +623,11 @@ export async function sendCrmEmail(
   const sendAt = scheduledAt ? Date.parse(scheduledAt) : 0;
   if (!sendAt || sendAt <= Date.now() + 5_000) {
     const full = mapped?.to[0] ? mapped : await getCrmEmail(id);
-    await deliverQueuedCrmEmail(full ?? mapped);
+    const html = typeof extra.html === "string" ? extra.html : undefined;
+    const files = Array.isArray(extra.files)
+      ? (extra.files.filter((item) => item instanceof File) as File[])
+      : undefined;
+    await deliverQueuedCrmEmail(full ?? mapped, { html, files });
   }
   return mapped;
 }
@@ -672,6 +676,26 @@ export async function attachCrmEmailObject(
   const data = await emailsMutate(`/${id}/attachments`, {
     method: "POST",
     body: JSON.stringify(extra),
+  });
+  const rows = mapAttachments(data);
+  if (rows[0]) return rows[0];
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    return mapAttachments([data as Record<string, unknown>])[0] ?? null;
+  }
+  return null;
+}
+
+export async function attachCrmEmailFile(
+  id: string,
+  file: File,
+): Promise<EmailAttachmentMeta | null> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  form.append("filename", file.name);
+  form.append("name", file.name);
+  const data = await emailsMutate(`/${id}/attachments`, {
+    method: "POST",
+    body: form,
   });
   const rows = mapAttachments(data);
   if (rows[0]) return rows[0];
