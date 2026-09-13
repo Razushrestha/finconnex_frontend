@@ -1,5 +1,9 @@
-import { ensureCrmAccess, ensureCrmSession } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import {
+  ensureCrmAccess,
+  ensureCrmSession,
+  isBoundCrmSession,
+} from "@/lib/activity-timeline/auth";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 
 export type AuditLogRow = {
   id: string;
@@ -123,20 +127,63 @@ export async function listAuditLogs(
   const params = new URLSearchParams();
   params.set("page", String(query.page ?? 1));
   params.set("limit", String(query.limit ?? 50));
-  if (query.search?.trim()) params.set("search", query.search.trim());
-  if (query.action?.trim()) params.set("action", query.action.trim());
   if (query.entityType?.trim()) params.set("entityType", query.entityType.trim());
 
-  const data = await crmFetch<unknown>(
-    auth,
-    `/v1/audit-logs?${params.toString()}`,
-  );
+  const path = `/v1/audit-logs?${params.toString()}`;
+  const data = isBoundCrmSession()
+    ? await crmFetch<unknown>(auth, path)
+    : await crmBffFetch<unknown>(path);
   const rawItems = asItems(data);
-  const items = rawItems.map((row, index) => normalizeAuditLog(row, index));
+  let items = rawItems.map((row, index) => normalizeAuditLog(row, index));
+  const needle = query.search?.trim().toLowerCase();
+  if (needle) {
+    items = items.filter((row) =>
+      [row.action, row.actor, row.entityType, row.summary]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle),
+    );
+  }
+  return {
+    items,
+    total: needle ? items.length : asTotal(data, items.length),
+    page: query.page ?? 1,
+    limit: query.limit ?? 50,
+  };
+}
+
+export async function listAuthSecurityEvents(
+  query: { page?: number; limit?: number } = {},
+): Promise<AuditLogPage> {
+  const auth = await resolveAuth();
+  if (!auth) {
+    throw new Error("Sign in to load login history");
+  }
+
+  const params = new URLSearchParams();
+  params.set("page", String(query.page ?? 1));
+  params.set("limit", String(query.limit ?? 20));
+  const path = `/v1/audit-logs/auth-security-events?${params.toString()}`;
+  const data = isBoundCrmSession()
+    ? await crmFetch<unknown>(auth, path)
+    : await crmBffFetch<unknown>(path);
+  const rawItems = asItems(data);
+  const items = rawItems.map((row, index) =>
+    normalizeAuditLog(
+      {
+        ...row,
+        action: pickStr(row.event, row.action, "AUTH"),
+        summary: pickStr(row.event, row.summary, "Authentication event"),
+        ip: pickStr(row.ipHash, row.ip),
+        actor: pickStr(row.userId, row.identityHash, "—"),
+      },
+      index,
+    ),
+  );
   return {
     items,
     total: asTotal(data, items.length),
     page: query.page ?? 1,
-    limit: query.limit ?? 50,
+    limit: query.limit ?? 20,
   };
 }

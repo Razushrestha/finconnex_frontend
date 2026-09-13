@@ -48,7 +48,7 @@ function parseDuration(raw: unknown): SlaDuration | null {
   return null;
 }
 
-function parseConfig(raw: unknown): PipelineSlaConfig {
+export function parsePipelineSlaConfig(raw: unknown): PipelineSlaConfig {
   if (!raw || typeof raw !== "object") {
     return structuredClone(DEFAULT_MORTGAGE_PIPELINE_SLA);
   }
@@ -100,7 +100,7 @@ export function loadPipelineSlaConfig(): PipelineSlaConfig {
     return structuredClone(DEFAULT_MORTGAGE_PIPELINE_SLA);
   }
   try {
-    return parseConfig(JSON.parse(raw));
+    return parsePipelineSlaConfig(JSON.parse(raw));
   } catch {
     return structuredClone(DEFAULT_MORTGAGE_PIPELINE_SLA);
   }
@@ -114,7 +114,7 @@ export function arePipelineSlaBadgesVisible(
 }
 
 export function savePipelineSlaConfig(config: PipelineSlaConfig): PipelineSlaConfig {
-  const normalized = parseConfig(config);
+  const normalized = parsePipelineSlaConfig(config);
   saveSettingsValues(
     PIPELINE_SLA_SETTINGS_KEY,
     {

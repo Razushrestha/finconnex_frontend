@@ -99,6 +99,8 @@ Today the Next app owns `/api/auth/*`. Options:
 
 `api.auth.*` already abstracts this for the UI.
 
+Settings hub persistence (catalog + first-class columns + module-backed pages) is documented in `docs/settings-api.md`.
+
 ## Files
 
 | Path | Role |

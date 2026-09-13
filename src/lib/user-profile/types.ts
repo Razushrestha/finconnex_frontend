@@ -10,6 +10,8 @@ export interface UserProfile {
   avatar: string;
   globalRole: string;
   isVerified: boolean;
+  twoFactorEnabled?: boolean;
+  twoFactorEnabledAt?: string | null;
 }
 
 export const DEFAULT_USER_PROFILE: UserProfile = {

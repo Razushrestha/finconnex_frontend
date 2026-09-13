@@ -1,31 +1,91 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  createBackupPoint,
-  deleteBackupPoint,
-  downloadBackupPoint,
-  importBackupJson,
-  listBackupPoints,
-  restoreBackupPoint,
-  type BackupPoint,
-} from "@/lib/backup/store";
-import { getRulesActor } from "@/lib/rules";
+  getCrmWorkspaceBackup,
+  listCrmWorkspaceBackups,
+  requestCrmWorkspaceBackup,
+  restoreCrmWorkspaceBackup,
+  tryCrmWorkspaceBackups,
+  type CrmWorkspaceBackup,
+} from "@/lib/backup/api";
 
 /** Settings → Data Management → Backup and Restore */
 export function BackupRestoreSettingsClient() {
-  const [points, setPoints] = useState<BackupPoint[]>(() => listBackupPoints());
+  const [points, setPoints] = useState<CrmWorkspaceBackup[]>([]);
   const [message, setMessage] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const actor = getRulesActor();
+  const [source, setSource] = useState<"api" | "offline">("offline");
+  const [busy, setBusy] = useState(false);
 
-  function refresh() {
-    setPoints(listBackupPoints());
+  async function refresh() {
+    const remote = await tryCrmWorkspaceBackups(() => listCrmWorkspaceBackups());
+    if (!remote) {
+      setSource("offline");
+      return;
+    }
+    setPoints(remote);
+    setSource("api");
   }
+
+  useEffect(() => {
+    void refresh();
+  }, []);
 
   function flash(msg: string) {
     setMessage(msg);
     window.setTimeout(() => setMessage(null), 3200);
+  }
+
+  async function onCreate() {
+    setBusy(true);
+    try {
+      await requestCrmWorkspaceBackup();
+      await refresh();
+      flash("Backup queued");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Could not request backup");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDownload(id: string) {
+    setBusy(true);
+    try {
+      const row = await getCrmWorkspaceBackup(id);
+      const blob = new Blob([JSON.stringify(row.payload ?? row, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `workspace-backup-${id}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Could not download backup");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRestore(id: string) {
+    if (
+      !window.confirm(
+        "Restore missing companies, contacts, deals, and leads from this backup? Existing rows are not overwritten.",
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await restoreCrmWorkspaceBackup(id);
+      flash("Restore finished");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Could not restore backup");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -35,54 +95,24 @@ export function BackupRestoreSettingsClient() {
           Backup & restore
         </h2>
         <p className="mt-0.5 text-[12px] text-slate-500">
-          Snapshot demo session keys (settings, finance, portals, journeys…).
-          Acting as{" "}
-          <span className="font-semibold text-slate-700">
-            {actor.name} ({actor.role})
-          </span>
-          . Recycle Bin restore is separate.
+          POST /v1/workspace-backups. Restore inserts missing CRM records only.
+          Recycle Bin restore is separate.
         </p>
+        <span className="mt-2 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+          {source === "api" ? "Live CRM" : "CRM unavailable"}
+        </span>
         {message ? (
           <p className="mt-2 text-[12px] font-medium text-violet-700">{message}</p>
         ) : null}
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => {
-              createBackupPoint();
-              refresh();
-              flash("Backup created");
-            }}
-            className="h-8 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white"
+            disabled={busy}
+            onClick={() => void onCreate()}
+            className="h-8 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white disabled:opacity-60"
           >
             Create backup
           </button>
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-700"
-          >
-            Import JSON
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              const text = await file.text();
-              const result = importBackupJson(text);
-              if (!result.ok) {
-                flash(result.message);
-                return;
-              }
-              refresh();
-              flash(`Imported ${result.point.label}`);
-              e.target.value = "";
-            }}
-          />
         </div>
       </div>
       <ul className="divide-y divide-slate-50">
@@ -97,49 +127,30 @@ export function BackupRestoreSettingsClient() {
               className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-[12px]"
             >
               <div>
-                <p className="font-semibold text-slate-800">{p.label}</p>
+                <p className="font-semibold text-slate-800">{p.status}</p>
                 <p className="text-[11px] text-slate-400">
-                  {new Date(p.createdAt).toLocaleString("en-AU")} · {p.keyCount}{" "}
-                  keys
+                  {p.createdAt
+                    ? new Date(p.createdAt).toLocaleString("en-AU")
+                    : "—"}
+                  {p.sizeBytes != null ? ` · ${p.sizeBytes} bytes` : ""}
                 </p>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 <button
                   type="button"
-                  onClick={() => downloadBackupPoint(p)}
-                  className="h-7 rounded-lg border border-slate-200 px-2 text-[11px] font-semibold text-slate-600"
+                  disabled={busy}
+                  onClick={() => void onDownload(p.id)}
+                  className="h-7 rounded-lg border border-slate-200 px-2 text-[11px] font-semibold text-slate-600 disabled:opacity-50"
                 >
                   Download
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    if (
-                      !window.confirm(
-                        "Restore this backup? Current session data for those keys will be overwritten.",
-                      )
-                    )
-                      return;
-                    const result = restoreBackupPoint(p);
-                    flash(
-                      result.ok
-                        ? `Restored ${result.restored} keys — reload recommended`
-                        : result.message,
-                    );
-                  }}
-                  className="h-7 rounded-lg bg-violet-600 px-2 text-[11px] font-semibold text-white"
+                  disabled={busy || p.status !== "COMPLETED"}
+                  onClick={() => void onRestore(p.id)}
+                  className="h-7 rounded-lg bg-violet-600 px-2 text-[11px] font-semibold text-white disabled:opacity-50"
                 >
                   Restore
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    deleteBackupPoint(p.id);
-                    refresh();
-                  }}
-                  className="h-7 rounded-lg border border-rose-200 px-2 text-[11px] font-semibold text-rose-700"
-                >
-                  Delete
                 </button>
               </div>
             </li>

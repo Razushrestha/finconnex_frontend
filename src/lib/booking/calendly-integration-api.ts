@@ -155,9 +155,21 @@ export function getCalendlySyncStatus(): Promise<CalendlySyncStatus> {
   });
 }
 
+export function calendarSyncProviderKey(
+  raw: string,
+): "google" | "outlook" | "" {
+  const n = raw.toLowerCase().replace(/-/g, "_");
+  if (n.includes("google")) return "google";
+  if (n.includes("outlook") || n.includes("microsoft")) return "outlook";
+  return "";
+}
+
 function pickRedirectUrl(data: unknown): string {
   const rec = asRecord(data) ?? extractRecords(data)[0] ?? {};
+  const nested = asRecord(rec.data) ?? {};
   return pickStr(
+    rec.authUrl,
+    nested.authUrl,
     rec.authorizationUrl,
     rec.authorization_url,
     rec.authorizeUrl,
@@ -317,15 +329,25 @@ export function authorizeCalendarSync(
 
 export function listCalendarSyncConnections(): Promise<CalendarSyncConnection[]> {
   return crmCall("/v1/calendar-sync/connections").then((data) =>
-    extractRecords(data).map((row, index) => ({
-      id: pickStr(row.id) || `cal-${index}`,
-      provider: pickStr(row.provider, row.kind).toLowerCase(),
-      email: pickStr(row.email, row.account),
-      connected:
-        pickBool(row.connected, row.isConnected) ||
-        pickStr(row.status).toLowerCase() !== "disconnected",
-      lastSyncedAt: pickStr(row.lastSyncedAt, row.last_synced_at),
-    })),
+    extractRecords(data).map((row, index) => {
+      const nested = asRecord(row.integrationConnection) ?? {};
+      const provider = calendarSyncProviderKey(
+        pickStr(row.provider, row.kind, nested.provider),
+      );
+      const status = pickStr(row.status, nested.status).toLowerCase();
+      return {
+        id: pickStr(row.id) || `cal-${index}`,
+        provider,
+        email: pickStr(row.email, row.account, nested.email, nested.label),
+        connected:
+          typeof row.isActive === "boolean"
+            ? row.isActive
+            : pickBool(row.connected, row.isConnected) ||
+              status === "connected" ||
+              status === "active",
+        lastSyncedAt: pickStr(row.lastSyncedAt, row.last_synced_at),
+      };
+    }),
   );
 }
 

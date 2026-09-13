@@ -3,23 +3,43 @@
 import { useEffect, useState } from "react";
 import {
   ROLES,
-  getRulesActor,
-  listFieldGrants,
-  saveFieldGrants,
   SENSITIVE_LEAD_FIELDS,
-  type PermissionGrant,
 } from "@/lib/rules";
+import {
+  deleteCrmFieldPermission,
+  FIELD_RESOURCE_TO_CRM,
+  listCrmFieldPermissions,
+  tryCrmFieldPermissions,
+  UI_ROLE_TO_CRM,
+  upsertCrmFieldPermission,
+  type CrmFieldPermission,
+  type CrmWorkspaceRole,
+} from "@/lib/settings/field-permissions-api";
+import { cn } from "@/lib/utils";
 
 /** Settings → Users & Access → Permissions (field ACL) */
 export function FieldPermissionsSettingsClient() {
-  const [grants, setGrants] = useState<PermissionGrant[]>(() =>
-    listFieldGrants(),
-  );
+  const [rows, setRows] = useState<CrmFieldPermission[]>([]);
+  const [source, setSource] = useState<"api" | "demo">("demo");
   const [message, setMessage] = useState<string | null>(null);
-  const actor = getRulesActor();
+  const [busy, setBusy] = useState(false);
+
+  const roles = ROLES.map((r) => r.name).filter(
+    (r) => UI_ROLE_TO_CRM[r],
+  );
+
+  async function refresh() {
+    const remote = await tryCrmFieldPermissions(() =>
+      listCrmFieldPermissions("LEAD"),
+    );
+    if (remote) {
+      setRows(remote);
+      setSource("api");
+    }
+  }
 
   useEffect(() => {
-    setGrants(listFieldGrants());
+    void refresh();
   }, []);
 
   function flash(msg: string) {
@@ -27,27 +47,59 @@ export function FieldPermissionsSettingsClient() {
     window.setTimeout(() => setMessage(null), 2400);
   }
 
-  function toggle(role: string, resource: string) {
-    const list = [...grants];
-    const i = list.findIndex((g) => g.role === role && g.resource === resource);
-    if (i >= 0) {
-      list[i] = { ...list[i]!, allowed: !list[i]!.allowed };
-    } else {
-      list.unshift({
-        id: `fg-${Date.now()}`,
-        role: role as PermissionGrant["role"],
-        scope: "field",
-        resource,
-        allowed: false,
-      });
-    }
-    setGrants(saveFieldGrants(list));
-    flash("Field grants saved");
+  function allowed(role: string, resource: string) {
+    const crmRole = UI_ROLE_TO_CRM[role as keyof typeof UI_ROLE_TO_CRM];
+    const fieldName = FIELD_RESOURCE_TO_CRM[resource];
+    if (!crmRole || !fieldName) return true;
+    const hit = rows.find(
+      (row) => row.role === crmRole && row.fieldName === fieldName,
+    );
+    if (!hit) return true;
+    return hit.canRead !== false;
   }
 
-  const roles = ROLES.map((r) => r.name).filter(
-    (r) => r !== "System Admin" && r !== "Org Admin",
-  );
+  async function toggle(role: string, resource: string) {
+    const crmRole = UI_ROLE_TO_CRM[role as keyof typeof UI_ROLE_TO_CRM];
+    const fieldName = FIELD_RESOURCE_TO_CRM[resource];
+    if (!crmRole || !fieldName) return;
+    const currently = allowed(role, resource);
+    setBusy(true);
+    try {
+      if (currently) {
+        const saved = await upsertCrmFieldPermission({
+          entityType: "LEAD",
+          fieldName,
+          role: crmRole as CrmWorkspaceRole,
+          canRead: false,
+          canWrite: false,
+        });
+        setRows((list) => {
+          const next = list.filter(
+            (row) => !(row.role === crmRole && row.fieldName === fieldName),
+          );
+          next.push(saved);
+          return next;
+        });
+        setSource("api");
+        flash("Field hidden for this role");
+      } else {
+        const hit = rows.find(
+          (row) => row.role === crmRole && row.fieldName === fieldName,
+        );
+        if (hit?.id) await deleteCrmFieldPermission(hit.id);
+        setRows((list) =>
+          list.filter(
+            (row) => !(row.role === crmRole && row.fieldName === fieldName),
+          ),
+        );
+        flash("Field restored for this role");
+      }
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Could not update field ACL");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
@@ -56,13 +108,19 @@ export function FieldPermissionsSettingsClient() {
           Field-level permissions
         </h2>
         <p className="mt-0.5 text-[12px] text-slate-500">
-          Hide or allow sensitive lead fields. Org Admin+ always allowed. You
-          are{" "}
-          <span className="font-semibold text-slate-700">
-            {actor.name} ({actor.role})
-          </span>
-          .
+          PUT /v1/field-permissions. OWNER and ADMIN are never restricted. No
+          row means the field is visible.
         </p>
+        <span
+          className={cn(
+            "mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            source === "api"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-slate-100 text-slate-500",
+          )}
+        >
+          {source === "api" ? "Live CRM" : "Not loaded"}
+        </span>
         {message ? (
           <p className="mt-2 text-[12px] font-medium text-violet-700">{message}</p>
         ) : null}
@@ -85,28 +143,24 @@ export function FieldPermissionsSettingsClient() {
                 <td className="px-4 py-3">
                   <p className="font-semibold text-slate-800">{f.label}</p>
                   <p className="font-mono text-[10px] text-slate-400">
-                    {f.resource}
+                    {FIELD_RESOURCE_TO_CRM[f.resource] ?? f.resource}
                   </p>
                 </td>
                 {roles.map((role) => {
-                  const g = grants.find(
-                    (x) => x.role === role && x.resource === f.resource,
-                  );
-                  const allowed =
-                    g?.allowed ??
-                    (role !== "User" && role !== "Read Only");
+                  const on = allowed(role, f.resource);
                   return (
                     <td key={role} className="px-3 py-3">
                       <button
                         type="button"
-                        onClick={() => toggle(role, f.resource)}
+                        disabled={busy || source !== "api"}
+                        onClick={() => void toggle(role, f.resource)}
                         className={
-                          allowed
-                            ? "rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700"
-                            : "rounded-md bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-700"
+                          on
+                            ? "rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 disabled:opacity-50"
+                            : "rounded-md bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-700 disabled:opacity-50"
                         }
                       >
-                        {allowed ? "Allow" : "Deny"}
+                        {on ? "Allow" : "Deny"}
                       </button>
                     </td>
                   );

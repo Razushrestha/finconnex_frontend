@@ -63,6 +63,10 @@ export function normalizeUserProfile(raw: unknown): UserProfile {
     avatar: pickStr(rec.avatar, rec.avatarUrl, rec.photoUrl, rec.image),
     globalRole: pickStr(rec.globalRole, rec.role),
     isVerified: rec.isVerified === true || rec.verified === true,
+    twoFactorEnabled:
+      rec.twoFactorEnabled === true || rec.two_factor_enabled === true,
+    twoFactorEnabledAt:
+      pickStr(rec.twoFactorEnabledAt, rec.two_factor_enabled_at) || null,
   };
 }
 

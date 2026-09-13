@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, Plus, Trash2 } from "lucide-react";
 import {
@@ -22,6 +22,11 @@ import type {
   StageSlaRow,
 } from "@/lib/pipeline-sla/types";
 import { MORTGAGE_PIPELINE_STAGES } from "@/lib/pipeline-sla/types";
+import {
+  getCrmMortgagePipelineSla,
+  putCrmMortgagePipelineSla,
+  tryCrmMortgagePipelineSla,
+} from "@/lib/pipeline-sla/api";
 import { cn } from "@/lib/utils";
 
 export function PipelineSlaSettingsClient() {
@@ -29,7 +34,19 @@ export function PipelineSlaSettingsClient() {
     loadPipelineSlaConfig(),
   );
   const [toast, setToast] = useState<string | null>(null);
+  const [source, setSource] = useState<"api" | "local">("local");
+  const [saving, setSaving] = useState(false);
   const durationOptions = useMemo(() => durationSelectOptions(), []);
+
+  useEffect(() => {
+    void tryCrmMortgagePipelineSla(() => getCrmMortgagePipelineSla()).then(
+      (remote) => {
+        if (!remote) return;
+        setConfig(remote);
+        setSource("api");
+      },
+    );
+  }, []);
 
   function flash(msg: string) {
     setToast(msg);
@@ -46,10 +63,23 @@ export function PipelineSlaSettingsClient() {
     flash("Restored mortgage defaults (not saved yet)");
   }
 
-  function onSave() {
-    const saved = savePipelineSlaConfig(config);
-    setConfig(saved);
-    flash("Saved. Lead cards will refresh");
+  async function onSave() {
+    setSaving(true);
+    try {
+      const saved = await putCrmMortgagePipelineSla(config);
+      setConfig(saved);
+      setSource("api");
+      flash("Saved to CRM. Lead cards will refresh");
+    } catch (err) {
+      savePipelineSlaConfig(config);
+      flash(
+        err instanceof Error
+          ? err.message
+          : "CRM save failed; kept a local copy",
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   function setStageDuration(stage: MortgagePipelineStage, value: string) {
@@ -114,6 +144,16 @@ export function PipelineSlaSettingsClient() {
               Lead cards/lists: On Track, Due Today, At Risk, Overdue, Milestone
               Overdue is off by default below.
             </p>
+            <span
+              className={cn(
+                "mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                source === "api"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-slate-100 text-slate-500",
+              )}
+            >
+              {source === "api" ? "Live CRM" : "Local"}
+            </span>
           </div>
           <Link
             href="/sales/leads"
@@ -348,10 +388,11 @@ export function PipelineSlaSettingsClient() {
         </button>
         <button
           type="button"
-          onClick={onSave}
-          className="h-9 rounded-lg bg-violet-600 px-3 text-[12px] font-semibold text-white shadow-sm shadow-violet-600/20 hover:bg-violet-700"
+          onClick={() => void onSave()}
+          disabled={saving}
+          className="h-9 rounded-lg bg-violet-600 px-3 text-[12px] font-semibold text-white shadow-sm shadow-violet-600/20 hover:bg-violet-700 disabled:opacity-60"
         >
-          Save changes
+          {saving ? "Saving…" : "Save changes"}
         </button>
       </div>
 

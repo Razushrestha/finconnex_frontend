@@ -56,6 +56,10 @@ const ALLOWED_ROOTS = new Set([
   "settings",
   "calculations",
   "user",
+  "field-permissions",
+  "workspace-backups",
+  "security",
+  "audit-logs",
 ]);
 
 function crmBaseUrl(): string | null {
@@ -86,6 +90,7 @@ function isAllowed(path: string[]): boolean {
       path.includes("notes") ||
       path.includes("reminders") ||
       path.includes("dashboard") ||
+      path.includes("pipelines") ||
       path[2] === "members" ||
       path[2] === "members-summary" ||
       path[2] === "members-admin" ||

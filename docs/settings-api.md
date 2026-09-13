@@ -131,6 +131,26 @@ Content-Type: application/json
 
 The Next.js BFF already proxies `/v1/settings/*` (including `pages`) for signed-in browsers.
 
+If hosted CRM returns **404** on `/v1/settings/pages` or **400** on `PATCH` `catalog`, FinConnex overlays the page in `data/settings-catalog/` (gitignored) so Company Profile and other generic hub forms still save.
+
+## Module-backed Settings screens
+
+These hub pages call first-class Nest modules (not the catalog JSON). Browser calls go through `/api/auth/crm/...` unless a bound CRM session is set (tests).
+
+| Settings page | Client | Nest routes | Who can write |
+| --- | --- | --- | --- |
+| CRM → Pipelines (mortgage SLA) | `PipelineSlaSettingsClient` | `GET/PUT /v1/workspaces/:workspaceId/pipelines/mortgage/sla` | OWNER, ADMIN |
+| Users & Access → Permissions | `FieldPermissionsSettingsClient` | `GET/PUT/DELETE /v1/field-permissions` | OWNER, ADMIN. UI roles map Manager→`MANAGER`, Team Lead→`TEAM_LEAD`, User→`MEMBER`, Read Only→`VIEWER`. No row means allow; deny stores `canRead`/`canWrite` false |
+| Security → Two-factor | `TwoFactorSettingsClient` | `POST /v1/security/two-factor/setup`, `/confirm` (`{ "code" }`), `/disable`. Status from `GET /v1/user/profile` (`twoFactorEnabled`). Workspace policy still `PATCH /v1/settings` `enforce2FA` | Any signed-in user for TOTP; OWNER/ADMIN for workspace enforce |
+| Security → Login history | `LoginHistorySettingsClient` | `GET /v1/audit-logs/auth-security-events` (failed logins) and `GET /v1/audit-logs` | OWNER, ADMIN. List query allows `page`, `limit`, `entityType`, `entityId`, `performedById`, `startDate`, `endDate` only |
+| Security → Audit logs | `AuditLogsSettingsClient` | `GET /v1/audit-logs` | OWNER, ADMIN. Search is filtered in the browser |
+| Data → Backup and restore | `BackupRestoreSettingsClient` | `POST/GET /v1/workspace-backups`, `GET /v1/workspace-backups/:id`, `POST .../restore` | OWNER, ADMIN (`backup.read` / `backup.manage`). Restore only when `status` is `COMPLETED`. Download is the JSON payload, not a file URL |
+| Integrations → Google / Outlook calendar | `CalendarSyncSettingsClient` | `GET /v1/calendar-sync/{google\|outlook}/authorize` returns `{ "authUrl" }`; `GET /v1/calendar-sync/connections`; `POST .../disconnect`; `POST .../sync` | OWNER, ADMIN. Nest providers are `GOOGLE_CALENDAR` / `OUTLOOK_CALENDAR`; the UI maps those to google/outlook |
+
+BFF `ALLOWED_ROOTS` for these calls: `settings`, `user`, `field-permissions`, `workspace-backups`, `security`, `audit-logs`, `calendar-sync`. Workspace SLA uses `/v1/workspaces/:id/pipelines/...` (BFF allows `pipelines` under `workspaces`).
+
+Calendly stays on `CalendlyConnectionCard` (`showCalendarSync={false}` on the Google/Outlook settings pages).
+
 ## Errors
 
 | Message key | HTTP |

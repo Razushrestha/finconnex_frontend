@@ -2,45 +2,51 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { listAuditEvents, onRulesChange, type AuditEvent } from "@/lib/rules";
+import {
+  listAuditLogs,
+  listAuthSecurityEvents,
+  type AuditLogRow,
+} from "@/lib/audit-logs/api";
 
-const AUTH_ACTIONS = new Set([
-  "login",
-  "logout",
-  "login_failed",
-  "2fa_success",
-  "2fa_failed",
-]);
+const AUTH_HINT = /login|logout|2fa|session|auth|password/i;
 
 /** Settings → Security → Login History */
 export function LoginHistorySettingsClient() {
-  const [rows, setRows] = useState<AuditEvent[]>([]);
-
-  function refresh() {
-    setRows(
-      listAuditEvents().filter(
-        (e) => e.module === "auth" || AUTH_ACTIONS.has(e.action),
-      ),
-    );
-  }
+  const [rows, setRows] = useState<AuditLogRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    refresh();
-    return onRulesChange(() => refresh());
+    void Promise.allSettled([
+      listAuthSecurityEvents({ limit: 80 }),
+      listAuditLogs({ limit: 80 }),
+    ]).then(([security, workspace]) => {
+      const securityRows =
+        security.status === "fulfilled" ? security.value.items : [];
+      const workspaceRows =
+        workspace.status === "fulfilled" ? workspace.value.items : [];
+      const hinted = workspaceRows.filter(
+        (row) =>
+          AUTH_HINT.test(row.action) ||
+          AUTH_HINT.test(row.entityType) ||
+          AUTH_HINT.test(row.summary),
+      );
+      const merged = [...securityRows, ...(hinted.length ? hinted : [])];
+      merged.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+      setRows(merged);
+      if (!merged.length && security.status === "rejected" && workspace.status === "rejected") {
+        const err = security.reason;
+        setError(err instanceof Error ? err.message : "Could not load login history");
+        return;
+      }
+      setError(null);
+    });
   }, []);
 
   function exportCsv() {
-    const header = "At,Action,Actor,Summary,IP,UserAgent";
+    const header = "At,Action,Actor,Summary,IP";
     const body = rows
       .map((r) =>
-        [
-          r.at,
-          r.action,
-          r.actor,
-          r.summary,
-          r.meta?.ip ?? "",
-          r.meta?.userAgent ?? "",
-        ]
+        [r.createdAt, r.action, r.actor, r.summary, r.ip]
           .map((c) => `"${String(c).replace(/"/g, '""')}"`)
           .join(","),
       )
@@ -60,12 +66,19 @@ export function LoginHistorySettingsClient() {
         <div>
           <h2 className="text-[16px] font-bold text-slate-900">Login history</h2>
           <p className="mt-0.5 text-[12px] text-slate-500">
-            Auth events from the central audit trail. Full trail also on{" "}
-            <Link href="/rules" className="font-semibold text-violet-600">
-              Rules hub
+            Failed logins from GET /v1/audit-logs/auth-security-events plus
+            workspace audit. Full trail also on{" "}
+            <Link
+              href="/settings/security/audit-logs"
+              className="font-semibold text-violet-600"
+            >
+              Audit logs
             </Link>
             .
           </p>
+          {error ? (
+            <p className="mt-2 text-[12px] font-medium text-rose-600">{error}</p>
+          ) : null}
         </div>
         <button
           type="button"
@@ -76,9 +89,9 @@ export function LoginHistorySettingsClient() {
         </button>
       </div>
       <ul className="divide-y divide-slate-50">
-        {rows.length === 0 ? (
+        {rows.length === 0 && !error ? (
           <li className="px-5 py-10 text-center text-[12px] text-slate-400">
-            No login events yet. Sign in or out to populate.
+            No login events yet.
           </li>
         ) : (
           rows.slice(0, 80).map((e) => (
@@ -87,11 +100,15 @@ export function LoginHistorySettingsClient() {
                 <p className="font-semibold text-slate-800">
                   {e.action} · {e.actor}
                 </p>
-                <span className="text-[11px] text-slate-400">{e.at}</span>
+                <span className="text-[11px] text-slate-400">
+                  {e.createdAt
+                    ? new Date(e.createdAt).toLocaleString("en-AU")
+                    : "—"}
+                </span>
               </div>
               <p className="text-[11px] text-slate-500">{e.summary}</p>
               <p className="mt-0.5 truncate text-[10px] text-slate-400">
-                {e.meta?.ip ?? "—"} · {e.meta?.userAgent ?? "—"}
+                {e.ip || "—"}
               </p>
             </li>
           ))

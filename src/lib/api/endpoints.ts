@@ -1040,7 +1040,8 @@ export const ENDPOINT_CATALOG = [
     notes: "Permanently delete a soft-deleted record",
   },
   { method: "GET", path: "/rules/permissions/me", module: "rules" },
-  { method: "GET", path: "/audit-logs", module: "audit-logs", notes: "Paginated audit trail; query: page, limit, search, action, entityType" },
+  { method: "GET", path: "/audit-logs", module: "audit-logs", notes: "Paginated audit trail; query: page, limit, entityType, entityId, performedById, startDate, endDate" },
+  { method: "GET", path: "/audit-logs/auth-security-events", module: "audit-logs", notes: "Failed logins and other auth security events" },
 
   // Custom fields (JWT; workspace via token claim)
   { method: "GET", path: "/custom-fields", module: "custom-fields", notes: "List definitions" },
@@ -1074,6 +1075,18 @@ export const ENDPOINT_CATALOG = [
   { method: "GET", path: "/settings/pages", module: "settings", notes: "Full settings-hub catalog" },
   { method: "GET", path: "/settings/pages/:category/:subpage", module: "settings", notes: "One settings-hub page" },
   { method: "PUT", path: "/settings/pages/:category/:subpage", module: "settings", notes: "Replace one settings-hub page" },
+  { method: "GET", path: "/workspaces/:workspaceId/pipelines/mortgage/sla", module: "settings", notes: "Mortgage pipeline SLA" },
+  { method: "PUT", path: "/workspaces/:workspaceId/pipelines/mortgage/sla", module: "settings", notes: "Replace mortgage pipeline SLA" },
+  { method: "GET", path: "/field-permissions", module: "settings", notes: "List field ACL" },
+  { method: "PUT", path: "/field-permissions", module: "settings", notes: "Upsert field ACL" },
+  { method: "DELETE", path: "/field-permissions/:id", module: "settings", notes: "Remove field ACL" },
+  { method: "POST", path: "/security/two-factor/setup", module: "settings", notes: "Start TOTP enroll" },
+  { method: "POST", path: "/security/two-factor/confirm", module: "settings", notes: "Confirm TOTP enroll" },
+  { method: "POST", path: "/security/two-factor/disable", module: "settings", notes: "Disable TOTP" },
+  { method: "POST", path: "/workspace-backups", module: "settings", notes: "Queue workspace backup" },
+  { method: "GET", path: "/workspace-backups", module: "settings", notes: "List workspace backups" },
+  { method: "GET", path: "/workspace-backups/:id", module: "settings", notes: "Backup payload" },
+  { method: "POST", path: "/workspace-backups/:id/restore", module: "settings", notes: "Restore missing CRM rows" },
 
   // Notification preferences (JWT; workspace-scoped URL preferred when token has workspaceId)
   {

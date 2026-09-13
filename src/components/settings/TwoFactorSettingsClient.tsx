@@ -1,34 +1,96 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ShieldCheck, KeyRound } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import {
-  DEMO_TOTP_CODE,
-  disableTwoFactor,
-  enableTwoFactor,
-  loadTwoFactorConfig,
-  regenerateBackupCodes,
-  type TwoFactorConfig,
-} from "@/lib/auth/two-factor";
+  confirmCrmTwoFactorSetup,
+  disableCrmTwoFactor,
+  startCrmTwoFactorSetup,
+} from "@/lib/auth/two-factor-api";
 import { patchCrmWorkspaceSettings } from "@/lib/settings/api";
 import { useCrmSettings } from "@/lib/settings/use-crm-settings";
+import {
+  getCrmUserProfile,
+  tryCrmUserProfile,
+} from "@/lib/user-profile/api";
 import { cn } from "@/lib/utils";
 
 /** Settings → Security → Two-Factor Authentication */
 export function TwoFactorSettingsClient() {
   const crm = useCrmSettings();
-  const [cfg, setCfg] = useState<TwoFactorConfig>(() => loadTwoFactorConfig());
+  const [enabled, setEnabled] = useState(false);
+  const [enrolledAt, setEnrolledAt] = useState<string | null>(null);
+  const [secret, setSecret] = useState("");
+  const [otpAuthUrl, setOtpAuthUrl] = useState("");
+  const [code, setCode] = useState("");
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [enforce, setEnforce] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (crm.security) setEnforce(crm.security.enforce2FA);
     else if (crm.settings) setEnforce(Boolean(crm.settings.enforce2FA));
   }, [crm.security, crm.settings]);
 
+  useEffect(() => {
+    void tryCrmUserProfile(() => getCrmUserProfile()).then((profile) => {
+      if (!profile) return;
+      setEnabled(Boolean(profile.twoFactorEnabled));
+      setEnrolledAt(profile.twoFactorEnabledAt ?? null);
+    });
+  }, []);
+
   function flash(msg: string) {
     setMessage(msg);
     window.setTimeout(() => setMessage(null), 2800);
+  }
+
+  async function onStart() {
+    setBusy(true);
+    try {
+      const setup = await startCrmTwoFactorSetup();
+      setSecret(setup.secret);
+      setOtpAuthUrl(setup.otpAuthUrl);
+      flash("Scan the secret in your authenticator, then confirm the code");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Could not start 2FA setup");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onConfirm() {
+    setBusy(true);
+    try {
+      const codes = await confirmCrmTwoFactorSetup(code);
+      setEnabled(true);
+      setEnrolledAt(new Date().toISOString());
+      setRecoveryCodes(codes);
+      setCode("");
+      flash("2FA enabled — store the recovery codes");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "That code was not accepted");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDisable() {
+    setBusy(true);
+    try {
+      await disableCrmTwoFactor();
+      setEnabled(false);
+      setEnrolledAt(null);
+      setSecret("");
+      setOtpAuthUrl("");
+      setRecoveryCodes([]);
+      flash("2FA disabled");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Could not disable 2FA");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -38,9 +100,8 @@ export function TwoFactorSettingsClient() {
           Two-factor authentication
         </h2>
         <p className="mt-0.5 text-[12px] text-slate-500">
-          Workspace policy uses GET /v1/settings/security. Personal TOTP demo
-          still uses code{" "}
-          <span className="font-semibold text-slate-700">{DEMO_TOTP_CODE}</span>.
+          Personal TOTP uses POST /v1/security/two-factor. Workspace policy uses
+          PATCH /v1/settings enforce2FA.
         </p>
         <span
           className={cn(
@@ -66,26 +127,34 @@ export function TwoFactorSettingsClient() {
             <ShieldCheck className="h-4 w-4 text-violet-600" />
             <div>
               <p className="text-[13px] font-semibold text-slate-800">
-                {cfg.enabled ? "2FA is on" : "2FA is off"}
+                {enabled ? "2FA is on" : "2FA is off"}
               </p>
               <p className="text-[11px] text-slate-500">
-                {cfg.enrolledAt
-                  ? `Enrolled ${new Date(cfg.enrolledAt).toLocaleString("en-AU")}`
+                {enrolledAt
+                  ? `Enrolled ${new Date(enrolledAt).toLocaleString("en-AU")}`
                   : "Not enrolled"}
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              const next = cfg.enabled ? disableTwoFactor() : enableTwoFactor();
-              setCfg(next);
-              flash(next.enabled ? "2FA enabled" : "2FA disabled");
-            }}
-            className="h-8 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white hover:bg-violet-700"
-          >
-            {cfg.enabled ? "Disable" : "Enable"}
-          </button>
+          {enabled ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void onDisable()}
+              className="h-8 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+            >
+              Disable
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void onStart()}
+              className="h-8 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
+            >
+              Enable
+            </button>
+          )}
         </div>
 
         <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3">
@@ -135,46 +204,53 @@ export function TwoFactorSettingsClient() {
           />
         </label>
 
-        <div className="rounded-xl border border-dashed border-slate-200 px-4 py-3">
-          <p className="text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
-            Authenticator secret (demo)
-          </p>
-          <p className="mt-1 font-mono text-[13px] text-slate-800">
-            {cfg.secretDemo}
-          </p>
-          <p className="mt-2 text-[11px] text-slate-500">
-            QR placeholder — use demo code {DEMO_TOTP_CODE} at login.
-          </p>
-        </div>
-
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-[12px] font-semibold text-slate-700">
-              Backup codes
+        {!enabled && (secret || otpAuthUrl) ? (
+          <div className="space-y-2 rounded-xl border border-dashed border-slate-200 px-4 py-3">
+            <p className="text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+              Authenticator secret
             </p>
-            <button
-              type="button"
-              onClick={() => {
-                setCfg(regenerateBackupCodes());
-                flash("Backup codes regenerated");
-              }}
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-700"
-            >
-              <KeyRound className="h-3 w-3" />
-              Regenerate
-            </button>
-          </div>
-          <ul className="grid grid-cols-1 gap-1 sm:grid-cols-3">
-            {cfg.backupCodes.map((c) => (
-              <li
-                key={c}
-                className="rounded-lg bg-slate-50 px-3 py-2 font-mono text-[12px] text-slate-700"
+            {secret ? (
+              <p className="font-mono text-[13px] text-slate-800">{secret}</p>
+            ) : null}
+            {otpAuthUrl ? (
+              <p className="break-all text-[11px] text-slate-500">{otpAuthUrl}</p>
+            ) : null}
+            <div className="flex flex-wrap gap-2 pt-1">
+              <input
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="6-digit code"
+                className="h-9 w-36 rounded-lg border border-slate-200 px-3 text-[13px] outline-none focus:border-violet-400"
+              />
+              <button
+                type="button"
+                disabled={busy || code.trim().length < 6}
+                onClick={() => void onConfirm()}
+                className="h-9 rounded-lg bg-violet-600 px-3 text-[12px] font-semibold text-white disabled:opacity-60"
               >
-                {c}
-              </li>
-            ))}
-          </ul>
-        </div>
+                Confirm
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {recoveryCodes.length ? (
+          <div>
+            <p className="mb-2 text-[12px] font-semibold text-slate-700">
+              Recovery codes (shown once)
+            </p>
+            <ul className="grid grid-cols-1 gap-1 sm:grid-cols-3">
+              {recoveryCodes.map((c) => (
+                <li
+                  key={c}
+                  className="rounded-lg bg-slate-50 px-3 py-2 font-mono text-[12px] text-slate-700"
+                >
+                  {c}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
     </div>
   );
