@@ -31,7 +31,7 @@ function addresses(list?: string[]) {
 /** SendGrid wants raw base64, no data: prefix or whitespace. */
 export function sendgridBase64(content: string): string {
   const trimmed = content.trim();
-  const dataUrl = trimmed.match(/^data:[^;]+;base64,(.+)$/is);
+  const dataUrl = trimmed.match(/^data:[^;]+;base64,([\s\S]+)$/i);
   const raw = dataUrl?.[1] ?? trimmed;
   return raw.replace(/\s+/g, "");
 }
