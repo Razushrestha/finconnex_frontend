@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   MessageSquare,
@@ -10,7 +10,6 @@ import {
   FileText,
 } from "lucide-react";
 import {
-  MESSAGE_OWNERS,
   MESSAGE_STATUSES,
   MESSAGE_TYPES,
   type MessageStatus,
@@ -35,11 +34,16 @@ import {
 
 import {
   createCrmMessage,
-  CRM_SMS_TO_NUMBER,
   isCrmMessageId,
   persistRemoteMessage,
   sendCrmMessage,
 } from "@/lib/messages/api";
+import {
+  listAssignableOwnersLocal,
+  loadAssignableOwners,
+  type AssignableOwner,
+} from "@/lib/users/assignable";
+import { listCrmContacts } from "@/lib/contacts/api";
 import { formatRulesAt } from "@/lib/rules/storage";
 import { defaultActorName } from "@/lib/rules/actor";
 
@@ -65,6 +69,13 @@ interface FormState {
   relatedId: string;
   status: MessageStatus | "";
   template: string;
+  /**
+   * The contact the message is addressed to. An external message carries a
+   * contact id, not a phone number — CreateMessageDto declares
+   * `@ValidateIf(EXTERNAL) @IsUUID() toContactId`, so leaving it unset made
+   * every external send fail validation with a bare 400.
+   */
+  toContactId: string;
 }
 
 const MESSAGE_TEMPLATES = [
@@ -79,12 +90,13 @@ const initialState: FormState = {
   subject: "",
   body: "",
   from: defaultActorName(),
-  to: CRM_SMS_TO_NUMBER,
+  to: "",
   relatedKind: "",
   relatedName: "",
   relatedId: "",
   status: "Draft",
   template: "",
+  toContactId: "",
 };
 
 export function CreateMessageForm({
@@ -105,6 +117,58 @@ export function CreateMessageForm({
   );
   const [submitted, setSubmitted] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  /**
+   * Real workspace members. This used to render MESSAGE_OWNERS, which is
+   * ACTIVITY_OWNERS, which is an empty array since the demo names were
+   * stripped — so the From select had no options at all.
+   */
+  const [owners, setOwners] = useState<AssignableOwner[]>(() =>
+    listAssignableOwnersLocal(),
+  );
+  const [contacts, setContacts] = useState<
+    { id: string; name: string; phone: string }[]
+  >([]);
+  const [contactsState, setContactsState] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadAssignableOwners()
+      .then((rows) => {
+        if (!cancelled && rows.length) setOwners(rows);
+      })
+      .catch(() => {
+        /* keep whatever the local directory already gave us */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void listCrmContacts({ limit: 100 })
+      .then((rows) => {
+        if (cancelled) return;
+        setContacts(
+          rows
+            .map(({ contact }) => ({
+              id: contact.id,
+              name: contact.name || contact.email || "Untitled contact",
+              phone: contact.phone ?? "",
+            }))
+            .filter((row) => isUuid(row.id)),
+        );
+        setContactsState("ready");
+      })
+      .catch(() => {
+        if (!cancelled) setContactsState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -122,6 +186,11 @@ export function CreateMessageForm({
     if (!form.type) next.type = "Type is required";
     if (!form.subject.trim()) next.subject = "Subject is required";
     if (!form.body.trim()) next.body = "Body is required";
+    // The API rejects an external message without a contact, so catch it here
+    // rather than surfacing the server's unlabelled 400.
+    if (form.type === "External" && !isUuid(form.toContactId)) {
+      next.toContactId = "Pick the contact this message goes to";
+    }
     if (form.relatedKind && !isUuid(form.relatedId)) {
       next.relatedName = "Pick a live CRM record";
     }
@@ -144,7 +213,8 @@ export function CreateMessageForm({
           type: form.type as MessageType,
           subject: form.subject.trim(),
           body: form.body.trim(),
-          to: CRM_SMS_TO_NUMBER,
+          to: form.to || undefined,
+          toContactId: form.toContactId || undefined,
           relatedTo,
           relatedType: form.relatedKind
             ? form.relatedKind.toUpperCase()
@@ -257,22 +327,51 @@ export function CreateMessageForm({
             value={form.from}
             onChange={(e) => update("from", e.target.value)}
           >
-            {MESSAGE_OWNERS.map((o) => (
-              <option key={o} value={o}>
-                {o}
+            <option value="">Select a teammate...</option>
+            {owners.map((o) => (
+              <option key={o.id} value={o.name || o.email}>
+                {o.name || o.email}
               </option>
             ))}
           </select>
         </InputShell>
       </Field>
-      <Field label="To">
+      {/*
+        An external message is addressed to a contact, not to a typed number:
+        the API takes `toContactId` and resolves the phone itself. A free-text
+        box here produced a message the backend rejected with a bare 400.
+      */}
+      <Field label="To" error={submitted ? errors.toContactId : undefined}>
         <InputShell icon={Users}>
-          <input
-            className={elevatedInputClass(true)}
-            value={form.to}
-            onChange={(e) => update("to", e.target.value)}
-            placeholder={CRM_SMS_TO_NUMBER}
-          />
+          <select
+            className={elevatedSelectClass(true)}
+            value={form.toContactId}
+            onChange={(e) => {
+              const contact = contacts.find((c) => c.id === e.target.value);
+              setForm((prev) => ({
+                ...prev,
+                toContactId: e.target.value,
+                to: contact?.phone || contact?.name || "",
+              }));
+            }}
+            disabled={form.type === "Internal"}
+          >
+            <option value="">
+              {contactsState === "loading"
+                ? "Loading contacts..."
+                : contactsState === "error"
+                  ? "Could not load contacts"
+                  : contacts.length === 0
+                    ? "No contacts yet — add one first"
+                    : "Select a contact..."}
+            </option>
+            {contacts.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+                {c.phone ? ` — ${c.phone}` : ""}
+              </option>
+            ))}
+          </select>
         </InputShell>
       </Field>
       <Field label="Status">
