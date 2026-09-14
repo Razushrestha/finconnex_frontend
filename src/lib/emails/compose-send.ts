@@ -29,6 +29,13 @@ export async function sendCrmActivityEmail(input: {
   scheduledAt?: string;
   files?: File[];
 }): Promise<Email> {
+  const { ensureCrmAccess } = await import("@/lib/activity-timeline/auth");
+  const access = await ensureCrmAccess();
+  if (!access?.accessToken) {
+    throw new Error(
+      "CRM session token unavailable. Sign out and sign in again, then retry sending.",
+    );
+  }
   const to = uniqueEmails(input.to);
   if (!to[0]) {
     throw new Error("Add a recipient email address");

@@ -23,7 +23,10 @@ type AttachmentIn = {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Sign in to send mail" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Session has expired. Sign in again to send mail." },
+      { status: 401 },
+    );
   }
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;

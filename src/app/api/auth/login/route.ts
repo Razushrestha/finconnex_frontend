@@ -147,6 +147,9 @@ export async function POST(request: Request) {
         source: "crm",
         isPlatformAdmin: platformAdmin,
         needsWorkspace: !scoped.workspace && !platformAdmin,
+        // Client must persist these — access JWTs often won't fit in cookies on Vercel.
+        accessToken: scoped.accessToken,
+        refreshToken: scoped.refreshToken ?? loggedIn.refreshToken,
         user: {
           id: sessionFields.userId,
           email: sessionFields.email,

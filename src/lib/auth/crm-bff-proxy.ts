@@ -11,7 +11,6 @@ import {
   isCrmJwtExpired,
   refreshCrmTokens,
   resolveLiveCrmAuth,
-  activateWorkspace,
 } from "@/lib/auth/crm-server";
 import { sessionRememberMe } from "@/lib/auth/constants";
 import { isPlatformAdminRole } from "@/lib/auth/platform";
@@ -164,33 +163,21 @@ export async function proxyCrmV1(
 
     auth = await resolveLiveCrmAuth();
     const headerToken = accessTokenFromRequest(request);
-    if (
-      headerToken &&
-      !isCrmJwtExpired(headerToken, 0) &&
-      (!auth?.accessToken || isCrmJwtExpired(auth.accessToken))
-    ) {
-      try {
-        const scoped = await activateWorkspace(
-          headerToken,
-          auth?.refreshToken ?? null,
-        );
-        auth = {
-          accessToken: scoped.accessToken,
-          refreshToken: scoped.refreshToken,
-        };
-      } catch {
-        auth = {
-          accessToken: headerToken,
-          refreshToken: auth?.refreshToken ?? null,
-        };
-      }
+    // Prefer a live browser Bearer token. On Vercel the access JWT often cannot
+    // fit in an httpOnly cookie, so the client holds it in localStorage and
+    // sends Authorization on every BFF call.
+    if (headerToken && !isCrmJwtExpired(headerToken, 0)) {
+      auth = {
+        accessToken: headerToken,
+        refreshToken: auth?.refreshToken ?? null,
+      };
     }
 
     if (!session && !auth?.accessToken) {
       const empty = tryEmptySignedInGet(path, request.method.toUpperCase());
       if (empty) return empty;
       return NextResponse.json(
-        { message: "Sign in to continue" },
+        { message: "Session has expired. Sign in again." },
         { status: 401 },
       );
     }
@@ -215,7 +202,10 @@ export async function proxyCrmV1(
       const empty = tryEmptySignedInGet(path, request.method.toUpperCase());
       if (empty) return empty;
       return NextResponse.json(
-        { message: "Invalid or missing access token" },
+        {
+          message:
+            "CRM session token unavailable. Sign out and sign in again so email sending can refresh your token.",
+        },
         { status: 401 },
       );
     }

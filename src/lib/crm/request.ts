@@ -79,6 +79,10 @@ const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
     "Workspace settings are missing on the CRM server. Ask an admin to open Settings once to create them.",
   "auth.error.insufficientPermissions":
     "Only a workspace owner or admin can update Company Profile and other workspace settings.",
+  "Invalid or missing access token":
+    "CRM session token unavailable. Sign out and sign in again so email sending can refresh your token.",
+  "Session has expired. Sign in again.":
+    "Session has expired. Sign out and sign in again.",
   "sms.error.phoneNumberNotConfigured":
     "Twilio from-number is missing on the CRM server.",
   "calendly.error.notConfigured":

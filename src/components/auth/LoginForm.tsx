@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { logAuth } from "@/lib/rules";
 import { isPendingVerificationEmail } from "@/lib/auth/pending-verification";
+import { persistCrmTokens } from "@/lib/activity-timeline/auth";
 
 function getSafeDashboardUrl(callbackUrl: string | null): string {
   if (
@@ -118,7 +119,15 @@ export function LoginForm() {
       const payload = data as {
         needsWorkspace?: boolean;
         isPlatformAdmin?: boolean;
+        accessToken?: string | null;
+        refreshToken?: string | null;
       };
+      if (payload.accessToken) {
+        persistCrmTokens({
+          accessToken: payload.accessToken,
+          refreshToken: payload.refreshToken,
+        });
+      }
       window.location.href = payload.isPlatformAdmin
         ? "/platform"
         : payload.needsWorkspace

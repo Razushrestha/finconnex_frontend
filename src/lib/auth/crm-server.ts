@@ -141,17 +141,29 @@ export function applyCrmTokenCookies(
   rememberMe = false,
 ) {
   const base = getSessionCookieOptions(rememberMe);
-  response.cookies.set(CRM_ACCESS_COOKIE, tokens.accessToken, {
-    ...base,
-    maxAge: tokenMaxAgeSeconds(tokens.accessToken, CRM_ACCESS_FALLBACK_MAX_AGE),
-  });
-  if (tokens.refreshToken) {
-    const refreshFallback = rememberMe ? REMEMBER_MAX_AGE : SESSION_MAX_AGE;
-    const refreshAge = tokenMaxAgeSeconds(tokens.refreshToken, refreshFallback);
-    response.cookies.set(CRM_REFRESH_COOKIE, tokens.refreshToken, {
+  // Browsers silently drop Set-Cookie values over ~4KB. Nest access JWTs often
+  // exceed that on Vercel, which leaves the FinConnex session cookie intact but
+  // strips CRM auth — every email/CRM mutation then fails as "token unavailable".
+  const maxCookieBytes = 3500;
+  const accessBytes = new TextEncoder().encode(tokens.accessToken).length;
+  if (accessBytes > 0 && accessBytes <= maxCookieBytes) {
+    response.cookies.set(CRM_ACCESS_COOKIE, tokens.accessToken, {
       ...base,
-      maxAge: rememberMe ? Math.max(refreshAge, REMEMBER_MAX_AGE) : refreshAge,
+      maxAge: tokenMaxAgeSeconds(tokens.accessToken, CRM_ACCESS_FALLBACK_MAX_AGE),
     });
+  } else {
+    response.cookies.set(CRM_ACCESS_COOKIE, "", { ...base, maxAge: 0 });
+  }
+  if (tokens.refreshToken) {
+    const refreshBytes = new TextEncoder().encode(tokens.refreshToken).length;
+    if (refreshBytes <= maxCookieBytes) {
+      const refreshFallback = rememberMe ? REMEMBER_MAX_AGE : SESSION_MAX_AGE;
+      const refreshAge = tokenMaxAgeSeconds(tokens.refreshToken, refreshFallback);
+      response.cookies.set(CRM_REFRESH_COOKIE, tokens.refreshToken, {
+        ...base,
+        maxAge: rememberMe ? Math.max(refreshAge, REMEMBER_MAX_AGE) : refreshAge,
+      });
+    }
   }
 }
 

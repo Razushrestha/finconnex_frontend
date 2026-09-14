@@ -10,6 +10,7 @@ import {
   getPendingVerificationEmail,
   setPendingVerificationEmail,
 } from "@/lib/auth/pending-verification";
+import { persistCrmTokens } from "@/lib/activity-timeline/auth";
 
 export function SignupForm() {
   const [firstName, setFirstName] = React.useState("");
@@ -201,7 +202,15 @@ export function SignupForm() {
           const payload = loginData as {
             needsWorkspace?: boolean;
             isPlatformAdmin?: boolean;
+            accessToken?: string | null;
+            refreshToken?: string | null;
           };
+          if (payload.accessToken) {
+            persistCrmTokens({
+              accessToken: payload.accessToken,
+              refreshToken: payload.refreshToken,
+            });
+          }
           window.location.href = payload.isPlatformAdmin
             ? "/platform"
             : payload.needsWorkspace
