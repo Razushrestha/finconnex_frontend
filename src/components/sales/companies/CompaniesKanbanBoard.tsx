@@ -47,9 +47,12 @@ type CompanyRecord = CompanyGroup["companies"][number];
 interface CompaniesKanbanBoardProps {
   filters?: CompanyFilters;
   visibleColumnIds?: string[];
+  /** Optional display title overrides keyed by group id. */
+  columnTitles?: Record<string, string>;
   selectedIds?: string[];
   onToggleSelect?: (id: string) => void;
   onAddLead?: (columnId: string) => void;
+  onAddCompany?: (columnId: string) => void;
   onQuickAction?: (kind: any, company: CompanyRecord) => void;
   sortValue?: string;
   sortDirection?: "asc" | "desc";
@@ -58,9 +61,11 @@ interface CompaniesKanbanBoardProps {
 export function CompaniesKanbanBoard({
   filters,
   visibleColumnIds,
+  columnTitles,
   selectedIds = [],
   onToggleSelect,
   onAddLead,
+  onAddCompany,
   onQuickAction,
   sortValue,
   sortDirection = "asc",
@@ -264,7 +269,7 @@ export function CompaniesKanbanBoard({
             >
               {isCollapsed ? (
                 <KanbanCollapsedRail
-                  title={group.title}
+                  title={columnTitles?.[group.id] ?? group.title}
                   count={group.companies.length}
                   onExpand={() => toggleCollapsed(group.id)}
                 />
@@ -273,8 +278,11 @@ export function CompaniesKanbanBoard({
                   <div className={KANBAN_HEADER}>
                     <div className="flex h-6 items-center justify-between gap-1">
                       <div className="flex min-w-0 items-center gap-2">
-                        <h2 className={KANBAN_HEADER_TITLE} title={group.title}>
-                          {group.title}
+                        <h2
+                          className={KANBAN_HEADER_TITLE}
+                          title={columnTitles?.[group.id] ?? group.title}
+                        >
+                          {columnTitles?.[group.id] ?? group.title}
                         </h2>
                         <span className={KANBAN_HEADER_COUNT}>
                           {group.companies.length}
@@ -287,9 +295,13 @@ export function CompaniesKanbanBoard({
                     footer={
                       <KanbanColumnFooter
                         createLabel="Create Company"
-                        onCreate={() => router.push("/sales/companies/create")}
+                        onCreate={() =>
+                          onAddCompany
+                            ? onAddCompany(group.id)
+                            : router.push("/sales/companies/create")
+                        }
                         onCollapse={() => toggleCollapsed(group.id)}
-                        collapseLabel={`Collapse ${group.title}`}
+                        collapseLabel={`Collapse ${columnTitles?.[group.id] ?? group.title}`}
                       />
                     }
                   >

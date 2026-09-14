@@ -1,4 +1,4 @@
-/** Common CRM timezone list (GHL / HubSpot / Calendly style). */
+/** Common CRM timezone list (GHL / HubSpot style). */
 export const WORLD_TIMEZONES = [
   "GMT-12:00 International Date Line West",
   "GMT-11:00 Midway Island, Samoa (SST)",
@@ -168,7 +168,7 @@ export function timezoneLabelFromIana(tz?: string): string {
   return IANA_TO_LABEL[tz] ?? WORLD_TIMEZONES.find((label) => label.includes(tz)) ?? tz;
 }
 
-/** Calendly / CRM APIs want IANA ids, not the GMT display labels. */
+/** CRM APIs want IANA ids, not the GMT display labels. */
 export function ianaTimezoneFromLabel(label?: string): string {
   const raw = label?.trim() || "";
   if (!raw) return "Australia/Sydney";

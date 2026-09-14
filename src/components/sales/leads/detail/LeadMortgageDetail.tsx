@@ -40,6 +40,7 @@ import {
   listLeadActivityCandidates,
 } from "@/lib/leads/activity-index";
 import type { LeadActivityCandidate } from "@/lib/leads/card-types";
+import { formatLastContactedAt } from "@/lib/leads/activity-dates";
 import { relatedToLabel } from "@/lib/related-entity";
 import { RecordTagsRow } from "@/components/shared/tags/RecordTags";
 import {
@@ -123,13 +124,13 @@ const FINANCE_META = [
   { icon: Clock, iconWrap: "bg-indigo-50 text-indigo-600" },
 ];
 
-const RELATED = [
-  { label: "Tasks", count: 3, icon: Check, tone: "bg-violet-50 text-violet-700" },
-  { label: "Notes", count: 4, icon: StickyNote, tone: "bg-amber-50 text-amber-700" },
-  { label: "Appts", count: 2, icon: CalendarDays, tone: "bg-sky-50 text-sky-700" },
-  { label: "Deals", count: 0, icon: Briefcase, tone: "bg-slate-100 text-slate-500" },
-  { label: "Docs", count: 3, icon: FileText, tone: "bg-rose-50 text-rose-600" },
-];
+const RELATED_META = [
+  { label: "Tasks", icon: Check, tone: "bg-violet-50 text-violet-700" },
+  { label: "Notes", icon: StickyNote, tone: "bg-amber-50 text-amber-700" },
+  { label: "Appts", icon: CalendarDays, tone: "bg-sky-50 text-sky-700" },
+  { label: "Deals", icon: Briefcase, tone: "bg-slate-100 text-slate-500" },
+  { label: "Docs", icon: FileText, tone: "bg-rose-50 text-rose-600" },
+] as const;
 
 const CONVERSATION_KINDS = new Set(["call", "sms", "email"]);
 const ACTIVITY_KINDS = new Set(["task", "meeting", "reminder"]);
@@ -324,6 +325,37 @@ export function LeadMortgageDetail({
     () => leadNextBestActivity(card.name, now),
     [card.name, now],
   );
+  const lastContacted = useMemo(() => {
+    const hit = activity.conversation.find(
+      (item) => item.bucket === "completed" && item.dueAt,
+    );
+    if (!hit?.dueAt) return "Never";
+    return formatLastContactedAt(hit.dueAt, now);
+  }, [activity.conversation, now]);
+  const relatedCounts = useMemo(
+    () => ({
+      Tasks: activity.activities.filter((item) => item.kind === "task").length,
+      Notes: activity.notes.length,
+      Appts: activity.activities.filter((item) => item.kind === "meeting")
+        .length,
+      Deals: card.convertedDealId ? 1 : 0,
+      Docs: activity.documents.length,
+    }),
+    [
+      activity.activities,
+      activity.notes.length,
+      activity.documents.length,
+      card.convertedDealId,
+    ],
+  );
+  const recentDocuments = useMemo(
+    () =>
+      activity.documents
+        .map((item) => item.title.trim())
+        .filter(Boolean)
+        .slice(0, 3),
+    [activity.documents],
+  );
   const router = useRouter();
   const nextOverdue = nextAction
     ? isOverdueActivity(nextAction.at, now)
@@ -352,7 +384,7 @@ export function LeadMortgageDetail({
   const showStrategyPanel = tab === "strategy";
   const showPipeline = tab === "overview";
   const showRedFlags = tab === "overview";
-  const showRecentDocuments = tab === "overview";
+  const showRecentDocuments = tab === "overview" && recentDocuments.length > 0;
   const showDocuments = tab === "documents";
   const showSidebar = tab === "overview";
   const showConversation = tab === "conversation";
@@ -568,7 +600,7 @@ export function LeadMortgageDetail({
             }
           />
           <Meta label="Lead Created" value={card.createdDate} />
-          <Meta label="Last Contacted" value="Yesterday, 1:00 PM" />
+          <Meta label="Last Contacted" value={lastContacted} />
           <Meta
             label="Days in Stage"
             value={`${inStage} day${inStage === 1 ? "" : "s"}`}
@@ -803,11 +835,7 @@ export function LeadMortgageDetail({
             <Card>
               <Eyebrow>Recent Documents</Eyebrow>
               <ul className="mt-3 space-y-2">
-                {[
-                  "ID Proof.pdf",
-                  "Payslip - Jun 2025.pdf",
-                  "Bank Statement - Jun 2025.pdf",
-                ].map((name) => (
+                {recentDocuments.map((name) => (
                   <li
                     key={name}
                     className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2"
@@ -943,7 +971,7 @@ export function LeadMortgageDetail({
           </Card>
           ) : null}
 
-          {tab === "overview" ? (
+          {tab === "overview" && score.score != null ? (
           <Card>
             <Eyebrow>Lead Score</Eyebrow>
             <div className="mt-3 flex items-center gap-4">
@@ -989,7 +1017,7 @@ export function LeadMortgageDetail({
               </Link>
             </div>
             <div className="grid grid-cols-5 gap-2">
-              {RELATED.map((item) => {
+              {RELATED_META.map((item) => {
                 const Icon = item.icon;
                 return (
                   <div key={item.label} className="text-center">
@@ -1002,7 +1030,7 @@ export function LeadMortgageDetail({
                       <Icon className="h-3.5 w-3.5" />
                     </span>
                     <p className="mt-1 text-[15px] font-bold text-slate-900">
-                      {item.count}
+                      {relatedCounts[item.label]}
                     </p>
                     <p className="text-[10px] text-slate-400">{item.label}</p>
                   </div>

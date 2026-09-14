@@ -208,10 +208,6 @@ export async function readCrmTokens(): Promise<{
 }
 
 /** Cookie/env CRM JWTs, refreshed and workspace-scoped when possible. */
-let inflightAuth: Promise<{
-  accessToken: string;
-  refreshToken: string | null;
-} | null> | null = null;
 let inflightRotate: Promise<{
   accessToken: string;
   refreshToken: string;
@@ -221,13 +217,7 @@ export async function resolveLiveCrmAuth(): Promise<{
   accessToken: string;
   refreshToken: string | null;
 } | null> {
-  if (inflightAuth) return inflightAuth;
-  inflightAuth = resolveLiveCrmAuthOnce();
-  try {
-    return await inflightAuth;
-  } finally {
-    inflightAuth = null;
-  }
+  return resolveLiveCrmAuthOnce();
 }
 
 async function resolveLiveCrmAuthOnce(): Promise<{
@@ -382,6 +372,14 @@ export async function crmVerifySignupOtp(input: {
   await crmFetch<unknown>("/auth/signup/verify-otp", {
     method: "POST",
     body: input,
+  });
+}
+
+/** Re-sends the signup activation code for an unverified account. */
+export async function crmResendSignupOtp(email: string): Promise<void> {
+  await crmFetch<unknown>("/auth/signup/resend-otp", {
+    method: "POST",
+    body: { email },
   });
 }
 
@@ -659,15 +657,39 @@ export async function activateWorkspace(
     return { accessToken, refreshToken, workspace: null, workspaces };
   }
 
-  const selected = await crmSelectWorkspace(
-    chosen.id,
-    accessToken,
-    refreshToken,
-  );
-  return {
-    accessToken: selected.data.accessToken,
-    refreshToken: selected.refreshToken ?? refreshToken,
-    workspace: chosen,
-    workspaces,
-  };
+  try {
+    const selected = await crmSelectWorkspace(
+      chosen.id,
+      accessToken,
+      refreshToken,
+    );
+    return {
+      accessToken: selected.data.accessToken,
+      refreshToken: selected.refreshToken ?? refreshToken,
+      workspace: chosen,
+      workspaces,
+    };
+  } catch {
+    // Login must still succeed if workspace scoping fails (common locally when
+    // CRM_WORKSPACE_ID points at a tenant the user cannot select).
+    for (const workspace of workspaces) {
+      if (workspace.id === chosen.id) continue;
+      try {
+        const selected = await crmSelectWorkspace(
+          workspace.id,
+          accessToken,
+          refreshToken,
+        );
+        return {
+          accessToken: selected.data.accessToken,
+          refreshToken: selected.refreshToken ?? refreshToken,
+          workspace,
+          workspaces,
+        };
+      } catch {
+        /* try next membership */
+      }
+    }
+    return { accessToken, refreshToken, workspace: null, workspaces };
+  }
 }

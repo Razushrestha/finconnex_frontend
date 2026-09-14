@@ -32,6 +32,8 @@ export interface Email {
   openedDate?: string;
   importance?: EmailImportance;
   attachments?: EmailAttachmentMeta[];
+  /** Client flag: this row was composed/sent from the app. */
+  outbound?: boolean;
 }
 
 export interface EmailColumn {

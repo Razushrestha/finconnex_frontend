@@ -489,6 +489,14 @@ async function tasksPath(suffix: string, query = ""): Promise<string> {
   if (scoped) {
     return `${workspaceTasksPath(scoped.workspaceId, suffix)}${query}`;
   }
+  const stored =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem("fc.crm.workspaceId") ||
+        window.sessionStorage.getItem("fc.crm.workspaceId")
+      : null;
+  if (stored && isUuid(stored)) {
+    return `${workspaceTasksPath(stored, suffix)}${query}`;
+  }
   return `${globalTasksPath(suffix)}${query}`;
 }
 

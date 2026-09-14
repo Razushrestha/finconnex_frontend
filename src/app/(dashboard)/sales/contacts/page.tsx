@@ -1,12 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   EntityHeader,
   type SortDirection,
   type ActionOption,
 } from "@/components/sales/EntityHeader";
+import {
+  columnTitleMap,
+  loadKanbanColumnPrefs,
+  persistKanbanColumnPrefs,
+  type KanbanColumnPref,
+} from "@/lib/kanban/column-prefs";
 import {
   ArrowLeftRight,
   Trash2,
@@ -19,6 +25,7 @@ import {
 } from "lucide-react";
 import { ContactsKanbanBoard } from "@/components/sales/contacts/ContactsKanbanBoard";
 import { ContactsListView } from "@/components/sales/contacts/ContactsListView";
+import { CreateContactForm } from "@/components/sales/contacts/CreateContactForm";
 import {
   FilterContactsPanel,
   EMPTY_CONTACT_FILTERS,
@@ -62,6 +69,7 @@ import { uniqueTags } from "@/lib/tags";
 import type { ContactSource, ContactStatus } from "@/lib/contacts/types";
 
 const CONTACT_VIEW_MODE_KEY = "finconnex.contacts.view-mode";
+const CONTACT_COLUMNS_KEY = "finconnex.contacts.kanban-columns";
 
 type ContactViewMode = "kanban" | "list";
 
@@ -84,18 +92,23 @@ function persistContactViewMode(mode: ContactViewMode) {
   }
 }
 
-const DEFAULT_CONTACT_COLUMNS = CONTACT_GROUPS.map((group) => ({
-  id: group.id,
-  label: group.title,
-  visible: true,
-}));
+const DEFAULT_CONTACT_COLUMNS: KanbanColumnPref[] = CONTACT_GROUPS.map(
+  (group, index) => ({
+    id: group.id,
+    label: group.title,
+    visible: true,
+    required: index === 0,
+  }),
+);
 
 export default function ContactsPage() {
   const router = useRouter();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ContactViewMode>("kanban");
   const [filters, setFilters] = useState<ContactFilters>(EMPTY_CONTACT_FILTERS);
-  const [columns, setColumns] = useState(DEFAULT_CONTACT_COLUMNS);
+  const [columns, setColumns] = useState<KanbanColumnPref[]>(
+    DEFAULT_CONTACT_COLUMNS,
+  );
 
   // Sort state — field and direction are tracked separately now, matching
   // the EntityHeader "Sort By" panel (field select + Ascending/Descending).
@@ -113,6 +126,7 @@ export default function ContactsPage() {
   const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
   const [isImportOpen, setImportOpen] = useState(false);
   const [isMergeOpen, setMergeOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [totalContacts, setTotalContacts] = useState(0);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
   const defaults = defaultContactImportSettings();
@@ -120,7 +134,57 @@ export default function ContactsPage() {
 
   useEffect(() => {
     setViewMode(loadContactViewMode());
+    setColumns(loadKanbanColumnPrefs(CONTACT_COLUMNS_KEY, DEFAULT_CONTACT_COLUMNS));
   }, []);
+
+  function saveContactColumns(next: KanbanColumnPref[]) {
+    setColumns(next);
+    persistKanbanColumnPrefs(CONTACT_COLUMNS_KEY, next);
+  }
+
+  function toggleContactStageColumn(columnId: string) {
+    const target = columns.find((col) => col.id === columnId);
+    if (target?.required && target.visible) return;
+    const next = columns.map((col) =>
+      col.id === columnId ? { ...col, visible: !col.visible } : col,
+    );
+    if (!next.some((col) => col.visible)) return;
+    saveContactColumns(next);
+  }
+
+  function renameContactStageColumn(columnId: string, nextLabel: string) {
+    saveContactColumns(
+      columns.map((col) =>
+        col.id === columnId ? { ...col, label: nextLabel } : col,
+      ),
+    );
+  }
+
+  function reorderContactStageColumn(draggedId: string, targetId: string) {
+    const next = [...columns];
+    const fromIndex = next.findIndex((c) => c.id === draggedId);
+    const toIndex = next.findIndex((c) => c.id === targetId);
+    if (fromIndex === -1 || toIndex === -1) return;
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved!);
+    saveContactColumns(next);
+  }
+
+  const contactColumnTitles = useMemo(
+    () => columnTitleMap(columns),
+    [columns],
+  );
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("create") !== "1") return;
+    setCreateOpen(true);
+    router.replace("/sales/contacts", { scroll: false });
+  }, [router]);
+
+  function openCreateContact() {
+    setCreateOpen(true);
+  }
 
   useEffect(() => {
     function refresh() {
@@ -192,15 +256,7 @@ export default function ContactsPage() {
   }
 
   function reorderColumn(draggedId: string, targetId: string) {
-    setColumns((prev) => {
-      const next = [...prev];
-      const fromIndex = next.findIndex((c) => c.id === draggedId);
-      const toIndex = next.findIndex((c) => c.id === targetId);
-      if (fromIndex === -1 || toIndex === -1) return prev;
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next;
-    });
+    reorderContactStageColumn(draggedId, targetId);
   }
 
   const visibleColumnIds = columns.filter((c) => c.visible).map((c) => c.id);
@@ -298,6 +354,7 @@ export default function ContactsPage() {
         entityLabel="Contact"
         actionOptions={actionOptions}
         createRoute="/sales/contacts/create"
+        onCreate={openCreateContact}
         importOptions={[
           {
             id: "import-contacts",
@@ -325,6 +382,16 @@ export default function ContactsPage() {
           setActiveSortDirection(direction);
         }}
         footerOptions={footerOptions}
+        columnOptions={viewMode === "kanban" ? columns : undefined}
+        onColumnToggle={
+          viewMode === "kanban" ? toggleContactStageColumn : undefined
+        }
+        onColumnRename={
+          viewMode === "kanban" ? renameContactStageColumn : undefined
+        }
+        onColumnReorder={
+          viewMode === "kanban" ? reorderColumn : undefined
+        }
       />
 
       {selectedIds.length > 0 ? (
@@ -415,9 +482,11 @@ export default function ContactsPage() {
             <ContactsKanbanBoard
               filters={filters}
               visibleColumnIds={visibleColumnIds}
+              columnTitles={contactColumnTitles}
               sortValue={activeSort}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelected}
+              onAddContact={() => openCreateContact()}
               refreshKey={`${crm.source}:${crm.loading}:${totalContacts}`}
             />
           ) : (
@@ -473,6 +542,18 @@ export default function ContactsPage() {
           setTotalContacts(
             listContactGroups().reduce((n, g) => n + g.contacts.length, 0),
           );
+        }}
+      />
+
+      <CreateContactForm
+        variant="modal"
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={() => {
+          setTotalContacts(
+            listContactGroups().reduce((n, g) => n + g.contacts.length, 0),
+          );
+          crm.refresh();
         }}
       />
 

@@ -267,8 +267,8 @@ export default function LinkShortener() {
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-4 w-4" />
-                  Shorten link
+              <Sparkles className="h-4 w-4" />
+              Shorten link
                 </>
               )}
             </button>

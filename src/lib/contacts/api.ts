@@ -12,6 +12,8 @@ import type {
   ContactSource,
   ContactStatus,
 } from "@/lib/contacts/types";
+import { coerceLeadSource } from "@/lib/leads/types";
+import { crmSourceToUi, uiSourceToCrm } from "@/lib/leads/api/map";
 import { ownerDisplayName, ownerDisplayNameOr } from "@/lib/users/display-name";
 
 export type CrmContactQuery = {
@@ -174,35 +176,15 @@ export function mapContactStatus(raw: string): ContactStatus {
 }
 
 export function mapContactSource(raw: string): ContactSource {
-  const value = raw.toLowerCase().replace(/[_-]/g, " ");
-  if (value.includes("refer")) return "Referral";
-  if (value.includes("social")) return "Social Media";
-  if (value.includes("email") || value.includes("campaign")) return "Email Campaign";
-  if (value.includes("cold") || value.includes("call")) return "Cold Call";
-  if (value.includes("web")) return "Website";
-  if (value.includes("other")) return "Other";
-  return "Website";
+  const trimmed = raw.trim();
+  if (!trimmed) return "Website";
+  if (/^[A-Z0-9_]+$/.test(trimmed)) return crmSourceToUi(trimmed);
+  return coerceLeadSource(trimmed);
 }
 
 function apiStatus(status: ContactStatus): string {
   return status.toUpperCase().replace(/ /g, "_");
 }
-
-function apiSource(source: ContactSource): string {
-  return source.toUpperCase().replace(/ /g, "_");
-}
-
-const CRM_CONTACT_SOURCES = new Set([
-  "WEBSITE",
-  "REFERRAL",
-  "COLD_CALL",
-  "SOCIAL_MEDIA",
-  "EMAIL_CAMPAIGN",
-  "PAID_AD",
-  "EVENT",
-  "PARTNER",
-  "OTHER",
-]);
 
 const CRM_LIFECYCLE_STAGES = new Set([
   "SUBSCRIBER",
@@ -227,8 +209,7 @@ function compactContactBody(input: Record<string, unknown>) {
 
 function asCrmContactSource(source?: ContactSource): string | undefined {
   if (!source) return undefined;
-  const value = apiSource(source);
-  return CRM_CONTACT_SOURCES.has(value) ? value : undefined;
+  return uiSourceToCrm(source);
 }
 
 function asCrmLifecycleStage(raw?: string): string | undefined {
@@ -573,7 +554,7 @@ export async function updateCrmContact(
   if (patch.phone != null) body.phone = patch.phone;
   if (patch.mobile != null) body.mobilePhone = patch.mobile;
   if (patch.companyId !== undefined) body.companyId = patch.companyId;
-  if (patch.source != null) body.source = apiSource(patch.source);
+  if (patch.source != null) body.source = asCrmContactSource(patch.source);
   if (patch.status != null) body.status = apiStatus(patch.status);
   if (patch.ownerId !== undefined) body.ownerId = patch.ownerId;
   if (patch.jobTitle != null) body.jobTitle = patch.jobTitle;

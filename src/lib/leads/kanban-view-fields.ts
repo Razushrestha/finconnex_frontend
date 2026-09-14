@@ -23,6 +23,7 @@ export function kanbanSelectedIdsToCardKeys(
   for (const id of selectedFieldIds) {
     const mapped = KANBAN_TO_CARD_FIELD[id];
     if (mapped == null) continue;
+    if (mapped === "owner") continue;
     if (seen.has(mapped)) continue;
     seen.add(mapped);
     keys.push(mapped);

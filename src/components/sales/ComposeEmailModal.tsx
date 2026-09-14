@@ -19,6 +19,11 @@ import {
 import { EmailAiAssist } from "@/components/activities/emails/create/EmailAiAssist";
 import { TaskDescriptionEditor } from "@/components/activities/tasks/TaskDescriptionEditor";
 import { cn } from "@/lib/utils";
+import {
+  invalidEmailMessage,
+  isEmailAddress,
+  partitionEmailAddresses,
+} from "@/lib/emails/address";
 
 export interface ComposeEmailRecipient {
   name: string;
@@ -48,6 +53,8 @@ export interface ComposeEmailModalProps {
   recipient: ComposeEmailRecipient;
   defaultSubject?: string;
   defaultGreeting?: string;
+  defaultTo?: string[];
+  defaultAttachments?: File[];
   onSend: (values: ComposeEmailSendValues) => void | Promise<void>;
   onDiscard?: () => void;
 }
@@ -98,13 +105,6 @@ function applyTokens(text: string, recipient: ComposeEmailRecipient) {
     .replaceAll("{email}", recipient.email);
 }
 
-function parseEmailTokens(raw: string): string[] {
-  return raw
-    .split(/[,;\n]+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-}
-
 function chipInitials(value: string) {
   const local = value.split("@")[0] ?? value;
   const parts = local.replace(/[._-]+/g, " ").trim().split(/\s+/);
@@ -138,74 +138,94 @@ function RecipientChipRow({
   placeholder: string;
   trailing?: ReactNode;
 }) {
+  const [commitError, setCommitError] = useState<string | undefined>();
+
   function commit(raw: string) {
-    const tokens = parseEmailTokens(raw);
-    if (!tokens.length) return;
-    onCommit(tokens);
+    const { valid, invalid } = partitionEmailAddresses(raw);
+    if (valid.length) onCommit(valid);
+    onDraftChange(invalid.join(", "));
+    setCommitError(invalidEmailMessage(invalid));
   }
 
   return (
-    <div className="flex items-start gap-2">
-      <span className="mt-1.5 w-7 shrink-0 text-[11px] font-medium text-slate-400">
-        {label}
-      </span>
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-        {values.map((value) => (
-          <span
-            key={value}
-            className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 py-0.5 pr-1 pl-1 text-[11px] font-medium text-slate-800"
-          >
-            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#5A32A3] text-[8px] font-bold text-white">
-              {chipInitials(value)}
-            </span>
-            <span className="max-w-[180px] truncate">{value}</span>
-            <button
-              type="button"
-              onClick={() => onRemove(value)}
-              aria-label={`Remove ${value}`}
-              className="rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+    <div className="min-w-0 flex-1">
+      <div className="flex items-start gap-2">
+        <span className="mt-1.5 w-7 shrink-0 text-[11px] font-medium text-slate-400">
+          {label}
+        </span>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          {values.map((value) => (
+            <span
+              key={value}
+              className={cn(
+                "inline-flex max-w-full items-center gap-1.5 rounded-full border py-0.5 pr-1 pl-1 text-[11px] font-medium",
+                isEmailAddress(value)
+                  ? "border-slate-200 bg-slate-50 text-slate-800"
+                  : "border-rose-200 bg-rose-50 text-rose-800",
+              )}
             >
-              <X className="h-3 w-3" />
-            </button>
-          </span>
-        ))}
-        <input
-          value={draft}
-          onChange={(e) => {
-            const next = e.target.value;
-            if (/[,;]/.test(next)) {
-              commit(next);
-              return;
-            }
-            onDraftChange(next);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === "Tab" || e.key === ";") {
-              if (draft.trim()) {
-                e.preventDefault();
-                commit(draft);
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#5A32A3] text-[8px] font-bold text-white">
+                {chipInitials(value)}
+              </span>
+              <span className="max-w-[180px] truncate">{value}</span>
+              <button
+                type="button"
+                onClick={() => onRemove(value)}
+                aria-label={`Remove ${value}`}
+                className="rounded-full p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+          <input
+            value={draft}
+            aria-invalid={Boolean(commitError) || undefined}
+            onChange={(e) => {
+              const next = e.target.value;
+              setCommitError(undefined);
+              if (/[,;]/.test(next)) {
+                commit(next);
+                return;
               }
-              return;
-            }
-            if (e.key === "Backspace" && !draft && values.length) {
-              onRemove(values[values.length - 1]!);
-            }
-          }}
-          onPaste={(e) => {
-            const text = e.clipboardData.getData("text");
-            if (/[,;\n]/.test(text)) {
-              e.preventDefault();
-              commit(`${draft} ${text}`);
-            }
-          }}
-          onBlur={() => {
-            if (draft.trim()) commit(draft);
-          }}
-          placeholder={values.length ? "Add another…" : placeholder}
-          className="min-w-[140px] flex-1 border-none bg-transparent py-1 text-[12px] text-slate-800 outline-none placeholder:text-slate-400"
-        />
+              onDraftChange(next);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "Tab" || e.key === ";") {
+                if (draft.trim()) {
+                  e.preventDefault();
+                  commit(draft);
+                }
+                return;
+              }
+              if (e.key === "Backspace" && !draft && values.length) {
+                onRemove(values[values.length - 1]!);
+              }
+            }}
+            onPaste={(e) => {
+              const text = e.clipboardData.getData("text");
+              if (/[,;\n]/.test(text)) {
+                e.preventDefault();
+                commit(`${draft} ${text}`);
+              }
+            }}
+            onBlur={() => {
+              if (draft.trim()) commit(draft);
+            }}
+            placeholder={values.length ? "Add another…" : placeholder}
+            className={cn(
+              "min-w-[140px] flex-1 border-none bg-transparent py-1 text-[12px] outline-none placeholder:text-slate-400",
+              commitError ? "text-rose-700" : "text-slate-800",
+            )}
+          />
+        </div>
+        {trailing}
       </div>
-      {trailing}
+      {commitError ? (
+        <p role="alert" className="mt-1 pl-9 text-[11px] text-rose-700">
+          {commitError}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -230,6 +250,8 @@ export function ComposeEmailModal({
   recipient,
   defaultSubject = "",
   defaultGreeting,
+  defaultTo,
+  defaultAttachments,
   onSend,
   onDiscard,
 }: ComposeEmailModalProps) {
@@ -263,6 +285,37 @@ export function ComposeEmailModal({
   const sendRef = useRef<HTMLDivElement>(null);
 
   const first = firstNameOf(recipient.name);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const to =
+      defaultTo?.filter((email) => isEmailAddress(email)) ??
+      (recipient.email && isEmailAddress(recipient.email)
+        ? [recipient.email]
+        : []);
+    setToList(to);
+    setCcList([]);
+    setBccList([]);
+    setToDraft("");
+    setCcDraft("");
+    setBccDraft("");
+    setSubject(defaultSubject);
+    setBody(greetingHtml(defaultGreeting));
+    setAttachments(defaultAttachments ?? []);
+    setSendError(null);
+    setSending(false);
+    setImportance("normal");
+    setSize("normal");
+    // Reset draft fields each time the composer is opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !defaultAttachments?.length) return;
+    setAttachments((prev) =>
+      defaultAttachments.length >= prev.length ? defaultAttachments : prev,
+    );
+  }, [isOpen, defaultAttachments]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -328,13 +381,12 @@ export function ComposeEmailModal({
   function addToField(
     setter: (update: (prev: string[]) => string[]) => void,
     tokens: string[],
-    clearDraft: () => void,
   ) {
     setter((prev) => {
       const next = [...prev];
       for (const token of tokens) {
         const value = token.trim();
-        if (!value) continue;
+        if (!isEmailAddress(value)) continue;
         if (next.some((item) => item.toLowerCase() === value.toLowerCase())) {
           continue;
         }
@@ -342,22 +394,25 @@ export function ComposeEmailModal({
       }
       return next;
     });
-    clearDraft();
     setSavedAt(new Date());
   }
 
   async function handleSend(sendAt?: string) {
-    const pendingTo = parseEmailTokens(toDraft);
-    const pendingCc = parseEmailTokens(ccDraft);
-    const pendingBcc = parseEmailTokens(bccDraft);
-    const finalTo = [...toList];
-    for (const token of pendingTo) {
-      if (!finalTo.some((item) => item.toLowerCase() === token.toLowerCase())) {
-        finalTo.push(token);
-      }
+    const toParts = partitionEmailAddresses([...toList, toDraft]);
+    const ccParts = partitionEmailAddresses([...ccList, ccDraft]);
+    const bccParts = partitionEmailAddresses([...bccList, bccDraft]);
+    const leftover = [
+      ...toParts.invalid,
+      ...ccParts.invalid,
+      ...bccParts.invalid,
+    ];
+    if (leftover.length) {
+      notice(invalidEmailMessage(leftover) ?? "Enter a valid email address");
+      return;
     }
-    const finalCc = [...ccList, ...pendingCc];
-    const finalBcc = [...bccList, ...pendingBcc];
+    const finalTo = toParts.valid;
+    const finalCc = ccParts.valid;
+    const finalBcc = bccParts.valid;
     if (!finalTo.length) {
       notice("Add at least one recipient");
       return;
@@ -481,7 +536,7 @@ export function ComposeEmailModal({
               values={toList}
               draft={toDraft}
               onDraftChange={setToDraft}
-              onCommit={(tokens) => addToField(setToList, tokens, () => setToDraft(""))}
+              onCommit={(tokens) => addToField(setToList, tokens)}
               onRemove={(value) =>
                 setToList((prev) => prev.filter((item) => item !== value))
               }
@@ -518,7 +573,7 @@ export function ComposeEmailModal({
                 draft={ccDraft}
                 onDraftChange={setCcDraft}
                 onCommit={(tokens) =>
-                  addToField(setCcList, tokens, () => setCcDraft(""))
+                  addToField(setCcList, tokens)
                 }
                 onRemove={(value) =>
                   setCcList((prev) => prev.filter((item) => item !== value))
@@ -533,7 +588,7 @@ export function ComposeEmailModal({
                 draft={bccDraft}
                 onDraftChange={setBccDraft}
                 onCommit={(tokens) =>
-                  addToField(setBccList, tokens, () => setBccDraft(""))
+                  addToField(setBccList, tokens)
                 }
                 onRemove={(value) =>
                   setBccList((prev) => prev.filter((item) => item !== value))

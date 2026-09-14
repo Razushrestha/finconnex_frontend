@@ -185,6 +185,12 @@ export function smokeCallsWiring() {
   if (!page.includes("useCrmCalls")) {
     fail("calls page does not call useCrmCalls");
   }
+  if (!page.includes("ActivityMassActionDialog")) {
+    fail("calls overflow menu must open ActivityMassActionDialog");
+  }
+  if (!page.includes('openMassAction("transfer")')) {
+    fail("calls Mass Transfer menu item has no handler");
+  }
 
   const detail = readSrc(
     "src/app/(dashboard)/activities/calls/detail/[id]/page.tsx",

@@ -1,12 +1,8 @@
-export const CONTACT_SOURCES = [
-  "Website",
-  "Referral",
-  "Social Media",
-  "Email Campaign",
-  "Cold Call",
-  "Other",
-] as const;
-export type ContactSource = (typeof CONTACT_SOURCES)[number];
+import { LEAD_SOURCES, type LeadSource } from "@/lib/leads/types";
+
+/** Same picklist as Create Lead so sources stay aligned. */
+export const CONTACT_SOURCES = LEAD_SOURCES;
+export type ContactSource = LeadSource;
 
 /** SRS §6.2 Status* */
 export const CONTACT_STATUSES = [

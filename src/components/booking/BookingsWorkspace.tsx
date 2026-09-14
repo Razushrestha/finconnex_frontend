@@ -26,20 +26,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import { initials } from "@/lib/activities/shared";
-import {
-  publicBookUrl,
-  type BookingPage,
-} from "@/lib/booking/types";
-import {
-  getCalendlySummary,
-  listCalendlyAvailabilitySchedules,
-  listCalendlyHosts,
-  markCalendlyNoShow,
-  removeCalendlyNoShow,
-  updateCalendlyHost,
-  type CalendlySummary,
-} from "@/lib/booking/calendly-api";
-import { isUuid } from "@/lib/activity-timeline/auth";
+import { publicBookUrl, type BookingPage } from "@/lib/booking/types";
 import { ConsultationsBoard } from "@/components/booking/ConsultationsBoard";
 import { NewBookingModal } from "@/components/booking/NewBookingModal";
 import {
@@ -193,13 +180,6 @@ export function BookingsWorkspace({
     if (searchParams.get("book") === "1") setBookOpen(true);
   }, [searchParams]);
 
-  useEffect(() => {
-    if (searchParams.get("calendly") !== "connected") return;
-    void import("@/lib/booking/calendly-integration-api").then((api) =>
-      api.syncCalendlyCatalog().catch(() => undefined),
-    );
-  }, [searchParams]);
-
   function closeBook() {
     setBookOpen(false);
     if (searchParams.get("book") === "1") router.replace("/booking");
@@ -232,7 +212,13 @@ export function BookingsWorkspace({
               onOpenPage={(id) => router.push(`/booking/${id}`)}
             />
           ) : null}
-          {section === "consultants" ? <ConsultantsPanel /> : null}
+          {section === "consultants" ? (
+            <ConsultantsPanel
+              consultants={crm.consultants}
+              loading={crm.loading}
+              error={crm.error}
+            />
+          ) : null}
         </div>
       </div>
       <NewBookingModal
@@ -282,29 +268,7 @@ function HomeView({
   });
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<DashboardAppointment | null>(null);
-  const [calendlySummary, setCalendlySummary] = useState<CalendlySummary | null>(
-    null,
-  );
   const pageSize = 6;
-
-  useEffect(() => {
-    const from = new Date(now.getFullYear(), now.getMonth(), 1);
-    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-    let alive = true;
-    void getCalendlySummary({
-      from: from.toISOString(),
-      to: to.toISOString(),
-    })
-      .then((summary) => {
-        if (alive) setCalendlySummary(summary);
-      })
-      .catch(() => {
-        if (alive) setCalendlySummary(null);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [now]);
 
   const kpi = useMemo(
     () => bookingKpiStats(appointments, now),
@@ -407,13 +371,6 @@ function HomeView({
           );
         })}
       </div>
-      {calendlySummary ? (
-        <p className="mb-3 text-[12px] text-slate-500">
-          Calendly this month: {calendlySummary.booked} booked ·{" "}
-          {calendlySummary.cancelled} cancelled · {calendlySummary.noShows}{" "}
-          no-shows · {calendlySummary.completed} completed
-        </p>
-      ) : null}
 
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
         <section className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
@@ -582,7 +539,7 @@ function HomeView({
                 <p className="text-[12px] text-slate-400">
                   {loading
                     ? "Loading hosts…"
-                    : "No Calendly hosts yet. Connect Calendly in CRM, then refresh."}
+                    : "No consultants yet."}
                 </p>
               ) : null}
               {consultants.slice(0, 4).map((c) => (
@@ -1010,32 +967,6 @@ function AppointmentDrawer({
             <Row label="Status" value={row.status} />
             <Row label="Channel" value={row.channel} />
           </dl>
-          {row.calendlyInviteeId && isUuid(row.calendlyInviteeId) ? (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  void markCalendlyNoShow(row.calendlyInviteeId!).catch(
-                    () => undefined,
-                  );
-                }}
-                className="h-9 rounded-lg bg-rose-600 px-3 text-[12px] font-semibold text-white"
-              >
-                Mark no-show
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void removeCalendlyNoShow(row.calendlyInviteeId!).catch(
-                    () => undefined,
-                  );
-                }}
-                className="h-9 rounded-lg border border-slate-200 px-3 text-[12px] font-semibold text-slate-700"
-              >
-                Clear no-show
-              </button>
-            </div>
-          ) : null}
         </div>
       </div>
     </div>
@@ -1120,8 +1051,8 @@ function PagesPanel({
             <tr>
               <td colSpan={5} className="px-5 py-12 text-center text-slate-400">
                 {loading
-                  ? "Loading Calendly event types…"
-                  : "No Calendly event types yet."}
+                  ? "Loading consultation pages…"
+                  : "No consultation pages yet."}
               </td>
             </tr>
           ) : null}
@@ -1132,68 +1063,30 @@ function PagesPanel({
   );
 }
 
-function ConsultantsPanel() {
-  const [hosts, setHosts] = useState<
-    import("@/lib/booking/calendly-api").CalendlyHost[]
-  >([]);
-  const [schedules, setSchedules] = useState<
-    Record<string, import("@/lib/booking/calendly-api").CalendlySchedule[]>
-  >({});
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let alive = true;
-    void listCalendlyHosts()
-      .then((rows) => {
-        if (!alive) return;
-        setHosts(rows);
-        return Promise.all(
-          rows.map(async (host) => {
-            try {
-              const items = await listCalendlyAvailabilitySchedules(host.id);
-              return [host.id, items] as const;
-            } catch {
-              return [host.id, [] as import("@/lib/booking/calendly-api").CalendlySchedule[]] as const;
-            }
-          }),
-        );
-      })
-      .then((pairs) => {
-        if (!alive || !pairs) return;
-        const next: Record<
-          string,
-          import("@/lib/booking/calendly-api").CalendlySchedule[]
-        > = {};
-        for (const [id, items] of pairs) next[id] = [...items];
-        setSchedules(next);
-      })
-      .catch((err) => {
-        if (alive) {
-          setError(
-            err instanceof Error ? err.message : "Could not load Calendly hosts.",
-          );
-        }
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
+function ConsultantsPanel({
+  consultants,
+  loading,
+  error,
+}: {
+  consultants: DashboardConsultant[];
+  loading: boolean;
+  error: string | null;
+}) {
   if (error) {
     return <p className="text-[13px] text-rose-600">{error}</p>;
   }
 
-  if (hosts.length === 0) {
+  if (consultants.length === 0) {
     return (
       <p className="text-[13px] text-slate-500">
-        No Calendly hosts yet. Connect Calendly in CRM, then refresh.
+        {loading ? "Loading consultants…" : "No consultants yet."}
       </p>
     );
   }
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {hosts.map((c) => (
+      {consultants.map((c) => (
         <div
           key={c.id}
           className="flex flex-col gap-3 rounded-xl border border-slate-200/70 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
@@ -1204,58 +1097,12 @@ function ConsultantsPanel() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-slate-900">{c.name}</p>
-              <p className="text-[12px] text-slate-500">
-                {c.email || (c.isHomeConsultant ? "Home consultant" : "Host")}
-              </p>
+              <p className="text-[12px] text-slate-500">{c.role}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                void updateCalendlyHost(c.id, {
-                  isConsultant: !c.isConsultant,
-                })
-                  .then((next) => {
-                    setHosts((prev) =>
-                      prev.map((row) => (row.id === next.id ? next : row)),
-                    );
-                  })
-                  .catch(() => undefined);
-              }}
-              className={cn(
-                "rounded-full px-2 py-1 text-[10px] font-semibold",
-                c.isConsultant
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-slate-100 text-slate-500",
-              )}
-            >
-              {c.isConsultant ? "Consultant" : "Host"}
-            </button>
+            <span className="text-[13px] font-bold tabular-nums text-slate-700">
+              {c.bookings}
+            </span>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              void updateCalendlyHost(c.id, {
-                isHomeConsultant: !c.isHomeConsultant,
-              })
-                .then((next) => {
-                  setHosts((prev) =>
-                    prev.map((row) => (row.id === next.id ? next : row)),
-                  );
-                })
-                .catch(() => undefined);
-            }}
-            className="self-start text-[11px] font-semibold text-[#5A32A3]"
-          >
-            {c.isHomeConsultant ? "Home consultant" : "Set as home consultant"}
-          </button>
-          {(schedules[c.id] ?? []).length > 0 ? (
-            <p className="text-[11px] text-slate-400">
-              {(schedules[c.id] ?? [])
-                .map((row) => row.name)
-                .filter(Boolean)
-                .join(" · ")}
-            </p>
-          ) : null}
         </div>
       ))}
     </div>

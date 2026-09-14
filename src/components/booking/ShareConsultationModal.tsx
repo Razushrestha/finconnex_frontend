@@ -2,14 +2,8 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Download, Pencil, RefreshCw, X } from "lucide-react";
-import { publicBookUrl, getBookingPageBySlug } from "@/lib/booking/types";
+import { publicBookUrl, getBookingPageBySlug, slotsForDate } from "@/lib/booking/types";
 import { saveOnceLink, saveShortLink } from "@/lib/booking/short-links";
-import {
-  createCalendlySchedulingLink,
-  listCalendlyAvailableTimes,
-  resolveCalendlyEventType,
-} from "@/lib/booking/calendly-api";
-import { isUuid } from "@/lib/activity-timeline/auth";
 import { cn } from "@/lib/utils";
 
 const BRAND = "#5A32A3";
@@ -71,12 +65,10 @@ function CopyBlock({
 export function ShareConsultationModal({
   title,
   slug,
-  eventTypeId,
   onClose,
 }: {
   title: string;
   slug: string;
-  eventTypeId?: string;
   onClose: () => void;
 }) {
   const [path, setPath] = useState(slug);
@@ -94,8 +86,6 @@ export function ShareConsultationModal({
   const [shortCopied, setShortCopied] = useState(false);
   const [onceCopied, setOnceCopied] = useState(false);
   const [linkError, setLinkError] = useState("");
-  const [linkBusy, setLinkBusy] = useState(false);
-  const [calendlyShareUrl, setCalendlyShareUrl] = useState("");
 
   const origin =
     typeof window !== "undefined" ? window.location.origin : "";
@@ -104,12 +94,11 @@ export function ShareConsultationModal({
   const shortUrl = shortCode ? `${origin}/s/${shortCode}` : null;
   const onceUrl = oneTime ? `${origin}/s/${oneTime}` : null;
   const displayUrl =
-    calendlyShareUrl ||
-    (tab === "shorten" && shortUrl
+    tab === "shorten" && shortUrl
       ? shortUrl
       : tab === "onetime" && onceUrl
         ? onceUrl
-        : bookUrl);
+        : bookUrl;
 
   const qrSrc = useMemo(
     () =>
@@ -124,36 +113,28 @@ export function ShareConsultationModal({
     setSlotsError("");
     void (async () => {
       const page = getBookingPageBySlug(path.trim() || slug);
-      const eventType = eventTypeId
-        ? { id: eventTypeId }
-        : await resolveCalendlyEventType(page);
-      const id = eventType && "id" in eventType ? eventType.id : "";
-      if (!id || !isUuid(id)) {
+      if (!page) {
         if (alive) {
           setApiSlots([]);
-          setSlotsError("No Calendly event type for this page.");
+          setSlotsError("Booking page not found.");
           setSlotsLoading(false);
         }
         return;
       }
-      const from = new Date();
-      const to = new Date();
-      to.setDate(to.getDate() + 14);
-      const times = await listCalendlyAvailableTimes({
-        eventTypeId: id,
-        from: from.toISOString(),
-        to: to.toISOString(),
-      });
-      const labels = times.map((row) => {
-        const date = new Date(row.startTime);
-        return date.toLocaleString("en-AU", {
-          weekday: "short",
-          day: "numeric",
-          month: "short",
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      });
+      const labels: string[] = [];
+      for (let i = 0; i < 14; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() + i);
+        for (const slot of slotsForDate(page, date)) {
+          labels.push(
+            `${date.toLocaleDateString("en-AU", {
+              weekday: "short",
+              day: "numeric",
+              month: "short",
+            })} · ${slot.label}`,
+          );
+        }
+      }
       if (alive) {
         setApiSlots(labels);
         setSlotsLoading(false);
@@ -169,7 +150,7 @@ export function ShareConsultationModal({
     return () => {
       alive = false;
     };
-  }, [tab, slug, path, eventTypeId]);
+  }, [tab, slug, path]);
 
   const embedOptions: {
     id: EmbedId;
@@ -220,30 +201,6 @@ export function ShareConsultationModal({
     setShortCopied(false);
     setShortCode(code);
     setLinkError("");
-    setLinkBusy(true);
-    try {
-      const page = getBookingPageBySlug(path.trim() || slug);
-      const eventType =
-        eventTypeId && isUuid(eventTypeId)
-          ? { id: eventTypeId }
-          : await resolveCalendlyEventType(page);
-      if (eventType && isUuid(eventType.id)) {
-        const link = await createCalendlySchedulingLink({
-          eventTypeId: eventType.id,
-          reusable: true,
-        });
-        if (link.url) {
-          setCalendlyShareUrl(link.url);
-          await navigator.clipboard.writeText(link.url).catch(() => undefined);
-        }
-      }
-    } catch (err) {
-      setLinkError(
-        err instanceof Error ? err.message : "Could not create a Calendly share link.",
-      );
-    } finally {
-      setLinkBusy(false);
-    }
   }
 
   async function generateOnce() {
@@ -253,30 +210,6 @@ export function ShareConsultationModal({
     setOnceCopied(false);
     setOneTime(code);
     setLinkError("");
-    setLinkBusy(true);
-    try {
-      const page = getBookingPageBySlug(path.trim() || slug);
-      const eventType =
-        eventTypeId && isUuid(eventTypeId)
-          ? { id: eventTypeId }
-          : await resolveCalendlyEventType(page);
-      if (eventType && isUuid(eventType.id)) {
-        const link = await createCalendlySchedulingLink({
-          eventTypeId: eventType.id,
-          reusable: false,
-        });
-        if (link.url) {
-          setCalendlyShareUrl(link.url);
-          await navigator.clipboard.writeText(link.url).catch(() => undefined);
-        }
-      }
-    } catch (err) {
-      setLinkError(
-        err instanceof Error ? err.message : "Could not create a Calendly one-time link.",
-      );
-    } finally {
-      setLinkBusy(false);
-    }
   }
 
   async function downloadQr() {
@@ -322,11 +255,6 @@ export function ShareConsultationModal({
           </h2>
           {linkError ? (
             <p className="mt-2 text-[12px] text-rose-600">{linkError}</p>
-          ) : null}
-          {linkBusy ? (
-            <p className="mt-1 text-[11px] text-slate-400">
-              Creating Calendly scheduling link…
-            </p>
           ) : null}
         </div>
 
@@ -567,7 +495,7 @@ export function ShareConsultationModal({
               ) : null}
               {!slotsLoading && !slotsError && slots.length === 0 ? (
                 <p className="text-[13px] text-slate-400">
-                  No available times from Calendly in the next 14 days.
+                  No available times in the next 14 days.
                 </p>
               ) : null}
               <ul className="space-y-1.5 text-[13px] text-slate-600">

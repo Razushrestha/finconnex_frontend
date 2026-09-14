@@ -1,7 +1,6 @@
-/** Live booking home — CRM meetings + Calendly hosts only. */
+/** Live booking home — CRM meetings + workspace consultants. */
 
 import type { Meeting } from "@/lib/meetings/types";
-import type { CalendlyHost } from "@/lib/booking/calendly-api";
 
 export type AppointmentStatus = "Confirmed" | "Pending" | "Scheduled";
 export type AppointmentType = "Consultation" | "Strategy Call" | "Review";
@@ -28,8 +27,6 @@ export interface DashboardAppointment {
   status: AppointmentStatus;
   channel: AppointmentChannel;
   avatarClass: string;
-  calendlyMeetingId?: string;
-  calendlyInviteeId?: string;
 }
 
 export const DASHBOARD_CONSULTANTS: DashboardConsultant[] = [];
@@ -297,7 +294,7 @@ function mapChannel(type: Meeting["type"]): AppointmentChannel {
 
 export function meetingToAppointment(
   meeting: Meeting,
-  hosts: CalendlyHost[] = [],
+  consultants: { id: string; name: string; email?: string }[] = [],
 ): DashboardAppointment | null {
   const status = mapMeetingStatus(meeting.status);
   if (!status) return null;
@@ -306,13 +303,12 @@ export function meetingToAppointment(
     meeting.attendees.find((row) => row.role !== "Host") ??
     meeting.attendees[0];
   const related = parseRelated(meeting.relatedTo);
-  const host =
-    hosts.find(
-      (row) =>
-        row.id === meeting.organizer ||
-        row.name === meeting.organizer ||
-        row.email === meeting.organizer,
-    ) ?? hosts.find((row) => row.isHomeConsultant);
+  const host = consultants.find(
+    (row) =>
+      row.id === meeting.organizer ||
+      row.name === meeting.organizer ||
+      (row.email && row.email === meeting.organizer),
+  );
   return {
     id: meeting.id,
     guestName: guest?.name || meeting.organizer || "Guest",
@@ -325,25 +321,21 @@ export function meetingToAppointment(
     status,
     channel: mapChannel(meeting.type),
     avatarClass: AVATARS[(guest?.name || meeting.title).length % AVATARS.length],
-    calendlyMeetingId: meeting.id,
   };
 }
 
 export function hostsToConsultants(
-  hosts: CalendlyHost[],
+  people: { id: string; name: string; role?: string }[],
   appointments: DashboardAppointment[],
 ): DashboardConsultant[] {
-  return hosts.map((host) => ({
-    id: host.id,
-    name: host.name,
-    role: host.isHomeConsultant
-      ? "Home consultant"
-      : host.isConsultant
-        ? "Consultant"
-        : "Host",
+  return people.map((person) => ({
+    id: person.id,
+    name: person.name,
+    role: person.role || "Consultant",
     photo: "",
     bookings: appointments.filter(
-      (row) => row.consultantId === host.id || row.consultantId === host.name,
+      (row) =>
+        row.consultantId === person.id || row.consultantId === person.name,
     ).length,
   }));
 }

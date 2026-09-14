@@ -270,6 +270,24 @@ function opt(value: string | null | undefined): string | undefined {
   return t || undefined;
 }
 
+export function normalizeLeadTags(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const tags = [
+    ...new Set(
+      raw
+        .map((item) => {
+          if (typeof item === "string") return item.trim();
+          if (item && typeof item === "object" && "name" in item) {
+            return String((item as { name?: unknown }).name ?? "").trim();
+          }
+          return "";
+        })
+        .filter(Boolean),
+    ),
+  ];
+  return tags.length ? tags : undefined;
+}
+
 export function crmLeadPipelineStage(lead: Pick<CrmLead, "pipelineStage" | "pipelineStageLabel" | "status">): MortgagePipelineStage {
   return (
     resolvePipelineStage(lead.pipelineStageLabel ?? "") ??
@@ -315,6 +333,7 @@ export function mapCrmLeadToCard(lead: CrmLead): LeadCardData {
     country: opt(lead.country),
     street: opt(lead.street),
     postalCode: opt(lead.postalCode),
+    updatedAt: opt(lead.updatedAt),
     modifiedDate: formatCreated(lead.updatedAt),
     lifecycleStage: lead.lifecycleStage ?? undefined,
     rating: lead.rating ?? undefined,
@@ -333,7 +352,7 @@ export function mapCrmLeadToCard(lead: CrmLead): LeadCardData {
     nextBest: lead.nextBest ?? null,
     redFlags: lead.redFlags ?? [],
     sla: lead.sla ?? null,
-    tags: lead.tags,
+    tags: normalizeLeadTags(lead.tags),
     followerIds: lead.followerIds,
     accentColorClass: PIPELINE_STAGE_DOT[stage],
     avatarBgClass: AVATAR_COLORS[hashIndex(lead.id)],
@@ -399,6 +418,7 @@ export function toCrmCreateBody(input: {
   description?: string;
   ownerId?: string;
   pipelineStage?: string;
+  tags?: string[];
 }): CrmCreateLeadInput {
   const website = asHttpUrl(input.companyWebsite) ?? asHttpUrl(input.websiteUrl);
   const firstName = input.firstName.trim();
@@ -423,6 +443,7 @@ export function toCrmCreateBody(input: {
     description: input.description?.trim() || undefined,
     ownerId: input.ownerId,
     pipelineStage: uiPipelineStageToCrm(input.pipelineStage),
+    tags: normalizeLeadTags(input.tags),
   };
 }
 

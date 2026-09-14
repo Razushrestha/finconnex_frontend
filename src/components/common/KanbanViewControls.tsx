@@ -46,6 +46,13 @@ export interface KanbanViewConfig {
   selectedFieldIds: string[];
   /** Which of the selected fields can be inline-edited directly on the card. */
   editableFieldIds: string[];
+  /**
+   * Ordered list of visible kanban column / stage title ids.
+   * When omitted, every available stage is shown.
+   */
+  selectedStageIds?: string[];
+  /** Display title overrides for stage column ids. */
+  stageLabels?: Record<string, string>;
   /** Hex for Single Colour headers. */
   singleHeaderColor?: string;
   /** Hex per category/stage key for Multi Colour headers. */
@@ -117,6 +124,8 @@ export interface KanbanViewControlsProps {
   view: KanbanViewConfig;
   /** All fields the entity exposes; `selectedFieldIds` on `view` picks which show. */
   availableFields: KanbanField[];
+  /** Pipeline column titles; `selectedStageIds` on `view` picks which show on the board. */
+  availableStages?: KanbanField[];
   categorizeByOptions: string[];
   aggregateByOptions: string[];
   headerStyleOptions: string[];
@@ -142,6 +151,7 @@ export interface KanbanViewControlsProps {
 export function KanbanViewControls({
   view,
   availableFields,
+  availableStages,
   categorizeByOptions,
   aggregateByOptions,
   headerStyleOptions,
@@ -180,6 +190,7 @@ export function KanbanViewControls({
         <KanbanViewSettingsModal
           view={view}
           availableFields={availableFields}
+          availableStages={availableStages}
           categorizeByOptions={categorizeByOptions}
           aggregateByOptions={aggregateByOptions}
           headerStyleOptions={headerStyleOptions}
@@ -211,6 +222,8 @@ export function KanbanViewControls({
 interface KanbanViewSettingsModalProps {
   view: KanbanViewConfig;
   availableFields: KanbanField[];
+  /** When provided, shows Add/Remove for kanban column titles (stages). */
+  availableStages?: KanbanField[];
   categorizeByOptions: string[];
   aggregateByOptions: string[];
   headerStyleOptions: string[];
@@ -238,6 +251,7 @@ function ColorSwatchRow({
 export function KanbanViewSettingsModal({
   view,
   availableFields,
+  availableStages = [],
   categorizeByOptions,
   aggregateByOptions,
   headerStyleOptions,
@@ -258,7 +272,14 @@ export function KanbanViewSettingsModal({
   const [editableIds, setEditableIds] = useState<string[]>(
     view.editableFieldIds,
   );
+  const [selectedStageIds, setSelectedStageIds] = useState<string[]>(() => {
+    const known = new Set(availableStages.map((s) => s.id));
+    const saved = view.selectedStageIds?.filter((id) => known.has(id));
+    if (saved?.length) return saved;
+    return availableStages.map((s) => s.id);
+  });
   const [search, setSearch] = useState("");
+  const [stageSearch, setStageSearch] = useState("");
   const [singleHeaderColor, setSingleHeaderColor] = useState(
     view.singleHeaderColor || DEFAULT_SINGLE_HEADER_COLOR,
   );
@@ -280,15 +301,29 @@ export function KanbanViewSettingsModal({
     () => new Map(availableFields.map((f) => [f.id, f])),
     [availableFields],
   );
+  const stagesById = useMemo(
+    () => new Map(availableStages.map((s) => [s.id, s])),
+    [availableStages],
+  );
 
   const selectedFields = selectedIds
     .map((id) => fieldsById.get(id))
     .filter((f): f is KanbanField => Boolean(f));
 
+  const selectedStages = selectedStageIds
+    .map((id) => stagesById.get(id))
+    .filter((s): s is KanbanField => Boolean(s));
+
   const availableList = availableFields.filter(
     (f) =>
       !selectedIds.includes(f.id) &&
       f.label.toLowerCase().includes(search.trim().toLowerCase()),
+  );
+
+  const availableStageList = availableStages.filter(
+    (s) =>
+      !selectedStageIds.includes(s.id) &&
+      s.label.toLowerCase().includes(stageSearch.trim().toLowerCase()),
   );
 
   const addField = (id: string) =>
@@ -299,6 +334,18 @@ export function KanbanViewSettingsModal({
     if (field?.required) return;
     setSelectedIds((prev) => prev.filter((f) => f !== id));
     setEditableIds((prev) => prev.filter((f) => f !== id));
+  };
+
+  const addStage = (id: string) =>
+    setSelectedStageIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+
+  const removeStage = (id: string) => {
+    const stage = stagesById.get(id);
+    if (stage?.required) return;
+    setSelectedStageIds((prev) => {
+      const next = prev.filter((s) => s !== id);
+      return next.length ? next : prev;
+    });
   };
 
   const showColourNote =
@@ -316,6 +363,9 @@ export function KanbanViewSettingsModal({
       shareWith,
       selectedFieldIds: selectedIds,
       editableFieldIds: editableIds.filter((id) => selectedIds.includes(id)),
+      selectedStageIds: availableStages.length
+        ? selectedStageIds.filter((id) => stagesById.has(id))
+        : view.selectedStageIds,
       singleHeaderColor,
       multiHeaderColors,
     });
@@ -452,6 +502,90 @@ export function KanbanViewSettingsModal({
               ))}
             </div>
           </div>
+
+          {availableStages.length > 0 ? (
+            <div className="pt-1">
+              <p className="mb-1 text-sm font-medium text-slate-700 dark:text-zinc-200">
+                Column titles
+              </p>
+              <p className="mb-2 text-xs text-slate-500 dark:text-zinc-400">
+                Add or remove pipeline stage titles on this board. Removing a
+                title hides that column; leads in that stage stay saved.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="mb-1 text-xs text-slate-500 dark:text-zinc-400">
+                    Available
+                  </p>
+                  <div className="rounded-md border border-slate-200 dark:border-zinc-700">
+                    <div className="flex items-center gap-1.5 border-b border-slate-200 px-2 py-1.5 dark:border-zinc-700">
+                      <Search className="h-3.5 w-3.5 text-slate-400" />
+                      <input
+                        value={stageSearch}
+                        onChange={(e) => setStageSearch(e.target.value)}
+                        placeholder="Search titles"
+                        className="w-full text-sm outline-none dark:bg-transparent dark:text-zinc-100"
+                      />
+                    </div>
+                    <ul className="h-40 overflow-y-auto text-sm">
+                      {availableStageList.map((stage) => (
+                        <li key={stage.id}>
+                          <button
+                            type="button"
+                            onClick={() => addStage(stage.id)}
+                            className="flex w-full items-center justify-between px-3 py-1.5 text-left text-slate-700 hover:bg-blue-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                          >
+                            {stage.label}
+                            {stage.required ? (
+                              <span className="ml-1 text-red-500">*</span>
+                            ) : null}
+                          </button>
+                        </li>
+                      ))}
+                      {availableStageList.length === 0 ? (
+                        <li className="px-3 py-2 text-xs text-slate-400">
+                          No matching titles
+                        </li>
+                      ) : null}
+                    </ul>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-1 text-xs text-slate-500 dark:text-zinc-400">
+                    Selected
+                  </p>
+                  <div className="h-[169px] overflow-y-auto rounded-md border border-slate-200 text-sm dark:border-zinc-700">
+                    <ul>
+                      {selectedStages.map((stage) => (
+                        <li
+                          key={stage.id}
+                          className="flex items-center justify-between px-3 py-1.5 text-slate-700 dark:text-zinc-200"
+                        >
+                          <span>
+                            {stage.label}
+                            {stage.required ? (
+                              <span className="ml-1 text-red-500">*</span>
+                            ) : null}
+                          </span>
+                          {!stage.required ? (
+                            <button
+                              type="button"
+                              onClick={() => removeStage(stage.id)}
+                              aria-label={`Remove ${stage.label}`}
+                              className="text-slate-300 hover:text-slate-500 dark:hover:text-zinc-300"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {/* Select Fields */}
           <div className="pt-1">

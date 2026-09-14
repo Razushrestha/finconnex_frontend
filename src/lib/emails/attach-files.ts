@@ -1,4 +1,5 @@
 import { attachCrmEmailObject } from "@/lib/emails/api";
+import { officeDocToPdfFile } from "@/lib/emails/office-to-pdf";
 import {
   uploadCrmStorageFile,
   type CrmStorageObject,
@@ -19,6 +20,10 @@ const CRM_EMAIL_MIME_EXT: Record<string, readonly string[]> = {
   "image/webp": [".webp"],
   "application/pdf": [".pdf"],
   "text/csv": [".csv"],
+  "application/msword": [".doc"],
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+    ".docx",
+  ],
 };
 
 const EXT_TO_MIME: Record<string, string> = {
@@ -28,6 +33,9 @@ const EXT_TO_MIME: Record<string, string> = {
   ".webp": "image/webp",
   ".pdf": "application/pdf",
   ".csv": "text/csv",
+  ".doc": "application/msword",
+  ".docx":
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 };
 
 function fileExtension(name: string): string {
@@ -41,16 +49,19 @@ function mimeFromFilename(name: string): string {
 }
 
 function guessMime(file: File, stored?: CrmStorageObject): string {
+  const fromName = mimeFromFilename(stored?.fileName || file.name);
   const candidates = [
     stored?.contentType,
     file.type,
-    mimeFromFilename(stored?.fileName || file.name),
+    fromName,
   ];
   for (const raw of candidates) {
     const value = (raw ?? "").split(";")[0].trim().toLowerCase();
     const normalized = value === "image/jpg" ? "image/jpeg" : value;
     if (CRM_EMAIL_MIME_EXT[normalized]) return normalized;
   }
+  // OOXML uploads sometimes land as ZIP / octet-stream; trust the extension.
+  if (fromName && CRM_EMAIL_MIME_EXT[fromName]) return fromName;
   return "";
 }
 
@@ -177,8 +188,16 @@ export async function attachFilesToCrmEmail(input: {
   let attached = 0;
   for (const file of files) {
     try {
-      const stored = await uploadCrmStorageFile(file);
-      const payload = toCrmEmailAttachmentDto(file, stored);
+      // Remote CRM may still reject Word MIME types. Convert to PDF so every
+      // compose attachment can be registered before /send.
+      let next = file;
+      const ext = fileExtension(file.name);
+      if (ext === ".docx" || ext === ".doc") {
+        const pdf = await officeDocToPdfFile(file);
+        if (pdf) next = pdf;
+      }
+      const stored = await uploadCrmStorageFile(next);
+      const payload = toCrmEmailAttachmentDto(next, stored);
       if (!payload) continue;
       await attachCrmEmailObject(input.emailId, payload);
       attached += 1;

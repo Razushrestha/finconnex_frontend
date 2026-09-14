@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { isPlatformAdminRole } from "@/lib/auth/platform";
 import { CreateWorkspaceForm } from "@/components/onboarding/CreateWorkspaceForm";
+import { SignOutOtherAccountButton } from "@/components/onboarding/SignOutOtherAccountButton";
 
 export const metadata: Metadata = {
   title: "Create your workspace: FinConnex",
@@ -30,6 +31,7 @@ export default async function CreateWorkspacePage() {
           <p className="mt-1 text-sm text-gray-500">
             Signed in as {session.email}
           </p>
+          <SignOutOtherAccountButton />
         </div>
 
         <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">

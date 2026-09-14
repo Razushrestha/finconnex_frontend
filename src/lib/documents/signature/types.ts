@@ -1,4 +1,5 @@
 import { emitRecordsChange } from "@/lib/records-sync";
+import { tenantOverlayKey } from "@/lib/persistence/tenant";
 
 export type SignatureStatus =
   | "Draft"
@@ -164,15 +165,27 @@ export interface SignatureRequest {
   updatedAt?: string;
 }
 
-const STORE_KEY = "signature:requests:v3";
+const STORE_BASE_KEY = "signature:requests:v3";
 const LEGACY_STORE_KEY = "signature:requests";
+const LEGACY_GLOBAL_V3_KEY = "signature:requests:v3";
 /** Keep small signature scribbles; drop PDFs / data URLs that blow the 5MB quota. */
 const MAX_PERSISTED_INLINE_CHARS = 80_000;
+
+function storeKey(): string {
+  return tenantOverlayKey(STORE_BASE_KEY);
+}
+
+function isCrmUuid(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    id,
+  );
+}
 
 const liveFileUrls = new Map<string, Record<string, string>>();
 
 function persistableUrl(url?: string): string | undefined {
   if (!url) return undefined;
+  if (url.startsWith("fc-file://")) return url;
   if (url.startsWith("blob:")) return undefined;
   if (url.startsWith("data:application/")) return undefined;
   if (url.startsWith("data:") && url.length > MAX_PERSISTED_INLINE_CHARS) {
@@ -463,15 +476,17 @@ export const signatureRequests: SignatureRequest[] = [];
 function readStore(): SignatureRequest[] | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(STORE_KEY);
+    const key = storeKey();
+    const raw = localStorage.getItem(key);
     if (raw) return JSON.parse(raw) as SignatureRequest[];
 
-    const legacy = localStorage.getItem(LEGACY_STORE_KEY);
-    if (legacy) {
-      const parsed = JSON.parse(legacy) as SignatureRequest[];
-      const migrated = parsed.map((r) => normalizeSignatureRequest(r));
-      writeStore(migrated);
-      return migrated;
+    // Never migrate the old global (unscoped) store into a workspace key —
+    // that reintroduced documents from other workspaces. Drop leftovers.
+    try {
+      localStorage.removeItem(LEGACY_GLOBAL_V3_KEY);
+      localStorage.removeItem(LEGACY_STORE_KEY);
+    } catch {
+      /* private mode */
     }
     return null;
   } catch {
@@ -481,9 +496,10 @@ function readStore(): SignatureRequest[] | null {
 
 function writeStore(list: SignatureRequest[]) {
   if (typeof window === "undefined") return;
+  const key = storeKey();
   let compact = list.map(compactRequest);
   const save = (rows: SignatureRequest[]) => {
-    localStorage.setItem(STORE_KEY, JSON.stringify(rows));
+    localStorage.setItem(key, JSON.stringify(rows));
   };
   try {
     save(compact);
@@ -496,7 +512,7 @@ function writeStore(list: SignatureRequest[]) {
       } catch {
         if (compact.length === 0) {
           try {
-            localStorage.removeItem(STORE_KEY);
+            localStorage.removeItem(key);
           } catch {
             /* private mode */
           }
@@ -504,7 +520,7 @@ function writeStore(list: SignatureRequest[]) {
       }
     }
   }
-  emitRecordsChange(STORE_KEY);
+  emitRecordsChange(key);
 }
 
 function loadStored(): SignatureRequest[] {
@@ -878,16 +894,17 @@ export function deleteSignatureRequest(id: string): SignatureRequest[] {
   return list.map(applyLiveFiles);
 }
 
-/** Replace the local store with live CRM rows (empty list is a valid live result). */
+/** Replace live CRM document rows for the active workspace store. */
 export function replaceCrmSignatureRequests(remote: SignatureRequest[]) {
   const previous = loadStored();
   const remoteIds = new Set(remote.map((row) => row.id));
+  // Keep only unsynced local drafts in this workspace. Never keep CRM UUID
+  // rows from a previous sync that are absent from `remote` — that leaked
+  // other-workspace documents when the store was global.
   const keep = previous.filter((row) => {
     if (remoteIds.has(row.id)) return false;
     if (row.recordType === "template") return true;
-    return !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      row.id,
-    );
+    return !isCrmUuid(row.id);
   });
   writeStore([
     ...keep.map((row) =>
@@ -895,6 +912,23 @@ export function replaceCrmSignatureRequests(remote: SignatureRequest[]) {
     ),
     ...remote.map((row) =>
       normalizeSignatureRequest(row, { allowEmptyFields: true }),
+    ),
+  ]);
+}
+
+/** Replace CRM template rows for the active workspace; keep documents. */
+export function replaceCrmSignatureTemplates(remote: SignatureRequest[]) {
+  const previous = loadStored();
+  const documents = previous.filter((row) => row.recordType !== "template");
+  writeStore([
+    ...documents.map((row) =>
+      normalizeSignatureRequest(row, { allowEmptyFields: true }),
+    ),
+    ...remote.map((row) =>
+      normalizeSignatureRequest(
+        { ...row, recordType: "template" },
+        { allowEmptyFields: true },
+      ),
     ),
   ]);
 }

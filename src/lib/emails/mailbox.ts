@@ -1,4 +1,8 @@
 import type { Email } from "@/lib/emails/types";
+import {
+  currentMailboxIdentity,
+  listFromIdentities,
+} from "@/lib/emails/send-as";
 
 export type MailFolder =
   | "all"
@@ -44,8 +48,24 @@ export function isOurAddress(value: string) {
   return OUR_MAIL.test(value.trim());
 }
 
+export function isMailboxWeOwn(value: string) {
+  const address = value.trim().toLowerCase();
+  if (!address.includes("@")) return false;
+  if (isOurAddress(address)) return true;
+  const mine = currentMailboxIdentity()?.email.trim().toLowerCase();
+  if (mine && mine === address) return true;
+  return listFromIdentities().some(
+    (item) => item.email.trim().toLowerCase() === address,
+  );
+}
+
 export function isOutbound(email: Email) {
-  return isOurAddress(email.from);
+  if (email.outbound === true) return true;
+  if (isMailboxWeOwn(email.from)) return true;
+  if (email.to.some((addr) => isMailboxWeOwn(addr)) && !isMailboxWeOwn(email.from)) {
+    return false;
+  }
+  return email.status === "Sent";
 }
 
 export function labelTone(label: MailLabel) {

@@ -6,8 +6,8 @@
 import { initials as personInitials } from "@/lib/activities/shared";
 import { listLeadActivityCandidates } from "@/lib/leads/activity-index";
 import {
+  lastActivityForLead,
   pickActivitySummary,
-  pickLastCompletedActivity,
 } from "@/lib/leads/activity-summary";
 import type {
   LeadCardDynamicField,
@@ -87,6 +87,19 @@ function fieldLabelForKey(key: string): string {
   return FIELD_LABELS[key] ?? key;
 }
 
+function hideDuplicateOwnerField(
+  field: LeadCardDynamicField,
+  ownerName: string,
+  showOwnerAvatar: boolean,
+): boolean {
+  const owner = ownerName.trim().toLowerCase();
+  const value = field.value.trim().toLowerCase();
+  if (field.key === "owner" && (showOwnerAvatar || (owner && value === owner))) {
+    return true;
+  }
+  return Boolean(showOwnerAvatar && owner && value === owner);
+}
+
 export function buildDynamicFields(
   lead: LeadRecord,
   keys: readonly string[] = DEFAULT_DYNAMIC_KEYS,
@@ -138,6 +151,8 @@ export function leadCardDataToRecord(
     initials: card.initials,
     accentColorClass: card.accentColorClass,
     avatarBgClass: card.avatarBgClass,
+    updatedAt: card.updatedAt,
+    modifiedDate: card.modifiedDate,
   };
 }
 
@@ -160,6 +175,9 @@ export function buildLeadCardViewModel(
   const maxFields = opts.dynamicFieldKeys
     ? opts.dynamicFieldKeys.length
     : MAX_DYNAMIC_FIELDS;
+  const dynamicFields = buildDynamicFields(lead, fieldKeys, maxFields).filter(
+    (field) => !hideDuplicateOwnerField(field, lead.owner, showOwnerAvatar),
+  );
   const cardLike: LeadCardData = {
     id: lead.id,
     name,
@@ -178,6 +196,8 @@ export function buildLeadCardViewModel(
     custom: lead.custom,
     accentColorClass: lead.accentColorClass,
     avatarBgClass: lead.avatarBgClass,
+    updatedAt: lead.updatedAt,
+    modifiedDate: lead.modifiedDate,
   };
 
   return {
@@ -191,9 +211,9 @@ export function buildLeadCardViewModel(
       initials: personInitials(lead.owner),
     },
     showOwnerAvatar,
-    dynamicFields: buildDynamicFields(lead, fieldKeys, maxFields),
+    dynamicFields,
     activitySummary: pickActivitySummary(candidates, now),
-    lastActivity: pickLastCompletedActivity(candidates, now),
+    lastActivity: lastActivityForLead(candidates, lead, now),
     quickActions: buildQuickActionStates(candidates, now),
     sla: computeSlaForLeadCard(cardLike, lead.status, now),
   };

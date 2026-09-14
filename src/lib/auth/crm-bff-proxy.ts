@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
+import {
+  accessTokenFromRequest,
+  crmBaseUrl,
+  tryEmptySignedInGet,
+} from "@/lib/auth/crm-bff-helpers";
 import { getSession } from "@/lib/auth/session";
 import {
   applyCrmTokenCookies,
   decodeJwtPayload,
+  isCrmJwtExpired,
+  refreshCrmTokens,
   resolveLiveCrmAuth,
+  activateWorkspace,
 } from "@/lib/auth/crm-server";
 import { sessionRememberMe } from "@/lib/auth/constants";
 import { isPlatformAdminRole } from "@/lib/auth/platform";
@@ -16,10 +24,9 @@ import {
 import {
   catalogFromPatchBody,
   mergeFallbackCatalog,
-  pagePayload,
   pageValuesFromPutBody,
-  pagesListPayload,
   readFallbackCatalog,
+  settingsGetFallbackPayload,
   settingsProxyKind,
   stripCatalogFromPatchBody,
   withCatalogOnSettings,
@@ -70,15 +77,6 @@ const ALLOWED_ROOTS = new Set([
   "notifications",
   "admin",
 ]);
-
-function crmBaseUrl(): string | null {
-  const raw =
-    process.env.CRM_API_URL?.trim() ||
-    process.env.NEXT_PUBLIC_CRM_API_URL?.trim() ||
-    process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
-    "https://finconnex.payperless.app";
-  return raw.replace(/\/$/, "") || null;
-}
 
 function isAllowed(path: string[]): boolean {
   const root = path[0];
@@ -142,24 +140,80 @@ export async function proxyCrmV1(
   const isPublic = path[0] === "public";
   let auth: Awaited<ReturnType<typeof resolveLiveCrmAuth>> = null;
   let rememberMe = false;
+  let sessionWorkspaceId: string | null = null;
 
   if (!isPublic) {
     const session = await getSession();
     rememberMe = sessionRememberMe(session);
-    if (!session) {
+    sessionWorkspaceId = session?.tenantId?.trim() || null;
+
+    if (path[0] === "admin") {
+      if (!session) {
+        return NextResponse.json(
+          { message: "Sign in to continue" },
+          { status: 401 },
+        );
+      }
+      if (!isPlatformAdminRole(session.role)) {
+        return NextResponse.json(
+          { message: "Platform admin access required" },
+          { status: 403 },
+        );
+      }
+    }
+
+    auth = await resolveLiveCrmAuth();
+    const headerToken = accessTokenFromRequest(request);
+    if (
+      headerToken &&
+      !isCrmJwtExpired(headerToken, 0) &&
+      (!auth?.accessToken || isCrmJwtExpired(auth.accessToken))
+    ) {
+      try {
+        const scoped = await activateWorkspace(
+          headerToken,
+          auth?.refreshToken ?? null,
+        );
+        auth = {
+          accessToken: scoped.accessToken,
+          refreshToken: scoped.refreshToken,
+        };
+      } catch {
+        auth = {
+          accessToken: headerToken,
+          refreshToken: auth?.refreshToken ?? null,
+        };
+      }
+    }
+
+    if (!session && !auth?.accessToken) {
+      const empty = tryEmptySignedInGet(path, request.method.toUpperCase());
+      if (empty) return empty;
       return NextResponse.json(
         { message: "Sign in to continue" },
         { status: 401 },
       );
     }
-    if (path[0] === "admin" && !isPlatformAdminRole(session.role)) {
-      return NextResponse.json(
-        { message: "Platform admin access required" },
-        { status: 403 },
-      );
-    }
-    auth = await resolveLiveCrmAuth();
+
+    const settingsKindEarly = settingsProxyKind(path);
     if (!auth?.accessToken) {
+      if (
+        session &&
+        settingsKindEarly &&
+        request.method.toUpperCase() === "GET"
+      ) {
+        const workspaceKey = sessionWorkspaceId || session.userId || "local";
+        const catalog = await readFallbackCatalog(workspaceKey);
+        return new NextResponse(
+          settingsGetFallbackPayload(settingsKindEarly, workspaceKey, catalog),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+      const empty = tryEmptySignedInGet(path, request.method.toUpperCase());
+      if (empty) return empty;
       return NextResponse.json(
         { message: "Invalid or missing access token" },
         { status: 401 },
@@ -199,6 +253,43 @@ export async function proxyCrmV1(
 
   let text = await upstream.text();
   let status = upstream.status;
+
+  if (status === 401 && auth?.refreshToken) {
+    try {
+      const rotated = await refreshCrmTokens(auth.refreshToken);
+      auth = {
+        accessToken: rotated.accessToken,
+        refreshToken: rotated.refreshToken,
+      };
+      headers.Authorization = `Bearer ${rotated.accessToken}`;
+      const retried = await fetch(target, {
+        method: request.method,
+        headers,
+        body,
+      });
+      text = await retried.text();
+      status = retried.status;
+    } catch {
+      /* keep the original 401 */
+    }
+  }
+
+  if (status === 401) {
+    const empty = tryEmptySignedInGet(path, method);
+    if (empty) {
+      if (auth?.accessToken) {
+        applyCrmTokenCookies(
+          empty,
+          {
+            accessToken: auth.accessToken,
+            refreshToken: auth.refreshToken,
+          },
+          rememberMe,
+        );
+      }
+      return empty;
+    }
+  }
 
   if (
     storageFallbackReq &&
@@ -278,84 +369,48 @@ export async function proxyCrmV1(
   }
 
   const settingsKind = settingsProxyKind(path);
-  const workspaceId = auth?.accessToken
-    ? (() => {
-        const id = decodeJwtPayload(auth.accessToken)?.workspaceId;
-        return typeof id === "string" && id ? id : null;
-      })()
-    : null;
+  const workspaceId =
+    (auth?.accessToken
+      ? (() => {
+          const id = decodeJwtPayload(auth.accessToken)?.workspaceId;
+          return typeof id === "string" && id ? id : null;
+        })()
+      : null) ||
+    sessionWorkspaceId ||
+    "local";
 
-  if (settingsKind && workspaceId && auth) {
+  if (settingsKind && method === "GET") {
     const localCatalog = await readFallbackCatalog(workspaceId);
-
-    if (settingsKind.kind === "root" && method === "GET" && status < 400) {
+    if (status >= 400) {
+      text = settingsGetFallbackPayload(settingsKind, workspaceId, localCatalog);
+      status = 200;
+    } else if (settingsKind.kind === "root" || settingsKind.kind === "pages") {
       text = withCatalogOnSettings(text, localCatalog);
     }
+  }
 
-    if (settingsKind.kind === "root" && method === "PATCH") {
-      const incoming = catalogFromPatchBody(
+  if (settingsKind?.kind === "root" && auth && method === "PATCH") {
+    const incoming = catalogFromPatchBody(
+      typeof body === "string" ? body : undefined,
+    );
+    if (Object.keys(incoming).length) {
+      await mergeFallbackCatalog(workspaceId, incoming);
+    }
+    if (status >= 400 && Object.keys(incoming).length) {
+      const stripped = stripCatalogFromPatchBody(
         typeof body === "string" ? body : undefined,
       );
-      if (Object.keys(incoming).length) {
-        await mergeFallbackCatalog(workspaceId, incoming);
-      }
-      if (status >= 400 && Object.keys(incoming).length) {
-        const stripped = stripCatalogFromPatchBody(
-          typeof body === "string" ? body : undefined,
-        );
-        const retry = await fetch(`${base}/v1/settings`, {
-          method: "PATCH",
-          headers,
-          body: stripped,
-        });
-        const retryText = await retry.text();
-        const merged = await readFallbackCatalog(workspaceId);
-        if (retry.ok) {
-          status = retry.status;
-          text = withCatalogOnSettings(retryText, merged);
-        } else {
-          const fresh = await fetch(`${base}/v1/settings`, {
-            method: "GET",
-            headers: {
-              Accept: "application/json",
-              Authorization: headers.Authorization,
-            },
-          });
-          text = withCatalogOnSettings(await fresh.text(), merged);
-          status = 200;
-        }
-      } else if (status < 400) {
-        text = withCatalogOnSettings(
-          text,
-          await readFallbackCatalog(workspaceId),
-        );
-      }
-    }
-
-    if (settingsKind.kind === "pages" && method === "GET") {
+      const retry = await fetch(`${base}/v1/settings`, {
+        method: "PATCH",
+        headers,
+        body: stripped,
+      });
+      const retryText = await retry.text();
       const merged = await readFallbackCatalog(workspaceId);
-      if (status >= 400) {
-        text = pagesListPayload(merged);
-        status = 200;
+      if (retry.ok) {
+        status = retry.status;
+        text = withCatalogOnSettings(retryText, merged);
       } else {
-        text = withCatalogOnSettings(text, merged);
-      }
-    }
-
-    if (settingsKind.kind === "page") {
-      const pageKey = `${settingsKind.category}/${settingsKind.subpage}`;
-      if (method === "GET") {
-        const merged = await readFallbackCatalog(workspaceId);
-        if (status >= 400) {
-          text = pagePayload(pageKey, merged[pageKey] ?? {});
-          status = 200;
-        }
-      }
-      if (method === "PUT" && status >= 400) {
-        const values = pageValuesFromPutBody(
-          typeof body === "string" ? body : undefined,
-        );
-        const merged = await writeFallbackPage(workspaceId, pageKey, values);
         const fresh = await fetch(`${base}/v1/settings`, {
           method: "GET",
           headers: {
@@ -363,13 +418,35 @@ export async function proxyCrmV1(
             Authorization: headers.Authorization,
           },
         });
-        text = withCatalogOnSettings(await fresh.text(), merged, {
-          key: pageKey,
-          values,
-        });
+        text = withCatalogOnSettings(await fresh.text(), merged);
         status = 200;
       }
+    } else if (status < 400) {
+      text = withCatalogOnSettings(
+        text,
+        await readFallbackCatalog(workspaceId),
+      );
     }
+  }
+
+  if (settingsKind?.kind === "page" && auth && method === "PUT" && status >= 400) {
+    const pageKey = `${settingsKind.category}/${settingsKind.subpage}`;
+    const values = pageValuesFromPutBody(
+      typeof body === "string" ? body : undefined,
+    );
+    const merged = await writeFallbackPage(workspaceId, pageKey, values);
+    const fresh = await fetch(`${base}/v1/settings`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: headers.Authorization,
+      },
+    });
+    text = withCatalogOnSettings(await fresh.text(), merged, {
+      key: pageKey,
+      values,
+    });
+    status = 200;
   }
 
   const response = new NextResponse(text, {

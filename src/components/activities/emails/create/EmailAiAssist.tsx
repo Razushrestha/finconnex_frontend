@@ -44,7 +44,7 @@ function getSpeechRecognition(): (new () => SpeechRec) | null {
 const TONES: EmailTone[] = ["friendly", "professional", "emotional", "loving"];
 
 const READY_PROMPTS = [
-  "Write a concise follow-up on the outstanding documents",
+  "Write a detailed follow-up on the outstanding documents",
   "Draft a professional reply confirming next steps",
   "Write a polite request to book a 20-minute call",
   "Summarise the proposal and ask for a decision",

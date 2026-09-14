@@ -9,10 +9,12 @@ import {
 import { RecipientStatusSection } from "./RecipientStatusSection";
 import type { RecipientStatusData } from "./RecipientStatusRow";
 import type { DocumentActionsMenuProps } from "./DocumentActionMenu";
+import type { DocumentToolbarMode } from "./DocumentDetailToolbar";
 
 interface SignatureDocumentDetailViewProps extends DocumentActionsMenuProps {
   document: DocumentSummaryData;
   recipients: RecipientStatusData[];
+  toolbarMode?: DocumentToolbarMode;
   onBack?: () => void;
   onViewDocument?: () => void;
   onEdit?: () => void;
@@ -20,6 +22,7 @@ interface SignatureDocumentDetailViewProps extends DocumentActionsMenuProps {
   onExtend?: () => void;
   onSendReminder?: () => void;
   onReminderSettings?: () => void;
+  onCompletionCertificate?: () => void;
 }
 
 export const SignatureDocumentDetailView: React.FC<
@@ -27,6 +30,7 @@ export const SignatureDocumentDetailView: React.FC<
 > = ({
   document,
   recipients,
+  toolbarMode = "signing",
   onBack,
   onViewDocument,
   onEdit,
@@ -34,11 +38,13 @@ export const SignatureDocumentDetailView: React.FC<
   onExtend,
   onSendReminder,
   onReminderSettings,
+  onCompletionCertificate,
   ...actionsMenuProps
 }) => {
   return (
     <div className="min-h-screen bg-background">
       <DocumentDetailToolbar
+        mode={toolbarMode}
         onBack={onBack}
         onViewDocument={onViewDocument}
         onEdit={onEdit}
@@ -46,6 +52,7 @@ export const SignatureDocumentDetailView: React.FC<
         onExtend={onExtend}
         onSendReminder={onSendReminder}
         onReminderSettings={onReminderSettings}
+        onCompletionCertificate={onCompletionCertificate}
         {...actionsMenuProps}
       />
 

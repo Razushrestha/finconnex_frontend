@@ -169,8 +169,6 @@ function CreateTemplateForm() {
   const [signingOrder, setSigningOrder] = useState<"sequential" | "parallel">(
     "sequential",
   );
-  const [enableReminders, setEnableReminders] = useState(false);
-  const [reminderDays, setReminderDays] = useState("5");
   const [enableExpiry, setEnableExpiry] = useState(false);
   const [expiryDate, setExpiryDate] = useState("");
   const [expiryTime, setExpiryTime] = useState("");
@@ -712,10 +710,6 @@ function CreateTemplateForm() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <AdvancedOptionsSection
-            enableReminders={enableReminders}
-            setEnableReminders={setEnableReminders}
-            reminderDays={reminderDays}
-            setReminderDays={setReminderDays}
             enableExpiry={enableExpiry}
             setEnableExpiry={setEnableExpiry}
             expiryDate={expiryDate}

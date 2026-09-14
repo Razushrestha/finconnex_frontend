@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { listCrmSignatureTemplates } from "@/lib/documents/signature/templates-api";
-import {
-  upsertSignatureRequest,
-} from "@/lib/documents/signature/types";
+import { replaceCrmSignatureTemplates } from "@/lib/documents/signature/types";
+import { getTenantContext } from "@/lib/persistence/tenant";
 
 export type SignatureTemplatesDataSource = "api" | "demo";
 
@@ -13,6 +12,7 @@ export function useCrmSignatureTemplates() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const workspaceId = getTenantContext().tenantId;
 
   const refresh = useCallback(() => setTick((n) => n + 1), []);
 
@@ -25,12 +25,7 @@ export function useCrmSignatureTemplates() {
       try {
         const remote = await listCrmSignatureTemplates();
         if (cancelled) return;
-        for (const row of remote) {
-          upsertSignatureRequest(
-            { ...row, recordType: "template" },
-            { allowEmptyFields: true },
-          );
-        }
+        replaceCrmSignatureTemplates(remote);
         setSource("api");
       } catch (err) {
         if (cancelled) return;
@@ -46,7 +41,7 @@ export function useCrmSignatureTemplates() {
     return () => {
       cancelled = true;
     };
-  }, [tick]);
+  }, [tick, workspaceId]);
 
-  return { source, loading, error, refresh };
+  return { source, loading, error, refresh, workspaceId };
 }

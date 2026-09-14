@@ -77,6 +77,10 @@ import React, { useState } from "react";
 import { FileText, Eye } from "lucide-react";
 import { CircularProgress } from "./CircularProgress";
 import { SignatureDocPreview } from "@/components/documents/signature/SignatureDocPreview";
+import type {
+  SignatureField,
+  SignatureSigner,
+} from "@/lib/documents/signature/types";
 
 export interface DocumentSummaryData {
   name: string;
@@ -88,7 +92,10 @@ export interface DocumentSummaryData {
   lastUpdatedAtLabel: string;
   completionPercent: number;
   thumbnailUrl?: string;
-  documentFileUrl?: string; // Added to support direct PDF/image preview from API if available
+  documentFileUrl?: string;
+  fileName?: string;
+  fields?: SignatureField[];
+  signers?: SignatureSigner[];
   onViewThumbnail?: () => void;
 }
 
@@ -101,6 +108,9 @@ export const DocumentSummaryCard: React.FC<DocumentSummaryData> = ({
   completionPercent,
   thumbnailUrl,
   documentFileUrl,
+  fileName,
+  fields = [],
+  signers = [],
   onViewThumbnail,
 }) => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -179,10 +189,14 @@ export const DocumentSummaryCard: React.FC<DocumentSummaryData> = ({
             </div>
             <div className="flex-1 bg-slate-50 dark:bg-zinc-900 p-4 overflow-auto flex items-center justify-center">
               <SignatureDocPreview
-                fileName={name}
-                fileUrl={documentFileUrl}
-                fields={[]}
-                signers={[]}
+                fileName={fileName || name}
+                fileUrl={
+                  documentFileUrl?.startsWith("fc-file://")
+                    ? undefined
+                    : documentFileUrl
+                }
+                fields={fields}
+                signers={signers}
                 className="w-full h-full max-w-2xl max-h-none"
               />
             </div>

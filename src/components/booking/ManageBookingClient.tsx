@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { isUuid } from "@/lib/activity-timeline/auth";
 import {
   cancelPublicBooking,
   markBookingRescheduleIntent,
 } from "@/lib/booking/actions";
-import { getCalendlyRescheduleLink } from "@/lib/booking/calendly-api";
 import {
   getBookingByToken,
   getBookingPageBySlug,
@@ -178,27 +176,8 @@ export function ManageBookingClient({
           <button
             type="button"
             onClick={() => {
-              void (async () => {
-                if (
-                  booking.calendlyMeetingId &&
-                  isUuid(booking.calendlyMeetingId)
-                ) {
-                  try {
-                    const url = await getCalendlyRescheduleLink(
-                      booking.calendlyMeetingId,
-                      booking.calendlyInviteeId,
-                    );
-                    if (url) {
-                      window.open(url, "_blank", "noopener");
-                      return;
-                    }
-                  } catch {
-                    /* Fall back to the local reschedule flow. */
-                  }
-                }
-                markBookingRescheduleIntent(token);
-                setDone("reschedule");
-              })();
+              markBookingRescheduleIntent(token);
+              setDone("reschedule");
             }}
             className="h-10 rounded-xl bg-violet-600 text-[13px] font-semibold text-white hover:bg-violet-700"
           >

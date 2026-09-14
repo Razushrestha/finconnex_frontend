@@ -11,7 +11,6 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { isUuid } from "@/lib/activity-timeline/auth";
 import { fetchCrmRelatedRecords, liveRelatedRecords } from "@/lib/activities/related-records";
 import {
   createQuickContact,
@@ -26,21 +25,6 @@ import {
   type DashboardAppointment,
 } from "@/lib/booking/dashboard";
 import {
-  calendlyCrmLinkFromRelated,
-  calendlyEventTypeToBookingPage,
-  createCalendlyBooking,
-  linkCalendlyMeetingCrm,
-  listCalendlyAvailableTimes,
-  listCalendlyBusyTimes,
-  listCalendlyEventTypes,
-  listCalendlyHosts,
-  localHHmmFromIso,
-  newCalendlyIdempotencyKey,
-  resolveCalendlyEventType,
-  type CalendlyHost,
-} from "@/lib/booking/calendly-api";
-import { getCalendlyConnection } from "@/lib/booking/calendly-integration-api";
-import {
   assignedCalendarMembers,
   bookingLocationLabel,
   calendarDefaultHost,
@@ -48,9 +32,10 @@ import {
   customDaySlots,
   formatSlotRange,
   internalSlotsForDate,
+  listBookingPages,
   type BookingPage,
 } from "@/lib/booking/types";
-import { DEFAULT_TIMEZONE, ianaTimezoneFromLabel } from "@/lib/booking/timezones";
+import { DEFAULT_TIMEZONE } from "@/lib/booking/timezones";
 import { DateTimeSection } from "@/components/booking/DateTimeSection";
 import {
   nowHHmm,
@@ -73,6 +58,7 @@ import {
   RELATED_ENTITY_KINDS,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
+import { loadAssignableOwners, type AssignableOwner } from "@/lib/users/assignable";
 
 const LOCATIONS = ["Zoom", "Google Meet", "Phone", "Full address"] as const;
 type LocationKind = (typeof LOCATIONS)[number];
@@ -169,12 +155,7 @@ export function NewBookingModal({
   const formBodyRef = useRef<HTMLDivElement>(null);
   const relatedFieldsRef = useRef<HTMLDivElement>(null);
   const [relatedRecordId, setRelatedRecordId] = useState("");
-  const [calendlyHosts, setCalendlyHosts] = useState<CalendlyHost[]>([]);
-  const [providerSlots, setProviderSlots] = useState<string[] | null>(null);
-  const [providerStartBySlot, setProviderStartBySlot] = useState<
-    Record<string, string>
-  >({});
-  const [calendlyConnected, setCalendlyConnected] = useState(false);
+  const [owners, setOwners] = useState<AssignableOwner[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -191,20 +172,12 @@ export function NewBookingModal({
         setContactsLoading(false);
       });
     void Promise.all([
-      listCalendlyHosts({ active: true }).catch(() => [] as CalendlyHost[]),
-      listCalendlyEventTypes().catch(() => []),
-      getCalendlyConnection().catch(() => null),
-    ]).then(([hosts, types, connection]) => {
+      Promise.resolve(listBookingPages()),
+      loadAssignableOwners().catch(() => [] as AssignableOwner[]),
+    ]).then(([pages, members]) => {
       if (!alive) return;
-      setCalendlyHosts(hosts);
-      setCalendlyConnected(Boolean(connection?.connected));
-      const hostName = (id: string) =>
-        hosts.find((host) => host.id === id)?.name ?? "";
-      setCalendars(
-        types.map((item) =>
-          calendlyEventTypeToBookingPage(item, hostName(item.hostId)),
-        ),
-      );
+      setCalendars(pages);
+      setOwners(members);
     });
     return () => {
       alive = false;
@@ -218,9 +191,9 @@ export function NewBookingModal({
       id: name,
       name,
     })),
-    ...calendlyHosts
-      .filter((host) => !assignedCalendarMembers(calendar).includes(host.name))
-      .map((host) => ({ id: host.id, name: host.name })),
+    ...owners
+      .filter((owner) => !assignedCalendarMembers(calendar).includes(owner.name))
+      .map((owner) => ({ id: owner.id, name: owner.name })),
   ];
   const slotDuration = customDuration;
   const fallbackSlots = useMemo(
@@ -238,86 +211,7 @@ export function NewBookingModal({
     );
     return hours.length > 0 ? hours : fallbackSlots;
   }, [calendar, date, fallbackSlots, slotDuration, whenMode]);
-  // Empty Calendly results must not wipe the slot list — `??` treats [] as defined.
-  const slots =
-    whenMode === "custom"
-      ? localSlots
-      : providerSlots && providerSlots.length > 0
-        ? providerSlots
-        : localSlots;
-
-  useEffect(() => {
-    if (!open || !calendar || whenMode === "custom" || !date) {
-      setProviderSlots(null);
-      setProviderStartBySlot({});
-      return;
-    }
-    let alive = true;
-    void (async () => {
-      try {
-        const hostId = isUuid(consultantId) ? consultantId : calendar.calendlyHostId;
-        const eventType = await resolveCalendlyEventType(calendar, hostId);
-        if (!eventType || !isUuid(eventType.id)) {
-          if (alive) {
-            setProviderSlots(null);
-            setProviderStartBySlot({});
-          }
-          return;
-        }
-        const from = new Date(`${date}T00:00:00`);
-        const to = new Date(`${date}T23:59:59`);
-        const times = await listCalendlyAvailableTimes({
-          eventTypeId: eventType.id,
-          from: from.toISOString(),
-          to: to.toISOString(),
-        });
-        const duration = eventType.durationMinutes || slotDuration;
-        const startsByLabel: Record<string, string> = {};
-        let mapped = times.map((row) => {
-          const label = formatSlotRange(
-            localHHmmFromIso(row.startTime),
-            duration,
-          );
-          startsByLabel[label] = row.startTime;
-          return label;
-        });
-        if (hostId && isUuid(hostId)) {
-          try {
-            const busy = await listCalendlyBusyTimes(hostId, {
-              from: from.toISOString(),
-              to: to.toISOString(),
-            });
-            mapped = mapped.filter((label) => {
-              const hhmm = slotStart(label);
-              return !busy.some((block) => {
-                const start = localHHmmFromIso(block.startTime);
-                const end = localHHmmFromIso(block.endTime);
-                return hhmm >= start && hhmm < end;
-              });
-            });
-          } catch {
-            /* available-times is already provider-authoritative */
-          }
-        }
-        if (alive) {
-          const kept: Record<string, string> = {};
-          for (const label of mapped) {
-            if (startsByLabel[label]) kept[label] = startsByLabel[label];
-          }
-          setProviderStartBySlot(kept);
-          setProviderSlots(mapped);
-        }
-      } catch {
-        if (alive) {
-          setProviderSlots(null);
-          setProviderStartBySlot({});
-        }
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [open, calendar, date, whenMode, slotDuration, consultantId]);
+  const slots = localSlots;
 
   useEffect(() => {
     if (!open || calendars.length === 0) return;
@@ -381,9 +275,9 @@ export function NewBookingModal({
       ? calendarDefaultHost(calendar)
       : consultantId;
   const consultant =
-    calendlyHosts.find((host) => host.id === consultantId) ??
-    calendlyHosts.find((host) => host.name === hostName) ??
-    calendlyHosts.find((host) => host.name === calendar?.owner);
+    owners.find((owner) => owner.id === consultantId) ??
+    owners.find((owner) => owner.name === hostName) ??
+    owners.find((owner) => owner.name === calendar?.owner);
   const client =
     findContactById(clientId)?.contact ??
     contacts.find((c) => c.id === clientId) ??
@@ -462,7 +356,7 @@ export function NewBookingModal({
       return;
     }
     if (!calendar) {
-      showFormError("No Calendly event type available to book.", "calendar");
+      showFormError("Choose a consultation page to book.", "calendar");
       return;
     }
     const firstStart = new Date(`${date}T${startHHmm}`);
@@ -515,47 +409,10 @@ export function NewBookingModal({
         ? formatTaskRepeatSummary(repeatRule)
         : "";
     const note = [internalNote.trim(), repeatNote].filter(Boolean).join("\n");
-    const relatedLink = calendlyCrmLinkFromRelated(
-      inferredRelatedKind,
-      inferredRelatedId,
-    );
     setSaving(true);
     setError("");
     setErrorField("");
-    const calendlyTimezone = ianaTimezoneFromLabel(timezone);
     try {
-      try {
-        const eventType = await resolveCalendlyEventType(calendar);
-        const startTime =
-          providerStartBySlot[slot] || starts[0].toISOString();
-        if (
-          client.email &&
-          eventType &&
-          isUuid(eventType.id) &&
-          (calendlyConnected || Boolean(providerStartBySlot[slot]))
-        ) {
-          const booked = await createCalendlyBooking({
-            idempotencyKey: newCalendlyIdempotencyKey(),
-            eventTypeId: eventType.id,
-            startTime,
-            name: client.name || clientName,
-            email: client.email,
-            timezone: calendlyTimezone,
-            ...relatedLink,
-          });
-          if (isUuid(booked.meetingId)) {
-            await linkCalendlyMeetingCrm(booked.meetingId, relatedLink).catch(
-              () => undefined,
-            );
-          }
-        }
-      } catch (err) {
-        showFormError(
-          err instanceof Error ? err.message : "Calendly booking failed.",
-          "calendar",
-        );
-        return;
-      }
       for (const startDate of starts) {
         const endDate = new Date(startDate.getTime() + minutes * 60 * 1000);
         await createCrmMeeting({
@@ -627,10 +484,9 @@ export function NewBookingModal({
           className="grid min-h-0 flex-1 grid-cols-1 overflow-auto lg:grid-cols-[minmax(0,1fr)_280px]"
         >
           <div className="space-y-4 border-b border-slate-100 px-5 py-5 lg:border-r lg:border-b-0">
-            {!calendlyConnected ? (
+            {!calendar ? (
               <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-800">
-                Calendly is not connected. This will save a CRM meeting only.
-                Connect Calendly on the Booking page to book a live invitee.
+                Create a consultation page first, then book from that calendar.
               </p>
             ) : null}
             <Field label="Calendar">
@@ -640,7 +496,7 @@ export function NewBookingModal({
                 className={inputClass}
               >
                 {calendars.length === 0 ? (
-                  <option value="">No Calendly event types</option>
+                  <option value="">No consultation pages</option>
                 ) : null}
                 {calendars.map((page) => (
                   <option key={page.id} value={page.id}>

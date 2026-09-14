@@ -25,11 +25,13 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { MockSendLinksModal } from "./MockSendLinksModal";
+import { PlaceFieldsPreviewModal } from "./PlaceFieldsPreviewModal";
 import {
   DEFAULT_PLACED_FIELD_HEIGHT,
   DEFAULT_PLACED_FIELD_WIDTH,
   pointerToPagePercent,
 } from "@/lib/documents/signature/field-placement";
+import { cn } from "@/lib/utils";
 
 const PdfFieldEditor = dynamic(
   () => import("@/components/documents/signature/create/PdfFieldEditor"),
@@ -140,8 +142,15 @@ export function PlaceFieldsView({
   const [testLinksFor, setTestLinksFor] = useState<SignatureSigner[] | null>(
     null,
   );
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
+  const [pdfReadyDocId, setPdfReadyDocId] = useState<string | null>(null);
+  const [docMotion, setDocMotion] = useState<"none" | "next" | "prev">("none");
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const switchLockRef = useRef(false);
+  const lastScrollTopRef = useRef(0);
+  const pendingScrollRef = useRef<"top" | "bottom" | null>(null);
 
   useEffect(() => {
     if (documents.length === 0) {
@@ -155,6 +164,69 @@ export function PlaceFieldsView({
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documents.map((d) => d.id).join(",")]);
+
+  const activeDocIndex = documents.findIndex((doc) => doc.id === activeDocId);
+
+  function goToAdjacentDocument(direction: 1 | -1) {
+    if (activeDocIndex < 0) return;
+    const next = documents[activeDocIndex + direction];
+    if (!next || switchLockRef.current || htmlDragRef.current) return;
+    const current = documents[activeDocIndex];
+    if (
+      current &&
+      isPdfDocument(current.file) &&
+      pdfReadyDocId !== current.id
+    ) {
+      return;
+    }
+    switchLockRef.current = true;
+    pendingScrollRef.current = direction === 1 ? "top" : "bottom";
+    setDocMotion(direction === 1 ? "next" : "prev");
+    setActiveDocId(next.id);
+    window.setTimeout(() => {
+      switchLockRef.current = false;
+    }, 500);
+  }
+
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const mode = pendingScrollRef.current ?? "top";
+    pendingScrollRef.current = null;
+    const frame = requestAnimationFrame(() => {
+      el.scrollTop = mode === "bottom" ? el.scrollHeight : 0;
+      lastScrollTopRef.current = el.scrollTop;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeDocId]);
+
+  function handleCanvasWheel(e: React.WheelEvent<HTMLDivElement>) {
+    if (htmlDragRef.current || documents.length < 2) return;
+    const el = canvasRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 20;
+    const atTop = el.scrollTop <= 20;
+    if (e.deltaY > 8 && atBottom && activeDocIndex < documents.length - 1) {
+      e.preventDefault();
+      goToAdjacentDocument(1);
+    } else if (e.deltaY < -8 && atTop && activeDocIndex > 0) {
+      e.preventDefault();
+      goToAdjacentDocument(-1);
+    }
+  }
+
+  function handleCanvasScroll() {
+    const el = canvasRef.current;
+    if (!el || switchLockRef.current || documents.length < 2) return;
+    const previous = lastScrollTopRef.current;
+    const top = el.scrollTop;
+    lastScrollTopRef.current = top;
+    if (el.scrollHeight - el.clientHeight <= 32) return;
+    const atBottom = el.scrollHeight - top - el.clientHeight <= 20;
+    const atTop = top <= 20;
+    if (top > previous && atBottom) goToAdjacentDocument(1);
+    else if (top < previous && atTop) goToAdjacentDocument(-1);
+  }
 
   const handleSubmitAction = async () => {
     setIsSubmitting(true);
@@ -319,7 +391,12 @@ export function PlaceFieldsView({
                   <button
                     key={doc.id}
                     type="button"
-                    onClick={() => setActiveDocId(doc.id)}
+                    onClick={() => {
+                      if (doc.id === activeDocId) return;
+                      setDocMotion(index > activeDocIndex ? "next" : "prev");
+                      pendingScrollRef.current = "top";
+                      setActiveDocId(doc.id);
+                    }}
                     className={`relative w-full text-left rounded-xl border bg-white p-3 shadow-sm transition-all ${
                       selected
                         ? "border-violet-400 ring-2 ring-violet-200 z-10"
@@ -366,8 +443,22 @@ export function PlaceFieldsView({
         ) : null}
 
         {/* Document Canvas Area */}
-        <div className="flex-1 bg-slate-100/80 rounded-sm border border-slate-200/80 flex items-start justify-center p-3 overflow-y-auto h-full relative shadow-inner">
-          <div className="w-full max-w-[800px] flex flex-col gap-4">
+        <div
+          ref={canvasRef}
+          onScroll={handleCanvasScroll}
+          onWheel={handleCanvasWheel}
+          className="flex-1 bg-slate-100/80 rounded-sm border border-slate-200/80 flex items-start justify-center p-3 overflow-y-auto h-full relative shadow-inner"
+        >
+          <div
+            key={activeDoc?.id ?? "empty"}
+            className={cn(
+              "w-full max-w-[800px] flex flex-col gap-4",
+              docMotion === "next" &&
+                "animate-in fade-in-0 slide-in-from-bottom-8 duration-500 ease-out fill-mode-both motion-reduce:animate-none",
+              docMotion === "prev" &&
+                "animate-in fade-in-0 slide-in-from-top-8 duration-500 ease-out fill-mode-both motion-reduce:animate-none",
+            )}
+          >
             <h2 className="text-sm font-bold text-slate-900">
               {activeDoc?.name ||
                 documentName.trim() ||
@@ -404,6 +495,7 @@ export function PlaceFieldsView({
                               onRepositionField={handleRepositionField}
                               onRemoveField={handleRemovePlacedField}
                               onResizeField={handleResizeField}
+                              onDocumentReady={setPdfReadyDocId}
                             />
                           ) : (
                             <div
@@ -598,6 +690,7 @@ export function PlaceFieldsView({
         <div className="flex items-center gap-4">
           <button
             type="button"
+            onClick={() => setIsPreviewOpen(true)}
             className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition-colors"
           >
             Preview
@@ -627,6 +720,21 @@ export function PlaceFieldsView({
           </button>
         </div>
       </footer>
+
+      {isPreviewOpen ? (
+        <PlaceFieldsPreviewModal
+          documents={documents}
+          placedFields={placedFields}
+          recipients={recipients}
+          isTemplate={isTemplate}
+          isSubmitting={isSubmitting}
+          onClose={() => setIsPreviewOpen(false)}
+          onConfirm={() => {
+            setIsPreviewOpen(false);
+            void handleSubmitAction();
+          }}
+        />
+      ) : null}
 
       {testLinksFor && (
         <MockSendLinksModal

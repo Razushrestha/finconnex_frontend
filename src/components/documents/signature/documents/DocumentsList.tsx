@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   FileText,
   Search,
@@ -108,6 +108,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 
 export default function DocumentsList() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const crm = useCrmSignatureRequests();
 
   const {
@@ -149,7 +150,13 @@ export default function DocumentsList() {
         req.relatedTo &&
         req.relatedTo.toLowerCase().includes(query.toLowerCase()),
       ),
-    statusFilterFn: (req, status) => computeOverallStatus(req) === status,
+    statusFilterFn: (req, status) => {
+      const overall = computeOverallStatus(req);
+      if (status === "In Progress") {
+        return overall === "Sent" || overall === "Viewed";
+      }
+      return overall === status;
+    },
   });
 
   useEffect(() => {
@@ -161,7 +168,22 @@ export default function DocumentsList() {
     };
     refresh();
     return onRecordsChange(refresh);
-  }, [setItems, crm.source, crm.loading]);
+  }, [setItems, crm.source, crm.loading, crm.workspaceId]);
+
+  useEffect(() => {
+    const raw = searchParams.get("status")?.trim().toLowerCase();
+    if (!raw || raw === "all") {
+      setStatusFilter("All");
+      return;
+    }
+    if (raw === "draft") setStatusFilter("Draft");
+    else if (raw === "in-progress" || raw === "inprogress") {
+      setStatusFilter("In Progress");
+    } else if (raw === "sent") setStatusFilter("Sent");
+    else if (raw === "signed") setStatusFilter("Signed");
+    else if (raw === "expired") setStatusFilter("Expired");
+    else if (raw === "declined") setStatusFilter("Declined");
+  }, [searchParams, setStatusFilter]);
 
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
@@ -277,7 +299,7 @@ export default function DocumentsList() {
             align="end"
             className="w-40 rounded-xl border-slate-200 dark:border-zinc-800 dark:bg-zinc-950"
           >
-            {["All", "Sent", "Signed", "Expired", "Declined"].map((status) => (
+            {["All", "Draft", "In Progress", "Sent", "Signed", "Expired", "Declined"].map((status) => (
               <DropdownMenuItem
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -426,10 +448,10 @@ export default function DocumentsList() {
                         <td className="py-2 px-4">
                           <div className="flex min-w-0 items-center gap-2">
                             <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-medium text-slate-700 dark:bg-zinc-800 dark:text-zinc-300">
-                              {req.createdBy ? req.createdBy[0] : "F"}
+                              {req.createdBy ? req.createdBy[0] : "?"}
                             </div>
                             <CellText className="text-xs font-medium text-slate-700 dark:text-zinc-300">
-                              {req.createdBy || "Finconnex"}
+                              {req.createdBy || "—"}
                             </CellText>
                           </div>
                         </td>

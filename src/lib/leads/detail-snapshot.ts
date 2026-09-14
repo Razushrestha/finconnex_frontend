@@ -1,4 +1,5 @@
 import type { LeadCardData } from "@/lib/leads/types";
+import { parseFlexibleDate } from "@/lib/leads/activity-dates";
 import { MORTGAGE_PIPELINE_STAGES } from "@/lib/pipeline-sla/types";
 
 export const LEAD_DETAIL_STAGES = [...MORTGAGE_PIPELINE_STAGES];
@@ -17,15 +18,18 @@ function formatAud(n: number) {
   });
 }
 
-function parseDisplayDate(value?: string): Date | null {
-  if (!value) return null;
-  const match = value.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (!match) return null;
-  return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+function displayMoney(raw?: string): string {
+  const text = raw?.trim() ?? "";
+  if (!text) return "";
+  const n = parseMoney(text);
+  if (n > 0 && !/\$/.test(text)) return formatAud(n);
+  return text;
 }
 
 export function daysInStage(card: LeadCardData, now = new Date()) {
-  const entered = parseDisplayDate(card.stageEnteredAt ?? card.createdDate);
+  const entered =
+    parseFlexibleDate(card.stageEnteredAt) ??
+    parseFlexibleDate(card.createdDate);
   if (!entered) return 0;
   return Math.max(
     0,
@@ -38,7 +42,7 @@ export function leadLocation(card: LeadCardData) {
     (part) => part?.trim(),
   );
   if (parts.length) return parts.join(", ");
-  return card.custom?.preferredBranch || "Sydney, NSW";
+  return card.custom?.preferredBranch?.trim() || "";
 }
 
 export function leadBuyerTag(card: LeadCardData) {
@@ -58,10 +62,13 @@ export function leadApplicants(card: LeadCardData) {
     name: primaryName,
     role: "Primary" as const,
     residency:
-      card.custom?.residency ||
-      card.custom?.residencyStatus ||
-      "Australian Citizen",
-    employment: card.custom?.employmentType || card.custom?.employment || "PAYG",
+      card.custom?.residency?.trim() ||
+      card.custom?.residencyStatus?.trim() ||
+      "",
+    employment:
+      card.custom?.employmentType?.trim() ||
+      card.custom?.employment?.trim() ||
+      "",
   };
   if (card.custom?.secondaryApplicant !== "Yes") return [primary];
   const secondaryName =
@@ -79,10 +86,10 @@ export function leadApplicants(card: LeadCardData) {
       name: secondaryName,
       role: "Secondary" as const,
       residency:
-        card.custom?.["secondary.residency"] ||
-        card.custom?.["secondary.residencyStatus"] ||
-        "Australian Citizen",
-      employment: card.custom?.["secondary.employmentType"] || "PAYG",
+        card.custom?.["secondary.residency"]?.trim() ||
+        card.custom?.["secondary.residencyStatus"]?.trim() ||
+        "",
+      employment: card.custom?.["secondary.employmentType"]?.trim() || "",
     },
   ];
 }
@@ -152,188 +159,149 @@ export const LEAD_FIELD_KEYS = {
 } as const;
 
 export function leadFinancials(card: LeadCardData) {
-  const value = parseMoney(card.custom?.loanAmount || card.estimatedValue);
-  const propertyDefault = value > 0 ? Math.round(value * 1.67) : 750_000;
-  const loanDefault = value > 0 ? value : 600_000;
-  const property = card.custom?.propertyPrice || formatAud(propertyDefault);
-  const loan = card.custom?.loanAmount || formatAud(loanDefault);
+  const property = displayMoney(card.custom?.propertyPrice);
+  const loan = displayMoney(card.custom?.loanAmount || card.estimatedValue);
   const deposit =
-    card.custom?.deposit ||
-    formatAud(Math.max(0, parseMoney(property) - parseMoney(loan)));
+    displayMoney(card.custom?.deposit) ||
+    (property && loan
+      ? formatAud(Math.max(0, parseMoney(property) - parseMoney(loan)))
+      : "");
   return [
-    { key: LEAD_FIELD_KEYS.purpose, label: "Purpose", value: card.custom?.purpose || "Purchase" },
+    {
+      key: LEAD_FIELD_KEYS.purpose,
+      label: "Purpose",
+      value: card.custom?.purpose?.trim() || "",
+    },
     { key: LEAD_FIELD_KEYS.propertyPrice, label: "Property Price", value: property },
     { key: LEAD_FIELD_KEYS.loanAmount, label: "Loan Amount", value: loan },
     { key: LEAD_FIELD_KEYS.deposit, label: "Deposit", value: deposit },
     {
       key: LEAD_FIELD_KEYS.householdIncome,
       label: "Household Income",
-      value: card.custom?.householdIncome || formatAud(205_000),
+      value: displayMoney(card.custom?.householdIncome),
     },
-    { key: LEAD_FIELD_KEYS.timeframe, label: "Timeframe", value: card.custom?.timeframe || "1–3 Months" },
+    {
+      key: LEAD_FIELD_KEYS.timeframe,
+      label: "Timeframe",
+      value: card.custom?.timeframe?.trim() || "",
+    },
   ];
 }
 
 export function leadScoreBreakdown(card: LeadCardData) {
-  const score = Number(card.score ?? card.custom?.leadScore ?? 82);
+  const fromCustom = card.custom?.leadScore?.trim();
+  const raw =
+    typeof card.score === "number" ? card.score : fromCustom ? Number(fromCustom) : NaN;
+  const score = Number.isFinite(raw) ? raw : null;
   return {
-    score: Number.isFinite(score) ? score : 82,
-    label: score >= 75 ? "High Potential" : score >= 50 ? "Warm" : "Cold",
-    parts: [
-      { label: "Contactability", value: 90, color: "#22c55e" },
-      { label: "Intent", value: 80, color: "#3b82f6" },
-      { label: "Financial Strength", value: 75, color: "#ef4444" },
-      { label: "Timeframe Fit", value: 85, color: "#f59e0b" },
-      { label: "Engagement", value: 88, color: "#7c3aed" },
-    ],
+    score,
+    label:
+      score == null
+        ? ""
+        : score >= 75
+          ? "High Potential"
+          : score >= 50
+            ? "Warm"
+            : "Cold",
+    parts: [] as { label: string; value: number; color: string }[],
   };
 }
 
 export function leadLoanStrategy(card: LeadCardData) {
-  const firstHome = Boolean(card.tags?.some((tag) => /first home/i.test(tag)));
-  const refinance = Boolean(card.tags?.some((tag) => /refinance/i.test(tag)));
+  const purpose = card.custom?.purpose?.trim() || "";
   const money = leadFinancials(card);
-  const loanLabel = money.find((row) => row.label === "Loan Amount")?.value ?? "—";
-  const deposit = money.find((row) => row.label === "Deposit")?.value ?? "—";
-
-  if (refinance) {
-    return {
-      headline: "Cash-flow refinance · Owner Occupier",
-      summary:
-        "Reprice the current loan and add an offset to cut interest without changing the repayment term.",
-    facts: [
-      { key: LEAD_FIELD_KEYS.purpose, label: "Purpose", value: card.custom?.purpose || "Refinance" },
-      { key: LEAD_FIELD_KEYS.structure, label: "Structure", value: card.custom?.structure || "P&I" },
-      { key: LEAD_FIELD_KEYS.occupancy, label: "Occupancy", value: card.custom?.occupancy || "Owner Occupier" },
-      { key: LEAD_FIELD_KEYS.rateType, label: "Rate type", value: card.custom?.rateType || "Variable" },
-      { key: LEAD_FIELD_KEYS.targetLvr, label: "Target LVR", value: card.custom?.targetLvr || "72%" },
-      { key: LEAD_FIELD_KEYS.lmi, label: "LMI", value: card.custom?.lmi || "Not required" },
-    ],
-      lenders: ["CBA", "Macquarie", "ING"],
-      features: ["Offset account", "Extra repayments", "Redraw"],
-      options: [
-        {
-          name: "Stay & reprice",
-          rate: "5.89%",
-          repayment: "$3,210 / mo",
-          note: "Lowest switch cost",
-          recommended: false,
-        },
-        {
-          name: "Refinance + offset",
-          rate: "5.74%",
-          repayment: "$3,150 / mo",
-          note: "Recommended",
-          recommended: true,
-        },
-        {
-          name: "Split 50 / 50",
-          rate: "5.92%",
-          repayment: "$3,240 / mo",
-          note: "Rate certainty",
-          recommended: false,
-        },
-      ],
-      note: `Current loan ${loanLabel}. Discharge and break costs should be confirmed before switching.`,
-    };
-  }
-
+  const loanLabel = money.find((row) => row.label === "Loan Amount")?.value ?? "";
+  const deposit = money.find((row) => row.label === "Deposit")?.value ?? "";
+  const facts = [
+    { key: LEAD_FIELD_KEYS.purpose, label: "Purpose", value: purpose },
+    {
+      key: LEAD_FIELD_KEYS.structure,
+      label: "Structure",
+      value: card.custom?.structure?.trim() || "",
+    },
+    {
+      key: LEAD_FIELD_KEYS.occupancy,
+      label: "Occupancy",
+      value: card.custom?.occupancy?.trim() || "",
+    },
+    {
+      key: LEAD_FIELD_KEYS.rateType,
+      label: "Rate type",
+      value: card.custom?.rateType?.trim() || "",
+    },
+    {
+      key: LEAD_FIELD_KEYS.targetLvr,
+      label: "Target LVR",
+      value: card.custom?.targetLvr?.trim() || "",
+    },
+    {
+      key: LEAD_FIELD_KEYS.lmi,
+      label: "LMI",
+      value: card.custom?.lmi?.trim() || "",
+    },
+  ];
   return {
-    headline: firstHome
-      ? "First home purchase · Owner Occupier"
-      : "Purchase · Owner Occupier",
-    summary: firstHome
-      ? "Maximise borrowing with a variable P&I loan and keep LVR under the LMI threshold where possible."
-      : "Structure a variable P&I home loan with offset so surplus cash reduces interest from day one.",
-    facts: [
-      { key: LEAD_FIELD_KEYS.purpose, label: "Purpose", value: card.custom?.purpose || "Purchase" },
-      { key: LEAD_FIELD_KEYS.structure, label: "Structure", value: card.custom?.structure || "P&I" },
-      { key: LEAD_FIELD_KEYS.occupancy, label: "Occupancy", value: card.custom?.occupancy || "Owner Occupier" },
-      { key: LEAD_FIELD_KEYS.rateType, label: "Rate type", value: card.custom?.rateType || "Variable" },
-      {
-        key: LEAD_FIELD_KEYS.targetLvr,
-        label: "Target LVR",
-        value: card.custom?.targetLvr || (firstHome ? "80%" : "78%"),
-      },
-      {
-        key: LEAD_FIELD_KEYS.lmi,
-        label: "LMI",
-        value: card.custom?.lmi || (firstHome ? "Avoid if possible" : "Not required"),
-      },
-    ],
-    lenders: firstHome
-      ? ["CBA", "NAB", "Bank of Queensland"]
-      : ["ANZ", "CBA", "Athena"],
-    features: firstHome
-      ? ["FHB grant check", "Offset account", "Extra repayments"]
-      : ["Offset account", "Extra repayments", "Redraw"],
-    options: [
-      {
-        name: "Variable + offset",
-        rate: "5.69%",
-        repayment: "$3,420 / mo",
-        note: "Recommended",
-        recommended: true,
-      },
-      {
-        name: "2-year fixed",
-        rate: "5.54%",
-        repayment: "$3,360 / mo",
-        note: "Repayment certainty",
-        recommended: false,
-      },
-      {
-        name: "70 / 30 split",
-        rate: "5.72%",
-        repayment: "$3,440 / mo",
-        note: "Balance of flexibility",
-        recommended: false,
-      },
-    ],
-    note: firstHome
-      ? `Deposit ${deposit}. Confirm First Home Buyer grant and stamp duty concessions for the purchase state.`
-      : `Loan amount ${loanLabel}. Keep genuine savings evidence ready for lender servicing.`,
+    headline: purpose || "Loan strategy",
+    summary: "",
+    facts,
+    lenders: [] as string[],
+    features: [] as string[],
+    options: [] as {
+      name: string;
+      rate: string;
+      repayment: string;
+      note: string;
+      recommended: boolean;
+    }[],
+    note: [loanLabel && `Loan ${loanLabel}`, deposit && `Deposit ${deposit}`]
+      .filter(Boolean)
+      .join(". "),
   };
 }
 
 export function leadQualification(card: LeadCardData) {
-  const firstHome = Boolean(
+  const firstHomeTag = Boolean(
     card.tags?.some((tag) => /first home/i.test(tag)),
   );
+  const firstHome =
+    card.custom?.firstHomeBuyer?.trim() || (firstHomeTag ? "Yes" : "");
   const money = leadFinancials(card);
+  const rows = [
+    {
+      key: LEAD_FIELD_KEYS.citizenship,
+      label: "Citizenship",
+      value: card.custom?.citizenship?.trim() || "",
+    },
+    {
+      key: LEAD_FIELD_KEYS.firstHomeBuyer,
+      label: "First Home Buyer",
+      value: firstHome,
+    },
+    {
+      key: LEAD_FIELD_KEYS.employment,
+      label: "Employment",
+      value: card.custom?.employment?.trim() || "",
+    },
+    {
+      key: LEAD_FIELD_KEYS.creditIssues,
+      label: "Credit Issues",
+      value: card.custom?.creditIssues?.trim() || "",
+    },
+    {
+      key: LEAD_FIELD_KEYS.deposit,
+      label: "Deposit",
+      value: money[3]?.value ?? "",
+    },
+    {
+      key: LEAD_FIELD_KEYS.householdIncome,
+      label: "Income",
+      value: money[4]?.value ?? "",
+    },
+  ];
   return {
-    rows: [
-      {
-        key: LEAD_FIELD_KEYS.citizenship,
-        label: "Citizenship",
-        value: card.custom?.citizenship || "Australian Citizen",
-        ok: true,
-      },
-      {
-        key: LEAD_FIELD_KEYS.firstHomeBuyer,
-        label: "First Home Buyer",
-        value: card.custom?.firstHomeBuyer || (firstHome ? "Yes" : "No"),
-        ok: (card.custom?.firstHomeBuyer || (firstHome ? "Yes" : "No")) === "Yes",
-      },
-      {
-        key: LEAD_FIELD_KEYS.employment,
-        label: "Employment",
-        value: card.custom?.employment || "PAYG",
-        ok: true,
-      },
-      {
-        key: LEAD_FIELD_KEYS.creditIssues,
-        label: "Credit Issues",
-        value: card.custom?.creditIssues || "None declared",
-        ok: true,
-      },
-      { key: LEAD_FIELD_KEYS.deposit, label: "Deposit", value: money[3]?.value ?? "—", ok: true },
-      {
-        key: LEAD_FIELD_KEYS.householdIncome,
-        label: "Income",
-        value: money[4]?.value ?? "—",
-        ok: true,
-      },
-    ],
+    rows: rows.map((row) => ({
+      ...row,
+      ok: Boolean(row.value.trim()),
+    })),
   };
 }

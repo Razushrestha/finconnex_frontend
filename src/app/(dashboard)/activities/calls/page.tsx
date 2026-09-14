@@ -7,10 +7,15 @@ import { CallsListTable } from "@/components/activities/calls/CallsListTable";
 import {
   ActivityToolbar,
   type ActivityView,
+  type MoreMenuItem,
+  type PrintViewItem,
 } from "@/components/activities/ActivityToolbar";
+import {
+  ActivityMassActionDialog,
+  type ActivityMassAction,
+} from "@/components/activities/ActivityMassActionDialog";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
-import { printViewItems } from "../tasks/page";
 import {
   ArrowRightLeft,
   Trash2,
@@ -20,19 +25,20 @@ import {
 } from "lucide-react";
 import { activityExportMenuItem } from "@/lib/activities/export";
 import { BOARD_PAGE } from "@/lib/layout";
-import { deleteCall, type CallScope } from "@/lib/calls/store";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import { tryCrm, updateCrmCall } from "@/lib/calls/api";
+import {
+  appendCallNoteTag,
+  deleteCall,
+  findCallById,
+  listCalls,
+  updateCall,
+  type CallScope,
+} from "@/lib/calls/store";
+import { CALL_STAGES, type CallStatus } from "@/lib/calls/types";
 import { openSoftphone } from "@/lib/softphone/events";
 import { useCrmCalls } from "@/lib/calls/use-crm-calls";
 import { cn } from "@/lib/utils";
-
-const moreMenuItems = [
-  { key: "mass-transfer", icon: ArrowRightLeft, label: "Mass Transfer" },
-  { key: "mass-delete", icon: Trash2, label: "Mass Delete" },
-  { key: "mass-update", icon: RefreshCw, label: "Mass Update" },
-  { key: "manage-tags", icon: Tags, label: "Manage Tags" },
-  { key: "assignment-rules", icon: ShieldCheck, label: "Assignment Rules" },
-  activityExportMenuItem("calls"),
-];
 
 export default function CallsPage() {
   const [view, setView] = useState<ActivityView>("kanban");
@@ -42,28 +48,169 @@ export default function CallsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
   const [scopeTab, setScopeTab] = useState("All Calls");
+  const [massAction, setMassAction] = useState<ActivityMassAction | null>(null);
+  const [massBusy, setMassBusy] = useState(false);
+  const [massError, setMassError] = useState<string | null>(null);
   const crm = useCrmCalls();
 
   const scope: CallScope =
     scopeTab === "My Overdue Calls" ? "my-overdue" : "all";
 
-  function runBulkDelete() {
-    if (!selectedIds.length) return;
-    const count = selectedIds.length;
-    if (
-      !window.confirm(
-        `Delete ${count} call${count === 1 ? "" : "s"}? This cannot be undone.`,
-      )
-    ) {
-      return;
-    }
-    let n = 0;
-    for (const id of selectedIds) {
-      if (deleteCall(id)) n += 1;
-    }
-    setSelectedIds([]);
-    setBulkFlash(`Deleted ${n} call${n === 1 ? "" : "s"}`);
+  function notify(message: string) {
+    setBulkFlash(message);
     window.setTimeout(() => setBulkFlash(null), 2800);
+  }
+
+  function openMassAction(action: ActivityMassAction) {
+    setMassError(null);
+    setMassAction(action);
+  }
+
+  const boardCalls = listCalls();
+  const printSource = selectedIds.length
+    ? boardCalls.filter((call) => selectedIds.includes(call.id))
+    : boardCalls;
+  const printRows = printSource.map((call) => ({
+    id: call.id,
+    name: call.subject,
+    owner: call.assignedTo,
+    status: call.status,
+  }));
+
+  const moreMenuItems: MoreMenuItem[] = [
+    {
+      key: "mass-transfer",
+      icon: ArrowRightLeft,
+      label: "Mass Transfer",
+      onSelect: () => openMassAction("transfer"),
+    },
+    {
+      key: "mass-delete",
+      icon: Trash2,
+      label: "Mass Delete",
+      onSelect: () => openMassAction("delete"),
+    },
+    {
+      key: "mass-update",
+      icon: RefreshCw,
+      label: "Mass Update",
+      onSelect: () => openMassAction("update"),
+    },
+    {
+      key: "manage-tags",
+      icon: Tags,
+      label: "Manage Tags",
+      onSelect: () => openMassAction("tags"),
+    },
+    {
+      key: "assignment-rules",
+      icon: ShieldCheck,
+      label: "Assignment Rules",
+      onSelect: () => openMassAction("assignment-rules"),
+    },
+    activityExportMenuItem("calls"),
+  ];
+
+  const printViewItems: PrintViewItem[] = [
+    {
+      key: "print-default",
+      label: "Print Default view",
+      onSelect: () => openMassAction("print"),
+    },
+    {
+      key: "print-canvas",
+      label: "Print Using Canvas",
+      premium: true,
+      onSelect: () => openMassAction("print"),
+    },
+  ];
+
+  async function applyMassDelete() {
+    if (!selectedIds.length) return;
+    setMassBusy(true);
+    setMassError(null);
+    try {
+      const ids = [...selectedIds];
+      let n = 0;
+      for (const id of ids) {
+        if (deleteCall(id)) n += 1;
+      }
+      setSelectedIds([]);
+      setMassAction(null);
+      notify(`Deleted ${n} call${n === 1 ? "" : "s"}`);
+    } catch (err) {
+      setMassError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setMassBusy(false);
+    }
+  }
+
+  function runBulkDelete() {
+    openMassAction("delete");
+  }
+
+  async function applyMassTransfer(ownerId: string, ownerName: string) {
+    if (!selectedIds.length) return;
+    setMassBusy(true);
+    setMassError(null);
+    try {
+      let n = 0;
+      for (const id of selectedIds) {
+        const next = updateCall(id, { assignedTo: ownerName });
+        if (next) n += 1;
+        if (isUuid(id) && isUuid(ownerId)) {
+          await tryCrm(() => updateCrmCall(id, { assignedTo: ownerId }));
+        }
+      }
+      setMassAction(null);
+      notify(`Transferred ${n} call${n === 1 ? "" : "s"} to ${ownerName}`);
+    } catch (err) {
+      setMassError(err instanceof Error ? err.message : "Transfer failed");
+    } finally {
+      setMassBusy(false);
+    }
+  }
+
+  async function applyMassUpdate(status: string) {
+    if (!selectedIds.length) return;
+    setMassBusy(true);
+    setMassError(null);
+    try {
+      let n = 0;
+      for (const id of selectedIds) {
+        const next = updateCall(id, { status: status as CallStatus });
+        if (next) n += 1;
+      }
+      setMassAction(null);
+      notify(`Updated status on ${n} call${n === 1 ? "" : "s"}`);
+    } catch (err) {
+      setMassError(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setMassBusy(false);
+    }
+  }
+
+  async function applyAddTag(tag: string) {
+    if (!selectedIds.length) return;
+    setMassBusy(true);
+    setMassError(null);
+    try {
+      let n = 0;
+      for (const id of selectedIds) {
+        const found = findCallById(id);
+        if (!found) continue;
+        const next = updateCall(id, {
+          notes: appendCallNoteTag(found.call.notes, tag),
+        });
+        if (next) n += 1;
+      }
+      setMassAction(null);
+      notify(`Added tag to ${n} call${n === 1 ? "" : "s"}`);
+    } catch (err) {
+      setMassError(err instanceof Error ? err.message : "Tag update failed");
+    } finally {
+      setMassBusy(false);
+    }
   }
 
   return (
@@ -163,6 +310,22 @@ export default function CallsPage() {
           )}
         </div>
       </div>
+
+      <ActivityMassActionDialog
+        action={massAction}
+        entityLabel="Call"
+        onClose={() => setMassAction(null)}
+        selectedCount={selectedIds.length}
+        busy={massBusy}
+        error={massError}
+        statusOptions={CALL_STAGES}
+        printRows={printRows}
+        printHint="Print selected calls, or the full board if none are selected."
+        onTransfer={applyMassTransfer}
+        onDelete={applyMassDelete}
+        onUpdate={applyMassUpdate}
+        onAddTag={applyAddTag}
+      />
     </div>
   );
 }

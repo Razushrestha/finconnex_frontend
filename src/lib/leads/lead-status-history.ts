@@ -9,6 +9,7 @@ import {
   type FieldChange,
 } from "@/lib/rules/audit";
 import { parseFlexibleDate } from "@/lib/leads/activity-dates";
+import { namesEqual } from "@/lib/related-entity";
 import type { LeadActivityCandidate, LeadActivityKind } from "@/lib/leads/card-types";
 import { MORTGAGE_PIPELINE_STAGES } from "@/lib/pipeline-sla/types";
 
@@ -28,10 +29,7 @@ const PIPELINE_STAGES = new Set<string>(MORTGAGE_PIPELINE_STAGES);
 export function ensureLeadStatusHistorySeeds() {}
 
 function matchesLead(event: AuditEvent, leadName: string): boolean {
-  const key = leadName.trim().toLowerCase();
-  if (event.recordLabel?.trim().toLowerCase() === key) return true;
-  if (event.summary.toLowerCase().includes(key)) return true;
-  return false;
+  return namesEqual(event.recordLabel, leadName);
 }
 
 function looksLikePipelineStage(value: unknown) {

@@ -86,6 +86,9 @@ export interface LeadRecord {
   pipelineStage?: string;
   stageEnteredAt?: string;
   pipelineStartedAt?: string;
+  /** ISO `updatedAt` from the CRM — used for live last-activity. */
+  updatedAt?: string;
+  modifiedDate?: string;
   /** Values keyed by Custom Field `key` (not `cf:` prefix). */
   custom?: Record<string, string>;
   initials: string;
@@ -124,6 +127,8 @@ export interface LeadCardData {
   country?: string;
   street?: string;
   postalCode?: string;
+  /** ISO `updatedAt` from the CRM — used for live last-activity. */
+  updatedAt?: string;
   modifiedDate?: string;
   lifecycleStage?: string;
   rating?: string;

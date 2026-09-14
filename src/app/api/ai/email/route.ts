@@ -3,8 +3,13 @@ import { getSession } from "@/lib/auth/session";
 import {
   type EmailAiAction,
   type EmailTone,
+  draftEmailFromPrompt,
+  editEmailWithPrompt,
+  extractEmailCore,
   htmlToPlainText,
   plainTextToEmailHtml,
+  rewriteEmailWithAi,
+  suggestSubjects,
 } from "@/lib/emails/ai-compose";
 import {
   generateGeminiText,
@@ -27,22 +32,24 @@ function instruction(body: Body) {
   const tone = body.tone || "professional";
   const name = body.recipientName?.trim() || "the client";
   const subject = body.subject?.trim();
-  const existing = htmlToPlainText(body.html ?? "");
+  const existing = extractEmailCore(htmlToPlainText(body.html ?? ""));
   const prompt = body.prompt?.trim() || "";
   const action = body.action;
 
   if (body.mode === "subjects") {
-    const deal = [body.dealTitle, body.dealStage].filter(Boolean).join(" · ");
     return [
       "Return ONLY a JSON array of exactly 4 objects. No markdown fences, no commentary.",
       'Each object: {"text":"subject line","recommended":true|false,"reason":"short why"}.',
       "Exactly one item has recommended true.",
-      "Subjects must be suitable for an Australian mortgage / finance CRM (FinConnex).",
+      "Ground every subject in the CURRENT SUBJECT and EMAIL BODY the user typed.",
+      "Rephrase that topic. Do not switch to a different product, deal, or campaign.",
+      "Do not mention a home loan, pre-approval, refinance, or deal name unless those words already appear in the current subject or body.",
       "Keep each subject under 80 characters. Do not use ALL CAPS.",
       `Recipient: ${name}.`,
       subject ? `Current subject: ${subject}.` : "Current subject: (empty).",
-      deal ? `Deal context: ${deal}.` : "",
-      existing ? `Email body:\n${existing.slice(0, 1200)}` : "Email body: (empty).",
+      existing
+        ? `Email body:\n${existing.slice(0, 1200)}`
+        : "Email body: (empty).",
     ]
       .filter(Boolean)
       .join("\n");
@@ -50,6 +57,15 @@ function instruction(body: Body) {
 
   const rules = [
     "Write a complete email body only. No subject line, no markdown fences, no commentary.",
+    "Replace the previous draft entirely. Do not quote it, do not append to it, and do not keep old greetings or sign-offs.",
+    "Always write in a polished, descriptive, professional register — even when the selected tone is friendly, emotional, or loving.",
+    "The selected tone should colour warmth and word choice. It must not make the email short, casual-only, or one-line.",
+    "Structure: exactly one greeting, then exactly three body paragraphs, then one sign-off.",
+    "Each of the three body paragraphs must contain at least two complete sentences (aim for two to four).",
+    "Paragraph 1: a considered opening that sets context in the chosen tone.",
+    "Paragraph 2: the substance — what is happening, which documents or topic, status, and why it matters. Expand the user's request; do not repeat it as a raw instruction.",
+    "Paragraph 3: a courteous close with a clear next step, still in the chosen tone.",
+    "Do not write a one-line or two-sentence email. Do not use bullet lists unless the user asked for a list.",
     `Tone: ${tone}.`,
     `Recipient first name / name: ${name}.`,
     subject ? `Subject context: ${subject}.` : "",
@@ -74,7 +90,7 @@ function instruction(body: Body) {
           ? "Add a little more helpful detail without becoming long-winded."
           : action === "cta"
             ? "Keep the draft and add a clear call to action."
-            : `Rewrite in a ${tone} tone.`;
+            : `Rewrite the meaning of the current draft in a ${tone} tone. Return one complete replacement email.`;
   return `${rules}\n\nCurrent draft:\n${existing || "(empty)"}\n\n${actionHint}`;
 }
 
@@ -103,28 +119,62 @@ function parseSubjectSuggestions(raw: string) {
   }
 }
 
+function localResult(body: Body) {
+  if (body.mode === "subjects") {
+    const bodyText = htmlToPlainText(body.html ?? "");
+    return {
+      subjects: suggestSubjects({
+        current: body.subject,
+        recipientName: body.recipientName,
+        body: bodyText,
+        prompt: body.prompt,
+      }),
+      text: "",
+    };
+  }
+  const html =
+    body.mode === "draft" || (!htmlToPlainText(body.html ?? "").trim() && body.prompt)
+      ? draftEmailFromPrompt({
+          prompt: body.prompt ?? "",
+          tone: body.tone,
+          recipientName: body.recipientName,
+          subject: body.subject,
+        })
+      : body.mode === "edit" || body.prompt
+        ? editEmailWithPrompt({
+            html: body.html ?? "",
+            prompt: body.prompt ?? "",
+            recipientName: body.recipientName,
+            subject: body.subject,
+          })
+        : rewriteEmailWithAi({
+            html: body.html ?? "",
+            tone: body.tone ?? "professional",
+            action: body.action,
+            recipientName: body.recipientName,
+            subject: body.subject,
+          });
+  return { html, text: htmlToPlainText(html) };
+}
+
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) {
     return NextResponse.json({ error: "Sign in to use Write with AI." }, { status: 401 });
   }
-  if (!isGeminiConfigured()) {
-    return NextResponse.json(
-      { error: "Set GEMINI_API_KEY in .env.local, then restart the app." },
-      { status: 503 },
-    );
-  }
-
   const body = (await request.json().catch(() => ({}))) as Body;
   try {
-    const text = await generateGeminiText(instruction(body));
+    if (!isGeminiConfigured()) {
+      return NextResponse.json(localResult(body));
+    }
+    const text = await generateGeminiText(instruction(body), {
+      timeoutMs: 8_000,
+      maxOutputTokens: 1400,
+    });
     if (body.mode === "subjects") {
       const subjects = parseSubjectSuggestions(text);
       if (!subjects.length) {
-        return NextResponse.json(
-          { error: "Google AI did not return subject suggestions." },
-          { status: 502 },
-        );
+        return NextResponse.json(localResult(body));
       }
       if (!subjects.some((row) => row.recommended)) {
         subjects[0] = {
@@ -135,10 +185,11 @@ export async function POST(request: Request) {
       }
       return NextResponse.json({ subjects, text });
     }
+    if (!text.trim()) {
+      return NextResponse.json(localResult(body));
+    }
     return NextResponse.json({ html: plainTextToEmailHtml(text), text });
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Google AI could not write this email.";
-    return NextResponse.json({ error: message }, { status: 502 });
+  } catch {
+    return NextResponse.json(localResult(body));
   }
 }

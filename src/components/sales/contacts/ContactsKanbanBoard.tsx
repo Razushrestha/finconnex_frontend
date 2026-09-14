@@ -51,6 +51,8 @@ type ContactRecord = ContactGroup["contacts"][number];
 interface ContactsKanbanBoardProps {
   filters?: ContactFilters;
   visibleColumnIds?: string[];
+  /** Optional display title overrides keyed by group id. */
+  columnTitles?: Record<string, string>;
   sortValue?: string;
   onAddContact?: (groupId: string) => void;
   selectedIds: string[];
@@ -61,6 +63,7 @@ interface ContactsKanbanBoardProps {
 export function ContactsKanbanBoard({
   filters,
   visibleColumnIds,
+  columnTitles,
   onAddContact,
   selectedIds = [],
   onToggleSelect,
@@ -245,7 +248,7 @@ export function ContactsKanbanBoard({
             >
               {isCollapsed ? (
                 <KanbanCollapsedRail
-                  title={group.title}
+                  title={columnTitles?.[group.id] ?? group.title}
                   count={group.contacts.length}
                   onExpand={() => toggleCollapsed(group.id)}
                 />
@@ -255,8 +258,11 @@ export function ContactsKanbanBoard({
                   <div className={KANBAN_HEADER}>
                     <div className="flex h-6 items-center justify-between gap-1">
                       <div className="flex min-w-0 items-center gap-2">
-                        <h2 className={KANBAN_HEADER_TITLE} title={group.title}>
-                          {group.title}
+                        <h2
+                          className={KANBAN_HEADER_TITLE}
+                          title={columnTitles?.[group.id] ?? group.title}
+                        >
+                          {columnTitles?.[group.id] ?? group.title}
                         </h2>
                         <span className={KANBAN_HEADER_COUNT}>
                           {group.contacts.length}
@@ -269,9 +275,13 @@ export function ContactsKanbanBoard({
                     footer={
                       <KanbanColumnFooter
                         createLabel="Create contact"
-                        onCreate={() => router.push("/sales/contacts/create")}
+                        onCreate={() =>
+                          onAddContact
+                            ? onAddContact(group.id)
+                            : router.push("/sales/contacts/create")
+                        }
                         onCollapse={() => toggleCollapsed(group.id)}
-                        collapseLabel={`Collapse ${group.title}`}
+                        collapseLabel={`Collapse ${columnTitles?.[group.id] ?? group.title}`}
                       />
                     }
                   >

@@ -9,6 +9,7 @@ import {
   type SignatureField,
   type SignatureSigner,
 } from "@/lib/documents/signature/types";
+import { placedFieldOverlayStyle } from "@/lib/documents/signature/field-placement";
 import { cn } from "@/lib/utils";
 import { SignatureFieldValue } from "./SignatureFieldValue";
 
@@ -45,6 +46,7 @@ interface DocxDocViewerProps {
   interactive?: boolean;
   onFieldClick?: (fieldId: string) => void;
   className?: string;
+  embedded?: boolean;
 }
 
 export default function DocxDocViewer({
@@ -57,6 +59,7 @@ export default function DocxDocViewer({
   interactive,
   onFieldClick,
   className,
+  embedded = false,
 }: DocxDocViewerProps) {
   const [html, setHtml] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -126,7 +129,9 @@ export default function DocxDocViewer({
   return (
     <div
       className={cn(
-        "relative mx-auto max-h-[68vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-slate-200 bg-slate-100/80 p-4 shadow-inner custom-scrollbar",
+        embedded
+          ? "relative mx-auto w-full bg-transparent p-0"
+          : "relative mx-auto max-h-[68vh] w-full max-w-3xl overflow-y-auto rounded-xl border border-slate-200 bg-slate-100/80 p-4 shadow-inner custom-scrollbar",
         className,
       )}
     >
@@ -149,24 +154,18 @@ export default function DocxDocViewer({
           return (
             <div
               key={f.id}
+              data-signing-field={f.id}
               className={cn(
-                "absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center gap-1 overflow-hidden rounded border-2 border-dashed px-1.5 py-1 text-[10px] font-semibold shadow-sm transition-all z-10 select-none",
+                "absolute flex items-center justify-center gap-1 overflow-hidden rounded border-2 border-dashed px-1.5 py-1 text-[10px] font-semibold shadow-sm transition-all z-10 scroll-mt-40 select-none",
                 color.bg,
                 color.text,
                 color.border,
                 dim,
                 selected && "ring-2 ring-violet-500 ring-offset-1 shadow-md",
                 filled && "border-solid bg-white/95",
-                interactive && "cursor-pointer hover:scale-105",
+                interactive && "cursor-pointer",
               )}
-              style={{
-                left: `${f.x}%`,
-                top: `${f.y}%`,
-                width: f.w && f.w <= 100 ? `${f.w}%` : "140px",
-                height: "34px",
-                minHeight: "34px",
-                maxHeight: "34px",
-              }}
+              style={placedFieldOverlayStyle(f)}
               onClick={(e) => {
                 e.stopPropagation();
                 onFieldClick?.(f.id);

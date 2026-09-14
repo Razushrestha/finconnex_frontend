@@ -1,4 +1,4 @@
-import { CreateContactForm } from "@/components/sales/contacts/CreateContactForm";
+import { redirect } from "next/navigation";
 
 interface CreateContactPageProps {
   searchParams: Promise<{ layoutid?: string; redirect?: string }>;
@@ -7,9 +7,6 @@ interface CreateContactPageProps {
 export default async function CreateContactPage({
   searchParams,
 }: CreateContactPageProps) {
-  const params = await searchParams;
-  const layoutId = params.layoutid ?? "standard";
-  const redirect = params.redirect === "true";
-
-  return <CreateContactForm layoutId={layoutId} redirect={redirect} />;
+  void (await searchParams);
+  redirect("/sales/contacts?create=1");
 }

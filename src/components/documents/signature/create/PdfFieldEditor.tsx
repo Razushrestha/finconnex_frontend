@@ -65,6 +65,10 @@ interface PdfFieldEditorProps {
   onResizeField?: (id: string, width: number, height: number) => void;
   /** Called once this document's page count is known, so the caller can show continuous numbering across documents. */
   onNumPagesResolved?: (documentId: string, numPages: number) => void;
+  /** Fired after the last page has rendered so scroll-to-next-doc is not premature. */
+  onDocumentReady?: (documentId: string) => void;
+  /** Preview-only: no move, resize, or delete. */
+  readOnly?: boolean;
 }
 
 type ActiveDrag = {
@@ -86,6 +90,8 @@ export default function PdfFieldEditor({
   onRemoveField,
   onResizeField,
   onNumPagesResolved,
+  onDocumentReady,
+  readOnly = false,
 }: PdfFieldEditorProps) {
   const [numPages, setNumPages] = useState(0);
   const [loadError, setLoadError] = useState(false);
@@ -257,6 +263,9 @@ export default function PdfFieldEditor({
             width={pageWidth}
             renderAnnotationLayer={false}
             renderTextLayer={false}
+            onRenderSuccess={() => {
+              if (pageNum === numPages) onDocumentReady?.(documentId);
+            }}
           />
 
           {fieldsForThisDocument
@@ -272,21 +281,25 @@ export default function PdfFieldEditor({
               return (
                 <div
                   key={field.id}
-                  onPointerDown={(e) => {
-                    if (e.button !== 0) return;
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    dragRef.current = {
-                      id: field.id,
-                      offsetX: e.clientX - rect.left,
-                      offsetY: e.clientY - rect.top,
-                      width,
-                      height,
-                    };
-                    setRepositioningId(field.id);
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                  }}
+                  onPointerDown={
+                    readOnly
+                      ? undefined
+                      : (e) => {
+                          if (e.button !== 0) return;
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          dragRef.current = {
+                            id: field.id,
+                            offsetX: e.clientX - rect.left,
+                            offsetY: e.clientY - rect.top,
+                            width,
+                            height,
+                          };
+                          setRepositioningId(field.id);
+                          e.currentTarget.setPointerCapture(e.pointerId);
+                        }
+                  }
                   style={{
                     left: `${field.xPct}%`,
                     top: `${field.yPct}%`,
@@ -299,9 +312,11 @@ export default function PdfFieldEditor({
                       ? `${color.bg} ${color.text} border-2 border-dashed ${color.border}`
                       : "bg-indigo-600 text-white border-2 border-dashed border-indigo-300"
                   } text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-md select-none z-10 touch-none ${
-                    isBeingDragged
-                      ? "cursor-grabbing shadow-xl z-20"
-                      : "cursor-grab"
+                    readOnly
+                      ? "cursor-default"
+                      : isBeingDragged
+                        ? "cursor-grabbing shadow-xl z-20"
+                        : "cursor-grab"
                   }`}
                 >
                   {field.type === "checkbox" ? (
@@ -326,44 +341,48 @@ export default function PdfFieldEditor({
                   ) : (
                     <span className="truncate">{field.label}</span>
                   )}
-                  <button
-                    type="button"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={() => onRemoveField(field.id)}
-                    className={`ml-1 opacity-0 group-hover:opacity-100 rounded-full p-0.5 transition-opacity ${
-                      color ? "hover:bg-black/10" : "hover:bg-indigo-700"
-                    }`}
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                  {onResizeField && (
-                    <div
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        const startX = e.clientX;
-                        const startY = e.clientY;
-                        const onMove = (moveEvent: PointerEvent) => {
-                          const newWidth = Math.max(
-                            80,
-                            width + (moveEvent.clientX - startX),
-                          );
-                          const newHeight = Math.max(
-                            30,
-                            height + (moveEvent.clientY - startY),
-                          );
-                          onResizeField(field.id, newWidth, newHeight);
-                        };
-                        const onUp = () => {
-                          window.removeEventListener("pointermove", onMove);
-                          window.removeEventListener("pointerup", onUp);
-                        };
-                        window.addEventListener("pointermove", onMove);
-                        window.addEventListener("pointerup", onUp);
-                      }}
-                      className="absolute -right-1 -bottom-1 w-3 h-3 bg-white border border-current rounded-full cursor-se-resize opacity-0 group-hover:opacity-100 z-30"
-                    />
-                  )}
+                  {!readOnly ? (
+                    <>
+                      <button
+                        type="button"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={() => onRemoveField(field.id)}
+                        className={`ml-1 opacity-0 group-hover:opacity-100 rounded-full p-0.5 transition-opacity ${
+                          color ? "hover:bg-black/10" : "hover:bg-indigo-700"
+                        }`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                      {onResizeField ? (
+                        <div
+                          onPointerDown={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            const startX = e.clientX;
+                            const startY = e.clientY;
+                            const onMove = (moveEvent: PointerEvent) => {
+                              const newWidth = Math.max(
+                                80,
+                                width + (moveEvent.clientX - startX),
+                              );
+                              const newHeight = Math.max(
+                                30,
+                                height + (moveEvent.clientY - startY),
+                              );
+                              onResizeField(field.id, newWidth, newHeight);
+                            };
+                            const onUp = () => {
+                              window.removeEventListener("pointermove", onMove);
+                              window.removeEventListener("pointerup", onUp);
+                            };
+                            window.addEventListener("pointermove", onMove);
+                            window.addEventListener("pointerup", onUp);
+                          }}
+                          className="absolute -right-1 -bottom-1 w-3 h-3 bg-white border border-current rounded-full cursor-se-resize opacity-0 group-hover:opacity-100 z-30"
+                        />
+                      ) : null}
+                    </>
+                  ) : null}
                 </div>
               );
             })}

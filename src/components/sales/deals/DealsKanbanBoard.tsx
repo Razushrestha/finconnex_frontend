@@ -68,6 +68,8 @@ interface DealsKanbanBoardProps {
   pipeline: DealPipeline;
   filters?: DealFilters;
   visibleColumnIds?: string[];
+  /** Optional display title overrides keyed by stage id. */
+  columnTitles?: Record<string, string>;
   onAddDeal?: (stageId: string) => void;
   selectedIds?: string[];
   onToggleSelect?: (id: string) => void;
@@ -80,6 +82,7 @@ export function DealsKanbanBoard({
   pipeline,
   filters,
   visibleColumnIds,
+  columnTitles,
   onAddDeal,
   selectedIds = [],
   onToggleSelect,
@@ -576,7 +579,7 @@ export function DealsKanbanBoard({
             >
               {isCollapsed ? (
                 <KanbanCollapsedRail
-                  title={stage.title}
+                  title={columnTitles?.[stage.id] ?? stage.title}
                   count={stage.deals.length}
                   onExpand={() => toggleCollapsed(stage.id)}
                   extra={
@@ -592,8 +595,11 @@ export function DealsKanbanBoard({
                   <div className={KANBAN_HEADER}>
                     <div className="flex h-6 items-center justify-between gap-1">
                       <div className="flex min-w-0 items-center gap-2">
-                        <h2 className={KANBAN_HEADER_TITLE} title={stage.title}>
-                          {stage.title}
+                        <h2
+                          className={KANBAN_HEADER_TITLE}
+                          title={columnTitles?.[stage.id] ?? stage.title}
+                        >
+                          {columnTitles?.[stage.id] ?? stage.title}
                         </h2>
                         <span className={KANBAN_HEADER_COUNT}>
                           {stage.deals.length}
@@ -613,9 +619,13 @@ export function DealsKanbanBoard({
                     footer={
                       <KanbanColumnFooter
                         createLabel="Create Deal"
-                        onCreate={() => router.push("/sales/deals/create")}
+                        onCreate={() =>
+                          onAddDeal
+                            ? onAddDeal(stage.id)
+                            : router.push("/sales/deals/create")
+                        }
                         onCollapse={() => toggleCollapsed(stage.id)}
-                        collapseLabel={`Collapse ${stage.title}`}
+                        collapseLabel={`Collapse ${columnTitles?.[stage.id] ?? stage.title}`}
                       />
                     }
                   >

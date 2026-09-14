@@ -21,9 +21,14 @@ import { attachFilesToCrmEmail, prepareEmailPayload } from "@/lib/emails/attach-
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { createEmail, deleteEmail, upsertEmail } from "@/lib/emails/store";
 import { takeCompose } from "@/lib/emails/outlook";
-import { htmlToPlainText, plainTextToEmailHtml, type EmailTone } from "@/lib/emails/ai-compose";
+import { htmlToPlainText, type EmailTone } from "@/lib/emails/ai-compose";
 import { requestEmailAi } from "@/lib/emails/request-email-ai";
-import { searchEmailTemplates, type EmailTemplate } from "@/lib/emails/templates";
+import {
+  filledTemplateSubject,
+  renderEmailTemplateHtml,
+  searchEmailTemplates,
+  type EmailTemplate,
+} from "@/lib/emails/templates";
 import {
   appendSignature,
   applyPersonaSignature,
@@ -37,7 +42,10 @@ import {
 } from "@/lib/emails/signature";
 import { listFromIdentities, loadFromIdentities, sendAsLabel } from "@/lib/emails/send-as";
 import { formatRulesAt, onRulesChange } from "@/lib/rules/storage";
-import { relatedRecordsForPerson } from "@/lib/emails/related-records";
+import {
+  invalidEmailMessage,
+  partitionEmailAddresses,
+} from "@/lib/emails/address";
 import { ComposeContextRail } from "./ComposeContextRail";
 import { ComposeActionBar } from "./ComposeActionBar";
 import { EmailEditor } from "./EmailEditor";
@@ -114,12 +122,8 @@ export function CreateEmailForm({
     relatedKind: defaults?.relatedKind ?? "",
     relatedName: defaults?.relatedName ?? "",
     relatedId: defaults?.relatedId ?? "",
-    to: defaults?.to
-      ? defaults.to.split(/[,;]/).map((item) => item.trim()).filter(Boolean)
-      : [],
-    cc: defaults?.cc
-      ? defaults.cc.split(/[,;]/).map((item) => item.trim()).filter(Boolean)
-      : [],
+    to: partitionEmailAddresses(defaults?.to ?? "").valid,
+    cc: partitionEmailAddresses(defaults?.cc ?? "").valid,
     subject: defaults?.subject ?? "",
     body: defaults?.body ?? "",
     template: defaults?.template ?? "",
@@ -208,6 +212,8 @@ export function CreateEmailForm({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const templatesRef = useRef<HTMLDivElement>(null);
   const fromRef = useRef<HTMLDivElement>(null);
+  const aiSeq = useRef(0);
+  const [editorEpoch, setEditorEpoch] = useState(0);
   const canPickFrom = fromIdentities.length > 1;
   const fromIdentity =
     fromIdentities.find((item) => item.email === form.from) ?? fromIdentities[0];
@@ -247,26 +253,34 @@ export function CreateEmailForm({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function parseAddresses(raw: string) {
-    return raw
-      .split(/[,;]+/)
-      .map((part) => part.trim())
-      .filter(Boolean);
-  }
-
   function addToList(
     key: "to" | "cc" | "bcc",
     raw: string,
-    clearDraft: () => void,
+    setDraft: (value: string) => void,
   ) {
-    const next = parseAddresses(raw);
-    if (next.length === 0) return;
-    update(key, [...new Set([...form[key], ...next])]);
-    clearDraft();
+    if (!raw.trim()) return;
+    const { valid, invalid } = partitionEmailAddresses(raw);
+    if (valid.length) {
+      const existing = new Set(form[key].map((item) => item.toLowerCase()));
+      const additions = valid.filter((item) => !existing.has(item.toLowerCase()));
+      if (additions.length) {
+        update(key, [...form[key], ...additions]);
+      }
+    }
+    if (invalid.length) {
+      setDraft(invalid.join(", "));
+      setErrors((prev) => ({
+        ...prev,
+        [key]: invalidEmailMessage(invalid),
+      }));
+      return;
+    }
+    setDraft("");
+    setErrors((prev) => ({ ...prev, [key]: undefined }));
   }
 
   function addRecipient() {
-    addToList("to", recipientDraft, () => setRecipientDraft(""));
+    addToList("to", recipientDraft, setRecipientDraft);
   }
 
   function removeRecipient(value: string) {
@@ -277,7 +291,7 @@ export function CreateEmailForm({
   }
 
   function addCc() {
-    addToList("cc", ccDraft, () => setCcDraft(""));
+    addToList("cc", ccDraft, setCcDraft);
   }
 
   function removeCc(value: string) {
@@ -288,7 +302,7 @@ export function CreateEmailForm({
   }
 
   function addBcc() {
-    addToList("bcc", bccDraft, () => setBccDraft(""));
+    addToList("bcc", bccDraft, setBccDraft);
   }
 
   function removeBcc(value: string) {
@@ -313,7 +327,7 @@ export function CreateEmailForm({
   }
 
   function mergeList(list: string[], draft: string) {
-    return [...new Set([...list, ...parseAddresses(draft)])];
+    return partitionEmailAddresses([...list, draft]);
   }
 
   async function save(
@@ -323,20 +337,35 @@ export function CreateEmailForm({
   ) {
     setSubmitted(true);
     setSendError(null);
-    const to = mergeList(form.to, recipientDraft);
-    const cc = mergeList(form.cc, ccDraft);
-    const bcc = mergeList(form.bcc, bccDraft);
+    const toParts = mergeList(form.to, recipientDraft);
+    const ccParts = mergeList(form.cc, ccDraft);
+    const bccParts = mergeList(form.bcc, bccDraft);
+    const to = toParts.valid;
+    const cc = ccParts.valid;
+    const bcc = bccParts.valid;
     setForm((prev) => ({ ...prev, to, cc, bcc }));
-    setRecipientDraft("");
-    setCcDraft("");
-    setBccDraft("");
+    setRecipientDraft(toParts.invalid.join(", "));
+    setCcDraft(ccParts.invalid.join(", "));
+    setBccDraft(bccParts.invalid.join(", "));
 
     const next: Partial<Record<keyof FormState, string>> = {};
     if (!form.subject.trim()) next.subject = "Subject is required";
     if (!form.body.trim()) next.body = "Body is required";
-    if (to.length === 0) next.to = "At least one recipient is required";
+    if (toParts.invalid.length) next.to = invalidEmailMessage(toParts.invalid);
+    else if (to.length === 0) next.to = "At least one recipient is required";
+    if (ccParts.invalid.length) next.cc = invalidEmailMessage(ccParts.invalid);
+    if (bccParts.invalid.length) next.bcc = invalidEmailMessage(bccParts.invalid);
     setErrors(next);
-    if (Object.keys(next).length > 0) return;
+    if (Object.keys(next).length > 0) {
+      setSending(false);
+      setSendError(
+        next.to ||
+          next.cc ||
+          next.bcc ||
+          "Fix the highlighted fields before sending.",
+      );
+      return;
+    }
 
     const relatedTo =
       form.relatedKind && form.relatedName
@@ -395,6 +424,7 @@ export function CreateEmailForm({
         id: remote.id,
         status,
         sentDate: local.sentDate,
+        outbound: status !== "Draft",
       }) ?? remote;
       keptId = current.id;
       const blobs = form.attachments
@@ -429,12 +459,16 @@ export function CreateEmailForm({
         const unsent =
           !sent || sent.status === "Draft" || sent.status === "Failed";
         if (unsent && status === "Sent") {
-          upsertEmail({ ...current, ...(sent ?? {}), status: "Draft" });
+          upsertEmail({
+            ...current,
+            ...(sent ?? {}),
+            status: "Draft",
+            outbound: true,
+          });
           setSending(false);
           setSendError(
-            "The email was not sent. It is saved in Drafts so you can retry.",
+            "The email was not sent. Check the recipient and try again. A draft was kept on this page.",
           );
-          router.push(`/activities/emails?folder=drafts&focus=${current.id}`);
           return;
         }
         current =
@@ -444,21 +478,21 @@ export function CreateEmailForm({
                   ...current,
                   ...sent,
                   id: sent.id,
-                  status: sent.status === "Scheduled" ? "Scheduled" : status,
+                  outbound: true,
+                  status: sent.status === "Scheduled" ? "Scheduled" : "Sent",
                 }
-              : { ...current, status },
+              : { ...current, status, outbound: true },
           ) ?? current;
         keptId = current.id;
       }
     } catch (err) {
-      upsertEmail({ ...local, status: "Draft" });
+      upsertEmail({ ...local, status: "Draft", outbound: true });
       setSending(false);
       setSendError(
         err instanceof Error
           ? err.message
-          : "Could not send. The message was saved in Drafts.",
+          : "Could not send. The message was saved as a draft on this page.",
       );
-      router.push(`/activities/emails?folder=drafts&focus=${local.id}`);
       return;
     }
 
@@ -470,22 +504,25 @@ export function CreateEmailForm({
       return;
     }
     if (after === "deal") {
-      const deal = relatedRecordsForPerson(
-        form.relatedName || undefined,
-        to[0],
-      ).find((item) => item.kind === "deal");
-      router.push(deal?.href ?? "/sales/deals");
+      router.push(
+        form.relatedKind === "Deal" && form.relatedId
+          ? `/sales/deals/detail/${form.relatedId}`
+          : "/sales/deals",
+      );
       return;
     }
-    router.push(`/activities/emails?focus=${keptId}`);
+    if (status === "Draft") {
+      router.push(`/activities/emails?folder=drafts&focus=${keptId}`);
+      return;
+    }
+    if (status === "Scheduled") {
+      router.push(`/activities/emails?folder=scheduled&focus=${keptId}`);
+      return;
+    }
+    router.push(`/activities/emails?folder=sent&focus=${keptId}`);
   }
 
   const contactName = form.relatedName || form.to[0] || "";
-  const related = relatedRecordsForPerson(
-    contactName.includes("@") ? undefined : contactName,
-    form.to[0],
-  );
-  const primaryDeal = related.find((item) => item.kind === "deal");
   const visibleTemplates = searchEmailTemplates(templateQuery);
 
   function keepSignatureIfPresent(nextHtml: string) {
@@ -495,18 +532,23 @@ export function CreateEmailForm({
   }
 
   function applyAiBody(nextHtml: string) {
-    update("body", keepSignatureIfPresent(nextHtml));
+    const replacement = stripAllSignatures(nextHtml).trim();
+    update("body", keepSignatureIfPresent(replacement));
   }
 
   async function runAi(work: () => Promise<string>) {
+    const seq = ++aiSeq.current;
     setImproving(true);
     try {
-      applyAiBody(await work());
+      const html = await work();
+      if (seq !== aiSeq.current) return;
+      applyAiBody(html);
       setAskOpen(false);
     } catch (err) {
+      if (seq !== aiSeq.current) return;
       setSendError(err instanceof Error ? err.message : "Google AI could not write this email.");
     } finally {
-      setImproving(false);
+      if (seq === aiSeq.current) setImproving(false);
     }
   }
 
@@ -525,10 +567,11 @@ export function CreateEmailForm({
   }
 
   function rewriteWith(tone: EmailTone, action?: "brief" | "clarity") {
+    const source = stripAllSignatures(form.body);
     void runAi(() =>
       requestEmailAi({
         mode: "rewrite",
-        html: stripAllSignatures(form.body),
+        html: source,
         tone,
         action,
         recipientName: aiRecipient,
@@ -570,12 +613,23 @@ export function CreateEmailForm({
   }
 
   function applyTemplate(item: EmailTemplate) {
+    aiSeq.current += 1;
+    setImproving(false);
+    const signature = getActiveSignatureProfile()?.body ?? "";
+    const html = renderEmailTemplateHtml(
+      item,
+      contactName.includes("@") ? undefined : contactName,
+    );
     setForm((prev) => ({
       ...prev,
       template: item.name,
-      subject: item.subject,
-      body: keepSignatureIfPresent(plainTextToEmailHtml(item.body)),
+      subject: filledTemplateSubject(
+        item,
+        contactName.includes("@") ? undefined : contactName,
+      ),
+      body: signature ? appendSignature(html, signature) : html,
     }));
+    setEditorEpoch((n) => n + 1);
     setTemplatesOpen(false);
     setTemplateQuery("");
   }
@@ -583,7 +637,10 @@ export function CreateEmailForm({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
       {sendError ? (
-        <div className="mx-6 mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+        <div
+          role="alert"
+          className="mx-6 mt-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive"
+        >
           {sendError}
         </div>
       ) : null}
@@ -596,7 +653,10 @@ export function CreateEmailForm({
             onBack={() => router.push("/activities/emails")}
             to={form.to}
             recipientDraft={recipientDraft}
-            onDraftChange={setRecipientDraft}
+            onDraftChange={(val) => {
+              setRecipientDraft(val);
+              if (errors.to) setErrors((prev) => ({ ...prev, to: undefined }));
+            }}
             onAddRecipient={addRecipient}
             onRemoveRecipient={removeRecipient}
             showCc={showCc}
@@ -613,16 +673,23 @@ export function CreateEmailForm({
             }}
             cc={form.cc}
             ccDraft={ccDraft}
-            onCcDraftChange={setCcDraft}
+            onCcDraftChange={(val) => {
+              setCcDraft(val);
+              if (errors.cc) setErrors((prev) => ({ ...prev, cc: undefined }));
+            }}
             onAddCc={addCc}
             onRemoveCc={removeCc}
             bcc={form.bcc}
             bccDraft={bccDraft}
-            onBccDraftChange={setBccDraft}
+            onBccDraftChange={(val) => {
+              setBccDraft(val);
+              if (errors.bcc) setErrors((prev) => ({ ...prev, bcc: undefined }));
+            }}
             onAddBcc={addBcc}
             onRemoveBcc={removeBcc}
             error={errors.to}
-            submitted={submitted}
+            ccError={errors.cc}
+            bccError={errors.bcc}
           />
           </div>
 
@@ -694,8 +761,6 @@ export function CreateEmailForm({
                 current={form.subject}
                 body={form.body}
                 recipientName={contactName.includes("@") ? undefined : contactName}
-                dealTitle={primaryDeal?.title}
-                dealStage={primaryDeal?.stage}
                 onPick={(subject) => update("subject", subject)}
               />
             </div>
@@ -753,6 +818,7 @@ export function CreateEmailForm({
           )}
 
           <EmailEditor
+            key={editorEpoch}
             body={form.body}
             onChange={(val) => update("body", val)}
             error={errors.body}

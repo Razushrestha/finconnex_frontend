@@ -10,6 +10,8 @@ import {
   Calendar,
   DollarSign,
   Percent,
+  X,
+  Loader2,
 } from "lucide-react";
 import {
   DEAL_CURRENCIES,
@@ -50,10 +52,19 @@ import {
   elevatedSelectClass,
   elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface CreateDealFormProps {
-  layoutId: string;
-  redirect: boolean;
+  layoutId?: string;
+  redirect?: boolean;
+  variant?: "page" | "modal";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onCreated?: () => void;
 }
 
 interface FormState {
@@ -81,27 +92,40 @@ const STAGE_PROBABILITY: Record<DealStageTitle, number> = {
   "Closed Lost": 0,
 };
 
-const initialState: Omit<FormState, "owner"> = {
-  dealName: "",
-  account: "",
-  contact: "",
-  leadSource: "",
-  stage: "Prospecting",
-  probability: "10",
-  expectedCloseDate: "",
-  dealValue: "",
-  currency: "AUD",
-  description: "",
-  lostReason: "",
-  competitor: "",
-};
+function makeInitialState(owner = "", currency: DealCurrency = "AUD"): FormState {
+  return {
+    dealName: "",
+    account: "",
+    contact: "",
+    leadSource: "",
+    stage: "Prospecting",
+    probability: "10",
+    expectedCloseDate: "",
+    dealValue: "",
+    currency,
+    owner,
+    description: "",
+    lostReason: "",
+    competitor: "",
+  };
+}
 
-export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
+export function CreateDealForm({
+  layoutId,
+  redirect,
+  variant = "page",
+  open = true,
+  onOpenChange,
+  onCreated,
+}: CreateDealFormProps) {
+  void layoutId;
+  void redirect;
   const router = useRouter();
   const crmCompanies = useCrmCompanies();
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<FormState>(() => {
     const owners = listAssignableOwnersLocal();
-    return { ...initialState, owner: defaultAssignableOwnerId(owners) };
+    return makeInitialState(defaultAssignableOwnerId(owners));
   });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>(
     {},
@@ -127,6 +151,17 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
       cancelled = true;
     };
   }, []);
+
+  const modalResetKey = `${variant}|${open}`;
+  const [prevModalResetKey, setPrevModalResetKey] = useState(modalResetKey);
+  if (prevModalResetKey !== modalResetKey) {
+    setPrevModalResetKey(modalResetKey);
+    if (variant === "modal" && open) {
+      setForm((prev) => makeInitialState(prev.owner, prev.currency));
+      setErrors({});
+      setSubmitted(false);
+    }
+  }
 
   const accounts = useMemo(() => {
     void crmCompanies.source;
@@ -157,6 +192,21 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
     }
     setErrors(next);
     return Object.keys(next).length === 0;
+  }
+
+  function afterSave(createAnother: boolean) {
+    onCreated?.();
+    if (createAnother) {
+      setForm(makeInitialState(form.owner, form.currency));
+      setErrors({});
+      setSubmitted(false);
+      return;
+    }
+    if (variant === "modal") {
+      onOpenChange?.(false);
+      return;
+    }
+    router.push("/sales/deals");
   }
 
   async function handleSave(createAnother: boolean) {
@@ -214,29 +264,21 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
       );
       return;
     }
-    if (createAnother) {
-      setForm({ ...initialState, owner: form.owner, currency: form.currency });
-      setErrors({});
-      setSubmitted(false);
-      return;
-    }
-    router.push("/sales/deals");
+    afterSave(createAnother);
   }
 
-  return (
-    <CreateEntityFormShell
-      breadcrumbParent={{ label: "Deals", href: "/sales/deals" }}
-      badge="Live CRM"
-      title="Create Deal"
-      subtitle="Track an opportunity from first interest through close: value, stage, and owner in one place."
-      tip="Tip: Name, account, stage, value, currency & owner are required."
-      cardIcon={Handshake}
-      cardTitle="Deal Information"
-      cardDescription="Fields marked required are needed to save (SRS §6.4)"
-      listHref="/sales/deals"
-      saveLabel="Save Deal"
-      onSave={handleSave}
-    >
+  async function runSave(createAnother: boolean) {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await handleSave(createAnother);
+    } finally {
+      window.setTimeout(() => setSaving(false), 350);
+    }
+  }
+
+  const fields = (
+    <>
       <Field
         label="Deal Name"
         required
@@ -458,6 +500,91 @@ export function CreateDealForm({ layoutId, redirect }: CreateDealFormProps) {
           />
         </TextAreaShell>
       </Field>
+    </>
+  );
+
+  if (variant === "modal") {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          showCloseButton={false}
+          className="flex max-h-[min(90vh,840px)] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl"
+        >
+          <DialogTitle className="sr-only">Create Deal</DialogTitle>
+          <header className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-5 py-3 dark:border-zinc-800">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-600 text-white">
+              <Handshake className="h-4 w-4" />
+            </div>
+            <h2 className="min-w-0 flex-1 truncate text-[15px] font-bold tracking-tight text-slate-900 dark:text-white">
+              Create Deal
+            </h2>
+            <button
+              type="button"
+              onClick={() => onOpenChange?.(false)}
+              aria-label="Close"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-zinc-800"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </header>
+          <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 dark:bg-zinc-900/40">
+            <div className="grid grid-cols-1 content-start gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-2">
+              {fields}
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+            <button
+              type="button"
+              onClick={() => onOpenChange?.(false)}
+              disabled={saving}
+              className="h-8 rounded-md border border-slate-200 bg-white px-3 text-[12px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-slate-300"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void runSave(true)}
+              disabled={saving}
+              className="h-8 rounded-md border border-violet-200 bg-violet-50 px-3 text-[12px] font-semibold text-violet-700 transition-colors hover:bg-violet-100 disabled:opacity-50 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300"
+            >
+              Save &amp; New
+            </button>
+            <button
+              type="button"
+              onClick={() => void runSave(false)}
+              disabled={saving}
+              className="inline-flex h-8 min-w-[7.5rem] items-center justify-center gap-1.5 rounded-md bg-violet-600 px-4 text-[12px] font-semibold text-white transition-all hover:bg-violet-700 disabled:opacity-90"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                "Save Deal"
+              )}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <CreateEntityFormShell
+      breadcrumbParent={{ label: "Deals", href: "/sales/deals" }}
+      badge="Live CRM"
+      title="Create Deal"
+      subtitle="Track an opportunity from first interest through close: value, stage, and owner in one place."
+      tip="Tip: Name, account, stage, value, currency & owner are required."
+      cardIcon={Handshake}
+      cardTitle="Deal Information"
+      cardDescription="Fields marked required are needed to save (SRS §6.4)"
+      listHref="/sales/deals"
+      saveLabel="Save Deal"
+      onSave={handleSave}
+    >
+      {fields}
     </CreateEntityFormShell>
   );
 }

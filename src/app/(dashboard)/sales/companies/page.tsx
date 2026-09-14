@@ -1,14 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ActionOption,
   EntityHeader,
   type SortDirection,
 } from "@/components/sales/EntityHeader";
+import {
+  columnTitleMap,
+  loadKanbanColumnPrefs,
+  persistKanbanColumnPrefs,
+  type KanbanColumnPref,
+} from "@/lib/kanban/column-prefs";
 import { CompaniesKanbanBoard } from "@/components/sales/companies/CompaniesKanbanBoard";
 import { CompaniesListView } from "@/components/sales/companies/CompaniesListView";
+import { CreateCompanyForm } from "@/components/sales/companies/CreateCompanyForm";
 import {
   FilterCompaniesPanel,
   EMPTY_COMPANY_FILTERS,
@@ -71,18 +78,25 @@ import { isUuid } from "@/lib/activity-timeline/auth";
 
 type CompanyRecord = CompanyGroup["companies"][number];
 
-const DEFAULT_COMPANY_COLUMNS = COMPANY_GROUPS.map((group) => ({
-  id: group.id,
-  label: group.title,
-  visible: true,
-}));
+const COMPANY_COLUMNS_KEY = "finconnex.companies.kanban-columns";
+
+const DEFAULT_COMPANY_COLUMNS: KanbanColumnPref[] = COMPANY_GROUPS.map(
+  (group, index) => ({
+    id: group.id,
+    label: group.title,
+    visible: true,
+    required: index === 0,
+  }),
+);
 
 export default function CompaniesPage() {
   const router = useRouter();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [filters, setFilters] = useState<CompanyFilters>(EMPTY_COMPANY_FILTERS);
-  const [columns, setColumns] = useState(DEFAULT_COMPANY_COLUMNS);
+  const [columns, setColumns] = useState<KanbanColumnPref[]>(
+    DEFAULT_COMPANY_COLUMNS,
+  );
 
   const [activeSort, setActiveSort] = useState("Sort");
   const [activeSortDirection, setActiveSortDirection] =
@@ -91,6 +105,7 @@ export default function CompaniesPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isImportOpen, setImportOpen] = useState(false);
   const [isMergeOpen, setMergeOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [totalCompanies, setTotalCompanies] = useState(0);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
   const defaults = defaultCompanyImportSettings();
@@ -101,6 +116,61 @@ export default function CompaniesPage() {
   const [isManageTagsOpen, setManageTagsOpen] = useState(false);
   const [isAssignmentRulesOpen, setAssignmentRulesOpen] = useState(false);
   const crm = useCrmCompanies();
+
+  useEffect(() => {
+    setColumns(
+      loadKanbanColumnPrefs(COMPANY_COLUMNS_KEY, DEFAULT_COMPANY_COLUMNS),
+    );
+  }, []);
+
+  function saveCompanyColumns(next: KanbanColumnPref[]) {
+    setColumns(next);
+    persistKanbanColumnPrefs(COMPANY_COLUMNS_KEY, next);
+  }
+
+  function toggleCompanyStageColumn(columnId: string) {
+    const target = columns.find((col) => col.id === columnId);
+    if (target?.required && target.visible) return;
+    const next = columns.map((col) =>
+      col.id === columnId ? { ...col, visible: !col.visible } : col,
+    );
+    if (!next.some((col) => col.visible)) return;
+    saveCompanyColumns(next);
+  }
+
+  function renameCompanyStageColumn(columnId: string, nextLabel: string) {
+    saveCompanyColumns(
+      columns.map((col) =>
+        col.id === columnId ? { ...col, label: nextLabel } : col,
+      ),
+    );
+  }
+
+  function reorderCompanyStageColumn(draggedId: string, targetId: string) {
+    const next = [...columns];
+    const fromIndex = next.findIndex((c) => c.id === draggedId);
+    const toIndex = next.findIndex((c) => c.id === targetId);
+    if (fromIndex === -1 || toIndex === -1) return;
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved!);
+    saveCompanyColumns(next);
+  }
+
+  const companyColumnTitles = useMemo(
+    () => columnTitleMap(columns),
+    [columns],
+  );
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("create") !== "1") return;
+    setCreateOpen(true);
+    router.replace("/sales/companies", { scroll: false });
+  }, [router]);
+
+  function openCreateCompany() {
+    setCreateOpen(true);
+  }
 
   useEffect(() => {
     function refresh() {
@@ -306,8 +376,6 @@ export default function CompaniesPage() {
   void isMassUpdateOpen;
   void isManageTagsOpen;
   void isAssignmentRulesOpen;
-  void columns;
-  void setColumns;
 
   return (
     <div className={BOARD_PAGE}>
@@ -335,6 +403,7 @@ export default function CompaniesPage() {
         entityLabel="Company"
         entityLabelPlural="Companies"
         createRoute="/sales/companies/create"
+        onCreate={openCreateCompany}
         importOptions={[
           {
             id: "import-companies",
@@ -363,6 +432,16 @@ export default function CompaniesPage() {
         }}
         actionOptions={actionOptions}
         footerOptions={footerOptions}
+        columnOptions={viewMode === "kanban" ? columns : undefined}
+        onColumnToggle={
+          viewMode === "kanban" ? toggleCompanyStageColumn : undefined
+        }
+        onColumnRename={
+          viewMode === "kanban" ? renameCompanyStageColumn : undefined
+        }
+        onColumnReorder={
+          viewMode === "kanban" ? reorderCompanyStageColumn : undefined
+        }
       />
 
       {selectedIds.length > 0 ? (
@@ -433,9 +512,11 @@ export default function CompaniesPage() {
             <CompaniesKanbanBoard
               filters={filters}
               visibleColumnIds={visibleColumnIds}
+              columnTitles={companyColumnTitles}
               onQuickAction={handleQuickAction}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelected}
+              onAddCompany={() => openCreateCompany()}
               sortValue={activeSort}
               sortDirection={activeSortDirection}
             />
@@ -497,6 +578,18 @@ export default function CompaniesPage() {
         onImported={(s) => {
           setBulkFlash(
             `Imported ${s.imported} · updated ${s.updated} · skipped ${s.skipped}`,
+          );
+          crm.refresh();
+        }}
+      />
+
+      <CreateCompanyForm
+        variant="modal"
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={() => {
+          setTotalCompanies(
+            listCompanyGroups().reduce((n, g) => n + g.companies.length, 0),
           );
           crm.refresh();
         }}

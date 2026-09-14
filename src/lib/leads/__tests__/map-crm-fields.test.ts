@@ -73,11 +73,13 @@ describe("lead CRM field mapping", () => {
       jobTitle: "Analyst",
       notes: "Prefers morning calls",
       linkedinUrl: "linkedin.com/in/ada",
+      tags: [" Hot ", "Hot", "Website"],
     });
     expect(body.companySize).toBe("SMALL");
     expect(body.companyWebsite).toBe("https://engines.example");
     expect(body.linkedinUrl).toBe("https://linkedin.com/in/ada");
     expect(body.notes).toBe("Prefers morning calls");
     expect(body.jobTitle).toBe("Analyst");
+    expect(body.tags).toEqual(["Hot", "Website"]);
   });
 });

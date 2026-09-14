@@ -40,6 +40,14 @@ describe("applyLocalLeadIdentity", () => {
     expect(next.custom?.contactName).toBe("Jane Smith");
   });
 
+  it("keeps locally saved tags when the CRM payload omitted them", () => {
+    const next = applyLocalLeadIdentity(
+      card({ tags: [] }),
+      card({ tags: ["Hot", "Website"] }),
+    );
+    expect(next.tags).toEqual(["Hot", "Website"]);
+  });
+
   it("leaves remote identity alone when the user did not pin a title", () => {
     const next = applyLocalLeadIdentity(card({}), card({ custom: { contactId: "c1" } }));
     expect(next.name).toBe("Jane Smith");

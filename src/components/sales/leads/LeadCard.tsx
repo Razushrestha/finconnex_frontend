@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState, useRef } from "react";
+import { useEffect, useId, useMemo, useState, useRef } from "react";
 import { useHasMounted } from "@/lib/use-has-mounted";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -119,7 +119,21 @@ export function LeadCard({
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customization, setCustomization] =
     useState<LeadCardCustomizationSettings>(DEFAULT_LEAD_CARD_SETTINGS);
+  const [nowTick, setNowTick] = useState(0);
   const callFlow = useLeadCallFlow();
+
+  useEffect(() => {
+    const tick = () => setNowTick((n) => n + 1);
+    const id = window.setInterval(tick, 30_000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
   const detailHref = `/sales/leads/detail/${card.id}`;
 
@@ -130,12 +144,14 @@ export function LeadCard({
 
   const vm = useMemo(() => {
     void revision;
+    void nowTick;
     return (
       viewModelProp ??
       buildLeadCardViewModelFromCard(card, status, {
         cardSettings,
         dynamicFieldKeys,
         showOwnerAvatar,
+        now: new Date(),
       })
     );
   }, [
@@ -146,6 +162,7 @@ export function LeadCard({
     dynamicFieldKeys,
     showOwnerAvatar,
     revision,
+    nowTick,
   ]);
 
   const summary = vm.activitySummary;
@@ -253,6 +270,24 @@ export function LeadCard({
             )}
           </div>
         </div>
+
+        {(() => {
+          const tags = (card.tags ?? []).map((tag) => tag.trim()).filter(Boolean);
+          const inDynamic = vm.dynamicFields.some((field) => field.key === "tags");
+          if (!tags.length || inDynamic) return null;
+          return (
+            <div className="mb-1.5 flex flex-wrap gap-1">
+              {tags.map((tag) => (
+                <RecordTagChip
+                  key={tag}
+                  tag={tag}
+                  compact
+                  recolorable={false}
+                />
+              ))}
+            </div>
+          );
+        })()}
 
         {/* §4 Dynamic fields — live, uncolored */}
         {vm.dynamicFields.length > 0 && (

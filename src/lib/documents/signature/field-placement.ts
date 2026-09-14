@@ -1,6 +1,64 @@
 export const DEFAULT_PLACED_FIELD_WIDTH = 140;
 export const DEFAULT_PLACED_FIELD_HEIGHT = 36;
 
+const PREVIEW_PAGE_WIDTH = 700;
+
+/** Match Place Fields overlays: top-left % origin, pixel box size. */
+export function placedFieldOverlayStyle(field: {
+  x: number;
+  y: number;
+  w?: number;
+  h?: number;
+}): {
+  left: string;
+  top: string;
+  width: string;
+  height: string;
+  transform: "none";
+} {
+  const width =
+    field.w && field.w > 40
+      ? `${field.w}px`
+      : `${field.w && field.w > 0 ? field.w : 20}%`;
+  const height =
+    field.h && field.h > 20
+      ? `${field.h}px`
+      : `${DEFAULT_PLACED_FIELD_HEIGHT}px`;
+  return {
+    left: `${field.x}%`,
+    top: `${field.y}%`,
+    width,
+    height,
+    transform: "none",
+  };
+}
+
+/** Same box the overlay uses, in PDF user space (origin bottom-left). */
+export function placedFieldPdfRect(
+  field: { x: number; y: number; w?: number; h?: number },
+  pageWidth: number,
+  pageHeight: number,
+  previewWidth = PREVIEW_PAGE_WIDTH,
+) {
+  const previewHeight = previewWidth * (pageHeight / pageWidth || 1);
+  const xPct = field.x <= 1 && field.y <= 1 ? field.x * 100 : field.x;
+  const yPct = field.x <= 1 && field.y <= 1 ? field.y * 100 : field.y;
+  let widthPx: number;
+  if (field.w && field.w > 40) widthPx = field.w;
+  else if (field.w && field.w > 0) widthPx = (field.w / 100) * previewWidth;
+  else widthPx = DEFAULT_PLACED_FIELD_WIDTH;
+  const heightPx =
+    field.h && field.h > 20 ? field.h : DEFAULT_PLACED_FIELD_HEIGHT;
+  const scaleX = pageWidth / previewWidth;
+  const scaleY = pageHeight / previewHeight;
+  return {
+    x: (xPct / 100) * pageWidth,
+    y: pageHeight - (yPct / 100) * pageHeight - heightPx * scaleY,
+    width: widthPx * scaleX,
+    height: heightPx * scaleY,
+  };
+}
+
 export type PagePercent = { xPct: number; yPct: number };
 
 function pageSurface(pageEl: HTMLElement): HTMLElement {

@@ -7,6 +7,7 @@ import { Loader2, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { logAuth } from "@/lib/rules";
+import { isPendingVerificationEmail } from "@/lib/auth/pending-verification";
 
 function getSafeDashboardUrl(callbackUrl: string | null): string {
   if (
@@ -33,7 +34,9 @@ export function LoginForm() {
   const [resendNote, setResendNote] = React.useState<string | null>(null);
   const [resending, setResending] = React.useState(false);
 
-  const needsVerification = (error ?? "").toLowerCase().includes("verify");
+  const needsVerification =
+    (error ?? "").toLowerCase().includes("verify") ||
+    isPendingVerificationEmail(email);
 
   async function resendVerification() {
     if (!email.trim()) {
@@ -42,19 +45,28 @@ export function LoginForm() {
     }
     setResending(true);
     setResendNote(null);
+    const pendingSignup = isPendingVerificationEmail(email);
     try {
-      const response = await fetch("/api/auth/email-verification/resend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
-      });
+      const response = await fetch(
+        pendingSignup
+          ? "/api/auth/resend-signup-otp"
+          : "/api/auth/email-verification/resend",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email.trim() }),
+        },
+      );
       const data = (await response.json().catch(() => ({}))) as {
         error?: string;
         message?: string;
       };
       setResendNote(
         response.ok
-          ? (data.message ?? "If that email needs verification, we sent a new message.")
+          ? (data.message ??
+              (pendingSignup
+                ? "If that account is pending activation, we sent a new signup code."
+                : "If that email needs verification, we sent a new message."))
           : (data.error ?? "Unable to resend verification."),
       );
     } catch {
@@ -133,14 +145,26 @@ export function LoginForm() {
         >
           {error}
           {needsVerification ? (
-            <button
-              type="button"
-              onClick={() => void resendVerification()}
-              disabled={resending}
-              className="mt-2 block font-semibold text-red-800 underline disabled:opacity-50"
-            >
-              {resending ? "Sending…" : "Resend verification email"}
-            </button>
+            <div className="mt-2 space-y-2">
+              <Link
+                href="/signup"
+                className="block font-semibold text-red-800 underline"
+              >
+                Enter your signup verification code
+              </Link>
+              <button
+                type="button"
+                onClick={() => void resendVerification()}
+                disabled={resending}
+                className="block font-semibold text-red-800 underline disabled:opacity-50"
+              >
+                {resending
+                  ? "Sending…"
+                  : needsVerification && isPendingVerificationEmail(email)
+                    ? "Resend signup code"
+                    : "Resend verification email"}
+              </button>
+            </div>
           ) : null}
         </div>
       )}

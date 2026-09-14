@@ -1,10 +1,12 @@
-import React from "react";
+"use client";
+
+import React, { useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { DateTimeSection } from "@/components/booking/DateTimeSection";
+import { DEFAULT_TIMEZONE } from "@/lib/booking/timezones";
+import { formatSlotRange } from "@/lib/booking/types";
 
 interface AdvancedOptionsProps {
-  enableReminders: boolean;
-  setEnableReminders: (val: boolean) => void;
-  reminderDays: string;
-  setReminderDays: (val: string) => void;
   enableExpiry: boolean;
   setEnableExpiry: (val: boolean) => void;
   expiryDate: string;
@@ -13,11 +15,28 @@ interface AdvancedOptionsProps {
   setExpiryTime: (val: string) => void;
 }
 
+const DURATIONS = [15, 30, 45, 60, 90];
+
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function todayIso() {
+  const date = new Date();
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function reminderSlots(durationMinutes: number): { value: string; label: string }[] {
+  const step = Math.max(1, durationMinutes);
+  const slots: { value: string; label: string }[] = [];
+  for (let mins = 6 * 60; mins + step <= 22 * 60; mins += step) {
+    const value = `${pad2(Math.floor(mins / 60))}:${pad2(mins % 60)}`;
+    slots.push({ value, label: formatSlotRange(value, step) });
+  }
+  return slots;
+}
+
 export const AdvancedOptionsSection: React.FC<AdvancedOptionsProps> = ({
-  enableReminders,
-  setEnableReminders,
-  reminderDays,
-  setReminderDays,
   enableExpiry,
   setEnableExpiry,
   expiryDate,
@@ -25,38 +44,73 @@ export const AdvancedOptionsSection: React.FC<AdvancedOptionsProps> = ({
   expiryTime,
   setExpiryTime,
 }) => {
+  const [timezone, setTimezone] = useState(DEFAULT_TIMEZONE);
+  const [whenMode, setWhenMode] = useState<"default" | "custom">("default");
+  const [date, setDate] = useState(todayIso);
+  const [slot, setSlot] = useState("06:00");
+  const [durationMinutes, setDurationMinutes] = useState(30);
+
+  const slots = useMemo(
+    () => reminderSlots(durationMinutes),
+    [durationMinutes],
+  );
+
   return (
     <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm space-y-6">
       <h3 className="text-slate-800 font-semibold text-sm">Advanced Options</h3>
 
-      {/* Reminders */}
-      <div className="space-y-3">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={enableReminders}
-            onChange={(e) => setEnableReminders(e.target.checked)}
-            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
-          />
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-            Send automatic reminders
-          </span>
-        </label>
-        {enableReminders && (
-          <div className="flex items-center gap-3 pl-6 text-xs text-slate-600">
-            <span>Continue to send reminders to receiver every</span>
-            <input
-              type="number"
-              value={reminderDays}
-              onChange={(e) => setReminderDays(e.target.value)}
-              className="w-16 px-2.5 py-1.5 rounded-lg border border-slate-200 text-center font-semibold text-slate-800"
-            />
-            <span>Days to complete (days)</span>
+      <DateTimeSection
+        timezone={timezone}
+        onTimezoneChange={setTimezone}
+        whenMode={whenMode}
+        onWhenModeChange={setWhenMode}
+        date={date}
+        onDateChange={setDate}
+        slot={slot}
+        onSlotChange={setSlot}
+        slots={slots}
+        emptySlotLabel="No slots this day"
+        durationMinutes={durationMinutes}
+        onDurationMinutesChange={(minutes) => {
+          setDurationMinutes(minutes);
+          const nextSlots = reminderSlots(minutes);
+          if (!nextSlots.some((item) => item.value === slot)) {
+            setSlot(nextSlots[0]?.value ?? "");
+          }
+        }}
+        duration={
+          <div>
+            <label className="mb-1 block text-[13px] font-medium text-slate-600">
+              Duration
+            </label>
+            <div className="relative">
+              <select
+                value={String(durationMinutes)}
+                onChange={(event) => {
+                  const minutes = Number(event.target.value);
+                  setDurationMinutes(minutes);
+                  const nextSlots = reminderSlots(minutes);
+                  if (!nextSlots.some((item) => item.value === slot)) {
+                    setSlot(nextSlots[0]?.value ?? "");
+                  }
+                }}
+                className="h-10 w-full appearance-none rounded-md border border-gray-200 bg-white px-3 pr-8 text-sm text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+              >
+                {DURATIONS.includes(durationMinutes) ? null : (
+                  <option value={durationMinutes}>{durationMinutes} min</option>
+                )}
+                {DURATIONS.map((item) => (
+                  <option key={item} value={item}>
+                    {item} min
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            </div>
           </div>
-        )}
-      </div>
+        }
+      />
 
-      {/* Expiry */}
       <div className="pt-2 border-t border-slate-100">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <label className="flex shrink-0 items-center gap-2 cursor-pointer">

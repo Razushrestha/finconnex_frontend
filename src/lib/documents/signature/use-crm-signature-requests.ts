@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { listCrmSignatureRequests } from "@/lib/documents/signature/api";
 import { replaceCrmSignatureRequests } from "@/lib/documents/signature/types";
+import { getTenantContext } from "@/lib/persistence/tenant";
 
 export type SignatureRequestsDataSource = "api" | "demo";
 
@@ -11,6 +12,7 @@ export function useCrmSignatureRequests() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const workspaceId = getTenantContext().tenantId;
 
   const refresh = useCallback(() => setTick((n) => n + 1), []);
 
@@ -39,7 +41,7 @@ export function useCrmSignatureRequests() {
     return () => {
       cancelled = true;
     };
-  }, [tick]);
+  }, [tick, workspaceId]);
 
-  return { source, loading, error, refresh };
+  return { source, loading, error, refresh, workspaceId };
 }

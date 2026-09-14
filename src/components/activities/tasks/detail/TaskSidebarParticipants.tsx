@@ -46,6 +46,16 @@ function personLabel(value: string, owners: AssignableOwner[]): string {
   return resolveAssignableOwnerName(trimmed);
 }
 
+const DEFAULT_OWNER = "Alex Sterling";
+const DEFAULT_COLLABORATORS: string[] = ["Sarah Jenkins"];
+
+function peopleEqual(a: Participant[], b: Participant[]) {
+  if (a.length !== b.length) return false;
+  return a.every(
+    (row, index) => row.name === b[index]?.name && row.role === b[index]?.role,
+  );
+}
+
 function fromProps(
   owner: string,
   collaborators: string[],
@@ -68,14 +78,18 @@ function fromProps(
 }
 
 export function TaskSidebarParticipants({
-  owner = "Alex Sterling",
-  collaborators = ["Sarah Jenkins"],
+  owner = DEFAULT_OWNER,
+  collaborators,
 }: TaskSidebarParticipantsProps) {
+  const collaboratorList = collaborators ?? DEFAULT_COLLABORATORS;
+  const collaboratorKey = collaboratorList.join("\0");
+  const collaboratorListRef = useRef(collaboratorList);
+  collaboratorListRef.current = collaboratorList;
   const [owners, setOwners] = useState<AssignableOwner[]>(() =>
     listAssignableOwnersLocal(),
   );
   const [people, setPeople] = useState<Participant[]>(() =>
-    fromProps(owner, collaborators, listAssignableOwnersLocal()),
+    fromProps(owner, collaboratorList, listAssignableOwnersLocal()),
   );
   const [draft, setDraft] = useState<Participant[]>(people);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -94,8 +108,9 @@ export function TaskSidebarParticipants({
   }, []);
 
   useEffect(() => {
-    setPeople(fromProps(owner, collaborators, owners));
-  }, [owner, collaborators, owners]);
+    const resolved = fromProps(owner, collaboratorListRef.current, owners);
+    setPeople((prev) => (peopleEqual(prev, resolved) ? prev : resolved));
+  }, [owner, collaboratorKey, owners]);
 
   const editing = useTaskSectionEdit({
     start() {

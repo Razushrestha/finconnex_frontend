@@ -846,7 +846,9 @@ export function listWorkqueueItemRows(
     case "followup":
       return contactRows(
         contacts.filter(
-          (c) => c.status === "Active" && c.source === "Cold Call",
+          (c) =>
+            c.status === "Active" &&
+            (c.source === "Phone" || c.source === "Cold Call"),
         ),
       );
     case "my-deals":

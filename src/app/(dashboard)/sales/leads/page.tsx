@@ -92,6 +92,14 @@ const DEFAULT_LEAD_COLUMNS = LEAD_PIPELINE_STAGES.map((stage) => ({
   visible: true,
 }));
 
+const LEAD_STAGES: KanbanField[] = LEAD_PIPELINE_STAGES.map((stage) => ({
+  id: stageColumnId(stage),
+  label: stage,
+  required: stage === "New Lead",
+}));
+
+const ALL_LEAD_STAGE_IDS = LEAD_STAGES.map((stage) => stage.id);
+
 const LEAD_FIELDS: KanbanField[] = [
   { id: "leadName", label: "Lead Name", required: true },
   { id: "source", label: "Source" },
@@ -187,11 +195,23 @@ const DEFAULT_VIEW_CONFIG: KanbanViewConfig = {
   aggregateBy: "Lead Count",
   headerStyle: "Multi Colour",
   shareWith: "everyone",
-  selectedFieldIds: ["leadName", "source", "phone", "leadOwner"],
+  selectedFieldIds: ["leadName", "source", "phone", "leadOwner", "tag"],
   editableFieldIds: ["leadOwner"],
+  selectedStageIds: ALL_LEAD_STAGE_IDS,
   singleHeaderColor: DEFAULT_SINGLE_HEADER_COLOR,
   multiHeaderColors: DEFAULT_MULTI_HEADER_COLORS,
 };
+
+function normalizeSelectedStageIds(raw: unknown): string[] {
+  const known = new Set(ALL_LEAD_STAGE_IDS);
+  const ids = Array.isArray(raw)
+    ? raw.filter((id): id is string => typeof id === "string" && known.has(id))
+    : [];
+  if (!ids.length) return [...ALL_LEAD_STAGE_IDS];
+  const required = LEAD_STAGES.find((stage) => stage.required)?.id;
+  if (required && !ids.includes(required)) ids.unshift(required);
+  return ids;
+}
 
 function loadViewConfig(): KanbanViewConfig {
   if (typeof window === "undefined") return DEFAULT_VIEW_CONFIG;
@@ -210,6 +230,11 @@ function loadViewConfig(): KanbanViewConfig {
       editableFieldIds: Array.isArray(parsed.editableFieldIds)
         ? parsed.editableFieldIds
         : DEFAULT_VIEW_CONFIG.editableFieldIds,
+      selectedStageIds: normalizeSelectedStageIds(parsed.selectedStageIds),
+      stageLabels:
+        parsed.stageLabels && typeof parsed.stageLabels === "object"
+          ? parsed.stageLabels
+          : {},
       singleHeaderColor:
         typeof parsed.singleHeaderColor === "string"
           ? parsed.singleHeaderColor
@@ -541,12 +566,68 @@ export default function LeadsPage() {
     return onRulesChange(() => refresh());
   }, [viewMode]);
 
-  function saveKanbanView(next: KanbanViewConfig) {
-    setViewConfig(next);
-    persistViewConfig(next);
-    applyViewFieldsToCards(next);
-    setIsKanbanSettingsOpen(false);
+  function persistKanbanView(next: KanbanViewConfig, closeSettings = true) {
+    const normalized: KanbanViewConfig = {
+      ...next,
+      selectedStageIds: normalizeSelectedStageIds(next.selectedStageIds),
+      stageLabels: next.stageLabels ?? {},
+    };
+    setViewConfig(normalized);
+    persistViewConfig(normalized);
+    applyViewFieldsToCards(normalized);
+    if (closeSettings) setIsKanbanSettingsOpen(false);
   }
+
+  function saveKanbanView(next: KanbanViewConfig) {
+    persistKanbanView(next, true);
+  }
+
+  function toggleLeadStageColumn(columnId: string) {
+    const stage = LEAD_STAGES.find((item) => item.id === columnId);
+    if (stage?.required) return;
+    const current = normalizeSelectedStageIds(viewConfig.selectedStageIds);
+    const nextIds = current.includes(columnId)
+      ? current.filter((id) => id !== columnId)
+      : [...current, columnId];
+    persistKanbanView(
+      {
+        ...viewConfig,
+        selectedStageIds: normalizeSelectedStageIds(nextIds),
+      },
+      false,
+    );
+  }
+
+  function renameLeadStageColumn(columnId: string, nextLabel: string) {
+    persistKanbanView(
+      {
+        ...viewConfig,
+        stageLabels: {
+          ...(viewConfig.stageLabels ?? {}),
+          [columnId]: nextLabel,
+        },
+      },
+      false,
+    );
+  }
+
+  const stageColumnOptions = useMemo(
+    () =>
+      LEAD_STAGES.map((stage) => ({
+        id: stage.id,
+        label: viewConfig.stageLabels?.[stage.id] ?? stage.label,
+        visible: normalizeSelectedStageIds(viewConfig.selectedStageIds).includes(
+          stage.id,
+        ),
+        required: stage.required,
+      })),
+    [viewConfig.selectedStageIds, viewConfig.stageLabels],
+  );
+
+  const leadColumnTitles = useMemo(
+    () => viewConfig.stageLabels ?? {},
+    [viewConfig.stageLabels],
+  );
 
   function saveListView(next: ListViewConfig) {
     const normalized: ListViewConfig = {
@@ -597,7 +678,9 @@ export default function LeadsPage() {
     );
   }
 
-  const visibleColumnIds = columns.filter((c) => c.visible).map((c) => c.id);
+  const visibleColumnIds = normalizeSelectedStageIds(
+    viewConfig.selectedStageIds,
+  );
 
   const importOptions: ImportOption[] = [
     {
@@ -744,16 +827,23 @@ export default function LeadsPage() {
         </div>
       ) : null}
       <div className="shrink-0">
-        <EntityHeader
-          entityLabel="Lead"
-          createRoute="/sales/leads/create"
+      <EntityHeader
+        entityLabel="Lead"
+        createRoute="/sales/leads/create"
           onCreate={() => openCreateLead()}
           importOptions={importOptions}
           actionOptions={actionOptions}
           footerOptions={footerOptions}
+          columnOptions={viewMode === "kanban" ? stageColumnOptions : undefined}
+          onColumnToggle={
+            viewMode === "kanban" ? toggleLeadStageColumn : undefined
+          }
+          onColumnRename={
+            viewMode === "kanban" ? renameLeadStageColumn : undefined
+          }
           hideTitle
           showSearch={false}
-          totalCount={totalLeads}
+        totalCount={totalLeads}
           afterScope={
             <button
               type="button"
@@ -773,10 +863,10 @@ export default function LeadsPage() {
               <Pencil className="h-3.5 w-3.5" />
             </button>
           }
-          viewMode={viewMode}
-          onViewChange={setViewMode}
-          isFilterOpen={isFilterOpen}
-          onToggleFilter={() => setIsFilterOpen((v) => !v)}
+        viewMode={viewMode}
+        onViewChange={setViewMode}
+        isFilterOpen={isFilterOpen}
+        onToggleFilter={() => setIsFilterOpen((v) => !v)}
           scopeOptions={LEAD_SCOPE_OPTIONS}
           activeScope={activeScope}
           onScopeChange={setActiveScope}
@@ -925,6 +1015,7 @@ export default function LeadsPage() {
               filters={filters}
               sortValue={activeSort}
               visibleColumnIds={visibleColumnIds}
+              columnTitles={leadColumnTitles}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
               cardFieldKeys={cardFieldKeys}
@@ -934,7 +1025,9 @@ export default function LeadsPage() {
               multiHeaderColors={viewConfig.multiHeaderColors}
               onAddLead={(columnId) => {
                 const column = columns.find((col) => col.id === columnId);
-                openCreateLead(column?.label);
+                openCreateLead(
+                  leadColumnTitles[columnId] ?? column?.label,
+                );
               }}
             />
           ) : (
@@ -957,6 +1050,7 @@ export default function LeadsPage() {
         <KanbanViewSettingsModal
           view={viewConfig}
           availableFields={LEAD_FIELDS}
+          availableStages={LEAD_STAGES}
           categorizeByOptions={["Status", "Source", "Lead Owner"]}
           aggregateByOptions={["Lead Count"]}
           headerStyleOptions={["Multi Colour", "Single Colour", "None"]}

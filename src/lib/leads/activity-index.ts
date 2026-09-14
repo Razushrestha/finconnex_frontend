@@ -466,12 +466,12 @@ function fromDocumentRequests(leadName: string): LeadActivityCandidate[] {
 }
 
 function fromWorkflows(leadName: string): LeadActivityCandidate[] {
-  const key = leadName.trim().toLowerCase();
-  if (!key) return [];
+  if (!leadName.trim()) return [];
   const out: LeadActivityCandidate[] = [];
   for (const log of listWorkflowLogs()) {
-    const blob = `${log.journeyName} ${log.message}`.toLowerCase();
-    if (!blob.includes(key)) continue;
+    if (!namesEqual(log.journeyName, leadName) && !namesEqual(log.message, leadName)) {
+      continue;
+    }
     const at = parseFlexibleDate(log.at);
     out.push({
       id: log.id,

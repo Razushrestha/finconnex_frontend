@@ -658,6 +658,11 @@ import {
 } from "@/lib/documents/signature/field-placement";
 import { toast } from "sonner";
 import { getNewlyNotifiedSigners } from "@/lib/documents/signature/mock-send";
+import {
+  cacheSignatureDocumentBlob,
+  cacheSignatureDocumentFile,
+  persistableSignatureFileUrl,
+} from "@/lib/documents/signature/file-cache";
 import { notifySigners } from "@/components/documents/signature/create/Notify";
 import {
   isCrmSignatureRequestId,
@@ -704,21 +709,18 @@ const isDocxFile = (file: File) =>
 // here since PdfFieldEditor's type definition wasn't shared.
 function toSignatureFields(placed: PlacedField[]): SignatureField[] {
   return placed
-    .filter((f) => f.recipientId) // a field with no assigned recipient can't be saved
+    .filter((f) => f.recipientId)
     .map((f) => ({
       id: f.id,
       kind: f.type as SignatureField["kind"],
       label: f.label,
       x: f.xPct,
       y: f.yPct,
-      w: typeof f.width === "number" && f.width <= 100 ? f.width : 20,
-      h: typeof f.height === "number" && f.height <= 20 ? f.height : 5,
+      w: f.width ?? DEFAULT_PLACED_FIELD_WIDTH,
+      h: f.height ?? DEFAULT_PLACED_FIELD_HEIGHT,
       page: f.page,
       signerId: f.recipientId!,
       required: true,
-      // Was silently dropped before — every field ended up looking like it
-      // belonged to the primary document regardless of which of the
-      // documents[] it was actually placed on.
       documentId: f.documentId,
     }));
 }
@@ -773,6 +775,11 @@ function CreateSignatureRequestForm() {
       if (fileUrl) URL.revokeObjectURL(fileUrl);
     };
   }, [fileUrl]);
+
+  useEffect(() => {
+    if (!documentFile) return;
+    void cacheSignatureDocumentBlob(ids.id, "primary", documentFile);
+  }, [documentFile, ids.id]);
 
   // Word Document conversion state (primary document)
   const [docHtmlContent, setDocHtmlContent] = useState<string>("");
@@ -841,6 +848,7 @@ function CreateSignatureRequestForm() {
 
       const docFileUrl = URL.createObjectURL(doc.file);
       const isDocx = isDocxFile(doc.file);
+      void cacheSignatureDocumentBlob(ids.id, doc.id, doc.file);
 
       setAdditionalPreviews((prev) => ({
         ...prev,
@@ -978,6 +986,15 @@ function CreateSignatureRequestForm() {
     additionalPreviews,
   ]);
 
+  const persistedDocuments = useMemo(
+    () =>
+      signatureDocuments.map((doc) => ({
+        ...doc,
+        fileUrl: persistableSignatureFileUrl(ids.id, doc.id, doc.fileUrl),
+      })),
+    [signatureDocuments, ids.id],
+  );
+
   const storedFileName = documentFile
     ? renamedStoredFileName(documentName, documentFile.name)
     : "";
@@ -993,8 +1010,6 @@ function CreateSignatureRequestForm() {
   const [signingOrder, setSigningOrder] = useState<"sequential" | "parallel">(
     "sequential",
   );
-  const [enableReminders, setEnableReminders] = useState(false);
-  const [reminderDays, setReminderDays] = useState("5");
   const [enableExpiry, setEnableExpiry] = useState(false);
   const [expiryDate, setExpiryDate] = useState("");
   const [expiryTime, setExpiryTime] = useState("");
@@ -1055,8 +1070,12 @@ function CreateSignatureRequestForm() {
       signatureRequestId: ids.signatureRequestId,
       documentName,
       documentFile: storedFileName,
-      documentFileUrl: persistentFileUrl || fileUrl,
-      documents: signatureDocuments,
+      documentFileUrl: persistableSignatureFileUrl(
+        ids.id,
+        "primary",
+        persistentFileUrl || fileUrl,
+      ),
+      documents: persistedDocuments,
       signer: recipients[0]?.name || "",
       signerEmail: recipients[0]?.email || "",
       signers: recipients,
@@ -1091,8 +1110,12 @@ function CreateSignatureRequestForm() {
       signatureRequestId: ids.signatureRequestId,
       documentName,
       documentFile: storedFileName,
-      documentFileUrl: persistentFileUrl || fileUrl,
-      documents: signatureDocuments,
+      documentFileUrl: persistableSignatureFileUrl(
+        ids.id,
+        "primary",
+        persistentFileUrl || fileUrl,
+      ),
+      documents: persistedDocuments,
       signer: recipients[0]?.name || "",
       signerEmail: recipients[0]?.email || "",
       signers: recipients,
@@ -1191,13 +1214,29 @@ function CreateSignatureRequestForm() {
     if (!assertRecipientsReady()) return [];
     const fields = toSignatureFields(placedFields);
 
+    await Promise.all([
+      documentFile
+        ? cacheSignatureDocumentBlob(ids.id, "primary", documentFile)
+        : Promise.resolve(),
+      ...additionalFiles.map((doc) =>
+        cacheSignatureDocumentBlob(ids.id, doc.id, doc.file),
+      ),
+      ...signatureDocuments.map((doc) =>
+        cacheSignatureDocumentFile(ids.id, doc.id, doc.fileUrl),
+      ),
+    ]);
+
     const draft = upsertSignatureRequest({
       id: ids.id,
       signatureRequestId: ids.signatureRequestId,
       documentName,
       documentFile: storedFileName,
-      documentFileUrl: persistentFileUrl || fileUrl,
-      documents: signatureDocuments,
+      documentFileUrl: persistableSignatureFileUrl(
+        ids.id,
+        "primary",
+        persistentFileUrl || fileUrl,
+      ),
+      documents: persistedDocuments,
       signer: recipients[0]?.name || "",
       signerEmail: recipients[0]?.email || "",
       signers: recipients,
@@ -1294,10 +1333,6 @@ function CreateSignatureRequestForm() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <AdvancedOptionsSection
-            enableReminders={enableReminders}
-            setEnableReminders={setEnableReminders}
-            reminderDays={reminderDays}
-            setReminderDays={setReminderDays}
             enableExpiry={enableExpiry}
             setEnableExpiry={setEnableExpiry}
             expiryDate={expiryDate}

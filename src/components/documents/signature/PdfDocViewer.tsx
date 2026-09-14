@@ -10,6 +10,7 @@ import {
   type SignatureField,
   type SignatureSigner,
 } from "@/lib/documents/signature/types";
+import { placedFieldOverlayStyle } from "@/lib/documents/signature/field-placement";
 import { cn } from "@/lib/utils";
 import { Calendar, PenLine, Type, User } from "lucide-react";
 import { SignatureFieldValue } from "./SignatureFieldValue";
@@ -42,6 +43,8 @@ interface PdfDocViewerProps {
   onFieldClick?: (fieldId: string) => void;
   pageWidth?: number;
   className?: string;
+  /** When true, grow with pages and let a parent scroller own overflow. */
+  embedded?: boolean;
 }
 
 export default function PdfDocViewer({
@@ -53,8 +56,9 @@ export default function PdfDocViewer({
   highlightSignerId,
   interactive,
   onFieldClick,
-  pageWidth = 620,
+  pageWidth = 700,
   className,
+  embedded = false,
 }: PdfDocViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [loadError, setLoadError] = useState<boolean>(false);
@@ -71,7 +75,9 @@ export default function PdfDocViewer({
   return (
     <div
       className={cn(
-        "relative mx-auto flex max-h-[68vh] w-full max-w-3xl flex-col items-center overflow-y-auto rounded-xl border border-slate-200 bg-slate-100/80 p-4 shadow-inner custom-scrollbar",
+        embedded
+          ? "relative mx-auto flex w-full flex-col items-center bg-transparent p-0"
+          : "relative mx-auto flex max-h-[68vh] w-full max-w-3xl flex-col items-center overflow-y-auto rounded-xl border border-slate-200 bg-slate-100/80 p-4 shadow-inner custom-scrollbar",
         className,
       )}
     >
@@ -121,24 +127,18 @@ export default function PdfDocViewer({
                 return (
                   <div
                     key={f.id}
+                    data-signing-field={f.id}
                     className={cn(
-                      "absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center gap-1 overflow-hidden rounded border-2 border-dashed px-1.5 py-1 text-[10px] font-semibold shadow-sm transition-all z-10 select-none",
+                      "absolute flex items-center justify-center gap-1 overflow-hidden rounded border-2 border-dashed px-1.5 py-1 text-[10px] font-semibold shadow-sm transition-all z-10 scroll-mt-40 select-none",
                       color.bg,
                       color.text,
                       color.border,
                       dim,
                       selected && "ring-2 ring-violet-500 ring-offset-1 shadow-md",
                       filled && "border-solid bg-white/95",
-                      interactive && "cursor-pointer hover:scale-105",
+                      interactive && "cursor-pointer",
                     )}
-                    style={{
-                      left: `${f.x}%`,
-                      top: `${f.y}%`,
-                      width: f.w && f.w <= 100 ? `${f.w}%` : "140px",
-                      height: "34px",
-                      minHeight: "34px",
-                      maxHeight: "34px",
-                    }}
+                    style={placedFieldOverlayStyle(f)}
                     onClick={(e) => {
                       e.stopPropagation();
                       onFieldClick?.(f.id);

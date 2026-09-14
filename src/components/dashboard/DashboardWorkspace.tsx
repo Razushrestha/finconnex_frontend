@@ -85,18 +85,31 @@ import { getRulesActor } from "@/lib/rules/actor";
 import { onRulesChange } from "@/lib/rules/storage";
 import { loadSettingsValues } from "@/lib/settings/settings-store";
 import { loadUserProfile } from "@/lib/user-profile/types";
-import { buildDashboardHero, type DashboardHero } from "@/lib/dashboard/greeting";
+import { buildDashboardHero, firstNameFromUser, type DashboardHero } from "@/lib/dashboard/greeting";
 import { cn } from "@/lib/utils";
 import type { HierarchyLevel } from "@/lib/rules/permissions";
 import type { ExecutiveOverview as ExecutiveData } from "@/lib/dashboard/executive";
 
-function dashboardHero(data: ExecutiveData): DashboardHero {
+function dashboardHero(
+  data: ExecutiveData,
+  sessionName: string,
+  clientReady: boolean,
+): DashboardHero {
+  if (!clientReady) {
+    const name = firstNameFromUser({ displayName: sessionName });
+    return {
+      greeting: `Welcome back, ${name} 👋`,
+      status: "Here's what's happening across your CRM today.",
+      period: "afternoon",
+      timeZone: "UTC",
+    };
+  }
   const profile = loadUserProfile();
   const actor = getRulesActor();
   const prefs = loadSettingsValues("my-preferences/profile");
   return buildDashboardHero({
     firstName: profile.firstName,
-    displayName: actor.name || String(prefs.displayName ?? ""),
+    displayName: actor.name || String(prefs.displayName ?? "") || sessionName,
     timeZone: typeof prefs.timezone === "string" ? prefs.timezone : "",
     signals: {
       overdueTasks: data.overdueTasks,
@@ -115,7 +128,11 @@ function spanClass(id: DashboardWidgetId) {
   return "xl:col-span-2";
 }
 
-export function DashboardWorkspace() {
+export function DashboardWorkspace({
+  sessionName = "",
+}: {
+  sessionName?: string;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [view, setView] = useState<DashboardViewId>("executive");
@@ -133,10 +150,15 @@ export function DashboardWorkspace() {
   const layoutSyncRef = useRef<number | null>(null);
 
   const { loading, executive, source } = useCrmDashboardStats(layout.filters);
+  const [heroReady, setHeroReady] = useState(false);
   const [heroTick, setHeroTick] = useState(0);
-  const hero = useMemo(() => dashboardHero(executive), [executive, heroTick]);
+  const hero = useMemo(
+    () => dashboardHero(executive, sessionName, heroReady),
+    [executive, heroTick, sessionName, heroReady],
+  );
 
   useEffect(() => {
+    setHeroReady(true);
     setHeroTick((n) => n + 1);
     return onRulesChange((kind) => {
       if (kind === "actor" || kind === "all") setHeroTick((n) => n + 1);
@@ -365,7 +387,7 @@ export function DashboardWorkspace() {
       className={cn(
         "dashboard-workspace flex flex-1 flex-col bg-[#F4F6F9]",
         fullscreen && "overflow-y-auto",
-        fullscreen && !document.fullscreenElement && "fixed inset-0 z-[80]",
+        fullscreen && "fixed inset-0 z-[80]",
       )}
     >
       <div className="mx-auto flex w-full max-w-[1920px] flex-1 flex-col gap-3 p-4 lg:px-6 2xl:px-8 2xl:py-5">

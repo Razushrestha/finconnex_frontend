@@ -1,8 +1,8 @@
 export const EMAIL_TONES = [
-  { id: "friendly", label: "Friendly", hint: "Warm and easy" },
-  { id: "professional", label: "Professional", hint: "Clear and polished" },
-  { id: "emotional", label: "Emotional", hint: "Heartfelt" },
-  { id: "loving", label: "Loving", hint: "Caring and close" },
+  { id: "friendly", label: "Friendly", hint: "Warm, full, and clear" },
+  { id: "professional", label: "Professional", hint: "Detailed and polished" },
+  { id: "emotional", label: "Emotional", hint: "Heartfelt and complete" },
+  { id: "loving", label: "Loving", hint: "Caring, close, and thorough" },
   { id: "formal", label: "Formal", hint: "Traditional business" },
   { id: "empathetic", label: "Empathetic", hint: "Supportive" },
   { id: "persuasive", label: "Persuasive", hint: "Drive a next step" },
@@ -67,6 +67,142 @@ function firstName(recipient?: string) {
   return raw.split(/\s+/)[0] ?? "there";
 }
 
+const TONE_OPENERS: Record<EmailTone, string> = {
+  friendly:
+    "I hope you are well. I wanted to write a proper note rather than a rushed line, so you have a clear and complete picture of where things stand.",
+  professional:
+    "I am writing to provide a clear, considered update and to place the relevant details in one message. The aim is to be accurate, thorough, and straightforward to act on.",
+  emotional:
+    "I wanted to reach out with genuine care, because this is more than a routine status note. I hope the explanation below gives you both clarity and reassurance about what has taken place.",
+  loving:
+    "I wanted to send a thoughtful, carefully written note so you feel looked after as well as informed. You have been very much in mind as we have brought this together.",
+  formal:
+    "Please accept this correspondence as a complete update for your records. The points below are set out so the position, the documents, and the requested next step are each easy to identify.",
+  empathetic:
+    "I recognise this may ask for your time and attention, and I have written with that in mind. My intention is to explain the position fully so you do not have to piece it together yourself.",
+  persuasive:
+    "I wanted to set out a complete picture of the opportunity and the work already done, so the value of moving forward is easy to see. A clear next step is included at the close of this note.",
+  confident:
+    "We are in a strong position to progress this, and I wanted to document that with the right level of detail. The summary below covers what is complete, what is attached, and how I recommend we proceed.",
+  grateful:
+    "Thank you for your time and trust; it is genuinely appreciated. I wanted to write a full note so you can see exactly how that trust has been used and what is now ready for you.",
+  urgent:
+    "This is time-sensitive, and I have therefore written a complete briefing rather than a short alert. Please read the three points of context, substance, and action below so nothing material is missed.",
+  warm:
+    "I wanted to stay in touch with a human, considered note rather than a thin update. The detail below is here so you feel supported and fully informed.",
+  executive:
+    "Please find a structured briefing below. I have kept the language professional while still covering context, substance, and the decision I need from you.",
+};
+
+const TONE_CLOSERS: Record<EmailTone, string> = {
+  friendly:
+    "Whenever you have a moment, please look through the details and any attachments and tell me if something does not line up. I am happy to talk it through and will make the next step as easy as I can.",
+  professional:
+    "Please review the information and any attachments at your convenience. I would welcome your confirmation, comments, or further instruction so we can proceed in an orderly and documented way.",
+  emotional:
+    "Please take the time you need to sit with this. If anything feels uncertain or incomplete, I am here, and I would be grateful to hear from you once you have had a chance to read it through.",
+  loving:
+    "Please know I am here if you would like anything explained more gently or in more detail. When you are ready, a short reply will help me keep supporting you with whatever comes next.",
+  formal:
+    "I should be grateful if you would review the enclosed position and respond with any observations or confirmation at your earliest convenience. I remain available should further particulars be required.",
+  empathetic:
+    "There is no expectation that you reply immediately if now is a difficult moment. When you are ready, I will gladly walk through any part of this with you and adjust the next step to what you can manage.",
+  persuasive:
+    "If this reads as the right course, I recommend we confirm the next step this week so momentum is not lost. Please reply with a preferred time, or with any concern I should address before we proceed.",
+  confident:
+    "I am ready to close this out cleanly once I have your go-ahead. Please confirm how you would like to proceed, and I will action it without delay.",
+  grateful:
+    "Thank you again for the confidence you have placed in this process. Please let me know if I can do anything further, and I will treat your reply with the same care.",
+  urgent:
+    "A prompt reply today would help us protect the timeline. Please confirm you have received this, reviewed the attachments, and can take the next step, or tell me immediately if something is blocking you.",
+  warm:
+    "I hope this leaves you feeling well briefed rather than hurried. Reply when you can, and I will take care of the follow-through from there.",
+  executive:
+    "Please confirm the decision or the change you want applied. I will then execute and report back with a short close-out note.",
+};
+
+const TONE_DEVELOP: Record<EmailTone, string> = {
+  friendly:
+    "I have spelled this out so you are not left guessing about the purpose of the email, the documents involved, and whether signing is complete or still under way. I would rather send a complete note than a thin one-liner you have to decode.",
+  professional:
+    "I have expanded the point so the purpose, the documents concerned, and the current signing status are each stated in plain terms. Please treat this as the working record until we agree any correction.",
+  emotional:
+    "I wanted the substance to be as clear as the feeling behind it: what these documents are, that they are signed or being signed, and why that matters for you. Nothing important should be left between the lines.",
+  loving:
+    "I have taken care to name the documents and the signing position so you can see, in one place, that things have been handled with attention. I want you to feel both close to the process and confident in the outcome.",
+  formal:
+    "The following restates the instruction in fuller terms, including the documents in view and the present status of execution, so the file is complete.",
+  empathetic:
+    "I have added the practical detail — the documents, the signing position, and what I am asking of you — so you can respond without having to chase missing context.",
+  persuasive:
+    "In more concrete terms, the documents are in hand, signing is the milestone we are confirming, and a timely response will let us lock in the benefit of the work already done.",
+  confident:
+    "To be specific: the relevant documents are identified below in spirit if not by every filename, signing is the status I am confirming, and I am ready to complete the remaining administration as soon as you reply.",
+  grateful:
+    "In practical terms, this note confirms the documents in play and the signing position, and it invites you to tell me if any further thanks or follow-up would help.",
+  urgent:
+    "Concretely, the documents and the signing status need your eyes now, because delay at this point creates avoidable risk. Please treat the attachments and the request in this email as the full brief.",
+  warm:
+    "I have included the fuller story — what we are sending, that signing is the heart of it, and how you can come back to me — so the message feels complete rather than abrupt.",
+  executive:
+    "Substance: documents in scope, signing status, and the decision or acknowledgement required. Please treat anything omitted as not material unless you tell me otherwise.",
+};
+
+const GREETING_LINE =
+  /^(hi|hello|hey|dear)\b[\s\S]{0,80}$/i;
+const EXEC_GREETING_LINE = /^[\w .'-]{1,60}\s+—$/;
+const SIGNOFF_LINE =
+  /^(kind regards|yours sincerely|yours faithfully|warm regards|best regards|best wishes|regards|talk soon|with care|warmly|with thanks|please reply today|cheers|thanks|thank you)[,\s]*$/i;
+const SENDER_LINE = /^(finconnex|kind regards,?\s*finconnex)$/i;
+
+function isGreetingLine(line: string) {
+  const value = line.trim();
+  if (!value) return false;
+  if (GREETING_LINE.test(value.replace(/,$/, ""))) return true;
+  return EXEC_GREETING_LINE.test(value);
+}
+
+function isOpenerLine(line: string) {
+  const value = line.trim();
+  return Object.values(TONE_OPENERS).some(
+    (opener) => value === opener || value.startsWith(opener.slice(0, 28)),
+  );
+}
+
+function isSignoffLine(line: string) {
+  const value = line.trim().replace(/,$/, "");
+  if (!value) return true;
+  return SIGNOFF_LINE.test(value) || SENDER_LINE.test(value);
+}
+
+function isCloserLine(line: string) {
+  const value = line.trim();
+  if (!value) return false;
+  return Object.values(TONE_CLOSERS).some(
+    (closer) => value === closer || value.startsWith(closer.slice(0, 32)),
+  );
+}
+
+/** Peel stacked greetings / openers / sign-offs so a tone change rewrites the core once. */
+export function extractEmailCore(text: string) {
+  let next = text.replace(/\u200b/g, "").trim();
+  let prev = "";
+  while (next && next !== prev) {
+    prev = next;
+    const lines = next.split(/\n/).map((line) => line.trimEnd());
+    while (lines.length && !lines[0]!.trim()) lines.shift();
+    while (lines.length && isGreetingLine(lines[0]!)) lines.shift();
+    while (lines.length && !lines[0]!.trim()) lines.shift();
+    while (lines.length && isOpenerLine(lines[0]!)) lines.shift();
+    while (lines.length && !lines[0]!.trim()) lines.shift();
+    while (lines.length && isSignoffLine(lines[lines.length - 1]!)) lines.pop();
+    while (lines.length && isCloserLine(lines[lines.length - 1]!)) lines.pop();
+    while (lines.length && !lines[lines.length - 1]!.trim()) lines.pop();
+    next = lines.join("\n").trim();
+  }
+  return next;
+}
+
 function greeting(tone: EmailTone, name: string) {
   switch (tone) {
     case "friendly":
@@ -107,24 +243,24 @@ function signoff(tone: EmailTone) {
   }
 }
 
-function wrapTone(body: string, tone: EmailTone, name: string) {
-  const core = body.trim() || "I wanted to follow up on our conversation and keep things moving.";
-  const openers: Record<EmailTone, string> = {
-    friendly: "Hope you're having a good day — I wanted to share a quick note.",
-    professional: "I am writing to follow up and keep this moving in a clear, timely way.",
-    emotional: "I have been thinking about this and wanted to reach out with care.",
-    loving: "I wanted to send a thoughtful note and make sure you feel supported.",
-    formal: "Please find below an update for your consideration.",
-    empathetic: "I understand this may take time and attention, and I am here to help.",
-    persuasive: "There is a clear next step that I believe will serve you well.",
-    confident: "We are in a strong position to progress this.",
-    grateful: "Thank you for your time and trust — it is genuinely appreciated.",
-    urgent: "This is time-sensitive and would benefit from a prompt response.",
-    warm: "Just a warm note to stay connected and helpful.",
-    executive: "Summary below. Decision requested.",
-  };
+function developMiddle(core: string, tone: EmailTone) {
+  const cleaned = core.replace(/\s+/g, " ").trim();
+  const sentence = cleaned
+    ? cleaned.endsWith(".") || cleaned.endsWith("?") || cleaned.endsWith("!")
+      ? cleaned
+      : `${cleaned}.`
+    : "I wanted to follow up on our conversation and keep things moving.";
+  const words = sentence.split(/\s+/).filter(Boolean).length;
+  if (words >= 40) return sentence;
+  return `${sentence} ${TONE_DEVELOP[tone]}`;
+}
 
-  return `${greeting(tone, name)}\n\n${openers[tone]}\n\n${core}\n\n${signoff(tone)}`;
+function wrapTone(body: string, tone: EmailTone, name: string) {
+  const core =
+    extractEmailCore(body) ||
+    "I wanted to follow up on our conversation and keep things moving.";
+  const middle = developMiddle(core, tone);
+  return `${greeting(tone, name)}\n\n${TONE_OPENERS[tone]}\n\n${middle}\n\n${TONE_CLOSERS[tone]}\n\n${signoff(tone)}`;
 }
 
 function applyAction(text: string, action: EmailAiAction) {
@@ -180,29 +316,92 @@ export function copilotToneId(label: "professional" | "friendly" | "concise" | "
   return label;
 }
 
+export function topicFromDraft(subject?: string, body?: string) {
+  const sub = (subject ?? "")
+    .replace(/^(re:|fw:|fwd:)\s*/i, "")
+    .trim();
+  if (sub) {
+    const leadIn = sub.match(
+      /^(check|review|see|look at|regarding|about|update on|following up on)\s+(.+)/i,
+    );
+    if (leadIn?.[2]) return leadIn[2].replace(/[.?!]+$/, "").trim();
+    return sub.replace(/[.?!]+$/, "");
+  }
+  const first = extractEmailCore(body ?? "")
+    .split(/(?<=[.!?])\s+/)
+    .map((part) => part.replace(/\s+/g, " ").trim())
+    .find((part) => part.length > 8);
+  if (!first) return "our conversation";
+  return first.length > 70 ? `${first.slice(0, 67).trim()}…` : first;
+}
+
+const UNRELATED_DEAL_NOISE =
+  /\b(home loan|pre-approval|preapproval|refinance|investment loan)\b/i;
+
+export function subjectsGroundedInDraft(
+  rows: SubjectSuggestion[],
+  source: string,
+): SubjectSuggestion[] {
+  const hay = source.toLowerCase();
+  const allowNoise = UNRELATED_DEAL_NOISE.test(hay);
+  return rows.filter((row) => {
+    const text = row.text.trim();
+    if (!text) return false;
+    if (!allowNoise && UNRELATED_DEAL_NOISE.test(text)) return false;
+    return true;
+  });
+}
+
 export function suggestSubjects(input: {
   current?: string;
   recipientName?: string;
   dealTitle?: string;
   dealStage?: string;
   prompt?: string;
+  body?: string;
 }): SubjectSuggestion[] {
-  const deal = input.dealTitle?.trim() || "your home loan";
-  const current = input.current?.trim();
-  const first = current || `${deal} – Next Steps`;
-  const options = [
-    first,
-    `Your Home Loan Application – What's Next?`,
-    `Next Steps for Your Home Loan Application`,
-    `Your Pre-Approval Application Update`,
-  ];
-  const unique = [...new Set(options)].slice(0, 4);
-  const recommended = unique.find((item) => item.toLowerCase().includes("next steps for")) ?? unique[0]!;
-  return unique.map((text) => ({
-    text,
-    recommended: text === recommended,
-    reason: text === recommended ? "Clearest next-step framing" : undefined,
-  }));
+  const current = input.current?.trim() ?? "";
+  const body = input.body?.trim() || input.prompt?.trim() || "";
+  const topic = topicFromDraft(current, body);
+  const titled = topic.charAt(0).toUpperCase() + topic.slice(1);
+  const reviewed = current.replace(/^check\b/i, "Review");
+  const unique: string[] = [];
+  const seen = new Set<string>();
+  for (const row of [
+    current,
+    reviewed !== current ? reviewed : "",
+    `Following up on ${topic}`,
+    titled,
+    `Quick note about ${topic}`,
+  ]) {
+    const text = row.replace(/\s+/g, " ").trim().slice(0, 80);
+    if (!text) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(text);
+    if (unique.length === 4) break;
+  }
+  const source = `${current} ${body}`;
+  const grounded = subjectsGroundedInDraft(
+    unique.map((text, index) => ({
+      text,
+      recommended: index === (current ? 1 : 0) || (unique.length === 1 && index === 0),
+      reason:
+        index === 0 && current
+          ? "Keeps your current subject"
+          : "Phrased from the subject and body",
+    })),
+    source,
+  );
+  if (!grounded.some((row) => row.recommended) && grounded[0]) {
+    grounded[0] = {
+      ...grounded[0],
+      recommended: true,
+      reason: grounded[0].reason || "Closest to the draft",
+    };
+  }
+  return grounded;
 }
 
 function crmParagraph(ctx?: ComposeAiContext) {
@@ -254,8 +453,8 @@ export function draftEmailFromPrompt(input: {
     (asksDocs
       ? `Could you please send through ${input.context!.documentsOutstanding!.join(" and ")} so we can keep your application moving?`
       : "I wanted to follow up and keep this moving.");
-  const body = [core, crm].filter(Boolean).join("\n\n");
-  const full = lengthen(`${greeting(tone, name)}\n\n${body}\n\n${signoff(tone)}`, input.length ?? "medium");
+  const seed = [core, crm].filter(Boolean).join(" ");
+  const full = lengthen(wrapTone(seed, tone, name), input.length ?? "medium");
   return plainTextToEmailHtml(full);
 }
 
@@ -269,7 +468,7 @@ export function rewriteEmailWithAi(input: {
 }) {
   const name = firstName(input.recipientName);
   const fromVoice = input.voiceNotes?.trim();
-  const existing = htmlToPlainText(input.html);
+  const existing = extractEmailCore(htmlToPlainText(input.html));
   const subjectHint = input.subject?.trim();
   const seed =
     fromVoice ||

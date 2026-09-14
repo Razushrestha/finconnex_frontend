@@ -2,12 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  calendlyEventTypeToBookingPage,
-  listCalendlyEventTypes,
-  listCalendlyHosts,
-  type CalendlyHost,
-} from "@/lib/booking/calendly-api";
-import {
   hostsToConsultants,
   meetingToAppointment,
   replaceDashboardAppointments,
@@ -15,15 +9,15 @@ import {
   type DashboardAppointment,
   type DashboardConsultant,
 } from "@/lib/booking/dashboard";
-import type { BookingPage } from "@/lib/booking/types";
+import { listBookingPages, type BookingPage } from "@/lib/booking/types";
 import { listCrmMeetings } from "@/lib/meetings/api";
+import { loadAssignableOwners } from "@/lib/users/assignable";
 
 export function useCrmBooking() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [appointments, setAppointments] = useState<DashboardAppointment[]>([]);
   const [consultants, setConsultants] = useState<DashboardConsultant[]>([]);
-  const [hosts, setHosts] = useState<CalendlyHost[]>([]);
   const [pages, setPages] = useState<BookingPage[]>([]);
   const [tick, setTick] = useState(0);
 
@@ -34,26 +28,29 @@ export function useCrmBooking() {
     setLoading(true);
     setError(null);
     void (async () => {
-      const [meetingsResult, hostRows, eventTypes] = await Promise.all([
-        listCrmMeetings().catch(() => [] as Awaited<ReturnType<typeof listCrmMeetings>>),
-        listCalendlyHosts().catch(() => [] as CalendlyHost[]),
-        listCalendlyEventTypes().catch(() => []),
+      const [meetingsResult, owners] = await Promise.all([
+        listCrmMeetings().catch(
+          () => [] as Awaited<ReturnType<typeof listCrmMeetings>>,
+        ),
+        loadAssignableOwners().catch(() => []),
       ]);
       if (!alive) return;
       const mapped = meetingsResult
-        .map((meeting) => meetingToAppointment(meeting, hostRows))
+        .map((meeting) => meetingToAppointment(meeting, owners))
         .filter((row): row is DashboardAppointment => !!row);
-      const consultantRows = hostsToConsultants(hostRows, mapped);
-      const hostName = (id: string) =>
-        hostRows.find((host) => host.id === id)?.name ?? "";
-      const eventPages = eventTypes.map((item) =>
-        calendlyEventTypeToBookingPage(item, hostName(item.hostId)),
+      const consultantRows = hostsToConsultants(
+        owners.map((owner) => ({
+          id: owner.id,
+          name: owner.name,
+          role: "Consultant",
+        })),
+        mapped,
       );
+      const eventPages = listBookingPages();
       replaceDashboardAppointments(mapped);
       replaceDashboardConsultants(consultantRows);
       setAppointments(mapped);
       setConsultants(consultantRows);
-      setHosts(hostRows);
       setPages(eventPages);
       setError(null);
       setLoading(false);
@@ -63,7 +60,6 @@ export function useCrmBooking() {
       replaceDashboardConsultants([]);
       setAppointments([]);
       setConsultants([]);
-      setHosts([]);
       setPages([]);
       setError(err instanceof Error ? err.message : "Booking APIs unavailable");
       setLoading(false);
@@ -78,7 +74,6 @@ export function useCrmBooking() {
     error,
     appointments,
     consultants,
-    hosts,
     pages,
     refresh,
   };

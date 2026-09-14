@@ -44,6 +44,17 @@ describe("mailbox folders", () => {
     expect(emailMatchesFolder(sent, "drafts", flags)).toBe(false);
   });
 
+  it("puts composed Sent mail in Sent even when From is not a FinConnex domain", () => {
+    const sent = mail({
+      status: "Sent",
+      from: "agent@gmail.com",
+      to: ["test@gmail.com"],
+      outbound: true,
+    });
+    expect(emailMatchesFolder(sent, "sent", flags)).toBe(true);
+    expect(emailMatchesFolder(sent, "inbox", flags)).toBe(false);
+  });
+
   it("shows reported spam only in Spam", () => {
     const row = mail({ status: "Delivered" });
     const spam: MailboxFlags = { spam: true };

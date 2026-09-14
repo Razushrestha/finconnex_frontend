@@ -114,9 +114,17 @@ export function settingsProxyKind(
   | { kind: "root" }
   | { kind: "pages" }
   | { kind: "page"; category: string; subpage: string }
+  | { kind: "capabilities" }
+  | { kind: "security" }
   | null {
   if (path[0] !== "settings") return null;
   if (path.length === 1) return { kind: "root" };
+  if (path[1] === "capabilities" && path.length === 2) {
+    return { kind: "capabilities" };
+  }
+  if (path[1] === "security" && path.length === 2) {
+    return { kind: "security" };
+  }
   if (path[1] !== "pages") return null;
   if (path.length === 2) return { kind: "pages" };
   if (path.length === 4) {
@@ -172,6 +180,47 @@ export function pagesListPayload(catalog: SettingsCatalog, revision = 1) {
     statusCode: 200,
     message: "Settings catalog retrieved",
     data: { catalog, revision },
+  });
+}
+
+export function settingsGetFallbackPayload(
+  kind: NonNullable<ReturnType<typeof settingsProxyKind>>,
+  workspaceId: string,
+  catalog: SettingsCatalog,
+): string {
+  if (kind.kind === "root") {
+    return withCatalogOnSettings(
+      JSON.stringify({ statusCode: 200, data: { workspaceId } }),
+      catalog,
+    );
+  }
+  if (kind.kind === "pages") {
+    return pagesListPayload(catalog);
+  }
+  if (kind.kind === "page") {
+    const pageKey = `${kind.category}/${kind.subpage}`;
+    return pagePayload(pageKey, catalog[pageKey] ?? {});
+  }
+  if (kind.kind === "capabilities") {
+    return JSON.stringify({
+      statusCode: 200,
+      message: "Settings capabilities retrieved",
+      data: {
+        workspaceId,
+        enabled: ["leads", "deals", "projects"],
+        revision: 1,
+      },
+    });
+  }
+  return JSON.stringify({
+    statusCode: 200,
+    message: "Settings security retrieved",
+    data: {
+      passwordMinLength: 8,
+      enforce2FA: false,
+      ipAllowlist: [],
+      sessionTimeoutMinutes: 480,
+    },
   });
 }
 

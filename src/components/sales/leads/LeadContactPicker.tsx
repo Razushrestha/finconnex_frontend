@@ -11,6 +11,7 @@ import {
   updateContact,
 } from "@/lib/contacts/store";
 import type { ContactCardData, ContactSource } from "@/lib/contacts/types";
+import { coerceLeadSource } from "@/lib/leads/types";
 import { listCrmContacts } from "@/lib/contacts/api";
 import { isValidPhoneInput } from "@/lib/contacts/phone";
 import { cn } from "@/lib/utils";
@@ -76,24 +77,7 @@ function toLinked(contact: ContactCardData): LinkedLeadContact {
 }
 
 function toContactSource(leadSource: string): ContactSource {
-  switch (leadSource) {
-    case "Website":
-      return "Website";
-    case "Google Ads":
-    case "Facebook":
-    case "Instagram":
-    case "TikTok":
-    case "Google":
-      return "Social Media";
-    case "Existing Client Referral":
-    case "Referral Partner":
-    case "Employee Referral":
-      return "Referral";
-    case "Phone":
-      return "Cold Call";
-    default:
-      return "Other";
-  }
+  return coerceLeadSource(leadSource);
 }
 
 function contactSearchPlaceholder(count: number) {

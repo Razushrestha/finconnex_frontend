@@ -1,5 +1,6 @@
 import { proxyCrmV1 } from "@/lib/auth/crm-bff-proxy";
 
+
 export const maxDuration = 60;
 
 type Ctx = { params: Promise<{ path: string[] }> };

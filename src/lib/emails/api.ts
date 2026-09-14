@@ -84,7 +84,15 @@ export function mapEmailStatus(raw: string, fallback: EmailStatus = "Draft"): Em
   if (value.includes("deliver")) return "Delivered";
   if (value.includes("bounce")) return "Bounced";
   if (value.includes("fail")) return "Failed";
-  if (value.includes("sent") || value.includes("send")) return "Sent";
+  if (
+    value.includes("sent") ||
+    value.includes("send") ||
+    value.includes("queue") ||
+    value.includes("pending") ||
+    value.includes("outbox")
+  ) {
+    return "Sent";
+  }
   if (value.includes("draft")) return "Draft";
   return fallback;
 }
@@ -285,6 +293,7 @@ async function emailsGet(suffix: string, query = ""): Promise<unknown> {
 
 async function emailsMutate(suffix: string, init: RequestInit): Promise<unknown> {
   if (!isBoundCrmSession()) {
+    await ensureCrmAccess();
     return crmBffFetch(await emailsPath(suffix), init);
   }
   return withSession((session, scoped) => {
@@ -488,7 +497,12 @@ function asEmail(data: unknown, fallback?: Partial<Email>): Email | null {
     mapped && mapped.subject !== "(no subject)"
       ? mapped.subject
       : fallback?.subject || mapped?.subject || "(no subject)";
-  const status = mapped?.status ?? fallback?.status ?? "Draft";
+  const mappedStatus = mapped?.status ?? fallback?.status ?? "Draft";
+  const status =
+    mappedStatus === "Draft" &&
+    (fallback?.status === "Sent" || fallback?.status === "Scheduled")
+      ? fallback.status
+      : mappedStatus;
   return {
     subject,
     body: mapped?.body || fallback?.body || "",
@@ -634,11 +648,12 @@ export async function sendCrmEmail(
   const sendAt = scheduledAt ? Date.parse(scheduledAt) : 0;
   if (!sendAt || sendAt <= Date.now() + 5_000) {
     const needsBackup =
-      !crmAttachedAll &&
-      (files.length > 0 ||
-        Boolean(html && (/<img\b/i.test(html) || /data:image\//i.test(html))));
+      files.length > 0 ||
+      Boolean(html && (/<img\b/i.test(html) || /data:image\//i.test(html)));
     if (needsBackup) {
       const full = mapped?.to[0] ? mapped : await getCrmEmail(id);
+      // Always push the full local file set through SendGrid. CRM may have
+      // dropped non-whitelisted types (e.g. .docx) before /send.
       await deliverQueuedCrmEmail(full ?? mapped, { html, files });
     }
   }

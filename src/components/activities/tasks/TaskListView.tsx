@@ -658,7 +658,7 @@ export function TaskListView({
                     ) : (
                       col.label
                     )}
-                  </th>
+                </th>
                 );
               })}
               <th

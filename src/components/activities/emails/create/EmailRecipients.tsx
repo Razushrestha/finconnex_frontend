@@ -1,5 +1,6 @@
 import { ArrowLeft, Minus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isEmailAddress } from "@/lib/emails/address";
 
 interface EmailRecipientsProps {
   to: string[];
@@ -24,8 +25,18 @@ interface EmailRecipientsProps {
   onAddBcc: () => void;
   onRemoveBcc: (val: string) => void;
   error?: string;
-  submitted?: boolean;
+  ccError?: string;
+  bccError?: string;
   onBack?: () => void;
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <p role="alert" className="mt-1 text-xs text-destructive">
+      {message}
+    </p>
+  );
 }
 
 function RecipientChips({
@@ -36,6 +47,7 @@ function RecipientChips({
   onAdd,
   onRemove,
   placeholder,
+  invalid,
 }: {
   label: string;
   values: string[];
@@ -44,29 +56,39 @@ function RecipientChips({
   onAdd: () => void;
   onRemove: (val: string) => void;
   placeholder: string;
+  invalid?: boolean;
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
       <span className="mr-1 shrink-0 text-sm text-muted-foreground">
         {label}
       </span>
-      {values.map((recipient) => (
-        <span
-          key={recipient}
-          className="inline-flex items-center gap-1.5 rounded-full bg-secondary py-1 pr-1.5 pl-2.5 text-sm font-medium text-secondary-foreground"
-        >
-          {recipient}
-          <button
-            type="button"
-            onClick={() => onRemove(recipient)}
-            className="text-muted-foreground hover:text-foreground"
+      {values.map((recipient) => {
+        const ok = isEmailAddress(recipient);
+        return (
+          <span
+            key={recipient}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full py-1 pr-1.5 pl-2.5 text-sm font-medium",
+              ok
+                ? "bg-secondary text-secondary-foreground"
+                : "border border-destructive/40 bg-destructive/10 text-destructive",
+            )}
           >
-            <X className="h-3 w-3" />
-          </button>
-        </span>
-      ))}
+            {recipient}
+            <button
+              type="button"
+              onClick={() => onRemove(recipient)}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        );
+      })}
       <input
         value={draft}
+        aria-invalid={invalid || undefined}
         onChange={(e) => onDraftChange(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === ",") {
@@ -76,7 +98,10 @@ function RecipientChips({
         }}
         onBlur={onAdd}
         placeholder={placeholder}
-        className="min-w-[140px] flex-1 bg-transparent py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+        className={cn(
+          "min-w-[140px] flex-1 bg-transparent py-1 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none",
+          invalid && "text-destructive",
+        )}
       />
     </div>
   );
@@ -127,7 +152,8 @@ export function EmailRecipients({
   onAddBcc,
   onRemoveBcc,
   error,
-  submitted,
+  ccError,
+  bccError,
   onBack,
 }: EmailRecipientsProps) {
   return (
@@ -152,10 +178,9 @@ export function EmailRecipients({
             onAdd={onAddRecipient}
             onRemove={onRemoveRecipient}
             placeholder="Add recipients…"
+            invalid={Boolean(error)}
           />
-          {submitted && error ? (
-            <p className="mt-1 text-xs text-destructive">{error}</p>
-          ) : null}
+          <FieldError message={error} />
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
@@ -184,16 +209,20 @@ export function EmailRecipients({
       {showCc || showBcc ? (
         <div className="divide-y divide-slate-200 bg-slate-50/70">
           {showCc ? (
-            <div className="flex items-center gap-2 px-5 py-3">
-              <RecipientChips
-                label="Cc:"
-                values={cc}
-                draft={ccDraft}
-                onDraftChange={onCcDraftChange}
-                onAdd={onAddCc}
-                onRemove={onRemoveCc}
-                placeholder="Add Cc emails…"
-              />
+            <div className="flex items-start gap-2 px-5 py-3">
+              <div className="min-w-0 flex-1">
+                <RecipientChips
+                  label="Cc:"
+                  values={cc}
+                  draft={ccDraft}
+                  onDraftChange={onCcDraftChange}
+                  onAdd={onAddCc}
+                  onRemove={onRemoveCc}
+                  placeholder="Add Cc emails…"
+                  invalid={Boolean(ccError)}
+                />
+                <FieldError message={ccError} />
+              </div>
               <HideFieldButton
                 label="Cc"
                 visible={cc.length === 0 && !ccDraft.trim()}
@@ -202,16 +231,20 @@ export function EmailRecipients({
             </div>
           ) : null}
           {showBcc ? (
-            <div className="flex items-center gap-2 px-5 py-3">
-              <RecipientChips
-                label="Bcc:"
-                values={bcc}
-                draft={bccDraft}
-                onDraftChange={onBccDraftChange}
-                onAdd={onAddBcc}
-                onRemove={onRemoveBcc}
-                placeholder="Add Bcc emails…"
-              />
+            <div className="flex items-start gap-2 px-5 py-3">
+              <div className="min-w-0 flex-1">
+                <RecipientChips
+                  label="Bcc:"
+                  values={bcc}
+                  draft={bccDraft}
+                  onDraftChange={onBccDraftChange}
+                  onAdd={onAddBcc}
+                  onRemove={onRemoveBcc}
+                  placeholder="Add Bcc emails…"
+                  invalid={Boolean(bccError)}
+                />
+                <FieldError message={bccError} />
+              </div>
               <HideFieldButton
                 label="Bcc"
                 visible={bcc.length === 0 && !bccDraft.trim()}

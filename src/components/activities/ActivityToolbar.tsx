@@ -31,6 +31,7 @@ export interface PrintViewItem {
   key: string;
   label: string;
   premium?: boolean;
+  onSelect?: () => void;
 }
 
 export interface CreateMenuItem {
@@ -531,7 +532,10 @@ export function ActivityToolbar({
                           <button
                             key={item.key}
                             type="button"
-                            onClick={() => setMoreMenuOpen(false)}
+                            onClick={() => {
+                              item.onSelect?.();
+                              setMoreMenuOpen(false);
+                            }}
                             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                           >
                             <span className="flex-1">{item.label}</span>

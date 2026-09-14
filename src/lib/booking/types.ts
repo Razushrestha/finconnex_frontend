@@ -122,9 +122,7 @@ export interface BookingPage {
   consultants?: string[];
   /** Priority per assigned consultant name. */
   consultantPriorities?: Record<string, ConsultantPriority>;
-  /** Synced Calendly event type (workspace UUID). */
   calendlyEventTypeId?: string;
-  /** Preferred Calendly host (workspace UUID). */
   calendlyHostId?: string;
 }
 

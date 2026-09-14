@@ -366,6 +366,6 @@ export function syncCalendarConnection(id: string): Promise<unknown> {
 }
 
 export function calendlyOAuthReturnUrl() {
-  if (typeof window === "undefined") return "/booking?calendly=connected";
-  return `${window.location.origin}/booking?calendly=connected`;
+  if (typeof window === "undefined") return "/settings/integrations/calendly";
+  return `${window.location.origin}/settings/integrations/calendly`;
 }

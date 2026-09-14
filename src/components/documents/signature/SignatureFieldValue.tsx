@@ -22,14 +22,14 @@ export function SignatureFieldValue({ field }: { field: SignatureField }) {
       <img
         src={field.value}
         alt=""
-        className="h-full max-h-8 w-full object-contain"
+        className="h-full max-h-8 w-full object-contain brightness-0 contrast-150"
       />
     );
   }
 
   if (isSignatureCaptureKind(field.kind) && field.value.startsWith("typed:")) {
     return (
-      <span className="font-serif text-[12px] leading-tight text-slate-800">
+      <span className="font-serif text-[13px] font-extrabold leading-tight text-black">
         {field.value.replace(/^typed:/, "")}
       </span>
     );

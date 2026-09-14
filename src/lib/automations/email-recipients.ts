@@ -14,6 +14,9 @@
  * carry an address of their own.
  */
 import type { AutomationEntityType } from "@/lib/automations/types";
+import { isEmailAddress } from "@/lib/emails/address";
+
+export { isEmailAddress };
 
 /** Mirrors `seen.size > 50` in EmailService.normalizeRecipients. */
 export const MAX_EMAIL_RECIPIENTS = 50;
@@ -44,17 +47,6 @@ export function isTriggerEmailToken(value: unknown): boolean {
     typeof value === "string" &&
     TRIGGER_EMAIL_TOKENS.has(value.trim().toLowerCase())
   );
-}
-
-/**
- * Deliberately the same shape the backend accepts (`class-validator`'s
- * `isEmail`), not a stricter one: rejecting an address the API would have
- * taken is its own kind of bug.
- */
-export function isEmailAddress(value: string): boolean {
-  const address = value.trim();
-  if (!address || /\s/.test(address)) return false;
-  return /^[^@]+@[^@.]+(\.[^@.]+)+$/.test(address);
 }
 
 /** A stored `cc` / `bcc` string as a list, deduped case-insensitively. */

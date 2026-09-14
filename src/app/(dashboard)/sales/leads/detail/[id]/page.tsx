@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LeadDetailView } from "@/components/sales/leads/LeadDetailView";
-import { findLeadById } from "@/lib/leads/store";
+import { findLeadById, upsertLeadFromCard } from "@/lib/leads/store";
 import { findLeadCardById } from "@/lib/leads/types";
 import {
   fetchLeadById,
@@ -10,7 +10,6 @@ import {
   hydrateCrmLeadRelated,
   mapCrmLeadToCard,
 } from "@/lib/leads/api";
-import { upsertLeadFromCard } from "@/lib/leads/store";
 import {
   listCrmCustomFieldValues,
   tryCrmCustomField,
@@ -83,9 +82,9 @@ export default function LeadDetailPage() {
               : {}),
           },
         };
-        upsertLeadFromCard(next);
+        const saved = upsertLeadFromCard(next);
         await hydrateCrmLeadRelated(next.id, next.name);
-        setCard(next);
+        setCard(saved);
       } finally {
         if (!cancelled) setLoading(false);
       }

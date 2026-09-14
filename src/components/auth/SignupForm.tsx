@@ -5,6 +5,11 @@ import Link from "next/link";
 import { CheckCircle2, Loader2, ShieldCheck, UserPlus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import {
+  clearPendingVerificationEmail,
+  getPendingVerificationEmail,
+  setPendingVerificationEmail,
+} from "@/lib/auth/pending-verification";
 
 export function SignupForm() {
   const [firstName, setFirstName] = React.useState("");
@@ -18,6 +23,78 @@ export function SignupForm() {
   );
   const [otp, setOtp] = React.useState("");
   const [isVerified, setIsVerified] = React.useState(false);
+  const [resendNote, setResendNote] = React.useState<string | null>(null);
+  const [resending, setResending] = React.useState(false);
+  const [resendCooldownUntil, setResendCooldownUntil] = React.useState(0);
+  const [needsPasswordForLogin, setNeedsPasswordForLogin] = React.useState(false);
+  const [, setTick] = React.useState(0);
+
+  React.useEffect(() => {
+    const pending = getPendingVerificationEmail();
+    if (pending) {
+      setSubmittedEmail(pending);
+      setNeedsPasswordForLogin(true);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (Date.now() >= resendCooldownUntil) return;
+    const id = window.setInterval(() => setTick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [resendCooldownUntil]);
+
+  const resendCooldownSeconds = Math.max(
+    0,
+    Math.ceil((resendCooldownUntil - Date.now()) / 1000),
+  );
+
+  function useDifferentEmail() {
+    clearPendingVerificationEmail();
+    setSubmittedEmail(null);
+    setEmail("");
+    setPassword("");
+    setOtp("");
+    setError(null);
+    setResendNote(null);
+    setIsVerified(false);
+    setNeedsPasswordForLogin(false);
+    setResendCooldownUntil(0);
+  }
+
+  async function resendSignupCode() {
+    if (!submittedEmail || resendCooldownSeconds > 0) return;
+    setResending(true);
+    setResendNote(null);
+    setError(null);
+    try {
+      const response = await fetch("/api/auth/resend-signup-otp", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: submittedEmail }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(
+          (data as { error?: string }).error ??
+            "Unable to resend the code. Try again.",
+        );
+        if (response.status === 429) {
+          setResendCooldownUntil(Date.now() + 60_000);
+        }
+      } else {
+        setResendNote(
+          (data as { message?: string }).message ??
+            "Signup code requested. Check inbox/spam — CRM sends it, not local SendGrid.",
+        );
+        setResendCooldownUntil(Date.now() + 60_000);
+      }
+    } catch {
+      setError("Network error. Check your connection and try again.");
+    } finally {
+      setResending(false);
+    }
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,7 +136,9 @@ export function SignupForm() {
         return;
       }
 
-      setSubmittedEmail(email.trim());
+      const trimmedEmail = email.trim();
+      setPendingVerificationEmail(trimmedEmail);
+      setSubmittedEmail(trimmedEmail);
       setIsLoading(false);
     } catch {
       setError("Network error. Check your connection and try again.");
@@ -74,6 +153,10 @@ export function SignupForm() {
 
     if (!otp.trim()) {
       setError("Enter your verification code.");
+      return;
+    }
+    if (!password) {
+      setError("Enter the password you used at signup so we can sign you in.");
       return;
     }
 
@@ -94,6 +177,43 @@ export function SignupForm() {
           (data as { error?: string }).error ??
             "Unable to verify. Please try again.",
         );
+        setIsLoading(false);
+        return;
+      }
+
+      clearPendingVerificationEmail();
+
+      // Same password is still in memory from signup — sign in immediately so
+      // local matches Vercel (verified account → session cookies).
+      if (password && submittedEmail) {
+        const loginResponse = await fetch("/api/auth/login", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: submittedEmail,
+            password,
+            rememberMe: true,
+          }),
+        });
+        const loginData = await loginResponse.json().catch(() => ({}));
+        if (loginResponse.ok) {
+          const payload = loginData as {
+            needsWorkspace?: boolean;
+            isPlatformAdmin?: boolean;
+          };
+          window.location.href = payload.isPlatformAdmin
+            ? "/platform"
+            : payload.needsWorkspace
+              ? "/create-workspace"
+              : "/";
+          return;
+        }
+        setError(
+          (loginData as { error?: string }).error ??
+            "Account verified, but sign-in failed. Try signing in manually.",
+        );
+        setIsVerified(true);
         setIsLoading(false);
         return;
       }
@@ -144,6 +264,9 @@ export function SignupForm() {
             <p className="mt-1 text-sm text-gray-500">
               Confirm the account for{" "}
               <span className="font-medium text-gray-700">{submittedEmail}</span>.
+              The code is emailed by FinConnex CRM (not this local app) — check
+              Spam/Promotions. If nothing arrives, use the same account that
+              already works on Vercel, or ask backend to fix CRM mail workers.
             </p>
           </div>
         </div>
@@ -156,6 +279,9 @@ export function SignupForm() {
             {error}
           </div>
         )}
+        {resendNote ? (
+          <p className="text-sm text-emerald-700">{resendNote}</p>
+        ) : null}
 
         <div className="space-y-1.5">
           <label htmlFor="otp" className="block text-sm font-medium text-gray-700">
@@ -177,6 +303,28 @@ export function SignupForm() {
           />
         </div>
 
+        {needsPasswordForLogin ? (
+          <div className="space-y-1.5">
+            <label
+              htmlFor="signup-password-confirm"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Password (to sign you in after verify)
+            </label>
+            <Input
+              id="signup-password-confirm"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              placeholder="Same password you used to sign up"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={isLoading}
+              required
+            />
+          </div>
+        ) : null}
+
         <button
           type="submit"
           disabled={isLoading}
@@ -193,6 +341,28 @@ export function SignupForm() {
           ) : (
             "Verify account"
           )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => void resendSignupCode()}
+          disabled={resending || isLoading || resendCooldownSeconds > 0}
+          className="block w-full text-center text-sm font-medium text-violet-600 hover:text-violet-700 disabled:opacity-50"
+        >
+          {resending
+            ? "Sending code…"
+            : resendCooldownSeconds > 0
+              ? `Resend available in ${resendCooldownSeconds}s`
+              : "Resend signup code"}
+        </button>
+
+        <button
+          type="button"
+          onClick={useDifferentEmail}
+          disabled={isLoading}
+          className="block w-full text-center text-sm font-medium text-violet-600 hover:text-violet-700 disabled:opacity-50"
+        >
+          Use a different email
         </button>
 
         <Link

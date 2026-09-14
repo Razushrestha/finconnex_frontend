@@ -23,6 +23,9 @@ import {
 import { isPlatformAdminRole } from "@/lib/auth/platform";
 
 function friendlyAuthMessage(raw: string, status?: number) {
+  if (status === 429) {
+    return "Too many sign-in attempts. Wait a few minutes, then try again.";
+  }
   if (status === 502 || status === 503 || status === 504) {
     return "FinConnex CRM is unavailable (bad gateway). Try again when the API is back.";
   }
@@ -35,8 +38,11 @@ function friendlyAuthMessage(raw: string, status?: number) {
   ) {
     return "FinConnex CRM is unavailable (bad gateway). Try again when the API is back.";
   }
+  if (key.includes("too many")) {
+    return "Too many sign-in attempts. Wait a few minutes, then try again.";
+  }
   if (key.includes("invalid") || key.includes("unauthorized") || key.includes("credential")) {
-    return "Invalid email or password.";
+    return "Invalid email or password. If you just signed up, verify your account with the code from your email before signing in.";
   }
   if (key.includes("verified") || key.includes("verification")) {
     return "Please verify your email before signing in.";
@@ -109,7 +115,14 @@ export async function POST(request: Request) {
         : await activateWorkspace(
             loggedIn.accessToken,
             loggedIn.refreshToken,
-          );
+          ).catch(() => ({
+            accessToken: loggedIn.accessToken,
+            refreshToken: loggedIn.refreshToken,
+            workspace: null,
+            workspaces: [] as Awaited<
+              ReturnType<typeof activateWorkspace>
+            >["workspaces"],
+          }));
       // The login response predates workspace selection, so it carries no
       // workspace role. Read it against the now-scoped token, otherwise a
       // user who owns the workspace they were just dropped into would sit in

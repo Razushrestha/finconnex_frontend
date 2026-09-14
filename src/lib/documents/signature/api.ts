@@ -9,6 +9,8 @@ import {
   makeSigner,
   upsertSignatureRequest,
   deleteSignatureRequest,
+  getRequestDocuments,
+  getSignatureRequestById,
   type SignatureRequest,
   type SignatureSigner,
   type SignatureStatus,
@@ -494,9 +496,41 @@ export async function tryCrmSignatureRequest<T>(
   }
 }
 
+function keepFileUrl(url?: string): string | undefined {
+  if (!url || url.startsWith("blob:")) return undefined;
+  return url;
+}
+
 export function persistRemoteSignatureRequest(row: SignatureRequest | null) {
-  if (row) upsertSignatureRequest(row, { allowEmptyFields: true });
-  return row;
+  if (!row) return row;
+  const existing = getSignatureRequestById(row.id);
+  if (!existing) {
+    upsertSignatureRequest(row, { allowEmptyFields: true });
+    return row;
+  }
+  const existingDocs = getRequestDocuments(existing);
+  const remoteDocs = getRequestDocuments(row);
+  const documents = (remoteDocs.length ? remoteDocs : existingDocs).map(
+    (doc) => {
+      const match = existingDocs.find((item) => item.id === doc.id);
+      return {
+        ...doc,
+        fileUrl: keepFileUrl(doc.fileUrl) || match?.fileUrl,
+      };
+    },
+  );
+  return upsertSignatureRequest(
+    {
+      ...existing,
+      ...row,
+      documents,
+      documentFileUrl:
+        keepFileUrl(row.documentFileUrl) || existing.documentFileUrl,
+      fields: row.fields?.length ? row.fields : existing.fields,
+      signers: row.signers?.length ? row.signers : existing.signers,
+    },
+    { allowEmptyFields: true },
+  );
 }
 
 export async function syncCrmSignatureDraft(
@@ -525,7 +559,22 @@ export async function syncCrmSignatureDraft(
     fields: draft.fields,
     signers: draft.signers.length ? draft.signers : remote.signers,
     recordType: draft.recordType ?? "document",
+    documents: getRequestDocuments(draft).map((doc) => ({
+      ...doc,
+      fileUrl: doc.fileUrl,
+    })),
+    documentFileUrl: draft.documentFileUrl,
   });
+  if (merged && merged.id !== draft.id) {
+    const { copyCachedSignatureFiles } = await import(
+      "@/lib/documents/signature/file-cache"
+    );
+    await copyCachedSignatureFiles(
+      draft.id,
+      merged.id,
+      getRequestDocuments(draft).map((doc) => doc.id),
+    );
+  }
   if (merged && draft.fields.length) {
     await tryCrmSignatureRequest(() =>
       placeCrmSignatureFields(merged.id, { ...merged, fields: draft.fields }),

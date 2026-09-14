@@ -30,7 +30,7 @@ import {
   type MeetingMode,
   type MeetingVia,
 } from "@/lib/booking/types";
-import { listCalendlyHosts } from "@/lib/booking/calendly-api";
+import { loadAssignableOwners } from "@/lib/users/assignable";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import {
   Field,
@@ -116,19 +116,15 @@ export function ConsultationSetup({
 
   useEffect(() => {
     let alive = true;
-    void listCalendlyHosts()
-      .then((hosts) => {
+    void loadAssignableOwners()
+      .then((owners) => {
         if (!alive) return;
         setApiConsultants(
-          hosts.map((host) => ({
-            id: host.id,
-            name: host.name,
-            role: host.isHomeConsultant
-              ? "Home consultant"
-              : host.isConsultant
-                ? "Consultant"
-                : "Host",
-            email: host.email,
+          owners.map((owner) => ({
+            id: owner.id,
+            name: owner.name,
+            role: "Consultant",
+            email: owner.email,
           })),
         );
       })
@@ -448,7 +444,7 @@ export function ConsultationSetup({
                 {filteredConsultants.length === 0 ? (
                   <p className="px-2 py-3 text-center text-[12px] text-slate-400">
                     {apiConsultants.length === 0
-                      ? "No Calendly hosts yet."
+                      ? "No workspace members yet."
                       : "No matches"}
                   </p>
                 ) : (

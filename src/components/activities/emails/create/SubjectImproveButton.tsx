@@ -10,8 +10,6 @@ interface SubjectImproveButtonProps {
   current: string;
   body?: string;
   recipientName?: string;
-  dealTitle?: string;
-  dealStage?: string;
   onPick: (subject: string) => void;
 }
 
@@ -19,8 +17,6 @@ export function SubjectImproveButton({
   current,
   body,
   recipientName,
-  dealTitle,
-  dealStage,
   onPick,
 }: SubjectImproveButtonProps) {
   const [open, setOpen] = useState(false);
@@ -47,8 +43,6 @@ export function SubjectImproveButton({
         subject: current,
         html: body,
         recipientName,
-        dealTitle,
-        dealStage,
       });
       setSuggestions(rows);
     } catch (err) {

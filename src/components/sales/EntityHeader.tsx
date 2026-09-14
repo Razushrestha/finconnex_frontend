@@ -14,6 +14,7 @@ import {
   MoreVertical,
   GripVertical,
   ArrowUpDown,
+  Pencil,
 } from "lucide-react";
 import { SearchInput } from "../ui/search-input";
 
@@ -35,6 +36,8 @@ export interface ColumnOption {
   id: string;
   label: string;
   visible: boolean;
+  /** When false, the stage cannot be removed from the board. */
+  required?: boolean;
 }
 
 export interface ImportOption {
@@ -88,6 +91,8 @@ export interface EntityHeaderProps {
   columnOptions?: ColumnOption[];
   onColumnToggle?: (columnId: string) => void;
   onColumnReorder?: (draggedId: string, targetId: string) => void;
+  /** Rename a stage / column title (e.g. prompt + save). */
+  onColumnRename?: (columnId: string, nextLabel: string) => void;
 
   actionOptions?: ActionOption[];
 
@@ -127,6 +132,7 @@ export function EntityHeader({
   columnOptions,
   onColumnToggle,
   onColumnReorder,
+  onColumnRename,
   actionOptions,
   footerOptions,
   importOptions,
@@ -140,6 +146,8 @@ export function EntityHeader({
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
+  const [isStagesOpen, setIsStagesOpen] = useState(false);
+  const [isAddStageOpen, setIsAddStageOpen] = useState(false);
   const [search, setSearch] = useState("");
 
   const moreMenuRef = useRef<HTMLDivElement>(null);
@@ -165,6 +173,8 @@ export function EntityHeader({
         !moreMenuRef.current.contains(e.target as Node)
       ) {
         setIsMoreMenuOpen(false);
+        setIsStagesOpen(false);
+        setIsAddStageOpen(false);
       }
       if (
         sortMenuRef.current &&
@@ -474,7 +484,16 @@ export function EntityHeader({
             <div className="relative" ref={moreMenuRef}>
               <button
                 type="button"
-                onClick={() => setIsMoreMenuOpen((open) => !open)}
+                onClick={() => {
+                  setIsMoreMenuOpen((open) => {
+                    const next = !open;
+                    if (!next) {
+                      setIsStagesOpen(false);
+                      setIsAddStageOpen(false);
+                    }
+                    return next;
+                  });
+                }}
                 aria-label="More options"
                 aria-pressed={isMoreMenuOpen}
                 aria-haspopup="true"
@@ -494,69 +513,171 @@ export function EntityHeader({
                   onMouseDown={(e) => e.stopPropagation()}
                 >
                   {columnOptions && columnOptions.length > 0 ? (
-                    <>
-                      <p className="px-2 py-1 text-[13px] font-semibold tracking-wide text-slate-400 uppercase">
-                        Stages
-                      </p>
-                      <div className="max-h-64 overflow-y-auto">
-                        {columnOptions.map((col) => (
-                          <div
-                            key={col.id}
-                            draggable={!!onColumnReorder}
-                            onDragStart={(e) => {
-                              setDraggedColumnId(col.id);
-                              e.dataTransfer.effectAllowed = "move";
-                            }}
-                            onDragOver={(e) => {
-                              if (!draggedColumnId) return;
-                              e.preventDefault();
-                              if (dragOverColumnId !== col.id) {
-                                setDragOverColumnId(col.id);
-                              }
-                            }}
-                            onDragLeave={() =>
-                              setDragOverColumnId((prev) =>
-                                prev === col.id ? null : prev,
-                              )
-                            }
-                            onDrop={(e) => {
-                              e.preventDefault();
-                              if (
-                                draggedColumnId &&
-                                draggedColumnId !== col.id
-                              ) {
-                                onColumnReorder?.(draggedColumnId, col.id);
-                              }
-                              setDraggedColumnId(null);
-                              setDragOverColumnId(null);
-                            }}
-                            onDragEnd={() => {
-                              setDraggedColumnId(null);
-                              setDragOverColumnId(null);
-                            }}
-                            className={`flex items-center gap-1 rounded border-t-2 ${
-                              dragOverColumnId === col.id &&
-                              draggedColumnId !== col.id
-                                ? "border-violet-400"
-                                : "border-transparent"
-                            } ${draggedColumnId === col.id ? "opacity-40" : ""}`}
-                          >
-                            {onColumnReorder ? (
-                              <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-slate-300 active:cursor-grabbing" />
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsStagesOpen((open) => {
+                            const next = !open;
+                            if (!next) setIsAddStageOpen(false);
+                            return next;
+                          });
+                        }}
+                        aria-expanded={isStagesOpen}
+                        aria-haspopup="true"
+                        className="flex w-full items-center justify-between rounded px-2 py-2 text-left text-[14px] font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-zinc-800"
+                      >
+                        <span>Stages</span>
+                        <ChevronDown
+                          className={`h-3.5 w-3.5 text-slate-400 transition-transform ${
+                            isStagesOpen ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+
+                      {isStagesOpen ? (
+                        <div className="mt-0.5 rounded-md border border-slate-100 bg-slate-50/80 p-1 dark:border-zinc-800 dark:bg-zinc-950/40">
+                          <div className="max-h-52 overflow-y-auto">
+                            {columnOptions
+                              .filter((col) => col.visible)
+                              .map((col) => (
+                                <div
+                                  key={col.id}
+                                  draggable={!!onColumnReorder}
+                                  onDragStart={(e) => {
+                                    setDraggedColumnId(col.id);
+                                    e.dataTransfer.effectAllowed = "move";
+                                  }}
+                                  onDragOver={(e) => {
+                                    if (!draggedColumnId) return;
+                                    e.preventDefault();
+                                    if (dragOverColumnId !== col.id) {
+                                      setDragOverColumnId(col.id);
+                                    }
+                                  }}
+                                  onDragLeave={() =>
+                                    setDragOverColumnId((prev) =>
+                                      prev === col.id ? null : prev,
+                                    )
+                                  }
+                                  onDrop={(e) => {
+                                    e.preventDefault();
+                                    if (
+                                      draggedColumnId &&
+                                      draggedColumnId !== col.id
+                                    ) {
+                                      onColumnReorder?.(
+                                        draggedColumnId,
+                                        col.id,
+                                      );
+                                    }
+                                    setDraggedColumnId(null);
+                                    setDragOverColumnId(null);
+                                  }}
+                                  onDragEnd={() => {
+                                    setDraggedColumnId(null);
+                                    setDragOverColumnId(null);
+                                  }}
+                                  className={`flex items-center gap-1 rounded border-t-2 ${
+                                    dragOverColumnId === col.id &&
+                                    draggedColumnId !== col.id
+                                      ? "border-violet-400"
+                                      : "border-transparent"
+                                  } ${draggedColumnId === col.id ? "opacity-40" : ""}`}
+                                >
+                                  {onColumnReorder ? (
+                                    <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-slate-300 active:cursor-grabbing" />
+                                  ) : null}
+                                  <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-[13px] text-slate-700 hover:bg-white dark:text-slate-200 dark:hover:bg-zinc-800">
+                                    <input
+                                      type="checkbox"
+                                      checked
+                                      disabled={col.required}
+                                      onChange={() =>
+                                        onColumnToggle?.(col.id)
+                                      }
+                                      className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-400 disabled:opacity-50 dark:border-zinc-600"
+                                    />
+                                    <span className="truncate">{col.label}</span>
+                                  </label>
+                                  {onColumnRename ? (
+                                    <button
+                                      type="button"
+                                      title={`Edit ${col.label}`}
+                                      aria-label={`Edit ${col.label}`}
+                                      onClick={() => {
+                                        const next = window.prompt(
+                                          "Stage title",
+                                          col.label,
+                                        );
+                                        const trimmed = next?.trim();
+                                        if (!trimmed || trimmed === col.label) {
+                                          return;
+                                        }
+                                        onColumnRename(col.id, trimmed);
+                                      }}
+                                      className="rounded p-1 text-slate-400 hover:bg-white hover:text-slate-700 dark:hover:bg-zinc-800 dark:hover:text-slate-200"
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </button>
+                                  ) : null}
+                                </div>
+                              ))}
+                            {columnOptions.every((col) => !col.visible) ? (
+                              <p className="px-2 py-2 text-[12px] text-slate-400">
+                                No stages on the board
+                              </p>
                             ) : null}
-                            <label className="flex flex-1 cursor-pointer items-center gap-2 rounded px-2 py-2 text-[14px] text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-zinc-800">
-                              <input
-                                type="checkbox"
-                                checked={col.visible}
-                                onChange={() => onColumnToggle?.(col.id)}
-                                className="h-3.5 w-3.5 rounded border-slate-300 text-violet-600 focus:ring-violet-400 dark:border-zinc-600"
-                              />
-                              {col.label}
-                            </label>
                           </div>
-                        ))}
-                      </div>
-                    </>
+
+                          <div className="relative mt-1 border-t border-slate-200 pt-1 dark:border-zinc-800">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setIsAddStageOpen((open) => !open)
+                              }
+                              aria-expanded={isAddStageOpen}
+                              className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-[13px] font-medium text-violet-700 hover:bg-white dark:text-violet-300 dark:hover:bg-zinc-800"
+                            >
+                              <span className="inline-flex items-center gap-1.5">
+                                <Plus className="h-3.5 w-3.5" />
+                                Add stage
+                              </span>
+                              <ChevronDown
+                                className={`h-3.5 w-3.5 transition-transform ${
+                                  isAddStageOpen ? "rotate-180" : ""
+                                }`}
+                              />
+                            </button>
+
+                            {isAddStageOpen ? (
+                              <div className="mt-0.5 max-h-40 overflow-y-auto rounded-md border border-slate-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
+                                {columnOptions
+                                  .filter((col) => !col.visible)
+                                  .map((col) => (
+                                    <button
+                                      key={col.id}
+                                      type="button"
+                                      onClick={() => {
+                                        onColumnToggle?.(col.id);
+                                        setIsAddStageOpen(false);
+                                      }}
+                                      className="flex w-full items-center rounded px-2 py-1.5 text-left text-[13px] text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-zinc-800"
+                                    >
+                                      {col.label}
+                                    </button>
+                                  ))}
+                                {columnOptions.every((col) => col.visible) ? (
+                                  <p className="px-2 py-2 text-[12px] text-slate-400">
+                                    All stages are already added
+                                  </p>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                   ) : null}
 
                   {columnOptions &&
@@ -577,6 +698,8 @@ export function EntityHeader({
                             e.stopPropagation();
                             opt.onClick();
                             setIsMoreMenuOpen(false);
+                            setIsStagesOpen(false);
+                            setIsAddStageOpen(false);
                           }}
                           className="flex items-center gap-2 rounded px-2 py-2 text-left text-[14px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-200 dark:hover:bg-zinc-800"
                         >
@@ -600,6 +723,8 @@ export function EntityHeader({
                               e.stopPropagation();
                               opt.onClick();
                               setIsMoreMenuOpen(false);
+                              setIsStagesOpen(false);
+                              setIsAddStageOpen(false);
                             }}
                             className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-[14px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:text-slate-200 dark:hover:bg-zinc-800"
                           >

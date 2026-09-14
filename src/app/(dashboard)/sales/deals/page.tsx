@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Sparkles,
   ArrowLeftRight,
@@ -23,6 +24,7 @@ import {
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import { DealsKanbanBoard } from "@/components/sales/deals/DealsKanbanBoard";
 import { DealsListView } from "@/components/sales/deals/DealsListView";
+import { CreateDealForm } from "@/components/sales/deals/CreateDealForm";
 import {
   DEAL_CURRENCIES,
   DEAL_PIPELINES,
@@ -33,6 +35,7 @@ import {
 } from "@/lib/deals/types";
 import {
   listDealPipelines,
+  saveDealPipelines,
   deleteDeals,
   updateDealOwners,
 } from "@/lib/deals/store";
@@ -97,6 +100,7 @@ const DEAL_FIELDS: KanbanField[] = [
 ];
 
 export default function DealsPage() {
+  const router = useRouter();
   const crm = useCrmDeals();
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
@@ -115,6 +119,18 @@ export default function DealsPage() {
     useState<SortDirection>("asc");
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("create") !== "1") return;
+    setCreateOpen(true);
+    router.replace("/sales/deals", { scroll: false });
+  }, [router]);
+
+  function openCreateDeal() {
+    setCreateOpen(true);
+  }
 
   // Selection state for deals across columns/list items
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -168,12 +184,73 @@ export default function DealsPage() {
               "tag",
             ],
             editableFieldIds: ["dealOwner"],
+            selectedStageIds: DEAL_PIPELINE_STAGES[pipeline].map((s) => s.id),
+            stageLabels: {},
           },
         ]),
       ) as Record<DealPipeline, KanbanViewConfig>,
   );
 
   const activeViewConfig = viewConfigs[activePipeline];
+
+  function updateActiveViewConfig(
+    patch: Partial<KanbanViewConfig>,
+    closeSettings = false,
+  ) {
+    setViewConfigs((prev) => ({
+      ...prev,
+      [activePipeline]: {
+        ...prev[activePipeline],
+        ...patch,
+      },
+    }));
+    if (closeSettings) setIsSettingsOpen(false);
+  }
+
+  function applyStageVisibility(
+    stageIds: string[],
+    pipeline: DealPipeline = activePipeline,
+  ) {
+    const allowed = new Set(stageIds);
+    const next = { ...allStages };
+    const stages = next[pipeline] ?? [];
+    const mapped = stages.map((stage, index) => ({
+      ...stage,
+      visible: allowed.has(stage.id) || (index === 0 && !allowed.size),
+    }));
+    if (!mapped.some((stage) => stage.visible ?? true)) {
+      if (mapped[0]) mapped[0] = { ...mapped[0], visible: true };
+    }
+    next[pipeline] = mapped;
+    setAllStages(next);
+    saveDealPipelines(next);
+  }
+
+  function toggleDealStageColumn(columnId: string) {
+    const stages = currentPipelineStages;
+    const target = stages.find((stage) => stage.id === columnId);
+    if (!target) return;
+    const index = stages.findIndex((stage) => stage.id === columnId);
+    const isVisible = target.visible ?? true;
+    if (index === 0 && isVisible) return;
+    const nextIds = stages
+      .filter((stage) =>
+        stage.id === columnId ? !isVisible : stage.visible ?? true,
+      )
+      .map((stage) => stage.id);
+    if (!nextIds.length) return;
+    applyStageVisibility(nextIds);
+    updateActiveViewConfig({ selectedStageIds: nextIds });
+  }
+
+  function renameDealStageColumn(columnId: string, nextLabel: string) {
+    updateActiveViewConfig({
+      stageLabels: {
+        ...(activeViewConfig.stageLabels ?? {}),
+        [columnId]: nextLabel,
+      },
+    });
+  }
 
   function exportTasks() {
     const n = exportDealsCsv({ pipeline: activePipeline });
@@ -229,12 +306,29 @@ export default function DealsPage() {
 
   // Transform current pipeline stages into column options format required by EntityHeader
   const columnOptions = useMemo(() => {
-    return currentPipelineStages.map((stage) => ({
+    const labels = activeViewConfig.stageLabels ?? {};
+    return currentPipelineStages.map((stage, index) => ({
       id: stage.id,
-      label: stage.title,
+      label: labels[stage.id] ?? stage.title,
       visible: stage.visible ?? true,
+      required: index === 0,
     }));
-  }, [currentPipelineStages]);
+  }, [currentPipelineStages, activeViewConfig.stageLabels]);
+
+  const dealColumnTitles = useMemo(
+    () => activeViewConfig.stageLabels ?? {},
+    [activeViewConfig.stageLabels],
+  );
+
+  const dealAvailableStages = useMemo(
+    () =>
+      currentPipelineStages.map((stage) => ({
+        id: stage.id,
+        label: activeViewConfig.stageLabels?.[stage.id] ?? stage.title,
+        required: stage.id === currentPipelineStages[0]?.id,
+      })),
+    [currentPipelineStages, activeViewConfig.stageLabels],
+  );
 
   const visibleColumnIds = useMemo(() => {
     return columnOptions.filter((c) => c.visible).map((c) => c.id);
@@ -243,8 +337,11 @@ export default function DealsPage() {
   const stageOptions = useMemo(() => {
     return currentPipelineStages
       .filter((stage) => stage.visible ?? true)
-      .map((stage) => stage.title);
-  }, [currentPipelineStages]);
+      .map(
+        (stage) =>
+          activeViewConfig.stageLabels?.[stage.id] ?? stage.title,
+      );
+  }, [currentPipelineStages, activeViewConfig.stageLabels]);
 
   const allVisibleDealIds = useMemo(() => {
     const ids: string[] = [];
@@ -382,6 +479,7 @@ export default function DealsPage() {
       <EntityHeader
         entityLabel="Deal"
         createRoute="/sales/deals/create"
+        onCreate={openCreateDeal}
         totalCount={totalCount}
         viewMode={viewMode}
         onViewChange={setViewMode}
@@ -404,6 +502,13 @@ export default function DealsPage() {
         importOptions={importOptions}
         actionOptions={actionOptions}
         footerOptions={footerOptions}
+        columnOptions={viewMode === "kanban" ? columnOptions : undefined}
+        onColumnToggle={
+          viewMode === "kanban" ? toggleDealStageColumn : undefined
+        }
+        onColumnRename={
+          viewMode === "kanban" ? renameDealStageColumn : undefined
+        }
       />
 
       {selectedIds.length > 0 ? (
@@ -475,20 +580,36 @@ export default function DealsPage() {
       )}
       {isSettingsOpen && (
         <KanbanViewSettingsModal
-          view={activeViewConfig}
+          view={{
+            ...activeViewConfig,
+            selectedStageIds: visibleColumnIds,
+          }}
           availableFields={DEAL_FIELDS}
+          availableStages={dealAvailableStages}
           categorizeByOptions={["Stage", "Lender", "Broker"]}
           aggregateByOptions={["Loan Amount", "Deal Count", "Commission"]}
           headerStyleOptions={["Multi Colour", "Single Colour", "None"]}
           onClose={() => setIsSettingsOpen(false)}
           onSave={(next) => {
-            setViewConfigs((prev) => ({ ...prev, [activePipeline]: next }));
-            setIsSettingsOpen(false);
-            // e.g. api.updateKanbanView(activePipeline, next);
+            const stageIds =
+              next.selectedStageIds?.length
+                ? next.selectedStageIds
+                : visibleColumnIds;
+            applyStageVisibility(stageIds);
+            updateActiveViewConfig(
+              {
+                ...next,
+                selectedStageIds: stageIds,
+                stageLabels: {
+                  ...(activeViewConfig.stageLabels ?? {}),
+                  ...(next.stageLabels ?? {}),
+                },
+              },
+              true,
+            );
           }}
           onDelete={() => {
             setIsSettingsOpen(false);
-            // e.g. api.deleteKanbanView(activePipeline);
           }}
         />
       )}
@@ -514,8 +635,10 @@ export default function DealsPage() {
               pipeline={activePipeline}
               filters={filters}
               visibleColumnIds={visibleColumnIds}
+              columnTitles={dealColumnTitles}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
+              onAddDeal={() => openCreateDeal()}
               sortValue={activeSort}
               sortDirection={activeSortDirection}
             />
@@ -573,6 +696,15 @@ export default function DealsPage() {
           setBulkFlash(
             `Imported ${s.imported} · updated ${s.updated} · skipped ${s.skipped}`,
           );
+        }}
+      />
+
+      <CreateDealForm
+        variant="modal"
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={() => {
+          crm.refresh();
         }}
       />
     </div>

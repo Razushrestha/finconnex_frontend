@@ -107,6 +107,7 @@ export function createEmail(input: {
     attachments: input.attachments?.length
       ? input.attachments.map((a) => ({ ...a }))
       : undefined,
+    outbound: input.status !== "Draft",
   };
   return upsertEmail(email);
 }
@@ -160,8 +161,10 @@ export function mergeCrmEmails(remote: Email[]) {
 }
 
 export function replaceCrmEmails(remote: Email[]) {
+  const previous = listEmails();
+  const previousById = new Map(previous.map((row) => [row.id, row]));
   const remoteIds = new Set(remote.map((row) => row.id));
-  const extras = listEmails().filter((row) => {
+  const extras = previous.filter((row) => {
     if (isDemoSeedId(row.id)) return false;
     if (remoteIds.has(row.id)) return false;
     if (!remote.length) return true;
@@ -172,5 +175,23 @@ export function replaceCrmEmails(remote: Email[]) {
     );
     return !duplicate;
   });
-  saveEmails([...remote.map(cloneEmail), ...extras.map(cloneEmail)]);
+  const mergedRemote = remote.map((row) => {
+    const local = previousById.get(row.id);
+    if (!local) return cloneEmail(row);
+    const keepSent =
+      local.outbound &&
+      (local.status === "Sent" ||
+        local.status === "Delivered" ||
+        local.status === "Opened") &&
+      (row.status === "Draft" || row.status === "Failed");
+    return cloneEmail({
+      ...row,
+      outbound: local.outbound || row.outbound,
+      status: keepSent ? local.status : row.status,
+      sentDate: row.sentDate || local.sentDate,
+      from: row.from || local.from,
+      to: row.to.length ? row.to : local.to,
+    });
+  });
+  saveEmails([...mergedRemote, ...extras.map(cloneEmail)]);
 }

@@ -1,4 +1,4 @@
-import { CreateDealForm } from "@/components/sales/deals/CreateDealForm";
+import { redirect } from "next/navigation";
 
 interface CreateDealPageProps {
   searchParams: Promise<{ layoutid?: string; redirect?: string }>;
@@ -7,9 +7,6 @@ interface CreateDealPageProps {
 export default async function CreateDealPage({
   searchParams,
 }: CreateDealPageProps) {
-  const params = await searchParams;
-  const layoutId = params.layoutid ?? "standard";
-  const redirect = params.redirect === "true";
-
-  return <CreateDealForm layoutId={layoutId} redirect={redirect} />;
+  void (await searchParams);
+  redirect("/sales/deals?create=1");
 }

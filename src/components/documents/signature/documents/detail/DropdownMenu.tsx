@@ -19,7 +19,7 @@ interface DropdownMenuProps {
   align?: "left" | "right";
 }
 
-const MENU_WIDTH = 224; // w-56
+const MENU_WIDTH = 248;
 
 export const DropdownMenu: React.FC<DropdownMenuProps> = ({
   trigger,

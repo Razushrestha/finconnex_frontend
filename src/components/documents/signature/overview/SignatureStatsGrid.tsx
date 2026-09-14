@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -14,6 +14,7 @@ import {
   computeOverallStatus,
   SignatureRequest,
 } from "@/lib/documents/signature/types";
+import { onRecordsChange } from "@/lib/records-sync";
 
 type StatCard = {
   icon: React.ElementType;
@@ -21,22 +22,22 @@ type StatCard = {
   iconColor: string;
   value: number;
   label: string;
-  sub?: string;
-  link?: string;
-  href?: string;
+  link: string;
+  href: string;
 };
 
 function buildStats(requests: SignatureRequest[]): StatCard[] {
-  const draft = requests.filter(
+  const docs = requests.filter((r) => r.recordType !== "template");
+  const draft = docs.filter(
     (r) => computeOverallStatus(r) === "Draft",
   ).length;
-  const inProgress = requests.filter((r) =>
+  const inProgress = docs.filter((r) =>
     ["Sent", "Viewed", "In Progress"].includes(computeOverallStatus(r)),
   ).length;
-  const signed = requests.filter(
+  const signed = docs.filter(
     (r) => computeOverallStatus(r) === "Signed",
   ).length;
-  const expired = requests.filter(
+  const expired = docs.filter(
     (r) => computeOverallStatus(r) === "Expired",
   ).length;
 
@@ -45,7 +46,7 @@ function buildStats(requests: SignatureRequest[]): StatCard[] {
       icon: FileText,
       iconBg: "bg-blue-50 dark:bg-blue-950/50",
       iconColor: "text-blue-600 dark:text-blue-400",
-      value: requests.length,
+      value: docs.length,
       label: "All Documents",
       link: "View all documents",
       href: "/signature/documents",
@@ -65,7 +66,8 @@ function buildStats(requests: SignatureRequest[]): StatCard[] {
       iconColor: "text-blue-600 dark:text-blue-400",
       value: inProgress,
       label: "In Progress",
-      sub: "Awaiting signatures",
+      link: "View in-progress documents",
+      href: "/signature/documents?status=in-progress",
     },
     {
       icon: CheckCircle2,
@@ -73,7 +75,8 @@ function buildStats(requests: SignatureRequest[]): StatCard[] {
       iconColor: "text-blue-600 dark:text-blue-400",
       value: signed,
       label: "Signed",
-      sub: "Successfully signed",
+      link: "View signed documents",
+      href: "/signature/documents?status=signed",
     },
     {
       icon: CalendarX2,
@@ -81,28 +84,30 @@ function buildStats(requests: SignatureRequest[]): StatCard[] {
       iconColor: "text-blue-600 dark:text-blue-400",
       value: expired,
       label: "Expired",
-      sub: "Expired documents",
+      link: "View expired documents",
+      href: "/signature/documents?status=expired",
     },
   ];
 }
 
 export function SignatureStatsGrid() {
-  const [requests] = useState<SignatureRequest[]>(() =>
+  const [requests, setRequests] = useState<SignatureRequest[]>(() =>
     listSignatureRequests(),
   );
+
+  useEffect(() => {
+    const refresh = () => setRequests(listSignatureRequests());
+    refresh();
+    return onRecordsChange(refresh);
+  }, []);
+
   const stats = buildStats(requests);
 
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
       {stats.map((stat) => {
         const cardContent = (
-          <div
-            className={`group flex h-full flex-col justify-between rounded-md border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04),0_10px_25px_rgba(15,23,42,0.04)] transition-all duration-300 dark:border-zinc-800 dark:bg-zinc-950 ${
-              stat.href
-                ? "hover:-translate-y-1 hover:border-blue-500/50 hover:shadow-[0_4px_20px_rgba(59,130,246,0.15)] dark:hover:border-blue-500/50 dark:hover:shadow-[0_4px_20px_rgba(59,130,246,0.25)]"
-                : "hover:-translate-y-1 hover:border-blue-500/50 hover:shadow-[0_4px_20px_rgba(59,130,246,0.15)] dark:hover:border-blue-500/50 dark:hover:shadow-[0_4px_20px_rgba(59,130,246,0.25)]"
-            }`}
-          >
+          <div className="group flex h-full cursor-pointer flex-col justify-between rounded-md border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04),0_10px_25px_rgba(15,23,42,0.04)] transition-all duration-300 hover:-translate-y-1 hover:border-blue-500/50 hover:shadow-[0_4px_20px_rgba(59,130,246,0.15)] dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-blue-500/50 dark:hover:shadow-[0_4px_20px_rgba(59,130,246,0.25)]">
             <div className="flex items-center gap-4">
               <div
                 className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-transform duration-300 group-hover:scale-105 ${stat.iconBg}`}
@@ -122,28 +127,18 @@ export function SignatureStatsGrid() {
               </div>
             </div>
             <div className="mt-4">
-              {stat.link ? (
-                <span className="text-xs font-semibold text-blue-600 hover:underline dark:text-blue-400">
-                  {stat.link}
-                </span>
-              ) : (
-                <div className="text-xs text-slate-500 dark:text-zinc-400">
-                  {stat.sub}
-                </div>
-              )}
+              <span className="text-xs font-semibold text-blue-600 group-hover:underline dark:text-blue-400">
+                {stat.link}
+              </span>
             </div>
           </div>
         );
 
         return (
           <div key={stat.label} className="flex flex-col">
-            {stat.href ? (
-              <Link href={stat.href} className="flex h-full flex-col">
-                {cardContent}
-              </Link>
-            ) : (
-              cardContent
-            )}
+            <Link href={stat.href} className="flex h-full flex-col">
+              {cardContent}
+            </Link>
           </div>
         );
       })}

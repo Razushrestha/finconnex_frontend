@@ -146,6 +146,7 @@ export function applyLocalLeadIdentity(
     owner: keepOwner ? ownerName || local?.owner || remote.owner : remote.owner,
     ownerId:
       ownerId && isUuid(ownerId) ? ownerId : remote.ownerId || local?.ownerId,
+    tags: remote.tags?.length ? remote.tags : local?.tags ?? remote.tags,
   };
   if (title || ownerName) {
     next.custom = {

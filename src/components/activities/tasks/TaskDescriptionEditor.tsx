@@ -1642,9 +1642,14 @@ export function TaskDescriptionEditor({
 
   useEffect(() => {
     const editor = editorRef.current;
-    if (!editor || editor.innerHTML === value || lastHtmlRef.current === value) return;
-    editor.innerHTML = value || "";
-    lastHtmlRef.current = value;
+    if (!editor) return;
+    const incoming = value || "";
+    if (editor.innerHTML === incoming) {
+      lastHtmlRef.current = incoming;
+      return;
+    }
+    editor.innerHTML = incoming;
+    lastHtmlRef.current = incoming;
   }, [value]);
 
   function currentFormatStyles(family = pendingFormatRef.current.family, size = pendingFormatRef.current.size) {

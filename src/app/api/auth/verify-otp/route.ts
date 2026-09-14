@@ -19,6 +19,24 @@ export async function POST(request: Request) {
       await crmVerifySignupOtp(parsed.data);
     } catch (err) {
       if (err instanceof CrmAuthError) {
+        if (err.status === 429) {
+          return NextResponse.json(
+            {
+              error:
+                "Too many verification attempts. Wait a few minutes, then request a new code and try once.",
+            },
+            { status: 429 },
+          );
+        }
+        if (err.status === 401) {
+          return NextResponse.json(
+            {
+              error:
+                "That code is not valid. Use the newest email only (each resend replaces the old code), check for typos, and try again.",
+            },
+            { status: 401 },
+          );
+        }
         if (err.status >= 500) {
           return NextResponse.json(
             { error: "Unable to verify right now. Try again shortly." },

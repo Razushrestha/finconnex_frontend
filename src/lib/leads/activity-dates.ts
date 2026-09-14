@@ -60,6 +60,24 @@ export function formatRelativeTime(at: Date, now = new Date()): string {
   return at.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 }
 
+/** Header “Last Contacted” — real timestamp only. */
+export function formatLastContactedAt(at: Date, now = new Date()): string {
+  const time = at.toLocaleTimeString("en-AU", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  const days = Math.round(
+    (startOfDay(now).getTime() - startOfDay(at).getTime()) / 86_400_000,
+  );
+  if (days <= 0) return `Today, ${time}`;
+  if (days === 1) return `Yesterday, ${time}`;
+  return `${at.toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })}, ${time}`;
+}
+
 /** Due / schedule label for Activity Summary. */
 export function formatSummaryDueLabel(
   dueAt: Date | null,

@@ -6,6 +6,7 @@
 import {
   formatRelativeTime,
   formatSummaryDueLabel,
+  parseFlexibleDate,
   startOfDay,
 } from "@/lib/leads/activity-dates";
 import type {
@@ -197,6 +198,46 @@ export function pickLastCompletedActivity(
     event,
     label: LAST_ACTIVITY_LABEL[event.kind] ?? "Activity completed",
     relativeTime: formatRelativeTime(event.dueAt, now),
+  };
+}
+
+/** Prefer a live CRM stamp when the activity index has nothing (or is older). */
+export function lastActivityForLead(
+  candidates: LeadActivityCandidate[],
+  stamps: {
+    id: string;
+    updatedAt?: string;
+    modifiedDate?: string;
+    createdDate?: string;
+    stageEnteredAt?: string;
+  },
+  now = new Date(),
+): LastActivitySelection | null {
+  const fromIndex = pickLastCompletedActivity(candidates, now);
+  const stamp =
+    parseFlexibleDate(stamps.updatedAt) ??
+    parseFlexibleDate(stamps.modifiedDate) ??
+    parseFlexibleDate(stamps.stageEnteredAt) ??
+    parseFlexibleDate(stamps.createdDate);
+  if (!stamp) return fromIndex;
+  if (
+    fromIndex?.event.dueAt &&
+    fromIndex.event.dueAt.getTime() >= stamp.getTime()
+  ) {
+    return fromIndex;
+  }
+  return {
+    event: {
+      id: `${stamps.id}-updated`,
+      kind: fromIndex ? fromIndex.event.kind : "created",
+      title: fromIndex?.event.title ?? "Lead updated",
+      dueAt: stamp,
+      createdAt: stamp,
+      bucket: "completed",
+      sourceModule: "leads",
+    },
+    label: fromIndex?.label ?? "Lead updated",
+    relativeTime: formatRelativeTime(stamp, now),
   };
 }
 

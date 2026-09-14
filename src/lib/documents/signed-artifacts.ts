@@ -5,6 +5,10 @@
 
 import type { SignatureRequest } from "@/lib/documents/signature/types";
 import {
+  buildCompletionCertificatePdf,
+  completionCertificateFromRequest,
+} from "@/lib/documents/signature/completion-certificate";
+import {
   pushLibraryDoc,
   type LibraryDocument,
 } from "@/lib/documents/library/types";
@@ -49,12 +53,7 @@ function fromBase64(b64: string): Uint8Array {
   return out;
 }
 
-/** Escape PDF literal string (basic). */
-function pdfEscape(s: string) {
-  return s.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
-}
-
-/** Build a one-page Helvetica certificate PDF (no external deps). */
+/** Build a Certificate of Completion PDF. */
 export function buildSignedCertificatePdf(input: {
   title: string;
   documentFile: string;
@@ -62,56 +61,33 @@ export function buildSignedCertificatePdf(input: {
   signers: { name: string; email: string; signedAt?: string }[];
   requestId: string;
 }): Uint8Array {
-  const lines = [
-    "FinConnex — Signed certificate (demo)",
-    `Request: ${input.requestId}`,
-    `Title: ${input.title}`,
-    `File: ${input.documentFile}`,
-    input.relatedTo ? `Related: ${input.relatedTo}` : "",
-    `Issued: ${new Date().toISOString()}`,
-    "",
-    "Signers:",
-    ...input.signers.map(
-      (s, i) =>
-        `${i + 1}. ${s.name} <${s.email}>${s.signedAt ? ` @ ${s.signedAt}` : ""}`,
-    ),
-    "",
-    "This demo artifact proves the e-sign flow completed.",
-  ].filter(Boolean);
-
-  const contentLines = lines
-    .map((line, i) => {
-      const y = 740 - i * 16;
-      return `BT /F1 11 Tf 50 ${y} Td (${pdfEscape(line.slice(0, 90))}) Tj ET`;
-    })
-    .join("\n");
-
-  const stream = contentLines;
-  const objects = [
-    "1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj\n",
-    "2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj\n",
-    "3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources<< /Font<< /F1 5 0 R >> >> >>endobj\n",
-    `4 0 obj<< /Length ${stream.length} >>stream\n${stream}\nendstream\nendobj\n`,
-    "5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj\n",
-  ];
-
-  let body = "%PDF-1.4\n";
-  const offsets: number[] = [0];
-  for (const obj of objects) {
-    offsets.push(body.length);
-    body += obj;
-  }
-  const xrefStart = body.length;
-  let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  for (let i = 1; i <= objects.length; i++) {
-    xref += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
-  }
-  body +=
-    xref +
-    `trailer<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF\n`;
-
-  const enc = new TextEncoder();
-  return enc.encode(body);
+  return buildCompletionCertificatePdf({
+    envelopeId: input.requestId,
+    documentName: input.title,
+    generatedAt: new Date().toLocaleString("en-US"),
+    sentByName: input.signers[0]?.name || "FinConnex",
+    sentByEmail: input.signers[0]?.email,
+    organizationName: "Finconnex Financial Services",
+    organizationAddress:
+      "Level 3/301 Castlereagh St., SYDNEY, NSW, Australia 2000",
+    signOrder: "Sequential",
+    documentCount: 1,
+    timezone: "Australia/Sydney (GMT+10:00)",
+    signerCount: input.signers.length,
+    ccCount: 0,
+    approverCount: 0,
+    witnessCount: 0,
+    reviewerCount: 0,
+    signers: input.signers.map((s) => ({
+      name: s.name,
+      email: s.email,
+      role: "Signer",
+      status: "Signed",
+      signedAt: s.signedAt,
+      device: "Web",
+      authenticationType: "None",
+    })),
+  });
 }
 
 export function saveSignedArtifact(artifact: SignedArtifact) {
@@ -145,20 +121,10 @@ export function downloadArtifactBlob(
 export function persistSignedPackage(req: SignatureRequest): LibraryDocument {
   const today = new Date().toLocaleDateString("en-AU");
   const docId = `lib-signed-${req.id}`;
-  const fileName = req.documentFile.replace(/\.pdf$/i, "") + "_Signed.pdf";
-  const pdf = buildSignedCertificatePdf({
-    title: req.documentName,
-    documentFile: req.documentFile,
-    relatedTo: req.relatedTo,
-    requestId: req.signatureRequestId,
-    signers: req.signers
-      .filter((s) => s.role !== "CC")
-      .map((s) => ({
-        name: s.name,
-        email: s.email,
-        signedAt: s.signedAt,
-      })),
-  });
+  const fileName = req.documentFile.replace(/\.pdf$/i, "") + "_Certificate.pdf";
+  const pdf = buildCompletionCertificatePdf(
+    completionCertificateFromRequest(req),
+  );
   const sizeKb = Math.max(1, Math.round(pdf.byteLength / 1024));
   const doc: LibraryDocument = {
     id: docId,

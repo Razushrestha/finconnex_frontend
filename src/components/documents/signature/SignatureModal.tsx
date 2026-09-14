@@ -18,6 +18,7 @@ interface SignatureModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialName: string;
+  existingSignature?: string | null;
   onSaveSignature: (signatureData: string) => void;
 }
 
@@ -31,9 +32,9 @@ const FONT_STYLES = [
 ];
 
 const INK_COLORS = [
-  { id: "navy", color: "#1e293b", label: "Navy Black" },
+  { id: "black", color: "#000000", label: "Black" },
+  { id: "navy", color: "#1e293b", label: "Navy" },
   { id: "blue", color: "#1d4ed8", label: "Royal Blue" },
-  { id: "purple", color: "#6d28d9", label: "Deep Purple" },
 ];
 
 const AI_PRESETS = [
@@ -47,6 +48,7 @@ export function SignatureModal({
   isOpen,
   onClose,
   initialName,
+  existingSignature,
   onSaveSignature,
 }: SignatureModalProps) {
   const [activeTab, setActiveTab] = useState<Mode>("type");
@@ -69,29 +71,117 @@ export function SignatureModal({
   const [selectedAiPreset, setSelectedAiPreset] = useState(AI_PRESETS[0].id);
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
   const [aiSignaturePreview, setAiSignaturePreview] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const aiRequestId = useRef(0);
 
   useEffect(() => {
-    if (initialName) setTypedName(initialName);
-  }, [initialName]);
+    if (initialName && !existingSignature?.startsWith("typed:")) {
+      setTypedName(initialName);
+    }
+  }, [initialName, existingSignature]);
 
-  // Setup canvas context when switching to draw tab
   useEffect(() => {
-    if (!isOpen || activeTab !== "draw") return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!isOpen) return;
+    const existing = existingSignature?.trim();
+    if (!existing) {
+      setHasInk(false);
+      setUploadedImage(null);
+      setAiSignaturePreview(null);
+      return;
+    }
+    if (existing.startsWith("typed:")) {
+      setActiveTab("type");
+      setTypedName(existing.replace(/^typed:/, ""));
+      return;
+    }
+    if (existing.includes("image/svg") || existing.includes("svg+xml")) {
+      setActiveTab("ai");
+      setAiSignaturePreview(existing);
+      return;
+    }
+    if (existing.startsWith("data:")) {
+      setActiveTab("draw");
+      setUploadedImage(existing);
+      setHasInk(true);
+    }
+  }, [isOpen, existingSignature]);
 
+  function styleCanvas(
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+  ) {
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 4;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = selectedColor;
-  }, [isOpen, activeTab, selectedColor]);
+    ctx.strokeStyle = "#000000";
+  }
+
+  function paintExistingDrawing(dataUrl: string) {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const image = new Image();
+    image.onload = () => {
+      const paint = (attempts = 0) => {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width < 2 || rect.height < 2) {
+          if (attempts < 20) requestAnimationFrame(() => paint(attempts + 1));
+          return;
+        }
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        ctx.scale(dpr, dpr);
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = selectedColor;
+        setHasInk(true);
+      };
+      paint();
+    };
+    image.src = dataUrl;
+  }
+
+  // Setup canvas context when switching to draw tab
+  useEffect(() => {
+    if (!isOpen || activeTab !== "draw") return;
+
+    const frame = requestAnimationFrame(() => {
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext("2d");
+      if (!canvas || !ctx) return;
+
+      const existing =
+        existingSignature?.startsWith("data:") &&
+        !existingSignature.includes("svg")
+          ? existingSignature
+          : null;
+
+      if (existing) {
+        paintExistingDrawing(existing);
+        return;
+      }
+
+      styleCanvas(ctx, canvas);
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [isOpen, activeTab, existingSignature]);
+
+  useEffect(() => {
+    const ctx = canvasRef.current?.getContext("2d");
+    if (ctx) ctx.strokeStyle = selectedColor;
+  }, [selectedColor]);
 
   if (!isOpen) return null;
 
@@ -108,6 +198,7 @@ export function SignatureModal({
     drawing.current = true;
     canvas?.setPointerCapture(e.pointerId);
     const { x, y } = pointerPos(e);
+    ctx.strokeStyle = selectedColor;
     ctx.beginPath();
     ctx.moveTo(x, y);
   }
@@ -134,10 +225,10 @@ export function SignatureModal({
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.scale(dpr, dpr);
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 4;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.strokeStyle = selectedColor;
+    ctx.strokeStyle = "#000000";
     setHasInk(false);
   }
 
@@ -154,25 +245,45 @@ export function SignatureModal({
     reader.readAsDataURL(file);
   }
 
-  function generateAiSignature(presetId: string) {
+  async function generateAiSignature(presetId: string) {
+    const name = (typedName || initialName || "").trim();
     setSelectedAiPreset(presetId);
-    setIsGeneratingAi(true);
+    if (name.length < 2) {
+      setAiError("Enter your name above, then generate a signature.");
+      setAiSignaturePreview(null);
+      return;
+    }
 
-    setTimeout(() => {
-      // Create SVG data URL based on name and preset style
-      const nameText = typedName || "Signature";
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" width="400" height="120">
-        <style>
-          .sig-text { font-family: 'Brush Script MT', 'cursive', sans-serif; font-size: 42px; font-style: italic; fill: #6d28d9; }
-          .sig-line { stroke: #6d28d9; stroke-width: 2; fill: none; stroke-linecap: round; }
-        </style>
-        <text x="20" y="70" class="sig-text">${nameText}</text>
-        <path d="M 15 85 Q 120 105 380 75" class="sig-line" />
-      </svg>`;
-      const encoded = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-      setAiSignaturePreview(encoded);
-      setIsGeneratingAi(false);
-    }, 450);
+    const requestId = ++aiRequestId.current;
+    setIsGeneratingAi(true);
+    setAiError(null);
+
+    try {
+      const res = await fetch("/api/ai/signature", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, style: presetId }),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        dataUrl?: string;
+        error?: string;
+      };
+      if (requestId !== aiRequestId.current) return;
+      if (!res.ok || !json.dataUrl) {
+        throw new Error(json.error || "Google AI could not generate this signature.");
+      }
+      setAiSignaturePreview(json.dataUrl);
+    } catch (err) {
+      if (requestId !== aiRequestId.current) return;
+      setAiSignaturePreview(null);
+      setAiError(
+        err instanceof Error
+          ? err.message
+          : "Google AI could not generate this signature.",
+      );
+    } finally {
+      if (requestId === aiRequestId.current) setIsGeneratingAi(false);
+    }
   }
 
   function handleSave() {
@@ -205,7 +316,7 @@ export function SignatureModal({
     (activeTab === "type" && typedName.trim().length > 0) ||
     (activeTab === "draw" && hasInk) ||
     (activeTab === "upload" && Boolean(uploadedImage)) ||
-    activeTab === "ai";
+    (activeTab === "ai" && Boolean(aiSignaturePreview) && !isGeneratingAi);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
@@ -297,7 +408,7 @@ export function SignatureModal({
                 value={typedName}
                 onChange={(e) => setTypedName(e.target.value)}
                 placeholder="Type your full name"
-                className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-center font-serif text-2xl text-slate-800 outline-none focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-800 dark:bg-zinc-800 dark:text-white"
+                className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 text-center font-serif text-2xl font-extrabold text-black outline-none focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-800 dark:bg-zinc-800 dark:text-white"
               />
 
               <div className="grid grid-cols-2 gap-2">
@@ -314,7 +425,7 @@ export function SignatureModal({
                     )}
                   >
                     <span className="text-[10px] text-slate-400 font-sans mb-1">{f.name}</span>
-                    <span className={cn("text-lg truncate max-w-full", f.style)}>
+                    <span className={cn("text-lg font-extrabold truncate max-w-full text-black", f.style)}>
                       {typedName || "Signature"}
                     </span>
                   </button>
@@ -423,9 +534,17 @@ export function SignatureModal({
               <div className="flex items-center gap-2 rounded-xl bg-violet-50 p-3 text-xs text-violet-900 border border-violet-100 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-900">
                 <Wand2 className="h-4 w-4 text-violet-600 shrink-0" />
                 <span>
-                  <strong>AI Smart Signature:</strong> Automatically synthesizes vector-perfect cursive scripts tailored to your name.
+                  <strong>AI Smart Signature:</strong> Gemini draws a handwritten signature from your name and the style you pick.
                 </span>
               </div>
+
+              <input
+                type="text"
+                value={typedName}
+                onChange={(e) => setTypedName(e.target.value)}
+                placeholder="Name to sign"
+                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-violet-500 focus:bg-white focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-800 dark:bg-zinc-800 dark:text-white"
+              />
 
               <div className="grid grid-cols-2 gap-2">
                 {AI_PRESETS.map((preset) => (
@@ -452,8 +571,10 @@ export function SignatureModal({
                 {isGeneratingAi ? (
                   <div className="flex items-center gap-2 text-xs text-violet-600">
                     <Sparkles className="h-4 w-4 animate-spin" />
-                    Generating AI vector signature…
+                    Gemini is drawing your signature…
                   </div>
+                ) : aiError ? (
+                  <p className="px-3 text-center text-xs text-rose-600">{aiError}</p>
                 ) : aiSignaturePreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img

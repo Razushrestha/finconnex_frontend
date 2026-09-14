@@ -8,6 +8,7 @@ import {
   crmLeadPipelineStage,
   kanbanColumnsToBoard,
   mapCrmLeadToCard,
+  normalizeLeadTags,
   parseEstimatedValue,
   pipelineStageToCrmStatus,
   toCrmCreateBody,
@@ -325,18 +326,24 @@ export async function createCrmLead(
   let created: CrmLead | null = null;
   try {
     created = await postLead(
-      compactBody({ firstName, lastName, email, ownerId }),
+      compactBody({
+        firstName,
+        lastName,
+        email,
+        ownerId,
+        tags: input.tags,
+      }),
     );
   } catch (err) {
     if (err instanceof CrmLeadHttpError && err.status === 409) {
       const existing = await recover();
-      if (existing) return existing;
+      if (!existing) throw err;
+      created = existing;
+    } else if (err instanceof CrmLeadHttpError && err.status >= 500) {
+      return null;
+    } else {
       throw err;
     }
-    if (err instanceof CrmLeadHttpError && err.status >= 500) {
-      return null;
-    }
-    throw err;
   }
 
   const extras = compactBody({
@@ -373,6 +380,21 @@ export async function createCrmLead(
         (await changeCrmLeadPipelineStage(created.id, pipelineStage)) ?? created;
     } catch {
       /* keep created row */
+    }
+  }
+  const tags = normalizeLeadTags(input.tags) ?? normalizeLeadTags(created.tags);
+  if (created.id && isUuid(created.id) && tags?.length) {
+    try {
+      const tagged = await replaceCrmLeadTags(created.id, tags);
+      if (Array.isArray(tagged)) {
+        created = { ...created, tags: tagged };
+      } else if (tagged?.tags) {
+        created = tagged;
+      } else {
+        created = { ...created, tags };
+      }
+    } catch {
+      created = { ...created, tags };
     }
   }
   return created;
@@ -818,11 +840,13 @@ export async function syncCreatedLead(input: {
   ownerId?: string;
   ownerName?: string;
   pipelineStage?: string;
+  tags?: string[];
 }): Promise<LeadCardData | null> {
   const created = await createCrmLead(
     toCrmCreateBody({
       ...input,
       pipelineStage: input.pipelineStage,
+      tags: input.tags,
     }),
     input.ownerId ?? input.ownerName,
   );
@@ -864,6 +888,8 @@ export async function syncCreatedLead(input: {
     }
   }
   const card = mapCrmLeadToCard(lead);
+  const tags = normalizeLeadTags(input.tags) ?? card.tags;
+  if (tags?.length) card.tags = tags;
   if (displayName) {
     card.name = displayName;
     card.initials =

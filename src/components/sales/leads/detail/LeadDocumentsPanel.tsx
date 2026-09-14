@@ -515,7 +515,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
   const esignRows = useMemo(() => {
     void recordsTick;
     const live = liveEsign(card);
-    if (live.length) return live;
+    if (live.length || isUuid(card.id)) return live;
     return seedEsign(card, now);
   }, [card, now, recordsTick]);
 

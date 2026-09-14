@@ -352,7 +352,7 @@ function stagesFromUnknown(data: unknown): DealStage[] | null {
 export async function listCrmDeals(
   query: CrmDealQuery = {},
 ): Promise<Array<DealRecord & { stageTitle: DealStageTitle }>> {
-  return extractRecords(
+  return normalizeCrmDeals(
     await dealsGet(
       "",
       toQuery({
@@ -362,7 +362,13 @@ export async function listCrmDeals(
         stage: query.stage,
       }),
     ),
-  ).map((row, index) => normalizeDeal(row, index));
+  );
+}
+
+export function normalizeCrmDeals(
+  data: unknown,
+): Array<DealRecord & { stageTitle: DealStageTitle }> {
+  return extractRecords(data).map((row, index) => normalizeDeal(row, index));
 }
 
 export async function getCrmDealPipeline(opts?: {

@@ -325,6 +325,7 @@ export function CreateLeadForm({
         source: form.leadSource || "Website",
         notes: form.notes,
         pipelineStage,
+        tags: form.tags,
       });
       if (live) {
         attachExtras(live.id, primary);
@@ -369,6 +370,7 @@ export function CreateLeadForm({
       status: pipelineStageToLeadStatus(pipelineStage),
       pipelineStage,
       owner: ownerLabel,
+      tags: form.tags,
     };
     let result = await api.leads.create(payload);
     if (!result.ok) {

@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Camera, Info, Search } from "lucide-react";
-import { listCalendlyHosts, updateCalendlyHost } from "@/lib/booking/calendly-api";
-import { isUuid } from "@/lib/activity-timeline/auth";
+import { loadAssignableOwners } from "@/lib/users/assignable";
 import {
   CONSULTANT_PRIORITIES,
   type ConsultantPriority,
@@ -39,21 +38,14 @@ export function AssignConsultantsStep({
     Record<string, ConsultantPriority>
   >({});
   const [error, setError] = useState("");
-  const [hostIds, setHostIds] = useState<Record<string, string>>({});
   const [hostNames, setHostNames] = useState<string[]>([]);
 
   useEffect(() => {
     let alive = true;
-    void listCalendlyHosts({ active: true })
-      .then((hosts) => {
+    void loadAssignableOwners()
+      .then((owners) => {
         if (!alive) return;
-        const ids: Record<string, string> = {};
-        const names = hosts.map((host) => {
-          ids[host.name] = host.id;
-          return host.name;
-        });
-        setHostIds(ids);
-        setHostNames(names);
+        setHostNames(owners.map((owner) => owner.name));
       })
       .catch(() => undefined);
     return () => {
@@ -195,7 +187,7 @@ export function AssignConsultantsStep({
           {names.length === 0 ? (
             <li className="px-5 py-10 text-center text-[13px] text-slate-400">
               {hostNames.length === 0
-                ? "No Calendly hosts yet. Connect Calendly in CRM, then refresh."
+                ? "No workspace members available to assign."
                 : "No consultants match your search."}
             </li>
           ) : null}
@@ -241,14 +233,6 @@ export function AssignConsultantsStep({
             const next: Record<string, ConsultantPriority> = {};
             for (const name of selected) next[name] = priorityOf(name);
             onCreate(selected, next);
-            for (const name of selected) {
-              const id = hostIds[name];
-              if (id && isUuid(id)) {
-                void updateCalendlyHost(id, { isConsultant: true }).catch(
-                  () => undefined,
-                );
-              }
-            }
           }}
           className="h-10 min-w-[96px] rounded-lg px-6 text-[13px] font-semibold text-white hover:brightness-110"
           style={{ backgroundColor: BRAND }}

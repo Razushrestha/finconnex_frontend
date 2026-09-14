@@ -203,15 +203,59 @@ export async function crmBffFetch<T>(
     throw new Error(`CRM path must start with /v1/: ${path}`);
   }
   const form = isFormDataBody(init?.body);
-  const res = await fetch(`/api/auth/crm${path.slice(3)}`, {
-    ...init,
-    credentials: "same-origin",
-    headers: {
-      Accept: "application/json",
-      ...(init?.body && !form ? { "Content-Type": "application/json" } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
+
+  async function currentAccessToken() {
+    if (typeof window === "undefined") return null;
+    try {
+      const stored =
+        window.sessionStorage.getItem("fc.crm.accessToken") ||
+        window.localStorage.getItem("fc.crm.accessToken");
+      if (stored?.trim()) return stored.trim();
+    } catch {
+      /* private mode */
+    }
+    const { ensureCrmAccess } = await import("@/lib/activity-timeline/auth");
+    return (await ensureCrmAccess())?.accessToken ?? null;
+  }
+
+  let accessToken = await currentAccessToken();
+  const send = () =>
+    fetch(`/api/auth/crm${path.slice(3)}`, {
+      ...init,
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        ...(init?.body && !form ? { "Content-Type": "application/json" } : {}),
+        ...(init?.headers ?? {}),
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+    });
+
+  let res = await send();
+  if (res.status === 401) {
+    try {
+      const tokenRes = await fetch("/api/auth/crm-token", {
+        credentials: "same-origin",
+      });
+      const tokenJson = (await tokenRes.json().catch(() => ({}))) as {
+        accessToken?: string | null;
+        refreshToken?: string | null;
+      };
+      if (tokenJson.accessToken) {
+        const { persistCrmTokens } = await import("@/lib/activity-timeline/auth");
+        persistCrmTokens({
+          accessToken: tokenJson.accessToken,
+          refreshToken: tokenJson.refreshToken,
+        });
+        accessToken = tokenJson.accessToken;
+      } else {
+        accessToken = (await currentAccessToken()) ?? accessToken;
+      }
+    } catch {
+      accessToken = (await currentAccessToken()) ?? accessToken;
+    }
+    res = await send();
+  }
   const text = await res.text();
   let json: unknown = null;
   if (text) {

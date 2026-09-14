@@ -1,32 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
-  Send,
-  X,
-  Download,
-  Copy,
-  LayoutTemplate,
-  Calendar,
-  Mail,
-  Link2,
-  RefreshCw,
-  Users,
-} from "lucide-react";
-import {
-  SIGNER_COLORS,
+  deleteSignatureRequest,
   formatAuditAt,
+  getRequestDocuments,
   getSignatureRequestById,
   markRequestSent,
   normalizeSignatureRequest,
   signedCount,
   upsertSignatureRequest,
+  type SignatureAuditEvent,
   type SignatureRequest,
-  type SignatureStatus,
-  type SignerStatus,
+  type SignatureSigner,
 } from "@/lib/documents/signature/types";
 import {
   deleteCrmSignatureRequest,
@@ -38,55 +26,185 @@ import {
   sendCrmSignatureRequest,
   tryCrmSignatureRequest,
 } from "@/lib/documents/signature/api";
+import { resolveRequestDocumentUrls } from "@/lib/documents/signature/file-cache";
 import {
   downloadArtifactBlob,
   getSignedArtifact,
   persistSignedPackage,
 } from "@/lib/documents/signed-artifacts";
-import { avatarColor, initials } from "@/lib/activities/shared";
 import { SignatureDocPreview } from "./SignatureDocPreview";
-import { cn } from "@/lib/utils";
+import { CompletionCertificateModal } from "./CompletionCertificateModal";
+import { PrintDocumentsModal } from "./documents/detail/PrintDocumentsModal";
+import { printSignatureDocuments } from "@/lib/documents/signature/print-documents";
+import { SignatureComposeEmailModal } from "./SignatureComposeEmailModal";
+import { SignatureDocumentDetailView } from "./documents/detail/SignatureDocumentDetailView";
+import { ExtendExpiryModal } from "./documents/detail/ExtendExpiryModal";
+import type { DocumentSummaryData } from "./documents/detail/DocumentSummaryCard";
+import type { RecipientStatusData } from "./documents/detail/RecipientStatusRow";
 
-const STATUS_STYLE: Record<SignatureStatus, string> = {
-  Draft: "bg-slate-100 text-slate-600",
-  Sent: "bg-sky-50 text-sky-700",
-  Viewed: "bg-amber-50 text-amber-800",
-  Signed: "bg-emerald-50 text-emerald-700",
-  Declined: "bg-rose-50 text-rose-700",
-  Expired: "bg-slate-100 text-slate-500",
-  Cancelled: "bg-slate-100 text-slate-500",
-};
+function formatDetailStamp(value?: string) {
+  if (!value) return "N/A";
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return value;
+  return new Date(parsed).toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
 
-const SIGNER_STATUS_STYLE: Record<SignerStatus, string> = {
-  Pending: "bg-slate-100 text-slate-500",
-  Sent: "bg-sky-50 text-sky-700",
-  Viewed: "bg-amber-50 text-amber-800",
-  Signed: "bg-emerald-50 text-emerald-700",
-  Declined: "bg-rose-50 text-rose-700",
-};
+function expiryToIso(expiryDate?: string) {
+  if (!expiryDate) return "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(expiryDate)) return expiryDate.slice(0, 10);
+  const [day, month, year] = expiryDate.split(/[/\-]/);
+  if (!day || !month || !year) return "";
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
+
+function isoToDisplay(iso: string) {
+  if (!iso) return "";
+  const [year, month, day] = iso.split("-");
+  if (!year || !month || !day) return iso;
+  return `${day}/${month}/${year}`;
+}
+
+function describeAccess(
+  signer: SignatureSigner,
+  audit: SignatureAuditEvent[],
+): string {
+  if (signer.status === "Signed" && signer.signedAt) {
+    return `Signed at ${signer.signedAt}`;
+  }
+  const viewedEvent = audit.find(
+    (a) => a.actor === signer.name && a.action.toLowerCase().includes("viewed"),
+  );
+  if (viewedEvent) return `Accessed using Web at ${viewedEvent.at}`;
+  if (signer.status === "Declined") return "Declined to sign";
+  if (signer.status === "Sent") return "Waiting for signer to open";
+  if (signer.status === "Viewed") return "Viewed — waiting for signature";
+  return "Not yet sent";
+}
+
+function mapRequestToView(req: SignatureRequest): {
+  document: DocumentSummaryData;
+  recipients: RecipientStatusData[];
+} {
+  const actionable = req.signers.filter((s) => s.role !== "CC");
+  const signed = signedCount(req);
+  const sentEvent = req.audit.find((a) =>
+    a.action.toLowerCase().includes("sent for signature"),
+  );
+  const lastEvent = req.audit[req.audit.length - 1];
+  const primary = getRequestDocuments(req)[0];
+
+  return {
+    document: {
+      name: req.documentName,
+      ownerName: req.createdBy,
+      description: req.relatedTo
+        ? `Related to ${req.relatedTo}`
+        : "Signature request document.",
+      submittedAtLabel: formatDetailStamp(
+        sentEvent?.at ?? req.sentDate ?? req.updatedAt,
+      ),
+      lastUpdatedAtLabel: formatDetailStamp(
+        lastEvent?.at ?? req.updatedAt ?? req.sentDate,
+      ),
+      completionPercent:
+        actionable.length > 0
+          ? Math.round((signed / actionable.length) * 100)
+          : req.status === "Signed"
+            ? 100
+            : 0,
+      documentFileUrl: primary?.fileUrl || req.documentFileUrl || "",
+      fileName: primary?.fileName || req.documentFile,
+      fields: req.fields,
+      signers: req.signers,
+    },
+    recipients: req.signers
+      .filter((s) => s.role !== "CC")
+      .map((s) => ({
+        id: s.id,
+        order: s.order,
+        name: s.name,
+        email: s.email,
+        accessInfo: describeAccess(s, req.audit),
+        mailed: s.status !== "Pending",
+        viewed:
+          s.status === "Viewed" ||
+          s.status === "Signed" ||
+          s.status === "Declined",
+        signed: s.status === "Signed",
+      })),
+  };
+}
 
 export function SignatureDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const [req, setReq] = useState<SignatureRequest | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isCertificateOpen, setIsCertificateOpen] = useState(false);
+  const [isPrintOpen, setIsPrintOpen] = useState(false);
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [isExtendOpen, setIsExtendOpen] = useState(false);
+  const [isReminderSettingsOpen, setIsReminderSettingsOpen] = useState(false);
 
   useEffect(() => {
-    const live = getSignatureRequestById(id);
-    setReq(live ? normalizeSignatureRequest(live) : null);
-    if (!isCrmSignatureRequestId(id)) return;
     let cancelled = false;
+
+    async function hydrate(next: SignatureRequest) {
+      const crmDownload =
+        next.status === "Signed" && isCrmSignatureRequestId(next.id)
+          ? await tryCrmSignatureRequest(() =>
+              downloadCrmSignatureRequest(next.id),
+            )
+          : null;
+      const resolved = await resolveRequestDocumentUrls(
+        next,
+        crmDownload?.url || undefined,
+      );
+      if (!cancelled) setReq(resolved);
+    }
+
+    const live = getSignatureRequestById(id);
+    if (live) {
+      const normalized = normalizeSignatureRequest(live);
+      setReq(normalized);
+      void hydrate(normalized);
+    } else {
+      setReq(null);
+    }
+
+    if (!isCrmSignatureRequestId(id)) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
     void (async () => {
       const remote = await tryCrmSignatureRequest(() =>
         getCrmSignatureRequest(id),
       );
       if (cancelled || !remote) return;
       persistRemoteSignatureRequest(remote);
-      setReq(normalizeSignatureRequest(remote, { allowEmptyFields: true }));
+      const normalized = normalizeSignatureRequest(remote, {
+        allowEmptyFields: true,
+      });
+      if (!cancelled) setReq(normalized);
+      await hydrate(normalized);
     })();
+
     return () => {
       cancelled = true;
     };
   }, [id]);
+
+  const view = useMemo(() => (req ? mapRequestToView(req) : null), [req]);
+  const expiryIso = expiryToIso(req?.expiryDate);
 
   function flash(msg: string) {
     setToast(msg);
@@ -108,7 +226,7 @@ export function SignatureDetailClient({ id }: { id: string }) {
     );
     if (missing.length) {
       flash(`Place a signature field for ${missing[0].name} first`);
-      router.push(`/documents/signature/${id}/place`);
+      router.push(`/signature/${id}/place`);
       return;
     }
     const sent = markRequestSent(req, req.createdBy);
@@ -127,29 +245,6 @@ export function SignatureDetailClient({ id }: { id: string }) {
     flash(
       `Sent · ${sent.signers.filter((s) => s.role !== "CC").length} signer link(s)`,
     );
-  }
-
-  function cancelRequest() {
-    if (!req) return;
-    save(
-      {
-        ...req,
-        status: "Cancelled",
-        audit: [
-          ...req.audit,
-          {
-            id: `a-${Date.now()}`,
-            at: formatAuditAt(),
-            action: "Cancelled",
-            actor: req.createdBy,
-          },
-        ],
-      },
-      "Request cancelled",
-    );
-    if (isCrmSignatureRequestId(req.id)) {
-      void tryCrmSignatureRequest(() => deleteCrmSignatureRequest(req.id));
-    }
   }
 
   function resend() {
@@ -180,20 +275,6 @@ export function SignatureDetailClient({ id }: { id: string }) {
     }
   }
 
-  function copySignLink(token: string, name?: string) {
-    const url = `${window.location.origin}/sign/${token}`;
-    void navigator.clipboard?.writeText(url);
-    flash(name ? `Link copied · ${name}` : "Sign link copied");
-  }
-
-  function refreshFromStore() {
-    const live = getSignatureRequestById(id);
-    if (live) {
-      setReq(normalizeSignatureRequest(live));
-      flash("Synced latest status");
-    }
-  }
-
   function downloadSigned() {
     if (!req) return;
     if (isCrmSignatureRequestId(req.id)) {
@@ -219,15 +300,20 @@ export function SignatureDetailClient({ id }: { id: string }) {
         return;
       }
     }
+    const fileUrl = getRequestDocuments(req)[0]?.fileUrl || req.documentFileUrl;
+    if (fileUrl) {
+      window.open(fileUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
     flash(`Document not fully signed yet: ${req.documentFile}`);
   }
 
-  if (!req) {
+  if (!req || !view) {
     return (
-      <div className="flex min-h-full flex-col items-center justify-center bg-slate-50 p-8">
+      <div className="flex min-h-full flex-col items-center justify-center bg-white p-8">
         <p className="font-bold text-slate-900">Request not found</p>
         <Link
-          href="/documents/signature"
+          href="/signature"
           className="mt-3 text-[12px] font-semibold text-violet-700"
         >
           Back
@@ -236,336 +322,255 @@ export function SignatureDetailClient({ id }: { id: string }) {
     );
   }
 
-  const openForSigner = req.status === "Sent" || req.status === "Viewed";
-  const done = signedCount(req);
-  const total = req.signers.filter((s) => s.role !== "CC").length;
-  const progressPct = total ? Math.round((done / total) * 100) : 0;
+  const previewDocs = getRequestDocuments(req);
 
   return (
-    <div className="relative flex min-h-full flex-col bg-slate-50">
-      <div className="relative flex flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
-        <div className="mb-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
-          <button
-            type="button"
-            onClick={() => router.push("/documents/signature")}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-            aria-label="Back"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-          </button>
-          <h1 className="text-[15px] font-bold text-slate-900">
-            {req.documentName}
-          </h1>
-          <span
-            className={cn(
-              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-              STATUS_STYLE[req.status],
-            )}
-          >
-            {req.status}
-          </span>
+    <div className="relative min-h-full bg-white">
+      <SignatureDocumentDetailView
+        document={view.document}
+        recipients={view.recipients}
+        toolbarMode={req.status === "Signed" ? "completed" : "signing"}
+        onBack={() => router.push("/signature")}
+        onViewDocument={() => setIsPreviewOpen(true)}
+        onEdit={() => {
+          if (req.status === "Draft") {
+            router.push(`/signature/${id}/place`);
+            return;
+          }
+          flash("This document has already been sent. Use Correct document to change fields.");
+        }}
+        onCorrectDocument={() => router.push(`/signature/${id}/place`)}
+        onCompletionCertificate={() => setIsCertificateOpen(true)}
+        onExtend={() => setIsExtendOpen(true)}
+        onSendReminder={() => {
+          if (req.status === "Draft") {
+            sendForSignature();
+            return;
+          }
+          resend();
+        }}
+        onReminderSettings={() => setIsReminderSettingsOpen(true)}
+        onRecall={() => {
+          save(
+            {
+              ...req,
+              status: "Cancelled",
+              audit: [
+                ...req.audit,
+                {
+                  id: `a-${Date.now()}`,
+                  at: formatAuditAt(),
+                  action: "Recalled",
+                  actor: req.createdBy,
+                },
+              ],
+            },
+            "Document recalled",
+          );
+        }}
+        onUploadSignedDocument={() =>
+          flash("Upload a signed copy from the document menu when needed.")
+        }
+        onEmailDocument={() => {
+          const to = req.signerEmail || req.signers[0]?.email;
+          if (!to?.includes("@")) {
+            flash("No recipient email is available for this document.");
+            return;
+          }
+          setIsComposeOpen(true);
+        }}
+        onSaveToCloud={() => flash("Cloud save is not configured.")}
+        onDownload={downloadSigned}
+        onEditAsNew={() => router.push(`/signature/create?from=${id}`)}
+        onSaveAsTemplate={() => {
+          upsertSignatureRequest({
+            ...req,
+            id: `${req.id}-tpl-${Date.now()}`,
+            signatureRequestId: `${req.signatureRequestId}-TPL`,
+            recordType: "template",
+            documentName: `${req.documentName} template`,
+          });
+          flash("Saved as template");
+        }}
+        onChangeOwnership={() => flash("Ownership stays with the request owner.")}
+        onPrint={() => setIsPrintOpen(true)}
+        onFormData={() =>
+          flash(
+            req.fields.some((field) => field.value)
+              ? `${req.fields.filter((field) => field.value).length} completed fields`
+              : "No form data captured",
+          )
+        }
+        onViewLegalDisclosure={() =>
+          flash("Electronic signatures on this request are legally binding records.")
+        }
+        onActivityHistory={() => {
+          const last = req.audit[req.audit.length - 1];
+          flash(last ? `${last.action} · ${last.at}` : "No activity yet");
+        }}
+        onCopyDebugInfo={() => {
+          void navigator.clipboard?.writeText(req.id);
+          flash("Request id copied");
+        }}
+        onDelete={() => {
+          if (!window.confirm(`Delete "${req.documentName}"?`)) return;
+          deleteSignatureRequest(req.id);
+          if (isCrmSignatureRequestId(req.id)) {
+            void tryCrmSignatureRequest(() => deleteCrmSignatureRequest(req.id));
+          }
+          router.push("/signature");
+        }}
+      />
 
-          <div className="ml-auto flex flex-wrap items-center gap-1.5">
+      <ExtendExpiryModal
+        isOpen={isExtendOpen}
+        onClose={() => setIsExtendOpen(false)}
+        currentExpiryDateLabel={req.expiryDate || isoToDisplay(expiryIso)}
+        currentExpiryDate={expiryIso || new Date().toISOString().slice(0, 10)}
+        onSet={(nextIso) => {
+          save(
+            {
+              ...req,
+              expiryDate: isoToDisplay(nextIso),
+              audit: [
+                ...req.audit,
+                {
+                  id: `a-${Date.now()}`,
+                  at: formatAuditAt(),
+                  action: `Expiry extended to ${isoToDisplay(nextIso)}`,
+                  actor: req.createdBy,
+                },
+              ],
+            },
+            "Expiry updated",
+          );
+        }}
+      />
+
+      {isPreviewOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setIsPreviewOpen(false)}
+        >
+          <div
+            className="flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b p-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Document Preview
+                </h3>
+                <p className="text-xs font-medium text-gray-500">
+                  {req.documentName}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPreviewOpen(false)}
+                className="text-gray-500 hover:text-black"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 space-y-8 overflow-auto bg-gray-100 p-4">
+              {previewDocs.map((doc, index) => (
+                <section key={doc.id} className="mx-auto w-full max-w-3xl">
+                  {previewDocs.length > 1 ? (
+                    <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                      Document {index + 1} of {previewDocs.length}
+                      {doc.name ? ` · ${doc.name}` : ""}
+                    </p>
+                  ) : null}
+                  <SignatureDocPreview
+                    fileName={doc.fileName || req.documentFile}
+                    fileUrl={
+                      doc.fileUrl && !doc.fileUrl.startsWith("fc-file://")
+                        ? doc.fileUrl
+                        : index === 0
+                          ? req.documentFileUrl
+                          : ""
+                    }
+                    fields={req.fields.filter(
+                      (field) =>
+                        (field.documentId ?? "primary") === doc.id,
+                    )}
+                    signers={req.signers}
+                    pageWidth={720}
+                    className="max-w-none shadow-sm"
+                  />
+                </section>
+              ))}
+            </div>
+
+            <div className="flex justify-end border-t bg-white p-4">
+              <button
+                type="button"
+                onClick={() => setIsPreviewOpen(false)}
+                className="rounded bg-gray-200 px-4 py-2 text-sm font-medium hover:bg-gray-300"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isCertificateOpen ? (
+        <CompletionCertificateModal
+          req={req}
+          onClose={() => setIsCertificateOpen(false)}
+        />
+      ) : null}
+
+      {isPrintOpen ? (
+        <PrintDocumentsModal
+          onClose={() => setIsPrintOpen(false)}
+          onPrint={(mode) => {
+            printSignatureDocuments(req, mode);
+            setIsPrintOpen(false);
+          }}
+        />
+      ) : null}
+
+      <SignatureComposeEmailModal
+        isOpen={isComposeOpen}
+        onClose={() => setIsComposeOpen(false)}
+        req={req}
+        documentName={req.documentName}
+        onSent={flash}
+      />
+
+      {isReminderSettingsOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setIsReminderSettingsOpen(false)}
+        >
+          <div
+            className="w-full max-w-md space-y-3 rounded-xl bg-white p-6 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold text-slate-900">
+              Reminder settings
+            </h3>
+            <p className="text-xs text-slate-500">
+              Automatic reminders are sent to recipients who have not signed
+              yet. Use Send reminder for an immediate follow-up.
+            </p>
             <button
               type="button"
-              onClick={refreshFromStore}
-              className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
-              title="Refresh after public sign"
+              onClick={() => {
+                setIsReminderSettingsOpen(false);
+                flash("Reminder settings saved");
+              }}
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
             >
-              <RefreshCw className="h-3.5 w-3.5" />
-              Sync
+              Done
             </button>
-            {req.status === "Draft" ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(`/documents/signature/${id}/place`)
-                  }
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 text-[11px] font-semibold text-violet-700"
-                >
-                  <LayoutTemplate className="h-3.5 w-3.5" />
-                  Place fields
-                </button>
-                <button
-                  type="button"
-                  onClick={sendForSignature}
-                  className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-sm shadow-violet-600/20 hover:bg-violet-700"
-                >
-                  <Send className="h-3.5 w-3.5" />
-                  Send for signature
-                </button>
-              </>
-            ) : null}
-
-            {openForSigner && req.signers[0] ? (
-              <button
-                type="button"
-                onClick={() =>
-                  copySignLink(req.signers[0].token, req.signers[0].name)
-                }
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 text-[11px] font-semibold text-violet-700"
-              >
-                <Copy className="h-3.5 w-3.5" />
-                Copy first link
-              </button>
-            ) : null}
-            {req.status === "Signed" ? (
-              <button
-                type="button"
-                onClick={downloadSigned}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 text-[11px] font-semibold text-white hover:bg-emerald-700"
-              >
-                <Download className="h-3.5 w-3.5" />
-                Download signed
-              </button>
-            ) : null}
           </div>
         </div>
-
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-5">
-            <div className="min-w-0">
-              <h2 className="text-xl font-bold tracking-tight text-slate-900">
-                {req.documentName}
-              </h2>
-              <p className="mt-1 text-[12px] text-slate-500">
-                {req.documentFile}
-                {req.status === "Draft"
-                  ? " · place and adjust fields before sending"
-                  : ` · ${req.signingOrder} signing`}
-              </p>
-              {total > 0 && req.status !== "Draft" ? (
-                <div className="mt-3 max-w-xs">
-                  <div className="mb-1 flex justify-between text-[10px] font-semibold text-slate-500">
-                    <span>Progress</span>
-                    <span>
-                      {done} of {total}
-                    </span>
-                  </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-violet-500 transition-all"
-                      style={{ width: `${progressPct}%` }}
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </div>
-            <div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2">
-              <span
-                className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-semibold",
-                  avatarColor(req.createdBy),
-                )}
-              >
-                {initials(req.createdBy)}
-              </span>
-              <div>
-                <p className="text-[12px] font-semibold text-slate-800">
-                  {req.createdBy}
-                </p>
-                <p className="text-[10px] text-slate-400">Created by</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid min-h-0 flex-1 lg:grid-cols-[1fr_300px]">
-            <div className="flex min-h-0 flex-col border-b border-slate-100 lg:border-r lg:border-b-0">
-              <div className="grid border-b border-slate-100 sm:grid-cols-2 xl:grid-cols-4">
-                <MetaCell
-                  icon={Users}
-                  label="Signers"
-                  value={`${total} · ${req.signingOrder}`}
-                />
-                <MetaCell
-                  icon={Mail}
-                  label="Primary email"
-                  value={req.signerEmail}
-                />
-                <MetaCell
-                  icon={Link2}
-                  label="Related to"
-                  value={req.relatedTo ?? ""}
-                />
-                <MetaCell
-                  icon={Calendar}
-                  label="Expiry"
-                  value={req.expiryDate}
-                />
-              </div>
-
-              <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
-                <p className="mb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                  Signer progress
-                </p>
-                <ul className="space-y-2">
-                  {req.signers.map((s) => {
-                    const color =
-                      SIGNER_COLORS[s.colorIndex % SIGNER_COLORS.length];
-                    return (
-                      <li
-                        key={s.id}
-                        className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2"
-                      >
-                        <span
-                          className={cn(
-                            "flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold",
-                            color.bg,
-                            color.text,
-                          )}
-                        >
-                          {s.order}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[12px] font-semibold text-slate-800">
-                            {s.name}
-                          </p>
-                          <p className="truncate text-[10px] text-slate-400">
-                            {s.email}
-                          </p>
-                        </div>
-                        <span
-                          className={cn(
-                            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                            SIGNER_STATUS_STYLE[s.status],
-                          )}
-                        >
-                          {s.status}
-                        </span>
-                        {openForSigner &&
-                        s.status !== "Signed" &&
-                        s.status !== "Declined" ? (
-                          <button
-                            type="button"
-                            onClick={() => copySignLink(s.token, s.name)}
-                            className="inline-flex h-7 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-semibold text-slate-600 hover:bg-slate-50"
-                          >
-                            <Copy className="h-3 w-3" />
-                            Link
-                          </button>
-                        ) : null}
-                        {s.status === "Signed" && s.signedAt ? (
-                          <span className="text-[10px] text-emerald-600">
-                            {s.signedAt}
-                          </span>
-                        ) : null}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-
-              <div className="flex min-h-0 flex-1 flex-col p-4 sm:p-5">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                    Document preview
-                  </p>
-                  {req.status === "Draft" ? (
-                    <Link
-                      href={`/documents/signature/${id}/place`}
-                      className="text-[10px] font-semibold text-violet-600 hover:underline"
-                    >
-                      Edit field placement
-                    </Link>
-                  ) : null}
-                </div>
-                <SignatureDocPreview
-                  fileName={req.documentFile}
-                  fields={req.fields}
-                  signers={req.signers}
-                />
-              </div>
-            </div>
-
-            <aside className="flex flex-col bg-slate-50/70 p-4 sm:p-5">
-              <p className="mb-3 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                Actions
-              </p>
-              <div className="space-y-2">
-                {req.status === "Draft" ? (
-                  <>
-                    <ActionBtn
-                      onClick={() =>
-                        router.push(`/documents/signature/${id}/place`)
-                      }
-                      icon={LayoutTemplate}
-                      label="Place / adjust fields"
-                    />
-                    <ActionBtn
-                      onClick={sendForSignature}
-                      icon={Send}
-                      label="Send for signature"
-                      tone="primary"
-                    />
-                  </>
-                ) : null}
-                {openForSigner ? (
-                  <ActionBtn
-                    onClick={resend}
-                    icon={Send}
-                    label="Resend reminders"
-                  />
-                ) : null}
-                {req.status === "Signed" ? (
-                  <ActionBtn
-                    onClick={downloadSigned}
-                    icon={Download}
-                    label="Download signed PDF"
-                    tone="success"
-                  />
-                ) : null}
-                {req.status !== "Signed" &&
-                req.status !== "Cancelled" &&
-                req.status !== "Declined" ? (
-                  <ActionBtn
-                    onClick={cancelRequest}
-                    icon={X}
-                    label="Cancel request"
-                    tone="danger"
-                  />
-                ) : null}
-              </div>
-
-              <dl className="mt-5 space-y-2.5 rounded-xl border border-slate-200/80 bg-white px-3 py-3 text-[12px]">
-                <Row label="Sent" value={req.sentDate ?? ""} />
-                <Row label="Completed" value={req.signedDate ?? ""} />
-                <Row label="IP address" value={req.ipAddress ?? ""} />
-                <Row label="Fields" value={String(req.fields.length)} />
-              </dl>
-
-              <p className="mt-5 mb-2 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-                Audit trail
-              </p>
-              <ol className="min-h-0 flex-1 space-y-0 overflow-auto">
-                {req.audit.map((a, i) => (
-                  <li
-                    key={a.id}
-                    className="relative flex gap-3 pb-3.5 last:pb-0"
-                  >
-                    {i < req.audit.length - 1 ? (
-                      <span
-                        aria-hidden
-                        className="absolute top-3 left-[5px] h-[calc(100%-4px)] w-px bg-slate-200"
-                      />
-                    ) : null}
-                    <span className="relative z-10 mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-violet-500 ring-4 ring-violet-50" />
-                    <div className="min-w-0">
-                      <p className="text-[12px] font-semibold text-slate-800">
-                        {a.action}
-                      </p>
-                      <p className="mt-0.5 text-[10px] text-slate-400">
-                        {a.at} · {a.actor}
-                        {a.ip ? ` · ${a.ip}` : ""}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </aside>
-          </div>
-        </div>
-      </div>
+      ) : null}
 
       {toast ? (
         <div className="fixed right-4 bottom-4 z-50 rounded-xl bg-slate-900 px-4 py-2.5 text-[12px] font-medium text-white shadow-lg">
@@ -573,72 +578,5 @@ export function SignatureDetailClient({ id }: { id: string }) {
         </div>
       ) : null}
     </div>
-  );
-}
-
-function MetaCell({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="border-b border-slate-100 px-4 py-3.5 sm:border-r sm:px-5 sm:[&:nth-child(2n)]:border-r-0 xl:border-b-0 xl:[&:nth-child(2n)]:border-r xl:[&:last-child]:border-r-0">
-      <p className="mb-1 flex items-center gap-1 text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-        <Icon className="h-3 w-3" />
-        {label}
-      </p>
-      <p className="truncate text-[13px] font-semibold text-slate-900">
-        {value || ""}
-      </p>
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-2">
-      <dt className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
-        {label}
-      </dt>
-      <dd className="truncate text-right font-medium text-slate-800">
-        {value || ""}
-      </dd>
-    </div>
-  );
-}
-
-function ActionBtn({
-  onClick,
-  icon: Icon,
-  label,
-  tone,
-}: {
-  onClick: () => void;
-  icon: React.ElementType;
-  label: string;
-  tone?: "primary" | "success" | "danger";
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "flex h-9 w-full items-center justify-center gap-1.5 rounded-lg text-[11px] font-semibold transition-all",
-        tone === "primary"
-          ? "bg-violet-600 text-white hover:bg-violet-700"
-          : tone === "success"
-            ? "bg-emerald-600 text-white hover:bg-emerald-700"
-            : tone === "danger"
-              ? "border border-rose-200 bg-white text-rose-600 hover:bg-rose-50"
-              : "border border-slate-200 bg-white text-slate-700 hover:shadow-sm",
-      )}
-    >
-      <Icon className="h-3.5 w-3.5" />
-      {label}
-    </button>
   );
 }

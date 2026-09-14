@@ -217,6 +217,12 @@ export function smokeEmailsWiring() {
   if (!create.includes("createCrmEmail") || !create.includes("sendCrmEmail")) {
     fail("create email form does not call createCrmEmail/sendCrmEmail");
   }
+  if (!create.includes("partitionEmailAddresses")) {
+    fail("create email form must validate recipient email format");
+  }
+  if (!create.includes("folder=sent") || !create.includes("setSendError")) {
+    fail("create email form must surface send errors and open Sent after send");
+  }
   if (!create.includes("requestEmailAi")) {
     fail("create email form does not call requestEmailAi");
   }
@@ -240,6 +246,9 @@ export function smokeEmailsWiring() {
   );
   if (!subjectBtn.includes("requestEmailSubjects")) {
     fail("Improve subject does not call Gemini");
+  }
+  if (!create.includes("renderEmailTemplateHtml")) {
+    fail("compose templates must replace the body with renderEmailTemplateHtml");
   }
   if (!create.includes("loadFromIdentities")) {
     fail("create email form does not load the From mailbox");

@@ -61,17 +61,10 @@ import {
   publicBookUrl,
   upsertBookingPage,
   WEEKDAYS,
+  listBookingPages,
   type BookingPage,
   type ConsultantPriority,
 } from "@/lib/booking/types";
-import {
-  attachCalendlyEventTypeToPage,
-  calendlyEventTypeToBookingPage,
-  listCalendlyEventTypes,
-  listCalendlyHosts,
-  type CalendlyHost,
-} from "@/lib/booking/calendly-api";
-import { CalendlyConnectionCard } from "@/components/booking/CalendlyConnectionCard";
 
 const BRAND = "#5A32A3";
 
@@ -87,15 +80,7 @@ const SECTION_FILTERS = [
 type SectionFilter = (typeof SECTION_FILTERS)[number];
 
 async function loadConsultationPagesFromApi(): Promise<BookingPage[]> {
-  const [hosts, types] = await Promise.all([
-    listCalendlyHosts().catch(() => [] as CalendlyHost[]),
-    listCalendlyEventTypes().catch(() => []),
-  ]);
-  const hostName = (id: string) =>
-    hosts.find((host) => host.id === id)?.name ?? "";
-  return types.map((item) =>
-    calendlyEventTypeToBookingPage(item, hostName(item.hostId)),
-  );
+  return listBookingPages();
 }
 
 function matchesSection(
@@ -273,9 +258,6 @@ export function ConsultationsBoard() {
       createdAt: new Date().toLocaleDateString("en-GB"),
     };
     upsertBookingPage(page);
-    void attachCalendlyEventTypeToPage(page).then(() => {
-      void loadConsultationPagesFromApi().then(setPages);
-    });
     void loadConsultationPagesFromApi().then(setPages);
     resetWizard();
   }
@@ -506,14 +488,13 @@ export function ConsultationsBoard() {
 
       {pagesLoading ? (
         <p className="rounded-xl border border-dashed border-[#E5E7EB] bg-white py-16 text-center text-[13px] text-slate-400">
-          Loading Calendly event types…
+          Loading consultation pages…
         </p>
       ) : filtered.length === 0 ? (
         <div className="space-y-3">
-          <p className="rounded-xl border border-dashed border-[#E5E7EB] bg-white py-8 text-center text-[13px] text-slate-400">
-            No Calendly event types yet. Connect Calendly below, then sync.
+          <p className="rounded-xl border border-dashed border-[#E5E7EB] bg-white py-16 text-center text-[13px] text-slate-400">
+            No consultation pages yet. Create one to start sharing booking links.
           </p>
-          <CalendlyConnectionCard compact />
         </div>
       ) : view === "grid" ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -737,7 +718,6 @@ function ConsultationCard({
           <ShareButton
             slug={page.slug}
             title={page.title}
-            eventTypeId={page.calendlyEventTypeId || page.id}
           />
         </div>
       </div>
@@ -789,7 +769,6 @@ function ConsultationRow({
         <ShareButton
           slug={page.slug}
           title={page.title}
-          eventTypeId={page.calendlyEventTypeId || page.id}
         />
         <CardMenu page={page} onRefresh={onRefresh} />
       </div>
@@ -958,11 +937,9 @@ function BrandMark({ page }: { page: BookingPage }) {
 function ShareButton({
   slug,
   title,
-  eventTypeId,
 }: {
   slug: string;
   title: string;
-  eventTypeId?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -984,7 +961,6 @@ function ShareButton({
         <ShareConsultationModal
           title={title}
           slug={slug}
-          eventTypeId={eventTypeId}
           onClose={() => setOpen(false)}
         />
       ) : null}

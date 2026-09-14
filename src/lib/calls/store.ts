@@ -266,6 +266,27 @@ export function deleteCall(id: string, opts?: { skipCrm?: boolean }): Call | nul
   return found;
 }
 
+/** Persist a tag on notes — Call has no Nest tags field. */
+export function appendCallNoteTag(notes: string | undefined, tag: string): string {
+  const clean = tag.trim().replace(/^#/, "");
+  if (!clean) return notes ?? "";
+  const existing = notes ?? "";
+  const match = existing.match(/^Tags:\s*(.+)$/m);
+  const current = match
+    ? match[1]
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean)
+    : [];
+  if (current.some((item) => item.toLowerCase() === clean.toLowerCase())) {
+    return existing;
+  }
+  const next = [...current, clean];
+  const line = `Tags: ${next.join(", ")}`;
+  if (match) return existing.replace(/^Tags:\s*.+$/m, line);
+  return existing.trim() ? `${line}\n${existing}` : line;
+}
+
 export function updateCall(id: string, patch: Partial<Call>): Call | null {
   const found = findCallById(id);
   if (!found) return null;

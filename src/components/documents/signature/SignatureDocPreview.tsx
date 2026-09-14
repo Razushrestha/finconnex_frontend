@@ -266,6 +266,7 @@ import {
   type SignatureSigner,
 } from "@/lib/documents/signature/types";
 import { cn } from "@/lib/utils";
+import { placedFieldOverlayStyle } from "@/lib/documents/signature/field-placement";
 import { SignatureFieldValue } from "./SignatureFieldValue";
 
 const PdfDocViewer = dynamic(() => import("./PdfDocViewer"), {
@@ -315,6 +316,8 @@ export function SignatureDocPreview({
   onFieldClick,
   onFieldPointerDown,
   className,
+  pageWidth = 700,
+  embedded = false,
 }: {
   fileName: string;
   fileUrl?: string;
@@ -330,6 +333,8 @@ export function SignatureDocPreview({
     e: React.PointerEvent<HTMLDivElement>,
   ) => void;
   className?: string;
+  pageWidth?: number;
+  embedded?: boolean;
 }) {
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
     if (!interactive || !onCanvasClick) return;
@@ -361,6 +366,7 @@ export function SignatureDocPreview({
           interactive={interactive}
           onFieldClick={onFieldClick}
           className={className}
+          embedded={embedded}
         />
       );
     }
@@ -374,7 +380,9 @@ export function SignatureDocPreview({
         highlightSignerId={highlightSignerId}
         interactive={interactive}
         onFieldClick={onFieldClick}
+        pageWidth={pageWidth}
         className={className}
+        embedded={embedded}
       />
     );
   }
@@ -463,8 +471,9 @@ export function SignatureDocPreview({
         return (
           <div
             key={f.id}
+            data-signing-field={f.id}
             className={cn(
-              "absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center gap-1 overflow-hidden rounded border-2 border-dashed px-1.5 py-1 text-[10px] font-semibold shadow-sm transition-all z-10 select-none",
+              "absolute flex items-center justify-center gap-1 overflow-hidden rounded border-2 border-dashed px-1.5 py-1 text-[10px] font-semibold shadow-sm transition-all z-10 scroll-mt-40 select-none",
               color.bg,
               color.text,
               color.border,
@@ -473,14 +482,7 @@ export function SignatureDocPreview({
               filled && "border-solid bg-white/95",
               interactive && "cursor-grab active:cursor-grabbing",
             )}
-            style={{
-              left: `${f.x}%`,
-              top: `${f.y}%`,
-              width: f.w && f.w <= 100 ? `${f.w}%` : "140px",
-              height: "34px",
-              minHeight: "34px",
-              maxHeight: "34px",
-            }}
+            style={placedFieldOverlayStyle(f)}
             onClick={(e) => {
               e.stopPropagation();
               onFieldClick?.(f.id);

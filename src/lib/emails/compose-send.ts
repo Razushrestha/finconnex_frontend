@@ -1,4 +1,5 @@
 import { persistRemoteEmail, createCrmEmail, sendCrmEmail } from "@/lib/emails/api";
+import { isEmailAddress } from "@/lib/emails/address";
 import { prepareEmailPayload } from "@/lib/emails/attach-files";
 import type { Email } from "@/lib/emails/types";
 
@@ -6,10 +7,12 @@ function uniqueEmails(list: Array<string | undefined>) {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const raw of list) {
-    const email = raw?.trim().toLowerCase();
-    if (!email || !email.includes("@") || seen.has(email)) continue;
-    seen.add(email);
-    out.push(raw!.trim());
+    const email = raw?.trim();
+    if (!email || !isEmailAddress(email)) continue;
+    const key = email.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(email);
   }
   return out;
 }

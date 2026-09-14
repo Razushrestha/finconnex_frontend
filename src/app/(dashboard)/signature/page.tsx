@@ -7,6 +7,7 @@ import {
   listSignatureRequests,
   type SignatureRequest,
   deleteSignatureRequest,
+  computeOverallStatus,
 } from "@/lib/documents/signature/types";
 import { onRecordsChange } from "@/lib/records-sync";
 import {
@@ -37,6 +38,10 @@ import { PaginationBar } from "@/components/ui/pagination-bar";
 import { ESignatureHeader } from "@/components/documents/signature/ESignatureHeader";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useDataTable } from "@/hooks/useDataTable";
+import {
+  formatRelativeTime,
+  parseFlexibleDate,
+} from "@/lib/leads/activity-dates";
 
 const DOC_DEFAULT_WIDTHS = {
   name: 240,
@@ -85,6 +90,37 @@ function initialsFor(name: string): string {
       .toUpperCase()
       .slice(0, 2) || "CU"
   );
+}
+
+function ownerLabel(doc: SignatureRequest): string {
+  const name = doc.createdBy?.trim();
+  if (!name || name === "—") return "—";
+  return name;
+}
+
+function ownerInitial(doc: SignatureRequest): string {
+  const name = ownerLabel(doc);
+  if (name === "—") return "?";
+  return name[0]?.toUpperCase() || "?";
+}
+
+function recipientLabel(doc: SignatureRequest): string {
+  const fromSigners = doc.signers
+    ?.map((s) => s.name?.trim() || s.email?.trim())
+    .filter(Boolean);
+  if (fromSigners?.length) return fromSigners.join(", ");
+  return doc.signer?.trim() || doc.signerEmail?.trim() || "—";
+}
+
+function lastActivityLabel(doc: SignatureRequest): string {
+  const auditAt = doc.audit?.length
+    ? doc.audit[doc.audit.length - 1]?.at
+    : undefined;
+  const raw = doc.updatedAt || auditAt || doc.sentDate || doc.signedDate;
+  if (!raw) return "—";
+  const parsed = parseFlexibleDate(raw) ?? new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return raw;
+  return formatRelativeTime(parsed);
 }
 
 // Small reusable row-actions dropdown (Edit / Delete) shared by both
@@ -189,7 +225,14 @@ export default function ESignatureOverviewPage() {
     };
     refresh();
     return onRecordsChange(refresh);
-  }, [crm.source, crm.loading, templatesCrm.source, templatesCrm.loading]);
+  }, [
+    crm.source,
+    crm.loading,
+    crm.workspaceId,
+    templatesCrm.source,
+    templatesCrm.loading,
+    templatesCrm.workspaceId,
+  ]);
 
   useEffect(() => {
     documentsTable.setItems(docsSource);
@@ -365,7 +408,7 @@ export default function ESignatureOverviewPage() {
                               </div>
                             </Tooltip>
                             <span className="inline-block mt-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-600 rounded dark:bg-zinc-800 dark:text-zinc-400">
-                              Draft
+                              {computeOverallStatus(doc)}
                             </span>
                           </div>
                         </div>
@@ -373,19 +416,29 @@ export default function ESignatureOverviewPage() {
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-1.5 min-w-0">
                           <div className="flex -space-x-1.5 overflow-hidden shrink-0">
-                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-700 ring-2 ring-white dark:ring-zinc-950">
-                              JS
-                            </span>
-                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-[10px] font-bold text-violet-700 ring-2 ring-white dark:ring-zinc-950">
-                              SL
-                            </span>
+                            {(doc.signers?.length
+                              ? doc.signers
+                              : [{ name: doc.signer, email: doc.signerEmail }]
+                            )
+                              .slice(0, 2)
+                              .map((signer, index) => (
+                                <span
+                                  key={`${doc.id}-s-${index}`}
+                                  className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ring-2 ring-white dark:ring-zinc-950 ${
+                                    index === 0
+                                      ? "bg-blue-100 text-blue-700"
+                                      : "bg-violet-100 text-violet-700"
+                                  }`}
+                                >
+                                  {initialsFor(
+                                    signer.name || signer.email || "?",
+                                  )}
+                                </span>
+                              ))}
                           </div>
-                          <Tooltip
-                            content={doc.signer || "john.smith@email.com"}
-                            fullWidth
-                          >
+                          <Tooltip content={recipientLabel(doc)} fullWidth>
                             <span className="block truncate text-slate-500">
-                              {doc.signer || "john.smith@email.com"}
+                              {recipientLabel(doc)}
                             </span>
                           </Tooltip>
                         </div>
@@ -393,11 +446,11 @@ export default function ESignatureOverviewPage() {
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="h-6 w-6 shrink-0 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-700 font-bold dark:bg-zinc-800 dark:text-zinc-300">
-                            F
+                            {ownerInitial(doc)}
                           </div>
-                          <Tooltip content="Finconnex" fullWidth>
+                          <Tooltip content={ownerLabel(doc)} fullWidth>
                             <span className="block truncate font-medium text-slate-900 dark:text-white">
-                              Finconnex
+                              {ownerLabel(doc)}
                             </span>
                           </Tooltip>
                         </div>
@@ -436,13 +489,17 @@ export default function ESignatureOverviewPage() {
                         </span>
                       </td>
                       <td className="py-3.5 px-4 text-slate-500">
-                        <Tooltip content="12 Aug 2025" fullWidth>
-                          <span className="block truncate">12 Aug 2025</span>
+                        <Tooltip content={doc.sentDate || "—"} fullWidth>
+                          <span className="block truncate">
+                            {doc.sentDate || "—"}
+                          </span>
                         </Tooltip>
                       </td>
                       <td className="py-3.5 px-4 text-slate-500">
-                        <Tooltip content="2 hours ago" fullWidth>
-                          <span className="block truncate">2 hours ago</span>
+                        <Tooltip content={lastActivityLabel(doc)} fullWidth>
+                          <span className="block truncate">
+                            {lastActivityLabel(doc)}
+                          </span>
                         </Tooltip>
                       </td>
                       <td className="py-3.5 px-4 text-right">

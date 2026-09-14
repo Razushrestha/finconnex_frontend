@@ -78,6 +78,8 @@ interface LeadKanbanBoardProps {
   /** Header Sort By value: newest | oldest | name_asc | name_desc */
   sortValue?: string;
   visibleColumnIds?: string[];
+  /** Optional display title overrides keyed by column id. */
+  columnTitles?: Record<string, string>;
   onAddLead?: (columnId: string) => void;
   selectedIds: string[];
   onToggleSelect: (id: string) => void;
@@ -96,6 +98,7 @@ export function LeadKanbanBoard({
   filters,
   sortValue,
   visibleColumnIds,
+  columnTitles,
   onAddLead,
   selectedIds,
   onToggleSelect,
@@ -458,7 +461,7 @@ export function LeadKanbanBoard({
             >
               {isCollapsed ? (
                 <KanbanCollapsedRail
-                  title={column.title}
+                  title={columnTitles?.[column.id] ?? column.title}
                   count={column.cards.length}
                   onExpand={() => toggleCollapsed(column.id)}
                   extra={
@@ -480,6 +483,7 @@ export function LeadKanbanBoard({
                       column.id,
                     );
                     const surface = kanbanHeaderSurfaceStyle(hex);
+                    const title = columnTitles?.[column.id] ?? column.title;
                     return (
                       <div
                         className={cn(
@@ -490,8 +494,8 @@ export function LeadKanbanBoard({
                       >
                         <div className="flex h-6 items-center justify-between gap-1">
                           <div className="flex min-w-0 items-center gap-2">
-                            <h2 className={KANBAN_HEADER_TITLE} title={column.title}>
-                              {column.title}
+                            <h2 className={KANBAN_HEADER_TITLE} title={title}>
+                              {title}
                             </h2>
                             <span className={KANBAN_HEADER_COUNT}>
                               {column.cards.length}
@@ -509,7 +513,7 @@ export function LeadKanbanBoard({
                     footer={
                       <KanbanColumnFooter
                         createLabel="Create lead"
-                        createAriaLabel={`Create lead in ${column.title}`}
+                        createAriaLabel={`Create lead in ${columnTitles?.[column.id] ?? column.title}`}
                         onCreate={() =>
                           onAddLead
                             ? onAddLead(column.id)
@@ -518,7 +522,7 @@ export function LeadKanbanBoard({
                               )
                         }
                         onCollapse={() => toggleCollapsed(column.id)}
-                        collapseLabel={`Collapse ${column.title}`}
+                        collapseLabel={`Collapse ${columnTitles?.[column.id] ?? column.title}`}
                       />
                     }
                   >

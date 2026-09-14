@@ -13,11 +13,11 @@ import {
   saveContactGroups,
 } from "@/lib/contacts/store";
 import {
-  CONTACT_SOURCES,
   CONTACT_STATUSES,
   type ContactSource,
   type ContactStatus,
 } from "@/lib/contacts/types";
+import { coerceLeadSource } from "@/lib/leads/types";
 import { getRulesActor, defaultActorName } from "@/lib/rules/actor";
 import { assertUniqueEmail } from "@/lib/rules/integrity";
 
@@ -116,10 +116,8 @@ function cell(
 }
 
 function asSource(value: string, fallback: ContactSource): ContactSource {
-  return (
-    CONTACT_SOURCES.find((s) => s.toLowerCase() === value.toLowerCase()) ??
-    fallback
-  );
+  if (!value.trim()) return fallback;
+  return coerceLeadSource(value);
 }
 
 function asStatus(value: string, fallback: ContactStatus): ContactStatus {
