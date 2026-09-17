@@ -7,6 +7,7 @@ import {
   actionScopeEntity,
   AUTOMATION_ACTION_KEYS,
   AUTOMATION_ACTION_TYPES,
+  hasLinkedContact,
   isActionAllowedForEntity,
   isActionImplemented,
   PLANNED_ACTIONS,
@@ -25,6 +26,21 @@ describe("automation action catalog", () => {
     expect([...RETIRED_ACTIONS]).toEqual(["CHANGE_STATUS"]);
     expect(ACTION_CATALOG.CHANGE_STATUS.label).toBe("Change Status");
     expect(PLANNED_ACTIONS.some((action) => action.label === "Change Status")).toBe(false);
+  });
+
+  it("offers Update Contact Field with an optional contact and required fields", () => {
+    expect(ACTION_CATALOG.UPDATE_CONTACT_FIELD.label).toBe("Update Contact Field");
+    expect(AUTOMATION_ACTION_KEYS.UPDATE_CONTACT_FIELD).toEqual({
+      allowed: ["contactId", "fields"],
+      required: ["fields"],
+    });
+    for (const entity of ["LEAD", "CONTACT", "DEAL", "COMPANY", "TASK"] as const) {
+      expect(isActionAllowedForEntity("UPDATE_CONTACT_FIELD", entity)).toBe(true);
+    }
+    // Mirrors CONTACT_LINKED_ENTITIES: only these can leave the contact empty.
+    expect(hasLinkedContact("LEAD")).toBe(true);
+    expect(hasLinkedContact("DEAL")).toBe(true);
+    expect(hasLinkedContact("COMPANY")).toBe(false);
   });
 
   it("labels and configures every action type", () => {

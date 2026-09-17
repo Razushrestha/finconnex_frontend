@@ -20,6 +20,7 @@ import {
   actionScopeEntity,
   AUTOMATION_ACTION_KEYS,
   FLOW_CONTROL_CATALOG,
+  hasLinkedContact,
   type AutomationActionStep,
   type AutomationEntityType,
   type AutomationIfElseStep,
@@ -142,6 +143,15 @@ function ActionConfigForm({
         ...base,
         label: actionFieldLabel(step.action, key) ?? base.label,
       };
+      // Update Contact Field's contact is optional only where the trigger
+      // record has a contact of its own to fall back on.
+      const contactTarget =
+        step.action === "UPDATE_CONTACT_FIELD" && key === "contactId";
+      if (contactTarget) {
+        meta.helpText = hasLinkedContact(entityType)
+          ? "Leave empty to update the contact linked to the record that started this workflow."
+          : "Pick a contact: this trigger's record has no contact of its own.";
+      }
       // `recordId` is the one key every delete action shares, so what the
       // picker lists comes from the action's entity scope: DELETE_LEAD lists
       // leads, DELETE_DEAL deals. Left empty it still means "the record that
@@ -160,7 +170,9 @@ function ActionConfigForm({
             : key === "fields"
               ? "fields"
               : meta.widget;
-      const required = keys.required.includes(key);
+      const required =
+        keys.required.includes(key) ||
+        (contactTarget && !hasLinkedContact(entityType));
       const value = config[key];
       return (
         <div key={key}>
@@ -234,7 +246,7 @@ function ActionConfigForm({
           )}
           {widget === "fields" && (
             <FieldsEditor
-              entityType={entityType}
+              entityType={step.action === "UPDATE_CONTACT_FIELD" ? "CONTACT" : entityType}
               value={value}
               onChange={(next) => set(key, next)}
               members={members}

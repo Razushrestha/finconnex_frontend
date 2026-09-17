@@ -89,6 +89,19 @@ const LIFECYCLE_STAGE = [
 
 const OWNER: UpdatableField = { label: "Owner", widget: "member" };
 
+/** prisma/schema.prisma → enum LeadSource, which Contact.source also uses. */
+const CONTACT_SOURCE = [
+  { label: "Website", value: "WEBSITE" },
+  { label: "Referral", value: "REFERRAL" },
+  { label: "Cold Call", value: "COLD_CALL" },
+  { label: "Social Media", value: "SOCIAL_MEDIA" },
+  { label: "Email Campaign", value: "EMAIL_CAMPAIGN" },
+  { label: "Paid Ad", value: "PAID_AD" },
+  { label: "Event", value: "EVENT" },
+  { label: "Partner", value: "PARTNER" },
+  { label: "Other", value: "OTHER" },
+];
+
 /** CreateLeadForm → LOAN_PURPOSES, stored in the lead's mortgage profile. */
 const LOAN_PURPOSE = [
   { label: "Purchase", value: "Purchase" },
@@ -135,7 +148,15 @@ export const UPDATABLE_FIELDS: Partial<
     },
     score: { label: "Score", widget: "number" },
   },
+  // Used by Update Field on a contact trigger and by Update Contact Field.
+  // `name` is split into firstName/lastName by the executor (contactUpdate).
   CONTACT: {
+    name: { label: "Contact Name", widget: "text", helpText: "e.g. Priya Mehta" },
+    email: { label: "Email", widget: "text", helpText: "name@example.com" },
+    phone: { label: "Phone", widget: "text" },
+    mobilePhone: { label: "Mobile", widget: "text" },
+    jobTitle: { label: "Job Title", widget: "text" },
+    department: { label: "Department", widget: "text" },
     status: {
       label: "Status",
       widget: "select",
@@ -145,13 +166,15 @@ export const UPDATABLE_FIELDS: Partial<
         { label: "Unsubscribed", value: "UNSUBSCRIBED" },
       ],
     },
-    ownerId: OWNER,
+    ownerId: { label: "Contact Owner", widget: "member" },
     lifecycleStage: {
       label: "Lifecycle Stage",
       widget: "select",
       options: LIFECYCLE_STAGE,
     },
+    source: { label: "Source", widget: "select", options: CONTACT_SOURCE },
     doNotContact: { label: "Do Not Contact", widget: "boolean" },
+    notes: { label: "Notes", widget: "longtext", helpText: "Replaces the contact's notes" },
   },
   COMPANY: {
     status: {

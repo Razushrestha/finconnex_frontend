@@ -66,6 +66,10 @@ export const TASK_CREATING_ACTIONS = [
 export const ACTION_FIELD_LABELS: Partial<
   Record<AutomationActionType, Readonly<Record<string, string>>>
 > = {
+  UPDATE_CONTACT_FIELD: {
+    contactId: "Contact",
+    fields: "Contact Fields to Update",
+  },
   CREATE_LEAD: {
     ownerId: "Lead owner",
     pipelineStage: "Lead Status",

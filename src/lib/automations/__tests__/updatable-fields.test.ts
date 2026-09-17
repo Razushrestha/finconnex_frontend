@@ -32,7 +32,22 @@ describe("updatable fields", () => {
       "secondaryContactId",
     ],
     DEAL: ["stage", "ownerId", "probability", "expectedCloseDate", "lostReason"],
-    CONTACT: ["status", "ownerId", "lifecycleStage", "doNotContact"],
+    CONTACT: [
+      "name",
+      "firstName",
+      "lastName",
+      "email",
+      "phone",
+      "mobilePhone",
+      "jobTitle",
+      "department",
+      "status",
+      "ownerId",
+      "lifecycleStage",
+      "source",
+      "doNotContact",
+      "notes",
+    ],
     COMPANY: ["status", "ownerId", "industry", "size"],
   } as const;
 
@@ -42,6 +57,7 @@ describe("updatable fields", () => {
    */
   const NOT_OFFERED: Partial<Record<keyof typeof BACKEND_MUTABLE, string[]>> = {
     LEAD: ["firstName", "lastName"],
+    CONTACT: ["firstName", "lastName"],
   };
 
   it("matches the executor's allowlist exactly, per entity", () => {

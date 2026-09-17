@@ -84,6 +84,7 @@ export type AutomationEntityType = (typeof AUTOMATION_ENTITY_TYPES)[number];
 
 export const AUTOMATION_ACTION_TYPES = [
   "UPDATE_RECORD",
+  "UPDATE_CONTACT_FIELD",
   "CHANGE_STATUS",
   "ASSIGN_OWNER",
   "CREATE_TASK",
@@ -242,6 +243,7 @@ export const ACTION_CATALOG: Record<
   { label: string; category: string; icon: string }
 > = {
   UPDATE_RECORD: { label: "Update Field", category: "Record", icon: "pencil" },
+  UPDATE_CONTACT_FIELD: { label: "Update Contact Field", category: "Record", icon: "pencil" },
   CHANGE_STATUS: { label: "Change Status", category: "Record", icon: "refresh-cw" },
   ASSIGN_OWNER: { label: "Assign Owner", category: "Record", icon: "user-check" },
   ADD_TAG: { label: "Add Tag", category: "Record", icon: "tag" },
@@ -310,6 +312,29 @@ export const PLANNED_ACTIONS: { label: string; category: string; note: string }[
  * AUTOMATION_ACTION_TYPES rather than listed here.
  */
 const NOT_YET_IMPLEMENTED_ACTIONS: AutomationActionType[] = [];
+
+/**
+ * Mirrors CONTACT_LINKED_ENTITIES in automation-definition.service.ts: trigger
+ * records Update Contact Field can find a contact on when no contact is
+ * picked. Any other trigger needs the step to name one, or publishing fails.
+ */
+export const CONTACT_LINKED_ENTITIES: readonly AutomationEntityType[] = [
+  "CONTACT",
+  "LEAD",
+  "DEAL",
+  "TASK",
+  "CALL",
+  "MEETING",
+  "MESSAGE",
+  "EMAIL",
+  "NOTE",
+  "DOCUMENT",
+  "DOCUMENT_REQUEST",
+];
+
+export function hasLinkedContact(entityType: AutomationEntityType): boolean {
+  return CONTACT_LINKED_ENTITIES.includes(entityType);
+}
 
 export function isActionImplemented(action: AutomationActionType): boolean {
   return !NOT_YET_IMPLEMENTED_ACTIONS.includes(action);
@@ -407,6 +432,10 @@ export const AUTOMATION_ACTION_KEYS: Record<
 > = {
   UPDATE_RECORD: {
     allowed: ["fields"],
+    required: ["fields"],
+  },
+  UPDATE_CONTACT_FIELD: {
+    allowed: ["contactId", "fields"],
     required: ["fields"],
   },
   CHANGE_STATUS: {
