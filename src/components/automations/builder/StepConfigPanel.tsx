@@ -43,6 +43,7 @@ import { entityNoun } from "@/lib/automations/trigger-scope";
 
 import { supportsRecordPicker } from "@/lib/automations/record-search";
 
+import { CreateTaskActionForm, createTaskActionProblems } from "./CreateTaskActionForm";
 import { FieldsEditor } from "./FieldsEditor";
 import { AttachmentsField } from "./AttachmentsField";
 import { MemberSearchField } from "./MemberSearchField";
@@ -116,6 +117,10 @@ function ActionConfigForm({
     );
   }
   const config = step.config ?? {};
+  // Create Task is the task page's own form, not the generic key list.
+  if (step.action === "CREATE_TASK") {
+    return <CreateTaskActionForm config={config} onChange={onChange} />;
+  }
   const email = step.action === "SEND_EMAIL";
   /**
    * Actions that create a task. Their `description` doubles as the task's
@@ -489,7 +494,12 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
           entityNoun(entityType).one,
         )
       : [];
-  const blocked = missingRequired.length > 0 || recipientProblems.length > 0;
+  const taskProblems =
+    draft.type === "ACTION" && draft.action === "CREATE_TASK"
+      ? createTaskActionProblems(draft.config ?? {})
+      : [];
+  const blocked =
+    missingRequired.length > 0 || recipientProblems.length > 0 || taskProblems.length > 0;
 
   return (
     <SlideOverPanel
@@ -568,7 +578,9 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
           <X className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           {draft.type === "IF_ELSE"
             ? "Add at least one condition to save."
-            : missingRequired.length > 0
+            : taskProblems.length > 0
+              ? taskProblems[0]
+              : missingRequired.length > 0
               ? `Missing: ${missingRequired.join(", ")}`
               : recipientProblems[0]}
         </p>
