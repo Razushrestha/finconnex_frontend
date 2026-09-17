@@ -1,6 +1,7 @@
 import { crmWorkspaceFetch } from "@/lib/crm/request";
 import type {
   Automation,
+  AutomationFolder,
   AutomationRun,
   CreateAutomationInput,
 } from "./types";
@@ -54,6 +55,8 @@ export type AutomationListQuery = {
   status?: string;
   triggerType?: string;
   search?: string;
+  /** A folder id, or "root" for the top level. Omit to list every folder. */
+  folderId?: string;
 };
 
 export async function listAutomations(
@@ -66,6 +69,7 @@ export async function listAutomations(
       status: query.status,
       triggerType: query.triggerType,
       search: query.search,
+      folderId: query.folderId,
     }),
   );
   return extractList<Automation>(data);
@@ -75,8 +79,9 @@ export async function getAutomation(id: string): Promise<Automation> {
   return automationsRequest(`/${id}`) as Promise<Automation>;
 }
 
+/** Creation is the only write that files a workflow; later moves use `moveAutomation`. */
 export async function createAutomation(
-  input: CreateAutomationInput,
+  input: CreateAutomationInput & { folderId?: string },
 ): Promise<Automation> {
   return automationsRequest("", {
     method: "POST",
@@ -154,6 +159,54 @@ export async function dryRunAutomation(
     method: "POST",
     body: JSON.stringify(input),
   }) as Promise<AutomationDryRunResult>;
+}
+
+export async function listAutomationFolders(): Promise<AutomationFolder[]> {
+  const data = await automationsRequest("/folders");
+  return extractList<AutomationFolder>(data).items;
+}
+
+export async function createAutomationFolder(input: {
+  name: string;
+  parentId?: string | null;
+}): Promise<AutomationFolder> {
+  return automationsRequest("/folders", {
+    method: "POST",
+    body: JSON.stringify({
+      name: input.name,
+      ...(input.parentId ? { parentId: input.parentId } : {}),
+    }),
+  }) as Promise<AutomationFolder>;
+}
+
+/** Rename a folder, or move it: `parentId: null` moves it to the top level. */
+export async function updateAutomationFolder(
+  id: string,
+  patch: { name?: string; parentId?: string | null },
+): Promise<AutomationFolder> {
+  return automationsRequest(`/folders/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  }) as Promise<AutomationFolder>;
+}
+
+/** The backend refuses a folder that still holds workflows or folders. */
+export async function deleteAutomationFolder(id: string): Promise<void> {
+  await automationsRequest(`/folders/${id}`, { method: "DELETE" });
+}
+
+/**
+ * Files a workflow in a folder, or at the top level with `null`. Unlike a
+ * draft save, this leaves the workflow's versions and published state alone.
+ */
+export async function moveAutomation(
+  id: string,
+  folderId: string | null,
+): Promise<void> {
+  await automationsRequest(`/${id}/move`, {
+    method: "POST",
+    body: JSON.stringify({ folderId }),
+  });
 }
 
 export async function deleteAutomation(id: string): Promise<void> {

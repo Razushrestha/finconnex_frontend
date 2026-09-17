@@ -887,6 +887,8 @@ export type Automation = {
   name: string;
   description?: string | null;
   status: AutomationStatus | string;
+  /** The folder it is filed in; null sits at the top level. */
+  folderId?: string | null;
   /** Flattened from the latest version by the detail endpoint, with run counts. */
   triggers?: AutomationTriggerWithStats[];
   activeVersion?: AutomationVersion | null;
@@ -909,6 +911,17 @@ export type AutomationRun = {
   startedAt?: string | null;
   completedAt?: string | null;
   createdAt?: string;
+};
+
+/** A folder on the workflows list. Folders nest through `parentId`. */
+export type AutomationFolder = {
+  id: string;
+  name: string;
+  parentId: string | null;
+  /** Workflows filed directly in this folder, not in its subfolders. */
+  automationCount: number;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type CreateAutomationInput = {
