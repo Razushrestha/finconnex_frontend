@@ -25,6 +25,7 @@ import {
 } from "@/lib/leads/api";
 import type { CrmLeadStatus } from "@/lib/leads/api/types";
 import { isUuid } from "@/lib/activity-timeline/auth";
+import { RECYCLE_BIN_LEADS_HREF } from "@/lib/recycle-bin/api";
 import { exportLeadsCsv } from "@/lib/leads/import";
 import { composeEmailsHref } from "@/lib/emails/href";
 import { ImportLeadsModal } from "@/components/sales/leads/ImportLeadsModal";
@@ -52,6 +53,7 @@ import {
   ShieldCheck,
   Download,
   Pencil,
+  ArchiveRestore,
 } from "lucide-react";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import { uniqueTags } from "@/lib/tags";
@@ -755,6 +757,12 @@ export default function LeadsPage() {
       label: "Mass Delete",
       icon: <Trash2 className="h-3.5 w-3.5 text-slate-400" />,
       onClick: () => openMassAction("delete"),
+    },
+    {
+      id: "deleted-leads",
+      label: "Deleted Leads",
+      icon: <ArchiveRestore className="h-3.5 w-3.5 text-slate-400" />,
+      onClick: () => router.push(RECYCLE_BIN_LEADS_HREF),
     },
     {
       id: "mass-update",
