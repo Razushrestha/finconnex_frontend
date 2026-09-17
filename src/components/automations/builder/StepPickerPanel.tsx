@@ -6,7 +6,6 @@ import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   ACTION_CATALOG,
-  RETIRED_ACTIONS,
   FLOW_CONTROL_CATALOG,
   isActionAllowedForEntity,
   PLANNED_ACTIONS,
@@ -153,10 +152,8 @@ export function ActionPickerPanel({
     () =>
       [
         ...(Object.entries(ACTION_CATALOG) as [AutomationActionType, (typeof ACTION_CATALOG)[AutomationActionType]][])
-          .filter(
-            ([key]) =>
-              !RETIRED_ACTIONS.has(key) &&
-              entityTypes.every((entityType) => isActionAllowedForEntity(key, entityType))
+          .filter(([key]) =>
+            entityTypes.every((entityType) => isActionAllowedForEntity(key, entityType))
           )
           .map(([key, meta]) => ({ key, label: meta.label, category: meta.category, icon: meta.icon })),
         ...PLANNED_ACTIONS.map((p, i) => ({

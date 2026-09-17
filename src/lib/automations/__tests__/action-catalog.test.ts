@@ -10,7 +10,6 @@ import {
   isActionAllowedForEntity,
   isActionImplemented,
   PLANNED_ACTIONS,
-  RETIRED_ACTIONS,
   type AutomationActionType,
 } from "@/lib/automations/types";
 
@@ -21,12 +20,6 @@ import {
  * publish time — so the shape is asserted rather than trusted.
  */
 describe("automation action catalog", () => {
-  it("no longer offers Update Field, but still names it on saved workflows", () => {
-    expect(RETIRED_ACTIONS.has("UPDATE_RECORD")).toBe(true);
-    expect(ACTION_CATALOG.UPDATE_RECORD.label).toBe("Update Field");
-    expect(PLANNED_ACTIONS.some((action) => action.label === "Update Field")).toBe(false);
-  });
-
   it("labels and configures every action type", () => {
     for (const action of AUTOMATION_ACTION_TYPES) {
       expect(ACTION_CATALOG[action], `${action} has no catalog entry`).toBeDefined();
