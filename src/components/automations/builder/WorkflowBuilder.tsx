@@ -585,7 +585,9 @@ function BuilderInner({ id, folderId: initialFolderId }: { id: string; folderId:
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col">
+    // Fills <main>, which already sits between the navbar and the BottomBar;
+    // a viewport-based height ran 2.5rem under the BottomBar.
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
         <div className="flex items-center gap-3">
           <Button
@@ -640,8 +642,8 @@ function BuilderInner({ id, folderId: initialFolderId }: { id: string; folderId:
           <Background gap={20} />
           <Controls showInteractive={false} />
         </ReactFlow>
-      </div>
 
+      {/* Panels live inside the canvas container so they open below the toolbar. */}
       {panel?.mode === "pick-trigger" && (
         <TriggerPickerPanel
           onClose={() => {
@@ -740,6 +742,7 @@ function BuilderInner({ id, folderId: initialFolderId }: { id: string; folderId:
           onDelete={() => onDeleteStep(panel.path)}
         />
       )}
+      </div>
     </div>
   );
 }

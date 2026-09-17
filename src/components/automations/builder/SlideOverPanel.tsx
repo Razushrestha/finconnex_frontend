@@ -21,13 +21,14 @@ export function SlideOverPanel({
 }) {
   return (
     <>
-      {/* Stops above the persistent BottomBar (BOTTOM_BAR_H = h-10) so its
-          Quick Add / softphone / voice controls stay reachable while a
-          workflow-builder panel is open, instead of being covered by it. */}
-      <div className="fixed inset-x-0 top-0 bottom-10 z-40 bg-slate-900/10" onClick={onClose} aria-hidden />
+      {/* Fills the builder's canvas area, not the viewport: it starts below
+          the workflow toolbar (name, Test Workflow, Save stay usable) and
+          ends above the persistent BottomBar. The parent must be the
+          `relative` canvas container. */}
+      <div className="absolute inset-0 z-40 bg-slate-900/10" onClick={onClose} aria-hidden />
       <aside
         className={cn(
-          "fixed right-0 top-0 bottom-10 z-40 flex w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-2xl",
+          "absolute inset-y-0 right-0 z-40 flex w-full max-w-[40rem] flex-col border-l border-slate-200 bg-white shadow-2xl",
           className
         )}
       >
