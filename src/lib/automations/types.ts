@@ -447,7 +447,7 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: ["ownerId"],
   },
   CREATE_TASK: {
-    allowed: ["subject", "description", "taskType", "priority", "status", "startAt", "dueAt", "reminderAt", "repeatEvery", "recurrenceTimezone", "recurrenceLimit", "isPublic", "isBillable", "assigneeIds", "collaboratorIds", "tags", "attachmentKeys", "relatedType", "leadId", "contactId", "companyId", "dealId"],
+    allowed: ["subject", "description", "taskType", "priority", "status", "startAt", "dueAt", "dueInMs", "reminderAt", "reminderBeforeDueMs", "repeatEvery", "recurrenceTimezone", "recurrenceLimit", "isPublic", "isBillable", "assigneeIds", "collaboratorIds", "tags", "attachmentKeys", "relatedType", "leadId", "contactId", "companyId", "dealId"],
     required: ["subject", "assigneeIds"],
   },
   CREATE_REMINDER: {

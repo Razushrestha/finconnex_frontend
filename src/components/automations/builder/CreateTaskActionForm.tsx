@@ -32,10 +32,14 @@ import type { RelatedTo } from "@/lib/activities/shared";
 import { describeRelatedTarget } from "@/lib/automations/record-search";
 import {
   isStoredRepeat,
+  offsetMs,
   TASK_ACTION_STATUSES,
+  TASK_OFFSET_UNITS,
   taskActionConfigFromForm,
   taskActionFormFromConfig,
   type TaskActionFormState,
+  type TaskOffset,
+  type TaskOffsetUnit,
 } from "@/lib/automations/task-action-form";
 import { listCrmCompanies, tryCrmCompany } from "@/lib/companies/api";
 import { listCrmContacts, tryCrmContact } from "@/lib/contacts/api";
@@ -87,9 +91,17 @@ function nowLocal(): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
 }
 
-/** The task page's date rules (validateTaskDates). */
+/** The task page's date rules (validateTaskDates), or their relative equivalents. */
 function dateErrors(form: TaskActionFormState) {
   const errors: { dueDate?: string; reminderDate?: string } = {};
+  if (form.dueMode === "relative") {
+    const due = offsetMs(form.dueIn);
+    if (due < 60_000) errors.dueDate = "Due time must be at least 1 minute after the workflow runs";
+    else if (due > 365 * 86_400_000) errors.dueDate = "Due time can be at most a year after the workflow runs";
+    if (form.reminderOn && offsetMs(form.reminderBefore) >= due)
+      errors.reminderDate = "Reminder must come before the task is due";
+    return errors;
+  }
   const now = parseLocal(nowLocal())!;
   const due = parseLocal(form.dueDate);
   if (!form.dueDate.trim()) errors.dueDate = "Due date is required";
@@ -102,6 +114,44 @@ function dateErrors(form: TaskActionFormState) {
     else if (reminder <= now) errors.reminderDate = "Reminder must be after the current date and time";
   }
   return errors;
+}
+
+/** "3 [Days]" — an amount and a unit, the task page's input style. */
+function OffsetInput({
+  value,
+  onChange,
+  label,
+  invalid,
+}: {
+  value: TaskOffset;
+  onChange: (next: TaskOffset) => void;
+  label: string;
+  invalid?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <input
+        type="number"
+        min={1}
+        aria-label={`${label} amount`}
+        className={cn(inputClass, "w-20", invalid && "border-red-300")}
+        value={value.amount}
+        onChange={(e) => onChange({ ...value, amount: Math.max(0, Number(e.target.value) || 0) })}
+      />
+      <select
+        aria-label={`${label} unit`}
+        className={cn(selectClass, "w-24")}
+        value={value.unit}
+        onChange={(e) => onChange({ ...value, unit: e.target.value as TaskOffsetUnit })}
+      >
+        {TASK_OFFSET_UNITS.map((unit) => (
+          <option key={unit.value} value={unit.value}>
+            {unit.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 }
 
 function newItemId() {
@@ -162,6 +212,8 @@ export function CreateTaskActionForm({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const collaboratorRef = useRef<HTMLDivElement>(null);
+  // A fixed "now" for previews, so rendering stays pure.
+  const [openedAt] = useState(() => Date.now());
   const formRef = useRef(form);
 
   function commit(next: TaskActionFormState) {
@@ -248,7 +300,11 @@ export function CreateTaskActionForm({
       return !q || owner.name.toLowerCase().includes(q) || owner.email.toLowerCase().includes(q);
     });
   const errors = dateErrors(form);
-  const hasDueDate = Boolean(parseLocal(form.dueDate));
+  const relative = form.dueMode === "relative";
+  // What the Repeat control previews against: for a relative task, as if
+  // the workflow ran now.
+  const previewDue = relative ? new Date(openedAt + offsetMs(form.dueIn)) : parseLocal(form.dueDate);
+  const hasDueDate = relative ? !errors.dueDate : Boolean(parseLocal(form.dueDate));
   const doneCount = form.actionItems.filter((item) => item.done).length;
 
   function addItem() {
@@ -681,6 +737,49 @@ export function CreateTaskActionForm({
           <label className={labelClass}>
             Due Date<Required />
           </label>
+          <div role="radiogroup" aria-label="When the task is due" className="mb-1.5 mt-1 grid grid-cols-2 gap-1 rounded-md bg-slate-100 p-0.5">
+            {(
+              [
+                ["relative", "After workflow runs"],
+                ["date", "Specific date"],
+              ] as const
+            ).map(([mode, text]) => (
+              <button
+                key={mode}
+                type="button"
+                role="radio"
+                aria-checked={form.dueMode === mode}
+                onClick={() =>
+                  commit({
+                    ...formRef.current,
+                    dueMode: mode,
+                    // Reminder settings do not carry across: one is an offset, the other a date.
+                    reminderOn: false,
+                    reminderDate: "",
+                  })
+                }
+                className={cn(
+                  "rounded px-2 py-1 text-[11px] font-medium",
+                  form.dueMode === mode ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700",
+                )}
+              >
+                {text}
+              </button>
+            ))}
+          </div>
+          {relative ? (
+            <div className="space-y-1">
+              <OffsetInput
+                label="Due in"
+                value={form.dueIn}
+                invalid={Boolean(errors.dueDate)}
+                onChange={(dueIn) => update("dueIn", dueIn)}
+              />
+              <p className="text-[11px] text-slate-400">
+                Due this long after the workflow runs, so it works every time the workflow does.
+              </p>
+            </div>
+          ) : (
           <div className="relative">
             <Calendar className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
             <input
@@ -702,6 +801,12 @@ export function CreateTaskActionForm({
               }}
             />
           </div>
+          )}
+          {!relative && form.dueDate && (
+            <p className="mt-1 text-[11px] text-amber-600">
+              The step fails once this date has passed. Use &ldquo;After workflow runs&rdquo; for a workflow that keeps running.
+            </p>
+          )}
           {errors.dueDate && <p className="mt-1 text-[11px] text-red-600">{errors.dueDate}</p>}
         </div>
 
@@ -719,7 +824,7 @@ export function CreateTaskActionForm({
               }
               value={form.taskRepeat}
               onChange={(taskRepeat) => update("taskRepeat", taskRepeat)}
-              due={parseLocal(form.dueDate)}
+              due={previewDue}
               allowAfterCompletion={false}
             />
             {form.repeatOn && !isStoredRepeat(form.taskRepeat) && (
@@ -743,7 +848,24 @@ export function CreateTaskActionForm({
                 aria-label="Reminder"
               />
             </div>
-            {form.reminderOn && (
+            {form.reminderOn && relative && (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <OffsetInput
+                    label="Remind before"
+                    value={form.reminderBefore}
+                    invalid={Boolean(errors.reminderDate)}
+                    onChange={(reminderBefore) => update("reminderBefore", reminderBefore)}
+                  />
+                  <span className="text-[11px] text-slate-500">before it&apos;s due</span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  The task owner gets an in-app reminder at this time.
+                </p>
+                {errors.reminderDate && <p className="text-[11px] text-red-600">{errors.reminderDate}</p>}
+              </>
+            )}
+            {form.reminderOn && !relative && (
               <>
                 <input
                   type="datetime-local"

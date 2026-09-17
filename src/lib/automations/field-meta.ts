@@ -376,6 +376,9 @@ export const FIELD_META: Record<string, FieldMeta> = {
   },
   requestedFromId: { label: "Requested From (Contact)", widget: "text", helpText: "Contact UUID" },
   dueDate: { label: "Due Date", widget: "datetime" },
+  // Create Task's relative schedule; its own form renders these as amount + unit.
+  dueInMs: { label: "Due After Workflow Runs (ms)", widget: "number" },
+  reminderBeforeDueMs: { label: "Reminder Before Due (ms)", widget: "number" },
   status: {
     label: "New Status",
     widget: "select",

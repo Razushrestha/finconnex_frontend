@@ -56,6 +56,30 @@ const RECURRENCE_LIMIT = 12;
 
 export type TaskActionAttachment = { key: string; name: string };
 
+/** Units for a relative due date or reminder, largest first. */
+export const TASK_OFFSET_UNITS = [
+  { label: "Weeks", value: "weeks", ms: 7 * 86_400_000 },
+  { label: "Days", value: "days", ms: 86_400_000 },
+  { label: "Hours", value: "hours", ms: 3_600_000 },
+  { label: "Minutes", value: "minutes", ms: 60_000 },
+] as const;
+export type TaskOffsetUnit = (typeof TASK_OFFSET_UNITS)[number]["value"];
+
+export type TaskOffset = { amount: number; unit: TaskOffsetUnit };
+
+export function offsetMs(offset: TaskOffset): number {
+  const unit = TASK_OFFSET_UNITS.find((row) => row.value === offset.unit)!;
+  return Math.max(0, Math.round(offset.amount)) * unit.ms;
+}
+
+/** The largest unit that expresses `ms` exactly: 172800000 → 2 days. */
+export function offsetFromMs(ms: number): TaskOffset {
+  const unit =
+    TASK_OFFSET_UNITS.find((row) => ms > 0 && ms % row.ms === 0) ??
+    TASK_OFFSET_UNITS[TASK_OFFSET_UNITS.length - 1];
+  return { amount: Math.round(ms / unit.ms), unit: unit.value };
+}
+
 export interface TaskActionFormState {
   title: string;
   taskType: TaskType;
@@ -70,6 +94,14 @@ export interface TaskActionFormState {
   actionItems: TaskActionItem[];
   assignedTo: string;
   collaborators: string[];
+  /**
+   * "relative": due a while after the workflow runs, which keeps working for
+   * as long as the workflow does. "date": a fixed moment, as on the task
+   * page, which the step can no longer meet once it has passed.
+   */
+  dueMode: "relative" | "date";
+  dueIn: TaskOffset;
+  reminderBefore: TaskOffset;
   /** `datetime-local` value, as on the task page. */
   dueDate: string;
   repeatOn: boolean;
@@ -95,6 +127,9 @@ export function emptyTaskActionForm(): TaskActionFormState {
     actionItems: [],
     assignedTo: "",
     collaborators: [],
+    dueMode: "relative",
+    dueIn: { amount: 1, unit: "days" },
+    reminderBefore: { amount: 1, unit: "hours" },
     dueDate: "",
     repeatOn: false,
     taskRepeat: { ...defaultReminderRepeatRule },
@@ -156,13 +191,21 @@ export function taskActionConfigFromForm(
   const collaborators = form.collaborators.filter((id) => id && id !== form.assignedTo);
   if (collaborators.length) config.collaboratorIds = collaborators;
 
-  const dueAt = toIso(form.dueDate);
-  if (dueAt) config.dueAt = dueAt;
-  const reminderAt = form.reminderOn ? toIso(form.reminderDate) : undefined;
-  if (reminderAt && dueAt) config.reminderAt = reminderAt;
+  const relative = form.dueMode === "relative";
+  const dueInMs = offsetMs(form.dueIn);
+  const dueAt = relative ? undefined : toIso(form.dueDate);
+  if (relative) {
+    config.dueInMs = dueInMs;
+    if (form.reminderOn) config.reminderBeforeDueMs = offsetMs(form.reminderBefore);
+  } else if (dueAt) {
+    config.dueAt = dueAt;
+    const reminderAt = form.reminderOn ? toIso(form.reminderDate) : undefined;
+    if (reminderAt) config.reminderAt = reminderAt;
+  }
+  const hasDue = relative ? dueInMs > 0 : Boolean(dueAt);
 
   const repeat =
-    form.repeatOn && dueAt
+    form.repeatOn && hasDue
       ? STORED_REPEATS[form.taskRepeat.preset as keyof typeof STORED_REPEATS]
       : undefined;
   if (repeat) {
@@ -210,9 +253,20 @@ export function taskActionFormFromConfig(
   form.assignedTo = ids(config.assigneeIds)[0] ?? "";
   form.collaborators = ids(config.collaboratorIds);
 
-  form.dueDate = toLocal(config.dueAt);
-  form.reminderDate = toLocal(config.reminderAt);
-  form.reminderOn = Boolean(form.reminderDate);
+  if (typeof config.dueInMs === "number") {
+    form.dueMode = "relative";
+    form.dueIn = offsetFromMs(config.dueInMs);
+    if (typeof config.reminderBeforeDueMs === "number") {
+      form.reminderOn = true;
+      form.reminderBefore = offsetFromMs(config.reminderBeforeDueMs);
+    }
+  } else if (config.dueAt !== undefined) {
+    // A step saved with a fixed date keeps it until someone changes it.
+    form.dueMode = "date";
+    form.dueDate = toLocal(config.dueAt);
+    form.reminderDate = toLocal(config.reminderAt);
+    form.reminderOn = Boolean(form.reminderDate);
+  }
 
   const repeat = Object.entries(STORED_REPEATS).find(
     ([, value]) => value === config.repeatEvery,

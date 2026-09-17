@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   emptyTaskActionForm,
+  offsetFromMs,
   isStoredRepeat,
   TASK_ACTION_STATUSES,
   taskActionConfigFromForm,
@@ -29,6 +30,7 @@ function filled(patch: Partial<TaskActionFormState> = {}): TaskActionFormState {
     ],
     assignedTo: OWNER,
     collaborators: [HELPER, OWNER],
+    dueMode: "date",
     dueDate: "2026-10-01T09:30",
     ...patch,
   };
@@ -129,6 +131,55 @@ describe("Create Task step form", () => {
     });
     expect(back.actionItems.map((item) => item.text)).toEqual(["Confirm income"]);
     expect(back.taskRepeat.preset).toBe("monthly");
+  });
+
+  it("defaults a new step to due a day after the workflow runs", () => {
+    const form = emptyTaskActionForm();
+    expect(form.dueMode).toBe("relative");
+    const config = taskActionConfigFromForm({ ...form, title: "Call", assignedTo: OWNER });
+    expect(config).toMatchObject({ dueInMs: 86_400_000 });
+    expect(config).not.toHaveProperty("dueAt");
+  });
+
+  it("schedules a relative task and its reminder as offsets", () => {
+    const form = filled({
+      dueMode: "relative",
+      dueIn: { amount: 3, unit: "days" },
+      reminderOn: true,
+      reminderBefore: { amount: 2, unit: "hours" },
+      reminderDate: "2026-09-30T09:00",
+      repeatOn: true,
+      taskRepeat: { ...defaultReminderRepeatRule, preset: "daily" },
+    });
+    const config = taskActionConfigFromForm(form, "Australia/Sydney");
+    expect(config).toMatchObject({
+      dueInMs: 3 * 86_400_000,
+      reminderBeforeDueMs: 2 * 3_600_000,
+      repeatEvery: "DAILY",
+    });
+    // Never both ways at once — the API refuses a mix.
+    expect(config).not.toHaveProperty("dueAt");
+    expect(config).not.toHaveProperty("reminderAt");
+
+    const back = taskActionFormFromConfig(config);
+    expect(back).toMatchObject({
+      dueMode: "relative",
+      dueIn: { amount: 3, unit: "days" },
+      reminderOn: true,
+      reminderBefore: { amount: 2, unit: "hours" },
+    });
+  });
+
+  it("keeps a step saved with a fixed date on that date", () => {
+    const back = taskActionFormFromConfig({ subject: "Call", dueAt: "2026-10-01T09:30:00.000Z" });
+    expect(back.dueMode).toBe("date");
+    expect(back.dueDate).not.toBe("");
+  });
+
+  it("shows an offset in the largest unit that fits exactly", () => {
+    expect(offsetFromMs(2 * 7 * 86_400_000)).toEqual({ amount: 2, unit: "weeks" });
+    expect(offsetFromMs(36 * 3_600_000)).toEqual({ amount: 36, unit: "hours" });
+    expect(offsetFromMs(90 * 60_000)).toEqual({ amount: 90, unit: "minutes" });
   });
 
   it("offers every task page status the CRM has", () => {
