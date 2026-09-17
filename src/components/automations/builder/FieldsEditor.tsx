@@ -28,6 +28,7 @@ import {
 import type { WorkspaceMember } from "@/lib/workspace-members/types";
 import type { AutomationEntityType } from "@/lib/automations/types";
 import {
+  offerableFieldKeys,
   unknownFieldKeys,
   updatableFields,
   type UpdatableField,
@@ -55,7 +56,8 @@ export function FieldsEditor({
   const catalog = updatableFields(entityType);
   const chosen = Object.keys(fields).filter((key) => key in catalog);
   const unknown = unknownFieldKeys(entityType, fields);
-  const available = Object.keys(catalog).filter((key) => !(key in fields));
+  const offerable = offerableFieldKeys(entityType, fields);
+  const available = offerable.filter((key) => !(key in fields));
 
   function write(next: Record<string, unknown>) {
     onChange(Object.keys(next).length ? next : undefined);
@@ -103,10 +105,7 @@ export function FieldsEditor({
         return (
           <div key={key} className="flex items-center gap-2">
             <Select
-              items={[...Object.entries(catalog)].map(([k, m]) => ({
-                label: m.label,
-                value: k,
-              }))}
+              items={offerable.map((k) => ({ label: catalog[k].label, value: k }))}
               value={key}
               onValueChange={(next) => next && next !== key && rename(key, next)}
             >
@@ -114,9 +113,9 @@ export function FieldsEditor({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(catalog).map(([k, m]) => (
+                {offerable.map((k) => (
                   <SelectItem key={k} value={k} disabled={k !== key && k in fields}>
-                    {m.label}
+                    {catalog[k].label}
                   </SelectItem>
                 ))}
               </SelectContent>

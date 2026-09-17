@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  offerableFieldKeys,
   unknownFieldKeys,
   updatableFields,
   UPDATABLE_FIELDS,
@@ -15,7 +16,7 @@ describe("updatable fields", () => {
    * happily lets you build.
    */
   const BACKEND_MUTABLE = {
-    LEAD: ["status", "ownerId", "rating", "lifecycleStage", "score"],
+    LEAD: ["pipelineStage", "status", "ownerId", "rating", "lifecycleStage", "score"],
     DEAL: ["stage", "ownerId", "probability", "expectedCloseDate", "lostReason"],
     CONTACT: ["status", "ownerId", "lifecycleStage", "doNotContact"],
     COMPANY: ["status", "ownerId", "industry", "size"],
@@ -75,6 +76,35 @@ describe("updatable fields", () => {
       const meta = updatableFields(entity as keyof typeof BACKEND_MUTABLE).ownerId;
       expect(meta.widget, `${entity}.ownerId`).toBe("member");
     }
+  });
+
+  it("offers a lead's pipeline stages as its Status", () => {
+    const status = updatableFields("LEAD").pipelineStage;
+    expect(status.label).toBe("Status");
+    expect(status.options?.map((o) => o.label)).toEqual([
+      "New Lead",
+      "Appointment Booked",
+      "Appointment Missed",
+      "In Conversation",
+      "Hold",
+      "No Answer",
+      "Waiting on Docs",
+      "Document Received",
+      "Findings",
+      "Research & Servicing",
+      "Servicing Completed",
+      "Loan Proposal Presented",
+      "Future Potential Clients",
+      "Closed Won",
+      "Closed Lost",
+    ]);
+  });
+
+  it("keeps the old lead status for saved steps without offering it for new rows", () => {
+    expect(offerableFieldKeys("LEAD", {})).not.toContain("status");
+    expect(offerableFieldKeys("LEAD", {})[0]).toBe("pipelineStage");
+    expect(offerableFieldKeys("LEAD", { status: "NEW" })).toContain("status");
+    expect(unknownFieldKeys("LEAD", { status: "NEW" })).toEqual([]);
   });
 
   it("surfaces a saved key it cannot offer instead of dropping it", () => {
