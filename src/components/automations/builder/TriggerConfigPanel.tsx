@@ -37,6 +37,7 @@ import {
   relatedRecordMeta,
   scopeRecordIds,
   showsConditionBuilder,
+  showsSpecificRecordOption,
   readTriggerFilter,
   transitionMeta,
   TRANSITION_UNSET,
@@ -931,7 +932,7 @@ export function TriggerConfigPanel({
           </ScopeOption>
         )}
 
-        {pickable && (
+        {pickable && showsSpecificRecordOption(triggerType, scope) && (
           <ScopeOption
             active={scope.mode === "RECORD"}
             title={`A specific ${noun.one}`}
