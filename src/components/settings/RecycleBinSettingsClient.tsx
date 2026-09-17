@@ -12,6 +12,8 @@ import {
   type RecycleBinItem,
 } from "@/lib/rules";
 import {
+  isRecycleEntityType,
+  RECYCLE_ENTITY_LABELS,
   RECYCLE_ENTITY_TYPES,
   purgeCrmRecycleBinItem,
   recycleEntityTypeOf,
@@ -21,8 +23,15 @@ import { useCrmRecycleBin } from "@/lib/recycle-bin/use-crm-recycle-bin";
 import { cn } from "@/lib/utils";
 
 /** Settings → Data Management → Recycle Bin */
-export function RecycleBinSettingsClient() {
-  const [entityType, setEntityType] = useState("");
+export function RecycleBinSettingsClient({
+  initialEntityType,
+}: {
+  /** From `?type=LEAD`, so "Deleted Leads" opens already filtered. */
+  initialEntityType?: string;
+} = {}) {
+  const [entityType, setEntityType] = useState(
+    isRecycleEntityType(initialEntityType) ? initialEntityType : "",
+  );
   const crm = useCrmRecycleBin(entityType || undefined);
   const [rows, setRows] = useState<RecycleBinItem[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -144,7 +153,7 @@ export function RecycleBinSettingsClient() {
             <option value="">All types</option>
             {RECYCLE_ENTITY_TYPES.map((type) => (
               <option key={type} value={type}>
-                {type}
+                {RECYCLE_ENTITY_LABELS[type]}
               </option>
             ))}
           </select>

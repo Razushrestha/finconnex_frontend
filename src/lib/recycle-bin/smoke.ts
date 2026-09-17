@@ -33,8 +33,8 @@ const DECOY_PATH = "/v1/__no_such_module_recycle_bin_probe__";
 
 const LIVE_ROUTES: Array<{ method: string; path: string }> = [
   { method: "GET", path: "/v1/recycle-bin" },
-  { method: "POST", path: `/v1/recycle-bin/lead/${ID}/restore` },
-  { method: "DELETE", path: `/v1/recycle-bin/lead/${ID}` },
+  { method: "POST", path: `/v1/recycle-bin/LEAD/${ID}/restore` },
+  { method: "DELETE", path: `/v1/recycle-bin/LEAD/${ID}` },
 ];
 
 function repoRoot() {
@@ -140,13 +140,13 @@ export async function smokeRecycleBinMock() {
     if (rows.length !== 1 || rows[0]?.recordLabel !== "Priya Mehta") {
       fail("listCrmRecycleBin did not unwrap CRM items");
     }
-    await restoreCrmRecycleBinItem("lead", ID);
-    await purgeCrmRecycleBinItem("lead", ID);
+    await restoreCrmRecycleBinItem("LEAD", ID);
+    await purgeCrmRecycleBinItem("LEAD", ID);
 
     const expected = [
       `GET ${recycleBinPath()}`,
-      `POST ${recycleBinPath(`/lead/${ID}/restore`)}`,
-      `DELETE ${recycleBinPath(`/lead/${ID}`)}`,
+      `POST ${recycleBinPath(`/LEAD/${ID}/restore`)}`,
+      `DELETE ${recycleBinPath(`/LEAD/${ID}`)}`,
     ];
     for (const hit of expected) {
       if (!hits.includes(hit)) {

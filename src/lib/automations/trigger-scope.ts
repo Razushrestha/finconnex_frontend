@@ -932,6 +932,27 @@ export function showsConditionBuilder(
   );
 }
 
+/**
+ * Triggers that do not offer "A specific <record>". A lead exists only after
+ * it is created, and it is created once, so a workflow pinned to one lead on
+ * "Lead Created" could never run.
+ *
+ * Display-only, like `showsConditionBuilder`: a record scope saved before
+ * this still shows, so the user can see it and switch it off.
+ */
+const SPECIFIC_RECORD_HIDDEN: ReadonlySet<AutomationTriggerType> = new Set<
+  AutomationTriggerType
+>(["LEAD_CREATED"]);
+
+export function showsSpecificRecordOption(
+  triggerType: AutomationTriggerType,
+  currentScope: TriggerScope,
+): boolean {
+  return (
+    !SPECIFIC_RECORD_HIDDEN.has(triggerType) || currentScope.mode === "RECORD"
+  );
+}
+
 export function relatedRecordMeta(triggerType: AutomationTriggerType | null) {
   return triggerType ? (RELATED_RECORD_TRIGGERS[triggerType] ?? null) : null;
 }

@@ -9,6 +9,7 @@ import {
   readTriggerScope,
   RELATED_RECORD_TRIGGERS,
   showsConditionBuilder,
+  showsSpecificRecordOption,
   TRANSITION_TRIGGERS,
   TRANSITION_UNSET,
   writeTriggerFilter,
@@ -899,5 +900,24 @@ describe("selecting several related records", () => {
     // than being silently rewritten.
     expect(readTriggerFilter(group, null, CALL_RELATED).related).toEqual({});
     expect(readTriggerFilter(group, null, CALL_RELATED).scope.mode).toBe("FILTER");
+  });
+});
+
+describe("the specific record option", () => {
+  const RECORD = { mode: "RECORD", recordId: "lead-1" } as const;
+  const ANY = { mode: "ANY" } as const;
+
+  it("is hidden on Lead Created, where a pinned lead could never run", () => {
+    expect(showsSpecificRecordOption("LEAD_CREATED", ANY)).toBe(false);
+  });
+
+  it("still shows on Lead Created when a lead was already saved", () => {
+    expect(showsSpecificRecordOption("LEAD_CREATED", RECORD)).toBe(true);
+  });
+
+  it("is unaffected on every other trigger", () => {
+    for (const trigger of ["LEAD_UPDATED", "CONTACT_CREATED", "DEAL_CREATED", "TASK_CREATED"] as const) {
+      expect(showsSpecificRecordOption(trigger, ANY)).toBe(true);
+    }
   });
 });

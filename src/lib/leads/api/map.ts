@@ -356,6 +356,10 @@ export function mapCrmLeadToCard(lead: CrmLead): LeadCardData {
     followerIds: lead.followerIds,
     accentColorClass: PIPELINE_STAGE_DOT[stage],
     avatarBgClass: AVATAR_COLORS[hashIndex(lead.id)],
+    // What the CRM itself says, kept even when a caller overrides `name` or
+    // `owner` for display — applyLocalLeadIdentity compares these across
+    // refreshes to notice a change made outside this browser.
+    custom: { crmName: name, crmOwnerId: lead.ownerId ?? "" },
   };
 }
 

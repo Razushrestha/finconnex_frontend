@@ -58,6 +58,9 @@ function initialsFromName(name: string, fallback: string) {
 type LeadIdentityPin = {
   name: string;
   owner: string;
+  /** The CRM's own name and owner when this was pinned; see applyLocalLeadIdentity. */
+  crmName?: string;
+  crmOwnerId?: string;
   ownerId?: string;
 };
 
@@ -111,6 +114,8 @@ export function pinLeadIdentity(card: LeadCardData) {
     name: name || card.name.trim(),
     owner: owner || (card.owner && !isUuid(card.owner) ? card.owner : ""),
     ownerId: ownerId && isUuid(ownerId) ? ownerId : undefined,
+    crmName: card.custom?.crmName,
+    crmOwnerId: card.custom?.crmOwnerId,
   };
   for (const key of pinKeys(card.id, card.email)) {
     identityPins.set(key, pin);
@@ -126,15 +131,38 @@ function pinnedIdentityFor(card: LeadCardData): LeadIdentityPin | undefined {
   return undefined;
 }
 
+/**
+ * The saved title and owner win over what a refresh returns — unless the CRM
+ * itself changed that value since the last sync (an automation, an import, a
+ * teammate). `crmName`/`crmOwnerId` are what mapCrmLeadToCard read from the
+ * CRM; comparing the incoming CRM value with the one recorded last time tells
+ * a real change apart from the CRM merely spelling the name differently.
+ */
 export function applyLocalLeadIdentity(
   remote: LeadCardData,
   local?: LeadCardData,
 ): LeadCardData {
   const pin = pinnedIdentityFor(remote);
-  const title = local?.custom?.leadTitle?.trim() || pin?.name || "";
-  const ownerName = local?.custom?.leadOwnerName?.trim() || pin?.owner || "";
-  const ownerId =
-    local?.custom?.leadOwnerId?.trim() || pin?.ownerId || "";
+  const remoteCrmName = remote.custom?.crmName;
+  const remoteCrmOwnerId = remote.custom?.crmOwnerId;
+  const lastCrmName = local?.custom?.crmName ?? pin?.crmName;
+  const lastCrmOwnerId = local?.custom?.crmOwnerId ?? pin?.crmOwnerId;
+  const crmRenamed =
+    remoteCrmName !== undefined && lastCrmName !== undefined && remoteCrmName !== lastCrmName;
+  const crmReassigned =
+    remoteCrmOwnerId !== undefined &&
+    lastCrmOwnerId !== undefined &&
+    remoteCrmOwnerId !== lastCrmOwnerId;
+
+  const title = crmRenamed
+    ? remote.name
+    : local?.custom?.leadTitle?.trim() || pin?.name || "";
+  const ownerName = crmReassigned
+    ? ""
+    : local?.custom?.leadOwnerName?.trim() || pin?.owner || "";
+  const ownerId = crmReassigned
+    ? ""
+    : local?.custom?.leadOwnerId?.trim() || pin?.ownerId || "";
   if (!local && !title && !ownerName && !ownerId) return remote;
   const name = title || local?.name || remote.name;
   const keepOwner = Boolean(ownerName || (ownerId && isUuid(ownerId)));
@@ -154,6 +182,21 @@ export function applyLocalLeadIdentity(
       ...(title ? { leadTitle: title } : {}),
       ...(ownerName ? { leadOwnerName: ownerName } : {}),
       ...(ownerId && isUuid(ownerId) ? { leadOwnerId: ownerId } : {}),
+    };
+  }
+  if (crmReassigned) {
+    next.custom = {
+      ...next.custom,
+      leadOwnerName: remote.owner,
+      leadOwnerId: remoteCrmOwnerId,
+    };
+  }
+  // The local card's older CRM values must not survive the merge above.
+  if (remoteCrmName !== undefined || remoteCrmOwnerId !== undefined) {
+    next.custom = {
+      ...next.custom,
+      ...(remoteCrmName !== undefined ? { crmName: remoteCrmName } : {}),
+      ...(remoteCrmOwnerId !== undefined ? { crmOwnerId: remoteCrmOwnerId } : {}),
     };
   }
   return next;
@@ -260,11 +303,17 @@ export function saveLeadColumns(cols: KanbanColumn[]) {
   board.save(next);
   if (typeof localStorage === "undefined") return;
   try {
+    // The backup must follow every save, including an empty one. Skipping
+    // empty boards left the last deleted lead in the backup, and
+    // listLeadColumns() falls back to the backup when the board is empty —
+    // so deleting the only lead brought it straight back.
     if (next.some((col) => col.cards.length > 0)) {
       localStorage.setItem(
         tenantOverlayKey(LEADS_BOARD_BACKUP),
         JSON.stringify(next),
       );
+    } else {
+      localStorage.removeItem(tenantOverlayKey(LEADS_BOARD_BACKUP));
     }
   } catch {
     /* quota / private mode */

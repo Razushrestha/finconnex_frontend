@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  filterFieldKeys,
+  offerableFieldKeys,
   unknownFieldKeys,
   updatableFields,
   UPDATABLE_FIELDS,
@@ -15,19 +17,56 @@ describe("updatable fields", () => {
    * happily lets you build.
    */
   const BACKEND_MUTABLE = {
-    LEAD: ["status", "ownerId", "rating", "lifecycleStage", "score"],
+    LEAD: [
+      "name",
+      "firstName",
+      "lastName",
+      "pipelineStage",
+      "status",
+      "ownerId",
+      "rating",
+      "lifecycleStage",
+      "score",
+      "notes",
+      "loanPurpose",
+      "secondaryContactId",
+    ],
     DEAL: ["stage", "ownerId", "probability", "expectedCloseDate", "lostReason"],
-    CONTACT: ["status", "ownerId", "lifecycleStage", "doNotContact"],
+    CONTACT: [
+      "name",
+      "firstName",
+      "lastName",
+      "email",
+      "phone",
+      "mobilePhone",
+      "jobTitle",
+      "department",
+      "status",
+      "ownerId",
+      "lifecycleStage",
+      "source",
+      "doNotContact",
+      "notes",
+    ],
     COMPANY: ["status", "ownerId", "industry", "size"],
   } as const;
 
+  /**
+   * Accepted by the executor but deliberately not offered: "Lead Name" writes
+   * both, split the way Create Lead splits a name.
+   */
+  const NOT_OFFERED: Partial<Record<keyof typeof BACKEND_MUTABLE, string[]>> = {
+    LEAD: ["firstName", "lastName"],
+    CONTACT: ["firstName", "lastName"],
+  };
+
   it("matches the executor's allowlist exactly, per entity", () => {
     for (const [entity, expected] of Object.entries(BACKEND_MUTABLE)) {
-      const offered = Object.keys(
-        updatableFields(entity as keyof typeof BACKEND_MUTABLE),
-      ).sort();
+      const key = entity as keyof typeof BACKEND_MUTABLE;
+      const hidden = NOT_OFFERED[key] ?? [];
+      const offered = Object.keys(updatableFields(key)).sort();
       expect(offered, `${entity} drifted from MUTABLE_${entity}_FIELDS`).toEqual(
-        [...expected].sort(),
+        expected.filter((field) => !hidden.includes(field)).sort(),
       );
     }
   });
@@ -61,6 +100,9 @@ describe("updatable fields", () => {
       )) {
         if (meta.widget !== "select") continue;
         expect(meta.options?.length, `${entity}.${key} has no options`).toBeGreaterThan(0);
+        // Loan purpose is not an enum: it is stored in the mortgage profile
+        // as the Create Lead form writes it ("Purchase", not "PURCHASE").
+        if (entity === "LEAD" && key === "loanPurpose") continue;
         // Values are written straight to the column, so they must be the
         // enum's own spelling, not a display label.
         for (const opt of meta.options ?? []) {
@@ -75,6 +117,68 @@ describe("updatable fields", () => {
       const meta = updatableFields(entity as keyof typeof BACKEND_MUTABLE).ownerId;
       expect(meta.widget, `${entity}.ownerId`).toBe("member");
     }
+  });
+
+  it("offers a lead's pipeline stages as its Status", () => {
+    const status = updatableFields("LEAD").pipelineStage;
+    expect(status.label).toBe("Lead Status");
+    expect(status.options?.map((o) => o.label)).toEqual([
+      "New Lead",
+      "Appointment Booked",
+      "Appointment Missed",
+      "In Conversation",
+      "Hold",
+      "No Answer",
+      "Waiting on Docs",
+      "Document Received",
+      "Findings",
+      "Research & Servicing",
+      "Servicing Completed",
+      "Loan Proposal Presented",
+      "Future Potential Clients",
+      "Closed Won",
+      "Closed Lost",
+    ]);
+  });
+
+  it("keeps the old lead status for saved steps without offering it for new rows", () => {
+    expect(offerableFieldKeys("LEAD", {})).not.toContain("status");
+    expect(offerableFieldKeys("LEAD", {})).toContain("pipelineStage");
+    expect(offerableFieldKeys("LEAD", { status: "NEW" })).toContain("status");
+    expect(unknownFieldKeys("LEAD", { status: "NEW" })).toEqual([]);
+  });
+
+  it("offers a lead's own fields first, in the lead page's terms", () => {
+    expect(offerableFieldKeys("LEAD", {}).slice(0, 6)).toEqual([
+      "name",
+      "ownerId",
+      "pipelineStage",
+      "loanPurpose",
+      "secondaryContactId",
+      "notes",
+    ]);
+    const lead = updatableFields("LEAD");
+    expect(lead.secondaryContactId.widget).toBe("contact");
+    expect(lead.notes.widget).toBe("longtext");
+    expect(lead.loanPurpose.options?.map((o) => o.value)).toEqual([
+      "Purchase",
+      "Refinance",
+      "Investment",
+    ]);
+  });
+
+  it("searches fields by any words of their label, in any case", () => {
+    const keys = offerableFieldKeys("LEAD", {});
+    expect(filterFieldKeys("LEAD", keys, "")).toEqual(keys);
+    expect(filterFieldKeys("LEAD", keys, "status")).toEqual(["pipelineStage"]);
+    expect(filterFieldKeys("LEAD", keys, "LOAN")).toEqual(["loanPurpose"]);
+    expect(filterFieldKeys("LEAD", keys, "contact secondary")).toEqual(["secondaryContactId"]);
+    expect(filterFieldKeys("LEAD", keys, "lead")).toEqual([
+      "name",
+      "ownerId",
+      "pipelineStage",
+    ]);
+    expect(filterFieldKeys("LEAD", keys, "nothing like this")).toEqual([]);
   });
 
   it("surfaces a saved key it cannot offer instead of dropping it", () => {

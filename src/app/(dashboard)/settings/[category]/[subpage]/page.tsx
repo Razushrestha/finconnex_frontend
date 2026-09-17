@@ -36,10 +36,14 @@ import { cn } from "@/lib/utils";
 
 interface PageProps {
   params: Promise<{ category: string; subpage: string }>;
+  searchParams: Promise<{ type?: string | string[] }>;
 }
 
-export default async function SettingsSubPage({ params }: PageProps) {
-  const { category: categorySlug, subpage: subpageSlug } = await params;
+export default async function SettingsSubPage({ params, searchParams }: PageProps) {
+  const [{ category: categorySlug, subpage: subpageSlug }, query] = await Promise.all([
+    params,
+    searchParams,
+  ]);
 
   const legacy = SETTINGS_REDIRECTS[`${categorySlug}/${subpageSlug}`];
   if (legacy) {
@@ -56,7 +60,9 @@ export default async function SettingsSubPage({ params }: PageProps) {
 
   const custom =
     key === "data-management/recycle-bin" ? (
-      <RecycleBinSettingsClient />
+      <RecycleBinSettingsClient
+        initialEntityType={Array.isArray(query.type) ? query.type[0] : query.type}
+      />
     ) : key === "crm-configuration/lead-card" ? (
       <LeadCardSettingsClient />
     ) : key === "crm-configuration/custom-fields" ? (

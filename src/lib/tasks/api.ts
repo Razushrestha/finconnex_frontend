@@ -138,7 +138,7 @@ export function mapTaskStatus(raw: string): TaskStatus {
   return hit ?? "Not Started";
 }
 
-function apiTaskStatus(status: TaskStatus): string {
+export function apiTaskStatus(status: TaskStatus): string {
   if (status === "In Progress") return "IN_PROGRESS";
   if (status === "Waiting") return "DEFERRED";
   if (status === "Review") return "REVIEW";
@@ -154,7 +154,7 @@ export function mapTaskPriority(raw: string): Priority {
   return hit ?? "Medium";
 }
 
-function apiTaskPriority(priority: Priority): string {
+export function apiTaskPriority(priority: Priority): string {
   if (priority === "Critical") return "URGENT";
   return priority.toUpperCase();
 }
@@ -167,7 +167,7 @@ export function mapTaskType(raw: string): TaskType {
   return hit ?? "Other";
 }
 
-function apiTaskType(type: TaskType): string {
+export function apiTaskType(type: TaskType): string {
   if (type === "Team Action") return "OTHER";
   if (type === "Follow-up") return "FOLLOW_UP";
   return type.toUpperCase().replace(/[\s-]+/g, "_");
@@ -634,7 +634,8 @@ export function toCreateTaskBody(input: CreateCrmTaskInput): Record<string, unkn
     assigneeIds: owners,
     collaboratorIds,
     attachmentKeys: input.attachmentKeys,
-    status: apiTaskStatus(input.status),
+    // No `status`: CreateTaskDto rejects it (every task starts NOT_STARTED),
+    // which failed every create. createCrmTask applies it afterwards.
     repeatEvery: input.repeatEvery,
     recurrenceTimezone: input.repeatEvery
       ? Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -654,7 +655,7 @@ export async function createCrmTask(
       "Could not find a workspace member to assign. Sign in and pick a Task Owner.",
     );
   }
-  const created = asTask(
+  let created = asTask(
     await tasksMutate("", {
       method: "POST",
       body: JSON.stringify(
@@ -662,6 +663,9 @@ export async function createCrmTask(
       ),
     }),
   );
+  if (created && input.status) {
+    created = (await applyCrmTaskStatus(created.taskId, input.status)) ?? created;
+  }
   if (
     created &&
     input.attachmentKeys?.length &&
@@ -733,6 +737,25 @@ export async function updateCrmTask(
 
 export async function deleteCrmTask(id: string): Promise<void> {
   await tasksMutate(`/${id}`, { method: "DELETE" });
+}
+
+/**
+ * Moves a new task out of Not Started through the lifecycle endpoints, the
+ * only way the API changes a status. "Review" has no API status, so it
+ * stays Not Started.
+ */
+export async function applyCrmTaskStatus(
+  id: string,
+  status: TaskStatus,
+): Promise<Task | null> {
+  const path = {
+    IN_PROGRESS: "start",
+    DEFERRED: "defer",
+    COMPLETED: "complete",
+    CANCELLED: "cancel",
+  }[apiTaskStatus(status)];
+  if (!path) return null;
+  return asTask(await tasksMutate(`/${id}/${path}`, { method: "POST", body: "{}" }));
 }
 
 export async function completeCrmTask(id: string): Promise<Task | null> {

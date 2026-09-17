@@ -79,3 +79,63 @@ describe("applyLocalLeadIdentity", () => {
     expect(next.owner).toBe("Binay");
   });
 });
+
+describe("applyLocalLeadIdentity after the CRM record changes", () => {
+  const OWNER_A = "22222222-2222-4222-8222-222222222222";
+  const OWNER_B = "33333333-3333-4333-8333-333333333333";
+
+  /** A card as mapCrmLeadToCard builds it: the CRM's own name and owner recorded. */
+  function fromCrm(name: string, owner: string, ownerId: string): LeadCardData {
+    return card({ name, owner, ownerId, custom: { crmName: name, crmOwnerId: ownerId } });
+  }
+
+  /** The local card after Create Lead: the typed title and chosen owner. */
+  const local = card({
+    name: "Priya",
+    owner: "Binay",
+    ownerId: OWNER_A,
+    custom: {
+      leadTitle: "Priya",
+      leadOwnerName: "Binay",
+      leadOwnerId: OWNER_A,
+      crmName: "Priya Priya",
+      crmOwnerId: OWNER_A,
+    },
+  });
+
+  it("keeps the typed title while the CRM name has not changed", () => {
+    const next = applyLocalLeadIdentity(fromCrm("Priya Priya", "Binay K", OWNER_A), local);
+    expect(next.name).toBe("Priya");
+    expect(next.owner).toBe("Binay");
+  });
+
+  it("shows a name the CRM changed since the last sync, such as an automation rename", () => {
+    const next = applyLocalLeadIdentity(fromCrm("Sam Lee", "Binay K", OWNER_A), local);
+    expect(next.name).toBe("Sam Lee");
+    expect(next.custom?.leadTitle).toBe("Sam Lee");
+    expect(next.custom?.crmName).toBe("Sam Lee");
+    // The owner did not change, so the chosen owner label stays.
+    expect(next.owner).toBe("Binay");
+  });
+
+  it("shows an owner the CRM changed since the last sync", () => {
+    const next = applyLocalLeadIdentity(fromCrm("Priya Priya", "Ramesh", OWNER_B), local);
+    expect(next.ownerId).toBe(OWNER_B);
+    expect(next.owner).toBe("Ramesh");
+    expect(next.custom?.leadOwnerId).toBe(OWNER_B);
+    expect(next.custom?.crmOwnerId).toBe(OWNER_B);
+    expect(next.name).toBe("Priya");
+  });
+
+  it("keeps the new name on the following refresh", () => {
+    const renamed = applyLocalLeadIdentity(fromCrm("Sam Lee", "Binay K", OWNER_A), local);
+    const again = applyLocalLeadIdentity(fromCrm("Sam Lee", "Binay K", OWNER_A), renamed);
+    expect(again.name).toBe("Sam Lee");
+  });
+
+  it("does not treat a card built outside the CRM as a CRM change", () => {
+    const next = applyLocalLeadIdentity(card({ name: "Someone Else", ownerId: OWNER_B }), local);
+    expect(next.name).toBe("Priya");
+    expect(next.owner).toBe("Binay");
+  });
+});

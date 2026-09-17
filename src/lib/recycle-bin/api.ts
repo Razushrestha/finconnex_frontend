@@ -1,25 +1,43 @@
 import { crmWorkspaceFetch } from "@/lib/crm/request";
 import type { RecycleBinItem } from "@/lib/rules/soft-delete";
 
+/**
+ * Mirrors RECYCLE_BIN_ENTITY_TYPE_VALUES in the API. The list endpoint
+ * requires one of these, spelled exactly so, and rejects any other query
+ * parameter — so these are the only types the bin can show.
+ */
 export const RECYCLE_ENTITY_TYPES = [
-  "lead",
-  "contact",
-  "company",
-  "deal",
-  "quote",
-  "estimate",
-  "invoice",
-  "payment",
-  "product",
-  "email",
-  "note",
-  "meeting",
-  "call",
-  "document",
-  "ticket",
+  "LEAD",
+  "CONTACT",
+  "COMPANY",
+  "DEAL",
+  "TASK",
+  "EMAIL",
+  "MESSAGE",
+  "DOCUMENT",
+  "DOCUMENT_REQUEST",
 ] as const;
 
 export type RecycleEntityType = (typeof RECYCLE_ENTITY_TYPES)[number];
+
+export const RECYCLE_BIN_HREF = "/settings/data-management/recycle-bin";
+export const RECYCLE_BIN_LEADS_HREF = `${RECYCLE_BIN_HREF}?type=LEAD`;
+
+export function isRecycleEntityType(value: unknown): value is RecycleEntityType {
+  return (RECYCLE_ENTITY_TYPES as readonly unknown[]).includes(value);
+}
+
+export const RECYCLE_ENTITY_LABELS: Record<RecycleEntityType, string> = {
+  LEAD: "Leads",
+  CONTACT: "Contacts",
+  COMPANY: "Companies",
+  DEAL: "Deals",
+  TASK: "Tasks",
+  EMAIL: "Emails",
+  MESSAGE: "Messages",
+  DOCUMENT: "Documents",
+  DOCUMENT_REQUEST: "Document requests",
+};
 
 export type CrmRecycleBinQuery = {
   entityType?: string;
@@ -94,6 +112,9 @@ export function moduleFromEntityType(entityType: string): string {
     meeting: "activities.meetings",
     call: "activities.calls",
     document: "documents.library",
+    document_request: "documents.requests",
+    task: "activities.tasks",
+    message: "activities.messages",
     ticket: "support.tickets",
   };
   return map[key] ?? `crm.${key}`;
@@ -160,45 +181,52 @@ export function normalizeRecycleBinItem(
   };
 }
 
-async function fetchList(query: CrmRecycleBinQuery): Promise<RecycleBinItem[]> {
+/** One entity type's page, raw, with only the parameters the API accepts. */
+async function fetchRecords(
+  entityType: string,
+  query: CrmRecycleBinQuery,
+): Promise<Record<string, unknown>[]> {
   const data = await crmWorkspaceFetch(
     recycleBinPath(
       toQuery({
+        entityType: entityType.toUpperCase(),
         page: query.page ?? 1,
-        limit: query.limit ?? 100,
-        entityType: query.entityType,
-        type: query.entityType,
+        limit: Math.min(query.limit ?? 100, 100),
       }),
     ),
   );
-  return extractRecords(data).map((row, index) =>
-    normalizeRecycleBinItem(row, index),
-  );
+  return extractRecords(data);
 }
 
+function deletedTime(row: Record<string, unknown>): number {
+  const parsed = Date.parse(pickStr(row.deletedAt, row.deleted_at));
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+/**
+ * The API lists one entity type per request, so "all types" is one request
+ * per type, merged newest-deleted first. A type that fails is skipped, but
+ * if every type fails the error surfaces instead of reading as an empty bin.
+ */
 export async function listCrmRecycleBin(
   query: CrmRecycleBinQuery = {},
 ): Promise<RecycleBinItem[]> {
-  if (query.entityType) return fetchList(query);
-  try {
-    return await fetchList(query);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "";
-    if (!/entitytype|type|required|bad request/i.test(message)) throw err;
-    const pages = await Promise.allSettled(
-      RECYCLE_ENTITY_TYPES.map((entityType) =>
-        fetchList({ ...query, entityType }),
-      ),
-    );
-    const byKey = new Map<string, RecycleBinItem>();
-    for (const page of pages) {
-      if (page.status !== "fulfilled") continue;
-      for (const row of page.value) {
-        byKey.set(`${row.entityType}:${row.recordId}`, row);
-      }
-    }
-    return Array.from(byKey.values());
+  const types = query.entityType ? [query.entityType] : [...RECYCLE_ENTITY_TYPES];
+  const pages = await Promise.allSettled(types.map((type) => fetchRecords(type, query)));
+  const loaded = pages.flatMap((page) => (page.status === "fulfilled" ? [page.value] : []));
+  if (loaded.length === 0) {
+    const failure = pages.find((page) => page.status === "rejected");
+    throw failure?.status === "rejected" && failure.reason instanceof Error
+      ? failure.reason
+      : new Error("Recycle bin unavailable");
   }
+  const byKey = new Map<string, Record<string, unknown>>();
+  for (const row of loaded.flat()) {
+    byKey.set(`${pickStr(row.entityType)}:${pickStr(row.id)}`, row);
+  }
+  return [...byKey.values()]
+    .sort((a, b) => deletedTime(b) - deletedTime(a))
+    .map((row, index) => normalizeRecycleBinItem(row, index));
 }
 
 function recycleItemPath(entityType: string, id: string): string {
@@ -226,6 +254,7 @@ export async function purgeCrmRecycleBinItem(
   });
 }
 
+/** The API's spelling (LEAD, DEAL, …), which restore and purge require. */
 export function recycleEntityTypeOf(item: RecycleBinItem): string {
-  return item.entityType?.trim() || entityTypeFromModule(item.module);
+  return (item.entityType?.trim() || entityTypeFromModule(item.module)).toUpperCase();
 }

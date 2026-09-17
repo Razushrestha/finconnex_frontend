@@ -14,10 +14,11 @@
  * dropped, so opening a step never discards someone else's configuration.
  */
 
-import { Plus, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -28,12 +29,15 @@ import {
 import type { WorkspaceMember } from "@/lib/workspace-members/types";
 import type { AutomationEntityType } from "@/lib/automations/types";
 import {
+  offerableFieldKeys,
   unknownFieldKeys,
   updatableFields,
   type UpdatableField,
 } from "@/lib/automations/updatable-fields";
 
+import { FieldPicker } from "./FieldPicker";
 import { MemberSelect } from "./MemberSelect";
+import { RecordField } from "./RecordField";
 
 export function FieldsEditor({
   entityType,
@@ -55,7 +59,9 @@ export function FieldsEditor({
   const catalog = updatableFields(entityType);
   const chosen = Object.keys(fields).filter((key) => key in catalog);
   const unknown = unknownFieldKeys(entityType, fields);
-  const available = Object.keys(catalog).filter((key) => !(key in fields));
+  const offerable = offerableFieldKeys(entityType, fields);
+  const available = offerable.filter((key) => !(key in fields));
+  const taken = new Set(Object.keys(fields));
 
   function write(next: Record<string, unknown>) {
     onChange(Object.keys(next).length ? next : undefined);
@@ -102,25 +108,14 @@ export function FieldsEditor({
         const meta = catalog[key];
         return (
           <div key={key} className="flex items-center gap-2">
-            <Select
-              items={[...Object.entries(catalog)].map(([k, m]) => ({
-                label: m.label,
-                value: k,
-              }))}
+            <FieldPicker
+              variant="row"
+              entityType={entityType}
+              keys={offerable}
               value={key}
-              onValueChange={(next) => next && next !== key && rename(key, next)}
-            >
-              <SelectTrigger className="h-8 w-[40%] text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(catalog).map(([k, m]) => (
-                  <SelectItem key={k} value={k} disabled={k !== key && k in fields}>
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              taken={taken}
+              onSelect={(next) => rename(key, next)}
+            />
 
             <div className="flex-1">
               <FieldValue
@@ -170,15 +165,13 @@ export function FieldsEditor({
       ))}
 
       {available.length > 0 && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1 text-xs"
-          onClick={() => setValue(available[0], defaultFor(catalog[available[0]]))}
-        >
-          <Plus className="h-3.5 w-3.5" />
-          Add field
-        </Button>
+        <FieldPicker
+          variant="add"
+          entityType={entityType}
+          keys={offerable}
+          taken={taken}
+          onSelect={(key) => setValue(key, defaultFor(catalog[key]))}
+        />
       )}
     </div>
   );
@@ -232,6 +225,28 @@ function FieldValue({
           ))}
         </SelectContent>
       </Select>
+    );
+  }
+
+  if (meta.widget === "contact") {
+    return (
+      <RecordField
+        target="CONTACT"
+        value={typeof value === "string" ? value : ""}
+        onChange={onChange}
+        noun={{ one: "contact", many: "contacts" }}
+      />
+    );
+  }
+
+  if (meta.widget === "longtext") {
+    return (
+      <Textarea
+        className="min-h-16 text-xs"
+        value={typeof value === "string" ? value : ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={meta.helpText}
+      />
     );
   }
 

@@ -19,17 +19,48 @@ import type { AutomationEntityType } from "./types";
 export type UpdatableFieldWidget =
   | "select"
   | "member"
+  | "contact"
   | "number"
   | "boolean"
   | "date"
-  | "text";
+  | "text"
+  | "longtext";
 
 export interface UpdatableField {
   label: string;
   widget: UpdatableFieldWidget;
   options?: { label: string; value: string }[];
   helpText?: string;
+  /**
+   * Still written by the executor, but no longer offered for a new row. A
+   * step that already sets it keeps showing it, so opening an older workflow
+   * never turns a working field into a warning.
+   */
+  legacy?: boolean;
 }
+
+/**
+ * prisma/schema.prisma → enum MortgagePipelineStage, labelled as the lead's
+ * pipeline and board columns name them. This is the "status" people see on
+ * a lead, so it is what Update Field offers as Status.
+ */
+const LEAD_PIPELINE_STAGE = [
+  { label: "New Lead", value: "NEW_LEAD" },
+  { label: "Appointment Booked", value: "APPOINTMENT_BOOKED" },
+  { label: "Appointment Missed", value: "APPOINTMENT_MISSED" },
+  { label: "In Conversation", value: "IN_CONVERSATION" },
+  { label: "Hold", value: "HOLD" },
+  { label: "No Answer", value: "NO_ANSWER" },
+  { label: "Waiting on Docs", value: "WAITING_ON_DOCS" },
+  { label: "Document Received", value: "DOCUMENT_RECEIVED" },
+  { label: "Findings", value: "FINDINGS" },
+  { label: "Research & Servicing", value: "RESEARCH_AND_SERVICING" },
+  { label: "Servicing Completed", value: "SERVICING_COMPLETED" },
+  { label: "Loan Proposal Presented", value: "LOAN_PROPOSAL_PRESENTED" },
+  { label: "Future Potential Clients", value: "FUTURE_POTENTIAL_CLIENTS" },
+  { label: "Closed Won", value: "CLOSED_WON" },
+  { label: "Closed Lost", value: "CLOSED_LOST" },
+];
 
 /** prisma/schema.prisma → enum LeadStatus */
 const LEAD_STATUS = [
@@ -58,12 +89,49 @@ const LIFECYCLE_STAGE = [
 
 const OWNER: UpdatableField = { label: "Owner", widget: "member" };
 
+/** prisma/schema.prisma → enum LeadSource, which Contact.source also uses. */
+const CONTACT_SOURCE = [
+  { label: "Website", value: "WEBSITE" },
+  { label: "Referral", value: "REFERRAL" },
+  { label: "Cold Call", value: "COLD_CALL" },
+  { label: "Social Media", value: "SOCIAL_MEDIA" },
+  { label: "Email Campaign", value: "EMAIL_CAMPAIGN" },
+  { label: "Paid Ad", value: "PAID_AD" },
+  { label: "Event", value: "EVENT" },
+  { label: "Partner", value: "PARTNER" },
+  { label: "Other", value: "OTHER" },
+];
+
+/** CreateLeadForm → LOAN_PURPOSES, stored in the lead's mortgage profile. */
+const LOAN_PURPOSE = [
+  { label: "Purchase", value: "Purchase" },
+  { label: "Refinance", value: "Refinance" },
+  { label: "Investment", value: "Investment" },
+];
+
 export const UPDATABLE_FIELDS: Partial<
   Record<AutomationEntityType, Record<string, UpdatableField>>
 > = {
+  // Order is the order "Add field" offers them in: the lead page's own
+  // fields first. `name`, `loanPurpose` and `secondaryContactId` are not
+  // columns — the executor maps them (automation-action.service updateLead).
   LEAD: {
-    status: { label: "Status", widget: "select", options: LEAD_STATUS },
-    ownerId: OWNER,
+    name: {
+      label: "Lead Name",
+      widget: "text",
+      helpText: "e.g. Priya Mehta",
+    },
+    ownerId: { label: "Lead Owner", widget: "member" },
+    pipelineStage: { label: "Lead Status", widget: "select", options: LEAD_PIPELINE_STAGE },
+    loanPurpose: { label: "Loan Purpose", widget: "select", options: LOAN_PURPOSE },
+    secondaryContactId: { label: "Add Secondary Contact", widget: "contact" },
+    notes: { label: "Notes", widget: "longtext", helpText: "Replaces the lead's notes" },
+    status: {
+      label: "Legacy status",
+      widget: "select",
+      options: LEAD_STATUS,
+      legacy: true,
+    },
     rating: {
       label: "Rating",
       widget: "select",
@@ -80,7 +148,15 @@ export const UPDATABLE_FIELDS: Partial<
     },
     score: { label: "Score", widget: "number" },
   },
+  // Used by Update Field on a contact trigger and by Update Contact Field.
+  // `name` is split into firstName/lastName by the executor (contactUpdate).
   CONTACT: {
+    name: { label: "Contact Name", widget: "text", helpText: "e.g. Priya Mehta" },
+    email: { label: "Email", widget: "text", helpText: "name@example.com" },
+    phone: { label: "Phone", widget: "text" },
+    mobilePhone: { label: "Mobile", widget: "text" },
+    jobTitle: { label: "Job Title", widget: "text" },
+    department: { label: "Department", widget: "text" },
     status: {
       label: "Status",
       widget: "select",
@@ -90,13 +166,15 @@ export const UPDATABLE_FIELDS: Partial<
         { label: "Unsubscribed", value: "UNSUBSCRIBED" },
       ],
     },
-    ownerId: OWNER,
+    ownerId: { label: "Contact Owner", widget: "member" },
     lifecycleStage: {
       label: "Lifecycle Stage",
       widget: "select",
       options: LIFECYCLE_STAGE,
     },
+    source: { label: "Source", widget: "select", options: CONTACT_SOURCE },
     doNotContact: { label: "Do Not Contact", widget: "boolean" },
+    notes: { label: "Notes", widget: "longtext", helpText: "Replaces the contact's notes" },
   },
   COMPANY: {
     status: {
@@ -150,6 +228,35 @@ export function updatableFields(
   entityType: AutomationEntityType,
 ): Record<string, UpdatableField> {
   return UPDATABLE_FIELDS[entityType] ?? {};
+}
+
+/**
+ * Narrows field keys for the "Fields to update" search. Every word typed must
+ * appear in the field's label (or its key, for someone who knows the API
+ * name), in any order and any case: "lead st" finds Lead Status.
+ */
+export function filterFieldKeys(
+  entityType: AutomationEntityType,
+  keys: string[],
+  query: string,
+): string[] {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return keys;
+  const catalog = updatableFields(entityType);
+  return keys.filter((key) => {
+    const haystack = `${catalog[key]?.label ?? ""} ${key}`.toLowerCase();
+    return terms.every((term) => haystack.includes(term));
+  });
+}
+
+/** Fields a row may be set to: every current field, plus a legacy one the step already uses. */
+export function offerableFieldKeys(
+  entityType: AutomationEntityType,
+  fields: Record<string, unknown>,
+): string[] {
+  return Object.entries(updatableFields(entityType))
+    .filter(([key, meta]) => !meta.legacy || key in fields)
+    .map(([key]) => key);
 }
 
 /**

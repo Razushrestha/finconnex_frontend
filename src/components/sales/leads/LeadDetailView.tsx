@@ -19,6 +19,7 @@ import {
   putLeadMortgage,
   replaceCrmLeadFollowers,
   replaceCrmLeadTags,
+  softDeleteCrmLead,
   syncLeadStatus,
   unassignCrmLeadOwner,
   updateCrmLead,
@@ -166,10 +167,22 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
     }
     if (action === "delete") {
       if (!window.confirm(`Delete ${card.name}? This cannot be undone.`)) return;
-      deleteLead(card.id);
-      emitRulesChange("all");
-      notify("Lead deleted");
-      router.push(back.href);
+      void (async () => {
+        // A CRM lead has to be deleted in the CRM first. Removing only the
+        // local card let the next board refresh bring the lead straight back.
+        if (isUuid(card.id)) {
+          try {
+            await softDeleteCrmLead(card.id);
+          } catch (err) {
+            notify(err instanceof Error ? err.message : "Could not delete the lead");
+            return;
+          }
+        }
+        deleteLead(card.id);
+        emitRulesChange("all");
+        notify("Lead deleted");
+        router.push(back.href);
+      })();
       return;
     }
     if (action === "archive") {

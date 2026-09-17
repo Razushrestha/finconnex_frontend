@@ -20,6 +20,7 @@ import {
   actionScopeEntity,
   AUTOMATION_ACTION_KEYS,
   FLOW_CONTROL_CATALOG,
+  hasLinkedContact,
   type AutomationActionStep,
   type AutomationEntityType,
   type AutomationIfElseStep,
@@ -42,6 +43,7 @@ import { entityNoun } from "@/lib/automations/trigger-scope";
 
 import { supportsRecordPicker } from "@/lib/automations/record-search";
 
+import { CreateTaskActionForm, createTaskActionProblems } from "./CreateTaskActionForm";
 import { FieldsEditor } from "./FieldsEditor";
 import { AttachmentsField } from "./AttachmentsField";
 import { MemberSearchField } from "./MemberSearchField";
@@ -115,6 +117,10 @@ function ActionConfigForm({
     );
   }
   const config = step.config ?? {};
+  // Create Task is the task page's own form, not the generic key list.
+  if (step.action === "CREATE_TASK") {
+    return <CreateTaskActionForm config={config} onChange={onChange} />;
+  }
   const email = step.action === "SEND_EMAIL";
   /**
    * Actions that create a task. Their `description` doubles as the task's
@@ -142,6 +148,15 @@ function ActionConfigForm({
         ...base,
         label: actionFieldLabel(step.action, key) ?? base.label,
       };
+      // Update Contact Field's contact is optional only where the trigger
+      // record has a contact of its own to fall back on.
+      const contactTarget =
+        step.action === "UPDATE_CONTACT_FIELD" && key === "contactId";
+      if (contactTarget) {
+        meta.helpText = hasLinkedContact(entityType)
+          ? "Leave empty to update the contact linked to the record that started this workflow."
+          : "Pick a contact: this trigger's record has no contact of its own.";
+      }
       // `recordId` is the one key every delete action shares, so what the
       // picker lists comes from the action's entity scope: DELETE_LEAD lists
       // leads, DELETE_DEAL deals. Left empty it still means "the record that
@@ -160,7 +175,9 @@ function ActionConfigForm({
             : key === "fields"
               ? "fields"
               : meta.widget;
-      const required = keys.required.includes(key);
+      const required =
+        keys.required.includes(key) ||
+        (contactTarget && !hasLinkedContact(entityType));
       const value = config[key];
       return (
         <div key={key}>
@@ -234,7 +251,7 @@ function ActionConfigForm({
           )}
           {widget === "fields" && (
             <FieldsEditor
-              entityType={entityType}
+              entityType={step.action === "UPDATE_CONTACT_FIELD" ? "CONTACT" : entityType}
               value={value}
               onChange={(next) => set(key, next)}
               members={members}
@@ -477,7 +494,12 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
           entityNoun(entityType).one,
         )
       : [];
-  const blocked = missingRequired.length > 0 || recipientProblems.length > 0;
+  const taskProblems =
+    draft.type === "ACTION" && draft.action === "CREATE_TASK"
+      ? createTaskActionProblems(draft.config ?? {})
+      : [];
+  const blocked =
+    missingRequired.length > 0 || recipientProblems.length > 0 || taskProblems.length > 0;
 
   return (
     <SlideOverPanel
@@ -556,7 +578,9 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
           <X className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           {draft.type === "IF_ELSE"
             ? "Add at least one condition to save."
-            : missingRequired.length > 0
+            : taskProblems.length > 0
+              ? taskProblems[0]
+              : missingRequired.length > 0
               ? `Missing: ${missingRequired.join(", ")}`
               : recipientProblems[0]}
         </p>

@@ -37,6 +37,7 @@ import {
   relatedRecordMeta,
   scopeRecordIds,
   showsConditionBuilder,
+  showsSpecificRecordOption,
   readTriggerFilter,
   transitionMeta,
   TRANSITION_UNSET,
@@ -208,7 +209,9 @@ function RecordPicker({
 
       {state === "ready" && rows.length === 0 && (
         <p className="rounded-md border border-dashed border-slate-200 p-3 text-xs text-slate-400">
-          No {noun.many} match &quot;{query}&quot;.
+          {query.trim()
+            ? <>No {noun.many} match &quot;{query}&quot;.</>
+            : `No ${noun.many} in this workspace yet. Create one first, then pick it here.`}
         </p>
       )}
 
@@ -929,7 +932,7 @@ export function TriggerConfigPanel({
           </ScopeOption>
         )}
 
-        {pickable && (
+        {pickable && showsSpecificRecordOption(triggerType, scope) && (
           <ScopeOption
             active={scope.mode === "RECORD"}
             title={`A specific ${noun.one}`}

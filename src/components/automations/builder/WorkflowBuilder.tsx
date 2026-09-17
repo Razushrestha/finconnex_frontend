@@ -189,9 +189,11 @@ function newDefaultStep(
   };
 }
 
-function BuilderInner({ id }: { id: string }) {
+function BuilderInner({ id, folderId: initialFolderId }: { id: string; folderId: string | null }) {
   const router = useRouter();
   const isNew = id === "new";
+  /** Where the workflow is filed: set from the URL for a new one, then from the saved record. */
+  const [folderId, setFolderId] = useState<string | null>(initialFolderId);
 
   const [automationId, setAutomationId] = useState<string | null>(isNew ? null : id);
   const [name, setName] = useState("Untitled Workflow");
@@ -222,6 +224,7 @@ function BuilderInner({ id }: { id: string }) {
         const definition = latest?.definition;
         setName(automation.name);
         setStatus(automation.status);
+        setFolderId(automation.folderId ?? null);
         setSteps((definition?.steps as AutomationStep[]) ?? []);
 
         const saved = definition?.triggers;
@@ -502,7 +505,12 @@ function BuilderInner({ id }: { id: string }) {
     setTestResult(null);
     try {
       if (!automationId) {
-        const created = await createAutomation(buildPayload());
+        // The folder is sent on create only: the draft PATCH does not accept
+        // it, and later moves go through the list's "Move to folder".
+        const created = await createAutomation({
+          ...buildPayload(),
+          ...(folderId ? { folderId } : {}),
+        });
         setAutomationId(created.id);
         setStatus(created.status);
         router.replace(`/automations/${created.id}`);
@@ -577,10 +585,19 @@ function BuilderInner({ id }: { id: string }) {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col">
+    // Fills <main>, which already sits between the navbar and the BottomBar;
+    // a viewport-based height ran 2.5rem under the BottomBar.
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon-sm" onClick={() => router.push("/automations")}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Back to workflows"
+            onClick={() =>
+              router.push(folderId ? `/automations?folder=${encodeURIComponent(folderId)}` : "/automations")
+            }
+          >
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Input
@@ -625,8 +642,8 @@ function BuilderInner({ id }: { id: string }) {
           <Background gap={20} />
           <Controls showInteractive={false} />
         </ReactFlow>
-      </div>
 
+      {/* Panels live inside the canvas container so they open below the toolbar. */}
       {panel?.mode === "pick-trigger" && (
         <TriggerPickerPanel
           onClose={() => {
@@ -725,14 +742,19 @@ function BuilderInner({ id }: { id: string }) {
           onDelete={() => onDeleteStep(panel.path)}
         />
       )}
+      </div>
     </div>
   );
 }
 
-export function WorkflowBuilder({ id }: { id: string }) {
+function isNewId(id: string): boolean {
+  return id === "new";
+}
+
+export function WorkflowBuilder({ id, folderId = null }: { id: string; folderId?: string | null }) {
   return (
     <ReactFlowProvider>
-      <BuilderInner id={id} />
+      <BuilderInner id={id} folderId={isNewId(id) ? folderId : null} />
     </ReactFlowProvider>
   );
 }

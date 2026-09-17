@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { RECYCLE_BIN_LEADS_HREF } from "@/lib/recycle-bin/api";
 import { CRM_LEAD_STATUSES, type CrmLeadStatus } from "@/lib/leads/api/types";
 import {
   assignableOwnerLabel,
@@ -202,9 +204,16 @@ export function LeadBoardMassActionDialog({
 
         {action === "delete" && !blockedReason ? (
           <p className="text-[13px] text-slate-600">
-            This will soft-delete the selected lead
-            {selectedCount === 1 ? "" : "s"} in CRM. You can restore from
-            archived records if needed.
+            The selected lead{selectedCount === 1 ? "" : "s"} will move to the
+            Recycle Bin. You can restore {selectedCount === 1 ? "it" : "them"}{" "}
+            from{" "}
+            <Link
+              href={RECYCLE_BIN_LEADS_HREF}
+              className="font-medium text-violet-600 hover:underline"
+            >
+              Deleted Leads
+            </Link>
+            .
           </p>
         ) : null}
 
