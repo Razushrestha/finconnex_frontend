@@ -16,19 +16,40 @@ describe("updatable fields", () => {
    * happily lets you build.
    */
   const BACKEND_MUTABLE = {
-    LEAD: ["pipelineStage", "status", "ownerId", "rating", "lifecycleStage", "score"],
+    LEAD: [
+      "name",
+      "firstName",
+      "lastName",
+      "pipelineStage",
+      "status",
+      "ownerId",
+      "rating",
+      "lifecycleStage",
+      "score",
+      "notes",
+      "loanPurpose",
+      "secondaryContactId",
+    ],
     DEAL: ["stage", "ownerId", "probability", "expectedCloseDate", "lostReason"],
     CONTACT: ["status", "ownerId", "lifecycleStage", "doNotContact"],
     COMPANY: ["status", "ownerId", "industry", "size"],
   } as const;
 
+  /**
+   * Accepted by the executor but deliberately not offered: "Lead Name" writes
+   * both, split the way Create Lead splits a name.
+   */
+  const NOT_OFFERED: Partial<Record<keyof typeof BACKEND_MUTABLE, string[]>> = {
+    LEAD: ["firstName", "lastName"],
+  };
+
   it("matches the executor's allowlist exactly, per entity", () => {
     for (const [entity, expected] of Object.entries(BACKEND_MUTABLE)) {
-      const offered = Object.keys(
-        updatableFields(entity as keyof typeof BACKEND_MUTABLE),
-      ).sort();
+      const key = entity as keyof typeof BACKEND_MUTABLE;
+      const hidden = NOT_OFFERED[key] ?? [];
+      const offered = Object.keys(updatableFields(key)).sort();
       expect(offered, `${entity} drifted from MUTABLE_${entity}_FIELDS`).toEqual(
-        [...expected].sort(),
+        expected.filter((field) => !hidden.includes(field)).sort(),
       );
     }
   });
@@ -62,6 +83,9 @@ describe("updatable fields", () => {
       )) {
         if (meta.widget !== "select") continue;
         expect(meta.options?.length, `${entity}.${key} has no options`).toBeGreaterThan(0);
+        // Loan purpose is not an enum: it is stored in the mortgage profile
+        // as the Create Lead form writes it ("Purchase", not "PURCHASE").
+        if (entity === "LEAD" && key === "loanPurpose") continue;
         // Values are written straight to the column, so they must be the
         // enum's own spelling, not a display label.
         for (const opt of meta.options ?? []) {
@@ -80,7 +104,7 @@ describe("updatable fields", () => {
 
   it("offers a lead's pipeline stages as its Status", () => {
     const status = updatableFields("LEAD").pipelineStage;
-    expect(status.label).toBe("Status");
+    expect(status.label).toBe("Lead Status");
     expect(status.options?.map((o) => o.label)).toEqual([
       "New Lead",
       "Appointment Booked",
@@ -102,9 +126,28 @@ describe("updatable fields", () => {
 
   it("keeps the old lead status for saved steps without offering it for new rows", () => {
     expect(offerableFieldKeys("LEAD", {})).not.toContain("status");
-    expect(offerableFieldKeys("LEAD", {})[0]).toBe("pipelineStage");
+    expect(offerableFieldKeys("LEAD", {})).toContain("pipelineStage");
     expect(offerableFieldKeys("LEAD", { status: "NEW" })).toContain("status");
     expect(unknownFieldKeys("LEAD", { status: "NEW" })).toEqual([]);
+  });
+
+  it("offers a lead's own fields first, in the lead page's terms", () => {
+    expect(offerableFieldKeys("LEAD", {}).slice(0, 6)).toEqual([
+      "name",
+      "ownerId",
+      "pipelineStage",
+      "loanPurpose",
+      "secondaryContactId",
+      "notes",
+    ]);
+    const lead = updatableFields("LEAD");
+    expect(lead.secondaryContactId.widget).toBe("contact");
+    expect(lead.notes.widget).toBe("longtext");
+    expect(lead.loanPurpose.options?.map((o) => o.value)).toEqual([
+      "Purchase",
+      "Refinance",
+      "Investment",
+    ]);
   });
 
   it("surfaces a saved key it cannot offer instead of dropping it", () => {

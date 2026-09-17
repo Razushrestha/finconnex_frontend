@@ -18,6 +18,7 @@ import { Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -35,6 +36,7 @@ import {
 } from "@/lib/automations/updatable-fields";
 
 import { MemberSelect } from "./MemberSelect";
+import { RecordField } from "./RecordField";
 
 export function FieldsEditor({
   entityType,
@@ -231,6 +233,28 @@ function FieldValue({
           ))}
         </SelectContent>
       </Select>
+    );
+  }
+
+  if (meta.widget === "contact") {
+    return (
+      <RecordField
+        target="CONTACT"
+        value={typeof value === "string" ? value : ""}
+        onChange={onChange}
+        noun={{ one: "contact", many: "contacts" }}
+      />
+    );
+  }
+
+  if (meta.widget === "longtext") {
+    return (
+      <Textarea
+        className="min-h-16 text-xs"
+        value={typeof value === "string" ? value : ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={meta.helpText}
+      />
     );
   }
 

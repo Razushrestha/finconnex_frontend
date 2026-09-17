@@ -19,10 +19,12 @@ import type { AutomationEntityType } from "./types";
 export type UpdatableFieldWidget =
   | "select"
   | "member"
+  | "contact"
   | "number"
   | "boolean"
   | "date"
-  | "text";
+  | "text"
+  | "longtext";
 
 export interface UpdatableField {
   label: string;
@@ -87,18 +89,36 @@ const LIFECYCLE_STAGE = [
 
 const OWNER: UpdatableField = { label: "Owner", widget: "member" };
 
+/** CreateLeadForm → LOAN_PURPOSES, stored in the lead's mortgage profile. */
+const LOAN_PURPOSE = [
+  { label: "Purchase", value: "Purchase" },
+  { label: "Refinance", value: "Refinance" },
+  { label: "Investment", value: "Investment" },
+];
+
 export const UPDATABLE_FIELDS: Partial<
   Record<AutomationEntityType, Record<string, UpdatableField>>
 > = {
+  // Order is the order "Add field" offers them in: the lead page's own
+  // fields first. `name`, `loanPurpose` and `secondaryContactId` are not
+  // columns — the executor maps them (automation-action.service updateLead).
   LEAD: {
-    pipelineStage: { label: "Status", widget: "select", options: LEAD_PIPELINE_STAGE },
+    name: {
+      label: "Lead Name",
+      widget: "text",
+      helpText: "e.g. Priya Mehta",
+    },
+    ownerId: { label: "Lead Owner", widget: "member" },
+    pipelineStage: { label: "Lead Status", widget: "select", options: LEAD_PIPELINE_STAGE },
+    loanPurpose: { label: "Loan Purpose", widget: "select", options: LOAN_PURPOSE },
+    secondaryContactId: { label: "Add Secondary Contact", widget: "contact" },
+    notes: { label: "Notes", widget: "longtext", helpText: "Replaces the lead's notes" },
     status: {
       label: "Legacy status",
       widget: "select",
       options: LEAD_STATUS,
       legacy: true,
     },
-    ownerId: OWNER,
     rating: {
       label: "Rating",
       widget: "select",
