@@ -28,7 +28,7 @@ export function SlideOverPanel({
       <div className="absolute inset-0 z-40 bg-slate-900/10" onClick={onClose} aria-hidden />
       <aside
         className={cn(
-          "absolute inset-y-0 right-0 z-40 flex w-full max-w-[40rem] flex-col border-l border-slate-200 bg-white shadow-2xl",
+          "absolute inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-2xl",
           className
         )}
       >
