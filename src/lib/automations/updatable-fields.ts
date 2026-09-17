@@ -207,6 +207,25 @@ export function updatableFields(
   return UPDATABLE_FIELDS[entityType] ?? {};
 }
 
+/**
+ * Narrows field keys for the "Fields to update" search. Every word typed must
+ * appear in the field's label (or its key, for someone who knows the API
+ * name), in any order and any case: "lead st" finds Lead Status.
+ */
+export function filterFieldKeys(
+  entityType: AutomationEntityType,
+  keys: string[],
+  query: string,
+): string[] {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (terms.length === 0) return keys;
+  const catalog = updatableFields(entityType);
+  return keys.filter((key) => {
+    const haystack = `${catalog[key]?.label ?? ""} ${key}`.toLowerCase();
+    return terms.every((term) => haystack.includes(term));
+  });
+}
+
 /** Fields a row may be set to: every current field, plus a legacy one the step already uses. */
 export function offerableFieldKeys(
   entityType: AutomationEntityType,

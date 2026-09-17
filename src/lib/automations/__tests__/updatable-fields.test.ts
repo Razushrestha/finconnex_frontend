@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  filterFieldKeys,
   offerableFieldKeys,
   unknownFieldKeys,
   updatableFields,
@@ -148,6 +149,20 @@ describe("updatable fields", () => {
       "Refinance",
       "Investment",
     ]);
+  });
+
+  it("searches fields by any words of their label, in any case", () => {
+    const keys = offerableFieldKeys("LEAD", {});
+    expect(filterFieldKeys("LEAD", keys, "")).toEqual(keys);
+    expect(filterFieldKeys("LEAD", keys, "status")).toEqual(["pipelineStage"]);
+    expect(filterFieldKeys("LEAD", keys, "LOAN")).toEqual(["loanPurpose"]);
+    expect(filterFieldKeys("LEAD", keys, "contact secondary")).toEqual(["secondaryContactId"]);
+    expect(filterFieldKeys("LEAD", keys, "lead")).toEqual([
+      "name",
+      "ownerId",
+      "pipelineStage",
+    ]);
+    expect(filterFieldKeys("LEAD", keys, "nothing like this")).toEqual([]);
   });
 
   it("surfaces a saved key it cannot offer instead of dropping it", () => {
