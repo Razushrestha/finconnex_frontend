@@ -14,15 +14,29 @@
  */
 import type { Edge, Node } from "@xyflow/react";
 
-import type { AutomationStep } from "./types";
+import type { AutomationStep, AutomationTriggerStats } from "./types";
 
 export const NODE_WIDTH = 280;
 export const NODE_HEIGHT = 84;
 export const V_GAP = 88;
 export const BRANCH_H_GAP = 48;
+/** A trigger card is taller than a step: header + filter summary + footer. */
+export const TRIGGER_NODE_HEIGHT = 132;
+/** Gap between trigger cards in the row, and before the "add" card. */
+export const TRIGGER_H_GAP = 32;
+
+/** One trigger card as the canvas needs to draw it. */
+export type TriggerView = {
+  key: string;
+  triggerType: string | null;
+  /** "Any lead" / "leads matching 2 conditions" — the card's filter line. */
+  scopeSummary?: string;
+  stats?: AutomationTriggerStats;
+};
 
 export type BuilderNodeData =
-  | { kind: "trigger"; triggerType: string | null; scopeSummary?: string }
+  | { kind: "trigger"; index: number; trigger: TriggerView; removable: boolean }
+  | { kind: "addTrigger" }
   | { kind: "step"; step: AutomationStep; path: string }
   | { kind: "add"; path: string; branch?: "then" | "else" }
   | { kind: "end" };
@@ -162,30 +176,69 @@ function layoutColumn(
   return { nodes, edges, width, nextY: y + NODE_HEIGHT + V_GAP, tails: [addId] };
 }
 
+/**
+ * Lays the workflow out: a row of trigger cards across the top, an "add
+ * trigger" card at its right end, and every one of them feeding the single
+ * column of steps below. Any trigger matching starts the workflow, so they
+ * are siblings that converge rather than a chain — which on the canvas is
+ * just several edges into the same first node, the same way branch tails
+ * reconverge in `layoutColumn`.
+ *
+ * The row is centred on x=0 so the step column below stays put as triggers
+ * are added and removed, instead of the whole flow shifting sideways.
+ */
 export function buildWorkflowGraph(
-  triggerType: string | null,
-  steps: AutomationStep[],
-  /** "Any lead" / "Jane Cooper" / "leads matching 2 conditions" — the trigger
-   * node's subtitle, so the canvas shows what the trigger is narrowed to
-   * without opening the panel. */
-  scopeSummary?: string
+  triggers: TriggerView[],
+  steps: AutomationStep[]
 ): { nodes: BuilderNode[]; edges: Edge[] } {
   counter = 0;
   const centerX = 0;
-  const triggerId = "trigger";
-  const nodes: BuilderNode[] = [
-    {
-      id: triggerId,
-      type: "trigger",
-      position: { x: centerX - NODE_WIDTH / 2, y: 0 },
-      data: { kind: "trigger", triggerType, scopeSummary },
-      draggable: false,
-    },
-  ];
+  const nodes: BuilderNode[] = [];
 
-  const body = layoutColumn(steps, "steps", centerX, NODE_HEIGHT + V_GAP, [
-    triggerId,
-  ]);
+  // Cards across the top: every trigger, then the dashed "add" card.
+  const cardCount = triggers.length + 1;
+  const rowWidth = cardCount * NODE_WIDTH + (cardCount - 1) * TRIGGER_H_GAP;
+  const rowLeft = centerX - rowWidth / 2;
+  const cardX = (slot: number) => rowLeft + slot * (NODE_WIDTH + TRIGGER_H_GAP);
+
+  const triggerIds: string[] = [];
+  triggers.forEach((trigger, index) => {
+    const id = `trigger-${trigger.key}`;
+    triggerIds.push(id);
+    nodes.push({
+      id,
+      type: "trigger",
+      position: { x: cardX(index), y: 0 },
+      data: {
+        kind: "trigger",
+        index,
+        trigger,
+        // The last trigger can't be removed: a workflow with none has no way
+        // to start, and the backend rejects it as `triggersRequired`.
+        removable: triggers.length > 1,
+      },
+      draggable: false,
+    });
+  });
+
+  const addTriggerId = "add-trigger";
+  nodes.push({
+    id: addTriggerId,
+    type: "addTrigger",
+    position: { x: cardX(triggers.length), y: 0 },
+    data: { kind: "addTrigger" },
+    draggable: false,
+  });
+
+  const body = layoutColumn(
+    steps,
+    "steps",
+    centerX,
+    TRIGGER_NODE_HEIGHT + V_GAP,
+    // The add card joins the merge too, so the canvas reads as one funnel
+    // rather than a card floating unconnected beside the flow.
+    [...triggerIds, addTriggerId]
+  );
   nodes.push(...body.nodes);
   const edges = [...body.edges];
 
