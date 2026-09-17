@@ -260,11 +260,17 @@ export function saveLeadColumns(cols: KanbanColumn[]) {
   board.save(next);
   if (typeof localStorage === "undefined") return;
   try {
+    // The backup must follow every save, including an empty one. Skipping
+    // empty boards left the last deleted lead in the backup, and
+    // listLeadColumns() falls back to the backup when the board is empty —
+    // so deleting the only lead brought it straight back.
     if (next.some((col) => col.cards.length > 0)) {
       localStorage.setItem(
         tenantOverlayKey(LEADS_BOARD_BACKUP),
         JSON.stringify(next),
       );
+    } else {
+      localStorage.removeItem(tenantOverlayKey(LEADS_BOARD_BACKUP));
     }
   } catch {
     /* quota / private mode */
