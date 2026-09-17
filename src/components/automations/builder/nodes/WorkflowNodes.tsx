@@ -1,7 +1,7 @@
 "use client";
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { Plus, Trash2, Zap } from "lucide-react";
+import { BarChart3, Copy, Plus, Trash2, Zap } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -95,24 +95,133 @@ export type NodeInteractions = {
   onSelectStep: (path: string) => void;
   onDeleteStep: (path: string) => void;
   onAddAt: (path: string) => void;
-  onSelectTrigger: () => void;
+  onSelectTrigger: (index: number) => void;
+  onAddTrigger: () => void;
+  onDuplicateTrigger: (index: number) => void;
+  onDeleteTrigger: (index: number) => void;
+  onShowTriggerStats: (index: number) => void;
   selectedPath: string | null;
 };
 
+function readInteractions(data: unknown): NodeInteractions | undefined {
+  return (data as { interactions?: NodeInteractions }).interactions;
+}
+
+/**
+ * A trigger card. Unlike a step node this is a three-part card — title, the
+ * filters it is narrowed by, and a footer of per-trigger actions — because a
+ * workflow can hold several triggers and each needs to be told apart,
+ * duplicated, removed and measured on its own.
+ */
 export function TriggerNode({ data }: NodeProps<BuilderNode>) {
   if (data.kind !== "trigger") return null;
-  const meta = data.triggerType ? TRIGGER_CATALOG[data.triggerType as keyof typeof TRIGGER_CATALOG] : null;
-  const interactions = (data as unknown as { interactions?: NodeInteractions }).interactions;
+  const { trigger, index, removable } = data;
+  const meta = trigger.triggerType
+    ? TRIGGER_CATALOG[trigger.triggerType as keyof typeof TRIGGER_CATALOG]
+    : null;
+  const interactions = readInteractions(data);
+  const selected = interactions?.selectedPath === `trigger:${index}`;
+  const runs = trigger.stats?.runs ?? 0;
+
   return (
-    <NodeShell
-      icon={meta ? <StepIcon icon={meta.icon} className="h-4.5 w-4.5 text-white" /> : <Zap className="h-4.5 w-4.5 text-white" />}
-      iconClassName="bg-blue-600"
-      title={meta ? meta.label : "Choose a Trigger"}
-      subtitle={meta ? (data.scopeSummary ?? "Trigger") : "Click to select what starts this workflow"}
-      selected={interactions?.selectedPath === "trigger"}
-      onClick={() => interactions?.onSelectTrigger()}
-      handles={{ top: false, bottom: true }}
-    />
+    <div
+      className={cn(
+        "w-[280px] overflow-hidden rounded-xl border bg-white shadow-sm transition hover:shadow-md",
+        selected ? "border-blue-500 ring-2 ring-blue-100" : "border-slate-200"
+      )}
+    >
+      <Handle type="source" position={Position.Bottom} className="!bg-slate-300" />
+
+      <button
+        type="button"
+        onClick={() => interactions?.onSelectTrigger(index)}
+        className="flex w-full items-center gap-3 p-3 text-left"
+      >
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600">
+          {meta ? (
+            <StepIcon icon={meta.icon} className="h-4.5 w-4.5 text-white" />
+          ) : (
+            <Zap className="h-4.5 w-4.5 text-white" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold text-slate-800">
+            {meta ? meta.label : "Choose a Trigger"}
+          </div>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => interactions?.onSelectTrigger(index)}
+        className="block w-full border-t border-slate-100 px-3 py-2.5 text-left text-sm text-slate-600 hover:bg-slate-50"
+      >
+        {meta
+          ? (trigger.scopeSummary ?? "No filters applied")
+          : "Click to select what starts this workflow"}
+      </button>
+
+      <div className="flex items-center gap-1 border-t border-slate-100 px-2 py-1.5">
+        <button
+          type="button"
+          onClick={() => interactions?.onDuplicateTrigger(index)}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+          aria-label="Duplicate trigger"
+          title="Duplicate trigger"
+        >
+          <Copy className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => removable && interactions?.onDeleteTrigger(index)}
+          disabled={!removable}
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded-md",
+            removable
+              ? "text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+              : "cursor-not-allowed text-slate-200"
+          )}
+          aria-label="Remove trigger"
+          title={removable ? "Remove trigger" : "A workflow needs at least one trigger"}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={() => interactions?.onShowTriggerStats(index)}
+          className="ml-auto flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold text-blue-600 hover:bg-blue-50"
+        >
+          <BarChart3 className="h-4 w-4" />
+          Stats
+          {runs > 0 && (
+            <span className="rounded-full bg-blue-100 px-1.5 text-[11px] font-semibold text-blue-700">
+              {runs}
+            </span>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** The dashed card that appends another entry point to the workflow. */
+export function AddTriggerNode({ data }: NodeProps<BuilderNode>) {
+  if (data.kind !== "addTrigger") return null;
+  const interactions = readInteractions(data);
+  return (
+    <>
+      <Handle type="source" position={Position.Bottom} className="!opacity-0" />
+      <button
+        type="button"
+        onClick={() => interactions?.onAddTrigger()}
+        className="flex h-[132px] w-[280px] items-center gap-3 rounded-xl border-2 border-dashed border-blue-300 bg-blue-50/60 px-4 text-left transition hover:border-blue-400 hover:bg-blue-50"
+      >
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm">
+          <Plus className="h-4.5 w-4.5 text-blue-600" />
+        </div>
+        <span className="text-sm font-semibold text-blue-600">Add new trigger</span>
+      </button>
+    </>
   );
 }
 

@@ -9,6 +9,12 @@ export type FieldWidget =
   | "number"
   | "member"
   | "members"
+  /** Single teammate, stored as a one-entry array — see MemberSearchField. */
+  | "owner"
+  /** Searchable IANA time-zone list — see TimezoneField. */
+  | "timezone"
+  /** Uploads files and stores their storage keys — see AttachmentsField. */
+  | "files"
   | "tags"
   | "select"
   | "checkbox"
@@ -197,16 +203,16 @@ export const FIELD_META: Record<string, FieldMeta> = {
     ],
   },
   startAt: { label: "Start At (ISO date)", widget: "datetime" },
-  startInMs: { label: "Start In (minutes from now)", widget: "number" },
   dueAt: { label: "Due At (ISO date)", widget: "datetime" },
-  dueInMs: { label: "Due In (minutes from now)", widget: "number" },
-  assigneeIds: { label: "Assignees", widget: "members" },
+  // A task has one owner in the builder's language. The key stays plural
+  // because the backend (and CreateTaskDto) model assignees as a list — the
+  // picker just keeps at most one in it.
+  assigneeIds: { label: "Task Owner", widget: "owner" },
   tags: { label: "Tags", widget: "tags" },
   title: { label: "Title", widget: "text" },
   body: { label: "Message", widget: "textarea" },
   message: { label: "Message", widget: "textarea" },
   remindAt: { label: "Remind At (ISO date)", widget: "datetime" },
-  remindInMs: { label: "Remind In (minutes from now)", widget: "number" },
   targetUserId: { label: "Remind", widget: "member" },
   recipientId: { label: "Recipient", widget: "member" },
   notificationType: { label: "Notification Type", widget: "text", placeholder: "GENERAL" },
@@ -407,7 +413,6 @@ export const FIELD_META: Record<string, FieldMeta> = {
   replyToId: { label: "In Reply To", widget: "text", helpText: "Record UUID" },
   // ─── Task ─────────────────────────────────────────────────────────────
   reminderAt: { label: "Reminder At", widget: "datetime" },
-  reminderInMs: { label: "Remind In (minutes from now)", widget: "number" },
   repeatEvery: {
     label: "Repeat Every",
     widget: "select",
@@ -418,13 +423,13 @@ export const FIELD_META: Record<string, FieldMeta> = {
       { label: "Yearly", value: "YEARLY" },
     ],
   },
-  recurrenceTimezone: { label: "Recurrence Timezone", widget: "text", placeholder: "America/New_York" },
+  recurrenceTimezone: { label: "Recurrence Timezone", widget: "timezone" },
   recurrenceLimit: { label: "Recurrence Limit", widget: "number", helpText: "Number of occurrences, 2–100" },
   isPublic: { label: "Visible to all workspace members", widget: "checkbox" },
   isBillable: { label: "Billable", widget: "checkbox" },
   followerIds: { label: "Followers", widget: "members" },
   collaboratorIds: { label: "Collaborators", widget: "members" },
-  attachmentKeys: { label: "Attachments", widget: "tags", helpText: "Uploaded storage keys" },
+  attachmentKeys: { label: "Attachments", widget: "files" },
   // ─── Note ─────────────────────────────────────────────────────────────
   noteType: {
     label: "Note Type",
@@ -467,7 +472,7 @@ export const FIELD_META: Record<string, FieldMeta> = {
   // ─── Call & meeting ───────────────────────────────────────────────────
   purpose: { label: "Purpose", widget: "text" },
   endAt: { label: "Ends At", widget: "datetime", helpText: "Overrides Duration when set" },
-  timezone: { label: "Timezone", widget: "text", placeholder: "Asia/Kathmandu" },
+  timezone: { label: "Timezone", widget: "timezone" },
   allDay: { label: "All day", widget: "checkbox" },
   // ─── Lead / contact / organization / deal columns ─────────────────────
   mobilePhone: { label: "Mobile Phone", widget: "text" },

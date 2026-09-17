@@ -24,7 +24,11 @@ import {
   publishAutomationVersion,
   updateAutomationDraft,
 } from "@/lib/automations/api";
-import { buildWorkflowGraph, type BuilderNode } from "@/lib/automations/layout";
+import {
+  buildWorkflowGraph,
+  type BuilderNode,
+  type TriggerView,
+} from "@/lib/automations/layout";
 import {
   generateStepKey,
   getStepAtPath,
@@ -39,6 +43,7 @@ import {
   type AutomationConditionGroup,
   type AutomationEntityType,
   type AutomationStep,
+  type AutomationTriggerStats,
   type AutomationTriggerType,
 } from "@/lib/automations/types";
 import {
@@ -60,6 +65,7 @@ import { loadAssignableOwners } from "@/lib/users/assignable";
 import {
   ActionNode,
   AddStepNode,
+  AddTriggerNode,
   BranchLabelNode,
   EndNode,
   IfElseNode,
@@ -68,10 +74,12 @@ import {
 } from "./nodes/WorkflowNodes";
 import { ActionPickerPanel, TriggerPickerPanel } from "./StepPickerPanel";
 import { StepConfigPanel } from "./StepConfigPanel";
+import { TriggerStatsPanel } from "./TriggerStatsPanel";
 import { TriggerConfigPanel } from "./TriggerConfigPanel";
 
 const nodeTypes = {
   trigger: TriggerNode,
+  addTrigger: AddTriggerNode,
   action: ActionNode,
   wait: WaitNode,
   ifElse: IfElseNode,
@@ -81,10 +89,75 @@ const nodeTypes = {
 };
 
 type PanelState =
-  | { mode: "pick-trigger" }
-  | { mode: "configure-trigger" }
+  | { mode: "pick-trigger"; index: number }
+  | { mode: "configure-trigger"; index: number }
+  | { mode: "trigger-stats"; index: number }
   | { mode: "pick-action"; insertPath: string }
   | { mode: "configure"; path: string };
+
+/**
+ * One trigger as the builder edits it. `type` is null only for the empty
+ * card a new workflow opens with; saving requires every trigger to name one.
+ *
+ * Record scope lives in each trigger's own `conditions` rather than the
+ * definition-wide group: with several entry points, "any lead" for one of
+ * them says nothing about the others.
+ */
+type BuilderTrigger = {
+  key: string;
+  type: AutomationTriggerType | null;
+  entityType: AutomationEntityType;
+  config: Record<string, unknown>;
+  conditions?: AutomationConditionGroup;
+};
+
+let triggerKeySeq = 0;
+function newTriggerKey(): string {
+  triggerKeySeq += 1;
+  return `trg-${Date.now().toString(36)}-${triggerKeySeq}`;
+}
+
+function blankTrigger(): BuilderTrigger {
+  return { key: newTriggerKey(), type: null, entityType: "LEAD", config: {} };
+}
+
+/**
+ * The card caption: what this trigger is narrowed to, so the canvas shows
+ * each entry point's filters without opening its panel.
+ */
+function summarizeTrigger(
+  trigger: BuilderTrigger,
+  owners: TransitionOption[],
+  recordLabels: Record<string, string>
+): string | undefined {
+  if (!trigger.type) return undefined;
+  const transition = transitionMeta(trigger.type);
+  const changedFields = changedFieldMeta(trigger.type);
+  const filter = readTriggerFilter(trigger.conditions, transition?.fields ?? null);
+  const pinned = scopeRecordIds(filter.scope);
+  const label =
+    pinned.length === 1
+      ? (recordLabels[`${trigger.entityType}:${pinned[0]}`] ?? null)
+      : null;
+  const scopeText = describeTriggerScope(filter.scope, trigger.entityType, label);
+  const detail = transition
+    ? describeTransition(filter.transition, transition, transition.options ?? owners)
+    : changedFields
+      ? describeChangedFields(filter.changedFields, changedFields)
+      : null;
+  return detail ? `${scopeText} · ${detail}` : scopeText;
+}
+
+/** The lone record a trigger is pinned to, if it is pinned to exactly one. */
+function pinnedRecordOf(
+  trigger: BuilderTrigger
+): { entityType: AutomationEntityType; id: string } | null {
+  if (!trigger.type) return null;
+  const transition = transitionMeta(trigger.type);
+  const filter = readTriggerFilter(trigger.conditions, transition?.fields ?? null);
+  const ids = scopeRecordIds(filter.scope);
+  return ids.length === 1 ? { entityType: trigger.entityType, id: ids[0] } : null;
+}
 
 function newDefaultStep(
   kind: AutomationActionType | "WAIT_FOR_DURATION" | "WAIT_UNTIL_DATE" | "IF_ELSE"
@@ -122,19 +195,16 @@ function BuilderInner({ id }: { id: string }) {
 
   const [automationId, setAutomationId] = useState<string | null>(isNew ? null : id);
   const [name, setName] = useState("Untitled Workflow");
-  const [triggerType, setTriggerType] = useState<AutomationTriggerType | null>(null);
-  const [entityType, setEntityType] = useState<AutomationEntityType>("LEAD");
   /**
-   * The definition's top-level condition group. This is what narrows a
-   * trigger to one record or to a filtered set — the backend refuses a
-   * `triggerConfig` for anything but the five temporal triggers, so scope
-   * lives here (see trigger-scope.ts).
+   * The workflow's entry points. It fires when ANY of them matches, so these
+   * are siblings, not a sequence — the canvas draws them as a row that
+   * converges into the shared step column.
    */
-  const [conditions, setConditions] = useState<AutomationConditionGroup | undefined>(undefined);
-  const [triggerConfig, setTriggerConfig] = useState<Record<string, unknown>>({});
-  /** The last record resolved for a RECORD-scoped trigger, kept whole so the
-   * label is only used when it still belongs to the pinned id. */
-  const [scopeRecord, setScopeRecord] = useState<AutomationRecordOption | null>(null);
+  const [triggers, setTriggers] = useState<BuilderTrigger[]>(() => [blankTrigger()]);
+  /** Run counts per trigger key, as the detail endpoint reports them. */
+  const [triggerStats, setTriggerStats] = useState<Record<string, AutomationTriggerStats>>({});
+  /** Resolved names for pinned records, keyed `entityType:id`, for the captions. */
+  const [recordLabels, setRecordLabels] = useState<Record<string, string>>({});
   const [steps, setSteps] = useState<AutomationStep[]>([]);
   const [status, setStatus] = useState<Automation["status"]>("DRAFT");
   const [loading, setLoading] = useState(!isNew);
@@ -149,15 +219,45 @@ function BuilderInner({ id }: { id: string }) {
       .then((automation) => {
         if (cancelled) return;
         const latest = automation.versions?.[0];
+        const definition = latest?.definition;
         setName(automation.name);
         setStatus(automation.status);
-        setTriggerType((latest?.triggerType as AutomationTriggerType) ?? null);
-        setEntityType(
-          (latest?.definition?.trigger?.entityType as AutomationEntityType) ?? "LEAD"
+        setSteps((definition?.steps as AutomationStep[]) ?? []);
+
+        const saved = definition?.triggers;
+        if (saved?.length) {
+          setTriggers(
+            saved.map((trigger, index) => ({
+              key: trigger.key || `trigger-${index + 1}`,
+              type: trigger.type as AutomationTriggerType,
+              entityType: trigger.entityType as AutomationEntityType,
+              config: trigger.config ?? {},
+              conditions: trigger.conditions ?? undefined,
+            }))
+          );
+        } else if (definition?.trigger?.type) {
+          // Saved before multi-trigger: its scope lived in the definition's
+          // top-level conditions, which is now the trigger's own. Folding it
+          // in here means the next save writes the current shape without
+          // changing what the workflow matches.
+          setTriggers([
+            {
+              key: "trigger-1",
+              type: definition.trigger.type as AutomationTriggerType,
+              entityType: (definition.trigger.entityType as AutomationEntityType) ?? "LEAD",
+              config: definition.trigger.config ?? {},
+              conditions: definition.conditions ?? undefined,
+            },
+          ]);
+        }
+
+        setTriggerStats(
+          Object.fromEntries(
+            (automation.triggers ?? [])
+              .filter((trigger) => trigger.stats)
+              .map((trigger) => [trigger.key, trigger.stats as AutomationTriggerStats])
+          )
         );
-        setSteps((latest?.definition?.steps as AutomationStep[]) ?? []);
-        setConditions(latest?.definition?.conditions ?? undefined);
-        setTriggerConfig(latest?.definition?.trigger?.config ?? {});
       })
       .finally(() => !cancelled && setLoading(false));
     return () => {
@@ -165,15 +265,15 @@ function BuilderInner({ id }: { id: string }) {
     };
   }, [id, isNew]);
 
-  const transition = transitionMeta(triggerType);
-  const changedFields = changedFieldMeta(triggerType);
   /**
    * Owner-backed transitions store user ids. The canvas caption has to render
-   * names, so the same list the panel offers is loaded here too — a bare uuid
-   * on the node would be unreadable.
+   * names, so the same list the panels offer is loaded here too — a bare uuid
+   * on a card would be unreadable.
    */
   const [owners, setOwners] = useState<TransitionOption[]>([]);
-  const ownerBacked = transition?.source === "owners";
+  const ownerBacked = triggers.some(
+    (trigger) => transitionMeta(trigger.type)?.source === "owners"
+  );
   useEffect(() => {
     if (!ownerBacked) return;
     let cancelled = false;
@@ -185,77 +285,123 @@ function BuilderInner({ id }: { id: string }) {
       cancelled = true;
     };
   }, [ownerBacked]);
-  const filter = useMemo(
-    () => readTriggerFilter(conditions, transition?.fields ?? null),
-    [conditions, transition]
-  );
-  const scope = filter.scope;
 
   /**
-   * Resolve a pinned record id to its name for the canvas subtitle. Only a
-   * lone pin gets a name — a set is captioned by its count.
+   * Resolve every pinned record id to a name for the captions. Keyed by
+   * `entityType:id` and only ever added to, so a card that goes back to "any
+   * record" costs no refetch if it is pinned again.
    */
-  const pinnedIds = scopeRecordIds(scope);
-  const pinnedRecordId = pinnedIds.length === 1 ? pinnedIds[0] : "";
+  const pinnedKey = triggers
+    .map((trigger) => {
+      const pinned = pinnedRecordOf(trigger);
+      return pinned ? `${pinned.entityType}:${pinned.id}` : "";
+    })
+    .join("|");
   useEffect(() => {
-    if (!pinnedRecordId) return;
     let cancelled = false;
-    describeAutomationRecord(entityType, pinnedRecordId).then((option) => {
-      if (!cancelled && option) setScopeRecord(option);
+    const missing = triggers
+      .map(pinnedRecordOf)
+      .filter(
+        (pinned): pinned is { entityType: AutomationEntityType; id: string } =>
+          pinned !== null && !(`${pinned.entityType}:${pinned.id}` in recordLabels)
+      );
+    if (!missing.length) return;
+    Promise.all(
+      missing.map((pinned) =>
+        describeAutomationRecord(pinned.entityType, pinned.id).then(
+          (option) => [pinned, option] as const
+        )
+      )
+    ).then((resolved) => {
+      if (cancelled) return;
+      const found = resolved.filter(([, option]) => option);
+      if (!found.length) return;
+      setRecordLabels((prev) => ({
+        ...prev,
+        ...Object.fromEntries(
+          found.map(([pinned, option]) => [
+            `${pinned.entityType}:${pinned.id}`,
+            (option as AutomationRecordOption).label,
+          ])
+        ),
+      }));
     });
     return () => {
       cancelled = true;
     };
-  }, [entityType, pinnedRecordId]);
+    // `pinnedKey` stands in for the pinned ids so an unrelated trigger edit
+    // does not re-run the lookups.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pinnedKey, recordLabels]);
 
-  const scopeSummary = useMemo(() => {
-    if (!triggerType) return undefined;
-    const scopeText = describeTriggerScope(
-      scope,
-      entityType,
-      // Only trust the resolved label while it still names the pinned
-      // record — otherwise a stale name would caption a new selection.
-      scopeRecord?.id === pinnedRecordId ? scopeRecord.label : null
-    );
-    const detail = transition
-      ? describeTransition(filter.transition, transition, transition.options ?? owners)
-      : changedFields
-        ? describeChangedFields(filter.changedFields, changedFields)
-        : null;
-    return detail ? `${scopeText} · ${detail}` : scopeText;
-  }, [
-    triggerType,
-    scope,
-    entityType,
-    scopeRecord,
-    pinnedRecordId,
-    transition,
-    filter.transition,
-    changedFields,
-    filter.changedFields,
-    owners,
-  ]);
+  /** Entity types the steps below have to be valid for — one per trigger. */
+  const entityTypes = useMemo(
+    () => [...new Set(triggers.map((trigger) => trigger.entityType))],
+    [triggers]
+  );
+  /** The trigger whose fields the step panels edit against. */
+  const primaryEntityType = entityTypes[0] ?? "LEAD";
+
+  const triggerViews = useMemo<TriggerView[]>(
+    () =>
+      triggers.map((trigger) => ({
+        key: trigger.key,
+        triggerType: trigger.type,
+        scopeSummary: summarizeTrigger(trigger, owners, recordLabels),
+        stats: triggerStats[trigger.key],
+      })),
+    [triggers, owners, recordLabels, triggerStats]
+  );
 
   const graph = useMemo(
-    () => buildWorkflowGraph(triggerType, steps, scopeSummary),
-    [triggerType, steps, scopeSummary]
+    () => buildWorkflowGraph(triggerViews, steps),
+    [triggerViews, steps]
   );
 
   const selectedPath =
     panel?.mode === "configure"
       ? panel.path
-      : panel?.mode === "pick-trigger" || panel?.mode === "configure-trigger"
-        ? "trigger"
+      : panel?.mode === "pick-trigger" ||
+          panel?.mode === "configure-trigger" ||
+          panel?.mode === "trigger-stats"
+        ? `trigger:${panel.index}`
         : null;
 
   /**
-   * Clicking the trigger node goes straight to its configuration once a
-   * trigger is chosen — "Change trigger" in that panel is the way back to the
-   * list, so re-picking is deliberate instead of the only thing a click does.
+   * Clicking a trigger card goes straight to its configuration once a trigger
+   * is chosen — "Change trigger" in that panel is the way back to the list,
+   * so re-picking is deliberate instead of the only thing a click does.
    */
   const onSelectTrigger = useCallback(
-    () => setPanel(triggerType ? { mode: "configure-trigger" } : { mode: "pick-trigger" }),
-    [triggerType]
+    (index: number) =>
+      setPanel(
+        triggers[index]?.type
+          ? { mode: "configure-trigger", index }
+          : { mode: "pick-trigger", index }
+      ),
+    [triggers]
+  );
+  const onAddTrigger = useCallback(() => {
+    setTriggers((prev) => [...prev, blankTrigger()]);
+    setPanel({ mode: "pick-trigger", index: triggers.length });
+  }, [triggers.length]);
+  const onDuplicateTrigger = useCallback((index: number) => {
+    setTriggers((prev) => {
+      const source = prev[index];
+      if (!source) return prev;
+      const copy: BuilderTrigger = { ...source, key: newTriggerKey() };
+      return [...prev.slice(0, index + 1), copy, ...prev.slice(index + 1)];
+    });
+  }, []);
+  const onDeleteTrigger = useCallback((index: number) => {
+    // Never drop the last one: a workflow with no trigger cannot start, and
+    // the backend refuses it as `triggersRequired`.
+    setTriggers((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
+    setPanel(null);
+  }, []);
+  const onShowTriggerStats = useCallback(
+    (index: number) => setPanel({ mode: "trigger-stats", index }),
+    []
   );
   const onSelectStep = useCallback((path: string) => setPanel({ mode: "configure", path }), []);
   const onDeleteStep = useCallback((path: string) => {
@@ -270,22 +416,49 @@ function BuilderInner({ id }: { id: string }) {
         ...node,
         data: {
           ...node.data,
-          interactions: { onSelectTrigger, onSelectStep, onDeleteStep, onAddAt, selectedPath },
+          interactions: {
+            onSelectTrigger,
+            onAddTrigger,
+            onDuplicateTrigger,
+            onDeleteTrigger,
+            onShowTriggerStats,
+            onSelectStep,
+            onDeleteStep,
+            onAddAt,
+            selectedPath,
+          },
         },
       })),
-    [graph.nodes, onSelectTrigger, onSelectStep, onDeleteStep, onAddAt, selectedPath]
+    [
+      graph.nodes,
+      onSelectTrigger,
+      onAddTrigger,
+      onDuplicateTrigger,
+      onDeleteTrigger,
+      onShowTriggerStats,
+      onSelectStep,
+      onDeleteStep,
+      onAddAt,
+      selectedPath,
+    ]
   );
 
   function buildPayload() {
     return {
       name,
-      triggerType: triggerType as AutomationTriggerType,
-      entityType,
-      triggerConfig,
-      // Explicitly null, never undefined: PATCH reads `dto.conditions ??
-      // current.conditions`, so an omitted key would silently keep the old
-      // scope when the user switches back to "any record".
-      conditions: conditions ?? null,
+      triggers: triggers.map((trigger) => ({
+        key: trigger.key,
+        type: trigger.type as AutomationTriggerType,
+        entityType: trigger.entityType,
+        config: trigger.config,
+        // Explicitly null, never undefined: the backend keeps a stored group
+        // when the key is absent, so an omitted one would silently restore
+        // the old scope after the user switched back to "any record".
+        conditions: trigger.conditions ?? null,
+      })),
+      // Scope now lives on each trigger, so the definition-wide group — where
+      // a single-trigger workflow used to keep it — is cleared on save.
+      conditions: null,
       steps,
       failurePolicy: "STOP_ON_FAILURE" as const,
     };
@@ -315,8 +488,14 @@ function BuilderInner({ id }: { id: string }) {
   async function handleSave(
     { republish = true }: { republish?: boolean } = {},
   ): Promise<string | null> {
-    if (!triggerType) {
-      window.alert("Choose a trigger before saving.");
+    const unset = triggers.findIndex((trigger) => !trigger.type);
+    if (unset !== -1) {
+      window.alert(
+        triggers.length === 1
+          ? "Choose a trigger before saving."
+          : `Trigger ${unset + 1} has no type yet — choose one or remove it before saving.`
+      );
+      setPanel({ mode: "pick-trigger", index: unset });
       return null;
     }
     setSaving(true);
@@ -374,7 +553,7 @@ function BuilderInner({ id }: { id: string }) {
     if (!savedId) return;
     try {
       const result = await dryRunAutomation(savedId, {
-        entityType,
+        entityType: primaryEntityType,
         snapshot: { id: "00000000-0000-0000-0000-000000000000", status: "NEW" },
       });
       setTestResult(
@@ -450,44 +629,75 @@ function BuilderInner({ id }: { id: string }) {
 
       {panel?.mode === "pick-trigger" && (
         <TriggerPickerPanel
-          onClose={() => setPanel(null)}
-          onSelect={(trigger) => {
-            const nextEntity = TRIGGER_CATALOG[trigger].entityType;
-            // Conditions name fields from AUTOMATION_FIELD_REGISTRY[entityType],
-            // so they can't survive a switch to a different entity — the
-            // backend would reject them with conditionFieldNotAllowed.
-            if (nextEntity !== entityType) {
-              setConditions(undefined);
-              setScopeRecord(null);
-            }
-            setTriggerConfig({});
-            setTriggerType(trigger);
-            setEntityType(nextEntity);
-            setPanel({ mode: "configure-trigger" });
+          onClose={() => {
+            // Backing out of the picker on a card that was never given a type
+            // would leave an unsavable blank behind, so it goes with it.
+            setTriggers((prev) =>
+              prev.length > 1 && !prev[panel.index]?.type
+                ? prev.filter((_, i) => i !== panel.index)
+                : prev
+            );
+            setPanel(null);
+          }}
+          onSelect={(type) => {
+            const nextEntity = TRIGGER_CATALOG[type].entityType;
+            setTriggers((prev) =>
+              prev.map((trigger, i) =>
+                i === panel.index
+                  ? {
+                      ...trigger,
+                      type,
+                      entityType: nextEntity,
+                      config: {},
+                      // Conditions name fields from
+                      // AUTOMATION_FIELD_REGISTRY[entityType], so they cannot
+                      // survive a switch to another entity — the backend
+                      // rejects them with conditionFieldNotAllowed.
+                      conditions:
+                        nextEntity === trigger.entityType ? trigger.conditions : undefined,
+                    }
+                  : trigger
+              )
+            );
+            setPanel({ mode: "configure-trigger", index: panel.index });
           }}
         />
       )}
 
-      {panel?.mode === "configure-trigger" && triggerType && (
+      {panel?.mode === "configure-trigger" && triggers[panel.index]?.type && (
         <TriggerConfigPanel
-          key={triggerType}
-          triggerType={triggerType}
-          entityType={entityType}
-          conditions={conditions}
-          triggerConfig={triggerConfig}
-          onBack={() => setPanel({ mode: "pick-trigger" })}
+          key={`${panel.index}:${triggers[panel.index].type}`}
+          triggerType={triggers[panel.index].type as AutomationTriggerType}
+          entityType={triggers[panel.index].entityType}
+          conditions={triggers[panel.index].conditions}
+          triggerConfig={triggers[panel.index].config}
+          onBack={() => setPanel({ mode: "pick-trigger", index: panel.index })}
           onClose={() => setPanel(null)}
           onSave={(next) => {
-            setConditions(next.conditions);
-            setTriggerConfig(next.triggerConfig);
+            setTriggers((prev) =>
+              prev.map((trigger, i) =>
+                i === panel.index
+                  ? { ...trigger, conditions: next.conditions, config: next.triggerConfig }
+                  : trigger
+              )
+            );
             setPanel(null);
           }}
         />
       )}
 
+      {panel?.mode === "trigger-stats" && triggers[panel.index] && (
+        <TriggerStatsPanel
+          trigger={triggers[panel.index]}
+          stats={triggerStats[triggers[panel.index].key]}
+          saved={Boolean(automationId)}
+          onClose={() => setPanel(null)}
+        />
+      )}
+
       {panel?.mode === "pick-action" && (
         <ActionPickerPanel
-          entityType={entityType}
+          entityTypes={entityTypes}
           onClose={() => setPanel(null)}
           onSelectAction={(action) => {
             const step = newDefaultStep(action);
@@ -506,7 +716,7 @@ function BuilderInner({ id }: { id: string }) {
         <StepConfigPanel
           key={panel.path}
           step={configuring}
-          entityType={entityType}
+          entityType={primaryEntityType}
           onClose={() => setPanel(null)}
           onSave={(updated) => {
             setSteps((prev) => updateStepAtPath(prev, panel.path, () => updated));

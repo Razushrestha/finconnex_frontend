@@ -43,6 +43,8 @@ import { entityNoun } from "@/lib/automations/trigger-scope";
 import { supportsRecordPicker } from "@/lib/automations/record-search";
 
 import { FieldsEditor } from "./FieldsEditor";
+import { AttachmentsField } from "./AttachmentsField";
+import { MemberSearchField } from "./MemberSearchField";
 import { MemberSelect } from "./MemberSelect";
 import { RecordField } from "./RecordField";
 import { ActionItemsField } from "./ActionItemsField";
@@ -58,6 +60,7 @@ import { EmailTemplateField } from "./EmailTemplateField";
 import { ConditionBuilder } from "./ConditionBuilder";
 import { StepIcon } from "./nodes/icons";
 import { SlideOverPanel } from "./SlideOverPanel";
+import { TimezoneField } from "./TimezoneField";
 
 function useMembers() {
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
@@ -282,39 +285,27 @@ function ActionConfigForm({
               membersStatus={membersStatus}
             />
           )}
-          {widget === "members" && (
-            <div className="space-y-1.5 rounded-lg border border-slate-200 p-2">
-              {membersStatus === "loading" && (
-                <p className="text-xs text-slate-400">Loading teammates...</p>
-              )}
-              {membersStatus === "error" && (
-                <p className="text-xs text-rose-500">
-                  Couldn&apos;t load teammates. Try closing and reopening this panel.
-                </p>
-              )}
-              {membersStatus === "ready" && members.length === 0 && (
-                <p className="text-xs text-slate-400">No teammates found.</p>
-              )}
-              {members.map((m) => {
-                const list = Array.isArray(value) ? (value as string[]) : [];
-                const checked = list.includes(m.userId);
-                return (
-                  <label key={m.userId} className="flex items-center gap-2 text-sm text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) =>
-                        set(
-                          key,
-                          e.target.checked ? [...list, m.userId] : list.filter((id) => id !== m.userId)
-                        )
-                      }
-                    />
-                    {m.name || m.email}
-                  </label>
-                );
-              })}
-            </div>
+          {widget === "timezone" && (
+            <TimezoneField
+              value={typeof value === "string" ? value : ""}
+              onChange={(zone) => set(key, zone || undefined)}
+            />
+          )}
+          {widget === "files" && (
+            <AttachmentsField
+              value={Array.isArray(value) ? (value as string[]) : []}
+              onChange={(keys) => set(key, keys)}
+            />
+          )}
+          {(widget === "members" || widget === "owner") && (
+            <MemberSearchField
+              members={members}
+              membersStatus={membersStatus}
+              value={Array.isArray(value) ? (value as string[]) : []}
+              // Both write an array; "owner" just caps it at one entry.
+              onChange={(ids) => set(key, ids)}
+              multiple={widget === "members"}
+            />
           )}
           {widget === "tags" && (
             <Input

@@ -409,11 +409,11 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: ["ownerId"],
   },
   CREATE_TASK: {
-    allowed: ["subject", "description", "taskType", "priority", "startAt", "startInMs", "dueAt", "dueInMs", "reminderAt", "reminderInMs", "repeatEvery", "recurrenceTimezone", "recurrenceLimit", "isPublic", "isBillable", "assigneeIds", "followerIds", "collaboratorIds", "tags", "attachmentKeys", "relatedType", "leadId", "contactId", "companyId", "dealId"],
+    allowed: ["subject", "description", "taskType", "priority", "startAt", "dueAt", "reminderAt", "repeatEvery", "recurrenceTimezone", "recurrenceLimit", "isPublic", "isBillable", "assigneeIds", "collaboratorIds", "tags", "attachmentKeys", "relatedType", "leadId", "contactId", "companyId", "dealId"],
     required: ["subject", "assigneeIds"],
   },
   CREATE_REMINDER: {
-    allowed: ["title", "remindAt", "remindInMs", "targetUserId", "reminderType", "notificationMethod", "taskId", "callId", "meetingId", "relatedType", "leadId", "contactId", "companyId", "dealId", "quoteId", "estimateId", "invoiceId", "creditNoteId"],
+    allowed: ["title", "remindAt", "targetUserId", "reminderType", "notificationMethod", "taskId", "callId", "meetingId", "relatedType", "leadId", "contactId", "companyId", "dealId", "quoteId", "estimateId", "invoiceId", "creditNoteId"],
     required: ["title", "targetUserId"],
   },
   CREATE_NOTE: {
@@ -444,11 +444,11 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: ["messageType", "subject", "body"],
   },
   ADD_TO_WORK_QUEUE: {
-    allowed: ["subject", "description", "taskType", "priority", "startAt", "startInMs", "dueAt", "dueInMs", "reminderAt", "reminderInMs", "repeatEvery", "recurrenceTimezone", "recurrenceLimit", "isPublic", "isBillable", "assigneeIds", "followerIds", "collaboratorIds", "tags", "attachmentKeys", "relatedType", "leadId", "contactId", "companyId", "dealId"],
+    allowed: ["subject", "description", "taskType", "priority", "startAt", "dueAt", "reminderAt", "repeatEvery", "recurrenceTimezone", "recurrenceLimit", "isPublic", "isBillable", "assigneeIds", "followerIds", "collaboratorIds", "tags", "attachmentKeys", "relatedType", "leadId", "contactId", "companyId", "dealId"],
     required: ["subject", "assigneeIds"],
   },
   CREATE_FOLLOW_UP: {
-    allowed: ["subject", "description", "taskType", "priority", "startAt", "startInMs", "dueAt", "dueInMs", "reminderAt", "reminderInMs", "repeatEvery", "recurrenceTimezone", "recurrenceLimit", "isPublic", "isBillable", "assigneeIds", "followerIds", "collaboratorIds", "tags", "attachmentKeys", "relatedType", "leadId", "contactId", "companyId", "dealId"],
+    allowed: ["subject", "description", "taskType", "priority", "startAt", "dueAt", "reminderAt", "repeatEvery", "recurrenceTimezone", "recurrenceLimit", "isPublic", "isBillable", "assigneeIds", "followerIds", "collaboratorIds", "tags", "attachmentKeys", "relatedType", "leadId", "contactId", "companyId", "dealId"],
     required: ["subject", "assigneeIds"],
   },
   TRIGGER_AUTOMATION: {
@@ -520,11 +520,11 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: [],
   },
   SCHEDULE_CALL: {
-    allowed: ["subject", "callType", "callAt", "callInMs", "duration", "phone", "agenda", "purpose", "notes", "reminderAt", "reminderInMs", "assignedToId", "participantIds", "relatedType", "leadId", "contactId", "companyId", "dealId"],
+    allowed: ["subject", "callType", "callAt", "callInMs", "duration", "phone", "agenda", "purpose", "notes", "reminderAt", "assignedToId", "participantIds", "relatedType", "leadId", "contactId", "companyId", "dealId"],
     required: ["subject"],
   },
   CREATE_MEETING: {
-    allowed: ["title", "meetingType", "startAt", "startInMs", "endAt", "durationMinutes", "timezone", "allDay", "location", "meetingLink", "agenda", "notes", "reminderAt", "reminderInMs", "attendeeIds", "externalAttendees", "relatedType", "leadId", "contactId", "companyId", "dealId"],
+    allowed: ["title", "meetingType", "startAt", "endAt", "durationMinutes", "timezone", "allDay", "location", "meetingLink", "agenda", "notes", "reminderAt", "attendeeIds", "externalAttendees", "relatedType", "leadId", "contactId", "companyId", "dealId"],
     required: ["title"],
   },
   SEND_SMS: {
@@ -536,7 +536,7 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: ["toPhone", "body"],
   },
   REQUEST_DOCUMENTS: {
-    allowed: ["title", "documentType", "requestedFromId", "dueDate", "dueInMs", "notes", "relatedType", "leadId", "contactId", "companyId", "dealId"],
+    allowed: ["title", "documentType", "requestedFromId", "dueDate", "notes", "relatedType", "leadId", "contactId", "companyId", "dealId"],
     required: ["title", "documentType", "requestedFromId"],
   },
   UPDATE_DOCUMENT_STATUS: {
@@ -833,17 +833,47 @@ export const ACTIVITY_CAPABLE_ENTITY_TYPES: AutomationEntityType[] = [
 /** Mirrors `AutomationDefinition` (automation-definition.interface.ts) — the
  * actual persisted shape. `entityType`/trigger config live under `trigger`,
  * not flat on the definition. */
+/**
+ * One entry point into a workflow. An automation fires when ANY of its
+ * triggers matches, so `conditions` here are that trigger's own filters,
+ * ANDed with the definition-wide ones. Mirrors AutomationTriggerDefinition in
+ * src/modules/automation/interfaces/automation-definition.interface.ts.
+ */
+export type AutomationTriggerDefinition = {
+  /** Stable across reorders — the backend writes it to `AutomationRun.triggerKey`. */
+  key: string;
+  label?: string;
+  type: AutomationTriggerType;
+  entityType: AutomationEntityType;
+  config?: Record<string, unknown>;
+  conditions?: AutomationConditionGroup | null;
+};
+
+/** Run counts for one trigger, as the detail endpoint returns them. */
+export type AutomationTriggerStats = {
+  runs: number;
+  byStatus: Partial<Record<AutomationRunStatus | string, number>>;
+};
+
+export type AutomationTriggerWithStats = AutomationTriggerDefinition & {
+  stats?: AutomationTriggerStats;
+};
+
 export type AutomationVersion = {
   id: string;
   version: number;
   status: AutomationVersionStatus | string;
+  /** The primary (first) trigger. Read the whole list from `definition.triggers`. */
   triggerType: AutomationTriggerType | string;
   definition: {
+    /** Always `triggers[0]`; absent only on definitions saved before multi-trigger. */
     trigger?: {
       type?: string;
       entityType?: string;
       config?: Record<string, unknown>;
     };
+    /** Absent on versions saved before multi-trigger — fall back to `trigger`. */
+    triggers?: AutomationTriggerDefinition[];
     conditions?: AutomationConditionGroup;
     steps?: AutomationStep[];
     failurePolicy?: string;
@@ -857,6 +887,8 @@ export type Automation = {
   name: string;
   description?: string | null;
   status: AutomationStatus | string;
+  /** Flattened from the latest version by the detail endpoint, with run counts. */
+  triggers?: AutomationTriggerWithStats[];
   activeVersion?: AutomationVersion | null;
   versions?: AutomationVersion[];
   createdAt?: string;
@@ -882,8 +914,14 @@ export type AutomationRun = {
 export type CreateAutomationInput = {
   name: string;
   description?: string;
-  triggerType: AutomationTriggerType;
-  entityType: AutomationEntityType;
+  /**
+   * The workflow's triggers; it fires when any of them matches. Sending this
+   * replaces the whole list. The single-trigger fields below are the older
+   * shape the backend still accepts — send one or the other, not both.
+   */
+  triggers?: AutomationTriggerDefinition[];
+  triggerType?: AutomationTriggerType;
+  entityType?: AutomationEntityType;
   triggerConfig?: Record<string, unknown>;
   /** `null` clears a saved condition group on update; omitting it keeps the
    * stored one (automation.service.ts reads `dto.conditions ?? current`). */

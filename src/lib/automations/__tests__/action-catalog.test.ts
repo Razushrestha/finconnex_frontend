@@ -128,6 +128,11 @@ describe("automation action catalog", () => {
     const expected: Record<string, string[]> = {
       // CreateTaskDto — the Create Task form's owner, collaborators,
       // recurrence, billing and attachment fields.
+      //
+      // `followerIds` is deliberately absent: a Create Task step asks for an
+      // owner and collaborators only. The sibling task actions
+      // (ADD_TO_WORK_QUEUE, CREATE_FOLLOW_UP) still accept followers, which
+      // is why the key survives in the registry.
       CREATE_TASK: [
         "subject",
         "taskType",
@@ -135,7 +140,6 @@ describe("automation action catalog", () => {
         "description",
         "assigneeIds",
         "collaboratorIds",
-        "followerIds",
         "dueAt",
         "reminderAt",
         "repeatEvery",

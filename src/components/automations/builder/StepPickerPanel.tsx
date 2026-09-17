@@ -122,12 +122,18 @@ export function TriggerPickerPanel({
 }
 
 export function ActionPickerPanel({
-  entityType,
+  entityTypes,
   onClose,
   onSelectAction,
   onSelectFlowControl,
 }: {
-  entityType: AutomationEntityType;
+  /**
+   * Every entity type the workflow's triggers can deliver. Whichever trigger
+   * fires, the same steps run against its record, so only actions supported
+   * by all of them are offered — mirrors the backend, which rejects the rest
+   * with `automation.error.actionEntityNotSupported`.
+   */
+  entityTypes: AutomationEntityType[];
   onClose: () => void;
   onSelectAction: (action: AutomationActionType) => void;
   onSelectFlowControl: (kind: FlowControlKey) => void;
@@ -146,7 +152,9 @@ export function ActionPickerPanel({
     () =>
       [
         ...(Object.entries(ACTION_CATALOG) as [AutomationActionType, (typeof ACTION_CATALOG)[AutomationActionType]][])
-          .filter(([key]) => isActionAllowedForEntity(key, entityType))
+          .filter(([key]) =>
+            entityTypes.every((entityType) => isActionAllowedForEntity(key, entityType))
+          )
           .map(([key, meta]) => ({ key, label: meta.label, category: meta.category, icon: meta.icon })),
         ...PLANNED_ACTIONS.map((p, i) => ({
           key: `planned-${i}`,
@@ -157,7 +165,7 @@ export function ActionPickerPanel({
           note: p.note,
         })),
       ].filter((e) => e.label.toLowerCase().includes(query.toLowerCase())),
-    [query, entityType]
+    [query, entityTypes]
   );
 
   const groupedActions = groupByCategory(actionEntries);
