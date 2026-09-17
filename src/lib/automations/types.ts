@@ -225,6 +225,15 @@ export const PLANNED_TRIGGERS: { label: string; category: string; note: string }
   { label: "Messenger Message Received", category: "Communication", note: "Needs Meta app integration" },
 ];
 
+/**
+ * Actions no longer offered when adding a step. Their catalog entries stay,
+ * so a workflow that already has one still shows its name and settings and
+ * keeps running.
+ */
+export const RETIRED_ACTIONS: ReadonlySet<AutomationActionType> = new Set<AutomationActionType>([
+  "CHANGE_STATUS",
+]);
+
 /** Groups + labels every real action for the canvas's action picker, plus
  * the two structural flow-control steps (Wait / Branch) that aren't
  * AutomationActionType values but are picked from the same panel. */
