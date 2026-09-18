@@ -376,6 +376,17 @@ export const FIELD_META: Record<string, FieldMeta> = {
   },
   requestedFromId: { label: "Requested From (Contact)", widget: "text", helpText: "Contact UUID" },
   dueDate: { label: "Due Date", widget: "datetime" },
+  // Create Lead's form renders these itself.
+  secondaryContactId: { label: "Secondary contact", widget: "record", target: "CONTACT" },
+  loanPurpose: {
+    label: "Loan purpose",
+    widget: "select",
+    options: [
+      { label: "Purchase", value: "Purchase" },
+      { label: "Refinance", value: "Refinance" },
+      { label: "Investment", value: "Investment" },
+    ],
+  },
   // Create Task's relative schedule; its own form renders these as amount + unit.
   dueInMs: { label: "Due After Workflow Runs (ms)", widget: "number" },
   reminderBeforeDueMs: { label: "Reminder Before Due (ms)", widget: "number" },

@@ -506,8 +506,11 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: ["url"],
   },
   CREATE_LEAD: {
-    allowed: ["firstName", "lastName", "email", "phone", "mobilePhone", "jobTitle", "department", "linkedinUrl", "websiteUrl", "twitterUrl", "street", "city", "state", "country", "postalCode", "companyId", "companyName", "companyWebsite", "industry", "companySize", "pipelineStage", "tags", "source", "lifecycleStage", "score", "rating", "doNotContact", "productInterest", "budgetRange", "estimatedValue", "currency", "probability", "expectedCloseDate", "description", "notes", "ownerId", "avatarKey"],
-    required: ["firstName", "lastName", "email"],
+    // The Create Lead form's shape (name + contact) first; the explicit
+    // firstName/lastName/email keys remain for steps saved before it.
+    allowed: ["name", "contactId", "secondaryContactId", "followerIds", "loanPurpose", "firstName", "lastName", "email", "phone", "mobilePhone", "jobTitle", "department", "linkedinUrl", "websiteUrl", "twitterUrl", "street", "city", "state", "country", "postalCode", "companyId", "companyName", "companyWebsite", "industry", "companySize", "pipelineStage", "tags", "source", "lifecycleStage", "score", "rating", "doNotContact", "productInterest", "budgetRange", "estimatedValue", "currency", "probability", "expectedCloseDate", "description", "notes", "ownerId", "avatarKey"],
+    // Either `name` or firstName/lastName/email — the step form checks which.
+    required: [],
   },
   DELETE_LEAD: {
     allowed: ["recordId"],

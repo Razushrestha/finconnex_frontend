@@ -43,6 +43,7 @@ import { entityNoun } from "@/lib/automations/trigger-scope";
 
 import { supportsRecordPicker } from "@/lib/automations/record-search";
 
+import { CreateLeadActionForm, createLeadActionProblems } from "./CreateLeadActionForm";
 import { CreateTaskActionForm, createTaskActionProblems } from "./CreateTaskActionForm";
 import { FieldsEditor } from "./FieldsEditor";
 import { AttachmentsField } from "./AttachmentsField";
@@ -120,6 +121,10 @@ function ActionConfigForm({
   // Create Task is the task page's own form, not the generic key list.
   if (step.action === "CREATE_TASK") {
     return <CreateTaskActionForm config={config} onChange={onChange} />;
+  }
+  // Create Lead is the Create Lead modal's own form.
+  if (step.action === "CREATE_LEAD") {
+    return <CreateLeadActionForm config={config} entityType={entityType} onChange={onChange} />;
   }
   const email = step.action === "SEND_EMAIL";
   /**
@@ -497,7 +502,9 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
   const taskProblems =
     draft.type === "ACTION" && draft.action === "CREATE_TASK"
       ? createTaskActionProblems(draft.config ?? {})
-      : [];
+      : draft.type === "ACTION" && draft.action === "CREATE_LEAD"
+        ? createLeadActionProblems(draft.config ?? {}, entityType)
+        : [];
   const blocked =
     missingRequired.length > 0 || recipientProblems.length > 0 || taskProblems.length > 0;
 
