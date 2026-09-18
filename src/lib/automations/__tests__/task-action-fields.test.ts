@@ -47,12 +47,21 @@ describe("create-task action fields", () => {
     }
   });
 
-  it("renders every allowed key — none are hidden for a task step", () => {
+  it("renders every allowed key except Billable on a task step", () => {
     for (const action of TASK_CREATING_ACTIONS) {
       const keys = AUTOMATION_ACTION_KEYS[action];
       expect(visibleActionConfigKeys(action, keys.allowed, {})).toEqual(
-        keys.allowed,
+        keys.allowed.filter((key) => key !== "isBillable"),
       );
+    }
+  });
+
+  it("still shows Billable on a step that already set it", () => {
+    for (const action of TASK_CREATING_ACTIONS) {
+      const keys = AUTOMATION_ACTION_KEYS[action];
+      expect(
+        visibleActionConfigKeys(action, keys.allowed, { isBillable: true }),
+      ).toContain("isBillable");
     }
   });
 

@@ -151,7 +151,8 @@ describe("send email step fields", () => {
   });
 
   it("leaves every other action's fields alone", () => {
-    const allowed = AUTOMATION_ACTION_KEYS.CREATE_TASK.allowed;
-    expect(visibleActionConfigKeys("CREATE_TASK", allowed, {})).toEqual([...allowed]);
+    // Create Note hides nothing of its own, so it shows every allowed key.
+    const allowed = AUTOMATION_ACTION_KEYS.CREATE_NOTE.allowed;
+    expect(visibleActionConfigKeys("CREATE_NOTE", allowed, {})).toEqual([...allowed]);
   });
 });

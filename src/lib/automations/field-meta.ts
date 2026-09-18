@@ -148,6 +148,11 @@ export const HIDDEN_ACTION_CONFIG_KEYS: Partial<
     "companyId",
     "dealId",
   ],
+  // Billing is not something a workflow decides; a step that already set
+  // it still shows it, so it can be seen and cleared.
+  CREATE_TASK: ["isBillable"],
+  ADD_TO_WORK_QUEUE: ["isBillable"],
+  CREATE_FOLLOW_UP: ["isBillable"],
 };
 
 /**
