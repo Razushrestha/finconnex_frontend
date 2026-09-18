@@ -7,6 +7,9 @@ import {
   signedAttachmentName,
   stampSignedPdfBytes,
 } from "@/lib/documents/signature/stamp-signed-pdf";
+import { prefillFieldsWithValues } from "@/lib/documents/signature/bake-prefill";
+import { toCrmFieldGeometry, toCrmSignatureFieldType } from "@/lib/documents/signature/api";
+import { PREFILL_RECIPIENT_ID } from "@/lib/documents/signature/types";
 import type { SignatureField, SignatureRequest } from "@/lib/documents/signature/types";
 
 async function blankPdf() {
@@ -121,5 +124,59 @@ describe("stamp signed pdf", () => {
     expect(box.x).toBeCloseTo(61.2, 1);
     expect(box.width).toBeCloseTo(122.4, 1);
     expect(box.height).toBeCloseTo(31.46, 1);
+  });
+
+  it("selects only filled prefill fields to bake into the PDF", () => {
+    const fields = [
+      {
+        id: "f1",
+        kind: "company",
+        label: "Company",
+        x: 10,
+        y: 10,
+        w: 140,
+        h: 36,
+        page: 1,
+        signerId: PREFILL_RECIPIENT_ID,
+        required: false,
+        value: "Nepatronix",
+      },
+      {
+        id: "f2",
+        kind: "signature",
+        label: "Signature",
+        x: 50,
+        y: 10,
+        w: 140,
+        h: 36,
+        page: 1,
+        signerId: "sg-1",
+        required: true,
+      },
+    ] as SignatureField[];
+    expect(prefillFieldsWithValues(fields)).toHaveLength(1);
+    expect(prefillFieldsWithValues(fields)[0].id).toBe("f1");
+  });
+
+  it("maps place-fields boxes to CRM 0-1 geometry", () => {
+    expect(toCrmSignatureFieldType("company")).toBe("TEXT");
+    expect(toCrmSignatureFieldType("signature")).toBe("SIGNATURE");
+    const box = toCrmFieldGeometry({
+      id: "f1",
+      kind: "text",
+      label: "Name",
+      x: 10,
+      y: 20,
+      w: 140,
+      h: 36,
+      page: 1,
+      signerId: "s1",
+      required: true,
+    });
+    expect(box.x).toBeCloseTo(0.1, 5);
+    expect(box.y).toBeCloseTo(0.2, 5);
+    expect(box.width).toBeGreaterThan(0.001);
+    expect(box.width).toBeLessThanOrEqual(1);
+    expect(box.pageNumber).toBe(1);
   });
 });

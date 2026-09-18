@@ -16,10 +16,13 @@ export function PersistenceBootstrap({
   const pathname = usePathname();
 
   useEffect(() => {
-    if (pathname === "/login") return;
+    if (pathname === "/login" || pathname.startsWith("/sign/")) return;
     void (async () => {
-      await runLiveApiCutover();
-      await enableProductionComms();
+      const result = await runLiveApiCutover({
+        hydrateKeys: [],
+        useModuleRoutes: false,
+      });
+      await enableProductionComms({ bridge: result.auth });
     })();
   }, [pathname]);
 

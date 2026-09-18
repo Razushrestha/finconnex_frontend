@@ -11,12 +11,15 @@ import {
   deleteSignatureRequest,
   getRequestDocuments,
   getSignatureRequestById,
+  PREFILL_RECIPIENT_ID,
+  type SignatureField,
   type SignatureRequest,
   type SignatureSigner,
   type SignatureStatus,
   type SignerRole,
   type SignerStatus,
 } from "@/lib/documents/signature/types";
+import { DEFAULT_PLACED_FIELD_HEIGHT, DEFAULT_PLACED_FIELD_WIDTH } from "@/lib/documents/signature/field-placement";
 
 export type CrmSignatureRequestQuery = {
   page?: number;
@@ -283,17 +286,22 @@ function asRequest(data: unknown): SignatureRequest | null {
 export async function listCrmSignatureRequests(
   query: CrmSignatureRequestQuery = {},
 ): Promise<SignatureRequest[]> {
-  return normalizeSignatureRequests(
-    await requestsGet(
-      "",
-      toQuery({
-        page: query.page,
-        limit: query.limit ?? 100,
-        search: query.search,
-        status: query.status,
-      }),
-    ),
-  );
+  try {
+    return normalizeSignatureRequests(
+      await requestsGet(
+        "",
+        toQuery({
+          page: query.page,
+          limit: query.limit ?? 100,
+          search: query.search,
+          status: query.status,
+        }),
+      ),
+    );
+  } catch (err) {
+    if (isMissingCrmRoute(err)) return [];
+    throw err;
+  }
 }
 
 export async function getCrmSignatureRequest(
@@ -313,20 +321,82 @@ function compactBody(input: Record<string, unknown>): Record<string, unknown> {
   );
 }
 
+function crmRecipientRole(role: SignerRole): string {
+  if (role === "Approver") return "APPROVER";
+  if (role === "CC") return "CC";
+  return "SIGNER";
+}
+
+export function toCrmSignatureFieldType(
+  kind: string,
+): "SIGNATURE" | "INITIALS" | "TEXT" | "DATE" | "CHECKBOX" {
+  const value = kind.toLowerCase();
+  if (value === "signature") return "SIGNATURE";
+  if (value === "initials") return "INITIALS";
+  if (value === "date" || value === "sign_date") return "DATE";
+  if (value === "checkbox") return "CHECKBOX";
+  return "TEXT";
+}
+
+function clampUnit(n: number, min = 0.001, max = 1) {
+  if (!Number.isFinite(n)) return min;
+  return Math.min(max, Math.max(min, n));
+}
+
+export function toCrmFieldGeometry(field: SignatureField) {
+  const x = field.x <= 1 ? field.x : field.x / 100;
+  const y = field.y <= 1 ? field.y : field.y / 100;
+  const widthPx =
+    field.w > 40 ? field.w : field.w > 0 ? (field.w / 100) * 700 : DEFAULT_PLACED_FIELD_WIDTH;
+  const heightPx = field.h > 20 ? field.h : DEFAULT_PLACED_FIELD_HEIGHT;
+  const previewHeight = 700 * (792 / 612);
+  return {
+    x: clampUnit(x, 0, 0.99),
+    y: clampUnit(y, 0, 0.99),
+    width: clampUnit(widthPx / 700),
+    height: clampUnit(heightPx / previewHeight),
+    pageNumber: Math.max(1, field.page || 1),
+  };
+}
+
+export function remapFieldsToRemoteRecipients(
+  fields: SignatureField[],
+  localSigners: SignatureSigner[],
+  remoteSigners: SignatureSigner[],
+): SignatureField[] {
+  return fields.flatMap((field) => {
+    if (field.signerId === PREFILL_RECIPIENT_ID) return [];
+    if (isUuid(field.signerId)) return [field];
+    const local = localSigners.find((signer) => signer.id === field.signerId);
+    const remote =
+      (local &&
+        remoteSigners.find(
+          (row) => row.email.toLowerCase() === local.email.toLowerCase(),
+        )) ||
+      remoteSigners.find((row) => row.id === field.signerId);
+    if (!remote || !isUuid(remote.id)) return [];
+    return [{ ...field, signerId: remote.id }];
+  });
+}
+
 export function toCreateSignatureRequestBody(
   input: SignatureRequest,
+  documentId?: string,
 ): Record<string, unknown> {
   return compactBody({
+    documentId: documentId && isUuid(documentId) ? documentId : undefined,
     title: input.documentName.trim(),
     documentName: input.documentName.trim(),
-    signingOrder: input.signingOrder.toUpperCase(),
+    signingOrder: input.signingOrder === "parallel" ? "PARALLEL" : "SEQUENTIAL",
     expiresAt: toIsoDate(input.expiryDate),
+    emailSubject: `Please sign: ${input.documentName.trim()}`,
     recipients: input.signers.map((signer) =>
       compactBody({
         name: signer.name.trim(),
         email: signer.email.trim(),
-        role: signer.role.toUpperCase(),
-        order: signer.order,
+        role: crmRecipientRole(signer.role),
+        phone: signer.phone,
+        deliverVia: signer.deliveryMethod === "email_sms" ? "EMAIL_SMS" : "EMAIL",
       }),
     ),
   });
@@ -334,22 +404,24 @@ export function toCreateSignatureRequestBody(
 
 export function toPlaceSignatureFieldsBody(input: SignatureRequest) {
   return {
-    fields: input.fields.map((field) =>
-      compactBody({
-        id: field.id,
-        type: field.kind.toUpperCase(),
-        kind: field.kind.toUpperCase(),
-        label: field.label,
-        page: field.page || 1,
-        x: field.x,
-        y: field.y,
-        width: field.w,
-        height: field.h,
-        signerId: field.signerId,
-        required: field.required,
-        documentId: field.documentId,
-      }),
-    ),
+    fields: input.fields.flatMap((field) => {
+      if (field.signerId === PREFILL_RECIPIENT_ID || !isUuid(field.signerId)) {
+        return [];
+      }
+      const box = toCrmFieldGeometry(field);
+      return [
+        compactBody({
+          recipientId: field.signerId,
+          type: toCrmSignatureFieldType(field.kind),
+          pageNumber: box.pageNumber,
+          x: box.x,
+          y: box.y,
+          width: box.width,
+          height: box.height,
+          required: field.required,
+        }),
+      ];
+    }),
   };
 }
 
@@ -535,19 +607,35 @@ export function persistRemoteSignatureRequest(row: SignatureRequest | null) {
 
 export async function syncCrmSignatureDraft(
   draft: SignatureRequest,
+  options?: { documentId?: string },
 ): Promise<SignatureRequest> {
-  const body = toCreateSignatureRequestBody(draft);
+  const documentId = options?.documentId;
+  const body = toCreateSignatureRequestBody(draft, documentId);
+
+  async function placeClientFields(id: string, local: SignatureRequest) {
+    const remoteSigners =
+      (await tryCrmSignatureRequest(() => listCrmSignatureRecipients(id))) ??
+      [];
+    const fields = remapFieldsToRemoteRecipients(
+      local.fields,
+      local.signers,
+      remoteSigners,
+    );
+    if (!fields.length) return;
+    await tryCrmSignatureRequest(() =>
+      placeCrmSignatureFields(id, { ...local, fields }),
+    );
+  }
+
   if (isUuid(draft.id)) {
     await tryCrmSignatureRequest(() =>
       updateCrmSignatureRequest(draft.id, body),
     );
-    if (draft.fields.length) {
-      await tryCrmSignatureRequest(() =>
-        placeCrmSignatureFields(draft.id, draft),
-      );
-    }
+    await placeClientFields(draft.id, draft);
     return draft;
   }
+  if (!documentId || !isUuid(documentId)) return draft;
+
   const remote = await tryCrmSignatureRequest(() =>
     createCrmSignatureRequest(body),
   );
@@ -575,10 +663,8 @@ export async function syncCrmSignatureDraft(
       getRequestDocuments(draft).map((doc) => doc.id),
     );
   }
-  if (merged && draft.fields.length) {
-    await tryCrmSignatureRequest(() =>
-      placeCrmSignatureFields(merged.id, { ...merged, fields: draft.fields }),
-    );
+  if (merged) {
+    await placeClientFields(merged.id, { ...merged, fields: draft.fields, signers: draft.signers });
   }
   return merged ?? draft;
 }

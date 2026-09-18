@@ -26,6 +26,8 @@ import {
 import { syncQuotationFromSignature } from "@/lib/finance/quotations/signatureBridge";
 import { persistSignedPackage } from "@/lib/documents/signed-artifacts";
 import { SignatureDocPreview } from "./SignatureDocPreview";
+import { mapPublicSignatureView } from "@/lib/documents/signature/public-view";
+import { parsePublicSignerStatus } from "@/lib/documents/signature/sync-public-status";
 import { SignedCompleteView } from "./SignedCompleteView";
 import { SignatureModal } from "./SignatureModal";
 import { SigningFieldInputModal } from "./SigningFieldInputModal";
@@ -84,6 +86,10 @@ export function PublicSignClient({ token }: { token: string }) {
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideIndex, setGuideIndex] = useState(0);
   const [submitError, setSubmitError] = useState("");
+
+  const [publicMode, setPublicMode] = useState(false);
+  const [linkExpired, setLinkExpired] = useState(false);
+  const justFinishedRef = useRef(false);
 
   // Which of the request's (possibly several) attached documents is
   // currently shown. Defaults to the first document once it's known.
@@ -153,52 +159,95 @@ export function PublicSignClient({ token }: { token: string }) {
   }, [req?.id, req?.documents?.length, hydrated]);
 
   useEffect(() => {
-    const hit = getSignatureByToken(token);
-    if (!hit) {
-      setReq(null);
-      setSigner(null);
-      setHydrated(true);
-      return;
-    }
+    let cancelled = false;
 
-    let liveReq = hit.request;
-    let liveSigner = hit.signer;
-
-    if (
-      liveReq.status !== "Draft" &&
-      liveReq.status !== "Cancelled" &&
-      liveReq.status !== "Expired" &&
-      liveSigner.status !== "Signed" &&
-      liveSigner.status !== "Declined" &&
-      canSignerAccess(liveReq, liveSigner.id)
-    ) {
-      liveReq = applySignerViewed(liveReq, liveSigner.id);
-      liveSigner =
-        liveReq.signers.find((s) => s.id === liveSigner.id) ?? liveSigner;
-    }
-
-    setReq(liveReq);
-    setSigner(liveSigner);
-    setHydrated(true);
-    if (isCrmSignatureRequestId(liveReq.id)) {
-      void tryCrmSignatureRequest(() => viewCrmSignatureRequest(liveReq.id)).then(
-        (remote) => {
-          if (!remote) return;
-          persistRemoteSignatureRequest(remote);
-        },
-      );
-    }
-
-    const requestId = liveReq.id;
     void (async () => {
-      const docs = getRequestDocuments(liveReq);
-      const publicRes = await fetch(
-        `/api/sign/${encodeURIComponent(token)}/document`,
-      )
-        .then((res) => res.json() as Promise<{ documentUrl?: string | null }>)
-        .catch(() => ({ documentUrl: null }));
-      const publicUrl = publicRes.documentUrl?.trim() || undefined;
+      const hit = getSignatureByToken(token);
+      const publicRes = await fetch(`/api/sign/${encodeURIComponent(token)}`)
+        .then((res) => res.json() as Promise<Record<string, unknown>>)
+        .catch(() => null);
+      if (cancelled) return;
 
+      if (
+        !justFinishedRef.current &&
+        (publicRes?.consumed ||
+          parsePublicSignerStatus(publicRes?.status) === "Signed")
+      ) {
+        setLinkExpired(true);
+        setHydrated(true);
+        return;
+      }
+
+      const publicUrl = String(publicRes?.documentUrl ?? "").trim() || undefined;
+      const publicFields = Array.isArray(publicRes?.fields)
+        ? publicRes.fields
+        : [];
+      const publicName = String(publicRes?.documentName ?? "").trim();
+
+      if (!hit) {
+        if (publicUrl || publicFields.length || publicName) {
+          const mapped = mapPublicSignatureView(token, {
+            documentName: publicName,
+            documentUrl: publicUrl,
+            recipientName: String(publicRes?.recipientName ?? ""),
+            role: String(publicRes?.role ?? ""),
+            status: String(publicRes?.status ?? "Sent"),
+            fields: publicFields as never,
+          });
+          setPublicMode(true);
+          setReq(mapped.request);
+          setSigner(mapped.signer);
+          setHydrated(true);
+          if (mapped.signer.status !== "Signed" && mapped.signer.status !== "Declined") {
+            void fetch(`/api/sign/${encodeURIComponent(token)}/view`, {
+              method: "POST",
+            });
+          }
+          return;
+        }
+        setReq(null);
+        setSigner(null);
+        setHydrated(true);
+        return;
+      }
+
+      let liveReq = hit.request;
+      let liveSigner = hit.signer;
+      if (liveReq.status === "Draft") {
+        liveReq = { ...liveReq, status: "Sent" };
+      }
+
+      if (
+        liveReq.status !== "Cancelled" &&
+        liveReq.status !== "Expired" &&
+        liveSigner.status !== "Signed" &&
+        liveSigner.status !== "Declined" &&
+        canSignerAccess(liveReq, liveSigner.id)
+      ) {
+        liveReq = applySignerViewed(liveReq, liveSigner.id);
+        liveSigner =
+          liveReq.signers.find((s) => s.id === liveSigner.id) ?? liveSigner;
+      }
+
+      setPublicMode(false);
+      setReq(liveReq);
+      setSigner(liveSigner);
+      setHydrated(true);
+      if (liveSigner.status !== "Signed" && liveSigner.status !== "Declined") {
+        void fetch(`/api/sign/${encodeURIComponent(token)}/view`, {
+          method: "POST",
+        });
+      }
+      if (isCrmSignatureRequestId(liveReq.id)) {
+        void tryCrmSignatureRequest(() =>
+          viewCrmSignatureRequest(liveReq.id),
+        ).then((remote) => {
+          if (remote) persistRemoteSignatureRequest(remote);
+        });
+      }
+
+      const requestId = liveReq.id;
+      const docs = getRequestDocuments(liveReq);
       const nextDocs = await Promise.all(
         docs.map(async (doc) => ({
           ...doc,
@@ -212,6 +261,7 @@ export function PublicSignClient({ token }: { token: string }) {
             doc.fileUrl,
         })),
       );
+      if (cancelled) return;
       setReq((prev) => {
         if (!prev || prev.id !== requestId) return prev;
         const firstUrl = nextDocs[0]?.fileUrl || publicUrl || prev.documentFileUrl;
@@ -222,6 +272,10 @@ export function PublicSignClient({ token }: { token: string }) {
         };
       });
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   function afterPersist(next: SignatureRequest) {
@@ -294,8 +348,25 @@ export function PublicSignClient({ token }: { token: string }) {
       return;
     }
     setSubmitError("");
+    justFinishedRef.current = true;
     const next = applySignerSignature(req, signer.id, pendingSignatureData);
     afterPersist(next);
+    if (publicMode) {
+      void fetch(`/api/sign/${encodeURIComponent(token)}/sign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fields: next.fields
+            .filter((field) => field.signerId === signer.id && field.value?.trim())
+            .map((field) => ({ fieldId: field.id, value: field.value })),
+        }),
+      }).then(async (res) => {
+        if (!res.ok) {
+          setSubmitError("Could not submit your signature. Try the link again.");
+        }
+      });
+      return;
+    }
     if (isCrmSignatureRequestId(req.id)) {
       void tryCrmSignatureRequest(() =>
         signCrmSignatureRequest(req.id, {
@@ -354,6 +425,14 @@ export function PublicSignClient({ token }: { token: string }) {
     if (!req || !signer) return;
     const next = applySignerDecline(req, signer.id);
     afterPersist(next);
+    if (publicMode) {
+      void fetch(`/api/sign/${encodeURIComponent(token)}/decline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      return;
+    }
     if (isCrmSignatureRequestId(req.id)) {
       void tryCrmSignatureRequest(() =>
         declineCrmSignatureRequest(req.id),
@@ -365,15 +444,39 @@ export function PublicSignClient({ token }: { token: string }) {
 
   if (!hydrated) {
     return (
-      <div className="flex min-h-dvh items-center justify-center text-[13px] text-slate-400">
+      <div
+        className="flex min-h-dvh items-center justify-center text-[13px] text-slate-400"
+        suppressHydrationWarning
+      >
         Loading…
+      </div>
+    );
+  }
+
+  if (linkExpired) {
+    return (
+      <div
+        className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-4 text-center"
+        suppressHydrationWarning
+      >
+        <Clock className="mb-3 h-10 w-10 text-slate-300" />
+        <h1 className="text-lg font-bold text-slate-900">
+          This signing link has expired
+        </h1>
+        <p className="mt-1 text-[13px] text-slate-500">
+          The document has already been signed, so this email link can no longer
+          be used.
+        </p>
       </div>
     );
   }
 
   if (!req || !signer) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-4 text-center">
+      <div
+        className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-4 text-center"
+        suppressHydrationWarning
+      >
         <PenLine className="mb-3 h-10 w-10 text-slate-300" />
         <h1 className="text-lg font-bold text-slate-900">Link invalid</h1>
         <p className="mt-1 text-[13px] text-slate-500">
@@ -452,12 +555,14 @@ export function PublicSignClient({ token }: { token: string }) {
   const documents = getRequestDocuments(req);
   const activeDoc =
     documents.find((d) => d.id === activeDocId) ?? documents[0] ?? null;
-  const activeDocFields = myFields.filter(
-    (f) => (f.documentId ?? "primary") === (activeDoc?.id ?? "primary"),
-  );
+  const fieldsForDoc = (docId: string) =>
+    req.fields.filter((field) => (field.documentId ?? "primary") === docId);
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-4xl flex-col px-4 py-6">
+    <div
+      className="mx-auto flex min-h-dvh max-w-4xl flex-col px-4 py-6"
+      suppressHydrationWarning
+    >
       {/* Electronic Record & Signature Disclosure Top Consent Bar */}
       <div
         data-sign-consent
@@ -590,10 +695,7 @@ export function PublicSignClient({ token }: { token: string }) {
                 <SignatureDocPreview
                   fileName={doc.fileName}
                   fileUrl={doc.fileUrl}
-                  fields={myFields.filter(
-                    (field) =>
-                      (field.documentId ?? "primary") === doc.id,
-                  )}
+                  fields={fieldsForDoc(doc.id)}
                   signers={req.signers}
                   selectedFieldId={guidedField?.id}
                   highlightSignerId={signer.id}
@@ -610,7 +712,7 @@ export function PublicSignClient({ token }: { token: string }) {
             key={activeDoc.id}
             fileName={activeDoc.fileName}
             fileUrl={activeDoc.fileUrl}
-            fields={activeDocFields}
+            fields={fieldsForDoc(activeDoc.id)}
             signers={req.signers}
             selectedFieldId={guidedField?.id}
             highlightSignerId={signer.id}

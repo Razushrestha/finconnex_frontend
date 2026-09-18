@@ -2,11 +2,14 @@
 
 import { useEffect } from "react";
 import { persistCrmTokens } from "@/lib/activity-timeline/auth";
+import {
+  fetchCrmTokenJson,
+  readStoredCrmTokens,
+  refreshCrmTokenFromBrowser,
+} from "@/lib/auth/browser-session-cache";
 
 const MIN_WAIT_MS = 15_000;
 const REFRESH_EARLY_MS = 60_000;
-const ACCESS_KEY = "fc.crm.accessToken";
-const REFRESH_KEY = "fc.crm.refreshToken";
 
 type TokenPayload = {
   authenticated?: boolean;
@@ -16,47 +19,13 @@ type TokenPayload = {
   error?: string;
 };
 
-function readStoredTokens() {
-  if (typeof window === "undefined") {
-    return { accessToken: null as string | null, refreshToken: null as string | null };
-  }
-  try {
-    return {
-      accessToken:
-        window.sessionStorage.getItem(ACCESS_KEY) ||
-        window.localStorage.getItem(ACCESS_KEY),
-      refreshToken:
-        window.sessionStorage.getItem(REFRESH_KEY) ||
-        window.localStorage.getItem(REFRESH_KEY),
-    };
-  } catch {
-    return { accessToken: null, refreshToken: null };
-  }
-}
-
 async function syncCrmTokens(): Promise<number> {
-  const res = await fetch("/api/auth/crm-token", { credentials: "same-origin" });
-  if (res.status === 401) return MIN_WAIT_MS;
-  if (!res.ok) return MIN_WAIT_MS;
-  let json = (await res.json()) as TokenPayload;
-  if (json.authenticated === false) {
-    return MIN_WAIT_MS;
-  }
-
-  // Cookie jar may not hold the access JWT on Vercel — re-seed from localStorage.
-  if (!json.accessToken) {
-    const stored = readStoredTokens();
-    if (stored.accessToken || stored.refreshToken) {
-      const seeded = await fetch("/api/auth/crm-token", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(stored),
-      });
-      if (seeded.ok) {
-        json = (await seeded.json()) as TokenPayload;
-      }
-    }
+  const stored = readStoredCrmTokens();
+  let json = (stored.accessToken || stored.refreshToken
+    ? await refreshCrmTokenFromBrowser()
+    : await fetchCrmTokenJson()) as TokenPayload;
+  if (json.authenticated !== true && !json.accessToken) {
+    json = (await fetchCrmTokenJson()) as TokenPayload;
   }
 
   if (json.accessToken) {
@@ -65,7 +34,7 @@ async function syncCrmTokens(): Promise<number> {
       refreshToken: json.refreshToken,
     });
   }
-  const expiresMs = (json.expiresIn ?? 0) * 1000;
+  const expiresMs = Number(json.expiresIn ?? 0) * 1000;
   if (expiresMs <= 0) return MIN_WAIT_MS;
   return Math.max(MIN_WAIT_MS, expiresMs - REFRESH_EARLY_MS);
 }
@@ -91,7 +60,9 @@ export function CrmTokenKeepAlive() {
       }
     };
 
-    void loop();
+    timer = window.setTimeout(() => {
+      void loop();
+    }, 8_000);
     const onVisible = () => {
       if (document.visibilityState === "visible") {
         window.clearTimeout(timer);

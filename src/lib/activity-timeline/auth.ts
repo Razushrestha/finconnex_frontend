@@ -16,6 +16,10 @@
  */
 
 import { fetchAuthBridge } from "@/lib/persistence/auth-bridge";
+import {
+  fetchCrmTokenJson,
+  refreshCrmTokenFromBrowser,
+} from "@/lib/auth/browser-session-cache";
 
 import { CRM_WORKSPACE_STORAGE_KEY } from "@/lib/persistence/tenant";
 
@@ -129,12 +133,7 @@ async function fetchServerCrmTokens(): Promise<{
     };
   }
   try {
-    const res = await fetch("/api/auth/crm-token", { credentials: "same-origin" });
-    if (!res.ok) return { accessToken: null, refreshToken: null };
-    const json = (await res.json()) as {
-      accessToken?: string | null;
-      refreshToken?: string | null;
-    };
+    const json = await fetchCrmTokenJson();
     return {
       accessToken:
         typeof json.accessToken === "string" && json.accessToken
@@ -165,13 +164,32 @@ async function resolveAccessToken(): Promise<string | null> {
   }
 
   const server = await fetchServerCrmTokens();
-  if (server.accessToken) {
+  if (server.accessToken && !isJwtExpired(server.accessToken)) {
     persistCrmTokens({
       accessToken: server.accessToken,
       refreshToken: server.refreshToken,
       workspaceId: workspaceIdFromToken(server.accessToken),
     });
     return server.accessToken;
+  }
+
+  if (typeof window !== "undefined") {
+    try {
+      const rotated = await refreshCrmTokenFromBrowser();
+      if (typeof rotated.accessToken === "string" && rotated.accessToken) {
+        persistCrmTokens({
+          accessToken: rotated.accessToken,
+          refreshToken:
+            typeof rotated.refreshToken === "string"
+              ? rotated.refreshToken
+              : null,
+          workspaceId: workspaceIdFromToken(rotated.accessToken),
+        });
+        if (!isJwtExpired(rotated.accessToken)) return rotated.accessToken;
+      }
+    } catch {
+      /* POST seed optional */
+    }
   }
 
   const bridge = await fetchAuthBridge();
@@ -191,6 +209,22 @@ let inflightRefresh: Promise<string | null> | null = null;
 async function refreshAccessToken(_baseUrl: string): Promise<string | null> {
   if (inflightRefresh) return inflightRefresh;
   inflightRefresh = (async () => {
+    try {
+      const rotated = await refreshCrmTokenFromBrowser();
+      if (typeof rotated.accessToken === "string" && rotated.accessToken) {
+        persistCrmTokens({
+          accessToken: rotated.accessToken,
+          refreshToken:
+            typeof rotated.refreshToken === "string"
+              ? rotated.refreshToken
+              : null,
+          workspaceId: workspaceIdFromToken(rotated.accessToken),
+        });
+        return rotated.accessToken;
+      }
+    } catch {
+      /* fall through to GET bridge */
+    }
     const server = await fetchServerCrmTokens();
     if (server.accessToken) {
       persistCrmTokens({

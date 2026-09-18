@@ -5,13 +5,15 @@ import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { X } from "lucide-react";
-import { SIGNER_COLORS } from "@/lib/documents/signature/types";
+import { signerColor } from "@/lib/documents/signature/types";
 import {
   DEFAULT_PLACED_FIELD_HEIGHT,
   DEFAULT_PLACED_FIELD_WIDTH,
   clientPointHitsPage,
+  isSenderPrefillField,
   pointerToPagePercent,
 } from "@/lib/documents/signature/field-placement";
+import { SenderFieldErrorTooltip } from "@/components/documents/signature/create/SenderFieldErrorTooltip";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -28,6 +30,8 @@ export interface PlacedField {
   height?: number;
   recipientId?: string;
   colorIndex?: number;
+  /** Sender-filled value for Prefill fields. */
+  value?: string;
 }
 
 export interface DraggingFieldType {
@@ -63,6 +67,9 @@ interface PdfFieldEditorProps {
   ) => void;
   onRemoveField: (id: string) => void;
   onResizeField?: (id: string, width: number, height: number) => void;
+  onChangeFieldValue?: (id: string, value: string) => void;
+  emptyFieldErrorId?: string | null;
+  onPickSignature?: (field: PlacedField) => void;
   /** Called once this document's page count is known, so the caller can show continuous numbering across documents. */
   onNumPagesResolved?: (documentId: string, numPages: number) => void;
   /** Fired after the last page has rendered so scroll-to-next-doc is not premature. */
@@ -89,12 +96,16 @@ export default function PdfFieldEditor({
   onRepositionField,
   onRemoveField,
   onResizeField,
+  onChangeFieldValue,
+  emptyFieldErrorId,
+  onPickSignature,
   onNumPagesResolved,
   onDocumentReady,
   readOnly = false,
 }: PdfFieldEditorProps) {
   const [numPages, setNumPages] = useState(0);
   const [loadError, setLoadError] = useState(false);
+  const [pageAspect, setPageAspect] = useState(11 / 8.5);
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const [dragOverPage, setDragOverPage] = useState<number | null>(null);
   const [dropGhost, setDropGhost] = useState<{
@@ -192,6 +203,7 @@ export default function PdfFieldEditor({
     e.preventDefault();
     e.stopPropagation();
     e.dataTransfer.dropEffect = "copy";
+    if (!draggingFieldType) return;
     updateDropGhost(page, e);
   };
 
@@ -202,9 +214,11 @@ export default function PdfFieldEditor({
     setDropGhost(null);
   };
 
-  const handleDropOnPage = (page: number) => (e: React.DragEvent) => {
+  const handleDropOnPage =
+    (page: number) => (e: { preventDefault(): void; stopPropagation(): void; clientX: number; clientY: number }) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!draggingFieldType) return;
     const el = pageRefs.current.get(page);
     setDragOverPage(null);
     setDropGhost(null);
@@ -241,28 +255,45 @@ export default function PdfFieldEditor({
           Loading document…
         </div>
       }
-      className="flex flex-col items-center gap-6"
+      className="bg-white shadow-[0_2px_16px_rgba(15,23,42,0.1)]"
     >
       {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
         <div
           key={pageNum}
           ref={(el) => setPageRef(pageNum, el)}
-          onDragOver={
-            draggingFieldType ? handleDragOverPage(pageNum) : undefined
-          }
-          onDragLeave={draggingFieldType ? handleDragLeavePage : undefined}
-          onDrop={draggingFieldType ? handleDropOnPage(pageNum) : undefined}
-          className={`relative inline-block rounded-md shadow-md transition-shadow ${
+          onDragOver={handleDragOverPage(pageNum)}
+          onDragLeave={handleDragLeavePage}
+          onDrop={handleDropOnPage(pageNum)}
+          onClick={(e) => {
+            if (!draggingFieldType || readOnly) return;
+            if ((e.target as HTMLElement).closest("[data-placed-field]")) {
+              return;
+            }
+            handleDropOnPage(pageNum)(e);
+          }}
+          style={{
+            width: pageWidth,
+            minHeight: Math.round(pageWidth * pageAspect),
+          }}
+          className={`relative block overflow-hidden bg-white ${
+            draggingFieldType ? "cursor-copy" : ""
+          } ${pageNum > 1 ? "border-t border-slate-200/80" : ""} ${
             dragOverPage === pageNum
-              ? "ring-2 ring-indigo-400 ring-offset-2"
+              ? "ring-2 ring-indigo-400 ring-offset-0"
               : ""
           }`}
+          id={`pdf-page-${documentId}-${pageNum}`}
         >
           <Page
             pageNumber={pageNum}
             width={pageWidth}
             renderAnnotationLayer={false}
             renderTextLayer={false}
+            className="pointer-events-none !block"
+            onLoadSuccess={(page) => {
+              if (pageNum !== 1 || page.originalWidth <= 0) return;
+              setPageAspect(page.originalHeight / page.originalWidth);
+            }}
             onRenderSuccess={() => {
               if (pageNum === numPages) onDocumentReady?.(documentId);
             }}
@@ -272,20 +303,37 @@ export default function PdfFieldEditor({
             .filter((f) => f.page === pageNum)
             .map((field) => {
               const isBeingDragged = repositioningId === field.id;
-              const color =
-                field.colorIndex != null
-                  ? SIGNER_COLORS[field.colorIndex]
-                  : null;
+              const color = signerColor(field.colorIndex);
               const { width, height } = fieldSize(field);
+              const isPrefill = isSenderPrefillField(field.recipientId);
+              const isSignaturePick =
+                !readOnly &&
+                (field.type === "signature" ||
+                  field.type === "initials" ||
+                  field.type === "stamp" ||
+                  field.type === "company" ||
+                  field.type === "job_title");
+              const showEmptyError = emptyFieldErrorId === field.id;
 
               return (
                 <div
                   key={field.id}
+                  id={`placed-field-${field.id}`}
+                  data-placed-field=""
                   onPointerDown={
                     readOnly
                       ? undefined
                       : (e) => {
                           if (e.button !== 0) return;
+                          const target = e.target as HTMLElement;
+                          if (target.closest("input, textarea, select, button")) {
+                            e.stopPropagation();
+                            return;
+                          }
+                          if (isSignaturePick) {
+                            e.stopPropagation();
+                            return;
+                          }
                           e.preventDefault();
                           e.stopPropagation();
                           const rect = e.currentTarget.getBoundingClientRect();
@@ -300,6 +348,14 @@ export default function PdfFieldEditor({
                           e.currentTarget.setPointerCapture(e.pointerId);
                         }
                   }
+                  onClick={
+                    isSignaturePick
+                      ? (e) => {
+                          e.stopPropagation();
+                          onPickSignature?.(field);
+                        }
+                      : undefined
+                  }
                   style={{
                     left: `${field.xPct}%`,
                     top: `${field.yPct}%`,
@@ -308,36 +364,98 @@ export default function PdfFieldEditor({
                     transform: "none",
                   }}
                   className={`group absolute flex items-center justify-between gap-1.5 ${
-                    color
-                      ? `${color.bg} ${color.text} border-2 border-dashed ${color.border}`
-                      : "bg-indigo-600 text-white border-2 border-dashed border-indigo-300"
-                  } text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-md select-none z-10 touch-none ${
+                    showEmptyError
+                      ? "z-40 bg-white text-slate-700 border-2 border-dashed border-sky-400 ring-2 ring-sky-300/60"
+                      : color
+                        ? `${color.bg} ${color.text} border-2 border-dashed ${color.border}`
+                        : "bg-indigo-600 text-white border-2 border-dashed border-indigo-300"
+                  } text-[11px] font-semibold px-2.5 py-1.5 rounded-md shadow-md select-none ${
+                    showEmptyError ? "" : "z-10"
+                  } ${
                     readOnly
                       ? "cursor-default"
                       : isBeingDragged
-                        ? "cursor-grabbing shadow-xl z-20"
-                        : "cursor-grab"
+                        ? "cursor-grabbing shadow-xl z-20 touch-none"
+                        : isSignaturePick
+                          ? "cursor-pointer"
+                          : isPrefill
+                          ? "cursor-text"
+                          : "cursor-grab touch-none"
                   }`}
                 >
-                  {field.type === "checkbox" ? (
+                  {isSignaturePick &&
+                  (field.type === "signature" || field.type === "initials") ? (
+                    field.value?.startsWith("data:") ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={field.value}
+                        alt=""
+                        className="h-full max-h-7 w-full object-contain object-left"
+                      />
+                    ) : (
+                      <span className="truncate">
+                        {field.value || field.label}
+                      </span>
+                    )
+                  ) : isSignaturePick ? (
+                    field.value?.startsWith("data:") ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={field.value}
+                        alt=""
+                        className="h-full max-h-7 w-full object-contain object-left"
+                      />
+                    ) : (
+                      <span className="truncate">{field.value || field.label}</span>
+                    )
+                  ) : field.type === "checkbox" ? (
                     <input
                       type="checkbox"
-                      disabled
-                      className="w-3.5 h-3.5 accent-current pointer-events-none shrink-0"
+                      disabled={readOnly || !isPrefill}
+                      checked={field.value === "true"}
+                      onChange={(e) =>
+                        onChangeFieldValue?.(field.id, e.target.checked ? "true" : "")
+                      }
+                      className={`w-3.5 h-3.5 accent-current shrink-0 ${
+                        isPrefill && !readOnly ? "" : "pointer-events-none"
+                      }`}
                     />
                   ) : field.type === "date" || field.type === "sign_date" ? (
                     <input
                       type="date"
-                      disabled
-                      className="w-full bg-transparent text-[11px] font-semibold pointer-events-none outline-none border-none"
+                      disabled={readOnly || !isPrefill}
+                      value={field.value ?? ""}
+                      onChange={(e) =>
+                        onChangeFieldValue?.(field.id, e.target.value)
+                      }
+                      className={`w-full bg-transparent text-[11px] font-semibold outline-none border-none ${
+                        isPrefill && !readOnly ? "" : "pointer-events-none"
+                      }`}
                     />
                   ) : field.type === "dropdown" ? (
                     <select
-                      disabled
-                      className="w-full bg-transparent text-[11px] font-semibold pointer-events-none outline-none border-none appearance-none truncate"
+                      disabled={readOnly || !isPrefill}
+                      value={field.value ?? ""}
+                      onChange={(e) =>
+                        onChangeFieldValue?.(field.id, e.target.value)
+                      }
+                      className={`w-full bg-transparent text-[11px] font-semibold outline-none border-none appearance-none truncate ${
+                        isPrefill && !readOnly ? "" : "pointer-events-none"
+                      }`}
                     >
-                      <option>{field.label}</option>
+                      <option value="">{field.label}</option>
+                      <option value={field.label}>{field.label}</option>
                     </select>
+                  ) : isPrefill && !readOnly ? (
+                    <input
+                      type="text"
+                      value={field.value ?? ""}
+                      placeholder={field.label}
+                      onChange={(e) =>
+                        onChangeFieldValue?.(field.id, e.target.value)
+                      }
+                      className="w-full min-w-0 bg-transparent text-[11px] font-semibold outline-none placeholder:text-current/70"
+                    />
                   ) : (
                     <span className="truncate">{field.label}</span>
                   )}
@@ -383,14 +501,23 @@ export default function PdfFieldEditor({
                       ) : null}
                     </>
                   ) : null}
+                  {showEmptyError ? (
+                    <SenderFieldErrorTooltip
+                      fieldId={field.id}
+                      fieldLabel={field.label}
+                    />
+                  ) : null}
                 </div>
               );
             })}
 
-          {draggingFieldType &&
-            dropGhost?.page === pageNum && (
+          {draggingFieldType && dropGhost?.page === pageNum && (
               <div
-                className="absolute z-30 pointer-events-none rounded-md border-2 border-dashed border-violet-400 bg-violet-100/80 text-[11px] font-semibold text-violet-700 px-2.5 flex items-center shadow-sm"
+                className={`absolute z-30 pointer-events-none rounded-md border-2 border-dashed px-2.5 text-[11px] font-semibold flex items-center shadow-sm ${
+                  signerColor(draggingFieldType.recipient?.colorIndex).bg
+                } ${signerColor(draggingFieldType.recipient?.colorIndex).text} ${
+                  signerColor(draggingFieldType.recipient?.colorIndex).border
+                }`}
                 style={{
                   left: `${dropGhost.xPct}%`,
                   top: `${dropGhost.yPct}%`,
@@ -403,7 +530,12 @@ export default function PdfFieldEditor({
             )}
 
           {dragOverPage === pageNum && (
-            <div className="absolute inset-0 bg-indigo-500/5 pointer-events-none" />
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                backgroundColor: `${signerColor(draggingFieldType?.recipient?.colorIndex).hex}14`,
+              }}
+            />
           )}
 
           <div className="absolute top-2 right-2 bg-slate-900/70 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full pointer-events-none">

@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type KanbanColumn, type LeadPipelineStage } from "@/lib/leads/types";
+import {
+  LEAD_COLUMNS,
+  type KanbanColumn,
+  type LeadPipelineStage,
+} from "@/lib/leads/types";
 import { listLeadColumns, saveLeadColumns } from "@/lib/leads/store";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import { pipelineStageToCrmStatus } from "@/lib/leads/api/map";
@@ -116,7 +120,7 @@ export function LeadKanbanBoard({
   } | null>(null);
 
   const [columns, setColumns] = useState<KanbanColumn[]>(() =>
-    listLeadColumns(),
+    LEAD_COLUMNS.map((col) => ({ ...col, cards: [] })),
   );
   const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
   const [dropTargetPos, setDropTargetPos] = useState<DropTargetPosition | null>(
@@ -152,6 +156,7 @@ export function LeadKanbanBoard({
   }, []);
 
   useEffect(() => {
+    setColumns(listLeadColumns());
     return onRulesChange(() => {
       setColumns(listLeadColumns());
     });

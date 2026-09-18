@@ -2,39 +2,18 @@
 
 import { useEffect, useState } from "react";
 import mammoth from "mammoth";
-import { Calendar, PenLine, Type, User } from "lucide-react";
-import {
-  SIGNER_COLORS,
-  fieldKindLabel,
-  type SignatureField,
-  type SignatureSigner,
-} from "@/lib/documents/signature/types";
-import { placedFieldOverlayStyle } from "@/lib/documents/signature/field-placement";
+import type { SignatureField, SignatureSigner } from "@/lib/documents/signature/types";
 import { cn } from "@/lib/utils";
-import { SignatureFieldValue } from "./SignatureFieldValue";
+import {
+  SigningFieldOverlay,
+  signingFieldsForPage,
+} from "./SigningFieldOverlay";
 
 /**
  * Mirrors PdfDocViewer's props/overlay behavior so SignatureDocPreview can
  * swap between the two based on file type without the caller knowing the
- * difference. Word docs are treated as a single flowing "page" — fields
- * placed on a docx are always page 1 (see PlaceFieldsView's docx branch,
- * which places fields the same way on the sender side).
+ * difference. Word docs are treated as a single flowing "page".
  */
-
-function FieldIcon({ kind }: { kind: SignatureField["kind"] }) {
-  switch (kind) {
-    case "signature":
-    case "initials":
-      return <PenLine className="h-3 w-3 shrink-0" />;
-    case "date":
-    case "sign_date":
-      return <Calendar className="h-3 w-3 shrink-0" />;
-    case "name":
-      return <User className="h-3 w-3 shrink-0" />;
-    default:
-      return <Type className="h-3 w-3 shrink-0" />;
-  }
-}
 
 interface DocxDocViewerProps {
   fileUrl: string;
@@ -81,9 +60,6 @@ export default function DocxDocViewer({
       }
 
       try {
-        // fileUrl is a data: URL (persistent) or a blob: URL (same-tab
-        // preview) — both are fetchable, unlike a bare File object which
-        // the recipient's browser never has.
         const res = await fetch(fileUrl);
         const arrayBuffer = await res.arrayBuffer();
         const result = await mammoth.convertToHtml({ arrayBuffer });
@@ -122,9 +98,7 @@ export default function DocxDocViewer({
     );
   }
 
-  const visibleFields = highlightSignerId
-    ? fields.filter((f) => f.signerId === highlightSignerId)
-    : fields;
+  const pageFields = signingFieldsForPage(fields, 1, 1, highlightSignerId);
 
   return (
     <div
@@ -141,50 +115,17 @@ export default function DocxDocViewer({
           dangerouslySetInnerHTML={{ __html: html }}
         />
 
-        {visibleFields.map((f) => {
-          const signer = signers.find((s) => s.id === f.signerId);
-          const color = SIGNER_COLORS[signer?.colorIndex ?? 0];
-          const dim =
-            highlightSignerId && f.signerId !== highlightSignerId
-              ? "opacity-35"
-              : "";
-          const selected = selectedFieldId === f.id;
-          const filled = Boolean(f.value);
-
-          return (
-            <div
-              key={f.id}
-              data-signing-field={f.id}
-              className={cn(
-                "absolute flex items-center justify-center gap-1 overflow-hidden rounded border-2 border-dashed px-1.5 py-1 text-[10px] font-semibold shadow-sm transition-all z-10 scroll-mt-40 select-none",
-                color.bg,
-                color.text,
-                color.border,
-                dim,
-                selected && "ring-2 ring-violet-500 ring-offset-1 shadow-md",
-                filled && "border-solid bg-white/95",
-                interactive && "cursor-pointer",
-              )}
-              style={placedFieldOverlayStyle(f)}
-              onClick={(e) => {
-                e.stopPropagation();
-                onFieldClick?.(f.id);
-              }}
-            >
-                    {filled ? (
-                      <SignatureFieldValue field={f} />
-                    ) : (
-                <>
-                  <FieldIcon kind={f.kind} />
-                  <span className="truncate">
-                    {f.label || fieldKindLabel(f.kind)}
-                    {signer ? ` · ${signer.name.split(" ")[0]}` : ""}
-                  </span>
-                </>
-              )}
-            </div>
-          );
-        })}
+        {pageFields.map((field) => (
+          <SigningFieldOverlay
+            key={field.id}
+            field={field}
+            signers={signers}
+            selectedFieldId={selectedFieldId}
+            highlightSignerId={highlightSignerId}
+            interactive={interactive}
+            onFieldClick={onFieldClick}
+          />
+        ))}
       </div>
     </div>
   );

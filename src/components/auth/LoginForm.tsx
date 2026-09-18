@@ -26,6 +26,11 @@ function getSafeDashboardUrl(callbackUrl: string | null): string {
 export function LoginForm() {
   const searchParams = useSearchParams();
   const destination = getSafeDashboardUrl(searchParams.get("callbackUrl"));
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -139,6 +144,17 @@ export function LoginForm() {
     }
   }
 
+  if (!mounted) {
+    return (
+      <div
+        className="flex h-40 items-center justify-center text-sm text-gray-400"
+        suppressHydrationWarning
+      >
+        Loading...
+      </div>
+    );
+  }
+
   return (
     <form
       onSubmit={handleSubmit}
@@ -146,6 +162,7 @@ export function LoginForm() {
       action="#"
       className="space-y-5"
       noValidate
+      suppressHydrationWarning
     >
       {error && (
         <div
@@ -181,7 +198,7 @@ export function LoginForm() {
         <p className="text-sm text-slate-600">{resendNote}</p>
       ) : null}
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5" suppressHydrationWarning>
         <label htmlFor="email" className="block text-sm font-medium text-gray-700">
           Email
         </label>
@@ -198,7 +215,7 @@ export function LoginForm() {
         />
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5" suppressHydrationWarning>
         <label
           htmlFor="password"
           className="block text-sm font-medium text-gray-700"
@@ -218,7 +235,7 @@ export function LoginForm() {
         />
       </div>
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3" suppressHydrationWarning>
         <label className="flex cursor-pointer items-center gap-2.5">
           <input
             type="checkbox"

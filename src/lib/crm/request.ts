@@ -1,4 +1,9 @@
 import type { CrmSession } from "@/lib/activity-timeline/auth";
+import {
+  fetchCrmTokenJson,
+  readStoredCrmTokens,
+  refreshCrmTokenFromBrowser,
+} from "@/lib/auth/browser-session-cache";
 
 type Envelope<T> = {
   statusCode?: number;
@@ -210,16 +215,25 @@ export async function crmBffFetch<T>(
 
   async function currentAccessToken() {
     if (typeof window === "undefined") return null;
-    try {
-      const stored =
-        window.sessionStorage.getItem("fc.crm.accessToken") ||
-        window.localStorage.getItem("fc.crm.accessToken");
-      if (stored?.trim()) return stored.trim();
-    } catch {
-      /* private mode */
-    }
+    const stored = readStoredCrmTokens().accessToken?.trim();
+    if (stored) return stored;
     const { ensureCrmAccess } = await import("@/lib/activity-timeline/auth");
     return (await ensureCrmAccess())?.accessToken ?? null;
+  }
+
+  async function adoptTokenJson(tokenJson: Record<string, unknown>) {
+    if (typeof tokenJson.accessToken !== "string" || !tokenJson.accessToken) {
+      return null;
+    }
+    const { persistCrmTokens } = await import("@/lib/activity-timeline/auth");
+    persistCrmTokens({
+      accessToken: tokenJson.accessToken,
+      refreshToken:
+        typeof tokenJson.refreshToken === "string"
+          ? tokenJson.refreshToken
+          : null,
+    });
+    return tokenJson.accessToken;
   }
 
   let accessToken = await currentAccessToken();
@@ -238,23 +252,12 @@ export async function crmBffFetch<T>(
   let res = await send();
   if (res.status === 401) {
     try {
-      const tokenRes = await fetch("/api/auth/crm-token", {
-        credentials: "same-origin",
-      });
-      const tokenJson = (await tokenRes.json().catch(() => ({}))) as {
-        accessToken?: string | null;
-        refreshToken?: string | null;
-      };
-      if (tokenJson.accessToken) {
-        const { persistCrmTokens } = await import("@/lib/activity-timeline/auth");
-        persistCrmTokens({
-          accessToken: tokenJson.accessToken,
-          refreshToken: tokenJson.refreshToken,
-        });
-        accessToken = tokenJson.accessToken;
-      } else {
-        accessToken = (await currentAccessToken()) ?? accessToken;
-      }
+      const rotated = await refreshCrmTokenFromBrowser();
+      accessToken =
+        (await adoptTokenJson(rotated)) ??
+        (await adoptTokenJson(await fetchCrmTokenJson())) ??
+        (await currentAccessToken()) ??
+        accessToken;
     } catch {
       accessToken = (await currentAccessToken()) ?? accessToken;
     }

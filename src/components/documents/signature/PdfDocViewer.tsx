@@ -4,33 +4,14 @@ import { useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
-import {
-  SIGNER_COLORS,
-  fieldKindLabel,
-  type SignatureField,
-  type SignatureSigner,
-} from "@/lib/documents/signature/types";
-import { placedFieldOverlayStyle } from "@/lib/documents/signature/field-placement";
+import type { SignatureField, SignatureSigner } from "@/lib/documents/signature/types";
 import { cn } from "@/lib/utils";
-import { Calendar, PenLine, Type, User } from "lucide-react";
-import { SignatureFieldValue } from "./SignatureFieldValue";
+import {
+  SigningFieldOverlay,
+  signingFieldsForPage,
+} from "./SigningFieldOverlay";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-
-function FieldIcon({ kind }: { kind: SignatureField["kind"] }) {
-  switch (kind) {
-    case "signature":
-    case "initials":
-      return <PenLine className="h-3 w-3 shrink-0" />;
-    case "date":
-    case "sign_date":
-      return <Calendar className="h-3 w-3 shrink-0" />;
-    case "name":
-      return <User className="h-3 w-3 shrink-0" />;
-    default:
-      return <Type className="h-3 w-3 shrink-0" />;
-  }
-}
 
 interface PdfDocViewerProps {
   fileUrl: string;
@@ -90,21 +71,20 @@ export default function PdfDocViewer({
             Loading document pages…
           </div>
         }
-        className="flex w-full flex-col items-center gap-4"
+        className="flex w-full flex-col items-center"
       >
         {Array.from({ length: numPages || 1 }, (_, i) => i + 1).map((pageNum) => {
-          const visibleFields = highlightSignerId
-            ? fields.filter((f) => f.signerId === highlightSignerId)
-            : fields;
-
-          const pageFields = visibleFields.filter(
-            (f) => (f.page || 1) === pageNum || numPages === 1,
+          const pageFields = signingFieldsForPage(
+            fields,
+            pageNum,
+            numPages,
+            highlightSignerId,
           );
 
           return (
             <div
               key={pageNum}
-              className="relative shadow-md rounded-lg overflow-hidden bg-white shrink-0 border border-slate-200/60"
+              className="relative overflow-hidden bg-white shrink-0 border-t border-slate-200/70 first:border-t-0"
             >
               <Page
                 pageNumber={pageNum}
@@ -113,51 +93,17 @@ export default function PdfDocViewer({
                 renderTextLayer={false}
               />
 
-              {/* Placed Field Overlays for this specific page */}
-              {pageFields.map((f) => {
-                const signer = signers.find((s) => s.id === f.signerId);
-                const color = SIGNER_COLORS[signer?.colorIndex ?? 0];
-                const dim =
-                  highlightSignerId && f.signerId !== highlightSignerId
-                    ? "opacity-35"
-                    : "";
-                const selected = selectedFieldId === f.id;
-                const filled = Boolean(f.value);
-
-                return (
-                  <div
-                    key={f.id}
-                    data-signing-field={f.id}
-                    className={cn(
-                      "absolute flex items-center justify-center gap-1 overflow-hidden rounded border-2 border-dashed px-1.5 py-1 text-[10px] font-semibold shadow-sm transition-all z-10 scroll-mt-40 select-none",
-                      color.bg,
-                      color.text,
-                      color.border,
-                      dim,
-                      selected && "ring-2 ring-violet-500 ring-offset-1 shadow-md",
-                      filled && "border-solid bg-white/95",
-                      interactive && "cursor-pointer",
-                    )}
-                    style={placedFieldOverlayStyle(f)}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onFieldClick?.(f.id);
-                    }}
-                  >
-                    {filled ? (
-                      <SignatureFieldValue field={f} />
-                    ) : (
-                      <>
-                        <FieldIcon kind={f.kind} />
-                        <span className="truncate">
-                          {f.label || fieldKindLabel(f.kind)}
-                          {signer ? ` · ${signer.name.split(" ")[0]}` : ""}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                );
-              })}
+              {pageFields.map((field) => (
+                <SigningFieldOverlay
+                  key={field.id}
+                  field={field}
+                  signers={signers}
+                  selectedFieldId={selectedFieldId}
+                  highlightSignerId={highlightSignerId}
+                  interactive={interactive}
+                  onFieldClick={onFieldClick}
+                />
+              ))}
             </div>
           );
         })}

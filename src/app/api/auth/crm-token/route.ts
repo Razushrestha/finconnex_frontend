@@ -63,12 +63,8 @@ export async function GET() {
  */
 export async function POST(request: Request) {
   const session = await getSession();
-  if (!session) {
-    return NextResponse.json(
-      { authenticated: false, error: "Session has expired. Sign in again." },
-      { status: 401 },
-    );
-  }
+  const live = await resolveLiveCrmAuth();
+  const remember = sessionRememberMe(session);
 
   const body = (await request.json().catch(() => ({}))) as {
     accessToken?: string | null;
@@ -79,11 +75,11 @@ export async function POST(request: Request) {
   let refreshToken =
     typeof body.refreshToken === "string" ? body.refreshToken.trim() : "";
 
-  if (!accessToken && !refreshToken) {
-    return NextResponse.json(
-      { error: "CRM session token unavailable. Sign in again." },
-      { status: 400 },
-    );
+  if (!accessToken) accessToken = live?.accessToken?.trim() || "";
+  if (!refreshToken) refreshToken = live?.refreshToken?.trim() || "";
+
+  if (!session && !accessToken && !refreshToken) {
+    return NextResponse.json({ authenticated: false });
   }
 
   if ((!accessToken || isCrmJwtExpired(accessToken)) && refreshToken) {
@@ -92,28 +88,21 @@ export async function POST(request: Request) {
       accessToken = rotated.accessToken;
       refreshToken = rotated.refreshToken;
     } catch {
-      return NextResponse.json(
-        { error: "Session has expired. Sign in again." },
-        { status: 401 },
-      );
+      return NextResponse.json({ authenticated: false });
     }
   }
 
   if (!accessToken || isCrmJwtExpired(accessToken, 0)) {
-    return NextResponse.json(
-      { error: "CRM session token unavailable. Sign in again." },
-      { status: 401 },
-    );
+    return NextResponse.json({ authenticated: false });
   }
 
-  const remember = sessionRememberMe(session);
   const response = NextResponse.json({
     authenticated: true,
     accessToken,
     refreshToken: refreshToken || null,
-    tenantId: session.tenantId,
-    tenantSlug: session.tenantSlug,
-    workspaceId: session.tenantId,
+    tenantId: session?.tenantId ?? null,
+    tenantSlug: session?.tenantSlug ?? null,
+    workspaceId: session?.tenantId ?? null,
     expiresIn: crmJwtExpiresInSeconds(accessToken),
     rememberMe: remember,
   });
@@ -123,11 +112,13 @@ export async function POST(request: Request) {
     { accessToken, refreshToken: refreshToken || null },
     remember,
   );
-  const nextSession = await createSessionToken(session, remember);
-  response.cookies.set(
-    SESSION_COOKIE,
-    nextSession,
-    getSessionCookieOptions(remember),
-  );
+  if (session) {
+    const nextSession = await createSessionToken(session, remember);
+    response.cookies.set(
+      SESSION_COOKIE,
+      nextSession,
+      getSessionCookieOptions(remember),
+    );
+  }
   return response;
 }

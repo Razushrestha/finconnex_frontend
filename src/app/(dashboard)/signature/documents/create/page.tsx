@@ -300,22 +300,24 @@ function CreateDocumentForm() {
 
   if (isPlacingFields) {
     return (
-      <PlaceFieldsView
-        documentName={draft.documentName}
-        documents={documents}
-        placedFields={placedFields}
-        draggingFieldType={null}
-        recipients={recipients}
-        isTemplate={false}
-        handleBackToForm={handleBackToForm}
-        handleDropField={() => {}}
-        handleRepositionField={handleRepositionField}
-        handleRemovePlacedField={handleRemovePlacedField}
-        handleSidebarDragStart={() => {}}
-        handleSidebarDragEnd={() => {}}
-        handleResizeField={handleResizeField}
-        onSend={handleSend}
-      />
+      <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-white">
+        <PlaceFieldsView
+          documentName={draft.documentName}
+          documents={documents}
+          placedFields={placedFields}
+          draggingFieldType={null}
+          recipients={recipients}
+          isTemplate={false}
+          handleBackToForm={handleBackToForm}
+          handleDropField={() => {}}
+          handleRepositionField={handleRepositionField}
+          handleRemovePlacedField={handleRemovePlacedField}
+          handleSidebarDragStart={() => {}}
+          handleSidebarDragEnd={() => {}}
+          handleResizeField={handleResizeField}
+          onSend={handleSend}
+        />
+      </div>
     );
   }
 

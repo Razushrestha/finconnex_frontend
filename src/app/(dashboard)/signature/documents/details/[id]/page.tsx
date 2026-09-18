@@ -13,11 +13,13 @@ import { SignatureComposeEmailModal } from "@/components/documents/signature/Sig
 import {
   getRequestDocuments,
   listSignatureRequests,
-  signedCount,
+  completionPercent,
   type SignatureAuditEvent,
   type SignatureRequest,
   type SignatureSigner,
 } from "@/lib/documents/signature/types";
+import { onRecordsChange } from "@/lib/records-sync";
+import { syncSignatureRequestFromPublicLinks } from "@/lib/documents/signature/sync-public-status";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -70,8 +72,6 @@ function describeAccess(
 }
 
 function mapRequestToView(req: SignatureRequest): MockSignatureDocument {
-  const actionable = req.signers.filter((s) => s.role !== "CC");
-  const signed = signedCount(req);
   const sentEvent = req.audit.find((a) =>
     a.action.toLowerCase().includes("sent for signature"),
   );
@@ -86,10 +86,7 @@ function mapRequestToView(req: SignatureRequest): MockSignatureDocument {
         : "Signature request document.",
       submittedAtLabel: sentEvent?.at ?? req.sentDate ?? "Not sent yet",
       lastUpdatedAtLabel: lastEvent?.at ?? req.sentDate ?? "N/A",
-      completionPercent:
-        actionable.length > 0
-          ? Math.round((signed / actionable.length) * 100)
-          : 0,
+      completionPercent: completionPercent(req),
       documentFileUrl:
         getRequestDocuments(req)[0]?.fileUrl || req.documentFileUrl || "",
       fileName: getRequestDocuments(req)[0]?.fileName || req.documentFile,
@@ -151,87 +148,51 @@ export default function SignatureDocumentDetailPage() {
   const [maxReminders, setMaxReminders] = useState("5");
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadDocumentDetail() {
       if (!documentId) return;
-      setIsLoading(true);
-
-      if (USE_MOCK_DATA) {
-        const req = findSignatureRequest(documentId);
-        setDocumentData(req ? mapRequestToView(req) : null);
-        setSourceReq(req ?? null);
-        if (req) {
-          void resolveRequestDocumentUrls(req).then((resolved) => {
-            setSourceReq(resolved);
-            setDocumentData(mapRequestToView(resolved));
-          });
+      const req = findSignatureRequest(documentId);
+      if (!req) {
+        if (!USE_MOCK_DATA) {
+          setIsLoading(true);
+        } else {
+          setDocumentData(null);
+          setSourceReq(null);
+          setIsLoading(false);
         }
-        const iso = toIsoDate(req?.expiryDate);
-        if (iso) {
-          setExpiryDateIso(iso);
-          setModalExpiryDate(iso);
-        }
-        setIsLoading(false);
         return;
       }
-
-      try {
-        const res = await fetch(
-          `${API_BASE_URL}/api/signature/requests/${documentId}/`,
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setDocumentData({
-            document: {
-              name: data.documentName || data.name || "Untitled Document",
-              ownerName: data.ownerName || data.owner || "Admin",
-              description: data.description,
-              submittedAtLabel: data.sentDate || data.submittedAt || "N/A",
-              lastUpdatedAtLabel: data.lastActivity || data.updatedAt || "N/A",
-              completionPercent: data.completionPercent || 0,
-              documentFileUrl: data.documentFileUrl || "",
-            },
-            recipients: (data.signers || data.recipients || []).map(
-              (s: any, idx: number) => ({
-                id: s.id || `${documentId}-r${idx + 1}`,
-                order: s.order || idx + 1,
-                name: s.name || "Recipient",
-                email: s.email || "",
-                accessInfo: s.accessInfo || "Waiting for access",
-                mailed: s.mailed ?? true,
-                viewed: s.viewed ?? false,
-                signed: s.signed ?? s.status === "Signed",
-              }),
-            ),
-          });
-
-          if (data.expiryDate) {
-            setExpiryDateIso(data.expiryDate);
-            setModalExpiryDate(data.expiryDate);
-          }
-        } else {
-          const req = findSignatureRequest(documentId);
-          setDocumentData(req ? mapRequestToView(req) : null);
-          const iso = toIsoDate(req?.expiryDate);
-          if (iso) {
-            setExpiryDateIso(iso);
-            setModalExpiryDate(iso);
-          }
-        }
-      } catch (error) {
-        console.warn("Backend offline, using local mock data.");
-        const req = findSignatureRequest(documentId);
-        setDocumentData(req ? mapRequestToView(req) : null);
-        const iso = toIsoDate(req?.expiryDate);
-        if (iso) {
-          setExpiryDateIso(iso);
-          setModalExpiryDate(iso);
-        }
-      } finally {
-        setIsLoading(false);
+      const merged = await syncSignatureRequestFromPublicLinks(req);
+      if (cancelled) return;
+      setSourceReq(merged);
+      setDocumentData(mapRequestToView(merged));
+      void resolveRequestDocumentUrls(merged).then((resolved) => {
+        if (cancelled) return;
+        setSourceReq(resolved);
+        setDocumentData(mapRequestToView(resolved));
+      });
+      const iso = toIsoDate(merged.expiryDate);
+      if (iso) {
+        setExpiryDateIso(iso);
+        setModalExpiryDate(iso);
       }
+      setIsLoading(false);
     }
 
-    loadDocumentDetail();
+    setIsLoading(true);
+    void loadDocumentDetail();
+    const interval = window.setInterval(() => {
+      void loadDocumentDetail();
+    }, 3000);
+    const stop = onRecordsChange(() => {
+      void loadDocumentDetail();
+    });
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      stop();
+    };
   }, [documentId]);
 
   const handleBack = () => {
@@ -642,10 +603,14 @@ export default function SignatureDocumentDetailPage() {
                             ? sourceReq.documentFileUrl
                             : ""
                       }
-                      fields={sourceReq.fields.filter(
-                        (field) =>
-                          (field.documentId ?? "primary") === doc.id,
-                      )}
+                      fields={
+                        sourceReq.status === "Signed"
+                          ? []
+                          : sourceReq.fields.filter(
+                              (field) =>
+                                (field.documentId ?? "primary") === doc.id,
+                            )
+                      }
                       signers={sourceReq.signers}
                       pageWidth={720}
                       className="max-w-none shadow-sm"

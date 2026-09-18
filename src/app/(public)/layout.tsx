@@ -4,7 +4,10 @@ export default function PublicLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-dvh bg-[#F7F6F9] text-slate-900 antialiased">
+    <div
+      className="min-h-dvh bg-[#F7F6F9] text-slate-900 antialiased"
+      suppressHydrationWarning
+    >
       {children}
     </div>
   );

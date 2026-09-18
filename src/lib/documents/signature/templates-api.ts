@@ -123,10 +123,15 @@ export function toCreateSignatureTemplateBody(
 }
 
 export async function listCrmSignatureTemplates(): Promise<SignatureRequest[]> {
-  return normalizeSignatureRequests(await templatesCall("")).map((row) => ({
-    ...row,
-    recordType: "template" as const,
-  }));
+  try {
+    return normalizeSignatureRequests(await templatesCall("")).map((row) => ({
+      ...row,
+      recordType: "template" as const,
+    }));
+  } catch (err) {
+    if (isMissingCrmRoute(err)) return [];
+    throw err;
+  }
 }
 
 export async function getCrmSignatureTemplate(

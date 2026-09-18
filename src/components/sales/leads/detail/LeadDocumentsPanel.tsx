@@ -1193,7 +1193,7 @@ export function LeadDocumentsPanel({ card }: { card: LeadCardData }) {
             <button
               type="button"
               onClick={() =>
-                router.push(leadSendHref("/signature/create", card))
+                router.push(leadSendHref("/signature/request/new?type=send", card))
               }
               className="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[12px] font-semibold text-white"
               style={{ backgroundColor: "#5A32A3" }}

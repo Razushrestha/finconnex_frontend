@@ -137,6 +137,62 @@ export type ExecutiveOverview = {
   settlementTarget: number;
 };
 
+export function emptyExecutiveOverview(): ExecutiveOverview {
+  return {
+    newLeads: 0,
+    newLeadsDelta: 0,
+    newLeadsSpark: [],
+    activePipeline: 0,
+    activePipelineDelta: 0,
+    activePipelineSpark: [],
+    settlements: 0,
+    settlementsDelta: 0,
+    settlementsSpark: [],
+    settlementValue: 0,
+    settlementValueDelta: 0,
+    settlementValueSpark: [],
+    commission: 0,
+    commissionDelta: 0,
+    commissionSpark: [],
+    conversionRate: 0,
+    conversionDelta: 0,
+    conversionSpark: [],
+    avgSettleDays: 0,
+    avgSettleDaysDelta: 0,
+    avgSettleDaysSpark: [],
+    overdue: 0,
+    overdueSpark: [],
+    funnel: [],
+    pipelineValue: 0,
+    weightedPipeline: 0,
+    activeDeals: 0,
+    leadToDeal: 0,
+    dealToSettle: 0,
+    leadToSettle: 0,
+    bottleneck: "None",
+    targetProgress: 0,
+    overdueTasks: 0,
+    followUpsDue: 0,
+    documentsPending: 0,
+    appointmentsToday: 0,
+    slaBreaches: 0,
+    trend: [],
+    sources: [],
+    brokers: [],
+    loanTypes: [],
+    alerts: [],
+    summary: "",
+    comparisonLabel: "",
+    periodLabel: "",
+    leadToDealDelta: 0,
+    dealToSettleDelta: 0,
+    avgDealSize: 0,
+    avgDealSizeDelta: 0,
+    bottleneckDays: 0,
+    settlementTarget: 0,
+  };
+}
+
 function ownerAllowed(owner: string, filters: DashboardFilters) {
   if (filters.owner !== "All" && owner !== filters.owner) return false;
   if (filters.team !== "All teams") {

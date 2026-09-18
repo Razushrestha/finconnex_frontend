@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Toaster } from "sonner";
@@ -36,7 +37,15 @@ export default async function RootLayout({
       style={{ colorScheme: theme }}
       suppressHydrationWarning
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var A="bis_skin_checked";function s(n){if(!n)return;if(n.nodeType===1&&n.removeAttribute)n.removeAttribute(A);if(!n.querySelectorAll)return;var l=n.querySelectorAll("["+A+"]");for(var i=0;i<l.length;i++)l[i].removeAttribute(A);}s(document.documentElement);})();`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <Script src="/strip-bis-skin.js" strategy="beforeInteractive" />
         <Toaster />
         <Providers>{children}</Providers>
       </body>

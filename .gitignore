@@ -43,4 +43,5 @@ next-env.d.ts
 # Local file-upload fallback when CRM storage is unconfigured
 /data/uploads/
 /data/settings-catalog/
+/data/public-sign/
 

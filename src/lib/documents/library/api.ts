@@ -11,6 +11,7 @@ import {
   type LibraryDocument,
 } from "@/lib/documents/library/types";
 import { isUuid } from "@/lib/activity-timeline/auth";
+import { isLocalStorageKey } from "@/lib/storage/api";
 
 export type CrmDocumentQuery = {
   page?: number;
@@ -484,18 +485,72 @@ function pickRelatedIds(input: Partial<LibraryDocument>): Record<string, string>
   return selected ? { [selected[0]]: selected[1] as string } : {};
 }
 
+function hasFileExtension(name: string) {
+  return /\.[a-z0-9]{2,8}$/i.test(name);
+}
+
+function crmDocumentFileName(body: Record<string, unknown>) {
+  const fileName = pickStr(body.fileName);
+  const name = pickStr(body.name, body.title);
+  if (hasFileExtension(fileName)) return fileName.slice(0, 255);
+  if (hasFileExtension(name)) return name.slice(0, 255);
+  const mime = pickStr(body.mimeType, body.contentType).toLowerCase();
+  const ext = mime.includes("pdf")
+    ? ".pdf"
+    : mime.includes("png")
+      ? ".png"
+      : mime.includes("jpeg") || mime.includes("jpg")
+        ? ".jpg"
+        : mime.includes("webp")
+          ? ".webp"
+          : mime.includes("csv")
+            ? ".csv"
+            : mime.includes("wordprocessingml")
+              ? ".docx"
+              : mime.includes("msword")
+                ? ".doc"
+                : ".pdf";
+  const base = (fileName || name || "document").slice(0, Math.max(1, 255 - ext.length));
+  return `${base}${ext}`;
+}
+
+function crmDocumentMimeType(body: Record<string, unknown>) {
+  const mime = pickStr(body.mimeType, body.contentType)
+    .toLowerCase()
+    .split(";")[0]
+    .trim();
+  if (mime && mime.length <= 127 && mime !== "application/octet-stream") {
+    return mime;
+  }
+  const name = crmDocumentFileName(body).toLowerCase();
+  if (name.endsWith(".pdf")) return "application/pdf";
+  if (name.endsWith(".png")) return "image/png";
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+  if (name.endsWith(".webp")) return "image/webp";
+  if (name.endsWith(".csv")) return "text/csv";
+  if (name.endsWith(".docx")) {
+    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  }
+  if (name.endsWith(".doc")) return "application/msword";
+  return mime || "application/pdf";
+}
+
 export async function createCrmDocument(
   body: Record<string, unknown>,
 ): Promise<LibraryDocument | null> {
   const documentType = pickStr(body.documentType);
   const sizeBytes = Math.round(Number(body.sizeBytes));
+  const key = pickStr(body.key, body.storageKey, body.fileKey);
+  if (isLocalStorageKey(key)) {
+    return null;
+  }
   const payload: Record<string, unknown> = {
-    name: pickStr(body.name, body.fileName, body.title),
+    name: crmDocumentFileName(body),
     documentType: CRM_DOCUMENT_TYPES.includes(documentType as CrmDocumentType)
       ? documentType
       : "OTHER",
-    key: pickStr(body.key, body.storageKey, body.fileKey),
-    mimeType: pickStr(body.mimeType, body.contentType),
+    key,
+    mimeType: crmDocumentMimeType(body),
     sizeBytes,
   };
   const description = pickStr(body.description);

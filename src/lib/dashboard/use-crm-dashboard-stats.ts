@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   computeDashboardStats,
+  emptyDashboardLiveStats,
   type DashboardFilters,
   type DashboardLiveStats,
 } from "@/lib/dashboard/layout";
@@ -17,6 +18,7 @@ import {
 } from "@/lib/dashboard/charts";
 import {
   computeExecutiveOverview,
+  emptyExecutiveOverview,
   type ExecutiveOverview,
 } from "@/lib/dashboard/executive";
 import {
@@ -26,27 +28,24 @@ import {
 
 export function useCrmDashboardStats(filters: DashboardFilters) {
   const [stats, setStats] = useState<DashboardLiveStats>(() =>
-    computeDashboardStats(filters),
+    emptyDashboardLiveStats(),
   );
-  const [industry, setIndustry] = useState<DashboardIndustryTile[]>(() =>
-    industryTiles(loadIndustryPreset(), computeDashboardStats(filters)),
-  );
+  const [industry, setIndustry] = useState<DashboardIndustryTile[]>([]);
   const [charts, setCharts] = useState<DashboardChartData>(() =>
-    chartsFromStats(computeDashboardStats(filters)),
+    chartsFromStats(emptyDashboardLiveStats()),
   );
   const [executive, setExecutive] = useState<ExecutiveOverview>(() =>
-    computeExecutiveOverview(filters),
+    emptyExecutiveOverview(),
   );
   const [source, setSource] = useState<DashboardDataSource>("demo");
   const [owners, setOwners] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading] = useState(false);
   const [tick, setTick] = useState(0);
 
   const refresh = useCallback(() => setTick((n) => n + 1), []);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     setStats(computeDashboardStats(filters));
     setIndustry(
       industryTiles(loadIndustryPreset(), computeDashboardStats(filters)),
@@ -63,7 +62,6 @@ export function useCrmDashboardStats(filters: DashboardFilters) {
       setExecutive(snap.executive);
       setSource(snap.source);
       if (snap.owners.length) setOwners(snap.owners);
-      setLoading(false);
     })();
 
     return () => {

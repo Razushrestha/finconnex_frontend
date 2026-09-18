@@ -10,12 +10,14 @@ import {
   getSignatureRequestById,
   markRequestSent,
   normalizeSignatureRequest,
-  signedCount,
+  completionPercent,
   upsertSignatureRequest,
   type SignatureAuditEvent,
   type SignatureRequest,
   type SignatureSigner,
 } from "@/lib/documents/signature/types";
+import { onRecordsChange } from "@/lib/records-sync";
+import { syncSignatureRequestFromPublicLinks } from "@/lib/documents/signature/sync-public-status";
 import {
   deleteCrmSignatureRequest,
   downloadCrmSignatureRequest,
@@ -92,8 +94,6 @@ function mapRequestToView(req: SignatureRequest): {
   document: DocumentSummaryData;
   recipients: RecipientStatusData[];
 } {
-  const actionable = req.signers.filter((s) => s.role !== "CC");
-  const signed = signedCount(req);
   const sentEvent = req.audit.find((a) =>
     a.action.toLowerCase().includes("sent for signature"),
   );
@@ -113,12 +113,7 @@ function mapRequestToView(req: SignatureRequest): {
       lastUpdatedAtLabel: formatDetailStamp(
         lastEvent?.at ?? req.updatedAt ?? req.sentDate,
       ),
-      completionPercent:
-        actionable.length > 0
-          ? Math.round((signed / actionable.length) * 100)
-          : req.status === "Signed"
-            ? 100
-            : 0,
+      completionPercent: completionPercent(req),
       documentFileUrl: primary?.fileUrl || req.documentFileUrl || "",
       fileName: primary?.fileName || req.documentFile,
       fields: req.fields,
@@ -170,36 +165,43 @@ export function SignatureDetailClient({ id }: { id: string }) {
       if (!cancelled) setReq(resolved);
     }
 
-    const live = getSignatureRequestById(id);
-    if (live) {
-      const normalized = normalizeSignatureRequest(live);
-      setReq(normalized);
-      void hydrate(normalized);
-    } else {
-      setReq(null);
-    }
-
-    if (!isCrmSignatureRequestId(id)) {
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    void (async () => {
-      const remote = await tryCrmSignatureRequest(() =>
-        getCrmSignatureRequest(id),
+    async function pull() {
+      const live = getSignatureRequestById(id);
+      if (!live) {
+        if (!cancelled) setReq(null);
+        return;
+      }
+      const merged = await syncSignatureRequestFromPublicLinks(
+        normalizeSignatureRequest(live),
       );
-      if (cancelled || !remote) return;
-      persistRemoteSignatureRequest(remote);
-      const normalized = normalizeSignatureRequest(remote, {
-        allowEmptyFields: true,
-      });
-      if (!cancelled) setReq(normalized);
-      await hydrate(normalized);
-    })();
+      if (cancelled) return;
+      setReq(merged);
+      void hydrate(merged);
+    }
+
+    void pull();
+    const interval = window.setInterval(() => {
+      void pull();
+    }, 3000);
+    const stop = onRecordsChange(() => {
+      void pull();
+    });
+
+    if (isCrmSignatureRequestId(id)) {
+      void (async () => {
+        const remote = await tryCrmSignatureRequest(() =>
+          getCrmSignatureRequest(id),
+        );
+        if (cancelled || !remote) return;
+        persistRemoteSignatureRequest(remote);
+        await pull();
+      })();
+    }
 
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
+      stop();
     };
   }, [id]);
 
@@ -381,7 +383,11 @@ export function SignatureDetailClient({ id }: { id: string }) {
         }}
         onSaveToCloud={() => flash("Cloud save is not configured.")}
         onDownload={downloadSigned}
-        onEditAsNew={() => router.push(`/signature/create?from=${id}`)}
+        onEditAsNew={() =>
+          router.push(
+            `/signature/request/new?from=${id}&layoutid=standard&redirect=false&type=send`,
+          )
+        }
         onSaveAsTemplate={() => {
           upsertSignatureRequest({
             ...req,
@@ -492,10 +498,14 @@ export function SignatureDetailClient({ id }: { id: string }) {
                           ? req.documentFileUrl
                           : ""
                     }
-                    fields={req.fields.filter(
-                      (field) =>
-                        (field.documentId ?? "primary") === doc.id,
-                    )}
+                    fields={
+                      req.status === "Signed"
+                        ? []
+                        : req.fields.filter(
+                            (field) =>
+                              (field.documentId ?? "primary") === doc.id,
+                          )
+                    }
                     signers={req.signers}
                     pageWidth={720}
                     className="max-w-none shadow-sm"

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { ChevronDown, Download, Mail, Printer } from "lucide-react";
 import { filesFromSignatureRequest } from "@/lib/documents/signature/compose-email";
 import {
@@ -228,13 +227,6 @@ export function SignedCompleteView({
           ) : null}
         </div>
       </div>
-
-      <Link
-        href="/signature"
-        className="mt-8 text-[13px] font-semibold text-blue-600 hover:underline"
-      >
-        Back to e-signature
-      </Link>
 
       {notice ? (
         <p className="mt-6 text-center text-[12px] text-slate-500">{notice}</p>

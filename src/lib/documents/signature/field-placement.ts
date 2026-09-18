@@ -113,13 +113,39 @@ export function clientPointHitsPage(
   );
 }
 
+export function pageDropTargetFromPoint(clientX: number, clientY: number) {
+  const node = document.elementFromPoint(clientX, clientY);
+  if (!(node instanceof Element)) return null;
+  const page = node.closest<HTMLElement>("[id^='pdf-page-']");
+  if (!page?.id) return null;
+  const match = page.id.match(/^pdf-page-(.+)-(\d+)$/);
+  if (!match) return null;
+  return {
+    documentId: match[1],
+    page: Number(match[2]),
+    el: page,
+  };
+}
+
+export function fieldDragFont() {
+  return "600 11px/1.2 ui-sans-serif, system-ui, sans-serif";
+}
+
 /** Tiny field-sized drag image so the cursor is the top-left of the preview. */
 export function setFieldDragImage(
   dataTransfer: DataTransfer,
   label: string,
-  width = DEFAULT_PLACED_FIELD_WIDTH,
-  height = DEFAULT_PLACED_FIELD_HEIGHT,
+  opts?: {
+    width?: number;
+    height?: number;
+    background?: string;
+    color?: string;
+    border?: string;
+    font?: string;
+  },
 ) {
+  const width = opts?.width ?? DEFAULT_PLACED_FIELD_WIDTH;
+  const height = opts?.height ?? DEFAULT_PLACED_FIELD_HEIGHT;
   const preview = document.createElement("div");
   preview.textContent = label;
   preview.style.cssText = [
@@ -131,15 +157,29 @@ export function setFieldDragImage(
     "display:flex",
     "align-items:center",
     "padding:0 10px",
-    "border:2px dashed rgb(167 139 250)",
+    `border:2px dashed ${opts?.border ?? "#FACC15"}`,
     "border-radius:6px",
-    "background:rgba(237,233,254,0.95)",
-    "color:rgb(109 40 217)",
-    "font:600 11px/1.2 system-ui,sans-serif",
+    `background:${opts?.background ?? "#FEF9C3"}`,
+    `color:${opts?.color ?? "#713F12"}`,
+    `font:${opts?.font ?? "600 11px/1.2 ui-sans-serif, system-ui, sans-serif"}`,
     "pointer-events:none",
     "box-sizing:border-box",
+    "white-space:nowrap",
+    "overflow:hidden",
   ].join(";");
   document.body.appendChild(preview);
   dataTransfer.setDragImage(preview, 0, 0);
   window.setTimeout(() => preview.remove(), 0);
+}
+
+export function isSenderPrefillField(recipientId?: string) {
+  return recipientId === "prefill";
+}
+
+export function isSenderFieldValueEmpty(field: {
+  type: string;
+  value?: string;
+}) {
+  if (field.type === "checkbox") return field.value !== "true";
+  return !String(field.value ?? "").trim();
 }

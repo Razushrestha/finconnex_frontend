@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import {
   accessTokenFromRequest,
   crmBaseUrl,
-  tryEmptySignedInGet,
+  isHostedMissingCrmGet,
+  normalizeCrmProxyPath,
+  tryMissingCrmFallback,
 } from "@/lib/auth/crm-bff-helpers";
 import { getSession } from "@/lib/auth/session";
 import {
@@ -120,10 +122,29 @@ function isAllowed(path: string[]): boolean {
   return true;
 }
 
+function withCrmCookies(
+  response: NextResponse,
+  auth: Awaited<ReturnType<typeof resolveLiveCrmAuth>>,
+  rememberMe: boolean,
+) {
+  if (auth?.accessToken) {
+    applyCrmTokenCookies(
+      response,
+      {
+        accessToken: auth.accessToken,
+        refreshToken: auth.refreshToken,
+      },
+      rememberMe,
+    );
+  }
+  return response;
+}
+
 export async function proxyCrmV1(
   request: Request,
-  path: string[],
+  rawPath: string[] | string | undefined,
 ): Promise<NextResponse> {
+  const path = normalizeCrmProxyPath(rawPath);
   if (!isAllowed(path)) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
@@ -163,18 +184,34 @@ export async function proxyCrmV1(
 
     auth = await resolveLiveCrmAuth();
     const headerToken = accessTokenFromRequest(request);
-    // Prefer a live browser Bearer token. On Vercel the access JWT often cannot
-    // fit in an httpOnly cookie, so the client holds it in localStorage and
-    // sends Authorization on every BFF call.
-    if (headerToken && !isCrmJwtExpired(headerToken, 0)) {
+    // Prefer the browser Bearer token. Access JWTs often cannot fit in cookies,
+    // so localStorage + Authorization is the live session. Keep an expired
+    // header token so we can refresh it instead of treating the user as logged out.
+    if (headerToken) {
       auth = {
         accessToken: headerToken,
         refreshToken: auth?.refreshToken ?? null,
       };
     }
 
+    if (
+      auth?.accessToken &&
+      isCrmJwtExpired(auth.accessToken) &&
+      auth.refreshToken
+    ) {
+      try {
+        const rotated = await refreshCrmTokens(auth.refreshToken);
+        auth = {
+          accessToken: rotated.accessToken,
+          refreshToken: rotated.refreshToken,
+        };
+      } catch {
+        /* keep the header/cookie access token */
+      }
+    }
+
     if (!session && !auth?.accessToken) {
-      const empty = tryEmptySignedInGet(path, request.method.toUpperCase());
+      const empty = tryMissingCrmFallback(path, request.method.toUpperCase());
       if (empty) return empty;
       return NextResponse.json(
         { message: "Session has expired. Sign in again." },
@@ -199,7 +236,30 @@ export async function proxyCrmV1(
           },
         );
       }
-      const empty = tryEmptySignedInGet(path, request.method.toUpperCase());
+      const storageUploadEarly =
+        request.method === "POST" &&
+        path[0] === "storage" &&
+        path[1] === "upload";
+      if (session && storageUploadEarly) {
+        try {
+          const stored = await saveLocalUpload(await request.formData());
+          return NextResponse.json(
+            {
+              statusCode: 201,
+              message: "Stored on FinConnex while the CRM token refreshes.",
+              data: stored,
+            },
+            { status: 201 },
+          );
+        } catch (err) {
+          const raw =
+            err instanceof Error
+              ? err.message
+              : "Could not store the file locally.";
+          return NextResponse.json({ message: raw }, { status: 502 });
+        }
+      }
+      const empty = tryMissingCrmFallback(path, request.method.toUpperCase());
       if (empty) return empty;
       return NextResponse.json(
         {
@@ -209,6 +269,29 @@ export async function proxyCrmV1(
         { status: 401 },
       );
     }
+  }
+
+  const method = request.method.toUpperCase();
+  if (isHostedMissingCrmGet(path, method)) {
+    const empty = tryMissingCrmFallback(path, method);
+    if (empty) return withCrmCookies(empty, auth, rememberMe);
+  }
+
+  const settingsKindSkip = settingsProxyKind(path);
+  if (settingsKindSkip && method === "GET") {
+    const workspaceKey = sessionWorkspaceId || "local";
+    const catalog = await readFallbackCatalog(workspaceKey);
+    return withCrmCookies(
+      new NextResponse(
+        settingsGetFallbackPayload(settingsKindSkip, workspaceKey, catalog),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      ),
+      auth,
+      rememberMe,
+    );
   }
 
   const storageUpload =
@@ -226,7 +309,6 @@ export async function proxyCrmV1(
   const incomingType = request.headers.get("content-type");
   if (incomingType) headers["Content-Type"] = incomingType;
 
-  const method = request.method.toUpperCase();
   const hasBody = method !== "GET" && method !== "HEAD";
   const isMultipart = incomingType?.includes("multipart/form-data") === true;
   const body = !hasBody
@@ -264,26 +346,22 @@ export async function proxyCrmV1(
     }
   }
 
-  if (status === 401) {
-    const empty = tryEmptySignedInGet(path, method);
-    if (empty) {
-      if (auth?.accessToken) {
-        applyCrmTokenCookies(
-          empty,
-          {
-            accessToken: auth.accessToken,
-            refreshToken: auth.refreshToken,
-          },
-          rememberMe,
-        );
-      }
-      return empty;
-    }
+  if (
+    status === 401 ||
+    status === 403 ||
+    status === 404 ||
+    status === 405 ||
+    status === 501
+  ) {
+    const empty = tryMissingCrmFallback(path, method);
+    if (empty) return withCrmCookies(empty, auth, rememberMe);
   }
 
   if (
     storageFallbackReq &&
-    (isStorageUnconfigured(status, text) || (status >= 500 && status < 600))
+    (isStorageUnconfigured(status, text) ||
+      (status >= 500 && status < 600) ||
+      ((status === 401 || status === 403) && Boolean(sessionWorkspaceId)))
   ) {
     try {
       const stored = await saveLocalUpload(await storageFallbackReq.formData());

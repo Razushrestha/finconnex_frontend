@@ -52,6 +52,12 @@ export type SignatureFieldKind =
   | "attachment";
 
 export type DeliveryMethod = "email" | "email_sms";
+export type RecipientSource =
+  | "email"
+  | "contact"
+  | "lead"
+  | "deal"
+  | "organization";
 
 export interface SignatureAuditEvent {
   id: string;
@@ -78,6 +84,8 @@ export interface SignatureSigner {
   signatureData?: string;
   deliveryMethod: DeliveryMethod;
   colorIndex: number;
+  /** Direct email vs CRM contact / lead / deal / organization. */
+  entityType?: RecipientSource;
 }
 
 export interface SignatureField {
@@ -232,38 +240,67 @@ function applyLiveFiles(req: SignatureRequest): SignatureRequest {
   };
 }
 
+export const PREFILL_RECIPIENT_ID = "prefill";
+
+/** First signer = yellow, Prefill / second signer = royal blue. */
 export const SIGNER_COLORS = [
   {
-    bg: "bg-violet-100",
-    text: "text-violet-800",
-    border: "border-violet-400",
-    hex: "#7C3AED",
+    bg: "bg-yellow-100",
+    text: "text-yellow-900",
+    border: "border-yellow-400",
+    hex: "#EAB308",
+    bgHex: "#FEF9C3",
+    textHex: "#713F12",
+    borderHex: "#FACC15",
   },
   {
-    bg: "bg-yellow-100",
-    text: "text-yellow-800",
-    border: "border-yellow-400",
-    hex: "#CA8A04",
+    bg: "bg-blue-100",
+    text: "text-blue-900",
+    border: "border-blue-600",
+    hex: "#1D4ED8",
+    bgHex: "#DBEAFE",
+    textHex: "#1E3A8A",
+    borderHex: "#2563EB",
   },
   {
     bg: "bg-amber-100",
     text: "text-amber-900",
     border: "border-amber-400",
     hex: "#D97706",
+    bgHex: "#FEF3C7",
+    textHex: "#78350F",
+    borderHex: "#FBBF24",
   },
   {
-    bg: "bg-emerald-100",
-    text: "text-emerald-800",
-    border: "border-emerald-400",
-    hex: "#059669",
+    bg: "bg-sky-100",
+    text: "text-sky-900",
+    border: "border-sky-500",
+    hex: "#0284C7",
+    bgHex: "#E0F2FE",
+    textHex: "#0C4A6E",
+    borderHex: "#0EA5E9",
   },
   {
-    bg: "bg-rose-100",
-    text: "text-rose-800",
-    border: "border-rose-400",
-    hex: "#E11D48",
+    bg: "bg-yellow-50",
+    text: "text-yellow-800",
+    border: "border-yellow-300",
+    hex: "#CA8A04",
+    bgHex: "#FEFCE8",
+    textHex: "#854D0E",
+    borderHex: "#FDE047",
   },
 ] as const;
+
+export const PREFILL_COLOR_INDEX = 1;
+
+export function signerColor(index?: number | null) {
+  const i =
+    index == null || Number.isNaN(index)
+      ? 0
+      : ((index % SIGNER_COLORS.length) + SIGNER_COLORS.length) %
+        SIGNER_COLORS.length;
+  return SIGNER_COLORS[i];
+}
 
 export function makeSigner(partial: {
   id: string;
@@ -275,6 +312,7 @@ export function makeSigner(partial: {
   colorIndex?: number;
   status?: SignerStatus;
   role?: SignerRole;
+  entityType?: RecipientSource;
   signedAt?: string;
   signatureData?: string;
 }): SignatureSigner {
@@ -290,6 +328,7 @@ export function makeSigner(partial: {
     token: partial.token,
     colorIndex:
       partial.colorIndex ?? (partial.order - 1) % SIGNER_COLORS.length,
+    entityType: partial.entityType ?? "email",
     signedAt: partial.signedAt,
     signatureData: partial.signatureData,
   };
@@ -411,6 +450,22 @@ export function signedCount(req: SignatureRequest): number {
   return normalizeSignatureRequest(req).signers.filter(
     (s) => s.status === "Signed",
   ).length;
+}
+
+/** Mailed → ~33%, viewed → ~67%, signed → 100% (averaged across signers). */
+export function completionPercent(req: SignatureRequest): number {
+  const n = normalizeSignatureRequest(req);
+  const actionable = n.signers.filter((s) => s.role !== "CC");
+  if (!actionable.length) return n.status === "Signed" ? 100 : 0;
+  const sum = actionable.reduce((acc, signer) => {
+    if (signer.status === "Signed") return acc + 1;
+    if (signer.status === "Viewed" || signer.status === "Declined") {
+      return acc + 2 / 3;
+    }
+    if (signer.status !== "Pending") return acc + 1 / 3;
+    return acc;
+  }, 0);
+  return Math.round((sum / actionable.length) * 100);
 }
 
 export function computeOverallStatus(req: SignatureRequest): SignatureStatus {
@@ -572,17 +627,41 @@ export function getSignatureRequestById(id: string) {
   return listSignatureRequests().find((r) => r.id === id);
 }
 
+function matchRequestByToken(
+  req: SignatureRequest,
+  token: string,
+): SignatureSigner | null {
+  const signer = req.signers.find((s) => s.token === token);
+  if (signer) return signer;
+  if (req.manageToken === token && req.signers[0]) return req.signers[0];
+  return null;
+}
+
 /** Resolve by request manageToken OR any signer token. */
 export function getSignatureByToken(token: string): {
   request: SignatureRequest;
   signer: SignatureSigner;
 } | null {
   for (const req of listSignatureRequests()) {
-    const signer = req.signers.find((s) => s.token === token);
+    const signer = matchRequestByToken(req, token);
     if (signer) return { request: req, signer };
-    if (req.manageToken === token && req.signers[0]) {
-      return { request: req, signer: req.signers[0] };
+  }
+  if (typeof window === "undefined") return null;
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key || !key.includes("signature:requests")) continue;
+      const parsed = JSON.parse(localStorage.getItem(key) || "[]") as unknown;
+      if (!Array.isArray(parsed)) continue;
+      for (const row of parsed) {
+        if (!row || typeof row !== "object") continue;
+        const req = row as SignatureRequest;
+        const signer = matchRequestByToken(req, token);
+        if (signer) return { request: req, signer };
+      }
     }
+  } catch {
+    /* private mode */
   }
   return null;
 }
@@ -803,6 +882,54 @@ export function applySignerViewed(
   return upsertSignatureRequest({
     ...draft,
     status: computeOverallStatus(draft),
+  });
+}
+
+export function applySignerCompleted(
+  req: SignatureRequest,
+  signerId: string,
+  signedAt?: string,
+): SignatureRequest {
+  const n = normalizeSignatureRequest(req);
+  const signer = n.signers.find((s) => s.id === signerId);
+  if (!signer || signer.status === "Signed") return n;
+  const at = signedAt?.trim() || new Date().toLocaleDateString("en-AU");
+  const signers = n.signers.map((s) =>
+    s.id === signerId
+      ? { ...s, status: "Signed" as SignerStatus, signedAt: s.signedAt || at }
+      : s,
+  );
+  let nextSigners = signers;
+  if (n.signingOrder === "sequential") {
+    const ordered = [...signers]
+      .filter((s) => s.role !== "CC")
+      .sort((a, b) => a.order - b.order);
+    const nextPending = ordered.find((s) => s.status === "Pending");
+    if (nextPending) {
+      nextSigners = signers.map((s) =>
+        s.id === nextPending.id ? { ...s, status: "Sent" as SignerStatus } : s,
+      );
+    }
+  }
+  const draft: SignatureRequest = {
+    ...n,
+    signers: nextSigners,
+    audit: [
+      ...n.audit,
+      {
+        id: `a-sign-${Date.now()}`,
+        at: formatAuditAt(),
+        action: `Signed by ${signer.name}`,
+        actor: signer.name,
+        ip: DEMO_SIGNER_IP,
+      },
+    ],
+  };
+  const overall = computeOverallStatus(draft);
+  return upsertSignatureRequest({
+    ...draft,
+    status: overall,
+    signedDate: overall === "Signed" ? at : draft.signedDate,
   });
 }
 

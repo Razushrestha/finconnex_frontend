@@ -39,14 +39,49 @@ export type CrmSettingsState = {
 
 const SettingsCrmContext = createContext<CrmSettingsState | null>(null);
 
+const SETTINGS_CACHE_KEY = "fc.settings.shell.v1";
+
+type SettingsCache = {
+  settings: CrmWorkspaceSettings | null;
+  security: CrmSecuritySettings | null;
+  capabilities: CrmCapabilities | null;
+};
+
+function readSettingsCache(): SettingsCache | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(SETTINGS_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as SettingsCache;
+  } catch {
+    return null;
+  }
+}
+
+function writeSettingsCache(cache: SettingsCache) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    /* quota */
+  }
+}
+
 function useCrmSettingsState(enabled: boolean): CrmSettingsState {
-  const [source, setSource] = useState<SettingsDataSource>("demo");
-  const [loading, setLoading] = useState(true);
+  const cached = typeof window !== "undefined" ? readSettingsCache() : null;
+  const [source, setSource] = useState<SettingsDataSource>(
+    cached?.settings ? "api" : "demo",
+  );
+  const [loading, setLoading] = useState(!cached?.settings);
   const [error, setError] = useState<string | null>(null);
-  const [settings, setSettings] = useState<CrmWorkspaceSettings | null>(null);
-  const [security, setSecurity] = useState<CrmSecuritySettings | null>(null);
+  const [settings, setSettings] = useState<CrmWorkspaceSettings | null>(
+    cached?.settings ?? null,
+  );
+  const [security, setSecurity] = useState<CrmSecuritySettings | null>(
+    cached?.security ?? null,
+  );
   const [capabilities, setCapabilities] = useState<CrmCapabilities | null>(
-    null,
+    cached?.capabilities ?? null,
   );
   const [previewBrand, setPreviewBrand] = useState<
     Partial<Pick<CrmWorkspaceSettings, "primaryColor" | "secondaryColor">> | null
@@ -58,7 +93,7 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    setLoading(true);
+    if (!settings) setLoading(true);
     setError(null);
 
     void (async () => {
@@ -82,6 +117,17 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
             : ws.value,
         );
         setSource("api");
+        writeSettingsCache({
+          settings:
+            fromPages
+              ? {
+                  ...ws.value,
+                  catalog: { ...fromPages, ...(ws.value.catalog ?? {}) },
+                }
+              : ws.value,
+          security: sec.status === "fulfilled" ? sec.value : security,
+          capabilities: caps.status === "fulfilled" ? caps.value : capabilities,
+        });
       } else {
         setSettings(null);
         setSource("demo");

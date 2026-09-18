@@ -12,7 +12,7 @@ import {
   enableDeviceIntentGateway,
   getSendGateway,
 } from "@/lib/comms/send-gateway";
-import { fetchAuthBridge } from "@/lib/persistence/auth-bridge";
+import { fetchAuthBridge, type AuthBridgeSnapshot } from "@/lib/persistence/auth-bridge";
 
 export type ProductionCommsResult = {
   uploadMode: "local" | "api";
@@ -28,6 +28,7 @@ export async function enableProductionComms(options?: {
   baseUrl?: string | null;
   fetchImpl?: typeof fetch;
   getAccessToken?: () => string | null | Promise<string | null>;
+  bridge?: AuthBridgeSnapshot;
 }): Promise<ProductionCommsResult> {
   const baseUrl =
     options?.baseUrl === null
@@ -47,7 +48,9 @@ export async function enableProductionComms(options?: {
     };
   }
 
-  const bridge = await fetchAuthBridge({ fetchImpl: options?.fetchImpl });
+  const bridge =
+    options?.bridge ??
+    (await fetchAuthBridge({ fetchImpl: options?.fetchImpl }));
   const getAccessToken =
     options?.getAccessToken ?? (async () => bridge.accessToken);
 

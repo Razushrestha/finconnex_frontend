@@ -1,12 +1,19 @@
 import type { SignatureField } from "@/lib/documents/signature/types";
 import { isSignatureCaptureKind } from "@/lib/documents/signature/field-kinds";
+import { cn } from "@/lib/utils";
 
-export function SignatureFieldValue({ field }: { field: SignatureField }) {
+export function SignatureFieldValue({
+  field,
+  ink = false,
+}: {
+  field: SignatureField;
+  ink?: boolean;
+}) {
   if (!field.value) return null;
 
   if (field.kind === "checkbox") {
     return (
-      <span className="text-sm font-bold text-slate-800">
+      <span className={cn("font-bold text-slate-800", ink ? "text-base" : "text-sm")}>
         {field.value === "true" ? "✓" : ""}
       </span>
     );
@@ -14,6 +21,7 @@ export function SignatureFieldValue({ field }: { field: SignatureField }) {
 
   if (
     field.kind === "image" ||
+    field.kind === "stamp" ||
     field.value.startsWith("data:image") ||
     (isSignatureCaptureKind(field.kind) && field.value.startsWith("data:"))
   ) {
@@ -22,14 +30,22 @@ export function SignatureFieldValue({ field }: { field: SignatureField }) {
       <img
         src={field.value}
         alt=""
-        className="h-full max-h-8 w-full object-contain brightness-0 contrast-150"
+        className={cn(
+          "w-full object-contain",
+          ink ? "h-full max-h-full" : "h-full max-h-8 brightness-0 contrast-150",
+        )}
       />
     );
   }
 
   if (isSignatureCaptureKind(field.kind) && field.value.startsWith("typed:")) {
     return (
-      <span className="font-serif text-[13px] font-extrabold leading-tight text-black">
+      <span
+        className={cn(
+          "font-serif font-extrabold leading-tight text-black",
+          ink ? "text-[15px]" : "text-[13px]",
+        )}
+      >
         {field.value.replace(/^typed:/, "")}
       </span>
     );

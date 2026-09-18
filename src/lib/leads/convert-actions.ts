@@ -14,7 +14,7 @@ export const LEAD_SEND_ACTIONS = [
     label: "Request Documents",
     href: "/documents/requests/create?layoutid=standard&redirect=false",
   },
-  { id: "esign", label: "Send E-Sign", href: "/signature/create" },
+  { id: "esign", label: "Send E-Sign", href: "/signature/request/new?type=send" },
   {
     id: "proposal",
     label: "Send Proposal",
@@ -104,12 +104,16 @@ export function entitySendHref(baseHref: string, entity: SendRelatedEntity) {
   url.searchParams.set("relatedId", entity.id);
   if (entity.email) url.searchParams.set("to", entity.email);
   if (entity.phone) url.searchParams.set("phone", entity.phone);
-  if (url.pathname === "/signature/create") {
+  if (
+    url.pathname === "/signature/create" ||
+    url.pathname === "/signature/request/new"
+  ) {
     url.searchParams.set(
       "signers",
       JSON.stringify(entity.signers ?? [{ name: entity.name, email: entity.email ?? "" }]),
     );
     url.searchParams.set("documentName", `${entity.name} – Signature request`);
+    url.searchParams.set("type", "send");
   }
   if (url.pathname === "/documents/requests/create") {
     url.searchParams.set(

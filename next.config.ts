@@ -7,7 +7,12 @@ const nextConfig: NextConfig = {
     proxyClientMaxBodySize: "25mb",
   },
   // Allow opening the dev app from LAN IPs (phones / other PCs)
-  allowedDevOrigins: ["192.168.137.1", "192.168.1.113", "localhost"],
+  allowedDevOrigins: [
+    "192.168.137.1",
+    "192.168.1.113",
+    "192.168.1.68",
+    "localhost",
+  ],
   images: {
     remotePatterns: [
       {

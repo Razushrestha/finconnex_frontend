@@ -390,6 +390,24 @@ export interface DashboardLiveStats {
   dateRange: DashboardDateRange;
 }
 
+export function emptyDashboardLiveStats(): DashboardLiveStats {
+  return {
+    totalLeads: 0,
+    totalContacts: 0,
+    totalCompanies: 0,
+    totalDeals: 0,
+    pipelineValue: 0,
+    wonDealsValue: 0,
+    openTasks: 0,
+    overdueTasks: 0,
+    activitiesToday: 0,
+    conversionRate: 0,
+    filteredOwner: "All",
+    filteredTeam: "All teams",
+    dateRange: "90d",
+  };
+}
+
 export function computeDashboardStats(
   filters: DashboardFilters,
 ): DashboardLiveStats {

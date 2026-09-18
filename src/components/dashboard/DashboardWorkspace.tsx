@@ -538,7 +538,8 @@ export function DashboardWorkspace({
 
         {view === "executive" ? (
           <>
-            {executive.newLeads === 0 &&
+            {!loading &&
+            executive.newLeads === 0 &&
             executive.settlements === 0 &&
             layout.filters.dateRange !== "all" ? (
               <p className="text-[12px] text-slate-500">

@@ -29,6 +29,14 @@ function pickNum(value: unknown): number {
   return 0;
 }
 
+export function isLocalStorageKey(key: string) {
+  const value = key.trim();
+  return (
+    value.startsWith("local/") ||
+    value.includes("/api/auth/local-files/")
+  );
+}
+
 export function storageUploadPath(): string {
   return "/v1/storage/upload";
 }
@@ -73,12 +81,13 @@ async function sendDirectUpload(
   return parseUploadResponse(res);
 }
 
-async function sendBffUpload(form: FormData) {
+async function sendBffUpload(form: FormData, accessToken?: string | null) {
   const res = await fetch(storageUploadBffPath(), {
     method: "POST",
     credentials: "same-origin",
     headers: {
       Accept: "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
     body: form,
   });
@@ -151,7 +160,25 @@ export async function uploadCrmStorageFile(
   try {
     // Always go through the same-origin BFF so Vercel can fall back to /tmp
     // when CRM disk storage returns ENOENT (/var/task/data is read-only).
-    let parsed = await sendBffUpload(form);
+    const browserAuth = await resolveAuth();
+    let parsed = await sendBffUpload(form, browserAuth?.accessToken);
+    if ([401, 403].includes(parsed.res.status)) {
+      const { refreshCrmTokenFromBrowser } = await import(
+        "@/lib/auth/browser-session-cache"
+      );
+      const { persistCrmTokens } = await import("@/lib/activity-timeline/auth");
+      const rotated = await refreshCrmTokenFromBrowser();
+      if (typeof rotated.accessToken === "string" && rotated.accessToken) {
+        persistCrmTokens({
+          accessToken: rotated.accessToken,
+          refreshToken:
+            typeof rotated.refreshToken === "string"
+              ? rotated.refreshToken
+              : null,
+        });
+        parsed = await sendBffUpload(form, rotated.accessToken);
+      }
+    }
     if ([401, 403].includes(parsed.res.status) && isBoundCrmSession()) {
       const auth = await resolveAuth();
       if (auth) parsed = await sendDirectUpload(auth, form);

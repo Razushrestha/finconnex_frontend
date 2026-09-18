@@ -651,27 +651,36 @@ function CreateTemplateForm() {
     setPlacedFields((prev) => prev.filter((f) => f.id !== id));
   };
 
+  const handleChangeFieldValue = (id: string, value: string) => {
+    setPlacedFields((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, value } : f)),
+    );
+  };
+
   // ==========================================
   // STEP 2: PLACE FIELDS VIEW (?step=place-fields)
   // ==========================================
   if (isPlacingFields) {
     return (
-      <PlaceFieldsView
-        documentName={documentName}
-        documents={documents}
-        placedFields={placedFields}
-        draggingFieldType={draggingFieldType}
-        recipients={recipients}
-        isTemplate={true}
-        handleBackToForm={handleBackToForm}
-        handleDropField={handleDropField}
-        handleRepositionField={handleRepositionField}
-        handleRemovePlacedField={handleRemovePlacedField}
-        handleSidebarDragStart={handleSidebarDragStart}
-        handleSidebarDragEnd={handleSidebarDragEnd}
-        handleResizeField={handleResizeField}
-        handleSaveTemplate={handleSaveTemplate}
-      />
+      <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-white">
+        <PlaceFieldsView
+          documentName={documentName}
+          documents={documents}
+          placedFields={placedFields}
+          draggingFieldType={draggingFieldType}
+          recipients={recipients}
+          isTemplate={true}
+          handleBackToForm={handleBackToForm}
+          handleDropField={handleDropField}
+          handleRepositionField={handleRepositionField}
+          handleRemovePlacedField={handleRemovePlacedField}
+          handleSidebarDragStart={handleSidebarDragStart}
+          handleSidebarDragEnd={handleSidebarDragEnd}
+          handleResizeField={handleResizeField}
+          handleChangeFieldValue={handleChangeFieldValue}
+          handleSaveTemplate={handleSaveTemplate}
+        />
+      </div>
     );
   }
 
