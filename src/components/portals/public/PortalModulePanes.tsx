@@ -259,10 +259,9 @@ export function PortalInvoicesPane({ slug }: { slug: string }) {
         }
         if (intent.clientSecret || intent.paymentIntentId) {
           setPayingId(null);
-          setToast(
+          notify(
             "Payment session created. Complete checkout to finish paying.",
           );
-          window.setTimeout(() => setToast(null), 3200);
           return;
         }
       } catch {
