@@ -264,7 +264,7 @@ export const ACTION_CATALOG: Record<
   DELETE_LEAD: { label: "Delete Lead", category: "Records", icon: "user-minus" },
   CREATE_CONTACT: { label: "Create Contact", category: "Records", icon: "user-plus" },
   DELETE_CONTACT: { label: "Delete Contact", category: "Records", icon: "user-minus" },
-  CREATE_COMPANY: { label: "Create Organization", category: "Records", icon: "building" },
+  CREATE_COMPANY: { label: "Create Company", category: "Records", icon: "building" },
   DELETE_COMPANY: { label: "Delete Organization", category: "Records", icon: "building" },
   CREATE_DEAL: { label: "Create Deal", category: "Records", icon: "circle-dollar-sign" },
   DELETE_DEAL: { label: "Delete Deal", category: "Records", icon: "circle-dollar-sign" },
@@ -526,7 +526,7 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: [],
   },
   CREATE_COMPANY: {
-    allowed: ["name", "website", "industry", "size", "employeeCount", "annualRevenue", "description", "street", "city", "state", "country", "postalCode", "linkedinUrl", "twitterUrl", "phone", "parentId", "ownerId"],
+    allowed: ["name", "website", "industry", "size", "employeeCount", "annualRevenue", "description", "street", "city", "state", "country", "postalCode", "linkedinUrl", "twitterUrl", "phone", "parentId", "ownerId", "status"],
     required: ["name"],
   },
   DELETE_COMPANY: {

@@ -43,6 +43,7 @@ import { entityNoun } from "@/lib/automations/trigger-scope";
 
 import { supportsRecordPicker } from "@/lib/automations/record-search";
 
+import { CreateCompanyActionForm, createCompanyActionProblems } from "./CreateCompanyActionForm";
 import { CreateContactActionForm, createContactActionProblems } from "./CreateContactActionForm";
 import { CreateLeadActionForm, createLeadActionProblems } from "./CreateLeadActionForm";
 import { CreateTaskActionForm, createTaskActionProblems } from "./CreateTaskActionForm";
@@ -122,6 +123,10 @@ function ActionConfigForm({
   // Create Task is the task page's own form, not the generic key list.
   if (step.action === "CREATE_TASK") {
     return <CreateTaskActionForm config={config} onChange={onChange} />;
+  }
+  // Create Company is the Create Company modal's own form.
+  if (step.action === "CREATE_COMPANY") {
+    return <CreateCompanyActionForm config={config} onChange={onChange} />;
   }
   // Create Contact is the Create Contact modal's own form.
   if (step.action === "CREATE_CONTACT") {
@@ -511,7 +516,9 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
         ? createLeadActionProblems(draft.config ?? {}, entityType)
         : draft.type === "ACTION" && draft.action === "CREATE_CONTACT"
           ? createContactActionProblems(draft.config ?? {}, entityType)
-          : [];
+          : draft.type === "ACTION" && draft.action === "CREATE_COMPANY"
+            ? createCompanyActionProblems(draft.config ?? {})
+            : [];
   const blocked =
     missingRequired.length > 0 || recipientProblems.length > 0 || taskProblems.length > 0;
 
