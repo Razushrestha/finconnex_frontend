@@ -7,7 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  Mail,
+  KeyRound,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -15,6 +15,7 @@ import {
   Shield,
   Trash2,
   Upload,
+  UserPlus,
   UserRound,
   Users,
 } from "lucide-react";
@@ -28,16 +29,16 @@ import {
 } from "@/lib/settings/users-store";
 import { ROLES, type HierarchyLevel } from "@/lib/rules/permissions";
 import {
-  cancelCrmWorkspaceInvitation,
+  createCrmWorkspaceMember,
   deleteCrmWorkspaceMember,
+  generateMemberPassword,
   importCrmWorkspaceMembers,
-  inviteCrmWorkspaceMember,
   persistRemoteWorkspaceMember,
-  resendCrmWorkspaceInvitation,
+  resendCrmWorkspaceCredentials,
   transferCrmWorkspaceOwnership,
   updateCrmWorkspaceMember,
 } from "@/lib/workspace-members/api";
-import { sendWorkspaceInviteMail } from "@/lib/workspace-members/invite-mail";
+import { notify, toast } from "@/lib/notify/toast";
 import {
   activateCrmWorkspaceMember,
   deactivateCrmWorkspaceMember,
@@ -151,7 +152,6 @@ export function UsersSettingsClient() {
   const live = crm.source === "api";
   const [users, setUsers] = useState<CrmUser[]>([]);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
-  const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState({
     name: "",
@@ -185,8 +185,7 @@ export function UsersSettingsClient() {
   }, [roleFilter, teamFilter, tableQuery, live]);
 
   function flash(msg: string) {
-    setMessage(msg);
-    window.setTimeout(() => setMessage(null), 2400);
+    notify(msg);
   }
 
   function resetDraft() {
@@ -260,7 +259,7 @@ export function UsersSettingsClient() {
     safePage * pageSize,
   );
 
-  async function saveUser(mode: "invite" | "add" = "invite") {
+  async function saveUser() {
     if (!draft.name.trim() || !draft.email.trim()) {
       flash("Name and email are required");
       return;
@@ -295,50 +294,36 @@ export function UsersSettingsClient() {
         refreshLocal();
         return;
       }
-
-      try {
-        persistRemoteWorkspaceMember(
-          await inviteCrmWorkspaceMember({
-            email: draft.email,
-            name: draft.name,
-            role: draft.role,
-            team: draft.team,
-            password: draft.password,
-            joinImmediately: mode === "add",
-          }),
-        );
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "";
-        if (
-          live &&
-          (mode !== "invite" ||
-            !/invitationDeliveryFailed|could not be queued/i.test(msg))
-        ) {
-          throw err;
-        }
-        if (!live) {
-          createCrmUser({
-            ...draft,
-            status: mode === "add" ? "Active" : "Invited",
-          });
-        }
+      if (!live) {
+        createCrmUser({ ...draft, status: "Active" });
+        flash("User added");
+        resetDraft();
+        refreshLocal();
+        return;
       }
 
-      if (mode === "invite") {
-        await sendWorkspaceInviteMail({
-          to: draft.email,
-          name: draft.name,
-          role: draft.role,
-          team: draft.team,
-          password: draft.password,
+      const email = draft.email.trim();
+      const { member, credentialsIssued } = await createCrmWorkspaceMember({
+        fullName: draft.name,
+        email,
+        password: draft.password,
+        role: draft.role,
+        team: draft.team,
+      });
+      persistRemoteWorkspaceMember(member);
+      if (credentialsIssued) {
+        toast.success(`${draft.name.trim()} added`, {
+          description: `Sign-in details were emailed to ${email}. They'll choose their own password when they first sign in.`,
         });
-        flash("Invitation email sent");
       } else {
-        flash(live ? "User added to the workspace" : "User added");
+        // The CRM kept their existing password; the one typed here is void.
+        toast.warning(`${draft.name.trim()} already had an account`, {
+          description: `They were added to this workspace and sign in with their existing password — not the one you entered.`,
+          duration: 10_000,
+        });
       }
       resetDraft();
-      if (live) crm.refresh();
-      else refreshLocal();
+      crm.refresh();
     } catch (err) {
       flash(err instanceof Error ? err.message : "Could not save member");
     } finally {
@@ -371,54 +356,32 @@ export function UsersSettingsClient() {
     }
   }
 
-  async function onResend(row: WorkspaceMember) {
+  async function onReissue(row: WorkspaceMember) {
+    if (
+      !window.confirm(
+        `Email ${row.name} new sign-in details? Their current password stops working and they're signed out everywhere.`,
+      )
+    ) {
+      return;
+    }
     setBusy(true);
     try {
-      persistRemoteWorkspaceMember(await resendCrmWorkspaceInvitation(row.id));
-      try {
-        await sendWorkspaceInviteMail({
-          to: row.email,
-          name: row.name,
-          role: row.role,
-          team: row.team,
+      // No password: the CRM generates a strong one and mails it.
+      persistRemoteWorkspaceMember(await resendCrmWorkspaceCredentials(row.id));
+      toast.success("Sign-in details sent", {
+        description: `${row.email} will choose a new password at their next sign-in.`,
+      });
+      crm.refresh();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (/credentialsNotReissuable|not reissuable/i.test(msg)) {
+        toast.error(`${row.name} manages their own password`, {
+          description:
+            "Their account wasn't created by this workspace. Ask them to use “Forgot password” on the sign-in page.",
         });
-      } catch {
-        /* CRM resend already queued the official invite */
+      } else {
+        flash(msg || "Could not send sign-in details");
       }
-      flash("Invitation resent");
-      crm.refresh();
-    } catch (err) {
-      flash(err instanceof Error ? err.message : "Resend failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onCancelInvite(row: WorkspaceMember) {
-    if (!window.confirm(`Cancel invitation for ${row.email}?`)) return;
-    setBusy(true);
-    try {
-      await cancelCrmWorkspaceInvitation(row.id);
-      deleteWorkspaceMember(row.id);
-      crm.refresh();
-      flash("Invitation cancelled");
-    } catch (err) {
-      flash(err instanceof Error ? err.message : "Cancel failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onAccept(row: WorkspaceMember) {
-    setBusy(true);
-    try {
-      persistRemoteWorkspaceMember(
-        await updateCrmWorkspaceMember(row.id, { accept: true }),
-      );
-      crm.refresh();
-      flash("Invitation accepted");
-    } catch (err) {
-      flash(err instanceof Error ? err.message : "Accept failed");
     } finally {
       setBusy(false);
     }
@@ -497,16 +460,25 @@ export function UsersSettingsClient() {
           email: string;
           role: HierarchyLevel;
           team?: string;
+          password: string;
         }> = [];
+        // name, email, role, team, password — a row without a password (or
+        // with one under 8 characters) gets a generated one.
         for (const line of lines) {
-          const [name, email, roleRaw, team] = line
+          const [name, email, roleRaw, team, password] = line
             .split(",")
             .map((p) => p.trim());
           if (!name || !email || name.toLowerCase() === "name") continue;
           const role = ROLE_OPTIONS.includes(roleRaw as HierarchyLevel)
             ? (roleRaw as HierarchyLevel)
             : "User";
-          rows.push({ name, email, role, team });
+          rows.push({
+            name,
+            email,
+            role,
+            team,
+            password: password && password.length >= 8 ? password : generateMemberPassword(),
+          });
         }
         if (!rows.length) {
           flash("No valid rows found");
@@ -517,16 +489,30 @@ export function UsersSettingsClient() {
           try {
             const result = await importCrmWorkspaceMembers(
               rows.map((row) => ({
-                ...row,
-                joinImmediately: false,
+                fullName: row.name,
+                email: row.email,
+                password: row.password,
+                role: row.role,
+                team: row.team,
               })),
             );
             crm.refresh();
-            const failed = result.failed.length;
-            flash(
-              failed
-                ? `Imported ${result.invited} users, ${failed} failed`
-                : `Imported ${result.invited} users`,
+            const parts = [`${result.created} created`];
+            if (result.attached) parts.push(`${result.attached} existing accounts added`);
+            const detail = [
+              result.attached
+                ? "Existing accounts sign in with their own password."
+                : "",
+              ...result.failed.map((row) => `${row.email}: ${row.error}`),
+            ]
+              .filter(Boolean)
+              .join("\n");
+            const toastFn = result.failed.length ? toast.warning : toast.success;
+            toastFn(
+              result.failed.length
+                ? `Imported: ${parts.join(", ")}, ${result.failed.length} failed`
+                : `Imported: ${parts.join(", ")}`,
+              { description: detail || "Sign-in details were emailed to each new member.", duration: 10_000 },
             );
           } catch (err) {
             flash(err instanceof Error ? err.message : "Import failed");
@@ -535,7 +521,7 @@ export function UsersSettingsClient() {
           }
           return;
         }
-        for (const row of rows) createCrmUser(row);
+        for (const row of rows) createCrmUser({ ...row, status: "Active" });
         refreshLocal();
         flash(`Imported ${rows.length} users`);
       })();
@@ -560,8 +546,9 @@ export function UsersSettingsClient() {
               Users
             </h1>
             <p className="mt-0.5 max-w-xl text-[13px] text-slate-500">
-              Invite teammates by email and assign a workspace role. Owners and
-              admins can change roles, send invitations, and remove members.
+              Create accounts for teammates and assign a workspace role. They&apos;re
+              emailed their sign-in details and choose their own password when
+              they first sign in.
             </p>
           </div>
         </div>
@@ -651,22 +638,19 @@ export function UsersSettingsClient() {
           </div>
           <p className="mt-1 max-w-2xl text-[12px] text-slate-500">
             {live
-              ? "Workspace members — invite, update role, resend or cancel invitations, remove, and transfer ownership."
-              : "Demo user directory — invite and edit locally. Deleting a UUID user calls DELETE /v1/admin/user/:id (platform admin)."}
+              ? "Workspace members — create accounts, update roles, re-issue sign-in details, remove, and transfer ownership."
+              : "Demo user directory — add and edit locally. Deleting a UUID user calls DELETE /v1/admin/user/:id (platform admin)."}
           </p>
           {live ? (
             <p className="mt-1 text-[12px] font-medium text-slate-500">
-              Joined {crm.summary.joined} · Pending {crm.summary.pending}
+              Joined {crm.summary.joined} · Awaiting first sign-in{" "}
+              {crm.summary.awaitingPasswordChange}
+              {crm.summary.pending ? ` · Old invitations ${crm.summary.pending}` : ""}
             </p>
           ) : null}
           {crm.error && !live ? (
             <p className="mt-1 text-[12px] font-medium text-amber-700">
               Sign in with a workspace to manage members
-            </p>
-          ) : null}
-          {message ? (
-            <p className="mt-1 text-[12px] font-medium text-violet-700">
-              {message}
             </p>
           ) : null}
         </div>
@@ -704,7 +688,7 @@ export function UsersSettingsClient() {
             className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-violet-600 px-3 text-[12px] font-semibold text-white hover:bg-violet-700"
           >
             <Plus className="h-3.5 w-3.5" />
-            Invite User
+            Add User
           </button>
         </div>
       </div>
@@ -715,11 +699,17 @@ export function UsersSettingsClient() {
           className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
         >
           <div className="mb-4 flex items-center gap-2">
-            <Mail className="h-4 w-4 text-violet-600" />
+            <UserPlus className="h-4 w-4 text-violet-600" />
             <h3 className="text-[14px] font-semibold text-slate-900">
-              {editingId ? "Edit user" : "Invite new user"}
+              {editingId ? "Edit user" : "Add new user"}
             </h3>
           </div>
+          {!editingId && live ? (
+            <p className="-mt-2 mb-4 text-[12px] text-slate-500">
+              We&apos;ll email them these sign-in details. They&apos;ll be asked to
+              choose their own password the first time they sign in.
+            </p>
+          ) : null}
           <div
             className={cn(
               "grid gap-3 md:grid-cols-2",
@@ -755,18 +745,28 @@ export function UsersSettingsClient() {
             </label>
             {!editingId ? (
               <label className="block">
-                <span className="mb-1.5 block text-[12px] font-medium text-slate-600">
-                  Password
+                <span className="mb-1.5 flex items-center justify-between text-[12px] font-medium text-slate-600">
+                  First password
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDraft((d) => ({ ...d, password: generateMemberPassword() }))
+                    }
+                    className="text-[11px] font-semibold text-violet-600 hover:text-violet-800"
+                  >
+                    Generate
+                  </button>
                 </span>
                 <input
-                  type="password"
-                  autoComplete="new-password"
+                  type="text"
+                  autoComplete="off"
+                  spellCheck={false}
                   value={draft.password}
                   onChange={(e) =>
                     setDraft((d) => ({ ...d, password: e.target.value }))
                   }
                   placeholder="At least 8 characters"
-                  className={fieldClass()}
+                  className={cn(fieldClass(), "font-mono")}
                 />
               </label>
             ) : null}
@@ -824,31 +824,21 @@ export function UsersSettingsClient() {
                 <button
                   type="button"
                   disabled={!canSend}
-                  onClick={() => void saveUser("invite")}
+                  onClick={() => void saveUser()}
                   className="inline-flex h-10 items-center rounded-xl bg-violet-600 px-4 text-[12px] font-semibold text-white hover:bg-violet-700 disabled:opacity-40"
                 >
                   Save
                 </button>
               </>
             ) : (
-              <>
-                <button
-                  type="button"
-                  disabled={!canSend}
-                  onClick={() => void saveUser("add")}
-                  className="inline-flex h-10 min-w-[88px] items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-[12px] font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-40"
-                >
-                  Add
-                </button>
-                <button
-                  type="button"
-                  disabled={!canSend}
-                  onClick={() => void saveUser("invite")}
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-violet-600 px-4 text-[12px] font-semibold text-white hover:bg-violet-700 disabled:opacity-40"
-                >
-                  Send invite
-                </button>
-              </>
+              <button
+                type="button"
+                disabled={!canSend}
+                onClick={() => void saveUser()}
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-violet-600 px-4 text-[12px] font-semibold text-white hover:bg-violet-700 disabled:opacity-40"
+              >
+                {live ? "Create user" : "Add user"}
+              </button>
             )}
           </div>
         </div>
@@ -985,19 +975,7 @@ export function UsersSettingsClient() {
                             <option value="Invited">Invited</option>
                           </select>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-slate-700">
-                            <span
-                              className={cn(
-                                "h-1.5 w-1.5 rounded-full",
-                                row.status === "Active"
-                                  ? "bg-emerald-500"
-                                  : row.status === "Invited"
-                                    ? "bg-amber-500"
-                                    : "bg-slate-400",
-                              )}
-                            />
-                            {row.status}
-                          </span>
+                          <MemberStatus row={row} />
                         )}
                       </td>
                       <td className="px-3 py-3 text-[13px] text-slate-600">
@@ -1027,32 +1005,16 @@ export function UsersSettingsClient() {
                             <MoreHorizontal className="h-4 w-4" />
                           </button>
                           {menuId === row.id ? (
-                            <div className="absolute top-8 right-0 z-20 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-                              {row.member && row.status === "Invited" ? (
-                                <>
-                                  <MenuItem
-                                    label="Accept"
-                                    onClick={() => {
-                                      setMenuId(null);
-                                      void onAccept(row.member!);
-                                    }}
-                                  />
-                                  <MenuItem
-                                    label="Resend invite"
-                                    onClick={() => {
-                                      setMenuId(null);
-                                      void onResend(row.member!);
-                                    }}
-                                  />
-                                  <MenuItem
-                                    label="Cancel invite"
-                                    danger
-                                    onClick={() => {
-                                      setMenuId(null);
-                                      void onCancelInvite(row.member!);
-                                    }}
-                                  />
-                                </>
+                            <div className="absolute top-8 right-0 z-20 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                              {row.member && !row.isOwner ? (
+                                <MenuItem
+                                  label="Re-issue sign-in details"
+                                  icon={KeyRound}
+                                  onClick={() => {
+                                    setMenuId(null);
+                                    void onReissue(row.member!);
+                                  }}
+                                />
                               ) : null}
                               {row.member && row.status !== "Invited" && !row.isOwner ? (
                                 <>
@@ -1162,16 +1124,54 @@ export function UsersSettingsClient() {
   );
 }
 
+/**
+ * A member's state. Status is Active from creation, so a member who hasn't
+ * signed in and replaced their first password reads "Awaiting first sign-in",
+ * with the credentials email's delivery when it hasn't landed.
+ */
+function MemberStatus({ row }: { row: DirectoryRow }) {
+  const member = row.member;
+  const awaiting = row.status === "Active" && member?.mustChangePassword === true;
+  const delivery = member?.credentialsDelivery;
+  const label = awaiting ? "Awaiting first sign-in" : row.status === "Invited" ? "Old invitation" : row.status;
+  const dot =
+    row.status === "Inactive"
+      ? "bg-slate-400"
+      : awaiting || row.status === "Invited"
+        ? "bg-amber-500"
+        : "bg-emerald-500";
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-slate-700">
+        <span className={cn("h-1.5 w-1.5 rounded-full", dot)} />
+        {label}
+      </span>
+      {awaiting && delivery === "FAILED" ? (
+        <span
+          className="text-[11px] font-medium text-rose-600"
+          title={member?.credentialsError}
+        >
+          Sign-in email failed — re-issue it
+        </span>
+      ) : awaiting && (delivery === "PENDING" || delivery === "QUEUED") ? (
+        <span className="text-[11px] text-slate-400">Sending sign-in email…</span>
+      ) : null}
+    </div>
+  );
+}
+
 function MenuItem({
   label,
   onClick,
   danger,
   disabled,
+  icon: Icon,
 }: {
   label: string;
   onClick: () => void;
   danger?: boolean;
   disabled?: boolean;
+  icon?: React.ElementType;
 }) {
   return (
     <button
@@ -1185,7 +1185,7 @@ function MenuItem({
           : "text-slate-700 hover:bg-slate-50",
       )}
     >
-      {danger ? <Trash2 className="h-3.5 w-3.5" /> : null}
+      {danger ? <Trash2 className="h-3.5 w-3.5" /> : Icon ? <Icon className="h-3.5 w-3.5" /> : null}
       {label}
     </button>
   );

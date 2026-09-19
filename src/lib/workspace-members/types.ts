@@ -4,6 +4,9 @@ import type { HierarchyLevel } from "@/lib/rules/permissions";
 
 export type WorkspaceMemberStatus = "Active" | "Invited" | "Inactive";
 
+/** Delivery state of the email that carries a new member's credentials. */
+export type CredentialsDelivery = "PENDING" | "QUEUED" | "DELIVERED" | "FAILED";
+
 export type WorkspaceMember = {
   id: string;
   userId: string;
@@ -14,11 +17,24 @@ export type WorkspaceMember = {
   isOwner: boolean;
   team?: string;
   joinedAt?: string;
+  /**
+   * The member hasn't replaced the password they were given yet — they have
+   * not really started using the account. Status is Active from creation, so
+   * this is what tells them apart.
+   */
+  mustChangePassword?: boolean;
+  credentialsDelivery?: CredentialsDelivery;
+  /** Why the credentials email failed, when it did. */
+  credentialsError?: string;
 };
 
 export type WorkspaceMembersSummary = {
+  total: number;
   joined: number;
+  /** Invitations left over from the email-invite flow; 0 for new members. */
   pending: number;
+  /** Members who haven't signed in and replaced their first password. */
+  awaitingPasswordChange: number;
   byRole: Record<string, number>;
 };
 
@@ -70,5 +86,5 @@ export function deleteWorkspaceMember(id: string) {
 }
 
 export function emptyWorkspaceMembersSummary(): WorkspaceMembersSummary {
-  return { joined: 0, pending: 0, byRole: {} };
+  return { total: 0, joined: 0, pending: 0, awaitingPasswordChange: 0, byRole: {} };
 }

@@ -52,7 +52,6 @@
     "smoke:reports": "npx tsx --tsconfig tsconfig.json src/lib/reports/smoke.ts",
     "smoke:resources": "npx tsx --tsconfig tsconfig.json src/lib/resources/smoke.ts",
     "smoke:user-profile": "npx tsx --tsconfig tsconfig.json src/lib/user-profile/smoke.ts",
-    "smoke:workspace-invitations": "npx tsx --tsconfig tsconfig.json src/lib/workspace-invitations/smoke.ts",
     "smoke:workspace-members": "npx tsx --tsconfig tsconfig.json src/lib/workspace-members/smoke.ts",
     "smoke:workspace-operations": "npx tsx --tsconfig tsconfig.json src/lib/workspace-operations/smoke.ts",
     "smoke:workspaces": "npx tsx --tsconfig tsconfig.json src/lib/workspaces/smoke.ts",

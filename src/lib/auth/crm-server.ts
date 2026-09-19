@@ -32,6 +32,8 @@ export type CrmUser = {
   workspaceRole?: string | null;
   /** The workspace the CRM access token is scoped to, if any. */
   workspaceId?: string | null;
+  /** Admin-provisioned account whose first password hasn't been replaced. */
+  mustChangePassword?: boolean;
 };
 
 export type CrmWorkspace = {
@@ -132,6 +134,7 @@ export function sessionFromCrmUser(
     tenantName: workspace?.name || "Workspace",
     hasWorkspace: !!(workspace?.id || fromJwt),
     workspaceRole: asWorkspaceRole(user.workspaceRole),
+    mustChangePassword: user.mustChangePassword === true,
   };
 }
 
@@ -507,6 +510,23 @@ export async function crmLogout(
   } catch {
     /* still clear local cookies */
   }
+}
+
+/**
+ * Replaces the signed-in user's password. The CRM then revokes every session,
+ * this one included, so the caller must sign in again.
+ */
+export async function crmChangePassword(
+  accessToken: string,
+  refreshToken: string | null | undefined,
+  body: { currentPassword: string; newPassword: string; newPasswordConfirmation: string },
+) {
+  await crmFetch<{ success?: boolean }>("/auth/password/change", {
+    method: "POST",
+    accessToken,
+    refreshToken,
+    body,
+  });
 }
 
 export async function crmLogoutAll(

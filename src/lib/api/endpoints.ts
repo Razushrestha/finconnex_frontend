@@ -21,9 +21,9 @@ export const ENDPOINT_CATALOG = [
   { method: "PUT", path: "/user", module: "user", notes: "Update current user profile" },
   {
     method: "POST",
-    path: "/workspaces/invitations/accept",
-    module: "workspace-invitations",
-    notes: "Public; accept a one-time workspace invitation",
+    path: "/auth/password/change",
+    module: "auth",
+    notes: "Replace the current password; required first for a new member",
   },
 
   // Workspace members (JWT; workspace-scoped)
@@ -63,16 +63,10 @@ export const ENDPOINT_CATALOG = [
     notes: "Remove a member from the workspace",
   },
   {
-    method: "DELETE",
-    path: "/workspaces/:workspaceId/members/:memberId/invitation",
-    module: "workspace-members",
-    notes: "Cancel a pending workspace invitation",
-  },
-  {
     method: "POST",
-    path: "/workspaces/:workspaceId/members/:memberId/invitation/resend",
+    path: "/workspaces/:workspaceId/members/:memberId/credentials/resend",
     module: "workspace-members",
-    notes: "Invalidate and resend a pending invitation",
+    notes: "Mail a member new sign-in credentials; they must replace the password",
   },
   {
     method: "POST",

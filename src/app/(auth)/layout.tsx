@@ -14,6 +14,9 @@ export default async function AuthLayout({
   const session = await getSession();
 
   if (session) {
+    if (session.mustChangePassword) {
+      redirect("/change-password");
+    }
     if (isPlatformAdminRole(session.role)) {
       redirect("/platform");
     }

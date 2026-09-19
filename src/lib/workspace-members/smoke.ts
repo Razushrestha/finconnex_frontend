@@ -7,15 +7,14 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { bindCrmSession, getCrmApiBaseUrl } from "@/lib/activity-timeline";
 import {
-  cancelCrmWorkspaceInvitation,
+  createCrmWorkspaceMember,
   deleteCrmWorkspaceMember,
   getCrmWorkspaceMember,
   getCrmWorkspaceMembersSummary,
-  inviteCrmWorkspaceMember,
   listCrmWorkspaceMembers,
   mapWorkspaceMemberRole,
   normalizeWorkspaceMember,
-  resendCrmWorkspaceInvitation,
+  resendCrmWorkspaceCredentials,
   transferCrmWorkspaceOwnership,
   updateCrmWorkspaceMember,
   workspaceMembersPath,
@@ -65,12 +64,8 @@ const LIVE_ROUTES: Array<{ method: string; path: string }> = [
     path: `/v1/workspaces/${SESSION.workspaceId}/members/${MEMBER_ID}`,
   },
   {
-    method: "DELETE",
-    path: `/v1/workspaces/${SESSION.workspaceId}/members/${MEMBER_ID}/invitation`,
-  },
-  {
     method: "POST",
-    path: `/v1/workspaces/${SESSION.workspaceId}/members/${MEMBER_ID}/invitation/resend`,
+    path: `/v1/workspaces/${SESSION.workspaceId}/members/${MEMBER_ID}/credentials/resend`,
   },
   {
     method: "POST",
@@ -98,11 +93,10 @@ export function smokeWorkspaceMembersWiring() {
     "listCrmWorkspaceMembers",
     "getCrmWorkspaceMember",
     "getCrmWorkspaceMembersSummary",
-    "inviteCrmWorkspaceMember",
+    "createCrmWorkspaceMember",
     "updateCrmWorkspaceMember",
     "deleteCrmWorkspaceMember",
-    "cancelCrmWorkspaceInvitation",
-    "resendCrmWorkspaceInvitation",
+    "resendCrmWorkspaceCredentials",
     "transferCrmWorkspaceOwnership",
     "importCrmWorkspaceMembers",
   ]) {
@@ -110,8 +104,8 @@ export function smokeWorkspaceMembersWiring() {
       fail(`workspace-members client missing ${name}`);
     }
   }
-  if (!api.includes("if (password) body.password = password")) {
-    fail("inviteCrmWorkspaceMember must send password when provided");
+  if (!api.includes("fullName: input.fullName.trim()") || !api.includes("password: input.password")) {
+    fail("createCrmWorkspaceMember must send fullName and password");
   }
 
   const catalog = readSrc("src/lib/api/endpoints.ts");
@@ -119,8 +113,7 @@ export function smokeWorkspaceMembersWiring() {
     'path: "/workspaces/:workspaceId/members"',
     'path: "/workspaces/:workspaceId/members-summary"',
     'path: "/workspaces/:workspaceId/members/:memberId"',
-    'path: "/workspaces/:workspaceId/members/:memberId/invitation"',
-    'path: "/workspaces/:workspaceId/members/:memberId/invitation/resend"',
+    'path: "/workspaces/:workspaceId/members/:memberId/credentials/resend"',
     'path: "/workspaces/:workspaceId/ownership-transfer"',
     'path: "/workspaces/:workspaceId/members/import"',
   ]) {
@@ -141,20 +134,18 @@ export function smokeWorkspaceMembersWiring() {
   const ui = readSrc("src/components/settings/UsersSettingsClient.tsx");
   for (const name of [
     "useCrmWorkspaceMembers",
-    "inviteCrmWorkspaceMember",
+    "createCrmWorkspaceMember",
     "updateCrmWorkspaceMember",
     "deleteCrmWorkspaceMember",
-    "cancelCrmWorkspaceInvitation",
-    "resendCrmWorkspaceInvitation",
+    "resendCrmWorkspaceCredentials",
     "transferCrmWorkspaceOwnership",
-    "sendWorkspaceInviteMail",
   ]) {
     if (!ui.includes(name)) {
       fail(`Users settings does not call ${name}`);
     }
   }
-  if (!ui.includes('type="password"')) {
-    fail("Users invite form missing password field");
+  if (!ui.includes("generateMemberPassword")) {
+    fail("Users form missing the first-password field");
   }
 
   const hook = readSrc("src/lib/workspace-members/use-crm-workspace-members.ts");
@@ -218,14 +209,14 @@ export async function smokeWorkspaceMembersMock() {
     await listCrmWorkspaceMembers();
     await getCrmWorkspaceMembersSummary();
     await getCrmWorkspaceMember(MEMBER_ID);
-    await inviteCrmWorkspaceMember({
+    await createCrmWorkspaceMember({
+      fullName: "New Member",
       email: "new@example.com",
       role: "User",
       password: "secret123",
     });
     await updateCrmWorkspaceMember(MEMBER_ID, { role: "Manager" });
-    await resendCrmWorkspaceInvitation(MEMBER_ID);
-    await cancelCrmWorkspaceInvitation(MEMBER_ID);
+    await resendCrmWorkspaceCredentials(MEMBER_ID);
     await transferCrmWorkspaceOwnership(MEMBER_ID);
     await deleteCrmWorkspaceMember(MEMBER_ID);
 
@@ -235,8 +226,7 @@ export async function smokeWorkspaceMembersMock() {
       `GET ${workspaceMembersPath(SESSION.workspaceId, `/${MEMBER_ID}`)}`,
       `POST ${workspaceMembersPath(SESSION.workspaceId)}`,
       `PATCH ${workspaceMembersPath(SESSION.workspaceId, `/${MEMBER_ID}`)}`,
-      `POST ${workspaceMembersPath(SESSION.workspaceId, `/${MEMBER_ID}/invitation/resend`)}`,
-      `DELETE ${workspaceMembersPath(SESSION.workspaceId, `/${MEMBER_ID}/invitation`)}`,
+      `POST ${workspaceMembersPath(SESSION.workspaceId, `/${MEMBER_ID}/credentials/resend`)}`,
       `POST ${workspaceOwnershipTransferPath(SESSION.workspaceId)}`,
       `DELETE ${workspaceMembersPath(SESSION.workspaceId, `/${MEMBER_ID}`)}`,
     ];

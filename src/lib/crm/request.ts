@@ -82,6 +82,11 @@ const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
     "This settings page cannot be saved on the CRM workspace.",
   "settings.error.notFound":
     "Workspace settings are missing on the CRM server. Ask an admin to open Settings once to create them.",
+  "auth.error.passwordChangeRequired":
+    "Choose your own password before you continue.",
+  "workspace.error.credentialsNotReissuable":
+    "This person manages their own password. Ask them to use “Forgot password” on the sign-in page.",
+  "workspace.error.memberAlreadyExists": "That person is already a member of this workspace.",
   "auth.error.insufficientPermissions":
     "Only a workspace owner or admin can update Company Profile and other workspace settings.",
   "Invalid or missing access token":
@@ -134,6 +139,22 @@ export function crmErrorMessage(json: unknown, fallback: string): string {
     }
   }
   return fallback;
+}
+
+/**
+ * The CRM refuses an account that still has the password an admin gave it
+ * everything but /auth/* — send the browser to choose its own. The page
+ * proxy normally does this first; this catches a session that started before
+ * the flag reached it.
+ */
+function redirectIfPasswordChangeRequired(status: number, json: unknown): void {
+  if (status !== 403 || typeof window === "undefined") return;
+  const message =
+    json && typeof json === "object" ? (json as { message?: unknown }).message : undefined;
+  if (message !== "auth.error.passwordChangeRequired") return;
+  if (window.location.pathname !== "/change-password") {
+    window.location.href = "/change-password";
+  }
 }
 
 export function unwrapCrmData<T>(json: unknown): T {
@@ -273,6 +294,7 @@ export async function crmBffFetch<T>(
     }
   }
   if (!res.ok) {
+    redirectIfPasswordChangeRequired(res.status, json);
     throw new Error(crmErrorMessage(json, `CRM request failed (${res.status})`));
   }
   return unwrapCrmData<T>(json);
@@ -329,6 +351,7 @@ export async function crmFetch<T>(
   }
 
   if (!res.ok) {
+    redirectIfPasswordChangeRequired(res.status, json);
     throw new Error(crmErrorMessage(json, `CRM request failed (${res.status})`));
   }
 

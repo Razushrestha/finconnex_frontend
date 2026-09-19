@@ -7,8 +7,8 @@ import {
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import type { HierarchyLevel } from "@/lib/rules/permissions";
 import {
-  emptyWorkspaceMembersSummary,
   upsertWorkspaceMember,
+  type CredentialsDelivery,
   type WorkspaceMember,
   type WorkspaceMemberStatus,
   type WorkspaceMembersSummary,
@@ -177,6 +177,7 @@ export function normalizeWorkspaceMember(
     pickStr(row.email, user.email) ||
     "Member";
   const joinedAt = pickStr(row.joinedAt, user.joinedAt) || undefined;
+  const delivery = pickStr(row.invitationStatus).toUpperCase();
   return {
     id,
     userId: pickStr(row.userId, user.id, id),
@@ -190,6 +191,13 @@ export function normalizeWorkspaceMember(
     isOwner,
     team: pickStr(row.team, row.teamName) || undefined,
     joinedAt,
+    mustChangePassword: user.mustChangePassword === true || row.mustChangePassword === true,
+    credentialsDelivery: (["PENDING", "QUEUED", "DELIVERED", "FAILED"] as const).includes(
+      delivery as CredentialsDelivery,
+    )
+      ? (delivery as CredentialsDelivery)
+      : undefined,
+    credentialsError: pickStr(row.invitationLastError) || undefined,
   };
 }
 
@@ -218,6 +226,7 @@ export function normalizeWorkspaceMembersSummary(
     }
   }
   return {
+    total: pickNum(nested.total),
     joined: pickNum(nested.joined ?? nested.active ?? nested.accepted),
     pending: pickNum(
       nested.pending ??
@@ -225,6 +234,7 @@ export function normalizeWorkspaceMembersSummary(
         nested.pendingInvitations ??
         nested.pendingInvites,
     ),
+    awaitingPasswordChange: pickNum(nested.awaitingPasswordChange),
     byRole,
   };
 }
@@ -264,38 +274,51 @@ export async function getCrmWorkspaceMembersSummary(): Promise<WorkspaceMembersS
   );
 }
 
-export async function inviteCrmWorkspaceMember(input: {
+export type NewWorkspaceMember = {
+  fullName: string;
   email: string;
-  name?: string;
+  /** What the member signs in with the first time; they must replace it. */
+  password: string;
   role: HierarchyLevel;
   team?: string;
-  password?: string;
-  joinImmediately?: boolean;
-}): Promise<WorkspaceMember | null> {
-  const session = await requireSession();
-  const role = apiWorkspaceMemberRole(input.role);
+};
+
+function newMemberBody(input: NewWorkspaceMember): Record<string, unknown> {
   const body: Record<string, unknown> = {
+    fullName: input.fullName.trim(),
     email: input.email.trim().toLowerCase(),
-    role,
+    password: input.password,
+    role: apiWorkspaceMemberRole(input.role),
   };
-  const name = input.name?.trim();
-  if (name) body.name = name;
   const team = input.team?.trim();
   if (team) body.team = team;
-  const password = input.password?.trim();
-  if (password) body.password = password;
-  if (input.joinImmediately === true) body.joinImmediately = true;
-  return asMember(
-    await membersCrm(workspaceMembersPath(session.workspaceId), {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
-  );
+  return body;
+}
+
+/**
+ * Creates the member's account and adds them to the workspace; the CRM mails
+ * them the credentials. `credentialsIssued` is false when the address already
+ * had an account: they were added, and sign in with their own password — the
+ * one sent here was discarded.
+ */
+export async function createCrmWorkspaceMember(
+  input: NewWorkspaceMember,
+): Promise<{ member: WorkspaceMember | null; credentialsIssued: boolean }> {
+  const session = await requireSession();
+  const data = await membersCrm<unknown>(workspaceMembersPath(session.workspaceId), {
+    method: "POST",
+    body: JSON.stringify(newMemberBody(input)),
+  });
+  const rec =
+    data && typeof data === "object" && !Array.isArray(data)
+      ? (data as Record<string, unknown>)
+      : {};
+  return { member: asMember(data), credentialsIssued: rec.credentialsIssued !== false };
 }
 
 export async function updateCrmWorkspaceMember(
   memberId: string,
-  patch: { role?: HierarchyLevel; team?: string; accept?: boolean },
+  patch: { role?: HierarchyLevel; team?: string },
 ): Promise<WorkspaceMember | null> {
   const session = await requireSession();
   const body: Record<string, unknown> = {};
@@ -305,10 +328,6 @@ export async function updateCrmWorkspaceMember(
     body.workspaceRole = role;
   }
   if (patch.team !== undefined) body.team = patch.team.trim();
-  if (patch.accept) {
-    body.accept = true;
-    body.status = "JOINED";
-  }
   return asMember(
     await membersCrm(
       workspaceMembersPath(session.workspaceId, `/${memberId}`),
@@ -325,27 +344,22 @@ export async function deleteCrmWorkspaceMember(memberId: string): Promise<void> 
   });
 }
 
-export async function cancelCrmWorkspaceInvitation(
+/**
+ * Mails the member new sign-in credentials; they must replace the password
+ * at their next sign-in, and their sessions end now. Leave `password` out to
+ * have the CRM generate a strong one. Fails with
+ * `workspace.error.credentialsNotReissuable` for an account this workspace
+ * didn't create — its password belongs to its owner.
+ */
+export async function resendCrmWorkspaceCredentials(
   memberId: string,
-): Promise<void> {
-  const session = await requireSession();
-  await membersCrm(
-    workspaceMembersPath(session.workspaceId, `/${memberId}/invitation`),
-    { method: "DELETE" },
-  );
-}
-
-export async function resendCrmWorkspaceInvitation(
-  memberId: string,
+  password?: string,
 ): Promise<WorkspaceMember | null> {
   const session = await requireSession();
   return asMember(
     await membersCrm(
-      workspaceMembersPath(
-        session.workspaceId,
-        `/${memberId}/invitation/resend`,
-      ),
-      { method: "POST", body: JSON.stringify({}) },
+      workspaceMembersPath(session.workspaceId, `/${memberId}/credentials/resend`),
+      { method: "POST", body: JSON.stringify(password ? { password } : {}) },
     ),
   );
 }
@@ -367,35 +381,15 @@ export async function transferCrmWorkspaceOwnership(
   );
 }
 
+/** Creates up to 100 members in one call; one bad row doesn't stop the rest. */
 export async function importCrmWorkspaceMembers(
-  items: Array<{
-    email: string;
-    name?: string;
-    role: HierarchyLevel;
-    team?: string;
-    joinImmediately?: boolean;
-  }>,
-): Promise<{ invited: number; added: number; failed: Array<{ email: string; error: string }> }> {
+  items: NewWorkspaceMember[],
+): Promise<{ created: number; attached: number; failed: Array<{ email: string; error: string }> }> {
   const session = await requireSession();
-  const data = await membersCrm(
-    workspaceMembersPath(session.workspaceId, "/import"),
-    {
-      method: "POST",
-      body: JSON.stringify({
-        items: items.map((item) => {
-          const role = apiWorkspaceMemberRole(item.role);
-          return {
-            email: item.email.trim().toLowerCase(),
-            name: item.name?.trim() || undefined,
-            role,
-            workspaceRole: role,
-            team: item.team?.trim() || undefined,
-            joinImmediately: item.joinImmediately === true,
-          };
-        }),
-      }),
-    },
-  );
+  const data = await membersCrm(workspaceMembersPath(session.workspaceId, "/import"), {
+    method: "POST",
+    body: JSON.stringify({ items: items.map(newMemberBody) }),
+  });
   const rec =
     data && typeof data === "object" && !Array.isArray(data)
       ? (data as Record<string, unknown>)
@@ -406,8 +400,8 @@ export async function importCrmWorkspaceMembers(
       : rec;
   const failedRaw = Array.isArray(nested.failed) ? nested.failed : [];
   return {
-    invited: pickNum(nested.invited),
-    added: pickNum(nested.added),
+    created: pickNum(nested.created),
+    attached: pickNum(nested.attached),
     failed: failedRaw
       .filter((row): row is Record<string, unknown> => !!row && typeof row === "object")
       .map((row) => ({
@@ -415,6 +409,17 @@ export async function importCrmWorkspaceMembers(
         error: pickStr(row.error) || "Import failed",
       })),
   };
+}
+
+/**
+ * A strong first password for a new member: 16 characters from a set without
+ * look-alikes, so it survives being read out or retyped.
+ */
+export function generateMemberPassword(length = 16): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%*";
+  const bytes = new Uint32Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (n) => alphabet[n % alphabet.length]).join("");
 }
 
 export async function tryCrmWorkspaceMembers<T>(

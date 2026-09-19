@@ -15,6 +15,9 @@ export default async function CreateWorkspacePage() {
   if (!session) {
     redirect("/login");
   }
+  if (session.mustChangePassword) {
+    redirect("/change-password");
+  }
   if (isPlatformAdminRole(session.role)) {
     redirect("/platform");
   }

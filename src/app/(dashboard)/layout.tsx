@@ -15,6 +15,11 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
+  // A member an admin created replaces that password before anything else.
+  if (session.mustChangePassword) {
+    redirect("/change-password");
+  }
+
   // Authenticated but no real workspace yet (fresh signup) → onboarding
   if (session.hasWorkspace === false) {
     if (isPlatformAdminRole(session.role)) {
