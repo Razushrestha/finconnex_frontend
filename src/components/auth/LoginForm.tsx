@@ -23,9 +23,17 @@ function getSafeDashboardUrl(callbackUrl: string | null): string {
   return callbackUrl;
 }
 
+/** Why the user was sent to sign in, when it's worth saying. */
+const REASON_NOTES: Record<string, string> = {
+  password_changed: "Your password was changed. Sign in with your new password.",
+  invitation_retired:
+    "Invitation links are no longer used. Your workspace admin creates your account, and you'll get an email with your sign-in details.",
+};
+
 export function LoginForm() {
   const searchParams = useSearchParams();
   const destination = getSafeDashboardUrl(searchParams.get("callbackUrl"));
+  const reasonNote = REASON_NOTES[searchParams.get("reason") ?? ""] ?? null;
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -124,6 +132,7 @@ export function LoginForm() {
       const payload = data as {
         needsWorkspace?: boolean;
         isPlatformAdmin?: boolean;
+        mustChangePassword?: boolean;
         accessToken?: string | null;
         refreshToken?: string | null;
       };
@@ -133,7 +142,9 @@ export function LoginForm() {
           refreshToken: payload.refreshToken,
         });
       }
-      window.location.href = payload.isPlatformAdmin
+      window.location.href = payload.mustChangePassword
+        ? "/change-password"
+        : payload.isPlatformAdmin
         ? "/platform"
         : payload.needsWorkspace
           ? "/create-workspace"
@@ -164,6 +175,14 @@ export function LoginForm() {
       noValidate
       suppressHydrationWarning
     >
+      {reasonNote && !error ? (
+        <div
+          role="status"
+          className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-800"
+        >
+          {reasonNote}
+        </div>
+      ) : null}
       {error && (
         <div
           role="alert"

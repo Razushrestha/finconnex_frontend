@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { jwtVerify } from "jose";
+import { jwtVerify, type JWTPayload } from "jose";
 import { getAuthSecretKey, SESSION_COOKIE } from "@/lib/auth/constants";
 
 /** Exact paths anyone can open (logged-out or logged-in). */
@@ -10,6 +10,8 @@ const PUBLIC_EXACT = new Set([
   "/forgot-password",
   "/reset-password",
   "/verify-email",
+  // Retired invitation links from emails sent before accounts were created
+  // by admins; the page sends people to sign in.
   "/accept-invitation",
 ]);
 
@@ -27,7 +29,7 @@ const PUBLIC_PREFIXES = [
   "/f/", // Marketing forms
   "/l/", // Linktree
   "/j/", // Proposal-to-payment journey (client link)
-  "/invite/", // One-time workspace invitation accept
+  "/invite/", // Retired invitation links (see /accept-invitation)
   "/public/", // Public sales quotes / estimates / invoices
 ] as const;
 
@@ -43,17 +45,22 @@ function isAuthEntryPath(pathname: string): boolean {
   return pathname === "/login";
 }
 
-async function isAuthenticated(request: NextRequest): Promise<boolean> {
+/** The verified session's claims, or null when signed out. */
+async function sessionClaims(
+  request: NextRequest,
+): Promise<JWTPayload | null> {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return false;
+  if (!token) return null;
 
   try {
-    await jwtVerify(token, getAuthSecretKey());
-    return true;
+    const { payload } = await jwtVerify(token, getAuthSecretKey());
+    return payload;
   } catch {
-    return false;
+    return null;
   }
 }
+
+const CHANGE_PASSWORD_PATH = "/change-password";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -62,7 +69,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const authenticated = await isAuthenticated(request);
+  const claims = await sessionClaims(request);
+  const authenticated = claims !== null;
   const publicPath = isPublicPath(pathname);
 
   if (!authenticated) {
@@ -75,6 +83,16 @@ export async function proxy(request: NextRequest) {
       loginUrl.searchParams.set("callbackUrl", pathname);
     }
     return NextResponse.redirect(loginUrl);
+  }
+
+  // A member an admin created replaces that password before anything else;
+  // the CRM refuses them everything but /auth/* until they do.
+  if (
+    claims?.mustChangePassword === true &&
+    pathname !== CHANGE_PASSWORD_PATH &&
+    !publicPath
+  ) {
+    return NextResponse.redirect(new URL(CHANGE_PASSWORD_PATH, request.url));
   }
 
   // Logged-in users leaving the login screen → dashboard

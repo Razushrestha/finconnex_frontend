@@ -1,29 +1,10 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
-/** CRM invitation emails use `/accept-invitation#token=...`. */
-export default function AcceptInvitationRedirectPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    const hash = window.location.hash.replace(/^#/, "");
-    const params = new URLSearchParams(hash);
-    const token =
-      params.get("token")?.trim() ||
-      params.get("invitationToken")?.trim() ||
-      "";
-    router.replace(
-      token
-        ? `/invite/accept?token=${encodeURIComponent(token)}`
-        : "/invite/accept",
-    );
-  }, [router]);
-
-  return (
-    <p className="p-8 text-center text-sm text-slate-600">
-      Opening invitation…
-    </p>
-  );
+/**
+ * Invitation emails sent before admins created accounts directly link here.
+ * There is nothing left to accept: send the person to sign in, where a note
+ * explains that their admin creates the account.
+ */
+export default function AcceptInvitationRetiredPage() {
+  redirect("/login?reason=invitation_retired");
 }

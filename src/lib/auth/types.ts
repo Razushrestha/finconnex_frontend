@@ -37,6 +37,12 @@ export interface SessionPayload {
   workspaceRole?: string | null;
   /** Login "Keep me signed in for 30 days" — sliding cookie + JWT lifetime. */
   rememberMe?: boolean;
+  /**
+   * The account was created by a workspace admin and still has the password
+   * they set. The CRM serves nothing but `/auth/*` until it's replaced, so the
+   * app sends the user to /change-password first.
+   */
+  mustChangePassword?: boolean;
 }
 
 export interface LoginCredentials {

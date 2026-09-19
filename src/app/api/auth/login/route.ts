@@ -90,7 +90,17 @@ export async function POST(request: Request) {
           { status: 403 },
         );
       }
-      const scoped = platformAdmin
+      // A member an admin created must replace that password first; the CRM
+      // answers nothing but /auth/* until then, so don't pick a workspace.
+      const mustChangePassword = loggedIn.user.mustChangePassword === true;
+      const scoped = mustChangePassword
+        ? {
+            accessToken: loggedIn.accessToken,
+            refreshToken: loggedIn.refreshToken,
+            workspace: null,
+            workspaces: [] as Awaited<ReturnType<typeof activateWorkspace>>["workspaces"],
+          }
+        : platformAdmin
         ? await (async () => {
             try {
               const listed = await crmListMyWorkspaces(
@@ -146,7 +156,8 @@ export async function POST(request: Request) {
         requires2fa: false,
         source: "crm",
         isPlatformAdmin: platformAdmin,
-        needsWorkspace: !scoped.workspace && !platformAdmin,
+        needsWorkspace: !scoped.workspace && !platformAdmin && !mustChangePassword,
+        mustChangePassword,
         // Client must persist these — access JWTs often won't fit in cookies on Vercel.
         accessToken: scoped.accessToken,
         refreshToken: scoped.refreshToken ?? loggedIn.refreshToken,
