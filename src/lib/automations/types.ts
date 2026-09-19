@@ -578,8 +578,9 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: ["toPhone", "body"],
   },
   REQUEST_DOCUMENTS: {
-    allowed: ["title", "documentType", "requestedFromId", "dueDate", "notes", "relatedType", "leadId", "contactId", "companyId", "dealId"],
-    required: ["title", "documentType", "requestedFromId"],
+    allowed: ["title", "documentType", "requestedFromId", "dueDate", "notes", "relatedType", "leadId", "contactId", "companyId", "dealId", "requestedFromTrigger", "dueInMs", "requestedById", "items"],
+    // `requestedFromId` unless `requestedFromTrigger` — the step form checks which.
+    required: ["title"],
   },
   UPDATE_DOCUMENT_STATUS: {
     allowed: ["status"],

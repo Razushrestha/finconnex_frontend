@@ -376,6 +376,10 @@ export const FIELD_META: Record<string, FieldMeta> = {
   },
   requestedFromId: { label: "Requested From (Contact)", widget: "text", helpText: "Contact UUID" },
   dueDate: { label: "Due Date", widget: "datetime" },
+  // Request Documents' form renders these itself.
+  requestedFromTrigger: { label: "Send to the contact that started this workflow", widget: "checkbox" },
+  requestedById: { label: "Send on behalf of", widget: "member" },
+  items: { label: "Documents", widget: "json" },
   // Create Deal's form renders these itself.
   contactFromTrigger: { label: "Use the contact that started this workflow", widget: "checkbox" },
   expectedCloseInMs: { label: "Closes After Workflow Runs (ms)", widget: "number" },

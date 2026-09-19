@@ -69,7 +69,7 @@ import {
   type AssignableOwner,
 } from "@/lib/users/assignable";
 
-function SenderOnBehalfField({
+export function SenderOnBehalfField({
   value,
   options,
   invalid,
@@ -181,7 +181,7 @@ function toRequestApplicants(
   }));
 }
 
-async function resolveApplicantContactId(
+export async function resolveApplicantContactId(
   row: RequestApplicant | undefined,
 ): Promise<string> {
   if (row?.recordId && isUuid(row.recordId)) return row.recordId;
@@ -516,7 +516,7 @@ function Field({
   );
 }
 
-function Stepper({ step }: { step: number }) {
+export function Stepper({ step }: { step: number }) {
   return (
     <ol className="flex w-full items-center justify-between gap-2">
       {STEPS.map((s, index) => {
