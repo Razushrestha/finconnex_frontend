@@ -31,6 +31,7 @@ import {
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
+import { notify, toast } from "@/lib/notify/toast";
 
 const STATUS_STYLE: Record<WhatsAppCampaignStatus, string> = {
   Draft: "bg-slate-100 text-slate-600",
@@ -44,15 +45,13 @@ const STATUS_STYLE: Record<WhatsAppCampaignStatus, string> = {
 export function WhatsAppCampaignDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const [campaign, setCampaign] = useState<WhatsAppCampaign | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     setCampaign(getWhatsAppCampaignById(id) ?? null);
   }, [id]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2600);
+    notify(msg);
   }
 
   function save(next: WhatsAppCampaign, msg?: string) {
@@ -378,7 +377,7 @@ export function WhatsAppCampaignDetailClient({ id }: { id: string }) {
                       snapshot: campaign,
                     });
                     if (!gate.ok) {
-                      window.alert(gate.message);
+                      toast.error(gate.message);
                       return;
                     }
                     deleteWhatsAppCampaign(campaign.id);
@@ -420,11 +419,6 @@ export function WhatsAppCampaignDetailClient({ id }: { id: string }) {
         </div>
       </div>
 
-      {toast ? (
-        <div className="fixed right-4 bottom-4 z-50 rounded-xl bg-slate-900 px-4 py-2.5 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
     </div>
   );
 }

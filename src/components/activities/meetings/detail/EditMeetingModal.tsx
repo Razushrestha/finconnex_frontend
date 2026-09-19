@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import { X } from "lucide-react";
 import {
   MEETING_ATTENDEE_ROLES,

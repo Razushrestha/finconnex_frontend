@@ -40,7 +40,7 @@ import {
   DEFAULT_PLACED_FIELD_WIDTH,
 } from "@/lib/documents/signature/field-placement";
 import AddRecipients from "@/components/documents/signature/templates/AddRecipients";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import { tryCrmStorage, uploadCrmStorageFile } from "@/lib/storage/api";
 import {
   createCrmSignatureTemplate,

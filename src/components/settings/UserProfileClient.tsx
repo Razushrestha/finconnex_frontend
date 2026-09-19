@@ -9,12 +9,12 @@ import {
 import { loadUserProfile, saveUserProfile } from "@/lib/user-profile/types";
 import { useCrmUserProfile } from "@/lib/user-profile/use-crm-user-profile";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 export function UserProfileClient() {
   const crm = useCrmUserProfile();
   const [values, setValues] = useState(loadUserProfile());
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (crm.loading) return;
@@ -22,8 +22,7 @@ export function UserProfileClient() {
   }, [crm.loading, crm.profile, crm.source]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 1800);
+    notify(msg);
   }
 
   function onCancel() {
@@ -131,9 +130,6 @@ export function UserProfileClient() {
         </label>
       </div>
 
-      {toast ? (
-        <p className="mt-3 text-[12px] font-medium text-emerald-700">{toast}</p>
-      ) : null}
 
       <div className="mt-4 flex gap-2">
         <button

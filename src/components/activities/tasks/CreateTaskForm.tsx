@@ -88,6 +88,7 @@ import {
   type ReminderRepeatRule,
 } from "@/lib/tasks/repeat-reminder";
 import { buildRemindersFromSchedule } from "@/lib/tasks/reminder-series";
+import { toast } from "@/lib/notify/toast";
 
 interface CreateTaskFormProps {
   layoutId: string;
@@ -614,7 +615,7 @@ export function CreateTaskForm({
     if (!validate()) return;
     const gate = requireAction("activities.tasks.create");
     if (!gate.ok) {
-      window.alert(gate.message);
+      toast.error(gate.message);
       return;
     }
     const pendingAction = newActionItem.trim();
@@ -644,7 +645,7 @@ export function CreateTaskForm({
     const ownerName = ownerDisplay(ownerOptions, form.assignedTo) || form.assignedTo;
     const assigneeUserId = await resolveCrmAssigneeUserId(form.assignedTo);
     if (!assigneeUserId) {
-      window.alert(
+      toast.error(
         "Could not find a workspace member to assign. Sign in, then pick a Task Owner.",
       );
       return;
@@ -729,12 +730,12 @@ export function CreateTaskForm({
         task = findTaskById(remote.taskId)?.task ?? remote;
       } else if (!remote) {
         deleteTask(local.taskId);
-        window.alert("CRM did not return the new task. Please try again.");
+        toast.error("CRM did not return the new task. Please try again.");
         return;
       }
     } catch (err) {
       deleteTask(local.taskId);
-      window.alert(
+      toast.error(
         err instanceof Error ? err.message : "Could not save this task to CRM.",
       );
       return;

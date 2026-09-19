@@ -38,7 +38,7 @@
 //   PlacedField,
 //   DraggingFieldType,
 // } from "@/components/documents/signature/create/PdfFieldEditor";
-// import { toast } from "sonner";
+// import { toast } from "@/lib/notify/toast";
 // import { getNewlyNotifiedSigners } from "@/lib/documents/signature/mock-send";
 // import { notifySigners } from "@/components/documents/signature/create/Notify";
 
@@ -664,7 +664,7 @@ import {
 } from "@/lib/documents/signature/file-cache";
 import { deliverSignatureRequest } from "@/lib/documents/signature/send-request";
 import { getRulesActor } from "@/lib/rules/actor";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 
 export default function CreateSignatureRequestPage() {
   return (

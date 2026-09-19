@@ -16,6 +16,7 @@ import {
   Info,
 } from "lucide-react";
 import { persistCalculatorResult } from "@/lib/utils/calculatorHistory";
+import { toast } from "@/lib/notify/toast";
 
 export default function BorrowingCapacityView() {
   // Form input states
@@ -43,7 +44,7 @@ export default function BorrowingCapacityView() {
 
     const totalGrossAnnual = annualIncome + coAnnualIncome;
     if (totalGrossAnnual <= 0) {
-      alert("Please enter a valid gross annual income.");
+      toast.error("Please enter a valid gross annual income.");
       return null;
     }
 
@@ -56,7 +57,7 @@ export default function BorrowingCapacityView() {
     const netSurplus = netMonthlyIncome - monthlyExpenses - commitments;
 
     if (netSurplus <= 0) {
-      alert(
+      toast.warning(
         "Expenses and commitments exceed net income. Borrowing capacity is $0.",
       );
       const zeroResults = {

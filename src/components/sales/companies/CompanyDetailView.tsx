@@ -41,6 +41,7 @@ import type { Email } from "@/lib/emails/types";
 import type { Call } from "@/lib/calls/types";
 import type { Task } from "@/lib/tasks/types";
 import type { LibraryDocument } from "@/lib/documents/library/types";
+import { toast } from "@/lib/notify/toast";
 
 const RELATED_LIST_CATALOG: RelatedListItem[] = [
   { id: "deals", label: "Deals" },
@@ -219,7 +220,7 @@ export function CompanyDetailView({
       snapshot: { company, status: statusTitle },
     });
     if (!gate.ok) {
-      window.alert(gate.message);
+      toast.error(gate.message);
       return;
     }
     if (!window.confirm(`Delete ${company.name}?`)) return;

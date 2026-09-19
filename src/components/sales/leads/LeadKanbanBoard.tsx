@@ -56,6 +56,7 @@ import {
   kanbanHeaderSurfaceStyle,
   resolveKanbanHeaderColor,
 } from "@/components/common/KanbanViewControls";
+import { notify } from "@/lib/notify/toast";
 
 interface DragInfo {
   cardId: string;
@@ -130,7 +131,6 @@ export function LeadKanbanBoard({
   const [overOutcome, setOverOutcome] = useState<"settled" | "lost" | null>(
     null,
   );
-  const [toast, setToast] = useState<string | null>(null);
   const [panel, setPanel] = useState<LeadPanelState | null>(null);
   const [activityRevision, setActivityRevision] = useState(0);
   const [cardSettings, setCardSettings] = useState<LeadCardSettings>(() =>
@@ -239,8 +239,7 @@ export function LeadKanbanBoard({
   );
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2400);
+    notify(msg);
   }
 
   function toggleCollapsed(columnId: string) {
@@ -733,11 +732,6 @@ export function LeadKanbanBoard({
         onQuickActionSuccess={(message) => flash(message)}
       />
 
-      {toast && (
-        <div className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

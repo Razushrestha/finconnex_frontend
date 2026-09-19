@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import { ChevronDown, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LeadCardData } from "@/lib/leads/types";

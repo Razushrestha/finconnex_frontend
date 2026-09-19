@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import { ArrowLeft, Check, CheckCircle2, Pencil, Phone, PhoneCall, X } from "lucide-react";
 import { ActivityTimelineButton } from "@/components/activities/ActivityTimelineButton";
 import { useTaskPageEditing } from "@/components/activities/tasks/detail/TaskEditContext";

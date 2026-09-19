@@ -27,7 +27,7 @@ import { MeetingNotes } from "@/components/activities/meetings/detail/MeetingNot
 import { MeetingSidebarCard } from "@/components/activities/meetings/detail/MeetingSidebarCard";
 import { EditMeetingModal } from "@/components/activities/meetings/detail/EditMeetingModal";
 import { onRulesChange } from "@/lib/rules";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 
 export default function MeetingDetailsPage({
   params,

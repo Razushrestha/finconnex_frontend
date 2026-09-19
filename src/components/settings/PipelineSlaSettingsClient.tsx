@@ -28,12 +28,12 @@ import {
   tryCrmMortgagePipelineSla,
 } from "@/lib/pipeline-sla/api";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 export function PipelineSlaSettingsClient() {
   const [config, setConfig] = useState<PipelineSlaConfig>(() =>
     loadPipelineSlaConfig(),
   );
-  const [toast, setToast] = useState<string | null>(null);
   const [source, setSource] = useState<"api" | "local">("local");
   const [saving, setSaving] = useState(false);
   const durationOptions = useMemo(() => durationSelectOptions(), []);
@@ -49,8 +49,7 @@ export function PipelineSlaSettingsClient() {
   }, []);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 1800);
+    notify(msg);
   }
 
   function onCancel() {
@@ -396,14 +395,6 @@ export function PipelineSlaSettingsClient() {
         </button>
       </div>
 
-      {toast && (
-        <div
-          className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg"
-          role="status"
-        >
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

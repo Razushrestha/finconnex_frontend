@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type ElementType } from "react";
-import Link from "next/link";
 import {
     Hash,
   Send,
@@ -70,6 +69,7 @@ import {
 } from "@/lib/rules/notify";
 import { cn } from "@/lib/utils";
 import { defaultActorName } from "@/lib/rules/actor";
+import { toast } from "@/lib/notify/toast";
 
 const EMOJIS = ["😀", "👍", "🙏", "🔥", "✅", "🎉", "😂", "❤️"];
 
@@ -89,19 +89,18 @@ function presenceDotClass(presence?: ChatPresence) {
   return "bg-slate-300";
 }
 
-function flash(
-  setToast: (v: string | null) => void,
-  message: string,
-  ms = 2600,
-  setToastHref?: (v: string | null) => void,
-  href?: string | null,
-) {
-  setToast(message);
-  setToastHref?.(href ?? null);
-  window.setTimeout(() => {
-    setToast(null);
-    setToastHref?.(null);
-  }, ms);
+/** A chat status toast; `href` adds an "Open" link to what it names. */
+function flash(message: string, ms = 2600, href?: string | null) {
+  const action = href
+    ? {
+        label: "Open",
+        onClick: () => {
+          window.location.assign(href);
+        },
+      }
+    : undefined;
+  if (/could not|couldn['’]t|failed/i.test(message)) toast.error(message, { duration: ms });
+  else toast.success(message, { duration: ms, action });
 }
 
 export default function TeamChatPage() {
@@ -114,8 +113,6 @@ export default function TeamChatPage() {
   const [channelQuery, setChannelQuery] = useState("");
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("chat");
   const [threadSearch, setThreadSearch] = useState("");
-  const [toast, setToast] = useState<string | null>(null);
-  const [toastHref, setToastHref] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
@@ -215,7 +212,7 @@ export default function TeamChatPage() {
       setEditingId(null);
       setDraft("");
       setReplyTo(null);
-      flash(setToast, "Message updated");
+      flash("Message updated");
       return;
     }
 
@@ -270,11 +267,8 @@ export default function TeamChatPage() {
         relatedTo: active ? channelLabel(active) : "Team Chat",
         relatedHref: "/activities/team-chat",
       });
-      flash(
-        setToast,
-        `Mention sent · ${mention[1]} notified`,
+      flash(`Mention sent · ${mention[1]} notified`,
         2800,
-        setToastHref,
         "/notifications",
       );
     }
@@ -288,18 +282,18 @@ export default function TeamChatPage() {
     if (crm.source === "api") {
       void tryCrmChat(() => deleteCrmChatMessage(id));
     }
-    flash(setToast, "Message deleted");
+    flash("Message deleted");
   }
 
   function startVoice() {
     if (recording) {
       setRecording(false);
       send("Voice note", { kind: "voice", voiceDurationSec: 8 });
-      flash(setToast, "Voice note sent");
+      flash("Voice note sent");
       return;
     }
     setRecording(true);
-    flash(setToast, "Recording… tap Voice again to send", 4000);
+    flash("Recording… tap Voice again to send", 4000);
   }
 
   function createTaskFromChat(title: string, description?: string) {
@@ -329,11 +323,8 @@ export default function TeamChatPage() {
       relatedHref: "/activities/tasks",
       message: `Task from chat: “${task.title}”`,
     });
-    flash(
-      setToast,
-      `Task created · ${task.title.slice(0, 36)}${task.title.length > 36 ? "…" : ""}`,
+    flash(`Task created · ${task.title.slice(0, 36)}${task.title.length > 36 ? "…" : ""}`,
       3600,
-      setToastHref,
       "/activities/tasks",
     );
     return task;
@@ -345,12 +336,12 @@ export default function TeamChatPage() {
     memberIds?: string[];
   }) {
     if (crm.source !== "api") {
-      flash(setToast, "Sign in to start a live conversation");
+      flash("Sign in to start a live conversation");
       return;
     }
     const created = await tryCrmChat(() => createCrmConversation(input));
     if (!created) {
-      flash(setToast, "Could not create conversation");
+      flash("Could not create conversation");
       return;
     }
     const memberId = input.memberIds?.[0];
@@ -363,7 +354,7 @@ export default function TeamChatPage() {
     setActiveId(created.id);
     setSidebarTab(input.type === "GROUP" ? "groups" : "chat");
     crm.refresh();
-    flash(setToast, `Opened ${channelLabel(created)}`);
+    flash(`Opened ${channelLabel(created)}`);
   }
 
   function onPlusAction(label: string) {
@@ -376,7 +367,7 @@ export default function TeamChatPage() {
       setDraft("");
       return;
     }
-    flash(setToast, label);
+    flash(label);
   }
 
   return (
@@ -437,11 +428,8 @@ export default function TeamChatPage() {
                   aria-label="Notifications"
                   title="Notifications"
                   onClick={() => {
-                    flash(
-                      setToast,
-                      "Opening notifications",
+                    flash("Opening notifications",
                       2200,
-                      setToastHref,
                       "/notifications",
                     );
                   }}
@@ -635,7 +623,7 @@ export default function TeamChatPage() {
                           updateChannel(ch.id, { archived: false });
                           setActiveId(ch.id);
                           setSidebarTab(isDm(ch) ? "chat" : "groups");
-                          flash(setToast, "Chat restored");
+                          flash("Chat restored");
                         }}
                       />
                     ))}
@@ -734,9 +722,7 @@ export default function TeamChatPage() {
                   aria-label="Audio call"
                   title="Audio call"
                   onClick={() =>
-                    flash(
-                      setToast,
-                      `Starting audio call with ${channelLabel(active)}…`,
+                    flash(`Starting audio call with ${channelLabel(active)}…`,
                     )
                   }
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-violet-50 hover:text-violet-700"
@@ -761,7 +747,7 @@ export default function TeamChatPage() {
                         label="Profile"
                         onClick={() => {
                           setHeaderMenuOpen(false);
-                          flash(setToast, "Open profile");
+                          flash("Open profile");
                         }}
                       />
                       <MenuItem
@@ -773,7 +759,7 @@ export default function TeamChatPage() {
                           if (active.archived) {
                             updateChannel(id, { archived: false });
                             setSidebarTab(isDm(active) ? "chat" : "groups");
-                            flash(setToast, "Chat restored");
+                            flash("Chat restored");
                             return;
                           }
                           setChannels((prev) => {
@@ -787,7 +773,7 @@ export default function TeamChatPage() {
                             return nextList;
                           });
                           setSidebarTab("archived");
-                          flash(setToast, "Chat archived. View in Archive tab");
+                          flash("Chat archived. View in Archive tab");
                         }}
                       />
                       <MenuItem
@@ -796,9 +782,7 @@ export default function TeamChatPage() {
                         onClick={() => {
                           setHeaderMenuOpen(false);
                           updateChannel(active.id, { muted: !active.muted });
-                          flash(
-                            setToast,
-                            active.muted ? "Chat unmuted" : "Chat muted",
+                          flash(active.muted ? "Chat unmuted" : "Chat muted",
                           );
                         }}
                       />
@@ -818,7 +802,7 @@ export default function TeamChatPage() {
                           if (crm.source === "api") {
                             void tryCrmChat(() => deleteCrmConversation(id));
                           }
-                          flash(setToast, "Chat deleted");
+                          flash("Chat deleted");
                         }}
                       />
                     </div>
@@ -873,22 +857,20 @@ export default function TeamChatPage() {
                       showMeta={showMeta}
                       onReact={(emoji) => {
                         if (crm.source !== "api") {
-                          flash(setToast, `${emoji} reacted`);
+                          flash(`${emoji} reacted`);
                           return;
                         }
                         void tryCrmChat(() =>
                           addCrmMessageReaction(msg.id, emoji),
                         ).then((ok) => {
                           if (ok != null) {
-                            flash(setToast, `Reacted ${emoji}`);
+                            flash(`Reacted ${emoji}`);
                             return;
                           }
                           void tryCrmChat(() =>
                             removeCrmMessageReaction(msg.id, emoji),
                           ).then((cleared) => {
-                            flash(
-                              setToast,
-                              cleared != null
+                            flash(cleared != null
                                 ? `Removed ${emoji}`
                                 : "Could not react",
                             );
@@ -902,19 +884,17 @@ export default function TeamChatPage() {
                           return;
                         }
                         if (action === "forward") {
-                          flash(setToast, "Forward message…");
+                          flash("Forward message…");
                           return;
                         }
                         if (action === "copy") {
                           void navigator.clipboard?.writeText(msg.body);
-                          flash(setToast, "Copied");
+                          flash("Copied");
                           return;
                         }
                         if (action === "edit") {
                           if (!canEditMessage(msg)) {
-                            flash(
-                              setToast,
-                              "Edit window expired (20 minutes)",
+                            flash("Edit window expired (20 minutes)",
                             );
                             return;
                           }
@@ -928,7 +908,7 @@ export default function TeamChatPage() {
                           return;
                         }
                         if (action === "note") {
-                          flash(setToast, "Added as note");
+                          flash("Added as note");
                           return;
                         }
                         if (action === "task") {
@@ -939,23 +919,23 @@ export default function TeamChatPage() {
                           return;
                         }
                         if (action === "meeting") {
-                          flash(setToast, "Schedule meeting link…");
+                          flash("Schedule meeting link…");
                           return;
                         }
                         if (action === "link") {
-                          flash(setToast, "Link to record…");
+                          flash("Link to record…");
                           return;
                         }
                         if (action === "ai") {
-                          flash(setToast, "Ask AI…");
+                          flash("Ask AI…");
                           return;
                         }
                         if (action === "download") {
-                          flash(setToast, "Downloading attachment…");
+                          flash("Downloading attachment…");
                           return;
                         }
                         if (action === "open") {
-                          flash(setToast, "Opening attachment…");
+                          flash("Opening attachment…");
                         }
                       }}
                     />
@@ -1155,20 +1135,6 @@ export default function TeamChatPage() {
         </div>
       </div>
 
-      {toast ? (
-        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-[12px] font-medium text-emerald-800 shadow-lg">
-          <CheckSquare className="h-3.5 w-3.5 text-emerald-600" />
-          <span>{toast}</span>
-          {toastHref ? (
-            <Link
-              href={toastHref}
-              className="ml-1 font-semibold text-violet-700 underline-offset-2 hover:underline"
-            >
-              Open
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
     </div>
   );
 }

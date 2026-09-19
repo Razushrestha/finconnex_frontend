@@ -10,6 +10,7 @@ import {
   Info,
 } from "lucide-react";
 import { persistCalculatorResult } from "@/lib/utils/calculatorHistory";
+import { toast } from "@/lib/notify/toast";
 
 export default function StampDutyFeesView() {
   // Form input states
@@ -34,7 +35,7 @@ export default function StampDutyFeesView() {
   const performCalculation = () => {
     const price = parseFloat(purchasePrice) || 0;
     if (price <= 0) {
-      alert("Please enter a valid property purchase price.");
+      toast.error("Please enter a valid property purchase price.");
       return null;
     }
 

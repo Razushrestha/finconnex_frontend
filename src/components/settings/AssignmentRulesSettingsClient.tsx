@@ -17,6 +17,7 @@ import { COMPANY_SIZE_OPTIONS } from "@/lib/lead-assignment/types";
 import { listCrmWorkspaceMembers } from "@/lib/workspace-members/api";
 import type { WorkspaceMember } from "@/lib/workspace-members/types";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 type Draft = {
   name: string;
@@ -125,15 +126,13 @@ export function AssignmentRulesSettingsClient() {
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
 
   function flash(message: string) {
-    setToast(message);
-    window.setTimeout(() => setToast(null), 2400);
+    notify(message);
   }
 
   async function load() {
@@ -623,11 +622,6 @@ export function AssignmentRulesSettingsClient() {
         </div>
       ) : null}
 
-      {toast ? (
-        <div className="fixed right-4 bottom-4 rounded-lg bg-slate-900 px-4 py-2 text-[12px] font-semibold text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -11,7 +11,7 @@ import {
   MessageCircle,
   Paperclip,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import type { Call, CallStatus } from "@/lib/calls/types";
 import { CALL_STAGES } from "@/lib/calls/types";
 import { isCallOverdue, parseCallWhen } from "@/lib/calls/store";

@@ -66,6 +66,7 @@ import { cn } from "@/lib/utils";
 import { RejectDocumentModal } from "@/components/documents/requests/RejectDocumentModal";
 import { ViewDocumentModal } from "@/components/documents/requests/ViewDocumentModal";
 import { EditRemindersModal } from "@/components/documents/requests/EditRemindersModal";
+import { notify } from "@/lib/notify/toast";
 
 const DETAIL_PIPELINE: {
   status: DocumentRequestStatus;
@@ -88,7 +89,6 @@ function pipelineIndex(status: DocumentRequestStatus) {
 export function DocumentRequestDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const [request, setRequest] = useState<DocumentRequest | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [justCreated, setJustCreated] = useState(false);
   const [internalNotes, setInternalNotes] = useState("");
   const [reply, setReply] = useState("");
@@ -149,8 +149,7 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
   const statusIndex = request ? pipelineIndex(request.status) : 0;
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2800);
+    notify(msg);
   }
 
   function save(
@@ -999,12 +998,6 @@ export function DocumentRequestDetailClient({ id }: { id: string }) {
         />
       ) : null}
 
-      {toast ? (
-        <div className="fixed right-4 bottom-4 z-50 flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-[12px] font-medium text-white shadow-lg">
-          <CheckCircle2 className="h-4 w-4" />
-          {toast}
-        </div>
-      ) : null}
     </div>
   );
 }

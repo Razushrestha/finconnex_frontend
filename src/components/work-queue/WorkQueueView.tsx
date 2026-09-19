@@ -56,6 +56,7 @@ import { onRulesChange } from "@/lib/rules";
 import { completeTask, deleteTask, findTaskById } from "@/lib/tasks/store";
 import { viewEnter } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 const PAGE_SIZE = 25;
 
@@ -101,7 +102,6 @@ export function WorkQueueView() {
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
 
   const [noteRow, setNoteRow] = React.useState<QueueRow | null>(null);
-  const [toast, setToast] = React.useState<string | null>(null);
   const crm = useCrmWorkQueue({
     nav: activeNav,
     scope,
@@ -261,8 +261,7 @@ export function WorkQueueView() {
   }
 
   function showToast(message: string) {
-    setToast(message);
-    window.setTimeout(() => setToast(null), 2200);
+    notify(message);
   }
 
   function handleEditRow(row: QueueRow) {
@@ -417,11 +416,6 @@ export function WorkQueueView() {
         />
       ) : null}
 
-      {toast ? (
-        <div className="fixed right-4 bottom-4 z-[60] rounded-lg bg-slate-900 px-3.5 py-2 text-[13px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
     </div>
   );
 }

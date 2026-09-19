@@ -19,6 +19,7 @@ import {
 } from "@/lib/notification-preferences/types";
 import { useCrmNotificationPreferences } from "@/lib/notification-preferences/use-crm-notification-preferences";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 const DIGEST_OPTIONS: { label: string; value: NotificationDigest }[] = [
   { label: "Real-time", value: "realtime" },
@@ -43,7 +44,6 @@ export function NotificationPreferencesClient({
     DEFAULT_NOTIFICATION_PREFERENCES,
   );
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (crm.loading) return;
@@ -51,8 +51,7 @@ export function NotificationPreferencesClient({
   }, [crm.loading, crm.prefs, crm.source]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 1800);
+    notify(msg);
   }
 
   function setField<K extends keyof NotificationPreferences>(
@@ -210,11 +209,6 @@ export function NotificationPreferencesClient({
         </button>
       </div>
 
-      {toast ? (
-        <div className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
     </div>
   );
 }

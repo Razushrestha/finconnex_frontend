@@ -31,6 +31,7 @@ import {
   ContactCardPanelHost,
   type ContactPanelState,
 } from "@/components/sales/contacts/ContactCardPanelHost";
+import { notify } from "@/lib/notify/toast";
 
 interface ContactsListViewProps {
   groups?: ContactGroup[];
@@ -168,7 +169,6 @@ export function ContactsListView({
     DEFAULT_CONTACT_COLUMNS,
   );
   const [panel, setPanel] = useState<ContactPanelState | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (groupsProp) setGroups(groupsProp);
@@ -192,12 +192,6 @@ export function ContactsListView({
       if (!groupsProp) setGroups(listContactGroups());
     });
   }, [groupsProp]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = window.setTimeout(() => setToast(null), 2500);
-    return () => window.clearTimeout(t);
-  }, [toast]);
 
   const columnRenderers = useMemo(
     () =>
@@ -415,14 +409,9 @@ export function ContactsListView({
       <ContactCardPanelHost
         panel={panel}
         onClose={() => setPanel(null)}
-        onQuickActionSuccess={(message) => setToast(message)}
+        onQuickActionSuccess={(message) => notify(message)}
       />
 
-      {toast && (
-        <div className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

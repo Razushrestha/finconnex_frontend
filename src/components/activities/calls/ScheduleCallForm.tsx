@@ -66,6 +66,7 @@ import {
   type ReminderRepeatRule,
 } from "@/lib/tasks/repeat-reminder";
 import { buildRemindersFromSchedule } from "@/lib/tasks/reminder-series";
+import { toast } from "@/lib/notify/toast";
 
 interface ScheduleCallFormProps {
   layoutId: string;
@@ -467,7 +468,7 @@ export function ScheduleCallForm({
           relatedTo: form.subject.trim() || "Call",
         });
         if (!result.ok) {
-          window.alert(`Failed to upload "${file.name}": ${result.message}`);
+          toast.error(`Failed to upload "${file.name}": ${result.message}`);
           return;
         }
         uploaded.push({

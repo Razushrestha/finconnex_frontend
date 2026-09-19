@@ -43,6 +43,7 @@ import {
   KANBAN_WELL,
 } from "@/lib/layout";
 import { useRouter } from "next/navigation";
+import { notify } from "@/lib/notify/toast";
 
 interface DragInfo {
   dealIds: string[];
@@ -106,11 +107,9 @@ export function DealsKanbanBoard({
   );
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
   const [panel, setPanel] = useState<DealPanelState | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2400);
+    notify(msg);
   }
 
   function openQuickAction(kind: DealQuickActionKind, deal: DealRecord) {
@@ -829,11 +828,6 @@ export function DealsKanbanBoard({
         onQuickActionSuccess={(message) => flash(message)}
       />
 
-      {toast && (
-        <div className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

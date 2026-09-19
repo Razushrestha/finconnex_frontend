@@ -53,6 +53,7 @@ import { RecordTagChip } from "@/components/shared/tags/RecordTags";
 import { BOARD_PAGE } from "@/lib/layout";
 import { softDeleteRecord } from "@/lib/rules";
 import { defaultActorName } from "@/lib/rules/actor";
+import { notify } from "@/lib/notify/toast";
 
 const ACCESS_STYLE: Record<DocumentAccessLevel, string> = {
   Private: "bg-slate-100 text-slate-600",
@@ -89,7 +90,6 @@ function DocumentLibraryPageInner() {
   const [drawer, setDrawer] = useState<"versions" | null>(null);
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
-  const [toast, setToast] = useState<string | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
 
@@ -181,8 +181,7 @@ function DocumentLibraryPageInner() {
   }, [accessFilter, crm.mine, crm.recent, crm.source, docs, folder, search]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2400);
+    notify(msg);
   }
 
   function openVersions(doc: LibraryDocument) {
@@ -748,11 +747,6 @@ function DocumentLibraryPageInner() {
         </Drawer>
       ) : null}
 
-      {toast ? (
-        <div className="fixed right-4 bottom-4 z-50 rounded-xl bg-slate-900 px-4 py-2.5 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
     </div>
   );
 }

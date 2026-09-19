@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import { type NoteType } from "@/lib/notes/types";
 import { asRelatedKind } from "@/lib/activities/create-defaults";
 import { type RelatedEntityKind } from "@/lib/activities/shared";

@@ -9,7 +9,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import {
   TASK_PRIORITIES,
   TASK_STATUSES,

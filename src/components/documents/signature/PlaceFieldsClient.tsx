@@ -37,6 +37,7 @@ import {
 } from "@/lib/documents/signature/api";
 import { SignatureDocPreview } from "./SignatureDocPreview";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 const FIELD_KINDS: {
   kind: SignatureFieldKind;
@@ -60,7 +61,6 @@ export function PlaceFieldsClient({ id }: { id: string }) {
   const [activeSignerId, setActiveSignerId] = useState<string>("");
   const [placeKind, setPlaceKind] = useState<SignatureFieldKind>("signature");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const dragRef = useRef<{
     id: string;
     startX: number;
@@ -141,8 +141,7 @@ export function PlaceFieldsClient({ id }: { id: string }) {
   }, []);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2400);
+    notify(msg);
   }
 
   function persist(nextFields: SignatureField[], msg?: string) {
@@ -591,11 +590,6 @@ export function PlaceFieldsClient({ id }: { id: string }) {
         </aside>
       </div>
 
-      {toast ? (
-        <div className="fixed right-4 bottom-4 z-50 rounded-xl bg-slate-900 px-4 py-2.5 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
     </div>
   );
 }

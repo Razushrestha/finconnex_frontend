@@ -37,6 +37,7 @@ import {
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { toast } from "@/lib/notify/toast";
 
 interface CreateCompanyFormProps {
   layoutId?: string;
@@ -187,7 +188,7 @@ export function CreateCompanyForm({
       }
       mergeCrmCompaniesIntoBoard([remote]);
     } catch (err) {
-      window.alert(
+      toast.error(
         err instanceof Error
           ? err.message
           : "The CRM could not save this company.",

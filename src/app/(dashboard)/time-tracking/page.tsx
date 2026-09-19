@@ -38,6 +38,7 @@ import {
 import { formatAUD } from "@/lib/finance/shared";
 import { cn } from "@/lib/utils";
 import { defaultActorName } from "@/lib/rules/actor";
+import { notify } from "@/lib/notify/toast";
 
 export default function TimeTrackingPage() {
   const router = useRouter();
@@ -50,7 +51,6 @@ export default function TimeTrackingPage() {
   const [userFilter, setUserFilter] = useState<string>("All");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [toast, setToast] = useState<string | null>(null);
   const [timerUser, setTimerUser] = useState<string>(defaultActorName());
   const [timerRelated, setTimerRelated] = useState(0);
   const [page, setPage] = useState(1);
@@ -69,8 +69,7 @@ export default function TimeTrackingPage() {
   }, [statusTab, kindFilter, billableFilter, userFilter, search]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2400);
+    notify(msg);
   }
 
   const running = useMemo(
@@ -528,11 +527,6 @@ export default function TimeTrackingPage() {
         </div>
       </div>
 
-      {toast && (
-        <div className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

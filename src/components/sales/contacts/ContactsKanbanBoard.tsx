@@ -35,6 +35,7 @@ import {
   KANBAN_WELL,
 } from "@/lib/layout";
 import { useRouter } from "next/navigation";
+import { notify } from "@/lib/notify/toast";
 
 interface DragInfo {
   contactId: string;
@@ -81,7 +82,6 @@ export function ContactsKanbanBoard({
     () => new Set(),
   );
   const [panel, setPanel] = useState<ContactPanelState | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     setGroups(listContactGroups());
@@ -89,8 +89,7 @@ export function ContactsKanbanBoard({
   }, [refreshKey]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2400);
+    notify(msg);
   }
 
   function persist(next: ContactGroup[]) {
@@ -441,11 +440,6 @@ export function ContactsKanbanBoard({
         onQuickActionSuccess={(message) => flash(message)}
       />
 
-      {toast && (
-        <div className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

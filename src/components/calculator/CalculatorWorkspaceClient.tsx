@@ -49,6 +49,7 @@ import {
 import { softDeleteRecord } from "@/lib/rules";
 import { cn } from "@/lib/utils";
 import { defaultActorName } from "@/lib/rules/actor";
+import { notify } from "@/lib/notify/toast";
 
 export function CalculatorWorkspaceClient() {
   const [type, setType] = useState<CalculatorType>("Loan");
@@ -62,7 +63,6 @@ export function CalculatorWorkspaceClient() {
   const [savedBy, setSavedBy] = useState<string>(defaultActorName());
   const [shareTarget, setShareTarget] = useState<string>(CALC_SHARE_TARGETS[1]);
   const [history, setHistory] = useState<SavedCalculation[]>(seedCalculations);
-  const [toast, setToast] = useState<string | null>(null);
   const [panel, setPanel] = useState<"workspace" | "history">("workspace");
 
   useEffect(() => {
@@ -91,8 +91,7 @@ export function CalculatorWorkspaceClient() {
   }, [result, currency]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2200);
+    notify(msg);
   }
 
   function selectType(next: CalculatorType) {
@@ -287,11 +286,6 @@ export function CalculatorWorkspaceClient() {
 
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
-      {toast ? (
-        <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-semibold text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="relative mx-auto flex max-w-[1200px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-end gap-2">

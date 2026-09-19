@@ -23,6 +23,7 @@ import {
   type WorkflowRuleTrigger,
 } from "@/lib/workflow-rules/types";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 const emptyDraft = {
   name: "",
@@ -41,7 +42,6 @@ export function WorkflowRulesSettingsClient() {
   const [suggestText, setSuggestText] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
 
   function reload() {
     setRows(listWorkflowRules());
@@ -52,8 +52,7 @@ export function WorkflowRulesSettingsClient() {
   }, [crm.source, crm.loading]);
 
   function flash(message: string) {
-    setToast(message);
-    window.setTimeout(() => setToast(null), 2200);
+    notify(message);
   }
 
   const filtered = useMemo(() => {
@@ -523,11 +522,6 @@ export function WorkflowRulesSettingsClient() {
           )}
         </ul>
       </div>
-      {toast ? (
-        <p className="rounded-xl bg-slate-900 px-3 py-2 text-[11px] font-semibold text-white">
-          {toast}
-        </p>
-      ) : null}
     </div>
   );
 }

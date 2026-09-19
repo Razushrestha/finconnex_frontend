@@ -38,7 +38,7 @@ import {
   signerColor,
 } from "@/lib/documents/signature/types";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import { ConfirmSendDetailsModal } from "./ConfirmSendDetailsModal";
 import { PlaceFieldsPreviewModal } from "./PlaceFieldsPreviewModal";
 import {

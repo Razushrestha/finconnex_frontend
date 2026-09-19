@@ -27,6 +27,7 @@ import {
 import { cloneCrmJourney, setCrmJourneyStatus } from "@/lib/journeys/api";
 import { useCrmJourneys } from "@/lib/journeys/use-crm-journeys";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 export default function JourneysPage() {
   const router = useRouter();
@@ -38,7 +39,6 @@ export default function JourneysPage() {
     "All",
   );
   const [search, setSearch] = useState("");
-  const [toast, setToast] = useState<string | null>(null);
   const { loading, error, refresh: refreshCrm } = useCrmJourneys();
 
   useEffect(() => {
@@ -46,8 +46,7 @@ export default function JourneysPage() {
   }, [loading]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2000);
+    notify(msg);
   }
 
   const filtered = useMemo(() => {
@@ -110,11 +109,6 @@ export default function JourneysPage() {
 
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
-      {toast ? (
-        <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-semibold text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="relative mx-auto flex max-w-[1920px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-end gap-2">

@@ -57,6 +57,7 @@ import {
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { toast } from "@/lib/notify/toast";
 
 interface CreateDealFormProps {
   layoutId?: string;
@@ -214,7 +215,7 @@ export function CreateDealForm({
     if (!validate()) return;
     const gate = requireAction("sales.deals.create");
     if (!gate.ok) {
-      window.alert(gate.message);
+      toast.error(gate.message);
       return;
     }
     try {
@@ -259,7 +260,7 @@ export function CreateDealForm({
         });
       }
     } catch (err) {
-      window.alert(
+      toast.error(
         err instanceof Error ? err.message : "The CRM could not save this deal.",
       );
       return;

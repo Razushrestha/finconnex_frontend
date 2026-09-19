@@ -47,6 +47,7 @@ import {
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { toast } from "@/lib/notify/toast";
 
 interface CreateContactFormProps {
   layoutId?: string;
@@ -190,7 +191,7 @@ export function CreateContactForm({
     if (!validate()) return;
     const gate = requireAction("sales.contacts.create");
     if (!gate.ok) {
-      window.alert(gate.message);
+      toast.error(gate.message);
       return;
     }
     try {
@@ -218,7 +219,7 @@ export function CreateContactForm({
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Could not save contact";
-      window.alert(message);
+      toast.error(message);
       return;
     }
     afterSave(createAnother);
