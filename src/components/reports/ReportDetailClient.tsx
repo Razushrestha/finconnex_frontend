@@ -17,6 +17,7 @@ import {
   Pencil,
   Activity,
   LayoutGrid,
+  Clock,
 } from "lucide-react";
 import {
   REPORT_DATE_RANGES,
@@ -51,18 +52,28 @@ import {
   sortOptionsForSource,
 } from "@/lib/reports/catalog";
 import {
+  cancelCrmReportExecution,
+  createCrmReportExecution,
+  createCrmReportSchedule,
   deleteCrmReport,
+  downloadCrmReportExecution,
   emailCrmReport,
   exportCrmReport,
   getCrmReport,
   isCrmReportId,
+  listCrmReportExecutions,
+  listCrmReportSchedules,
+  pauseCrmReportSchedule,
   persistRemoteReport,
+  resumeCrmReportSchedule,
   runCrmReport,
   saveCrmReportAsTemplate,
   shareCrmReport,
   toUpdateReportBody,
   tryCrmReport,
   updateCrmReport,
+  type CrmReportExecution,
+  type CrmReportScheduleConfig,
 } from "@/lib/reports/api";
 import { cn } from "@/lib/utils";
 import {
@@ -85,10 +96,14 @@ export function ReportDetailClient({ id }: { id: string }) {
   const [row, setRow] = useState<SavedReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<"results" | "edit" | "activity">("results");
+  const [tab, setTab] = useState<"results" | "runs" | "edit" | "activity">(
+    "results",
+  );
   const [dirty, setDirty] = useState(false);
   const [shareTarget, setShareTarget] = useState("Managers");
   const [emailTo, setEmailTo] = useState("");
+  const [executions, setExecutions] = useState<CrmReportExecution[]>([]);
+  const [schedules, setSchedules] = useState<CrmReportScheduleConfig[]>([]);
 
   // edit draft
   const [name, setName] = useState("");
@@ -122,6 +137,13 @@ export function ReportDetailClient({ id }: { id: string }) {
         persistRemoteReport(remote);
         setRow(remote);
         hydrate(remote);
+        const [runs, sched] = await Promise.all([
+          listCrmReportExecutions(id).catch(() => []),
+          listCrmReportSchedules(id).catch(() => []),
+        ]);
+        if (cancelled) return;
+        setExecutions(runs);
+        setSchedules(sched);
       } catch {
         /* keep local overlay */
       } finally {
@@ -150,6 +172,15 @@ export function ReportDetailClient({ id }: { id: string }) {
     setShareTarget(r.sharedWith ?? "Managers");
     setEmailTo(r.emailedTo ?? "");
     setDirty(false);
+  }
+
+  async function refreshRuns(reportId: string) {
+    const [runs, sched] = await Promise.all([
+      listCrmReportExecutions(reportId).catch(() => []),
+      listCrmReportSchedules(reportId).catch(() => []),
+    ]);
+    setExecutions(runs);
+    setSchedules(sched);
   }
 
   function flash(msg: string) {
@@ -184,6 +215,8 @@ export function ReportDetailClient({ id }: { id: string }) {
             appendReportAudit(remote, "Run completed", "System"),
             "Run completed",
           );
+          await tryCrmReport(() => createCrmReportExecution(row.id, "csv"));
+          await refreshRuns(row.id);
           return;
         }
         save(
@@ -323,27 +356,42 @@ export function ReportDetailClient({ id }: { id: string }) {
     );
     save(next, s === "None" ? "Unscheduled" : `Scheduled ${s}`);
     if (isCrmReportId(row.id)) {
-      void tryCrmReport(() =>
-        updateCrmReport(
-          row.id,
-          toUpdateReportBody({
-            name: next.name,
-            type: next.type,
-            dataSource: next.dataSource,
-            dateRange: next.dateRange,
-            customFrom: next.customFrom,
-            customTo: next.customTo,
-            filterField: next.filterField,
-            filterOperator: next.filterOperator,
-            filterValue: next.filterValue,
-            groupBy: next.groupBy,
-            sortBy: next.sortBy,
-            schedule: s,
-            status: next.status,
-            reportCode: next.reportId,
-          }),
-        ),
-      );
+      void (async () => {
+        await tryCrmReport(() =>
+          updateCrmReport(
+            row.id,
+            toUpdateReportBody({
+              name: next.name,
+              type: next.type,
+              dataSource: next.dataSource,
+              dateRange: next.dateRange,
+              customFrom: next.customFrom,
+              customTo: next.customTo,
+              filterField: next.filterField,
+              filterOperator: next.filterOperator,
+              filterValue: next.filterValue,
+              groupBy: next.groupBy,
+              sortBy: next.sortBy,
+              schedule: s,
+              status: next.status,
+              reportCode: next.reportId,
+            }),
+          ),
+        );
+        if (s === "None") {
+          const current = await listCrmReportSchedules(row.id).catch(() => []);
+          await Promise.all(
+            current
+              .filter((item) => !item.isPaused)
+              .map((item) =>
+                tryCrmReport(() => pauseCrmReportSchedule(row.id, item.id)),
+              ),
+          );
+        } else {
+          await tryCrmReport(() => createCrmReportSchedule(row.id, s));
+        }
+        await refreshRuns(row.id);
+      })();
     }
   }
 
@@ -582,6 +630,7 @@ export function ReportDetailClient({ id }: { id: string }) {
           {(
             [
               { id: "results" as const, label: "Results", icon: LayoutGrid },
+              { id: "runs" as const, label: "Runs", icon: Clock },
               { id: "edit" as const, label: "Edit", icon: Pencil },
               { id: "activity" as const, label: "Activity", icon: Activity },
             ] as const
@@ -702,6 +751,150 @@ export function ReportDetailClient({ id }: { id: string }) {
                   </div>
                 ))}
               </div>
+            </div>
+          ) : null}
+
+          {tab === "runs" ? (
+            <div className="p-4 sm:p-5">
+              <h2 className="text-[16px] font-bold text-slate-900">
+                Executions & schedules
+              </h2>
+              <p className="mt-1 text-[12px] text-slate-500">
+                Queued runs, downloads, and pause/resume from the CRM report
+                execution APIs.
+              </p>
+              {!isCrmReportId(row.id) ? (
+                <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-[12px] text-slate-600">
+                  Save this report to CRM to queue executions and schedules.
+                </p>
+              ) : (
+                <>
+                  <div className="mt-4">
+                    <h3 className="text-[12px] font-semibold text-slate-700">
+                      Schedules
+                    </h3>
+                    {schedules.length === 0 ? (
+                      <p className="mt-2 text-[12px] text-slate-500">
+                        No CRM schedules yet. Pick Daily, Weekly, or Monthly
+                        above.
+                      </p>
+                    ) : (
+                      <ul className="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-100">
+                        {schedules.map((item) => (
+                          <li
+                            key={item.id}
+                            className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-[12px]"
+                          >
+                            <span>
+                              {item.frequency} · {item.timezone}{" "}
+                              {item.isPaused ? "· Paused" : "· Active"}
+                            </span>
+                            <button
+                              type="button"
+                              className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600"
+                              onClick={() => {
+                                void (async () => {
+                                  if (item.isPaused) {
+                                    await tryCrmReport(() =>
+                                      resumeCrmReportSchedule(row.id, item.id),
+                                    );
+                                  } else {
+                                    await tryCrmReport(() =>
+                                      pauseCrmReportSchedule(row.id, item.id),
+                                    );
+                                  }
+                                  await refreshRuns(row.id);
+                                })();
+                              }}
+                            >
+                              {item.isPaused ? "Resume" : "Pause"}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div className="mt-5">
+                    <h3 className="text-[12px] font-semibold text-slate-700">
+                      Runs
+                    </h3>
+                    {executions.length === 0 ? (
+                      <p className="mt-2 text-[12px] text-slate-500">
+                        No queued runs yet. Click Run to create one.
+                      </p>
+                    ) : (
+                      <ul className="mt-2 divide-y divide-slate-100 rounded-xl border border-slate-100">
+                        {executions.map((item) => (
+                          <li
+                            key={item.id}
+                            className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-[12px]"
+                          >
+                            <span>
+                              {item.status} · {item.format}
+                              {item.createdAt ? ` · ${item.createdAt}` : ""}
+                              {item.errorCode ? ` · ${item.errorCode}` : ""}
+                            </span>
+                            <span className="flex gap-1">
+                              {item.status === "COMPLETED" ? (
+                                <button
+                                  type="button"
+                                  className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600"
+                                  onClick={() => {
+                                    void (async () => {
+                                      try {
+                                        const blob =
+                                          await downloadCrmReportExecution(
+                                            item.id,
+                                          );
+                                        const named = blob as Blob & {
+                                          filename?: string;
+                                        };
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement("a");
+                                        a.href = url;
+                                        a.download =
+                                          named.filename ||
+                                          `${row.reportId}.${item.format}`;
+                                        a.click();
+                                        URL.revokeObjectURL(url);
+                                      } catch (err) {
+                                        flash(
+                                          err instanceof Error
+                                            ? err.message
+                                            : "Download failed",
+                                        );
+                                      }
+                                    })();
+                                  }}
+                                >
+                                  Download
+                                </button>
+                              ) : null}
+                              {item.status === "QUEUED" ||
+                              item.status === "RUNNING" ? (
+                                <button
+                                  type="button"
+                                  className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-rose-600"
+                                  onClick={() => {
+                                    void (async () => {
+                                      await tryCrmReport(() =>
+                                        cancelCrmReportExecution(item.id),
+                                      );
+                                      await refreshRuns(row.id);
+                                    })();
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              ) : null}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           ) : null}
 

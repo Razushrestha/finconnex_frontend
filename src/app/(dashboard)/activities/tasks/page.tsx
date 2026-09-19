@@ -20,6 +20,7 @@ import {
 } from "@/components/activities/ActivityToolbar";
 import {
   EMPTY_TASK_FILTERS,
+  taskColumns,
   type TaskFilters,
 } from "@/lib/tasks/types";
 import {
@@ -45,6 +46,8 @@ import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import { BOARD_PAGE } from "@/lib/layout";
 import { defaultActorName } from "@/lib/rules/actor";
+import { kanbanPrefsFromCatalog } from "@/lib/kanban/column-prefs";
+import { useKanbanColumnPrefs } from "@/lib/kanban/use-kanban-column-prefs";
 
 const TASK_VIEW_MODE_KEY = "finconnex.tasks.view-mode";
 
@@ -133,6 +136,10 @@ const taskSortOptions = [
   { key: "taskType", label: "Type" },
 ];
 
+const TASK_STAGE_DEFAULTS = kanbanPrefsFromCatalog(
+  taskColumns.map((col) => ({ id: col.id, label: col.title })),
+);
+
 export default function TasksPage() {
   const { source: tasksSource } = useCrmTasks();
   const [view, setView] = useState<ActivityView>("kanban");
@@ -144,6 +151,10 @@ export default function TasksPage() {
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
   const [scopeTab, setScopeTab] = useState("All Tasks");
+  const stagePrefs = useKanbanColumnPrefs(
+    "finconnex.tasks.kanban-columns",
+    TASK_STAGE_DEFAULTS,
+  );
 
   const scopedFilters: TaskFilters = {
     ...filters,
@@ -270,6 +281,18 @@ export default function TasksPage() {
           extraViewIcons={[
             { key: "calendar", icon: CalendarDays, label: "Calendar view" },
           ]}
+          columnOptions={view === "kanban" ? stagePrefs.columns : undefined}
+          onColumnToggle={view === "kanban" ? stagePrefs.toggle : undefined}
+          onColumnRename={view === "kanban" ? stagePrefs.rename : undefined}
+          onColumnAdd={
+            view === "kanban"
+              ? (title) => {
+                  const error = stagePrefs.addTitle(title);
+                  if (error) flash(error);
+                }
+              : undefined
+          }
+          onColumnReorder={view === "kanban" ? stagePrefs.reorder : undefined}
         />
 
         {bulkFlash ? (
@@ -308,6 +331,8 @@ export default function TasksPage() {
               search={search}
               selectedIds={selectedTaskIds}
               onSelectedIdsChange={setSelectedTaskIds}
+              visibleColumnIds={stagePrefs.visibleIds}
+              columnTitles={stagePrefs.titles}
             />
           ) : view === "calendar" ? (
             <TaskCalendarView filters={scopedFilters} search={search} />

@@ -1,4 +1,4 @@
-import {
+﻿import {
   ensureCrmSession,
   isBoundCrmSession,
   isUuid,
@@ -298,7 +298,7 @@ function newMemberBody(input: NewWorkspaceMember): Record<string, unknown> {
 /**
  * Creates the member's account and adds them to the workspace; the CRM mails
  * them the credentials. `credentialsIssued` is false when the address already
- * had an account: they were added, and sign in with their own password — the
+ * had an account: they were added, and sign in with their own password ΓÇö the
  * one sent here was discarded.
  */
 export async function createCrmWorkspaceMember(
@@ -349,7 +349,7 @@ export async function deleteCrmWorkspaceMember(memberId: string): Promise<void> 
  * at their next sign-in, and their sessions end now. Leave `password` out to
  * have the CRM generate a strong one. Fails with
  * `workspace.error.credentialsNotReissuable` for an account this workspace
- * didn't create — its password belongs to its owner.
+ * didn't create ΓÇö its password belongs to its owner.
  */
 export async function resendCrmWorkspaceCredentials(
   memberId: string,

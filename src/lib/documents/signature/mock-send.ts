@@ -5,8 +5,9 @@ import type {
 
 /** Absolute URL a recipient would land on after clicking "Start Signing" in the email/SMS. */
 export function getSigningLink(token: string): string {
-  if (typeof window === "undefined") return `/sign/${token}`;
-  return `${window.location.origin}/sign/${token}`;
+  const path = `/sign/${encodeURIComponent(token)}`;
+  if (typeof window === "undefined") return path;
+  return `${window.location.origin}${path}`;
 }
 
 /**

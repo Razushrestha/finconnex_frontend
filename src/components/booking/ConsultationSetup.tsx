@@ -30,7 +30,7 @@ import {
   type MeetingMode,
   type MeetingVia,
 } from "@/lib/booking/types";
-import { loadAssignableOwners } from "@/lib/users/assignable";
+import { loadWorkspaceConsultants } from "@/lib/users/assignable";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import {
   Field,
@@ -116,7 +116,7 @@ export function ConsultationSetup({
 
   useEffect(() => {
     let alive = true;
-    void loadAssignableOwners()
+    void loadWorkspaceConsultants()
       .then((owners) => {
         if (!alive) return;
         setApiConsultants(

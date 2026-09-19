@@ -30,6 +30,12 @@ import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
 import { KanbanEmptyStage } from "@/components/common/KanbanEmptyStage";
 import { KanbanStageScroll } from "@/components/common/KanbanStageScroll";
 import { KanbanCollapsedRail } from "@/components/common/KanbanCollapsedRail";
+import { KanbanDragGhost } from "@/components/common/KanbanDragGhost";
+import {
+  usePointerKanbanDrag,
+  type PointerKanbanDrop,
+  type PointerKanbanOutcomeDrop,
+} from "@/lib/kanban/use-pointer-kanban-drag";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
@@ -420,11 +426,15 @@ export function DealsKanbanBoard({
     }
   }
 
-  function handleDrop(targetStageId: string, targetIndex?: number) {
+  function handleDrop(
+    targetStageId: string,
+    targetIndex: number | undefined,
+    info: DragInfo | null,
+  ) {
     setOverStageId(null);
     setDropTargetPos(null);
-    if (!dragInfo) return;
-    const { dealIds, sourceStageId } = dragInfo;
+    if (!info) return;
+    const { dealIds, sourceStageId } = info;
 
     const currentStages = allStages[pipeline];
     const sourceStage = currentStages.find((s) => s.id === sourceStageId);
@@ -472,10 +482,13 @@ export function DealsKanbanBoard({
     );
   }
 
-  function handleOutcomeDrop(outcome: "won" | "lost") {
+  function handleOutcomeDrop(
+    outcome: "won" | "lost",
+    info: DragInfo | null,
+  ) {
     setOverOutcome(null);
-    if (!dragInfo) return;
-    const { dealIds, sourceStageId } = dragInfo;
+    if (!info) return;
+    const { dealIds, sourceStageId } = info;
 
     const targetStage = outcome === "won" ? wonStage : lostStage;
     if (!targetStage) {
@@ -551,6 +564,37 @@ export function DealsKanbanBoard({
     setLostReason("");
   }
 
+  const drag = usePointerKanbanDrag({
+    onDrop: ({
+      itemId,
+      sourceColumnId,
+      targetColumnId,
+      targetIndex,
+    }: PointerKanbanDrop) => {
+      handleDrop(targetColumnId, targetIndex, {
+        dealIds: [itemId],
+        sourceStageId: sourceColumnId,
+      });
+    },
+    onOutcomeDrop: ({
+      itemId,
+      sourceColumnId,
+      outcome,
+    }: PointerKanbanOutcomeDrop) => {
+      handleOutcomeDrop(outcome, {
+        dealIds: [itemId],
+        sourceStageId: sourceColumnId,
+      });
+    },
+  });
+
+  const dealDragInfo = drag.dragInfo
+    ? {
+        dealIds: [drag.dragInfo.itemId],
+        sourceStageId: drag.dragInfo.sourceColumnId,
+      }
+    : dragInfo;
+
   return (
     <div
       ref={boardRef}
@@ -558,7 +602,7 @@ export function DealsKanbanBoard({
     >
       <div className={KANBAN_BOARD_ROW}>
         {visibleStages.map((stage) => {
-          const isOver = overStageId === stage.id;
+          const isOver = drag.overColumnId === stage.id || overStageId === stage.id;
           const isCollapsed = collapsedStages.has(stage.id);
           const stageDealIds = stage.deals.map((d) => d.id);
           const allStageSelected =
@@ -571,6 +615,7 @@ export function DealsKanbanBoard({
           return (
             <div
               key={stage.id}
+              data-kanban-drop-column={stage.id}
               className={cn(
                 "group/stage relative flex h-full min-h-0 flex-col gap-2 transition-all duration-200",
                 isCollapsed ? KANBAN_COL_COLLAPSED : KANBAN_COL,
@@ -640,7 +685,7 @@ export function DealsKanbanBoard({
               }
               onDrop={(e) => {
                 e.preventDefault();
-                handleDrop(stage.id);
+                handleDrop(stage.id, undefined, dealDragInfo);
               }}
                     className={cn(
                       "relative flex min-h-full flex-col rounded-sm border p-1",
@@ -669,21 +714,24 @@ export function DealsKanbanBoard({
                       onDrop={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        handleDrop(stage.id, dropTargetPos?.targetIndex);
+                        handleDrop(stage.id, dropTargetPos?.targetIndex, dealDragInfo);
                       }}
                       className="flex min-h-[180px] flex-1 flex-col gap-3 pb-8"
                     >
                       {(() => {
                         let visibleIndex = 0;
                         const rendered: React.ReactNode[] = [];
-                        const draggedSet = dragInfo
-                          ? new Set(dragInfo.dealIds)
-                          : new Set();
-
+                        const draggedSet = dealDragInfo
+                          ? new Set(dealDragInfo.dealIds)
+                          : new Set<string>();
                         const showPlaceholderAt = (idx: number) =>
-                          dragInfo &&
-                          dropTargetPos?.stageId === stage.id &&
-                          dropTargetPos.targetIndex === idx;
+                          Boolean(
+                            dealDragInfo &&
+                              (drag.dropTargetPos?.columnId === stage.id ||
+                                dropTargetPos?.stageId === stage.id) &&
+                              (drag.dropTargetPos?.targetIndex ??
+                                dropTargetPos?.targetIndex) === idx,
+                          );
 
                         stage.deals.forEach((deal) => {
                           const isDraggedDeal = draggedSet.has(deal.id);
@@ -703,22 +751,7 @@ export function DealsKanbanBoard({
                           rendered.push(
                             <div
                               key={deal.id}
-                              onDragOver={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (!dragInfo || isDraggedDeal) return;
-
-                                const rect =
-                                  e.currentTarget.getBoundingClientRect();
-                                const midpoint = rect.top + rect.height / 2;
-                                const insertIndex =
-                                  e.clientY < midpoint ? myIndex : myIndex + 1;
-
-                                setDropTargetPos({
-                                  stageId: stage.id,
-                                  targetIndex: insertIndex,
-                                });
-                              }}
+                              data-kanban-card-slot={deal.id}
                               className="relative group/card"
                             >
                   <DealRecordCard
@@ -728,10 +761,20 @@ export function DealsKanbanBoard({
                                 onSelect={(e) =>
                                   handleSelectDeal(deal.id, stage.deals, e)
                                 }
-                                onDragStart={(e) =>
-                                  handleDragStart(e, deal.id, stage.id)
+                                onDragPointerDown={
+                                  drag.cardPointerProps({
+                                    id: deal.id,
+                                    columnId: stage.id,
+                                    name: deal.name,
+                                  }).onPointerDown
                                 }
-                    onDragEnd={handleDragEnd}
+                                onDragClickCapture={
+                                  drag.cardPointerProps({
+                                    id: deal.id,
+                                    columnId: stage.id,
+                                    name: deal.name,
+                                  }).onClickCapture
+                                }
                                 onQuickAction={(kind) =>
                                   openQuickAction(kind, deal)
                                 }
@@ -776,7 +819,7 @@ export function DealsKanbanBoard({
         )}
       </div>
 
-      {activeSelectedIds.size > 0 && !dragInfo && !selectedIds.length && (
+      {activeSelectedIds.size > 0 && !dealDragInfo && !selectedIds.length && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl bg-slate-900/90 px-4 py-3 text-white shadow-2xl backdrop-blur-md">
           <span className="text-xs font-medium">
             {activeSelectedIds.size} deal{activeSelectedIds.size > 1 ? "s" : ""}{" "}
@@ -793,16 +836,18 @@ export function DealsKanbanBoard({
         </div>
       )}
 
-      {dragInfo && boardBounds && (
+      <KanbanDragGhost ghost={drag.ghost} />
+
+      {dealDragInfo && boardBounds && (
         <KanbanOutcomeDropBar
-          over={overOutcome}
+          over={drag.overOutcome ?? overOutcome}
           onOver={setOverOutcome}
           onLeave={(outcome) =>
             setOverOutcome((prev) => (prev === outcome ? null : prev))
           }
-          onDrop={handleOutcomeDrop}
-          wonLabel={`Win (${dragInfo.dealIds.length})`}
-          lostLabel={`Lost (${dragInfo.dealIds.length})`}
+          onDrop={(outcome) => handleOutcomeDrop(outcome, dealDragInfo)}
+          wonLabel={`Win (${dealDragInfo.dealIds.length})`}
+          lostLabel={`Lost (${dealDragInfo.dealIds.length})`}
           style={{ left: boardBounds.left, width: boardBounds.width }}
         />
       )}

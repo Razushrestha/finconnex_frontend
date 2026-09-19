@@ -78,6 +78,25 @@ const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
     "Settings changed since they were loaded. Save again.",
   "settings.error.invalidPageValues":
     "One of these settings fields is not a plain text, number, or on/off value.",
+  "portal.error.companyNotFound":
+    "Pick a live CRM company for this client portal.",
+  "portal.error.primaryContactNotFound":
+    "Primary contact must be a live CRM contact on that company.",
+  "portal.error.primaryContactEmailMissing":
+    "That contact has no email, so a portal password reset cannot be sent.",
+  "portal.error.notFound": "Client portal not found.",
+  "portal.error.workspaceNotFound": "Workspace is not available for this portal.",
+  "portal.error.passwordResetFailed":
+    "The portal password reset email could not be sent.",
+  "portal.error.accessForbidden": "This client portal is not active.",
+  "calculation.error.notFound": "Saved calculation not found.",
+  "report.error.reportNotFound": "Report not found in this workspace.",
+  "report.error.executionNotFound": "Report run not found.",
+  "report.error.downloadUnavailable":
+    "That report file is not ready yet, or the download has expired.",
+  "report.error.scheduleNotFound": "Report schedule not found.",
+  "calculation.error.workspaceRequired":
+    "Sign in to a workspace to save calculator results.",
   "settings.error.invalidPageKey":
     "This settings page cannot be saved on the CRM workspace.",
   "settings.error.notFound":
@@ -216,6 +235,7 @@ export async function crmWorkspaceFetch<T>(
     return crmFetch<T>(scoped, path, init);
   }
   if (typeof window !== "undefined") {
+    await ensureCrmSession();
     return crmBffFetch<T>(path, init);
   }
   const session = (await ensureCrmSession()) ?? (await ensureCrmAccess());

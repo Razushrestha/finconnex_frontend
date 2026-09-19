@@ -19,6 +19,13 @@ import {
 } from "@/lib/contacts/store";
 import { formatMeetingDateTime } from "@/lib/meetings/store";
 import { createCrmMeeting } from "@/lib/meetings/api";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import {
+  bookingCrmLinkFromRelated,
+  createCrmBooking,
+  linkCrmBooking,
+  tryCrmBooking,
+} from "@/lib/booking/api";
 import {
   type AppointmentChannel,
   type AppointmentStatus,
@@ -58,7 +65,7 @@ import {
   RELATED_ENTITY_KINDS,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
-import { loadAssignableOwners, type AssignableOwner } from "@/lib/users/assignable";
+import { loadWorkspaceConsultants, type AssignableOwner } from "@/lib/users/assignable";
 
 const LOCATIONS = ["Zoom", "Google Meet", "Phone", "Full address"] as const;
 type LocationKind = (typeof LOCATIONS)[number];
@@ -173,7 +180,7 @@ export function NewBookingModal({
       });
     void Promise.all([
       Promise.resolve(listBookingPages()),
-      loadAssignableOwners().catch(() => [] as AssignableOwner[]),
+      loadWorkspaceConsultants().catch(() => [] as AssignableOwner[]),
     ]).then(([pages, members]) => {
       if (!alive) return;
       setCalendars(pages);
@@ -415,6 +422,30 @@ export function NewBookingModal({
     try {
       for (const startDate of starts) {
         const endDate = new Date(startDate.getTime() + minutes * 60 * 1000);
+        const eventTypeId = calendar?.crmEventTypeId || calendar?.id;
+        const related = bookingCrmLinkFromRelated(
+          inferredRelatedKind,
+          inferredRelatedId,
+        );
+        if (eventTypeId && isUuid(eventTypeId) && client?.email) {
+          const booked = await tryCrmBooking(() =>
+            createCrmBooking({
+              eventTypeId,
+              startTime: startDate.toISOString(),
+              name: clientName || client.email,
+              email: client.email,
+              timezone,
+              phone: client.phone,
+              ...related,
+            }),
+          );
+          if (booked?.id) {
+            if (Object.keys(related).length) {
+              await tryCrmBooking(() => linkCrmBooking(booked.id, related));
+            }
+            continue;
+          }
+        }
         await createCrmMeeting({
           title: title.trim() || "Consultation",
           relatedTo: `${inferredRelatedKind}: ${inferredRelatedName}`,

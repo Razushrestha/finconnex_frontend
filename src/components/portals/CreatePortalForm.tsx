@@ -1,38 +1,31 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Globe,
   User,
   Building2,
   Type,
-  Link2,
   Shield,
-    ArrowLeft,
+  ArrowLeft,
   ExternalLink,
 } from "lucide-react";
 import {
   PORTAL_ACCESS_LEVELS,
-  PORTAL_CLIENTS,
   PORTAL_MODULES,
-  PORTAL_OWNERS,
-  PORTAL_STATUSES,
   appendPortalAudit,
   formatPortalDate,
-  nextPortalIds,
-  portalPublicPath,
-  uniqueSlug,
   upsertPortal,
   type PortalAccessLevel,
   type PortalModule,
-  type PortalStatus,
 } from "@/lib/portals/types";
 import {
   createCrmClientPortal,
-  tryCrmPortal,
 } from "@/lib/portals/api";
+import { listCrmCompanies } from "@/lib/companies/api";
+import { loadCrmContacts } from "@/lib/contacts/api";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import {
   InputShell,
   elevatedInputClass,
@@ -80,44 +73,76 @@ function CompactField({
 export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
   const router = useRouter();
   const [name, setName] = useState("");
-  const [clientId, setClientId] = useState<string>(PORTAL_CLIENTS[0]?.id ?? "");
-  const [slug, setSlug] = useState("");
-  const [status, setStatus] = useState<PortalStatus>("Active");
+  const [clientId, setClientId] = useState("");
+  const [contactId, setContactId] = useState("");
   const [accessLevel, setAccessLevel] =
-    useState<PortalAccessLevel>("Full");
+    useState<PortalAccessLevel>("Limited");
   const [modules, setModules] = useState<PortalModule[]>([
     "Deals",
     "Documents",
     "Tickets",
     "Invoices",
   ]);
-  const [createdBy, setCreatedBy] = useState<string>(defaultActorName());
-  const [contactName, setContactName] = useState<string>(PORTAL_CLIENTS[0]?.contact ?? "");
-  const [contactEmail, setContactEmail] = useState<string>(PORTAL_CLIENTS[0]?.email ?? "");
-  const [contactTouched, setContactTouched] = useState(false);
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
+  const [contacts, setContacts] = useState<
+    Array<{ id: string; name: string; email: string; companyId?: string }>
+  >([]);
+  const [catalogError, setCatalogError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [slugTouched, setSlugTouched] = useState(false);
 
-  const client =
-    PORTAL_CLIENTS.find((c) => c.id === clientId) ?? PORTAL_CLIENTS[0];
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [companyRows, contactRows] = await Promise.all([
+          listCrmCompanies({ limit: 100 }),
+          loadCrmContacts({ limit: 100 }),
+        ]);
+        if (cancelled) return;
+        setCompanies(
+          companyRows
+            .map((row) => ({ id: row.company.id, name: row.company.name }))
+            .filter((row) => isUuid(row.id)),
+        );
+        setContacts(
+          contactRows
+            .map((row) => ({
+              id: row.contact.id,
+              name: row.contact.name,
+              email: row.contact.email,
+              companyId: row.contact.companyId,
+            }))
+            .filter((row) => isUuid(row.id)),
+        );
+        setCatalogError("");
+      } catch (err) {
+        if (!cancelled) {
+          setCatalogError(
+            err instanceof Error ? err.message : "Could not load companies and contacts",
+          );
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const companyContacts = useMemo(
+    () => contacts.filter((row) => row.companyId === clientId),
+    [contacts, clientId],
+  );
+  const client = companies.find((c) => c.id === clientId);
+  const contact = companyContacts.find((c) => c.id === contactId);
 
   function onClientChange(id: string) {
     setClientId(id);
-    const c = PORTAL_CLIENTS.find((x) => x.id === id);
-    if (c) {
-      if (!slugTouched) {
-        setSlug(uniqueSlug(c.name.split(" ")[0] ?? c.name));
-      }
-      if (!contactTouched) {
-        setContactName(c.contact);
-        setContactEmail(c.email);
-      }
-    }
+    setContactId("");
   }
 
   function onNameChange(v: string) {
     setName(v);
-    if (!slugTouched) setSlug(uniqueSlug(v || client?.name || ""));
   }
 
   function toggleModule(m: PortalModule) {
@@ -129,66 +154,60 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
   function validate() {
     const next: Record<string, string> = {};
     if (!name.trim()) next.name = "Name is required";
-    if (!clientId) next.clientId = "Client is required";
-    if (!status) next.status = "Status is required";
+    if (!isUuid(clientId)) next.clientId = "Pick a CRM company";
+    if (!isUuid(contactId)) next.contactId = "Pick a CRM contact on that company";
     if (!accessLevel) next.accessLevel = "Access level is required";
-    if (!contactName.trim()) next.contactName = "Primary contact name is required";
-    if (!contactEmail.trim()) next.contactEmail = "Primary contact email is required";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim()))
-      next.contactEmail = "Enter a valid email";
-    if (!slug.trim()) next.slug = "Portal URL slug is required";
+    if (!modules.length) next.modules = "Enable at least one module";
+    if (!companies.length) next.clientId = "Create a CRM company first";
+    if (isUuid(clientId) && !companyContacts.length) {
+      next.contactId = "This company has no CRM contacts";
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
-  function onSave(createAnother: boolean) {
-    if (!validate() || !client) return;
-    const ids = nextPortalIds();
-    const finalSlug = uniqueSlug(slug);
-    const created = upsertPortal(
-      appendPortalAudit(
-        {
-          id: ids.id,
-          portalId: ids.portalId,
-          name: name.trim(),
-          clientId: client.id,
-          clientName: client.name,
-          slug: finalSlug,
-          status,
-          accessLevel,
-          modules,
-          primaryContactName: contactName.trim(),
-          primaryContactEmail: contactEmail.trim(),
-          createdBy,
-          createdAt: formatPortalDate(),
-          activity: [],
-          audit: [],
-        },
-        "Created",
-        createdBy,
-      ),
-    );
-    void tryCrmPortal(async () => {
+  async function onSave(createAnother: boolean) {
+    if (!validate() || !client || !contact) return;
+    setSaving(true);
+    setErrors((prev) => ({ ...prev, form: "" }));
+    try {
       const remote = await createCrmClientPortal({
-        name: created.name,
-        slug: created.slug,
-        status: created.status,
-        accessLevel: created.accessLevel,
-        modules: created.modules,
-        clientId: created.clientId,
-        clientName: created.clientName,
-        primaryContactName: created.primaryContactName,
-        primaryContactEmail: created.primaryContactEmail,
+        name: name.trim(),
+        companyId: client.id,
+        primaryContactId: contact.id,
+        accessLevel,
+        modules,
       });
-      if (remote) upsertPortal(remote);
-    });
-    if (createAnother) {
-      setName("");
-      setSlugTouched(false);
-      setErrors({});
-      return;
+      if (!remote?.id) throw new Error("CRM did not create the client portal");
+      upsertPortal(
+        appendPortalAudit(
+          {
+            ...remote,
+            clientName: remote.clientName || client.name,
+            primaryContactName: remote.primaryContactName || contact.name,
+            primaryContactEmail: remote.primaryContactEmail || contact.email,
+            createdBy: defaultActorName(),
+            createdAt: remote.createdAt || formatPortalDate(),
+          },
+          "Created",
+          defaultActorName(),
+        ),
+      );
+      if (createAnother) {
+        setName("");
+        setContactId("");
+        setErrors({});
+        return;
+      }
+      router.push(`/portals/${remote.id}`);
+    } catch (err) {
+      setErrors((prev) => ({
+        ...prev,
+        form: err instanceof Error ? err.message : "Could not create the portal",
+      }));
+    } finally {
+      setSaving(false);
     }
-    router.push(`/portals/${created.id}`);
   }
 
   const inputSm = (hasIcon?: boolean) =>
@@ -196,7 +215,7 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
   const selectSm = (hasIcon?: boolean) =>
     cn(elevatedSelectClass(hasIcon), "!h-9 !text-[12px] !rounded-lg");
 
-  const publicUrl = portalPublicPath(slug || "…");
+  const publicUrl = "Assigned by CRM on create";
 
   return (
     <div className="relative flex min-h-full flex-col overflow-hidden bg-slate-50">
@@ -226,17 +245,19 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
             </button>
             <button
               type="button"
-              onClick={() => onSave(true)}
-              className="inline-flex h-8 items-center rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-100"
+              onClick={() => void onSave(true)}
+              disabled={saving}
+              className="inline-flex h-8 items-center rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-40"
             >
               Save &amp; New
             </button>
             <button
               type="button"
-              onClick={() => onSave(false)}
-              className="inline-flex h-8 items-center rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-sm shadow-violet-600/20 hover:bg-violet-700"
+              onClick={() => void onSave(false)}
+              disabled={saving}
+              className="inline-flex h-8 items-center rounded-lg bg-violet-600 px-3 text-[11px] font-semibold text-white shadow-sm shadow-violet-600/20 hover:bg-violet-700 disabled:opacity-40"
             >
-              Create portal
+              {saving ? "Creating…" : "Create portal"}
             </button>
           </div>
         </div>
@@ -266,14 +287,15 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
                   </InputShell>
                 </CompactField>
 
-                <CompactField label="Client" required error={errors.clientId}>
+                <CompactField label="Company" required error={errors.clientId}>
                   <InputShell icon={Building2} error={!!errors.clientId}>
                     <select
                       className={selectSm(true)}
                       value={clientId}
                       onChange={(e) => onClientChange(e.target.value)}
                     >
-                      {PORTAL_CLIENTS.map((c) => (
+                      <option value="">Select a CRM company</option>
+                      {companies.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name}
                         </option>
@@ -282,69 +304,28 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
                   </InputShell>
                 </CompactField>
 
-                <CompactField label="Primary contact name" required error={errors.contactName}>
-                  <InputShell icon={User} error={!!errors.contactName}>
-                    <input
-                      className={inputSm(true)}
-                      value={contactName}
-                      onChange={(e) => {
-                        setContactTouched(true);
-                        setContactName(e.target.value);
-                      }}
-                      placeholder="Contact name"
-                    />
-                  </InputShell>
-                </CompactField>
-
-                <CompactField label="Primary contact email" required error={errors.contactEmail}>
-                  <InputShell icon={User} error={!!errors.contactEmail}>
-                    <input
-                      className={inputSm(true)}
-                      type="email"
-                      value={contactEmail}
-                      onChange={(e) => {
-                        setContactTouched(true);
-                        setContactEmail(e.target.value);
-                      }}
-                      placeholder="contact@example.com"
-                    />
-                  </InputShell>
-                </CompactField>
-
                 <CompactField
-                  label="URL slug"
+                  label="Primary contact"
                   required
-                  error={errors.slug}
+                  error={errors.contactId}
+                  className="sm:col-span-2"
                 >
-                  <InputShell icon={Link2} error={!!errors.slug}>
-                    <input
-                      className={inputSm(true)}
-                      value={slug}
-                      onChange={(e) => {
-                        setSlugTouched(true);
-                        setSlug(
-                          e.target.value
-                            .toLowerCase()
-                            .replace(/[^a-z0-9-]/g, ""),
-                        );
-                      }}
-                      placeholder="greystone"
-                    />
-                  </InputShell>
-                </CompactField>
-
-                <CompactField label="Status" required error={errors.status}>
-                  <InputShell>
+                  <InputShell icon={User} error={!!errors.contactId}>
                     <select
-                      className={selectSm(false)}
-                      value={status}
-                      onChange={(e) =>
-                        setStatus(e.target.value as PortalStatus)
-                      }
+                      className={selectSm(true)}
+                      value={contactId}
+                      onChange={(e) => setContactId(e.target.value)}
+                      disabled={!clientId}
                     >
-                      {PORTAL_STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
+                      <option value="">
+                        {clientId
+                          ? "Select a contact on this company"
+                          : "Pick a company first"}
+                      </option>
+                      {companyContacts.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                          {c.email ? ` · ${c.email}` : ""}
                         </option>
                       ))}
                     </select>
@@ -373,21 +354,11 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
                   </InputShell>
                 </CompactField>
 
-                <CompactField label="Created by">
-                  <InputShell icon={User}>
-                    <select
-                      className={selectSm(true)}
-                      value={createdBy}
-                      onChange={(e) => setCreatedBy(e.target.value)}
-                    >
-                      {PORTAL_OWNERS.map((o) => (
-                        <option key={o} value={o}>
-                          {o}
-                        </option>
-                      ))}
-                    </select>
-                  </InputShell>
-                </CompactField>
+                {errors.form || catalogError ? (
+                  <p className="sm:col-span-2 xl:col-span-3 text-[12px] font-medium text-rose-600">
+                    {errors.form || catalogError}
+                  </p>
+                ) : null}
               </div>
 
               <div className="mt-5">
@@ -450,7 +421,7 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-slate-400">Status</span>
-                    <span className="font-semibold text-slate-700">{status}</span>
+                    <span className="font-semibold text-slate-700">Active</span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-slate-400">Access</span>
@@ -461,13 +432,13 @@ export function CreatePortalForm({ layoutId: _l, redirect: _r }: Props) {
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-slate-400">Contact</span>
                     <span className="truncate font-semibold text-slate-700">
-                      {contactName.trim() || ""}
+                      {contact?.name.trim() || ""}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-slate-400">Email</span>
                     <span className="truncate font-semibold text-slate-700">
-                      {contactEmail.trim() || ""}
+                      {contact?.email.trim() || ""}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2">

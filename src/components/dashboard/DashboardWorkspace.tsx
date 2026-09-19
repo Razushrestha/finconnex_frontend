@@ -149,7 +149,7 @@ export function DashboardWorkspace({
   const rootRef = useRef<HTMLDivElement>(null);
   const layoutSyncRef = useRef<number | null>(null);
 
-  const { loading, executive, source } = useCrmDashboardStats(layout.filters);
+  const { loading, executive, sales, performance, source } = useCrmDashboardStats(layout.filters);
   const [heroReady, setHeroReady] = useState(false);
   const [heroTick, setHeroTick] = useState(0);
   const hero = useMemo(
@@ -557,12 +557,14 @@ export function DashboardWorkspace({
         {view === "sales" ? (
           <SalesDashboardView
             filters={layout.filters}
+            data={sales}
             {...reorderProps}
           />
         ) : null}
         {view === "performance" ? (
           <PerformanceDashboardView
             filters={layout.filters}
+            data={performance}
             {...reorderProps}
           />
         ) : null}

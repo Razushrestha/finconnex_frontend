@@ -30,22 +30,36 @@ import { chargePaymentDemoLive } from "@/lib/finance/pay-gateway";
 import { FINANCE_OWNERS, formatAUD, formatFinanceDate } from "@/lib/finance/shared";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { defaultActorName } from "@/lib/rules/actor";
+import { FinanceCreateDialog } from "@/components/finance/FinanceCreateDialog";
 import {
   CreateEntityFormShell,
   Field,
   InputShell,
-  TextAreaShell,
   elevatedInputClass,
   elevatedSelectClass,
-  elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
 
 interface Props {
-  layoutId: string;
-  redirect: boolean;
+  layoutId?: string;
+  redirect?: boolean;
+  variant?: "page" | "modal";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onCreated?: () => void;
+  initialInvoiceId?: string;
 }
 
-export function CreatePaymentForm({ layoutId: _l, redirect: _r }: Props) {
+export function CreatePaymentForm({
+  layoutId: _l,
+  redirect: _r,
+  variant = "page",
+  open = true,
+  onOpenChange,
+  onCreated,
+  initialInvoiceId,
+}: Props) {
+  void _l;
+  void _r;
   const router = useRouter();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [invoiceId, setInvoiceId] = useState("");
@@ -64,11 +78,13 @@ export function CreatePaymentForm({ layoutId: _l, redirect: _r }: Props) {
       (i) => i.amountDue > 0 && !["Void", "Cancelled", "Draft"].includes(i.status),
     );
     setInvoices(list);
-    if (list[0]) {
-      setInvoiceId(list[0].id);
-      setAmount(String(list[0].amountDue));
+    const preferred =
+      (initialInvoiceId && list.find((i) => i.id === initialInvoiceId)) || list[0];
+    if (preferred) {
+      setInvoiceId(preferred.id);
+      setAmount(String(preferred.amountDue));
     }
-  }, []);
+  }, [initialInvoiceId]);
 
   const invoice = invoices.find((i) => i.id === invoiceId) ?? getInvoiceById(invoiceId);
 
@@ -87,6 +103,29 @@ export function CreatePaymentForm({ layoutId: _l, redirect: _r }: Props) {
       next.amount = `Cannot exceed balance ${formatAUD(invoice.amountDue)}`;
     setErrors(next);
     return Object.keys(next).length === 0;
+  }
+
+  function afterSave(createAnother: boolean, paymentId?: string) {
+    if (createAnother) {
+      setReference("");
+      setNotes("");
+      setErrors({});
+      const list = listInvoices().filter(
+        (i) => i.amountDue > 0 && !["Void", "Cancelled", "Draft"].includes(i.status),
+      );
+      setInvoices(list);
+      if (list[0]) {
+        setInvoiceId(list[0].id);
+        setAmount(String(list[0].amountDue));
+      }
+      return;
+    }
+    if (variant === "modal") {
+      onCreated?.();
+      onOpenChange?.(false);
+      return;
+    }
+    if (paymentId) router.push(`/finance/payments/${paymentId}`);
   }
 
   async function onSave(createAnother: boolean) {
@@ -108,22 +147,7 @@ export function CreatePaymentForm({ layoutId: _l, redirect: _r }: Props) {
         return;
       }
       setGatewayMsg(`Charged via demo gateway · ${result.providerId}`);
-      if (createAnother) {
-        setReference("");
-        setNotes("");
-        setErrors({});
-        const list = listInvoices().filter(
-          (i) =>
-            i.amountDue > 0 && !["Void", "Cancelled", "Draft"].includes(i.status),
-        );
-        setInvoices(list);
-        if (list[0]) {
-          setInvoiceId(list[0].id);
-          setAmount(String(list[0].amountDue));
-        }
-        return;
-      }
-      router.push(`/finance/payments/${result.payment.id}`);
+      afterSave(createAnother, result.payment.id);
       return;
     }
 
@@ -176,36 +200,14 @@ export function CreatePaymentForm({ layoutId: _l, redirect: _r }: Props) {
     }
 
     if (createAnother) {
-      setReference("");
-      setNotes("");
-      setErrors({});
-      const list = listInvoices().filter(
-        (i) => i.amountDue > 0 && !["Void", "Cancelled", "Draft"].includes(i.status),
-      );
-      setInvoices(list);
-      if (list[0]) {
-        setInvoiceId(list[0].id);
-        setAmount(String(list[0].amountDue));
-      }
+      afterSave(true);
       return;
     }
-    router.push(`/finance/payments/${created.id}`);
+    afterSave(false, created.id);
   }
 
-  return (
-    <CreateEntityFormShell
-      breadcrumbParent={{ label: "Payments", href: "/finance/payments" }}
-      badge="§13.5"
-      title="Record Payment"
-      subtitle="Record payments against invoices. Stripe + Pending uses the demo gateway."
-      tip="Invoice and amount are required. Stripe with Pending status charges via demo gateway."
-      cardIcon={Banknote}
-      cardTitle="Payment details"
-      cardDescription="SRS §20.4: links to the open invoice balance"
-      listHref="/finance/payments"
-      saveLabel={busy ? "Charging…" : "Save payment"}
-      onSave={(again) => void onSave(again)}
-    >
+  const fields = (
+    <>
       {gatewayMsg ? (
         <p className="col-span-full mb-1 text-[12px] font-medium text-emerald-700">
           {gatewayMsg}
@@ -314,6 +316,41 @@ export function CreatePaymentForm({ layoutId: _l, redirect: _r }: Props) {
           placeholder="Internal notes… Type @ to assign someone."
         />
       </Field>
+    </>
+  );
+
+  if (variant === "modal") {
+    return (
+      <FinanceCreateDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        title="Record Payment"
+        icon={Banknote}
+        saving={busy}
+        saveLabel={busy ? "Charging…" : "Save payment"}
+        onSave={onSave}
+        wide={false}
+      >
+        {fields}
+      </FinanceCreateDialog>
+    );
+  }
+
+  return (
+    <CreateEntityFormShell
+      breadcrumbParent={{ label: "Payments", href: "/finance/payments" }}
+      badge="§13.5"
+      title="Record Payment"
+      subtitle="Record payments against invoices. Stripe + Pending uses the demo gateway."
+      tip="Invoice and amount are required. Stripe with Pending status charges via demo gateway."
+      cardIcon={Banknote}
+      cardTitle="Payment details"
+      cardDescription="SRS §20.4: links to the open invoice balance"
+      listHref="/finance/payments"
+      saveLabel={busy ? "Charging…" : "Save payment"}
+      onSave={(again) => void onSave(again)}
+    >
+      {fields}
     </CreateEntityFormShell>
   );
 }

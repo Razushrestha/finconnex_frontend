@@ -1,6 +1,8 @@
 /** Map CRM dashboard metrics + widget payloads onto local dashboard models. */
 
 import type { ExecutiveOverview, RankingRow } from "@/lib/dashboard/executive";
+import type { PerformanceDashboard } from "@/lib/dashboard/performance";
+import type { SalesDashboard } from "@/lib/dashboard/sales";
 import {
   type DashboardLiveStats,
   type DashboardWidgetId,
@@ -167,8 +169,8 @@ export function applyMetricsToStats(
     "wonValue",
     "closedWonValue",
   ]);
-  const openTasks = num(rec, ["openTasks", "tasksOpen"]);
-  const overdueTasks = num(rec, ["overdueTasks", "overdue"]);
+  const openTasks = num(rec, ["openTasksCount", "openTasks", "tasksOpen"]);
+  const overdueTasks = num(rec, ["overdueTasksCount", "overdueTasks", "overdue"]);
   const activitiesToday = num(rec, ["activitiesToday", "todayActivities"]);
   const conversionRate = num(rec, ["conversionRate", "leadToDeal", "conversion"]);
   if (totalLeads != null) next.totalLeads = totalLeads;
@@ -199,13 +201,16 @@ export function overlayExecutiveOverview(
     ...metricsRecord(widgets.kpis),
     ...metricsRecord(widgets.metrics),
   };
+  for (const [key, payload] of Object.entries(widgets)) {
+    rec[key] = analyticsWidgetValue(payload);
+  }
   const next = { ...base };
   const assign = (key: keyof ExecutiveOverview, keys: string[]) => {
     const n = num(rec, keys);
     if (n != null) (next as Record<string, unknown>)[key] = n;
   };
 
-  assign("newLeads", ["newLeads", "leadsCreated", "leadsThisPeriod"]);
+  assign("newLeads", ["newLeads", "leadsCreated", "leadsThisPeriod", "totalLeads"]);
   assign("newLeadsDelta", ["newLeadsDelta", "leadsDelta"]);
   assign("activePipeline", ["activePipeline", "pipelineValue", "openPipeline"]);
   assign("activePipelineDelta", ["activePipelineDelta", "pipelineDelta"]);
@@ -215,22 +220,22 @@ export function overlayExecutiveOverview(
   assign("settlementValueDelta", ["settlementValueDelta"]);
   assign("commission", ["commission", "estimatedCommission"]);
   assign("commissionDelta", ["commissionDelta"]);
-  assign("conversionRate", ["conversionRate", "leadToSettle"]);
+  assign("conversionRate", ["conversionRate", "leadToSettle", "LEAD_CONVERSION_RATE"]);
   assign("conversionDelta", ["conversionDelta"]);
   assign("avgSettleDays", ["avgSettleDays", "averageSettleDays"]);
   assign("avgSettleDaysDelta", ["avgSettleDaysDelta"]);
-  assign("overdue", ["overdue", "overdueDeals"]);
+  assign("overdue", ["overdue", "overdueDeals", "overdueTasksCount"]);
   assign("pipelineValue", ["pipelineValue"]);
   assign("weightedPipeline", ["weightedPipeline"]);
   assign("activeDeals", ["activeDeals", "openDeals"]);
-  assign("leadToDeal", ["leadToDeal"]);
-  assign("dealToSettle", ["dealToSettle"]);
-  assign("leadToSettle", ["leadToSettle"]);
+  assign("leadToDeal", ["leadToDeal", "conversionRate"]);
+  assign("dealToSettle", ["dealToSettle", "DEAL_WIN_LOSS_RATIO"]);
+  assign("leadToSettle", ["leadToSettle", "conversionRate"]);
   assign("targetProgress", ["targetProgress"]);
-  assign("overdueTasks", ["overdueTasks"]);
-  assign("followUpsDue", ["followUpsDue", "followupsDue"]);
+  assign("overdueTasks", ["overdueTasks", "overdueTasksCount"]);
+  assign("followUpsDue", ["followUpsDue", "followupsDue", "pendingReminders"]);
   assign("documentsPending", ["documentsPending"]);
-  assign("appointmentsToday", ["appointmentsToday"]);
+  assign("appointmentsToday", ["appointmentsToday", "upcomingMeetings"]);
   assign("slaBreaches", ["slaBreaches"]);
   assign("leadToDealDelta", ["leadToDealDelta"]);
   assign("dealToSettleDelta", ["dealToSettleDelta"]);
@@ -261,8 +266,14 @@ export function overlayExecutiveOverview(
   const funnel =
     asFunnel(rec.funnel) ??
     asFunnel(pipeline.funnel) ??
-    asFunnel(pipeline.stages);
+    asFunnel(pipeline.stages) ??
+    funnelFromDealStages(rec.DEAL_STAGE_FUNNEL);
   if (funnel) next.funnel = funnel;
+
+  next.conversionRate = asPercent(next.conversionRate);
+  next.leadToDeal = asPercent(next.leadToDeal);
+  next.dealToSettle = asPercent(next.dealToSettle);
+  next.leadToSettle = asPercent(next.leadToSettle);
 
   const trendWidget = metricsRecord(widgets.trend);
   const trend =
@@ -324,4 +335,101 @@ export function widgetPayloadMap(
     }
   }
   return out;
+}
+
+export function analyticsWidgetValue(raw: unknown): unknown {
+  const rec = asRecord(raw);
+  if (!rec) return raw;
+  const period = asRecord(rec.period);
+  if (period && "value" in period) return period.value;
+  if ("value" in rec) return rec.value;
+  return rec.data ?? raw;
+}
+
+function asPercent(n: number) {
+  return n > 0 && n <= 1 ? Math.round(n * 1000) / 10 : n;
+}
+
+function titleCaseStage(raw: string) {
+  return raw
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
+function funnelFromDealStages(
+  value: unknown,
+): Array<{ label: string; count: number; value: number }> | undefined {
+  if (!Array.isArray(value) || !value.length) return undefined;
+  const rows: Array<{ label: string; count: number; value: number }> = [];
+  for (const item of value) {
+    const rec = asRecord(item);
+    if (!rec) continue;
+    const label = titleCaseStage(
+      String(rec.stage ?? rec.label ?? rec.name ?? "").trim(),
+    );
+    if (!label) continue;
+    const count = num(rec, ["count", "leads", "total"]) ?? 0;
+    rows.push({ label, count, value: count });
+  }
+  return rows.length ? rows : undefined;
+}
+
+export function overlaySalesDashboard(
+  base: SalesDashboard,
+  rawMetrics: unknown,
+  widgets: Record<string, unknown> = {},
+): SalesDashboard {
+  const rec = metricsRecord(rawMetrics);
+  for (const [key, payload] of Object.entries(widgets)) {
+    rec[key] = analyticsWidgetValue(payload);
+  }
+  const next = { ...base };
+  const totalLeads = num(rec, ["totalLeads", "TOTAL_LEADS"]);
+  const totalDeals = num(rec, ["totalDeals", "TOTAL_DEALS"]);
+  const wonDeals = num(rec, ["wonDeals"]);
+  const lostDeals = num(rec, ["lostDeals"]);
+  const conversion = num(rec, ["conversionRate", "LEAD_CONVERSION_RATE"]);
+  const winLoss = num(rec, ["DEAL_WIN_LOSS_RATIO"]);
+  if (totalLeads != null) next.newLeads = totalLeads;
+  if (totalDeals != null) next.dealsCreated = totalDeals;
+  if (wonDeals != null) next.settled = wonDeals;
+  if (lostDeals != null) next.lostDeals = lostDeals;
+  if (conversion != null) next.leadToDeal = asPercent(conversion);
+  if (winLoss != null) next.dealToSettle = asPercent(winLoss);
+  const funnel = funnelFromDealStages(rec.DEAL_STAGE_FUNNEL);
+  if (funnel) {
+    next.funnel = funnel;
+    next.dealsByStage = funnel.map((row) => ({
+      name: row.label,
+      value: row.count,
+      count: row.count,
+    }));
+  }
+  return next;
+}
+
+export function overlayPerformanceDashboard(
+  base: PerformanceDashboard,
+  rawMetrics: unknown,
+  widgets: Record<string, unknown> = {},
+): PerformanceDashboard {
+  const rec = metricsRecord(rawMetrics);
+  for (const [key, payload] of Object.entries(widgets)) {
+    rec[key] = analyticsWidgetValue(payload);
+  }
+  const next = { ...base };
+  const wonDeals = num(rec, ["wonDeals", "settlements"]);
+  const conversion = num(rec, ["conversionRate", "LEAD_CONVERSION_RATE"]);
+  if (wonDeals != null) next.settlements = wonDeals;
+  if (conversion != null) next.conversion = asPercent(conversion);
+  const funnel = funnelFromDealStages(rec.DEAL_STAGE_FUNNEL);
+  if (funnel) {
+    next.funnel = funnel;
+    next.pipelineByStage = funnel
+      .filter((row) => !/closed won|settled/i.test(row.label))
+      .map((row) => ({ label: row.label, value: row.count }));
+    next.pipelineValue = next.pipelineByStage.reduce((n, row) => n + row.value, 0);
+  }
+  return next;
 }

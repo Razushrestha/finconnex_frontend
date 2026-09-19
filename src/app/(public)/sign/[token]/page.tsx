@@ -6,5 +6,11 @@ interface PageProps {
 
 export default async function PublicSignPage({ params }: PageProps) {
   const { token } = await params;
-  return <PublicSignClient token={token} />;
+  let value = token?.trim() ?? "";
+  try {
+    value = decodeURIComponent(value);
+  } catch {
+    /* already decoded */
+  }
+  return <PublicSignClient token={value} />;
 }

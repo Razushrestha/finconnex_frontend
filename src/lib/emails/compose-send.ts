@@ -21,8 +21,15 @@ function uniqueEmails(list: Array<string | undefined>) {
 
 function isCrmAuthFailure(err: unknown) {
   const msg = err instanceof Error ? err.message : String(err);
-  return /token unavailable|not authorized|sign in again|session has expired/i.test(
+  return /token unavailable|not authorized|unauthorized|\b401\b|sign in again|session has expired/i.test(
     msg,
+  );
+}
+
+function isPublicBookSurface() {
+  return (
+    typeof window !== "undefined" &&
+    /^\/book(\/|$)/i.test(window.location.pathname)
   );
 }
 
@@ -124,7 +131,7 @@ export async function sendCrmActivityEmail(input: {
       access = await ensureCrmAccess();
     }
   }
-  if (!access?.accessToken) {
+  if (!access?.accessToken || isPublicBookSurface()) {
     return deliverThroughFinConnexMail({
       to: [to[0]],
       cc,

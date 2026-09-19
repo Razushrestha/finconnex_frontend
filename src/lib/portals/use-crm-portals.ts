@@ -23,8 +23,8 @@ export function useCrmPortals() {
       try {
         const remote = await listCrmClientPortals();
         if (cancelled) return;
-        if (remote.length) mergeCrmPortals(remote);
-        setSource(remote.length ? "api" : "demo");
+        mergeCrmPortals(remote);
+        setSource("api");
       } catch (err) {
         if (cancelled) return;
         setSource("demo");

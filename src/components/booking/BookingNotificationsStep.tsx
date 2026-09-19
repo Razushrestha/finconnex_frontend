@@ -10,108 +10,18 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  DEFAULT_NOTIFICATIONS,
+  NOTIFY_CHANNELS,
+  type NotificationRow,
+  type NotifyChannel,
+} from "@/lib/booking/notify-prefs";
+import { sendNotifyTest } from "@/lib/booking/notify";
+
+export type { NotificationRow, NotifyChannel };
+export { DEFAULT_NOTIFICATIONS };
 
 const BRAND = "#5A32A3";
-
-export type NotifyChannel = "Email" | "In-app" | "SMS" | "WhatsApp";
-
-export type NotificationRow = {
-  id: string;
-  title: string;
-  description: string;
-  info: string;
-  channels: Record<NotifyChannel, boolean>;
-  emailSubject: string;
-  emailBody: string;
-  fromName: string;
-  fromAddress: string;
-  smsBody: string;
-};
-
-const CHANNELS: NotifyChannel[] = ["Email", "In-app", "SMS", "WhatsApp"];
-
-export const DEFAULT_NOTIFICATIONS: NotificationRow[] = [
-  {
-    id: "unconfirmed",
-    title: "Appointment booked (Status: Unconfirmed)",
-    description: "Notifies when an appointment is booked with an unconfirmed status.",
-    info: "This notification is sent when an appointment is created with Unconfirmed status.",
-    channels: { Email: false, "In-app": false, SMS: false, WhatsApp: false },
-    emailSubject: "Appointment request on {{appointment.start_time}}",
-    emailBody:
-      "Hi {{contact.first_name}},\n\nYour appointment request has been received.",
-    fromName: "{{appointment.user.name}}",
-    fromAddress: "{{appointment.user.email}}",
-    smsBody:
-      "Unconfirmed: Appointment with {{contact.name}} on {{appointment.start_time}}.",
-  },
-  {
-    id: "confirmed",
-    title: "Appointment booked (Status: Confirmed)",
-    description: "Notifies when an appointment is successfully confirmed.",
-    info: "This notification is sent when an appointment is created with or updated to the Confirmed status.",
-    channels: { Email: true, "In-app": true, SMS: true, WhatsApp: false },
-    emailSubject:
-      "Appointment Confirmation on {{appointment.start_time}} ({{appointment.timezone}})",
-    emailBody:
-      "Hi {{contact.first_name}},\n\nYour appointment has been scheduled. Here are the details of your upcoming appointment:\n\nAppointment Title: {{appointment.title}}",
-    fromName: "{{appointment.user.name}}",
-    fromAddress: "{{appointment.user.email}}",
-    smsBody:
-      "Confirmed: Appointment with {{contact.name}} on {{appointment.start_time}} ({{appointment.timezone}}).",
-  },
-  {
-    id: "cancel",
-    title: "Cancellation",
-    description: "Alerts when an appointment is canceled.",
-    info: "This notification is sent when an appointment is canceled.",
-    channels: { Email: true, "In-app": false, SMS: true, WhatsApp: false },
-    emailSubject: "Appointment canceled",
-    emailBody: "Hi {{contact.first_name}},\n\nYour appointment has been canceled.",
-    fromName: "{{appointment.user.name}}",
-    fromAddress: "{{appointment.user.email}}",
-    smsBody: "Canceled: Appointment with {{contact.name}}.",
-  },
-  {
-    id: "reschedule",
-    title: "Reschedule",
-    description: "Notifies when an appointment is rescheduled.",
-    info: "This notification is sent when an appointment is rescheduled.",
-    channels: { Email: true, "In-app": false, SMS: true, WhatsApp: false },
-    emailSubject: "Appointment rescheduled",
-    emailBody:
-      "Hi {{contact.first_name}},\n\nYour appointment has been rescheduled to {{appointment.start_time}}.",
-    fromName: "{{appointment.user.name}}",
-    fromAddress: "{{appointment.user.email}}",
-    smsBody:
-      "Rescheduled: Appointment with {{contact.name}} on {{appointment.start_time}}.",
-  },
-  {
-    id: "reminder",
-    title: "Reminder",
-    description: "Sends a reminder before the appointment.",
-    info: "This notification is sent before the appointment starts.",
-    channels: { Email: true, "In-app": false, SMS: true, WhatsApp: false },
-    emailSubject: "Reminder: {{appointment.title}}",
-    emailBody:
-      "Hi {{contact.first_name}},\n\nThis is a reminder for your upcoming appointment.",
-    fromName: "{{appointment.user.name}}",
-    fromAddress: "{{appointment.user.email}}",
-    smsBody: "Reminder: Appointment on {{appointment.start_time}}.",
-  },
-  {
-    id: "followup",
-    title: "Follow-Up",
-    description: "Sends a follow-up message after the appointment is completed.",
-    info: "This notification is sent after the appointment is completed.",
-    channels: { Email: false, "In-app": false, SMS: false, WhatsApp: false },
-    emailSubject: "Thanks for meeting with us",
-    emailBody: "Hi {{contact.first_name}},\n\nThank you for your appointment.",
-    fromName: "{{appointment.user.name}}",
-    fromAddress: "{{appointment.user.email}}",
-    smsBody: "Thanks for your appointment with {{appointment.user.name}}.",
-  },
-];
 
 function Pill({
   label,
@@ -168,8 +78,8 @@ export function BookingNotificationsStep({
         <div className="border-b border-[#E5E7EB] px-5 py-5 sm:px-7">
           <h1 className="text-[18px] font-bold text-slate-900">Notifications</h1>
           <p className="mt-1 text-[13px] text-slate-500">
-            Configure how you send booking notifications via email, SMS,
-            WhatsApp, and in-app alerts.
+            Purple channels send. Email goes to the guest, In-app to the FinConnex
+            inbox, SMS and WhatsApp to the guest phone.
           </p>
         </div>
 
@@ -187,7 +97,7 @@ export function BookingNotificationsStep({
                   <p className="text-[14px] font-bold text-slate-800">
                     {row.title}
                   </p>
-                  {CHANNELS.map((c) => (
+                  {NOTIFY_CHANNELS.map((c) => (
                     <Pill
                       key={c}
                       label={c}
@@ -263,11 +173,11 @@ function NotificationEditModal({
 }) {
   const [draft, setDraft] = useState(row);
   const [tab, setTab] = useState<NotifyChannel>("Email");
-  const [contactOn, setContactOn] = useState(true);
-  const [userOn, setUserOn] = useState(false);
   const [contactOpen, setContactOpen] = useState(true);
   const [testEmail, setTestEmail] = useState("");
   const [testPhone, setTestPhone] = useState("+12345678901");
+  const [testNote, setTestNote] = useState("");
+  const [testing, setTesting] = useState(false);
 
   const enabled = draft.channels[tab];
   const words = useMemo(
@@ -278,6 +188,24 @@ function NotificationEditModal({
     () => draft.smsBody.trim().split(/\s+/).filter(Boolean).length,
     [draft.smsBody],
   );
+
+  async function runTest(channel: NotifyChannel) {
+    setTesting(true);
+    setTestNote("");
+    try {
+      await sendNotifyTest({
+        channel,
+        row: draft,
+        email: testEmail,
+        phone: testPhone,
+      });
+      setTestNote(`${channel} test sent.`);
+    } catch (err) {
+      setTestNote(err instanceof Error ? err.message : "Test send failed");
+    } finally {
+      setTesting(false);
+    }
+  }
 
   return (
     <div
@@ -310,7 +238,7 @@ function NotificationEditModal({
 
           <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#E5E7EB]">
             <div className="flex gap-4">
-              {CHANNELS.map((c) => (
+              {NOTIFY_CHANNELS.map((c) => (
                 <button
                   key={c}
                   type="button"
@@ -362,8 +290,10 @@ function NotificationEditModal({
                 <label className="flex items-center gap-2 text-[13px] font-medium text-slate-800">
                   <input
                     type="checkbox"
-                    checked={contactOn}
-                    onChange={(e) => setContactOn(e.target.checked)}
+                    checked={draft.notifyContact}
+                    onChange={(e) =>
+                      setDraft((d) => ({ ...d, notifyContact: e.target.checked }))
+                    }
                     className="accent-[#5A32A3]"
                   />
                   Contact
@@ -380,16 +310,8 @@ function NotificationEditModal({
                   />
                 </button>
               </div>
-              {contactOpen && contactOn && tab === "Email" ? (
+              {contactOpen && draft.notifyContact && tab === "Email" ? (
                 <div className="space-y-3 border-t border-[#F3F4F6] px-3 py-3">
-                  <label className="block">
-                    <span className="mb-1 block text-[12px] font-semibold text-slate-600">
-                      Email template
-                    </span>
-                    <select className="h-10 w-full rounded-lg border border-[#E5E7EB] px-3 text-[13px] text-slate-500">
-                      <option>Select an email template or start from scratch.</option>
-                    </select>
-                  </label>
                   <label className="block">
                     <span className="mb-1 block text-[12px] font-semibold text-slate-600">
                       Subject<span className="text-rose-500">*</span>
@@ -439,39 +361,6 @@ function NotificationEditModal({
                   </label>
                   <label className="block">
                     <span className="mb-1 block text-[12px] font-semibold text-slate-600">
-                      From name
-                    </span>
-                    <div className="relative">
-                      <input
-                        value={draft.fromName}
-                        onChange={(e) =>
-                          setDraft((d) => ({ ...d, fromName: e.target.value }))
-                        }
-                        className="h-10 w-full rounded-lg border border-[#E5E7EB] pr-9 pl-3 text-[13px] outline-none"
-                      />
-                      <Tag className="absolute top-1/2 right-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                    </div>
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[12px] font-semibold text-slate-600">
-                      From address
-                    </span>
-                    <div className="relative">
-                      <input
-                        value={draft.fromAddress}
-                        onChange={(e) =>
-                          setDraft((d) => ({
-                            ...d,
-                            fromAddress: e.target.value,
-                          }))
-                        }
-                        className="h-10 w-full rounded-lg border border-[#E5E7EB] pr-9 pl-3 text-[13px] outline-none"
-                      />
-                      <Tag className="absolute top-1/2 right-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                    </div>
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[12px] font-semibold text-slate-600">
                       Test email
                     </span>
                     <input
@@ -482,23 +371,20 @@ function NotificationEditModal({
                     />
                     <button
                       type="button"
-                      className="mt-2 h-8 rounded-md border border-[#E5E7EB] px-3 text-[12px] font-semibold text-slate-600 hover:bg-slate-50"
+                      disabled={testing}
+                      onClick={() => void runTest("Email")}
+                      className="mt-2 h-8 rounded-md border border-[#E5E7EB] px-3 text-[12px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                     >
                       Send test email
                     </button>
+                    {testNote ? (
+                      <p className="mt-1 text-[12px] text-slate-500">{testNote}</p>
+                    ) : null}
                   </label>
                 </div>
               ) : null}
-              {contactOpen && contactOn && tab === "SMS" ? (
+              {contactOpen && draft.notifyContact && tab === "SMS" ? (
                 <div className="space-y-3 border-t border-[#F3F4F6] px-3 py-3">
-                  <label className="block">
-                    <span className="mb-1 block text-[12px] font-semibold text-slate-600">
-                      SMS template
-                    </span>
-                    <select className="h-10 w-full rounded-lg border border-[#E5E7EB] px-3 text-[13px]">
-                      <option>None</option>
-                    </select>
-                  </label>
                   <label className="block">
                     <span className="mb-1 flex items-center justify-between text-[12px] font-semibold text-slate-600">
                       <span>
@@ -531,8 +417,7 @@ function NotificationEditModal({
                       <Tag className="absolute right-3 bottom-3 h-3.5 w-3.5 text-slate-400" />
                     </div>
                     <p className="mt-1 text-right text-[11px] text-slate-400">
-                      {draft.smsBody.length} characters | {smsWords} words | 1
-                      segs
+                      {draft.smsBody.length} characters | {smsWords} words
                     </p>
                   </label>
                   <label className="block">
@@ -546,17 +431,47 @@ function NotificationEditModal({
                     />
                     <button
                       type="button"
-                      className="mt-2 h-8 rounded-md border border-[#E5E7EB] px-3 text-[12px] font-semibold text-slate-600 hover:bg-slate-50"
+                      disabled={testing}
+                      onClick={() => void runTest("SMS")}
+                      className="mt-2 h-8 rounded-md border border-[#E5E7EB] px-3 text-[12px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                     >
                       Send test SMS
                     </button>
+                    {testNote ? (
+                      <p className="mt-1 text-[12px] text-slate-500">{testNote}</p>
+                    ) : null}
                   </label>
                 </div>
               ) : null}
-              {contactOpen && contactOn && (tab === "In-app" || tab === "WhatsApp") ? (
-                <div className="border-t border-[#F3F4F6] px-3 py-4 text-[13px] text-slate-500">
-                  {tab} notifications use the same appointment details as email.
-                  Enable the channel to deliver this event.
+              {contactOpen &&
+              draft.notifyContact &&
+              (tab === "In-app" || tab === "WhatsApp") ? (
+                <div className="space-y-3 border-t border-[#F3F4F6] px-3 py-4 text-[13px] text-slate-500">
+                  {tab === "In-app"
+                    ? "In-app alerts go to the assigned consultant’s FinConnex notification inbox."
+                    : "WhatsApp uses the same message as SMS and sends to the guest phone."}
+                  {tab === "WhatsApp" ? (
+                    <button
+                      type="button"
+                      disabled={testing}
+                      onClick={() => void runTest("WhatsApp")}
+                      className="mt-2 h-8 rounded-md border border-[#E5E7EB] px-3 text-[12px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      Send test WhatsApp
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={testing}
+                      onClick={() => void runTest("In-app")}
+                      className="mt-2 h-8 rounded-md border border-[#E5E7EB] px-3 text-[12px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      Send test in-app
+                    </button>
+                  )}
+                  {testNote ? (
+                    <p className="text-[12px] text-slate-500">{testNote}</p>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -564,16 +479,14 @@ function NotificationEditModal({
               <span className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={userOn}
-                  onChange={(e) => setUserOn(e.target.checked)}
+                  checked={draft.notifyUser}
+                  onChange={(e) =>
+                    setDraft((d) => ({ ...d, notifyUser: e.target.checked }))
+                  }
                   className="accent-[#5A32A3]"
                 />
                 Assigned user
               </span>
-            </label>
-            <label className="flex items-center gap-2 border-t border-[#F3F4F6] px-3 py-2.5 text-[13px] font-medium text-slate-800">
-              <input type="checkbox" className="accent-[#5A32A3]" />
-              {tab === "SMS" ? "Additional Phone Numbers" : "Additional emails"}
             </label>
           </div>
         </div>

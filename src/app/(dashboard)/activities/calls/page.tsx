@@ -35,10 +35,16 @@ import {
   updateCall,
   type CallScope,
 } from "@/lib/calls/store";
-import { CALL_STAGES, type CallStatus } from "@/lib/calls/types";
+import { CALL_STAGES, callColumns, type CallStatus } from "@/lib/calls/types";
 import { openSoftphone } from "@/lib/softphone/events";
 import { useCrmCalls } from "@/lib/calls/use-crm-calls";
 import { cn } from "@/lib/utils";
+import { kanbanPrefsFromCatalog } from "@/lib/kanban/column-prefs";
+import { useKanbanColumnPrefs } from "@/lib/kanban/use-kanban-column-prefs";
+
+const CALL_STAGE_DEFAULTS = kanbanPrefsFromCatalog(
+  callColumns.map((col) => ({ id: col.id, label: col.title })),
+);
 
 export default function CallsPage() {
   const [view, setView] = useState<ActivityView>("kanban");
@@ -52,6 +58,10 @@ export default function CallsPage() {
   const [massBusy, setMassBusy] = useState(false);
   const [massError, setMassError] = useState<string | null>(null);
   const crm = useCrmCalls();
+  const stagePrefs = useKanbanColumnPrefs(
+    "finconnex.calls.kanban-columns",
+    CALL_STAGE_DEFAULTS,
+  );
 
   const scope: CallScope =
     scopeTab === "My Overdue Calls" ? "my-overdue" : "all";
@@ -264,6 +274,18 @@ export default function CallsPage() {
           onClearSort={() => setSortActive(false)}
           moreMenuItems={moreMenuItems}
           printViewItems={printViewItems}
+          columnOptions={view === "kanban" ? stagePrefs.columns : undefined}
+          onColumnToggle={view === "kanban" ? stagePrefs.toggle : undefined}
+          onColumnRename={view === "kanban" ? stagePrefs.rename : undefined}
+          onColumnAdd={
+            view === "kanban"
+              ? (title) => {
+                  const error = stagePrefs.addTitle(title);
+                  if (error) notify(error);
+                }
+              : undefined
+          }
+          onColumnReorder={view === "kanban" ? stagePrefs.reorder : undefined}
         />
 
         {bulkFlash ? (
@@ -297,6 +319,8 @@ export default function CallsPage() {
               filters={filters}
               selectedIds={selectedIds}
               onSelectedIdsChange={setSelectedIds}
+              visibleColumnIds={stagePrefs.visibleIds}
+              columnTitles={stagePrefs.titles}
             />
           ) : (
             <CallsListTable

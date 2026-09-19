@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import { accessTokenFromRequest } from "@/lib/auth/crm-bff-helpers";
 import { isLocalSignToken } from "@/lib/documents/signature/public-sign-proxy";
 import { canPublishPublicSign } from "@/lib/documents/signature/public-sign-auth";
+import { uploadPublicSignDocumentDurable } from "@/lib/documents/signature/public-sign-durable";
+import { sealPublicSignSession } from "@/lib/documents/signature/public-sign-envelope";
 import {
   publicSignDocumentPath,
   writePublicSignDocument,
@@ -55,10 +58,20 @@ export async function POST(request: Request) {
   const contentType =
     file instanceof File ? file.type || "application/pdf" : "application/pdf";
 
+  const sourceDocumentUrl = bytes
+    ? await uploadPublicSignDocumentDurable({
+        bytes,
+        fileName: file instanceof File ? file.name || "document.pdf" : "document.pdf",
+        contentType,
+        accessToken: accessTokenFromRequest(request),
+      })
+    : null;
+
+  const tokens: Record<string, string> = {};
   for (const signer of signers) {
     const token = String(signer.token).trim();
     if (!isLocalSignToken(token)) continue;
-    await writePublicSignSession(token, {
+    const session = {
       documentName: meta.documentName || "Document",
       recipientName: signer.name || "Signer",
       role: signer.role || "Signer",
@@ -67,12 +80,26 @@ export async function POST(request: Request) {
       signerId: signer.id || "",
       signerEmail: signer.email || "",
       fields: Array.isArray(meta.fields) ? meta.fields : [],
+      fileToken: token,
+      sourceDocumentUrl,
       documentUrl: publicSignDocumentPath(token),
-    });
+    };
+    await writePublicSignSession(token, session);
     if (bytes) {
       await writePublicSignDocument(token, bytes, contentType);
     }
+    const sealed = sealPublicSignSession(session);
+    tokens[token] = sealed;
+    session.documentUrl = publicSignDocumentPath(sealed);
+    await writePublicSignSession(sealed, session);
+    if (bytes) {
+      await writePublicSignDocument(sealed, bytes, contentType);
+    }
   }
 
-  return NextResponse.json({ ok: true, published: signers.length });
+  return NextResponse.json({
+    ok: true,
+    published: Object.keys(tokens).length,
+    tokens,
+  });
 }

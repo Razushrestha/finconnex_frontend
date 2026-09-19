@@ -1,5 +1,13 @@
+export function isPackedSignToken(token: string) {
+  const parts = token.trim().split(".");
+  return parts.length === 3 && parts[0] === "sigp1" && Boolean(parts[1] && parts[2]);
+}
+
 export function isLocalSignToken(token: string) {
-  return /^sig-[a-zA-Z0-9._-]{1,120}$/i.test(token.trim());
+  const value = token.trim();
+  return (
+    isPackedSignToken(value) || /^sig-[a-zA-Z0-9._-]{1,180}$/i.test(value)
+  );
 }
 
 function pickStr(...values: unknown[]): string {

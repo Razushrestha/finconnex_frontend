@@ -77,6 +77,7 @@ function OutcomeTile({
 
   return (
     <div
+      data-kanban-outcome={outcome}
       onDragOver={(event) => {
         event.preventDefault();
         onOver(outcome);

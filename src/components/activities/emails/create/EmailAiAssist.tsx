@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Mic, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { EMAIL_TONES, htmlToPlainText, type EmailTone } from "@/lib/emails/ai-compose";
+import { EMAIL_TONES, extractEmailCore, htmlToPlainText, type EmailTone } from "@/lib/emails/ai-compose";
 import { requestEmailAi } from "@/lib/emails/request-email-ai";
 
 interface EmailAiAssistProps {
@@ -97,7 +97,9 @@ export function EmailAiAssist({
     setBusy(true);
     try {
       const drafted = await requestEmailAi({
-        mode: htmlToPlainText(html) ? "edit" : "draft",
+        mode: extractEmailCore(htmlToPlainText(html)).split(/\s+/).filter(Boolean).length >= 6
+          ? "edit"
+          : "draft",
         prompt: next,
         html,
         tone,

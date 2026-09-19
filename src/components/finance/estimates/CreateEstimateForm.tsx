@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, User, Building2, Calendar } from "lucide-react";
+import { FileText, User, Building2, Calendar, Loader2, X } from "lucide-react";
 import {
   ESTIMATE_STATUSES,
   appendEstimateAudit,
@@ -40,10 +40,15 @@ import {
   elevatedInputClass,
   elevatedSelectClass,
 } from "@/components/sales/CreateEntityForm";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 interface Props extends RelatedFinancePrefill {
-  layoutId: string;
-  redirect: boolean;
+  layoutId?: string;
+  redirect?: boolean;
+  variant?: "page" | "modal";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onCreated?: () => void;
 }
 
 export function CreateEstimateForm({
@@ -53,7 +58,13 @@ export function CreateEstimateForm({
   relatedName,
   relatedId,
   email,
+  variant = "page",
+  open = true,
+  onOpenChange,
+  onCreated,
 }: Props) {
+  void _l;
+  void _r;
   const router = useRouter();
   const prefill = useMemo(
     () => ({ relatedKind, relatedName, relatedId, email }),
@@ -77,6 +88,26 @@ export function CreateEstimateForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  const modalResetKey = `${variant}|${open}|${relatedKind ?? ""}|${relatedId ?? ""}`;
+  const [prevModalResetKey, setPrevModalResetKey] = useState(modalResetKey);
+  if (prevModalResetKey !== modalResetKey) {
+    setPrevModalResetKey(modalResetKey);
+    if (variant === "modal" && open) {
+      setTitle(defaultFinanceTitle("proposal", prefill));
+      setStatus("Draft");
+      setClientId(clients[0]?.id ?? "");
+      setDealName(defaultFinanceDealName(prefill));
+      setOwner(defaultActorName());
+      setValidUntil(defaultFinanceValidUntil());
+      setNotes("");
+      setLineItems([
+        newLineItem({ name: "Home loan packaging", unitPrice: 2200, taxRate: 10 }),
+      ]);
+      setErrors({});
+      setSaveError(null);
+    }
+  }
 
   const client = clients.find((c) => c.id === clientId) ?? clients[0];
 
@@ -164,39 +195,25 @@ export function CreateEstimateForm({
       setSaveError(null);
       return;
     }
+    if (variant === "modal") {
+      onCreated?.();
+      onOpenChange?.(false);
+      return;
+    }
     router.push(`/finance/estimates/${created.id}`);
   }
 
-  return (
-    <CreateEntityFormShell
-      breadcrumbParent={{ label: "Estimates", href: "/finance/estimates" }}
-      badge="Live CRM"
-      title="Create Estimate"
-      subtitle="Create, edit, send, and track estimates linked to deals and contacts."
-      tip="Title, Client, Owner, Valid until, and line items are required."
-      cardIcon={FileText}
-      cardTitle="Estimate details"
-      cardDescription="Opening move in the proposal-to-payment flow"
-      listHref="/finance/estimates"
-      saveLabel="Save estimate"
-      onSave={onSave}
-    >
+  const fields = (
+    <>
       {relatedTo ? (
         <Field label="Related to" className="sm:col-span-2">
           <InputShell icon={Building2}>
-            <input
-              readOnly
-              className={elevatedInputClass(true)}
-              value={relatedTo}
-            />
+            <input readOnly className={elevatedInputClass(true)} value={relatedTo} />
           </InputShell>
         </Field>
       ) : null}
       {saveError ? (
         <p className="sm:col-span-2 text-[12px] text-rose-600">{saveError}</p>
-      ) : null}
-      {saving ? (
-        <p className="sm:col-span-2 text-[12px] text-slate-500">Saving…</p>
       ) : null}
       <Field label="Title" required error={errors.title} className="sm:col-span-2">
         <InputShell icon={FileText} error={!!errors.title}>
@@ -302,6 +319,91 @@ export function CreateEstimateForm({
         ) : null}
         <LineItemsEditor items={lineItems} onChange={setLineItems} />
       </div>
+    </>
+  );
+
+  if (variant === "modal") {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          showCloseButton={false}
+          className="flex max-h-[min(92vh,900px)] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl"
+        >
+          <DialogTitle className="sr-only">Create Estimate</DialogTitle>
+          <header className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-5 py-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-600 text-white">
+              <FileText className="h-4 w-4" />
+            </div>
+            <h2 className="min-w-0 flex-1 truncate text-[15px] font-bold tracking-tight text-slate-900">
+              Create Estimate
+            </h2>
+            <button
+              type="button"
+              onClick={() => onOpenChange?.(false)}
+              aria-label="Close"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </header>
+          <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/70">
+            <div className="grid grid-cols-1 content-start gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-2">
+              {fields}
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+            <button
+              type="button"
+              onClick={() => onOpenChange?.(false)}
+              disabled={saving}
+              className="h-8 rounded-md border border-slate-200 bg-white px-3 text-[12px] font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void onSave(true)}
+              disabled={saving}
+              className="h-8 rounded-md border border-violet-200 bg-violet-50 px-3 text-[12px] font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+            >
+              Save &amp; New
+            </button>
+            <button
+              type="button"
+              onClick={() => void onSave(false)}
+              disabled={saving}
+              className="inline-flex h-8 min-w-[7.5rem] items-center justify-center gap-1.5 rounded-md bg-violet-600 px-4 text-[12px] font-semibold text-white hover:bg-violet-700 disabled:opacity-90"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                "Save estimate"
+              )}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return (
+    <CreateEntityFormShell
+      breadcrumbParent={{ label: "Estimates", href: "/finance/estimates" }}
+      badge="Live CRM"
+      title="Create Estimate"
+      subtitle="Create, edit, send, and track estimates linked to deals and contacts."
+      tip="Title, Client, Owner, Valid until, and line items are required."
+      cardIcon={FileText}
+      cardTitle="Estimate details"
+      cardDescription="Opening move in the proposal-to-payment flow"
+      listHref="/finance/estimates"
+      saveLabel="Save estimate"
+      onSave={onSave}
+    >
+      {fields}
     </CreateEntityFormShell>
   );
 }

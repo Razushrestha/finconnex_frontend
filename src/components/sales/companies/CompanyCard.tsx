@@ -18,7 +18,6 @@ import {
 import type { CompanyCardData } from "@/lib/companies/types";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion, cardSubject, entityCardBox } from "@/lib/motion";
-import Link from "next/link";
 import {
   CustomizeCompanyCardDrawer,
   DEFAULT_COMPANY_CARD_SETTINGS,
@@ -42,8 +41,8 @@ export type CompanyQuickActionKind =
 interface CompanyCardProps {
   company: CompanyCardData;
   isDragging: boolean;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragEnd: () => void;
+  onDragPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onDragClickCapture?: (e: React.MouseEvent) => void;
   onQuickAction?: (kind: CompanyQuickActionKind) => void;
   /** Whether this card's checkbox is checked — driven by the board/page. */
   isSelected: boolean;
@@ -112,8 +111,8 @@ const DEFAULT_QUICK_ACTION_KINDS_ARRAY: CompanyQuickActionKind[] = [
 export function CompanyCard({
   company,
   isDragging,
-  onDragStart,
-  onDragEnd,
+  onDragPointerDown,
+  onDragClickCapture,
   onQuickAction,
   isSelected,
   onToggleSelect,
@@ -154,22 +153,9 @@ export function CompanyCard({
   return (
     <>
       <div
-        draggable
-        onDragStart={(e) => {
-          const target = e.target as HTMLElement | null;
-          if (target?.closest("a,button,input,textarea,select,[role='button']")) {
-            e.preventDefault();
-            return;
-          }
-          dragMovedRef.current = true;
-          onDragStart(e);
-        }}
-        onDragEnd={() => {
-          onDragEnd();
-          window.setTimeout(() => {
-            dragMovedRef.current = false;
-          }, 0);
-        }}
+        draggable={false}
+        onPointerDown={onDragPointerDown}
+        onClickCapture={onDragClickCapture}
         onClick={openDetail}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -190,23 +176,19 @@ export function CompanyCard({
         )}
       >
         <div className="mb-3 flex items-center justify-between gap-2">
-          <Link
-            href={detailHref}
-            className="min-w-0"
-            onClick={(e) => e.stopPropagation()}
+          <h3
+            className={cn(
+              "min-w-0 truncate text-[13px] font-semibold text-slate-800",
+              cardSubject,
+            )}
           >
-            <h3
-              className={cn(
-                "truncate text-[13px] font-semibold text-slate-800",
-                cardSubject,
-              )}
-            >
-              {company.name}
-            </h3>
-          </Link>
+            {company.name}
+          </h3>
 
           <input
             type="checkbox"
+            data-no-drag
+            draggable={false}
             checked={isSelected}
             onChange={() => onToggleSelect(company.id)}
             onMouseDown={(e) => e.stopPropagation()}

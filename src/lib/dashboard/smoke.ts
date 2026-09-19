@@ -121,8 +121,14 @@ export function smokeDashboardWiring() {
       fail(`dashboard client missing ${name}`);
     }
   }
-  if (!api.includes("crmBffFetch")) {
-    fail("dashboard client must call crmBffFetch in the browser");
+  if (!api.includes("crmWorkspaceFetch")) {
+    fail("dashboard client must call crmWorkspaceFetch in the browser");
+  }
+  if (!api.includes('scope: "USER"')) {
+    fail("layout write body must match CreateDashboardLayoutDto");
+  }
+  if (!api.includes("instanceId: key")) {
+    fail("widget batch body must send { widgets: [{ key, instanceId }] }");
   }
 
   const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");

@@ -84,13 +84,46 @@ export async function persistCalculatorResult(input: {
   displayType: string;
   sharedWith?: string;
   savedBy?: string;
-}): Promise<{ record: CalculationRecord; source: "api" | "local" }> {
-  const remote = await tryCrmCalculation(() =>
-    createCrmCalculation(toCreateCalculationBody(input)),
-  );
-  if (remote) {
-    persistRemoteCalculation(remote);
-    return { record: savedToHistoryRecord(remote), source: "api" };
+}): Promise<{
+  record: CalculationRecord;
+  source: "api" | "local";
+  error?: string;
+}> {
+  try {
+    const remote = await createCrmCalculation(toCreateCalculationBody(input));
+    if (remote) {
+      persistRemoteCalculation(remote);
+      return { record: savedToHistoryRecord(remote), source: "api" };
+    }
+  } catch (err) {
+    const error = err instanceof Error ? err.message : "Could not save to CRM";
+    const ids = nextCalcIds();
+    const saved = upsertCalculation({
+      id: ids.id,
+      calcId: ids.calcId,
+      title: input.title,
+      type: input.type,
+      currency: input.currency,
+      inputs: input.inputs,
+      result: input.result,
+      formula: input.formula,
+      savedBy: input.savedBy?.trim() || "—",
+      savedAt: formatCalcAt(),
+      sharedWith: input.sharedWith,
+    });
+    const record: CalculationRecord = {
+      id: saved.id,
+      type: input.displayType,
+      date: saved.savedAt,
+      inputs: Object.fromEntries(
+        Object.entries(input.inputs).filter(([key]) => !key.startsWith("_")),
+      ),
+      summary: input.summary,
+      badge: input.badge,
+      source: "local",
+    };
+    writeLocal([record, ...readLocal().filter((row) => row.id !== record.id)]);
+    return { record, source: "local", error };
   }
 
   const ids = nextCalcIds();

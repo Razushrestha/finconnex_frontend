@@ -76,6 +76,20 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
   return [];
 }
 
+const CALCULATOR_KIND: Record<CalculatorType, string> = {
+  Commission: "COMMISSION",
+  ROI: "ROI",
+  Discount: "DISCOUNT",
+  Tax: "TAX",
+  Currency: "CURRENCY",
+  Loan: "LOAN",
+  Custom: "CUSTOM",
+};
+
+export function apiCalculatorKind(type: CalculatorType): string {
+  return CALCULATOR_KIND[type] ?? "CUSTOM";
+}
+
 export function mapCalculatorType(raw: string): CalculatorType {
   const value = raw.toLowerCase().replace(/[_-]/g, " ").trim();
   const compact = value.replace(/\s+/g, "");
@@ -180,20 +194,34 @@ function asCalculation(data: unknown): SavedCalculation | null {
 export async function listCrmCalculations(
   query: CrmCalculationQuery = {},
 ): Promise<SavedCalculation[]> {
-  return normalizeCalculations(
-    await calculationsRequest(
-      toQuery({
-        page: query.page,
-        limit: Math.min(query.limit ?? 100, 100),
-        type: query.type ? query.type.toUpperCase() : undefined,
-      }),
-    ),
-  );
+  const limit = Math.min(100, Math.max(1, query.limit ?? 100));
+  const startPage = query.page != null ? Math.max(1, query.page) : 1;
+  const maxPages = query.page != null ? 1 : 20;
+  const type =
+    query.type && CALCULATOR_KIND[query.type]
+      ? apiCalculatorKind(query.type)
+      : undefined;
+  const all: SavedCalculation[] = [];
+  for (let i = 0; i < maxPages; i += 1) {
+    const batch = normalizeCalculations(
+      await calculationsRequest(
+        toQuery({
+          page: startPage + i,
+          limit,
+          type,
+        }),
+      ),
+    );
+    all.push(...batch);
+    if (batch.length < limit) break;
+  }
+  return all;
 }
 
 export async function getCrmCalculation(
   id: string,
 ): Promise<SavedCalculation | null> {
+  if (!isUuid(id)) return null;
   return asCalculation(await calculationsRequest(`/${id}`));
 }
 
@@ -203,12 +231,14 @@ export async function createCrmCalculation(
   return asCalculation(
     await calculationsRequest("", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
   );
 }
 
 export async function deleteCrmCalculation(id: string): Promise<void> {
+  if (!isUuid(id)) return;
   await calculationsRequest(`/${id}`, { method: "DELETE" });
 }
 
@@ -236,15 +266,33 @@ export function toCreateCalculationBody(input: {
   formula: string;
   sharedWith?: string;
 }): Record<string, unknown> {
+  const formula = (input.formula || input.result.formula || "Calculation").trim().slice(0, 2000);
+  const title = input.title.trim().slice(0, 255) || `${input.type} calculation`;
+  const inputs = Object.fromEntries(
+    Object.entries(input.inputs ?? {}).map(([key, value]) => [
+      key,
+      value == null ? "" : String(value),
+    ]),
+  );
   const body: Record<string, unknown> = {
-    title: input.title,
-    type: input.type.toUpperCase(),
+    title,
+    type: apiCalculatorKind(input.type),
     currency: input.currency,
-    inputs: input.inputs,
-    result: input.result,
-    formula: input.formula,
+    inputs,
+    result: {
+      primaryLabel: input.result.primaryLabel,
+      primaryValue: Number(input.result.primaryValue) || 0,
+      primaryFormat: input.result.primaryFormat,
+      formula: input.result.formula || formula,
+      lines: (input.result.lines ?? []).map((line) => ({
+        label: line.label,
+        value: Number(line.value) || 0,
+        format: line.format,
+      })),
+    },
+    formula,
   };
-  if (input.sharedWith?.trim()) body.sharedWith = input.sharedWith.trim();
+  if (input.sharedWith?.trim()) body.sharedWith = input.sharedWith.trim().slice(0, 120);
   return body;
 }
 

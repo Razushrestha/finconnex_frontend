@@ -67,6 +67,23 @@ export function rewritePublicSalesUrl(raw: string): string {
   );
 }
 
+/** Extract kind/id/hash from a CRM or in-app public sales URL. */
+export function parsePublicSalesLink(
+  raw: string | undefined | null,
+): { kind: PublicSalesKind; id: string; hash: string } | null {
+  if (!raw?.trim()) return null;
+  const value = rewritePublicSalesUrl(raw.trim());
+  const match = value.match(
+    /\/(?:v1\/)?public\/sales\/(quotes|estimates|invoices)\/([^/]+)\/([^/?#]+)/i,
+  );
+  if (!match) return null;
+  return {
+    kind: match[1].toLowerCase() as PublicSalesKind,
+    id: match[2],
+    hash: match[3],
+  };
+}
+
 function crmBase(): string {
   return (
     getCrmApiBaseUrl() ||

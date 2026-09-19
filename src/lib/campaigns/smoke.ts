@@ -24,6 +24,7 @@ import {
   listCrmClientPortals,
   normalizeClientPortal,
   resetCrmClientPortalPassword,
+  toCreatePortalBody,
   updateCrmClientPortal,
 } from "@/lib/portals/api";
 import {
@@ -99,6 +100,14 @@ export function smokeCampaignsPortalsWiring() {
   if (!portals.includes("`/v1/client-portals${suffix}`")) {
     fail("portals client missing /v1/client-portals path");
   }
+  if (!portals.includes("crmBffFetch") || !portals.includes("toCreatePortalBody")) {
+    fail("portals client must BFF-proxy Swagger DTOs");
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('"client-portals"')) {
+    fail("BFF proxy does not allow /v1/client-portals");
+  }
 
   const catalog = readSrc("src/lib/api/endpoints.ts");
   if (!catalog.includes('path: "/campaigns"')) {
@@ -153,14 +162,34 @@ export function smokeCampaignsPortalsWiring() {
       name: "Greystone Portal",
       status: "ACTIVE",
       accessLevel: "FULL",
-      slug: "greystone",
-      primaryContactEmail: "a@example.com",
-      primaryContactName: "Ada",
+      portalUrl: "/acme/portal/p1",
+      companyId: ID,
+      primaryContactId: ID,
+      allowedModules: ["Documents", "Tickets"],
     },
     0,
   );
   if (portal.name !== "Greystone Portal" || portal.status !== "Active") {
     fail("normalizeClientPortal did not map Swagger-shaped fields");
+  }
+  if (portal.clientId !== ID || !portal.portalUrl) {
+    fail("normalizeClientPortal must map companyId and portalUrl");
+  }
+  const createBody = toCreatePortalBody({
+    name: "Portal",
+    companyId: ID,
+    primaryContactId: ID,
+    modules: ["Deals"],
+  });
+  if (
+    createBody.companyId !== ID ||
+    createBody.primaryContactId !== ID ||
+    createBody.allowedModules === undefined
+  ) {
+    fail("toCreatePortalBody must send companyId, primaryContactId, allowedModules");
+  }
+  if ("slug" in createBody || "clientName" in createBody) {
+    fail("toCreatePortalBody must not send fields outside CreatePortalDto");
   }
 }
 
@@ -225,7 +254,11 @@ export async function smokeCampaignsPortalsMock() {
 
     await listCrmClientPortals();
     await getCrmClientPortal(ID);
-    await createCrmClientPortal({ name: "Portal" });
+    await createCrmClientPortal({
+      name: "Portal",
+      companyId: ID,
+      primaryContactId: ID,
+    });
     await updateCrmClientPortal(ID, { name: "Updated portal" });
     await resetCrmClientPortalPassword(ID);
     await deleteCrmClientPortal(ID);

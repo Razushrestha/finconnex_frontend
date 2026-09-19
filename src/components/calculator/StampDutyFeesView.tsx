@@ -94,7 +94,7 @@ export default function StampDutyFeesView() {
     if (!currentResults) return;
 
     const summary = `Total Fees: $${currentResults.totalFees.toLocaleString()} AUD`;
-    await persistCalculatorResult({
+    const saved = await persistCalculatorResult({
       title: "Govt Charges",
       type: "Tax",
       currency: "AUD",
@@ -133,6 +133,9 @@ export default function StampDutyFeesView() {
         ],
       },
     });
+    if (saved.source !== "api" && saved.error) {
+      console.warn("CRM calculation save failed", saved.error);
+    }
   };
 
   return (

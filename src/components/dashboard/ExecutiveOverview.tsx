@@ -238,7 +238,7 @@ export function ExecutiveKpis({ data }: { data: ExecutiveData }) {
         delta={data.commissionDelta}
         spark={data.commissionSpark}
         icon={CircleDollarSign}
-        href="/finance"
+        href="/finance/invoices"
         vs={vs}
         iconClass="bg-cyan-50 text-cyan-600"
         sparkColor="#0891B2"

@@ -35,6 +35,9 @@ const PUBLIC_PREFIXES = [
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_EXACT.has(pathname)) return true;
+  if (pathname.startsWith("/api/book/") && pathname !== "/api/book/publish") {
+    return true;
+  }
   return PUBLIC_PREFIXES.some(
     (prefix) => pathname === prefix.slice(0, -1) || pathname.startsWith(prefix),
   );

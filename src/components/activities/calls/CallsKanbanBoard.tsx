@@ -12,6 +12,11 @@ import { callMatchesFilters } from "@/lib/filters/records";
 import type { CallFilters } from "@/lib/filters/module-filters";
 import { onRulesChange } from "@/lib/rules/storage";
 import { CallsKanbanColumn } from "./CallsKanbanColumn";
+import { KanbanDragGhost } from "@/components/common/KanbanDragGhost";
+import {
+  usePointerKanbanDrag,
+  type PointerKanbanDrop,
+} from "@/lib/kanban/use-pointer-kanban-drag";
 import type { Priority } from "@/lib/tasks/types";
 
 interface DragInfo {
@@ -29,17 +34,17 @@ export function CallsKanbanBoard({
   filters,
   selectedIds,
   onSelectedIdsChange,
+  visibleColumnIds,
+  columnTitles,
 }: {
   scope?: CallScope;
   filters?: CallFilters;
   selectedIds?: string[];
   onSelectedIdsChange?: (ids: string[]) => void;
+  visibleColumnIds?: string[];
+  columnTitles?: Record<string, string>;
 }) {
   const [columns, setColumns] = useState<CallColumn[]>(() => listCallColumns());
-  const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
-  const [dropTargetPos, setDropTargetPos] = useState<DropTargetPos | null>(
-    null,
-  );
   const [localSelectedIds, setLocalSelectedIds] = useState<string[]>([]);
   const selectedCallIds = selectedIds ?? localSelectedIds;
 
@@ -56,19 +61,17 @@ export function CallsKanbanBoard({
     return onRulesChange(() => setColumns(listCallColumns()));
   }, []);
 
-  function handleDragStartCall(
-    e: React.DragEvent<HTMLDivElement>,
-    callId: string,
-    columnId: string,
-  ) {
-    setDragInfo({ callId, sourceColumnId: columnId });
-    e.dataTransfer.effectAllowed = "move";
+  function handleDropCall({
+    itemId: callId,
+    targetColumnId,
+  }: PointerKanbanDrop) {
+    const targetColumn = columns.find((c) => c.id === targetColumnId);
+    if (!targetColumn) return;
+    updateCall(callId, { status: targetColumn.title });
+    setColumns(listCallColumns());
   }
 
-  function handleDragEndCall() {
-    setDragInfo(null);
-    setDropTargetPos(null);
-  }
+  const drag = usePointerKanbanDrag({ onDrop: handleDropCall });
 
   function handleToggleSelect(callId: string) {
     setSelectedCallIds(
@@ -116,17 +119,9 @@ export function CallsKanbanBoard({
     });
   }
 
-  function handleDropCall(targetColumnId: string, targetIndex?: number) {
-    if (!dragInfo) return;
-    const { callId, sourceColumnId } = dragInfo;
-    const targetColumn = columns.find((c) => c.id === targetColumnId);
-    if (!targetColumn) return;
-    updateCall(callId, { status: targetColumn.title });
-    setColumns(listCallColumns());
-    handleDragEndCall();
-  }
-
-  const visibleColumns = columns.map((column) => {
+  const visibleColumns = columns
+    .filter((column) => !visibleColumnIds?.length || visibleColumnIds.includes(column.id))
+    .map((column) => {
     const calls = column.calls.filter(
       (call) => callMatchesScope(call, scope) && callMatchesFilters(call, filters),
     );
@@ -139,20 +134,24 @@ export function CallsKanbanBoard({
         <CallsKanbanColumn
           key={column.id}
           column={column}
-          draggingCallId={dragInfo?.callId ?? null}
-          dropTargetPos={dropTargetPos}
-          setDropTargetPos={setDropTargetPos}
-          onDragStartCall={handleDragStartCall}
-          onDragEndCall={handleDragEndCall}
-          onDropCall={handleDropCall}
+          draggingCallId={drag.dragInfo?.itemId ?? null}
+          dropTargetPos={drag.dropTargetPos}
+          setDropTargetPos={() => undefined}
+          onCardPointerDown={drag.onCardPointerDown}
+          onDragClickCapture={
+            drag.cardPointerProps({ id: "", columnId: "", name: "" })
+              .onClickCapture
+          }
           selectedCallIds={selectedCallIds}
           onToggleSelect={handleToggleSelect}
           onChangeStatus={handleChangeStatus}
           onChangePriority={handleChangePriority}
           onAssignUser={handleAssignUser}
           onAddComment={handleAddComment}
+          displayTitle={columnTitles?.[column.id]}
         />
       ))}
+      <KanbanDragGhost ghost={drag.ghost} />
     </div>
   );
 }

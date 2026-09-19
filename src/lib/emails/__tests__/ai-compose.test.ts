@@ -1,12 +1,42 @@
 import { describe, expect, it } from "vitest";
 import {
   draftEmailFromPrompt,
+  editEmailWithPrompt,
   extractEmailCore,
   htmlToPlainText,
   rewriteEmailWithAi,
   subjectsGroundedInDraft,
   suggestSubjects,
 } from "@/lib/emails/ai-compose";
+
+describe("write with AI follow-up prompt", () => {
+  it("does not paste the user prompt or current draft into the email", () => {
+    const html = editEmailWithPrompt({
+      html: "<p>Hi Nepatronix,</p>",
+      prompt: "write a email for follow up",
+      recipientName: "Nepatronix",
+    });
+    const text = htmlToPlainText(html);
+    expect(text.toLowerCase()).not.toContain("write a email");
+    expect(text.toLowerCase()).not.toContain("keep the same recipient");
+    expect(text.toLowerCase()).not.toContain("current draft");
+    expect(text.toLowerCase()).toContain("following up");
+    expect(text).toContain("Nepatronix");
+    expect(text.toLowerCase()).not.toContain("signing status");
+  });
+
+  it("turns a follow-up prompt into a follow-up, not the raw instruction", () => {
+    const text = htmlToPlainText(
+      draftEmailFromPrompt({
+        prompt: "write a email for follow up",
+        tone: "professional",
+        recipientName: "Nepatronix",
+      }),
+    );
+    expect(text.toLowerCase()).toContain("following up");
+    expect(text.toLowerCase()).not.toContain("write a email for follow up");
+  });
+});
 
 describe("write with AI length", () => {
   it("writes three descriptive body paragraphs for every compose tone", () => {

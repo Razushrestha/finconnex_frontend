@@ -1,9 +1,23 @@
 /** Booking confirm / cancel / notify orchestration (client demo store). */
 
-import { createContact } from "@/lib/contacts/store";
 import { createLead } from "@/lib/leads/store";
+import { createCalendarItem } from "@/lib/calendar/store";
 import { createMeeting, findMeetingById, listMeetings, saveMeetings } from "@/lib/meetings/store";
+import { createCrmMeeting, persistRemoteMeeting, tryCrmMeeting } from "@/lib/meetings/api";
 import type { MeetingType } from "@/lib/meetings/types";
+import {
+  createCrmBooking,
+  crmEventTypeIdOf,
+  rescheduleCrmBooking,
+  tryCrmBooking,
+} from "@/lib/booking/api";
+import {
+  cancelQueuedBookingNotifies,
+  dispatchBookingNotifications,
+  queueBookingLifecycleNotifies,
+} from "@/lib/booking/notify";
+import { allocateConferencingLink, conferencingKind } from "@/lib/booking/meeting-link";
+import { nextBookingRef } from "@/lib/booking/guest-confirm-email";
 import {
   formatNotificationAt,
   listNotifications,
@@ -81,10 +95,12 @@ export async function confirmPublicBooking(input: {
   guestPhone?: string;
   start: string;
   answers: Record<string, string>;
+  timezone?: string;
   /** Existing manage token when guest is rescheduling */
   rescheduleToken?: string;
 }): Promise<{ booking: Booking; manageToken: string }> {
   const page = input.page;
+  const timezone = input.timezone?.trim() || page.timezone;
   const end = slotEndIso(input.start, page.durationMinutes);
   const when = formatBookingWhen(input.start, end);
   const location = bookingLocationLabel(page);
@@ -94,8 +110,62 @@ export async function confirmPublicBooking(input: {
     ? getBookingByToken(input.rescheduleToken)
     : undefined;
 
+  const onPublicBook =
+    typeof window !== "undefined" &&
+    /^\/book(\/|$)/i.test(window.location.pathname);
+
+  const eventTypeId = crmEventTypeIdOf(page);
+  if (eventTypeId && !onPublicBook) {
+    const crmStart = new Date(input.start);
+    const startIso = Number.isNaN(crmStart.getTime())
+      ? input.start
+      : crmStart.toISOString();
+    if (existing?.id && input.rescheduleToken) {
+      await tryCrmBooking(() => rescheduleCrmBooking(existing.id, startIso));
+    } else {
+      const booked = await tryCrmBooking(() =>
+        createCrmBooking({
+          eventTypeId,
+          startTime: startIso,
+          name: input.guestName.trim(),
+          email: input.guestEmail.trim(),
+          timezone,
+          phone: input.guestPhone,
+        }),
+      );
+      if (booked?.id && !existing) {
+        /* local copy below keeps manage-token UX even when CRM accepted */
+      }
+    }
+  }
+
   const manageToken = existing?.manageToken ?? nextManageToken();
   const bookingId = existing?.id ?? nextBookingId();
+  const reference = existing?.reference ?? nextBookingRef();
+
+  const crmMeeting =
+    onPublicBook || existing?.joinUrl || conferencingKind(page) === "none"
+      ? null
+      : await tryCrmMeeting(() =>
+          createCrmMeeting({
+            title: `${page.title} — ${input.guestName}`,
+            type: meetingTypeForPage(page),
+            startDateTime: input.start,
+            endDateTime: end,
+            status: "Scheduled",
+            organizer: page.owner,
+            location: page.location || page.meetingViaDetail,
+            agenda: `Booked via /book/${page.slug}`,
+            timezone,
+            externalAttendees: [{ email: input.guestEmail.trim(), name: input.guestName.trim() }],
+          }),
+        );
+  if (crmMeeting) persistRemoteMeeting(crmMeeting);
+
+  const joinUrl =
+    existing?.joinUrl ||
+    crmMeeting?.meetingLink ||
+    allocateConferencingLink(page, `${page.slug}-${reference}`);
 
   let leadId = existing?.leadId;
   let contactId = existing?.contactId;
@@ -117,18 +187,6 @@ export async function confirmPublicBooking(input: {
     leadId = lead.id;
     createdLead = true;
 
-    const contact = await createContact({
-      firstName,
-      lastName,
-      email: input.guestEmail,
-      phone: input.guestPhone,
-      company: input.answers.q1 || undefined,
-      source: "Website",
-      status: "Active",
-      owner: page.owner,
-    });
-    contactId = contact.id;
-
     const meeting = createMeeting({
       title: `${page.title} — ${input.guestName}`,
       relatedTo: lead.name,
@@ -138,13 +196,24 @@ export async function confirmPublicBooking(input: {
       status: "Scheduled",
       organizer: page.owner,
       location: page.location || page.meetingViaDetail,
-      meetingLink: page.videoLink,
+      meetingLink: joinUrl || page.videoLink,
       agenda: `Booked via /book/${page.slug}`,
       notes: Object.entries(input.answers)
         .map(([k, v]) => `${k}: ${v}`)
         .join("\n"),
     });
     meetingId = meeting.id;
+
+    if (page.calendarInvites !== false) {
+      createCalendarItem({
+        title: `${page.title} — ${input.guestName}`,
+        type: "Meeting",
+        start: input.start,
+        end,
+        owner: page.owner,
+        relatedTo: input.guestName,
+      });
+    }
 
     emitBookingNotification({
       type: "Lead Assigned",
@@ -184,24 +253,6 @@ export async function confirmPublicBooking(input: {
   });
   const nowIso = new Date().toISOString();
 
-  // Guest-facing confirmation (inbox for owner + system trail)
-  emitBookingNotification({
-    type: "Meeting Reminder",
-    title: existing ? "Booking rescheduled" : "Booking confirmation",
-    message: confirmationMessage,
-    recipient: page.owner,
-    relatedTo: input.guestName,
-    relatedHref: `/book/${page.slug}/manage/${manageToken}`,
-  });
-  emitBookingNotification({
-    type: "Meeting Reminder",
-    title: "Reminder queued",
-    message: reminderMessage,
-    recipient: page.owner,
-    relatedTo: input.guestName,
-    relatedHref: `/book/${page.slug}/manage/${manageToken}`,
-  });
-
   const booking: Booking = {
     id: bookingId,
     pageId: page.id,
@@ -225,10 +276,20 @@ export async function confirmPublicBooking(input: {
     reminderQueuedAt: nowIso,
     createdAt: existing?.createdAt ?? nowIso,
     rescheduledFrom: existing ? existing.start : undefined,
+    reference,
+    joinUrl,
   };
 
   upsertBooking(booking);
   recomputePageStats(page.id);
+
+  void dispatchBookingNotifications({
+    event: existing ? "reschedule" : "confirmed",
+    page: { ...page, timezone, videoLink: joinUrl || page.videoLink },
+    booking,
+  }).then(() => {
+    if (!existing) queueBookingLifecycleNotifies(page, booking);
+  });
 
   return { booking, manageToken };
 }
@@ -252,13 +313,11 @@ export async function cancelPublicBooking(token: string): Promise<Booking | null
 
   const page = getBookingPageById(booking.pageId);
   if (page) {
-    emitBookingNotification({
-      type: "System Alert",
-      title: "Booking cancelled",
-      message: `${booking.guestName} cancelled ${page.title} (${formatBookingWhen(booking.start, booking.end)})`,
-      recipient: page.owner,
-      relatedTo: booking.guestName,
-      relatedHref: "/booking",
+    cancelQueuedBookingNotifies(booking.id);
+    void dispatchBookingNotifications({
+      event: "cancel",
+      page,
+      booking: cancelled,
     });
     recomputePageStats(page.id);
   }

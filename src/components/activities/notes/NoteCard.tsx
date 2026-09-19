@@ -35,8 +35,8 @@ const TYPE_META: Record<NoteType, { soft: string; text: string }> = {
 interface NoteCardProps {
   note: Note;
   columnId: string;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragEnd: () => void;
+  onDragPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onDragClickCapture?: (e: React.MouseEvent) => void;
   isDragging: boolean;
   isSelected?: boolean;
   onSelect?: (
@@ -47,8 +47,8 @@ interface NoteCardProps {
 export function NoteCard({
   note,
   columnId,
-  onDragStart,
-  onDragEnd,
+  onDragPointerDown,
+  onDragClickCapture,
   isDragging,
   isSelected = false,
   onSelect,
@@ -65,19 +65,12 @@ export function NoteCard({
 
   return (
     <div
-      draggable
+      draggable={false}
+      onPointerDown={onDragPointerDown}
+      onClickCapture={onDragClickCapture}
+      onDragStart={(e) => e.preventDefault()}
       role="link"
       tabIndex={0}
-      onDragStart={(e) => {
-        wasDragging.current = true;
-        onDragStart(e);
-      }}
-      onDragEnd={() => {
-        onDragEnd();
-        setTimeout(() => {
-          wasDragging.current = false;
-        }, 0);
-      }}
       onClick={goToNote}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {

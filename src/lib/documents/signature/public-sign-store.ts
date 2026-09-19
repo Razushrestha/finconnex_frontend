@@ -1,8 +1,14 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+
+import {
+  isPackedPublicSignToken,
+  openPublicSignSession,
+} from "@/lib/documents/signature/public-sign-envelope";
 
 export type PublicSignSession = {
   documentName?: string;
@@ -17,6 +23,8 @@ export type PublicSignSession = {
   signerEmail?: string;
   fields?: unknown[];
   documentUrl?: string | null;
+  sourceDocumentUrl?: string | null;
+  fileToken?: string;
 };
 
 const memoryMeta = new Map<string, PublicSignSession>();
@@ -42,7 +50,21 @@ function storeDir() {
 }
 
 export function safePublicSignToken(token: string) {
-  return token.replace(/[^a-zA-Z0-9._-]/g, "").slice(0, 120);
+  const trimmed = token.trim();
+  if (isPackedPublicSignToken(trimmed) || trimmed.length > 120) {
+    return createHash("sha256").update(trimmed).digest("hex").slice(0, 40);
+  }
+  return trimmed.replace(/[^a-zA-Z0-9._-]/g, "").slice(0, 120);
+}
+
+function sessionKeys(token: string, session?: PublicSignSession | null) {
+  const keys = new Set<string>();
+  const packed = session ?? openPublicSignSession(token);
+  const fileToken = packed?.fileToken?.trim();
+  if (fileToken) keys.add(safePublicSignToken(fileToken));
+  const hashed = safePublicSignToken(token);
+  if (hashed) keys.add(hashed);
+  return [...keys];
 }
 
 function metaPath(token: string) {
@@ -53,10 +75,15 @@ function filePath(token: string) {
   return path.join(/* turbopackIgnore: true */ storeDir(), `${safePublicSignToken(token)}.bin`);
 }
 
-export async function readPublicSignSession(
-  token: string,
-): Promise<PublicSignSession | null> {
-  const key = safePublicSignToken(token);
+function mergeSession(
+  base: PublicSignSession | null,
+  overlay: PublicSignSession | null,
+): PublicSignSession | null {
+  if (!base && !overlay) return null;
+  return { ...(base ?? {}), ...(overlay ?? {}) };
+}
+
+async function readStoredSession(key: string): Promise<PublicSignSession | null> {
   if (!key) return null;
   try {
     const parsed = JSON.parse(
@@ -69,17 +96,28 @@ export async function readPublicSignSession(
   }
 }
 
+export async function readPublicSignSession(
+  token: string,
+): Promise<PublicSignSession | null> {
+  const packed = openPublicSignSession(token);
+  let stored: PublicSignSession | null = null;
+  for (const key of sessionKeys(token, packed)) {
+    stored = mergeSession(stored, await readStoredSession(key));
+  }
+  return mergeSession(packed, stored);
+}
+
 export async function writePublicSignSession(
   token: string,
   session: PublicSignSession,
 ) {
-  const key = safePublicSignToken(token);
-  if (!key) return;
   const next = { ...session };
-  memoryMeta.set(key, next);
+  const keys = sessionKeys(token, next);
+  if (!keys.length) return;
+  for (const key of keys) memoryMeta.set(key, next);
   try {
     await mkdir(storeDir(), { recursive: true });
-    await writeFile(metaPath(key), JSON.stringify(next));
+    await writeFile(metaPath(keys[0]!), JSON.stringify(next));
   } catch {
     /* memory is enough on a read-only host */
   }
@@ -90,14 +128,15 @@ export async function writePublicSignDocument(
   bytes: Buffer,
   contentType: string,
 ) {
-  const key = safePublicSignToken(token);
-  if (!key) return;
-  memoryFiles.set(key, { bytes, contentType });
+  const keys = sessionKeys(token);
+  if (!keys.length) return;
+  const file = { bytes, contentType };
+  for (const key of keys) memoryFiles.set(key, file);
   try {
     await mkdir(storeDir(), { recursive: true });
-    await writeFile(filePath(key), bytes);
+    await writeFile(filePath(keys[0]!), bytes);
     await writeFile(
-      `${filePath(key)}.type`,
+      `${filePath(keys[0]!)}.type`,
       contentType || "application/pdf",
       "utf8",
     );
@@ -106,11 +145,10 @@ export async function writePublicSignDocument(
   }
 }
 
-export async function readPublicSignDocument(token: string): Promise<{
+async function readStoredDocument(key: string): Promise<{
   bytes: Buffer;
   contentType: string;
 } | null> {
-  const key = safePublicSignToken(token);
   if (!key) return null;
   try {
     const bytes = await readFile(filePath(key));
@@ -125,12 +163,50 @@ export async function readPublicSignDocument(token: string): Promise<{
   }
 }
 
+async function fetchRemoteDocument(url: string): Promise<{
+  bytes: Buffer;
+  contentType: string;
+} | null> {
+  if (!/^https?:\/\//i.test(url) || url.includes("/api/sign/")) return null;
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return null;
+    const bytes = Buffer.from(await res.arrayBuffer());
+    if (bytes.length < 1) return null;
+    return {
+      bytes,
+      contentType: res.headers.get("content-type") || "application/pdf",
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function readPublicSignDocument(token: string): Promise<{
+  bytes: Buffer;
+  contentType: string;
+} | null> {
+  const session = await readPublicSignSession(token);
+  for (const key of sessionKeys(token, session)) {
+    const stored = await readStoredDocument(key);
+    if (stored) return stored;
+  }
+  const remote =
+    session?.sourceDocumentUrl ||
+    (typeof session?.documentUrl === "string" ? session.documentUrl : "");
+  if (remote) return fetchRemoteDocument(remote);
+  return null;
+}
+
 export async function listPublicSignSessions(filter?: {
   requestId?: string;
   tokens?: string[];
 }): Promise<Array<PublicSignSession & { token: string }>> {
+  const wantedRaw = (filter?.tokens ?? [])
+    .map((token) => String(token || "").trim())
+    .filter(Boolean);
   const wantedTokens = new Set(
-    (filter?.tokens ?? []).map((token) => safePublicSignToken(token)).filter(Boolean),
+    wantedRaw.map((token) => safePublicSignToken(token)).filter(Boolean),
   );
   const requestId = filter?.requestId?.trim();
   const found = new Map<string, PublicSignSession & { token: string }>();
@@ -164,11 +240,10 @@ export async function listPublicSignSessions(filter?: {
     /* directory missing */
   }
 
-  if (wantedTokens.size) {
-    for (const token of wantedTokens) {
-      if (found.has(token)) continue;
+  if (wantedRaw.length) {
+    for (const token of wantedRaw) {
       const session = await readPublicSignSession(token);
-      if (session) take(token, session);
+      if (session) take(session.fileToken || token, session);
     }
   }
 

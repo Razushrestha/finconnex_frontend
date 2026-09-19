@@ -1,106 +1,105 @@
 "use client";
 
-import React from "react";
-import { CheckCircle2, Clock, AlertCircle, Building2, TrendingUp } from "lucide-react";
-import { Payment } from "@/lib/finance/payments/types";
+import { CheckCircle2, Clock, AlertCircle, Landmark, TrendingDown, TrendingUp } from "lucide-react";
+import { formatAUD, type Payment } from "@/lib/finance/payments/types";
 
-interface PaymentMetricsRowProps {
-  data: Payment[];
+function parseWhen(value?: string) {
+  if (!value) return null;
+  const iso = new Date(value);
+  if (!Number.isNaN(iso.getTime())) return iso;
+  const m = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!m) return null;
+  return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
 }
 
-export const PaymentMetricsRow: React.FC<PaymentMetricsRowProps> = ({ data }) => {
-  const completedPayments = data.filter((p) => p.status === "Completed");
-  const totalSettled = completedPayments.reduce((sum, p) => sum + p.amount, 0);
+function settledInWindow(data: Payment[], from: number, to: number) {
+  return data
+    .filter((p) => p.status === "Completed")
+    .filter((p) => {
+      const t = parseWhen(p.receivedAt || p.createdAt)?.getTime();
+      return t != null && t >= from && t < to;
+    })
+    .reduce((sum, p) => sum + p.amount, 0);
+}
 
-  const pendingPayments = data.filter((p) => p.status === "Pending");
-  const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
+export function PaymentMetricsRow({ data }: { data: Payment[] }) {
+  const completed = data.filter((p) => p.status === "Completed");
+  const totalSettled = completed.reduce((sum, p) => sum + p.amount, 0);
+  const pending = data.filter((p) => p.status === "Pending");
+  const totalPending = pending.reduce((sum, p) => sum + p.amount, 0);
+  const failed = data.filter((p) => p.status === "Failed");
+  const totalFailed = failed.reduce((sum, p) => sum + p.amount, 0);
 
-  const failedPayments = data.filter((p) => p.status === "Failed");
-  const totalFailed = failedPayments.reduce((sum, p) => sum + p.amount, 0);
+  const now = Date.now();
+  const day = 86_400_000;
+  const current = settledInWindow(data, now - 30 * day, now);
+  const previous = settledInWindow(data, now - 60 * day, now - 30 * day);
+  const deltaPct =
+    previous > 0 ? Math.round(((current - previous) / previous) * 1000) / 10 : null;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      {/* Card 1: Total Settled Volume */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
-            TOTAL SETTLED VOLUME
+    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="relative overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-violet-50/80 p-5 shadow-sm">
+        <div className="flex items-start justify-between">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Settled Volume</p>
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
+            <CheckCircle2 className="h-4 w-4" />
           </span>
-          <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 font-bold text-lg">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
         </div>
-        <div className="mt-3">
-          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-            ${totalSettled > 0 ? totalSettled.toLocaleString(undefined, { minimumFractionDigits: 2 }) : "16,200.00"}
-          </h2>
-          <div className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-purple-600">
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>+8.4% vs previous 30 days</span>
-          </div>
-        </div>
+        <p className="mt-3 text-[26px] font-bold text-slate-900">{formatAUD(totalSettled)}</p>
+        <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-violet-600">
+          {deltaPct == null ? (
+            <span className="font-medium text-slate-400">{completed.length} completed payments</span>
+          ) : deltaPct >= 0 ? (
+            <>
+              <TrendingUp className="h-3.5 w-3.5" />
+              +{deltaPct}% vs previous 30 days
+            </>
+          ) : (
+            <>
+              <TrendingDown className="h-3.5 w-3.5" />
+              {deltaPct}% vs previous 30 days
+            </>
+          )}
+        </p>
       </div>
 
-      {/* Card 2: Pending Settlement */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
-            PENDING SETTLEMENT
+      <div className="relative overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-emerald-50/70 p-5 shadow-sm">
+        <div className="flex items-start justify-between">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Pending Settlement</p>
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+            <Clock className="h-4 w-4" />
           </span>
-          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-            <Clock className="w-5 h-5" />
-          </div>
         </div>
-        <div className="mt-3">
-          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-            ${totalPending > 0 ? totalPending.toLocaleString(undefined, { minimumFractionDigits: 2 }) : "500.00"}
-          </h2>
-          <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-500 font-medium">
-            <span className="w-2 h-2 rounded-full bg-blue-500" />
-            <span>{pendingPayments.length || 1} payment pending gateway clearance</span>
-          </div>
-        </div>
+        <p className="mt-3 text-[26px] font-bold text-slate-900">{formatAUD(totalPending)}</p>
+        <p className="mt-1 text-[11px] text-slate-500">
+          {pending.length} payment{pending.length === 1 ? "" : "s"} pending clearance
+        </p>
       </div>
 
-      {/* Card 3: Failed Transactions */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
-            FAILED TRANSACTIONS
+      <div className="relative overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-rose-50/80 p-5 shadow-sm">
+        <div className="flex items-start justify-between">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Failed Transactions</p>
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+            <AlertCircle className="h-4 w-4" />
           </span>
-          <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600">
-            <AlertCircle className="w-5 h-5" />
-          </div>
         </div>
-        <div className="mt-3">
-          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-            ${totalFailed > 0 ? totalFailed.toLocaleString(undefined, { minimumFractionDigits: 2 }) : "1,650.00"}
-          </h2>
-          <div className="flex items-center gap-1.5 mt-2 text-xs font-semibold text-rose-600">
-            <span>1 card declined</span>
-            <span className="text-slate-400 font-normal">•</span>
-            <span className="font-normal text-slate-500">Requires re-try</span>
-          </div>
-        </div>
+        <p className="mt-3 text-[26px] font-bold text-slate-900">{formatAUD(totalFailed)}</p>
+        <p className="mt-1 text-[11px] font-semibold text-rose-600">
+          {failed.length} failed{failed.length ? " — requires re-try" : ""}
+        </p>
       </div>
 
-      {/* Card 4: Gateway Fee Overhead */}
-      <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-xs flex flex-col justify-between hover:shadow-md transition-shadow">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
-            GATEWAY FEE OVERHEAD
+      <div className="relative overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-br from-white to-sky-50/80 p-5 shadow-sm">
+        <div className="flex items-start justify-between">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Gateway Fee Overhead</p>
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
+            <Landmark className="h-4 w-4" />
           </span>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600">
-            <Building2 className="w-5 h-5" />
-          </div>
         </div>
-        <div className="mt-3">
-          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">$184.20</h2>
-          <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-500 font-medium">
-            <span>Avg. 1.2% rate across Stripe & EFT</span>
-          </div>
-        </div>
+        <p className="mt-3 text-[26px] font-bold text-slate-900">{formatAUD(0)}</p>
+        <p className="mt-1 text-[11px] text-slate-400">Fee amounts are not stored on payments</p>
       </div>
     </div>
   );
-};
+}

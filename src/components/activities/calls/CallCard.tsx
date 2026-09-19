@@ -26,8 +26,8 @@ import { useRouter } from "next/navigation";
 interface CallCardProps {
   call: Call;
   columnId: string;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragEnd: () => void;
+  onDragPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onDragClickCapture?: (e: React.MouseEvent) => void;
   isDragging: boolean;
   onChangeStatus?: (callId: string, status: CallStatus) => void;
   onChangePriority?: (callId: string, priority: Priority) => void;
@@ -51,8 +51,8 @@ type OpenMenu = "status" | "priority" | null;
 export function CallCard({
   call,
   columnId,
-  onDragStart,
-  onDragEnd,
+  onDragPointerDown,
+  onDragClickCapture,
   isDragging,
   onChangeStatus,
   onChangePriority,
@@ -84,16 +84,8 @@ export function CallCard({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [openMenu]);
 
-  const handleCardDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-    wasDragging.current = true;
-    onDragStart(e);
-  };
-
-  const handleCardDragEnd = () => {
-    onDragEnd();
-    setTimeout(() => {
-      wasDragging.current = false;
-    }, 0);
+  const handleCardDragStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    onDragPointerDown(e);
   };
 
   const currentPriority = (call as any).priority || "Medium";
@@ -164,11 +156,12 @@ export function CallCard({
   return (
     <>
       <div
-        draggable
+        draggable={false}
+        onPointerDown={handleCardDragStart}
+        onClickCapture={onDragClickCapture}
+        onDragStart={(e) => e.preventDefault()}
         role="link"
         tabIndex={0}
-        onDragStart={handleCardDragStart}
-        onDragEnd={handleCardDragEnd}
         onClick={(e) => {
           if (wasDragging.current) return;
           if (

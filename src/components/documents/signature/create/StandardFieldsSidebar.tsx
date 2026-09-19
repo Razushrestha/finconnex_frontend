@@ -207,6 +207,7 @@ export function StandardFieldsSidebar({
             const isSelected = recipient.id === selectedId;
             const initial =
               recipient.name?.trim()?.[0]?.toUpperCase() ||
+              recipient.roleLabel?.trim()?.[0]?.toUpperCase() ||
               recipient.email?.trim()?.[0]?.toUpperCase() ||
               "?";
             return (
@@ -233,7 +234,9 @@ export function StandardFieldsSidebar({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13px] font-medium text-slate-800">
-                    {recipient.name || "Unnamed signer"}
+                    {recipient.name ||
+                      recipient.roleLabel ||
+                      "Unnamed signer"}
                   </span>
                   <span className="block truncate text-[11px] text-slate-500">
                     {recipient.email || "No email yet"}

@@ -76,6 +76,11 @@ export interface SignatureSigner {
   /** 1-based signing order when sequential */
   order: number;
   role: SignerRole;
+  /**
+   * Free-text party / template role label (e.g. "Landlord").
+   * Templates use this as the Nest role `name`; send requests keep person name in `name`.
+   */
+  roleLabel?: string;
   status: SignerStatus;
   /** Unique public link token for this signer */
   token: string;

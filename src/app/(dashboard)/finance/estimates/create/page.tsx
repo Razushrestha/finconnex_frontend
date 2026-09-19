@@ -1,4 +1,4 @@
-import { CreateEstimateForm } from "@/components/finance/estimates/CreateEstimateForm";
+import { redirect } from "next/navigation";
 
 export default async function CreateEstimatePage({
   searchParams,
@@ -13,14 +13,10 @@ export default async function CreateEstimatePage({
   }>;
 }) {
   const sp = await searchParams;
-  return (
-    <CreateEstimateForm
-      layoutId={sp.layoutid ?? "standard"}
-      redirect={sp.redirect !== "false"}
-      relatedKind={sp.relatedKind}
-      relatedName={sp.relatedName}
-      relatedId={sp.relatedId}
-      email={sp.to}
-    />
-  );
+  const qs = new URLSearchParams({ create: "1" });
+  if (sp.relatedKind) qs.set("relatedKind", sp.relatedKind);
+  if (sp.relatedName) qs.set("relatedName", sp.relatedName);
+  if (sp.relatedId) qs.set("relatedId", sp.relatedId);
+  if (sp.to) qs.set("to", sp.to);
+  redirect(`/finance/estimates?${qs.toString()}`);
 }

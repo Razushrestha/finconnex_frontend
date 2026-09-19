@@ -97,6 +97,8 @@ export type ZohoSendFormSettings = {
 
 interface ZohoStyleSendFormProps {
   mode: "send" | "self";
+  /** Template create uses the same layout with a free-text Role field. */
+  variant?: "send" | "template";
   documentName: string;
   onChangeName: (name: string) => void;
   documentFile: File | null;
@@ -116,6 +118,8 @@ interface ZohoStyleSendFormProps {
   showRecipientErrors?: boolean;
   onContinue: () => void;
   onClose: () => void;
+  onSaveDraft?: () => void;
+  isSaving?: boolean;
 }
 
 const fieldClass =
@@ -150,6 +154,8 @@ function FormLabel({ children }: { children: React.ReactNode }) {
 }
 
 export function ZohoStyleSendForm({
+  mode: _mode,
+  variant = "send",
   documentName,
   onChangeName,
   documentFile,
@@ -169,11 +175,14 @@ export function ZohoStyleSendForm({
   showRecipientErrors,
   onContinue,
   onClose,
+  onSaveDraft,
+  isSaving,
 }: ZohoStyleSendFormProps) {
+  const isTemplate = variant === "template";
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(isTemplate);
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
   const [crmResults, setCrmResults] = useState<SignatureCrmEntityOption[]>([]);
   const [crmSearching, setCrmSearching] = useState(false);
@@ -430,14 +439,16 @@ export function ZohoStyleSendForm({
                           <Upload className="h-3.5 w-3.5 text-primary" />
                           From computer
                         </button>
-                        <Link
-                          href="/signature/templates"
-                          className="flex items-center gap-2 px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-50"
-                          onClick={() => setAddMenuOpen(false)}
-                        >
-                          <LayoutTemplate className="h-3.5 w-3.5 text-primary" />
-                          Use template
-                        </Link>
+                        {!isTemplate ? (
+                          <Link
+                            href="/signature/templates"
+                            className="flex items-center gap-2 px-3 py-2 text-[13px] text-slate-700 hover:bg-slate-50"
+                            onClick={() => setAddMenuOpen(false)}
+                          >
+                            <LayoutTemplate className="h-3.5 w-3.5 text-primary" />
+                            Use template
+                          </Link>
+                        ) : null}
                       </div>
                     </>
                   ) : null}
@@ -569,6 +580,29 @@ export function ZohoStyleSendForm({
                       </span>
                     </div>
 
+                    {isTemplate ? (
+                      <div className="w-[140px]">
+                        <label className={colLabel}>Role</label>
+                        <input
+                          type="text"
+                          value={signer.roleLabel ?? ""}
+                          onChange={(e) =>
+                            updateRecipient(signer.id, {
+                              roleLabel: e.target.value,
+                            })
+                          }
+                          placeholder="e.g. Landlord"
+                          className={cn(
+                            fieldClass,
+                            "h-9",
+                            showRecipientErrors &&
+                              !(signer.roleLabel ?? "").trim() &&
+                              "border-rose-400",
+                          )}
+                        />
+                      </div>
+                    ) : null}
+
                     <div className="w-[148px] space-y-0">
                       <label className={colLabel}>Recipient Source</label>
                       <select
@@ -697,7 +731,9 @@ export function ZohoStyleSendForm({
                     ) : null}
 
                     <div className="w-[148px]">
-                      <label className={colLabel}>Role</label>
+                      <label className={colLabel}>
+                        {isTemplate ? "Action" : "Role"}
+                      </label>
                       <select
                         value={signer.role ?? "Signer"}
                         onChange={(e) =>
@@ -1021,10 +1057,21 @@ export function ZohoStyleSendForm({
         <div className="flex shrink-0 items-center gap-2.5 border-t border-slate-200 bg-white px-6 py-2.5">
             <button
               type="submit"
-              className="inline-flex h-8 items-center rounded-md bg-[#0E9F6E] px-4 text-[13px] font-semibold text-white hover:bg-[#0B8A5F]"
+              disabled={isSaving}
+              className="inline-flex h-8 items-center rounded-md bg-[#0E9F6E] px-4 text-[13px] font-semibold text-white hover:bg-[#0B8A5F] disabled:opacity-50"
             >
-              Continue
+              {isSaving ? "Saving…" : "Continue"}
             </button>
+            {onSaveDraft ? (
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={onSaveDraft}
+                className="inline-flex h-8 items-center rounded-md border border-slate-300 bg-white px-4 text-[13px] font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {isSaving ? "Saving…" : "Save Draft"}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={onClose}

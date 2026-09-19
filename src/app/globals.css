@@ -279,6 +279,14 @@ select:not([multiple]):not([size]):not(.fc-select-caret) {
   background: #cbd5e1;
 }
 
+/* Native HTML5 drag on links/images steals pointer moves on kanban cards. */
+[data-kanban-card-slot],
+[data-kanban-card-slot] a,
+[data-kanban-drop-column] a {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
 /* Dark mode */
 .dark *::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, oklch(1 0 0 / 22%), oklch(1 0 0 / 12%));

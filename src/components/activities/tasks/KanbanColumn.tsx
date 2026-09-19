@@ -19,17 +19,16 @@ interface KanbanColumnProps {
   draggingTaskId: string | null;
   dropTargetPos: DropTargetPos | null;
   setDropTargetPos: React.Dispatch<React.SetStateAction<DropTargetPos | null>>;
-  onDragStartTask: (
-    e: React.DragEvent<HTMLDivElement>,
-    taskId: string,
-    columnId: string,
+  onCardPointerDown: (
+    e: React.PointerEvent<HTMLElement>,
+    item: { id: string; columnId: string; name: string },
   ) => void;
-  onDragEndTask: () => void;
-  onDropTask: (targetColumnId: string, targetIndex?: number) => void;
+  onDragClickCapture?: (e: React.MouseEvent) => void;
   selectedIds?: string[];
   onToggleSelect: (id: string) => void;
   onChangePriority?: (taskId: string, priority: Priority) => void;
   onChangeStatus?: (taskId: string, status: TaskStatus) => void;
+  displayTitle?: string;
 }
 
 export function KanbanColumn({
@@ -37,14 +36,15 @@ export function KanbanColumn({
   draggingTaskId,
   dropTargetPos,
   setDropTargetPos,
-  onDragStartTask,
-  onDragEndTask,
-  onDropTask,
+  onCardPointerDown,
+  onDragClickCapture,
   selectedIds,
   onToggleSelect,
   onChangePriority,
   onChangeStatus,
+  displayTitle,
 }: KanbanColumnProps) {
+  const heading = displayTitle ?? column.title;
   const router = useRouter();
   const [isOver, setIsOver] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -77,7 +77,7 @@ export function KanbanColumn({
   if (isCollapsed) {
     return (
       <KanbanCollapsedRail
-        title={column.title}
+        title={heading}
         count={column.count}
         onExpand={() => setIsCollapsed(false)}
       />
@@ -85,7 +85,10 @@ export function KanbanColumn({
   }
 
   return (
-    <div className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}>
+    <div
+      data-kanban-drop-column={column.id}
+      className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}
+    >
       {/* Header Box */}
       <div
         className={cn("mb-2 shrink-0", KANBAN_HEADER)}
@@ -99,7 +102,7 @@ export function KanbanColumn({
           >
             <ChevronDown className="h-4 w-4 shrink-0 text-slate-700" />
             <h3 className="text-sm font-semibold text-slate-900">
-              {column.title}
+              {heading}
             </h3>
           </button>
           <span className={KANBAN_HEADER_COUNT}>
@@ -114,27 +117,17 @@ export function KanbanColumn({
             createLabel="Create task"
             onCreate={() => router.push("/activities/tasks/create")}
             onCollapse={() => setIsCollapsed(true)}
-            collapseLabel={`Collapse ${column.title}`}
+            collapseLabel={`Collapse ${heading}`}
           />
         }
       >
       <div
-        onDragOver={handleDragOverContainer}
-        onDragLeave={() => {
-          setIsOver(false);
-          if (dropTargetPos?.columnId === column.id) {
-            setDropTargetPos(null);
-          }
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          setIsOver(false);
-          onDropTask(column.id, dropTargetPos?.targetIndex);
-        }}
         className={cn(
           "flex min-h-full flex-col rounded-sm border border-transparent p-2",
           dropTargetIdle,
-          isOver ? dropTargetActive : KANBAN_WELL,
+          draggingTaskId && dropTargetPos?.columnId === column.id
+            ? dropTargetActive
+            : KANBAN_WELL,
         )}
       >
         <div className="flex min-h-[180px] flex-1 flex-col space-y-3 pb-4">
@@ -157,17 +150,21 @@ export function KanbanColumn({
                   <div className={KANBAN_DROP_GHOST} />
                 )}
 
-                <div data-task-card>
+                <div data-task-card data-kanban-card-slot={task.taskId}>
                   <TaskCard
                     task={task}
                     columnId={column.id}
                     isDragging={draggingTaskId === task.taskId}
                     isSelected={selectedIds?.includes(task.taskId)}
                     onSelect={() => onToggleSelect(task.taskId)}
-                    onDragStart={(e) =>
-                      onDragStartTask(e, task.taskId, column.id)
+                    onDragPointerDown={(e) =>
+                      onCardPointerDown(e, {
+                        id: task.taskId,
+                        columnId: column.id,
+                        name: task.title,
+                      })
                     }
-                    onDragEnd={onDragEndTask}
+                    onDragClickCapture={onDragClickCapture}
                     onChangePriority={onChangePriority}
                     onChangeStatus={onChangeStatus}
                   />

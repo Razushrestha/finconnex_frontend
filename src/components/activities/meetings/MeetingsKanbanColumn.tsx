@@ -19,13 +19,11 @@ interface MeetingsKanbanColumnProps {
   draggingMeetingId: string | null;
   dropTargetPos: DropTargetPos | null;
   setDropTargetPos: React.Dispatch<React.SetStateAction<DropTargetPos | null>>;
-  onDragStartMeeting: (
-    e: React.DragEvent<HTMLDivElement>,
-    meetingId: string,
-    columnId: string,
+  onCardPointerDown: (
+    e: React.PointerEvent<HTMLElement>,
+    item: { id: string; columnId: string; name: string },
   ) => void;
-  onDragEndMeeting: () => void;
-  onDropMeeting: (targetColumnId: string, targetIndex?: number) => void;
+  onDragClickCapture?: (e: React.MouseEvent) => void;
   embedded?: boolean;
   selectedIds?: string[];
   onToggleSelect?: (meetingId: string) => void;
@@ -36,9 +34,8 @@ export function MeetingsKanbanColumn({
   draggingMeetingId,
   dropTargetPos,
   setDropTargetPos,
-  onDragStartMeeting,
-  onDragEndMeeting,
-  onDropMeeting,
+  onCardPointerDown,
+  onDragClickCapture,
   selectedIds = [],
   onToggleSelect,
 }: MeetingsKanbanColumnProps) {
@@ -81,7 +78,10 @@ export function MeetingsKanbanColumn({
   }
 
   return (
-    <div className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}>
+    <div
+      data-kanban-drop-column={column.id}
+      className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}
+    >
       {/* Separate Header Box */}
       <div
         className={cn("mb-2 shrink-0", KANBAN_HEADER)}
@@ -127,7 +127,6 @@ export function MeetingsKanbanColumn({
         onDrop={(e) => {
           e.preventDefault();
           setIsOver(false);
-          onDropMeeting(column.id, dropTargetPos?.targetIndex);
         }}
         className={cn(
           "flex min-h-full flex-col rounded-sm border border-transparent p-2",
@@ -154,15 +153,19 @@ export function MeetingsKanbanColumn({
                   <div className={KANBAN_DROP_GHOST} />
                 )}
 
-                <div data-meeting-card>
+                <div data-meeting-card data-kanban-card-slot={meeting.id}>
                   <MeetingCard
                     meeting={meeting}
                     columnId={column.id}
                     isDragging={draggingMeetingId === meeting.id}
-                    onDragStart={(e) =>
-                      onDragStartMeeting(e, meeting.id, column.id)
+                    onDragPointerDown={(e) =>
+                      onCardPointerDown(e, {
+                        id: meeting.id,
+                        columnId: column.id,
+                        name: meeting.title,
+                      })
                     }
-                    onDragEnd={onDragEndMeeting}
+                    onDragClickCapture={onDragClickCapture}
                     isSelected={selectedIds.includes(meeting.id)}
                     onSelect={
                       onToggleSelect

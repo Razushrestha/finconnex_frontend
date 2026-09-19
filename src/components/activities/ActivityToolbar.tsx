@@ -17,6 +17,10 @@ import {
   Search,
   type LucideIcon,
 } from "lucide-react";
+import {
+  KanbanStagesMenu,
+  type KanbanStageColumnOption,
+} from "@/components/common/KanbanStagesMenu";
 
 export type ActivityView = "list" | "kanban" | "calendar" | "timeline";
 
@@ -89,6 +93,11 @@ export interface ActivityToolbarProps {
     labeled?: boolean;
   }[];
   createMenuItems?: CreateMenuItem[];
+  columnOptions?: KanbanStageColumnOption[];
+  onColumnToggle?: (columnId: string) => void;
+  onColumnRename?: (columnId: string, nextLabel: string) => void;
+  onColumnAdd?: (title: string) => void;
+  onColumnReorder?: (draggedId: string, targetId: string) => void;
 }
 
 export const TIMELINE_VIEW_TOGGLE = {
@@ -129,6 +138,11 @@ export function ActivityToolbar({
   onSavedViewChange,
   extraViewIcons = [],
   createMenuItems = [],
+  columnOptions,
+  onColumnToggle,
+  onColumnRename,
+  onColumnAdd,
+  onColumnReorder,
 }: ActivityToolbarProps) {
   const router = useRouter();
   const [internalActiveTab, setInternalActiveTab] = useState(tabs[0]);
@@ -152,6 +166,8 @@ export function ActivityToolbar({
 
   const activeTab = externalActiveTab ?? internalActiveTab;
   const hasCreateMenu = createMenuItems.length > 0;
+  const hasStageMenu = Boolean(columnOptions?.length);
+  const hasMoreMenu = Boolean(moreMenuItems?.length || hasStageMenu);
 
   function createHref(extra?: Record<string, string>) {
     const params = new URLSearchParams({
@@ -484,7 +500,7 @@ export function ActivityToolbar({
             <button
               type="button"
               onClick={() => {
-                if (!moreMenuItems) return;
+                if (!hasMoreMenu) return;
                 setCreateMenuOpen(false);
                 setMoreMenuOpen((v) => !v);
               }}
@@ -494,14 +510,28 @@ export function ActivityToolbar({
               <MoreHorizontal className="h-3.5 w-3.5" />
             </button>
 
-            {moreMenuItems && moreMenuOpen && (
+            {hasMoreMenu && moreMenuOpen && (
               <>
                 <div
                   className="fixed inset-0 z-10"
                   onClick={() => setMoreMenuOpen(false)}
                 />
-                <div className="absolute right-0 z-20 mt-1 w-52 rounded-lg border border-slate-100 bg-white py-1 shadow-lg">
-                  {moreMenuItems.map(({ key, icon: Icon, label, onSelect }) => (
+                <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-slate-100 bg-white py-1 shadow-lg">
+                  {hasStageMenu && columnOptions ? (
+                    <div className="px-1.5 pb-1">
+                      <KanbanStagesMenu
+                        columns={columnOptions}
+                        onToggle={onColumnToggle}
+                        onRename={onColumnRename}
+                        onAdd={onColumnAdd}
+                        onReorder={onColumnReorder}
+                      />
+                    </div>
+                  ) : null}
+                  {hasStageMenu && moreMenuItems?.length ? (
+                    <div className="mx-1.5 my-1 h-px bg-slate-100" />
+                  ) : null}
+                  {moreMenuItems?.map(({ key, icon: Icon, label, onSelect }) => (
                     <button
                       key={key}
                       type="button"

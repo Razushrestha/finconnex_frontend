@@ -10,13 +10,16 @@ import {
 } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import mammoth from "mammoth";
-import { AdvancedOptionsSection } from "@/components/documents/signature/create/AdvancedOptionsSection";
 import {
-  DocumentDetailsSection,
   renamedStoredFileName,
+  splitFileName,
   type AdditionalDocument,
 } from "@/components/documents/signature/create/DocumentDetailsSection";
-import { EmailMessageSection } from "@/components/documents/signature/create/EmailMessageSection";
+import {
+  ZohoStyleSendForm,
+  type ZohoSendFormSettings,
+} from "@/components/documents/signature/create/ZohoStyleSendForm";
+import { defaultTemplateMoreSettings } from "@/components/documents/signature/create/AdvancedOptionsSection";
 import {
   PlaceFieldsView,
   type SignatureDocumentPreview,
@@ -24,6 +27,7 @@ import {
 import type { StandardFieldType } from "@/components/documents/signature/create/StandardFieldsSidebar";
 import {
   listSignatureRequests,
+  makeSigner,
   nextSignatureIds,
   SignatureField,
   upsertSignatureRequest,
@@ -39,7 +43,6 @@ import {
   DEFAULT_PLACED_FIELD_HEIGHT,
   DEFAULT_PLACED_FIELD_WIDTH,
 } from "@/lib/documents/signature/field-placement";
-import AddRecipients from "@/components/documents/signature/templates/AddRecipients";
 import { toast } from "@/lib/notify/toast";
 import { tryCrmStorage, uploadCrmStorageFile } from "@/lib/storage/api";
 import {
@@ -50,6 +53,10 @@ import {
   tryCrmSignatureTemplate,
   updateCrmSignatureTemplate,
 } from "@/lib/documents/signature/templates-api";
+
+let additionalDocIdCounter = 0;
+const nextAdditionalDocId = () =>
+  `additional-doc-${Date.now()}-${additionalDocIdCounter++}`;
 
 export default function CreateTemplatePage() {
   return (
@@ -153,36 +160,49 @@ function CreateTemplateForm() {
     string | undefined
   >();
 
-  const [recipients, setRecipients] = useState<SignatureSigner[]>([
-    {
-      id: "",
+  const [recipients, setRecipients] = useState<SignatureSigner[]>(() => [
+    makeSigner({
+      id: "sg-1",
       name: "",
       email: "",
-      colorIndex: 0,
       order: 1,
-      role: "" as any,
-      status: "Pending",
-      token: "",
-      deliveryMethod: "email",
-    },
+      token: `sig-1-${Date.now()}`,
+      colorIndex: 0,
+      role: "Signer",
+    }),
   ]);
   const [signingOrder, setSigningOrder] = useState<"sequential" | "parallel">(
     "sequential",
   );
-  const [enableExpiry, setEnableExpiry] = useState(false);
+  const [moreSettings, setMoreSettings] = useState<ZohoSendFormSettings>(
+    defaultTemplateMoreSettings,
+  );
   const [expiryDate, setExpiryDate] = useState("");
-  const [expiryTime, setExpiryTime] = useState("");
-
-  const [emailTitle, setEmailTitle] = useState(`Please sign: ${documentName}`);
   const [emailMessage, setEmailMessage] = useState("");
+  const [showRecipientErrors, setShowRecipientErrors] = useState(false);
 
   const [fileError, setFileError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  function expiryFromDays(days: number) {
+    const d = new Date();
+    d.setDate(d.getDate() + Math.max(1, days));
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  function resolvedExpiryDate() {
+    return expiryDate || expiryFromDays(moreSettings.daysToComplete);
+  }
 
   // Field placement state
   const [placedFields, setPlacedFields] = useState<PlacedField[]>([]);
   const [draggingFieldType, setDraggingFieldType] =
     useState<DraggingFieldType | null>(null);
+  const draggingRef = useRef<DraggingFieldType | null>(null);
+  draggingRef.current = draggingFieldType;
 
   // --- Load existing template data when editing ---
   useEffect(() => {
@@ -211,13 +231,29 @@ function CreateTemplateForm() {
         }
 
         if (existing.signers && existing.signers.length > 0) {
-          setRecipients(existing.signers);
+          setRecipients(
+            existing.signers.map((signer) => {
+              const knownRoles = ["Signer", "Approver", "CC"] as const;
+              const roleIsKnown = knownRoles.includes(
+                signer.role as (typeof knownRoles)[number],
+              );
+              if (roleIsKnown || signer.roleLabel) return signer;
+              return {
+                ...signer,
+                roleLabel: String(signer.role || ""),
+                role: "Signer" as const,
+              };
+            }),
+          );
         }
         if (existing.signingOrder) {
           setSigningOrder(existing.signingOrder);
         }
         if (existing.fields) {
           setPlacedFields(existing.fields as unknown as PlacedField[]);
+        }
+        if (existing.expiryDate) {
+          setExpiryDate(existing.expiryDate);
         }
       }
     } catch (error) {
@@ -412,6 +448,55 @@ function CreateTemplateForm() {
     setExistingDocumentFileUrl(undefined);
   };
 
+  const applyPrimaryFile = (file: File) => {
+    const { base } = splitFileName(file.name);
+    setDocumentName(base);
+    handleFileChange(file);
+  };
+
+  const addAdditionalFiles = (files: File[]) => {
+    if (files.length === 0) return;
+    const newEntries: AdditionalDocument[] = files.map((file) => {
+      const { base, ext } = splitFileName(file.name);
+      return {
+        id: nextAdditionalDocId(),
+        file,
+        fileUrl: URL.createObjectURL(file),
+        name: base,
+        extension: ext,
+      };
+    });
+    setAdditionalFiles((prev) => [...prev, ...newEntries]);
+  };
+
+  const handleIncomingFiles = (files: File[]) => {
+    if (files.length === 0) return;
+    setFileError("");
+    if (!documentFile) {
+      const [first, ...rest] = files;
+      applyPrimaryFile(first);
+      addAdditionalFiles(rest);
+      return;
+    }
+    addAdditionalFiles(files);
+  };
+
+  const handleRemovePrimary = () => {
+    if (additionalFiles.length > 0) {
+      const [next, ...rest] = additionalFiles;
+      setDocumentName(next.name);
+      handleFileChange(next.file);
+      setAdditionalFiles(rest);
+      return;
+    }
+    setDocumentName("");
+    handleFileChange(null);
+  };
+
+  const handleRemoveAdditional = (id: string) => {
+    setAdditionalFiles((prev) => prev.filter((doc) => doc.id !== id));
+  };
+
   const handleResizeField = (id: string, width: number, height: number) => {
     setPlacedFields((prev) =>
       prev.map((f) => (f.id === id ? { ...f, width, height } : f)),
@@ -445,7 +530,7 @@ function CreateTemplateForm() {
         fields: placedFields as unknown as SignatureField[],
         signingOrder,
         status: "Draft",
-        expiryDate: expiryDate || "31/10/2026",
+        expiryDate: resolvedExpiryDate(),
         createdBy: "Current User",
         manageToken: ids.manageToken,
         audit: [
@@ -492,7 +577,7 @@ function CreateTemplateForm() {
         fields: placedFields as unknown as SignatureField[],
         signingOrder,
         status: "Draft",
-        expiryDate: expiryDate || "31/10/2026",
+        expiryDate: resolvedExpiryDate(),
         createdBy: "Current User",
         manageToken: ids.manageToken,
         audit: [
@@ -539,6 +624,14 @@ function CreateTemplateForm() {
       setFileError("Document file is required");
       return;
     }
+    const missingRole = recipients.some(
+      (r) => !(r.roleLabel ?? "").trim() && !r.name.trim(),
+    );
+    if (missingRole) {
+      setShowRecipientErrors(true);
+      toast.error("Add a Role for each recipient");
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -559,13 +652,13 @@ function CreateTemplateForm() {
         documents:
           persistedDocuments.length > 0 ? persistedDocuments : undefined,
         recordType: "template",
-        signer: recipients[0]?.name || "",
+        signer: recipients[0]?.name || recipients[0]?.roleLabel || "",
         signerEmail: recipients[0]?.email || "",
         signers: recipients,
         fields: placedFields as unknown as SignatureField[],
         signingOrder,
         status: "Draft",
-        expiryDate: expiryDate || "31/10/2026",
+        expiryDate: resolvedExpiryDate(),
         createdBy: "Current User",
         manageToken: ids.manageToken,
         audit: [
@@ -600,11 +693,23 @@ function CreateTemplateForm() {
   ) => {
     e.dataTransfer.effectAllowed = "copy";
     e.dataTransfer.setData("text/plain", field.type);
-    setDraggingFieldType(recipient ? { ...field, recipient } : field);
+    const next = recipient ? { ...field, recipient } : field;
+    draggingRef.current = next;
+    setDraggingFieldType(next);
   };
 
   const handleSidebarDragEnd = () => {
+    draggingRef.current = null;
     setDraggingFieldType(null);
+  };
+
+  const handleArmField = (
+    field: StandardFieldType,
+    recipient?: { id: string; name: string; email: string; colorIndex: number },
+  ) => {
+    const next = recipient ? { ...field, recipient } : field;
+    draggingRef.current = next;
+    setDraggingFieldType(next);
   };
 
   const handleDropField = (
@@ -613,23 +718,25 @@ function CreateTemplateForm() {
     xPct: number,
     yPct: number,
   ) => {
-    if (!draggingFieldType) return;
+    const current = draggingRef.current;
+    if (!current) return;
     setPlacedFields((prev) => [
       ...prev,
       {
         id: `field-${Date.now()}-${prev.length}`,
-        type: draggingFieldType.type,
-        label: draggingFieldType.label,
+        type: current.type,
+        label: current.label,
         documentId,
         page,
         xPct,
         yPct,
         width: DEFAULT_PLACED_FIELD_WIDTH,
         height: DEFAULT_PLACED_FIELD_HEIGHT,
-        recipientId: draggingFieldType.recipient?.id,
-        colorIndex: draggingFieldType.recipient?.colorIndex,
+        recipientId: current.recipient?.id,
+        colorIndex: current.recipient?.colorIndex,
       },
     ]);
+    draggingRef.current = null;
     setDraggingFieldType(null);
   };
 
@@ -676,6 +783,7 @@ function CreateTemplateForm() {
           handleRemovePlacedField={handleRemovePlacedField}
           handleSidebarDragStart={handleSidebarDragStart}
           handleSidebarDragEnd={handleSidebarDragEnd}
+          handleArmField={handleArmField}
           handleResizeField={handleResizeField}
           handleChangeFieldValue={handleChangeFieldValue}
           handleSaveTemplate={handleSaveTemplate}
@@ -688,82 +796,34 @@ function CreateTemplateForm() {
   // STEP 1: CREATE FORM VIEW (Default URL)
   // ==========================================
   return (
-    <div className="min-h-screen bg-background p-4 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-bold text-foreground tracking-tight">
-            {editId ? "Edit Template" : "Create Template"}
-          </h1>
-        </div>
-      </div>
-
-      <hr className="border-border" />
-
-      <div className="w-full space-y-4">
-        <DocumentDetailsSection
-          documentName={documentName}
-          documentFile={documentFile}
-          onChangeName={setDocumentName}
-          onChangeFile={handleFileChange}
-          error={fileError}
-          additionalFiles={additionalFiles}
-          onChangeAdditionalFiles={setAdditionalFiles}
-        />
-
-        <AddRecipients
-          signers={recipients}
-          onChange={setRecipients}
-          signingOrder={signingOrder}
-          onToggleOrder={setSigningOrder}
-        />
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <AdvancedOptionsSection
-            enableExpiry={enableExpiry}
-            setEnableExpiry={setEnableExpiry}
-            expiryDate={expiryDate}
-            setExpiryDate={setExpiryDate}
-            expiryTime={expiryTime}
-            setExpiryTime={setExpiryTime}
-          />
-
-          <EmailMessageSection
-            title={emailTitle}
-            setTitle={setEmailTitle}
-            message={emailMessage}
-            setMessage={setEmailMessage}
-          />
-        </div>
-      </div>
-
-      <div className="sticky bottom-0 bg-white/80 backdrop-blur-md border-t border-slate-200 w-full p-2 flex items-center justify-between rounded-xl shadow-lg">
-        <button
-          type="button"
-          onClick={() => router.push("/signature/templates")}
-          className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-colors shadow-xs"
-        >
-          Cancel
-        </button>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleSaveDraft}
-            disabled={isSaving}
-            className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-colors shadow-xs disabled:opacity-50"
-          >
-            {isSaving ? "Saving…" : "Save Draft"}
-          </button>
-          <button
-            type="button"
-            onClick={handleContinue}
-            disabled={isSaving}
-            className="px-6 py-2.5 rounded-xl bg-primary text-white text-xs font-semibold transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50"
-          >
-            <span>{isSaving ? "Saving…" : "Continue to place fields"}</span>
-            <span>→</span>
-          </button>
-        </div>
-      </div>
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-white">
+      <ZohoStyleSendForm
+        mode="send"
+        variant="template"
+        documentName={documentName}
+        onChangeName={setDocumentName}
+        documentFile={documentFile}
+        additionalFiles={additionalFiles}
+        onIncomingFiles={handleIncomingFiles}
+        onRemovePrimary={handleRemovePrimary}
+        onRemoveAdditional={handleRemoveAdditional}
+        fileError={fileError}
+        recipients={recipients}
+        onChangeRecipients={setRecipients}
+        signingOrder={signingOrder}
+        onToggleOrder={setSigningOrder}
+        settings={moreSettings}
+        onChangeSettings={(patch) =>
+          setMoreSettings((prev) => ({ ...prev, ...patch }))
+        }
+        noteToRecipients={emailMessage}
+        onChangeNote={setEmailMessage}
+        showRecipientErrors={showRecipientErrors}
+        onContinue={() => void handleContinue()}
+        onClose={() => router.push("/signature/templates")}
+        onSaveDraft={() => void handleSaveDraft()}
+        isSaving={isSaving}
+      />
     </div>
   );
 }

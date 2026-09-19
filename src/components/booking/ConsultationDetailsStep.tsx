@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { ImagePlus, ChevronDown, LocateFixed, MapPin, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConsultationMode } from "@/lib/booking/types";
 import {
   defaultOfficeAddress,
-  integratedMeetingPlatforms,
+  selectableOnlinePlatforms,
   type OnlineMeetingPlatform,
 } from "@/lib/booking/meeting-platforms";
 
@@ -70,14 +69,14 @@ export function ConsultationDetailsStep({
   });
   const [connectedPlatforms, setConnectedPlatforms] = useState<
     OnlineMeetingPlatform[]
-  >(() => integratedMeetingPlatforms());
+  >(() => selectableOnlinePlatforms());
   const [platform, setPlatform] = useState(() => {
-    const list = integratedMeetingPlatforms();
+    const list = selectableOnlinePlatforms();
     const preferred = initial?.platform;
     if (preferred && list.includes(preferred as OnlineMeetingPlatform)) {
       return preferred;
     }
-    return list[0] ?? "";
+    return list[0] ?? "Zoom";
   });
   const [locationDetail, setLocationDetail] = useState(
     initial?.locationDetail ?? "",
@@ -109,12 +108,12 @@ export function ConsultationDetailsStep({
   }, []);
 
   function refreshConnectedPlatforms(preferred?: string) {
-    const list = integratedMeetingPlatforms();
+    const list = selectableOnlinePlatforms();
     setConnectedPlatforms(list);
     setPlatform((current) => {
       const pick = preferred || current;
       if (list.includes(pick as OnlineMeetingPlatform)) return pick;
-      return list[0] ?? "";
+      return list[0] ?? "Zoom";
     });
   }
 
@@ -202,14 +201,8 @@ export function ConsultationDetailsStep({
       setError("Enter a price for paid consultations");
       return;
     }
-    if (meetingPlace === "online" && connectedPlatforms.length === 0) {
-      setError(
-        "You don’t have a meeting integration yet. Connect Zoom, Google Meet, or Microsoft Teams in Settings.",
-      );
-      return;
-    }
     if (meetingPlace === "online" && !platform) {
-      setError("Choose a connected meeting platform");
+      setError("Choose Zoom or Google Meet");
       return;
     }
     if (meetingPlace === "offline") {
@@ -464,16 +457,8 @@ export function ConsultationDetailsStep({
                 connectedPlatforms.length === 0 ? (
                   <div className="min-w-0 flex-1 rounded-lg border border-dashed border-[#E5E7EB] bg-slate-50 px-3 py-2.5">
                     <p className="text-[13px] text-slate-600">
-                      You don’t have a meeting integration yet. You’ll need to
-                      connect Zoom, Google Meet, or Microsoft Teams to use
-                      online meetings.
+                      Choose Zoom or Google Meet for this consultation.
                     </p>
-                    <Link
-                      href="/settings/integrations"
-                      className="mt-1 inline-block text-[12px] font-semibold text-[#5A32A3] hover:underline"
-                    >
-                      Go to Settings → Integrations
-                    </Link>
                   </div>
                 ) : (
                   <div className="relative min-w-0 flex-1">
@@ -528,7 +513,7 @@ export function ConsultationDetailsStep({
                           ))}
                           {platforms.length === 0 ? (
                             <li className="px-3 py-3 text-[12px] text-slate-400">
-                              No connected platforms match your search
+                              No platforms match your search
                             </li>
                           ) : null}
                         </ul>

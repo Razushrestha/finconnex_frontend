@@ -1,15 +1,5 @@
-import { CreateProductForm } from "@/components/finance/products/CreateProductForm";
+import { redirect } from "next/navigation";
 
-export default async function CreateProductPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ layoutid?: string; redirect?: string }>;
-}) {
-  const sp = await searchParams;
-  return (
-    <CreateProductForm
-      layoutId={sp.layoutid ?? "standard"}
-      redirect={sp.redirect !== "false"}
-    />
-  );
+export default function CreateProductPage() {
+  redirect("/finance/products?create=1");
 }

@@ -26,6 +26,7 @@ import {
   listCrmEstimateAttachments,
   persistRemoteEstimate,
   sendCrmEstimate,
+  toCreateEstimateBody,
   tryCrmEstimate,
   updateCrmEstimate,
 } from "@/lib/finance/estimates/api";
@@ -44,7 +45,11 @@ import {
   upsertQuotation,
 } from "@/lib/finance/quotations/types";
 import { ensureJourneyForQuote } from "@/lib/finance/journey/types";
-import { formatAUD } from "@/lib/finance/shared";
+import {
+  formatAUD,
+  totalsFromLines,
+  type FinanceLineItem,
+} from "@/lib/finance/shared";
 import { ESTIMATE_STATUS_STYLE } from "@/lib/finance/statusStyles";
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
 import { CommercialTrail } from "@/components/finance/CommercialTrail";
@@ -212,8 +217,8 @@ export function EstimateDetailClient({ id }: { id: string }) {
 
   function convertToQuotation() {
     if (!row) return;
-    if (row.status !== "Accepted" && row.status !== "Sent") {
-      flash("Accept (or send) the estimate before converting");
+    if (row.status !== "Accepted") {
+      flash("Accept the estimate before converting to a quotation");
       return;
     }
     if (row.quotationId) {
@@ -269,6 +274,52 @@ export function EstimateDetailClient({ id }: { id: string }) {
       "Converted to quotation",
     );
     router.push(`/finance/quotations/${quo.id}`);
+  }
+
+  function onLineItemsChange(lineItems: FinanceLineItem[]) {
+    if (!row || row.status !== "Draft") return;
+    const t = totalsFromLines(lineItems);
+    setRow({ ...row, lineItems, subtotal: t.subtotal, tax: t.tax, total: t.total });
+  }
+
+  async function saveLineItems() {
+    if (!row || row.status !== "Draft" || busy) return;
+    setBusy(true);
+    try {
+      const next = appendEstimateAudit({ ...row }, "Line items updated");
+      save(next, "Line items saved");
+      if (isCrmEstimateId(row.id)) {
+        const body = toCreateEstimateBody({
+          title: row.title,
+          clientName: row.clientName,
+          clientId: row.clientId,
+          contactName: row.contactName,
+          contactEmail: row.contactEmail,
+          dealName: row.dealName,
+          notes: row.notes,
+          status: row.status,
+          owner: row.owner,
+          validUntil: row.validUntil,
+          lineItems: row.lineItems,
+        });
+        const remote = await tryCrmEstimate(() =>
+          updateCrmEstimate(row.id, {
+            lineItems: body.lineItems,
+            subtotal: body.subtotal,
+            tax: body.tax,
+            taxTotal: body.taxTotal,
+            total: body.total,
+            amount: body.amount,
+          }),
+        );
+        if (remote) {
+          persistRemoteEstimate(remote);
+          setRow(remote);
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (loading && !row) {
@@ -368,7 +419,7 @@ export function EstimateDetailClient({ id }: { id: string }) {
                 </button>
               </>
             ) : null}
-            {!locked && (row.status === "Accepted" || row.status === "Sent") ? (
+            {!locked && row.status === "Accepted" ? (
               <button
                 type="button"
                 onClick={convertToQuotation}
@@ -471,7 +522,26 @@ export function EstimateDetailClient({ id }: { id: string }) {
           </div>
 
           <div className="px-5 py-4">
-            <LineItemsEditor items={row.lineItems} onChange={() => {}} readOnly />
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-[12px] font-bold tracking-wide text-slate-700 uppercase">
+                Line items
+              </h3>
+              {row.status === "Draft" ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void saveLineItems()}
+                  className="inline-flex h-8 items-center rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-semibold text-violet-700 disabled:opacity-50"
+                >
+                  Save lines
+                </button>
+              ) : null}
+            </div>
+            <LineItemsEditor
+              items={row.lineItems}
+              onChange={onLineItemsChange}
+              readOnly={row.status !== "Draft"}
+            />
           </div>
 
           <div className="border-t border-slate-100 px-5 py-4">

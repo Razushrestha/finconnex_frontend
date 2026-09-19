@@ -9,20 +9,24 @@ export function KanbanColumnFooter({
   onCreate,
   onCollapse,
   collapseLabel,
+  inert = false,
 }: {
   createLabel: string;
   createAriaLabel?: string;
   onCreate: () => void;
   onCollapse: () => void;
   collapseLabel: string;
+  inert?: boolean;
 }) {
   return (
     <div
       className={cn(
         "pointer-events-none absolute inset-x-1 bottom-1 z-20 flex overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm",
         "opacity-0 transition-opacity duration-150",
-        "group-hover/stage:pointer-events-auto group-hover/stage:opacity-100",
-        "group-focus-within/stage:pointer-events-auto group-focus-within/stage:opacity-100",
+        !inert &&
+          "group-hover/stage:pointer-events-auto group-hover/stage:opacity-100",
+        !inert &&
+          "group-focus-within/stage:pointer-events-auto group-focus-within/stage:opacity-100",
       )}
     >
       <button

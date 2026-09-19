@@ -268,6 +268,9 @@ export function smokeEmailsWiring() {
   if (!composeSend.includes("files") || !composeSend.includes("sendCrmEmail")) {
     fail("activity compose send does not attach files");
   }
+  if (!composeSend.includes("isPublicBookSurface") || !composeSend.includes("/api/auth/mail/deliver")) {
+    fail("guest /book email must use SendGrid, not CRM /emails with a host cookie");
+  }
   const sendClient = readSrc("src/lib/emails/api.ts");
   if (!sendClient.includes("attachFilesToCrmEmail")) {
     fail("sendCrmEmail must register CRM attachments before /send");

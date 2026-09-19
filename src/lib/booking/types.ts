@@ -124,6 +124,26 @@ export interface BookingPage {
   consultantPriorities?: Record<string, ConsultantPriority>;
   calendlyEventTypeId?: string;
   calendlyHostId?: string;
+  crmEventTypeId?: string;
+  /** Put confirmed bookings on the FinConnex calendar (default on). */
+  calendarInvites?: boolean;
+  inviteNotes?: string;
+  allowReschedule?: boolean;
+  allowCancel?: boolean;
+  notifyPrefs?: Array<{
+    id: string;
+    title: string;
+    description: string;
+    info: string;
+    channels: Record<"Email" | "In-app" | "SMS" | "WhatsApp", boolean>;
+    emailSubject: string;
+    emailBody: string;
+    fromName: string;
+    fromAddress: string;
+    smsBody: string;
+    notifyContact: boolean;
+    notifyUser: boolean;
+  }>;
 }
 
 export interface Booking {
@@ -151,6 +171,9 @@ export interface Booking {
   createdAt?: string;
   calendlyMeetingId?: string;
   calendlyInviteeId?: string;
+  /** Guest-facing booking number, e.g. NE-00001 */
+  reference?: string;
+  joinUrl?: string;
   /** When this booking replaced an earlier slot (same manage token). */
   rescheduledFrom?: string;
 }
@@ -284,16 +307,32 @@ export const bookings: Booking[] = [];
 function readStore(): BookingPage[] | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem(STORE_KEY);
-    return raw ? (JSON.parse(raw) as BookingPage[]) : null;
+    const fromLocal = window.localStorage.getItem(STORE_KEY);
+    if (fromLocal) return JSON.parse(fromLocal) as BookingPage[];
+    const fromSession = window.sessionStorage.getItem(STORE_KEY);
+    if (fromSession) {
+      window.localStorage.setItem(STORE_KEY, fromSession);
+      return JSON.parse(fromSession) as BookingPage[];
+    }
   } catch {
     return null;
   }
+  return null;
 }
 
 function writeStore(list: BookingPage[]) {
   if (typeof window === "undefined") return;
-  sessionStorage.setItem(STORE_KEY, JSON.stringify(list));
+  const raw = JSON.stringify(list);
+  try {
+    window.localStorage.setItem(STORE_KEY, raw);
+  } catch {
+    /* quota */
+  }
+  try {
+    window.sessionStorage.setItem(STORE_KEY, raw);
+  } catch {
+    /* private mode */
+  }
 }
 
 export function listBookingPages(): BookingPage[] {
@@ -417,14 +456,36 @@ export function upsertBookingPage(page: BookingPage) {
   if (i >= 0) list[i] = normalized;
   else list.unshift(normalized);
   writeStore(list);
+  if (normalized.status === "Live") {
+    void import("@/lib/booking/publish-public-page").then((mod) =>
+      mod.publishPublicBookingPage(normalized),
+    );
+  }
   return normalized;
 }
 
+export function bookingSlugKey(slug: string) {
+  return slug
+    .trim()
+    .toLowerCase()
+    .replace(/^\/book\//, "")
+    .replace(/^\//, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+export function bookingPageMatchesSlug(page: BookingPage, slug: string) {
+  const key = bookingSlugKey(slug);
+  if (!key) return false;
+  return (
+    bookingSlugKey(page.slug) === key || bookingSlugKey(page.title) === key
+  );
+}
+
 export function getBookingPageBySlug(slug: string) {
-  if (typeof window !== "undefined") {
-    return listBookingPages().find((p) => p.slug === slug);
-  }
-  return bookingPages.find((p) => p.slug === slug);
+  const list =
+    typeof window !== "undefined" ? listBookingPages() : bookingPages;
+  return list.find((page) => bookingPageMatchesSlug(page, slug));
 }
 
 export function getBookingPageById(id: string) {
@@ -530,6 +591,10 @@ export function getBookingByToken(token: string) {
     }
   }
   return bookings.find((b) => b.manageToken === token);
+}
+
+export function getBookingById(id: string) {
+  return listBookings().find((b) => b.id === id);
 }
 
 export function getBookingsForPage(pageId: string) {

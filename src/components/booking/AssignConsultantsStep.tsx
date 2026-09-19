@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Camera, Info, Search } from "lucide-react";
-import { loadAssignableOwners } from "@/lib/users/assignable";
+import { loadWorkspaceConsultants } from "@/lib/users/assignable";
 import {
   CONSULTANT_PRIORITIES,
   type ConsultantPriority,
@@ -42,7 +42,7 @@ export function AssignConsultantsStep({
 
   useEffect(() => {
     let alive = true;
-    void loadAssignableOwners()
+    void loadWorkspaceConsultants()
       .then((owners) => {
         if (!alive) return;
         setHostNames(owners.map((owner) => owner.name));

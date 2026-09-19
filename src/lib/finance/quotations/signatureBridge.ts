@@ -17,6 +17,7 @@ import {
   upsertQuotation,
   type Quotation,
 } from "@/lib/finance/quotations/types";
+import { createInvoiceFromQuotation } from "@/lib/finance/quotations/convert";
 import {
   ensureJourneyForQuote,
   touchJourneyStatus,
@@ -153,7 +154,7 @@ export function syncQuotationFromSignature(signature: SignatureRequest) {
   if (!quote) return null;
 
   if (signature.status === "Signed") {
-    const next = upsertQuotation(
+    let next = upsertQuotation(
       appendQuotationAudit(
         {
           ...quote,
@@ -169,6 +170,11 @@ export function syncQuotationFromSignature(signature: SignatureRequest) {
     touchJourneyStatus(next.id, "Signed", {
       signatureRequestId: signature.id,
     });
+    // SRS §13.4 / §20.3 — auto-create Draft invoice once the contract is signed
+    if (!next.invoiceId) {
+      const converted = createInvoiceFromQuotation(next, signature.signer);
+      next = converted.quotation;
+    }
     return next;
   }
 

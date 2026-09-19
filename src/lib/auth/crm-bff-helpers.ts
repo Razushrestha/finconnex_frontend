@@ -40,7 +40,6 @@ export function isEmptySignedInListPath(path: string[], method: string) {
   if (!resource) return false;
 
   if (resource === "dashboard") {
-    if (!rest) return true;
     if (rest === "layouts" && !segs[2]) return true;
     if (rest === "widgets" && segs[2] === "catalog") return true;
     return false;
@@ -74,9 +73,7 @@ export function isHostedMissingSignatureListPath(
 /** Skip the hosted round-trip so the Next access log is 200, not 404. */
 export function isHostedMissingCrmGet(path: string[], method: string) {
   if (method !== "GET") return false;
-  if (isHostedMissingSignatureListPath(path, method)) return true;
-  const segs = resourceSegments(path);
-  return segs[0] === "dashboard" && isEmptySignedInListPath(path, method);
+  return isHostedMissingSignatureListPath(path, method);
 }
 
 export function isEmptyDashboardLayoutWritePath(
@@ -111,7 +108,7 @@ export function tryEmptySignedInGet(path: string[], method: string) {
   }
   const segs = resourceSegments(path);
   if (segs[0] === "dashboard" && !segs[1]) {
-    return emptyEnvelope({});
+    return null;
   }
   return emptyEnvelope([]);
 }

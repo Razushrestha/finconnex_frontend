@@ -102,7 +102,10 @@ export function toCreateSignatureTemplateBody(
     signingOrder: input.signingOrder.toUpperCase(),
     roles: input.signers.map((signer) =>
       compactBody({
-        name: signer.name.trim() || signer.role,
+        name:
+          (signer.roleLabel ?? "").trim() ||
+          signer.name.trim() ||
+          signer.role,
         role: signer.role.toUpperCase(),
         order: signer.order,
       }),

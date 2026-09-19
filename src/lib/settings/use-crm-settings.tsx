@@ -40,12 +40,39 @@ export type CrmSettingsState = {
 const SettingsCrmContext = createContext<CrmSettingsState | null>(null);
 
 const SETTINGS_CACHE_KEY = "fc.settings.shell.v1";
+const SHELL_TTL_MS = 45_000;
 
 type SettingsCache = {
   settings: CrmWorkspaceSettings | null;
   security: CrmSecuritySettings | null;
   capabilities: CrmCapabilities | null;
 };
+
+type ShellBundle = {
+  ws: PromiseSettledResult<CrmWorkspaceSettings>;
+  sec: PromiseSettledResult<CrmSecuritySettings>;
+  caps: PromiseSettledResult<CrmCapabilities>;
+};
+
+let shellInflight: Promise<ShellBundle> | null = null;
+let shellFetchedAt = 0;
+
+function fetchShellSettings(force: boolean) {
+  if (
+    !force &&
+    shellInflight &&
+    Date.now() - shellFetchedAt < SHELL_TTL_MS
+  ) {
+    return shellInflight;
+  }
+  shellFetchedAt = Date.now();
+  shellInflight = Promise.allSettled([
+    getCrmWorkspaceSettings(),
+    getCrmSecuritySettings(),
+    getCrmWorkspaceCapabilities(),
+  ]).then(([ws, sec, caps]) => ({ ws, sec, caps }));
+  return shellInflight;
+}
 
 function readSettingsCache(): SettingsCache | null {
   if (typeof window === "undefined") return null;
@@ -93,42 +120,32 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    if (!settings) setLoading(true);
+    const cachedNow = readSettingsCache();
+    if (!cachedNow?.settings) setLoading(true);
     setError(null);
 
-    void (async () => {
-      const [ws, sec, caps, pages] = await Promise.allSettled([
-        getCrmWorkspaceSettings(),
-        getCrmSecuritySettings(),
-        getCrmWorkspaceCapabilities(),
-        getCrmSettingsCatalog(),
-      ]);
+    const run = async () => {
+      const { ws, sec, caps } = await fetchShellSettings(tick > 0);
       if (cancelled) return;
 
       if (ws.status === "fulfilled") {
-        const fromPages =
-          pages.status === "fulfilled" ? pages.value.catalog : null;
-        setSettings(
-          fromPages
-            ? {
-                ...ws.value,
-                catalog: { ...fromPages, ...(ws.value.catalog ?? {}) },
-              }
-            : ws.value,
-        );
+        setSettings((prev) => ({
+          ...ws.value,
+          catalog: { ...(ws.value.catalog ?? {}), ...(prev?.catalog ?? {}) },
+        }));
         setSource("api");
         writeSettingsCache({
-          settings:
-            fromPages
-              ? {
-                  ...ws.value,
-                  catalog: { ...fromPages, ...(ws.value.catalog ?? {}) },
-                }
-              : ws.value,
-          security: sec.status === "fulfilled" ? sec.value : security,
-          capabilities: caps.status === "fulfilled" ? caps.value : capabilities,
+          settings: ws.value,
+          security:
+            sec.status === "fulfilled"
+              ? sec.value
+              : cachedNow?.security ?? null,
+          capabilities:
+            caps.status === "fulfilled"
+              ? caps.value
+              : cachedNow?.capabilities ?? null,
         });
-      } else {
+      } else if (!cachedNow?.settings) {
         setSettings(null);
         setSource("demo");
         setError(
@@ -139,16 +156,49 @@ function useCrmSettingsState(enabled: boolean): CrmSettingsState {
       }
 
       if (sec.status === "fulfilled") setSecurity(sec.value);
-      else if (ws.status !== "fulfilled") setSecurity(null);
+      else if (ws.status !== "fulfilled" && !cachedNow?.security) setSecurity(null);
 
       if (caps.status === "fulfilled") setCapabilities(caps.value);
-      else if (ws.status !== "fulfilled") setCapabilities(null);
+      else if (ws.status !== "fulfilled" && !cachedNow?.capabilities) {
+        setCapabilities(null);
+      }
 
       setLoading(false);
-    })();
+
+      if (ws.status !== "fulfilled") return;
+      const onSettingsHub =
+        typeof window !== "undefined" &&
+        window.location.pathname.startsWith("/settings");
+      if (!onSettingsHub && tick === 0) return;
+      const pages = await Promise.allSettled([getCrmSettingsCatalog()]);
+      if (cancelled) return;
+      const catalog =
+        pages[0]?.status === "fulfilled" ? pages[0].value.catalog : null;
+      if (!catalog) return;
+      setSettings((prev) => {
+        const next = {
+          ...ws.value,
+          catalog: { ...catalog, ...(ws.value.catalog ?? {}), ...(prev?.catalog ?? {}) },
+        };
+        writeSettingsCache({
+          settings: next,
+          security: sec.status === "fulfilled" ? sec.value : cachedNow?.security ?? null,
+          capabilities:
+            caps.status === "fulfilled" ? caps.value : cachedNow?.capabilities ?? null,
+        });
+        return next;
+      });
+    };
+
+    // Let / and dashboard compile before the four settings BFF routes.
+    const waitMs = cachedNow?.settings && tick === 0 ? 2_500 : tick === 0 ? 400 : 0;
+    const timer = window.setTimeout(() => {
+      void run();
+    }, waitMs);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, [enabled, tick]);
 

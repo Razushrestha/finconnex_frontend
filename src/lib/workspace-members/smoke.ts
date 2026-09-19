@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Cross-check workspace-members Swagger routes.
  * Run: npx tsx --tsconfig tsconfig.json src/lib/workspace-members/smoke.ts
  */
@@ -328,17 +328,17 @@ export async function smokeWorkspaceMembersLive() {
 
 export async function runWorkspaceMembersSmoke() {
   installSmokePolyfill();
-  console.log("Workspace members API smoke…");
+  console.log("Workspace members API smokeΓÇª");
 
-  console.log("\n1) Client + UI wiring…");
+  console.log("\n1) Client + UI wiringΓÇª");
   smokeWorkspaceMembersWiring();
-  console.log("   OK — client, catalog, Users settings");
+  console.log("   OK ΓÇö client, catalog, Users settings");
 
-  console.log("\n2) Mock fetch…");
+  console.log("\n2) Mock fetchΓÇª");
   await smokeWorkspaceMembersMock();
-  console.log("   OK — all 9 Swagger routes hit");
+  console.log("   OK ΓÇö all 9 Swagger routes hit");
 
-  console.log("\n3) Live CRM probe…");
+  console.log("\n3) Live CRM probeΓÇª");
   const live = await smokeWorkspaceMembersLive();
   for (const row of live.rows) {
     const isDecoy = row.path === DECOY_PATH;

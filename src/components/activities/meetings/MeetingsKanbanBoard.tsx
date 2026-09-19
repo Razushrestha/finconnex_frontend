@@ -6,6 +6,11 @@ import {
   type MeetingColumn,
 } from "@/lib/meetings/types";
 import { MeetingsKanbanColumn } from "./MeetingsKanbanColumn";
+import { KanbanDragGhost } from "@/components/common/KanbanDragGhost";
+import {
+  usePointerKanbanDrag,
+  type PointerKanbanDrop,
+} from "@/lib/kanban/use-pointer-kanban-drag";
 
 interface DragInfo {
   meetingId: string;
@@ -19,28 +24,13 @@ export interface DropTargetPos {
 
 export function MeetingsKanbanBoard() {
   const [columns, setColumns] = useState<MeetingColumn[]>(initialColumns);
-  const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
-  const [dropTargetPos, setDropTargetPos] = useState<DropTargetPos | null>(
-    null,
-  );
 
-  function handleDragStartMeeting(
-    e: React.DragEvent<HTMLDivElement>,
-    meetingId: string,
-    columnId: string,
-  ) {
-    setDragInfo({ meetingId, sourceColumnId: columnId });
-    e.dataTransfer.effectAllowed = "move";
-  }
-
-  function handleDragEndMeeting() {
-    setDragInfo(null);
-    setDropTargetPos(null);
-  }
-
-  function handleDropMeeting(targetColumnId: string, targetIndex?: number) {
-    if (!dragInfo) return;
-    const { meetingId, sourceColumnId } = dragInfo;
+  function handleDropMeeting({
+    itemId: meetingId,
+    sourceColumnId,
+    targetColumnId,
+    targetIndex,
+  }: PointerKanbanDrop) {
 
     setColumns((prev) => {
       const sourceCol = prev.find((c) => c.id === sourceColumnId);
@@ -86,9 +76,9 @@ export function MeetingsKanbanBoard() {
         return col;
       });
     });
-
-    handleDragEndMeeting();
   }
+
+  const drag = usePointerKanbanDrag({ onDrop: handleDropMeeting });
 
   return (
     <div className="flex h-full w-full min-w-0 items-stretch gap-4 overflow-x-auto p-1">
@@ -96,14 +86,17 @@ export function MeetingsKanbanBoard() {
         <MeetingsKanbanColumn
           key={column.id}
           column={column}
-          draggingMeetingId={dragInfo?.meetingId ?? null}
-          dropTargetPos={dropTargetPos}
-          setDropTargetPos={setDropTargetPos}
-          onDragStartMeeting={handleDragStartMeeting}
-          onDragEndMeeting={handleDragEndMeeting}
-          onDropMeeting={handleDropMeeting}
+          draggingMeetingId={drag.dragInfo?.itemId ?? null}
+          dropTargetPos={drag.dropTargetPos}
+          setDropTargetPos={() => undefined}
+          onCardPointerDown={drag.onCardPointerDown}
+          onDragClickCapture={
+            drag.cardPointerProps({ id: "", columnId: "", name: "" })
+              .onClickCapture
+          }
         />
       ))}
+      <KanbanDragGhost ghost={drag.ghost} />
     </div>
   );
 }

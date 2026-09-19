@@ -37,6 +37,9 @@ export interface ClientPortal {
   lastLoginAt?: string;
   createdBy: string;
   createdAt: string;
+  /** Nest `portalUrl`, e.g. /{workspaceSlug}/portal/{id} */
+  portalUrl?: string;
+  primaryContactId?: string;
   activity: PortalActivityEvent[];
   audit: PortalActivityEvent[];
 }
@@ -101,6 +104,12 @@ export function slugifyPortalName(name: string) {
 
 export function portalPublicPath(slug: string) {
   return `/p/${slug}`;
+}
+
+export function portalRecordPath(portal: Pick<ClientPortal, "slug" | "portalUrl">) {
+  const url = portal.portalUrl?.trim() ?? "";
+  if (url.startsWith("/")) return url;
+  return portalPublicPath(portal.slug);
 }
 
 export function portalLoginPath(slug: string) {
@@ -180,9 +189,13 @@ export function upsertPortal(p: ClientPortal) {
 }
 
 export function mergeCrmPortals(remote: ClientPortal[]) {
-  if (!remote.length) return;
   const remoteIds = new Set(remote.map((p) => p.id));
-  const local = listPortals().filter((p) => !remoteIds.has(p.id));
+  const local = listPortals().filter((p) => {
+    if (remoteIds.has(p.id)) return false;
+    return !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      p.id,
+    );
+  });
   writeStore([...remote, ...local]);
 }
 

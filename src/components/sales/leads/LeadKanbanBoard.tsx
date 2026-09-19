@@ -41,6 +41,14 @@ import { KanbanEmptyStage } from "@/components/common/KanbanEmptyStage";
 import { KanbanStageScroll } from "@/components/common/KanbanStageScroll";
 import { KanbanCollapsedRail } from "@/components/common/KanbanCollapsedRail";
 import { KanbanOutcomeDropBar } from "@/components/common/KanbanOutcomeDropBar";
+import { KanbanDragGhost } from "@/components/common/KanbanDragGhost";
+import {
+  KANBAN_CARD_SLOT_ATTR,
+  KANBAN_DROP_COLUMN_ATTR,
+  usePointerKanbanDrag,
+  type PointerKanbanDrop,
+  type PointerKanbanOutcomeDrop,
+} from "@/lib/kanban/use-pointer-kanban-drag";
 import { cn } from "@/lib/utils";
 import {
   KANBAN_BOARD_ROW,
@@ -57,16 +65,6 @@ import {
   resolveKanbanHeaderColor,
 } from "@/components/common/KanbanViewControls";
 import { notify } from "@/lib/notify/toast";
-
-interface DragInfo {
-  cardId: string;
-  sourceColumnId: string;
-}
-
-interface DropTargetPosition {
-  columnId: string;
-  targetIndex: number;
-}
 
 type LeadCardRecord = KanbanColumn["cards"][number];
 
@@ -123,14 +121,7 @@ export function LeadKanbanBoard({
   const [columns, setColumns] = useState<KanbanColumn[]>(() =>
     LEAD_COLUMNS.map((col) => ({ ...col, cards: [] })),
   );
-  const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
-  const [dropTargetPos, setDropTargetPos] = useState<DropTargetPosition | null>(
-    null,
-  );
-  const [overColumnId, setOverColumnId] = useState<string | null>(null);
-  const [overOutcome, setOverOutcome] = useState<"settled" | "lost" | null>(
-    null,
-  );
+  const [toast, setToast] = useState<string | null>(null);
   const [panel, setPanel] = useState<LeadPanelState | null>(null);
   const [activityRevision, setActivityRevision] = useState(0);
   const [cardSettings, setCardSettings] = useState<LeadCardSettings>(() =>
@@ -161,14 +152,6 @@ export function LeadKanbanBoard({
       setColumns(listLeadColumns());
     });
   }, []);
-
-  // recompute right when a drag starts too, in case layout shifted (sidebar toggle, etc.)
-  useEffect(() => {
-    if (dragInfo && boardRef.current) {
-      const rect = boardRef.current.getBoundingClientRect();
-      setBoardBounds({ left: rect.left, width: rect.width });
-    }
-  }, [dragInfo]);
 
   useEffect(() => {
     return onLeadActivityChange(() => {
@@ -251,21 +234,6 @@ export function LeadKanbanBoard({
     });
   }
 
-  function handleDragStart(
-    e: React.DragEvent<HTMLElement>,
-    cardId: string,
-    columnId: string,
-  ) {
-    setDragInfo({ cardId, sourceColumnId: columnId });
-    e.dataTransfer.effectAllowed = "move";
-  }
-
-  function handleDragEnd() {
-    setDragInfo(null);
-    setOverColumnId(null);
-    setOverOutcome(null);
-  }
-
   /** Shared move: pulls the card out of the source column, drops it into the target. */
   function moveCard(
     card: LeadCardRecord,
@@ -332,20 +300,16 @@ export function LeadKanbanBoard({
     });
   }
 
-  function handleDrop(targetColumnId: string, targetIndex?: number) {
-    setOverColumnId(null);
-    setDropTargetPos(null);
-    if (!dragInfo) return;
-    const { cardId, sourceColumnId } = dragInfo;
-
+  function handleDrop({
+    itemId,
+    sourceColumnId,
+    targetColumnId,
+    targetIndex,
+  }: PointerKanbanDrop) {
     const sourceColumn = columns.find((col) => col.id === sourceColumnId);
     const targetColumn = columns.find((col) => col.id === targetColumnId);
-    const card = sourceColumn?.cards.find((c) => c.id === cardId);
-
-    if (!card || !sourceColumn || !targetColumn) {
-      setDragInfo(null);
-      return;
-    }
+    const card = sourceColumn?.cards.find((c) => c.id === itemId);
+    if (!card || !sourceColumn || !targetColumn) return;
 
     const gate = assertPipelineStageChange(
       sourceColumn.title,
@@ -353,7 +317,6 @@ export function LeadKanbanBoard({
     );
     if (!gate.ok) {
       flash(gate.message);
-      setDragInfo(null);
       return;
     }
 
@@ -362,30 +325,23 @@ export function LeadKanbanBoard({
       targetColumn.title,
       new Date(),
     );
-
     moveCard(card, sourceColumn, targetColumn, updatedCard, targetIndex);
-    setDragInfo(null);
   }
 
-  /** Drop onto the floating Win / Lost zone rather than a column. */
-  function handleOutcomeDrop(outcome: "settled" | "lost") {
-    setOverOutcome(null);
-    if (!dragInfo) return;
-    const { cardId, sourceColumnId } = dragInfo;
-
-    const targetColumn = outcome === "settled" ? wonColumn : lostColumn;
+  function handleOutcomeDrop({
+    itemId,
+    sourceColumnId,
+    outcome,
+  }: PointerKanbanOutcomeDrop) {
+    const targetColumn = outcome === "won" ? wonColumn : lostColumn;
     if (!targetColumn) {
-      flash(`No "${outcome === "settled" ? "Won" : "Lost"}" column found`);
-      setDragInfo(null);
+      flash(`No "${outcome === "won" ? "Won" : "Lost"}" column found`);
       return;
     }
 
     const sourceColumn = columns.find((col) => col.id === sourceColumnId);
-    const card = sourceColumn?.cards.find((c) => c.id === cardId);
-    if (!card || !sourceColumn || sourceColumn.id === targetColumn.id) {
-      setDragInfo(null);
-      return;
-    }
+    const card = sourceColumn?.cards.find((c) => c.id === itemId);
+    if (!card || !sourceColumn || sourceColumn.id === targetColumn.id) return;
 
     if (outcome === "lost") {
       setPendingLostDrop({
@@ -395,7 +351,6 @@ export function LeadKanbanBoard({
         targetColumnTitle: targetColumn.title,
       });
       setLostReason("");
-      setDragInfo(null);
       return;
     }
 
@@ -405,16 +360,19 @@ export function LeadKanbanBoard({
       new Date(),
     );
     moveCard(card, sourceColumn, targetColumn, updatedCard);
-    setDragInfo(null);
     flash(`${card.name} marked as settled`);
   }
 
-  function visibleCardCount(column: KanbanColumn) {
-    if (dragInfo && dragInfo.sourceColumnId === column.id) {
-      return column.cards.length - 1;
-    }
-    return column.cards.length;
-  }
+  const drag = usePointerKanbanDrag({
+    onDrop: handleDrop,
+    onOutcomeDrop: handleOutcomeDrop,
+  });
+
+  useEffect(() => {
+    if (!drag.isDragging || !boardRef.current) return;
+    const rect = boardRef.current.getBoundingClientRect();
+    setBoardBounds({ left: rect.left, width: rect.width });
+  }, [drag.isDragging]);
 
   function confirmLostDrop() {
     if (!pendingLostDrop) return;
@@ -451,12 +409,13 @@ export function LeadKanbanBoard({
     >
       <div className={KANBAN_BOARD_ROW}>
         {visibleColumns.map((column) => {
-          const isOver = overColumnId === column.id;
+          const isOver = drag.overColumnId === column.id;
           const isCollapsed = collapsedColumns.has(column.id);
 
           return (
             <div
               key={column.id}
+              {...{ [KANBAN_DROP_COLUMN_ATTR]: column.id }}
               className={cn(
                 "group/stage relative flex h-full min-h-0 flex-col gap-2 transition-all duration-200",
                 BOARD_HEIGHT,
@@ -527,63 +486,29 @@ export function LeadKanbanBoard({
                         }
                         onCollapse={() => toggleCollapsed(column.id)}
                         collapseLabel={`Collapse ${columnTitles?.[column.id] ?? column.title}`}
+                        inert={drag.isDragging}
                       />
                     }
                   >
                   <div
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      if (dragInfo) setOverColumnId(column.id);
-                    }}
-                    onDragLeave={() =>
-                      setOverColumnId((prev) =>
-                        prev === column.id ? null : prev,
-                      )
-                    }
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      handleDrop(column.id);
-                    }}
                     className={cn(
                       "relative flex min-h-full flex-col rounded-sm border p-1",
                       dropTargetIdle,
                       isOver ? dropTargetActive : KANBAN_WELL,
                     )}
                   >
-                    <div
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        if (dragInfo) {
-                          setOverColumnId(column.id);
-                          if (
-                            !dropTargetPos ||
-                            dropTargetPos.columnId !== column.id
-                          ) {
-                            setDropTargetPos({
-                              columnId: column.id,
-                              targetIndex: visibleCardCount(column),
-                            });
-                          }
-                        }
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleDrop(column.id, dropTargetPos?.targetIndex);
-                      }}
-                      className="flex min-h-[180px] flex-1 flex-col gap-3 pb-2"
-                    >
+                    <div className="flex min-h-[180px] flex-1 flex-col gap-3 pb-2">
                       {(() => {
                         let visibleIndex = 0;
                         const rendered: React.ReactNode[] = [];
 
                         const showPlaceholderAt = (idx: number) =>
-                          dragInfo &&
-                          dropTargetPos?.columnId === column.id &&
-                          dropTargetPos.targetIndex === idx;
+                          drag.dragInfo &&
+                          drag.dropTargetPos?.columnId === column.id &&
+                          drag.dropTargetPos.targetIndex === idx;
 
                         column.cards.forEach((card) => {
-                          const isDraggedCard = dragInfo?.cardId === card.id;
+                          const isDraggedCard = drag.isDraggingItem(card.id);
                           const myIndex = visibleIndex;
 
                           if (!isDraggedCard && showPlaceholderAt(myIndex)) {
@@ -595,25 +520,16 @@ export function LeadKanbanBoard({
                             );
                           }
 
+                          const pointer = drag.cardPointerProps({
+                            id: card.id,
+                            columnId: column.id,
+                            name: card.name,
+                          });
+
                           rendered.push(
                             <div
                               key={card.id}
-                              onDragOver={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (!dragInfo || isDraggedCard) return;
-
-                                const rect =
-                                  e.currentTarget.getBoundingClientRect();
-                                const midpoint = rect.top + rect.height / 2;
-                                const insertIndex =
-                                  e.clientY < midpoint ? myIndex : myIndex + 1;
-
-                                setDropTargetPos({
-                                  columnId: column.id,
-                                  targetIndex: insertIndex,
-                                });
-                              }}
+                              {...{ [KANBAN_CARD_SLOT_ATTR]: card.id }}
                             >
                               <LeadCard
                                 card={card}
@@ -625,10 +541,8 @@ export function LeadKanbanBoard({
                                 isDragging={isDraggedCard}
                                 isSelected={selectedIds.includes(card.id)}
                                 onToggleSelect={onToggleSelect}
-                                onDragStart={(e) =>
-                                  handleDragStart(e, card.id, column.id)
-                                }
-                                onDragEnd={handleDragEnd}
+                                onDragPointerDown={pointer.onPointerDown}
+                                onDragClickCapture={pointer.onClickCapture}
                                 onOpenActivitySummary={() =>
                                   setPanel({
                                     type: "activity-summary",
@@ -691,26 +605,14 @@ export function LeadKanbanBoard({
         })}
       </div>
 
-      {dragInfo && boardBounds && (
+      <KanbanDragGhost ghost={drag.ghost} />
+
+      {drag.isDragging && boardBounds && (
         <KanbanOutcomeDropBar
-          over={
-            overOutcome === "settled"
-              ? "won"
-              : overOutcome === "lost"
-                ? "lost"
-                : null
-          }
-          onOver={(outcome) =>
-            setOverOutcome(outcome === "won" ? "settled" : "lost")
-          }
-          onLeave={(outcome) =>
-            setOverOutcome((prev) =>
-              (outcome === "won" ? "settled" : "lost") === prev ? null : prev,
-            )
-          }
-          onDrop={(outcome) =>
-            handleOutcomeDrop(outcome === "won" ? "settled" : "lost")
-          }
+          over={drag.overOutcome}
+          onOver={() => undefined}
+          onLeave={() => undefined}
+          onDrop={() => undefined}
           style={{ left: boardBounds.left, width: boardBounds.width }}
         />
       )}

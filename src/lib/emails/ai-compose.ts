@@ -60,6 +60,73 @@ export function plainTextToEmailHtml(text: string) {
     .join("");
 }
 
+function looksLikeInstruction(text: string) {
+  const value = text.replace(/\s+/g, " ").trim();
+  if (!value) return false;
+  if (
+    /keep the same recipient|current draft:|apply this instruction/i.test(value)
+  ) {
+    return true;
+  }
+  return /^(please\s+)?(write|draft|compose|create|make|generate|rewrite|send)\b/i.test(
+    value,
+  );
+}
+
+/** Drop leaked composer instructions so they never appear in the sent body. */
+export function stripInstructionLeak(text: string) {
+  return text
+    .replace(/keep the same recipient and purpose\.?/gi, " ")
+    .replace(/apply this instruction:\s*/gi, " ")
+    .replace(/current draft:\s*/gi, " ")
+    .replace(
+      /^(please\s+)?(write|draft|compose|create|make|generate)\s+(me\s+)?(a|an|the)?\s*(quick\s+|short\s+|detailed\s+|professional\s+)?(email|message)\s+(for|about)?\s*/gi,
+      " ",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function substanceFromPrompt(input: {
+  prompt: string;
+  existing?: string;
+  subject?: string;
+}) {
+  const prompt = input.prompt.trim();
+  const existing = stripInstructionLeak(extractEmailCore(input.existing ?? ""));
+  const cleaned = stripInstructionLeak(prompt);
+  const hay = `${prompt} ${cleaned}`.toLowerCase();
+  const topic = topicFromDraft(input.subject, existing);
+  const about =
+    topic && topic !== "our conversation" ? topic.replace(/[.?!]+$/g, "") : "";
+
+  if (/\bfollow[\s-]?up\b/.test(hay)) {
+    if (/\bdocument/.test(hay) || /\boutstanding/.test(hay)) {
+      return about
+        ? `I am following up on ${about}, specifically the documents still outstanding. Could you please send through whatever remains so we can keep the file moving without a further delay?\n\nIf those papers are already on the way, a short confirmation would help. If something is blocking you, tell me what you need and I will help.`
+        : `I am following up on the documents we still need from you. Please send through anything outstanding, or let me know if you are waiting on something from our side.\n\nA short reply is enough for us to update the file and take the next step.`;
+    }
+    if (/\b(call|meeting|book|20-minute)\b/.test(hay)) {
+      return `I am following up to book a short call so we can confirm next steps together. Twenty minutes should be enough if you have the file to hand.\n\nPlease reply with a couple of times that suit you this week, and I will send a calendar invite.`;
+    }
+    return about
+      ? `I am following up regarding ${about}. I wanted to check whether you have had a chance to review this, and whether anything is still needed from you or from us before we continue.\n\nIf you have already actioned it, thank you. If not, a brief update on where things stand would help us keep the matter moving in an orderly way.`
+      : `I am following up to make sure this has not stalled, and that you have everything you need from FinConnex.\n\nWhen you have a moment, please let me know if you are happy for us to continue, or if there is a question I should answer first.`;
+  }
+
+  if (cleaned && !looksLikeInstruction(cleaned) && cleaned.split(/\s+/).length >= 6) {
+    return cleaned.endsWith(".") || cleaned.endsWith("?") || cleaned.endsWith("!")
+      ? cleaned
+      : `${cleaned}.`;
+  }
+
+  if (existing && !looksLikeInstruction(existing) && existing.split(/\s+/).length >= 6) {
+    return existing;
+  }
+
+  return "I wanted to follow up and keep this moving. Please let me know the best next step from your side.";
+}
+
 function firstName(recipient?: string) {
   const raw = recipient?.trim();
   if (!raw) return "there";
@@ -244,14 +311,17 @@ function signoff(tone: EmailTone) {
 }
 
 function developMiddle(core: string, tone: EmailTone) {
-  const cleaned = core.replace(/\s+/g, " ").trim();
-  const sentence = cleaned
-    ? cleaned.endsWith(".") || cleaned.endsWith("?") || cleaned.endsWith("!")
+  const cleaned = stripInstructionLeak(core).replace(/\s+/g, " ").trim();
+  if (!cleaned || looksLikeInstruction(cleaned)) {
+    return substanceFromPrompt({ prompt: core || "follow up" });
+  }
+  if (cleaned.includes("\n")) return cleaned;
+  const sentence =
+    cleaned.endsWith(".") || cleaned.endsWith("?") || cleaned.endsWith("!")
       ? cleaned
-      : `${cleaned}.`
-    : "I wanted to follow up on our conversation and keep things moving.";
+      : `${cleaned}.`;
   const words = sentence.split(/\s+/).filter(Boolean).length;
-  if (words >= 40) return sentence;
+  if (words >= 24) return sentence;
   return `${sentence} ${TONE_DEVELOP[tone]}`;
 }
 
@@ -448,11 +518,12 @@ export function draftEmailFromPrompt(input: {
   const asksDocs =
     /document|payslip|outstanding|id|licence|license|bank statement/i.test(prompt) &&
     (input.context?.documentsOutstanding?.length ?? 0) > 0;
-  const core =
-    prompt ||
-    (asksDocs
-      ? `Could you please send through ${input.context!.documentsOutstanding!.join(" and ")} so we can keep your application moving?`
-      : "I wanted to follow up and keep this moving.");
+  const core = asksDocs
+    ? `Could you please send through ${input.context!.documentsOutstanding!.join(" and ")} so we can keep your application moving?`
+    : substanceFromPrompt({
+        prompt,
+        subject: input.subject,
+      });
   const seed = [core, crm].filter(Boolean).join(" ");
   const full = lengthen(wrapTone(seed, tone, name), input.length ?? "medium");
   return plainTextToEmailHtml(full);
@@ -470,12 +541,19 @@ export function rewriteEmailWithAi(input: {
   const fromVoice = input.voiceNotes?.trim();
   const existing = extractEmailCore(htmlToPlainText(input.html));
   const subjectHint = input.subject?.trim();
-  const seed =
-    fromVoice ||
-    existing ||
-    (subjectHint
-      ? `This note is about “${subjectHint}”. I wanted to follow up and keep you updated.`
-      : "I wanted to follow up and see how we can help next.");
+  const seed = fromVoice
+    ? substanceFromPrompt({
+        prompt: fromVoice,
+        existing,
+        subject: subjectHint,
+      })
+    : existing && !looksLikeInstruction(existing)
+      ? existing
+      : substanceFromPrompt({
+          prompt: subjectHint || "follow up",
+          existing,
+          subject: subjectHint,
+        });
 
   let next = wrapTone(seed, input.tone, name);
   if (input.action) next = wrapTone(applyAction(seed, input.action), input.tone, name);
@@ -496,7 +574,8 @@ export function editEmailWithPrompt(input: {
 }) {
   const prompt = input.prompt.trim();
   const existing = htmlToPlainText(input.html);
-  if (!existing) {
+  const core = extractEmailCore(existing);
+  if (!core || looksLikeInstruction(core) || core.split(/\s+/).length < 6) {
     return draftEmailFromPrompt({
       prompt,
       recipientName: input.recipientName,
@@ -508,7 +587,7 @@ export function editEmailWithPrompt(input: {
     tone: "professional",
     recipientName: input.recipientName,
     subject: input.subject,
-    voiceNotes: `${prompt}\n\nKeep the same recipient and purpose. Current draft:\n${existing}`,
+    voiceNotes: prompt,
   });
 }
 

@@ -13,7 +13,7 @@ import {
   clientPortals as seed,
   exportPortalsCsv,
   listPortals,
-  portalPublicPath,
+  portalRecordPath,
   type ClientPortal,
   type PortalAccessLevel,
   type PortalStatus,
@@ -199,7 +199,7 @@ export default function PortalsPage() {
                     <div className="font-semibold text-slate-900">{r.portalId}</div>
                     <div className="text-[11px] text-slate-500">{r.name}</div>
                     <div className="text-[10px] text-violet-600">
-                      {portalPublicPath(r.slug)}
+                      {portalRecordPath(r)}
                     </div>
                   </td>
                   <td className="px-3 py-3 text-slate-700">{r.clientName}</td>

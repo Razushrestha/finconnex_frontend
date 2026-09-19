@@ -17,6 +17,7 @@ import {
 import {
   EMPTY_REMINDER_FILTERS,
   reminderMatchesFilters,
+  reminderColumns as REMINDER_COLUMN_SEED,
   type Reminder,
   type ReminderColumn,
   type ReminderFilters,
@@ -54,7 +55,6 @@ import { cn } from "@/lib/utils";
 import {
   BOARD_PAGE,
   KANBAN_BOARD_ROW,
-  KANBAN_CARD,
   KANBAN_COL,
   KANBAN_DROP_GHOST,
   KANBAN_HEADER,
@@ -67,13 +67,21 @@ import {
   cardSubject,
   cardMotion,
   cardDragging,
+  entityCardBox,
 } from "@/lib/motion";
 import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
 import { KanbanEmptyStage } from "@/components/common/KanbanEmptyStage";
 import { KanbanStageScroll } from "@/components/common/KanbanStageScroll";
 import { KanbanCollapsedRail } from "@/components/common/KanbanCollapsedRail";
+import { KanbanDragGhost } from "@/components/common/KanbanDragGhost";
+import {
+  usePointerKanbanDrag,
+  type PointerKanbanDrop,
+} from "@/lib/kanban/use-pointer-kanban-drag";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import { parseTaskDueDate } from "@/lib/dashboard/layout";
+import { kanbanPrefsFromCatalog } from "@/lib/kanban/column-prefs";
+import { useKanbanColumnPrefs } from "@/lib/kanban/use-kanban-column-prefs";
 
 const reminderSortOptions = [
   { key: "dateTime", label: "When" },
@@ -83,6 +91,10 @@ const reminderSortOptions = [
   { key: "owner", label: "Owner" },
   { key: "relatedTo", label: "Related To" },
 ];
+
+const REMINDER_STAGE_DEFAULTS = kanbanPrefsFromCatalog(
+  REMINDER_COLUMN_SEED.map((col) => ({ id: col.id, label: col.title })),
+);
 
 function sortReminders(
   items: Reminder[],
@@ -153,11 +165,13 @@ export default function RemindersPage() {
   const [filters, setFilters] = useState<ReminderFilters>(EMPTY_REMINDER_FILTERS);
   const [sortField, setSortField] = useState<string | undefined>();
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [overCol, setOverCol] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const stagePrefs = useKanbanColumnPrefs(
+    "finconnex.reminders.kanban-columns",
+    REMINDER_STAGE_DEFAULTS,
+  );
 
   useEffect(() => {
     if (crm.loading) return;
@@ -188,7 +202,8 @@ export default function RemindersPage() {
     return columns
       .filter(
         (col) =>
-          filters.statuses.length === 0 || filters.statuses.includes(col.title),
+          (filters.statuses.length === 0 || filters.statuses.includes(col.title)) &&
+          (!stagePrefs.visibleIds.length || stagePrefs.visibleIds.includes(col.id)),
       )
       .map((col) => {
         const reminders = sortReminders(
@@ -208,7 +223,7 @@ export default function RemindersPage() {
         );
         return { ...col, reminders, count: reminders.length };
       });
-  }, [columns, filters, sortField, sortDirection]);
+  }, [columns, filters, sortField, sortDirection, stagePrefs.visibleIds]);
 
   const visibleReminders = useMemo(
     () =>
@@ -288,12 +303,13 @@ export default function RemindersPage() {
     });
   }
 
-  function handleDrop(targetStatus: ReminderStatus) {
-    if (!dragId) return;
-    moveReminder(dragId, targetStatus);
-    setDragId(null);
-    setOverCol(null);
+  function handleDrop({ itemId, targetColumnId }: PointerKanbanDrop) {
+    const col = visibleColumns.find((c) => c.id === targetColumnId);
+    if (!col) return;
+    moveReminder(itemId, col.title);
   }
+
+  const drag = usePointerKanbanDrag({ onDrop: handleDrop });
 
   function toggleSelected(id: string) {
     setSelectedIds((prev) =>
@@ -367,6 +383,21 @@ export default function RemindersPage() {
           extraViewIcons={[TIMELINE_VIEW_TOGGLE]}
           moreMenuItems={[activityExportMenuItem("reminders")]}
           printViewItems={printViewItems}
+          columnOptions={view === "kanban" ? stagePrefs.columns : undefined}
+          onColumnToggle={view === "kanban" ? stagePrefs.toggle : undefined}
+          onColumnRename={view === "kanban" ? stagePrefs.rename : undefined}
+          onColumnAdd={
+            view === "kanban"
+              ? (title) => {
+                  const error = stagePrefs.addTitle(title);
+                  if (error) {
+                    setBulkFlash(error);
+                    window.setTimeout(() => setBulkFlash(null), 2800);
+                  }
+                }
+              : undefined
+          }
+          onColumnReorder={view === "kanban" ? stagePrefs.reorder : undefined}
         />
 
         {bulkFlash ? (
@@ -403,15 +434,16 @@ export default function RemindersPage() {
             {view === "timeline" ? (
               <RemindersTimelineView reminders={visibleReminders} />
             ) : view === "kanban" ? (
+              <>
               <div className={KANBAN_BOARD_ROW}>
                 {visibleColumns.map((col) => {
-                  const isOver = overCol === col.id;
+                  const isOver = drag.overColumnId === col.id;
                   const isCollapsed = collapsed.has(col.id);
                   if (isCollapsed) {
                     return (
                       <KanbanCollapsedRail
                         key={col.id}
-                        title={col.title}
+                        title={stagePrefs.titles[col.id] ?? col.title}
                         count={col.reminders.length}
                         onExpand={() =>
                           setCollapsed((prev) => {
@@ -426,6 +458,7 @@ export default function RemindersPage() {
                   return (
                     <div
                       key={col.id}
+                      data-kanban-drop-column={col.id}
                       className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}
                     >
                       <div className={cn("mb-2 shrink-0", KANBAN_HEADER)}>
@@ -440,7 +473,7 @@ export default function RemindersPage() {
                           >
                             <ChevronDown className="h-4 w-4 shrink-0 text-slate-700" />
                             <h3 className="text-sm font-semibold text-slate-900">
-                              {col.title}
+                              {stagePrefs.titles[col.id] ?? col.title}
                             </h3>
                           </button>
                           <span className={KANBAN_HEADER_COUNT}>
@@ -464,17 +497,6 @@ export default function RemindersPage() {
                         }
                       >
                       <div
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          setOverCol(col.id);
-                        }}
-                        onDragLeave={() =>
-                          setOverCol((p) => (p === col.id ? null : p))
-                        }
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          handleDrop(col.title);
-                        }}
                         className={cn(
                           "flex min-h-full flex-col rounded-sm border border-transparent p-2",
                           dropTargetIdle,
@@ -482,27 +504,32 @@ export default function RemindersPage() {
                         )}
                       >
                         <div className="flex min-h-[180px] flex-1 flex-col space-y-3 pb-4">
-                          {isOver && dragId ? (
+                          {isOver && drag.isDragging ? (
                             <div className={KANBAN_DROP_GHOST} />
                           ) : null}
-                          {col.reminders.map((r) => (
+                          {col.reminders.map((r) => {
+                            const pointer = drag.cardPointerProps({
+                              id: r.id,
+                              columnId: col.id,
+                              name: r.title,
+                            });
+                            return (
+                            <div key={r.id} data-kanban-card-slot={r.id}>
                             <ReminderCard
-                              key={r.id}
                               reminder={r}
                               status={col.title}
-                              isDragging={dragId === r.id}
+                              isDragging={drag.isDraggingItem(r.id)}
                               isSelected={selectedIds.includes(r.id)}
                               onSelect={() => toggleSelected(r.id)}
-                              onDragStart={() => setDragId(r.id)}
-                              onDragEnd={() => {
-                                setDragId(null);
-                                setOverCol(null);
-                              }}
+                              onDragPointerDown={pointer.onPointerDown}
+                              onDragClickCapture={pointer.onClickCapture}
                               onSnooze={() => moveReminder(r.id, "Snoozed")}
                               onDismiss={() => moveReminder(r.id, "Dismissed")}
                               onActivate={() => moveReminder(r.id, "Pending")}
                             />
-                          ))}
+                            </div>
+                            );
+                          })}
 
                           {col.reminders.length === 0 && !isOver ? (
                             <KanbanEmptyStage entity="Reminders" />
@@ -514,6 +541,8 @@ export default function RemindersPage() {
                   );
                 })}
               </div>
+              <KanbanDragGhost ghost={drag.ghost} />
+              </>
             ) : (
               <ResizableColumns storageKey="reminders-list">
               <table className="w-full min-w-[960px] text-left text-[12px]">
@@ -667,8 +696,8 @@ function ReminderCard({
   isDragging,
   isSelected = false,
   onSelect,
-  onDragStart,
-  onDragEnd,
+  onDragPointerDown,
+  onDragClickCapture,
   onSnooze,
   onDismiss,
   onActivate,
@@ -678,8 +707,8 @@ function ReminderCard({
   isDragging: boolean;
   isSelected?: boolean;
   onSelect?: () => void;
-  onDragStart: () => void;
-  onDragEnd: () => void;
+  onDragPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onDragClickCapture?: (e: React.MouseEvent) => void;
   onSnooze: () => void;
   onDismiss: () => void;
   onActivate: () => void;
@@ -690,17 +719,15 @@ function ReminderCard({
 
   return (
     <div
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
-        onDragStart();
-      }}
-      onDragEnd={onDragEnd}
+      draggable={false}
+      onPointerDown={onDragPointerDown}
+      onClickCapture={onDragClickCapture}
+      onDragStart={(e) => e.preventDefault()}
       data-focus-id={reminder.id}
       data-reminder-id={reminder.id}
       className={cn(
-        "group/card cursor-grab rounded-md border border-slate-100 border-l-[3px] !bg-white p-3.5 shadow-sm active:cursor-grabbing",
-        KANBAN_CARD,
+        "group/card",
+        entityCardBox,
         cardMotion,
         meta.border,
         isDragging

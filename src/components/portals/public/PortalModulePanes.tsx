@@ -20,6 +20,10 @@ import {
   listInvoices,
 } from "@/lib/finance/invoices/types";
 import { chargePaymentDemoLive } from "@/lib/finance/pay-gateway";
+import {
+  createPublicInvoicePayIntent,
+  parsePublicSalesLink,
+} from "@/lib/finance/public-sales/api";
 import { formatAUD } from "@/lib/finance/shared";
 import {
   listTickets,
@@ -242,6 +246,30 @@ export function PortalInvoicesPane({ slug }: { slug: string }) {
     const inv = listInvoices().find((i) => i.id === invoiceId);
     if (!inv || !canPay || inv.amountDue <= 0) return;
     setPayingId(invoiceId);
+
+    const parts = parsePublicSalesLink(inv.publicLink);
+    if (parts?.kind === "invoices") {
+      try {
+        const intent = await createPublicInvoicePayIntent(parts.id, parts.hash);
+        if (intent.url) {
+          logActivity(`Opened pay checkout for ${inv.invoiceId}`);
+          setPayingId(null);
+          window.location.href = intent.url;
+          return;
+        }
+        if (intent.clientSecret || intent.paymentIntentId) {
+          setPayingId(null);
+          setToast(
+            "Payment session created. Complete checkout to finish paying.",
+          );
+          window.setTimeout(() => setToast(null), 3200);
+          return;
+        }
+      } catch {
+        /* fall through to demo gateway */
+      }
+    }
+
     const result = await chargePaymentDemoLive({
       invoiceId: inv.id,
       amount: inv.amountDue,

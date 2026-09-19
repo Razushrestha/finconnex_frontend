@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Building2,
   DollarSign,
@@ -17,7 +18,6 @@ import {
 import type { DealRecord } from "@/lib/deals/types";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion, cardSubject, entityCardBox } from "@/lib/motion";
-import Link from "next/link";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 import { listLocalDealAttachments } from "@/lib/deals/attachments";
 import { onRulesChange } from "@/lib/rules/storage";
@@ -34,8 +34,8 @@ export type DealQuickActionKind =
 interface DealRecordCardProps {
   deal: DealRecord;
   isDragging: boolean;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragEnd: () => void;
+  onDragPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onDragClickCapture?: (e: React.MouseEvent) => void;
   onQuickAction?: (kind: DealQuickActionKind) => void;
   isSelected?: boolean;
   onSelect?: (
@@ -79,12 +79,13 @@ const DEFAULT_DEAL_QUICK_ACTIONS: { kind: DealQuickActionKind; badgeCount: numbe
 export function DealRecordCard({
   deal,
   isDragging,
-  onDragStart,
-  onDragEnd,
+  onDragPointerDown,
+  onDragClickCapture,
   onQuickAction,
   isSelected = false,
   onSelect,
 }: DealRecordCardProps) {
+  const router = useRouter();
   const [attachCount, setAttachCount] = useState(0);
 
   useEffect(() => {
@@ -109,9 +110,11 @@ export function DealRecordCard({
 
   return (
     <div
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      draggable={false}
+      onPointerDown={onDragPointerDown}
+      onClickCapture={onDragClickCapture}
+      onDragStart={(e) => e.preventDefault()}
+      onClick={() => router.push(`/sales/deals/detail/${deal.id}`)}
       data-focus-id={deal.id}
       data-deal-id={deal.id}
       className={cn(
@@ -131,12 +134,7 @@ export function DealRecordCard({
             cardSubject,
           )}
         >
-          <Link
-            href={`/sales/deals/detail/${deal.id}`}
-            className="focus-visible:outline-none"
-          >
-            {deal.name}
-          </Link>
+          {deal.name}
         </h3>
 
         {onSelect && (
@@ -150,6 +148,8 @@ export function DealRecordCard({
           >
             <input
               type="checkbox"
+              data-no-drag
+              draggable={false}
               checked={isSelected}
               onChange={onSelect}
               onClick={(e) => e.stopPropagation()}

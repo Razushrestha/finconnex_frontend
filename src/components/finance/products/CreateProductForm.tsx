@@ -17,6 +17,7 @@ import {
 } from "@/lib/finance/products/api";
 import { FINANCE_OWNERS, formatFinanceDate } from "@/lib/finance/shared";
 import { defaultActorName } from "@/lib/rules/actor";
+import { FinanceCreateDialog } from "@/components/finance/FinanceCreateDialog";
 import {
   CreateEntityFormShell,
   Field,
@@ -28,11 +29,24 @@ import {
 } from "@/components/sales/CreateEntityForm";
 
 interface Props {
-  layoutId: string;
-  redirect: boolean;
+  layoutId?: string;
+  redirect?: boolean;
+  variant?: "page" | "modal";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onCreated?: () => void;
 }
 
-export function CreateProductForm({ layoutId: _l, redirect: _r }: Props) {
+export function CreateProductForm({
+  layoutId: _l,
+  redirect: _r,
+  variant = "page",
+  open = true,
+  onOpenChange,
+  onCreated,
+}: Props) {
+  void _l;
+  void _r;
   const router = useRouter();
   const [name, setName] = useState("");
   const [type, setType] = useState<ProductType>("Service");
@@ -91,26 +105,16 @@ export function CreateProductForm({ layoutId: _l, redirect: _r }: Props) {
       setErrors({});
       return;
     }
+    if (variant === "modal") {
+      onCreated?.();
+      onOpenChange?.(false);
+      return;
+    }
     router.push("/finance/products");
   }
 
-  return (
-    <CreateEntityFormShell
-      breadcrumbParent={{
-        label: "Products & Services",
-        href: "/finance/products",
-      }}
-      badge="§13.6"
-      title="Add Product / Service"
-      subtitle="Shared catalogue pricing for estimates, quotations, and invoices."
-      tip="Name is required. Active items appear in line-item pickers."
-      cardIcon={Package}
-      cardTitle="Catalogue item"
-      cardDescription="SRS §20.5: maintain pricing in one place"
-      listHref="/finance/products"
-      saveLabel="Save item"
-      onSave={(again) => void onSave(again)}
-    >
+  const fields = (
+    <>
       <Field label="Name" required error={errors.name} className="sm:col-span-2">
         <InputShell icon={Package} error={!!errors.name}>
           <input
@@ -195,6 +199,43 @@ export function CreateProductForm({ layoutId: _l, redirect: _r }: Props) {
           />
         </TextAreaShell>
       </Field>
+    </>
+  );
+
+  if (variant === "modal") {
+    return (
+      <FinanceCreateDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        title="Add Product / Service"
+        icon={Package}
+        saveLabel="Save item"
+        onSave={onSave}
+        wide={false}
+      >
+        {fields}
+      </FinanceCreateDialog>
+    );
+  }
+
+  return (
+    <CreateEntityFormShell
+      breadcrumbParent={{
+        label: "Products & Services",
+        href: "/finance/products",
+      }}
+      badge="§13.6"
+      title="Add Product / Service"
+      subtitle="Shared catalogue pricing for estimates, quotations, and invoices."
+      tip="Name is required. Active items appear in line-item pickers."
+      cardIcon={Package}
+      cardTitle="Catalogue item"
+      cardDescription="SRS §20.5: maintain pricing in one place"
+      listHref="/finance/products"
+      saveLabel="Save item"
+      onSave={(again) => void onSave(again)}
+    >
+      {fields}
     </CreateEntityFormShell>
   );
 }

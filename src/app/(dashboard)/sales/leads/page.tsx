@@ -87,6 +87,14 @@ import {
   tablePreferenceFromListView,
   tryCrmTablePreference,
 } from "@/lib/table-preferences/api";
+import {
+  applyKanbanPreferenceToView,
+  getCrmLeadKanbanPreference,
+  isEmptyLeadKanbanPreference,
+  persistCrmLeadKanbanPreference,
+  tryCrmLeadKanbanPreference,
+} from "@/lib/kanban/preference-api";
+import { bindKanbanStageTitle } from "@/lib/kanban/stage-titles";
 
 const DEFAULT_LEAD_COLUMNS = LEAD_PIPELINE_STAGES.map((stage) => ({
   id: stageColumnId(stage),
@@ -556,6 +564,18 @@ export default function LeadsPage() {
         }
       },
     );
+    void tryCrmLeadKanbanPreference(() => getCrmLeadKanbanPreference()).then(
+      (pref) => {
+        if (pref && !isEmptyLeadKanbanPreference(pref)) {
+          setViewConfig((current) => {
+            const next = applyKanbanPreferenceToView(current, pref);
+            persistViewConfig(next);
+            applyViewFieldsToCards(next);
+            return next;
+          });
+        }
+      },
+    );
   }, []);
 
   useEffect(() => {
@@ -577,6 +597,7 @@ export default function LeadsPage() {
     setViewConfig(normalized);
     persistViewConfig(normalized);
     applyViewFieldsToCards(normalized);
+    persistCrmLeadKanbanPreference(normalized);
     if (closeSettings) setIsKanbanSettingsOpen(false);
   }
 
@@ -600,6 +621,27 @@ export default function LeadsPage() {
     );
   }
 
+  function addLeadStageColumnTitle(title: string) {
+    const bound = bindKanbanStageTitle({
+      stages: LEAD_STAGES,
+      selectedStageIds: normalizeSelectedStageIds(viewConfig.selectedStageIds),
+      stageLabels: viewConfig.stageLabels ?? {},
+      title,
+    });
+    if (!bound.ok) {
+      notifyBoard(bound.error, "warn");
+      return;
+    }
+    persistKanbanView(
+      {
+        ...viewConfig,
+        selectedStageIds: bound.selectedStageIds,
+        stageLabels: bound.stageLabels,
+      },
+      false,
+    );
+  }
+
   function renameLeadStageColumn(columnId: string, nextLabel: string) {
     persistKanbanView(
       {
@@ -608,6 +650,24 @@ export default function LeadsPage() {
           ...(viewConfig.stageLabels ?? {}),
           [columnId]: nextLabel,
         },
+      },
+      false,
+    );
+  }
+
+  function reorderLeadStageColumn(draggedId: string, targetId: string) {
+    const current = normalizeSelectedStageIds(viewConfig.selectedStageIds);
+    const from = current.indexOf(draggedId);
+    const to = current.indexOf(targetId);
+    if (from < 0 || to < 0 || from === to) return;
+    const next = [...current];
+    const [moved] = next.splice(from, 1);
+    if (!moved) return;
+    next.splice(to, 0, moved);
+    persistKanbanView(
+      {
+        ...viewConfig,
+        selectedStageIds: normalizeSelectedStageIds(next),
       },
       false,
     );
@@ -848,6 +908,12 @@ export default function LeadsPage() {
           }
           onColumnRename={
             viewMode === "kanban" ? renameLeadStageColumn : undefined
+          }
+          onColumnAdd={
+            viewMode === "kanban" ? addLeadStageColumnTitle : undefined
+          }
+          onColumnReorder={
+            viewMode === "kanban" ? reorderLeadStageColumn : undefined
           }
           hideTitle
           showSearch={false}

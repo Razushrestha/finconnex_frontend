@@ -80,7 +80,7 @@ export async function deliverSignatureRequest(
     }
   }
 
-  await publishPublicSignSession(working, baked.pdfFiles);
+  working = await publishPublicSignSession(working, baked.pdfFiles);
 
   if (!emailedByCrm) {
     const pending = working.signers.filter(

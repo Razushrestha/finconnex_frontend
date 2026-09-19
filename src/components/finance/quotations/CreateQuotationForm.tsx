@@ -33,6 +33,7 @@ import {
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { defaultActorName } from "@/lib/rules/actor";
+import { FinanceCreateDialog } from "@/components/finance/FinanceCreateDialog";
 import {
   CreateEntityFormShell,
   Field,
@@ -42,8 +43,12 @@ import {
 } from "@/components/sales/CreateEntityForm";
 
 interface Props extends RelatedFinancePrefill {
-  layoutId: string;
-  redirect: boolean;
+  layoutId?: string;
+  redirect?: boolean;
+  variant?: "page" | "modal";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onCreated?: () => void;
 }
 
 export function CreateQuotationForm({
@@ -53,7 +58,13 @@ export function CreateQuotationForm({
   relatedName,
   relatedId,
   email,
+  variant = "page",
+  open = true,
+  onOpenChange,
+  onCreated,
 }: Props) {
+  void _l;
+  void _r;
   const router = useRouter();
   const prefill = useMemo(
     () => ({ relatedKind, relatedName, relatedId, email }),
@@ -162,23 +173,16 @@ export function CreateQuotationForm({
       setSaveError(null);
       return;
     }
+    if (variant === "modal") {
+      onCreated?.();
+      onOpenChange?.(false);
+      return;
+    }
     router.push(`/finance/quotations/${created.id}`);
   }
 
-  return (
-    <CreateEntityFormShell
-      breadcrumbParent={{ label: "Quotations", href: "/finance/quotations" }}
-      badge="§13.2"
-      title="Create Quotation"
-      subtitle="Formal quotation with line items and pricing: convertible to invoice."
-      tip="Title, Valid until, and line items are required."
-      cardIcon={FileText}
-      cardTitle="Quotation details"
-      cardDescription="SRS §20.2: standalone or from an accepted estimate"
-      listHref="/finance/quotations"
-      saveLabel="Save quotation"
-      onSave={onSave}
-    >
+  const fields = (
+    <>
       {relatedTo ? (
         <Field label="Related to" className="sm:col-span-2">
           <InputShell icon={Building2}>
@@ -293,6 +297,40 @@ export function CreateQuotationForm({
         ) : null}
         <LineItemsEditor items={lineItems} onChange={setLineItems} />
       </div>
+    </>
+  );
+
+  if (variant === "modal") {
+    return (
+      <FinanceCreateDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        title="Create Quotation"
+        icon={FileText}
+        saving={saving}
+        saveLabel="Save quotation"
+        onSave={onSave}
+      >
+        {fields}
+      </FinanceCreateDialog>
+    );
+  }
+
+  return (
+    <CreateEntityFormShell
+      breadcrumbParent={{ label: "Quotations", href: "/finance/quotations" }}
+      badge="§13.2"
+      title="Create Quotation"
+      subtitle="Formal quotation with line items and pricing: convertible to invoice."
+      tip="Title, Valid until, and line items are required."
+      cardIcon={FileText}
+      cardTitle="Quotation details"
+      cardDescription="SRS §20.2: standalone or from an accepted estimate"
+      listHref="/finance/quotations"
+      saveLabel="Save quotation"
+      onSave={onSave}
+    >
+      {fields}
     </CreateEntityFormShell>
   );
 }

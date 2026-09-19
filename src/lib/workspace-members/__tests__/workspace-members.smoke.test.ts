@@ -17,4 +17,19 @@ describe("Workspace members API smoke (CI)", () => {
     const { SCREENSHOT_ENDPOINTS } = await import("@/lib/api/endpoints");
     expect(SCREENSHOT_ENDPOINTS).toHaveLength(5);
   });
+
+  it("builds a whitelist-safe invite body", async () => {
+    const { toInviteMemberBody } = await import("@/lib/workspace-members/api");
+    const body = toInviteMemberBody({
+      email: "Ada@Example.com",
+      name: "Ada Lovelace",
+      role: "User",
+    });
+    expect(body).toEqual({
+      email: "ada@example.com",
+      role: "MEMBER",
+      firstName: "Ada",
+      lastName: "Lovelace",
+    });
+  });
 });

@@ -1,9 +1,13 @@
 import {
   ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
   isUuid,
 } from "@/lib/activity-timeline/auth";
-import { crmErrorMessage, crmFetch } from "@/lib/crm/request";
+import {
+  crmErrorMessage,
+  crmWorkspaceFetch,
+} from "@/lib/crm/request";
 import {
   formatFilterLabel,
   inferDateRangePreset,
@@ -26,9 +30,29 @@ import {
 } from "@/lib/reports/types";
 
 export type CrmReportQuery = {
-  page?: number;
-  limit?: number;
   search?: string;
+  reportType?: string;
+  isTemplate?: boolean;
+};
+
+export type CrmReportExecution = {
+  id: string;
+  reportId: string;
+  status: string;
+  format: string;
+  filename?: string;
+  errorCode?: string;
+  createdAt?: string;
+  completedAt?: string;
+};
+
+export type CrmReportScheduleConfig = {
+  id: string;
+  reportId: string;
+  frequency: ReportSchedule;
+  timezone: string;
+  isPaused: boolean;
+  createdAt?: string;
 };
 
 function pickStr(...values: unknown[]): string {
@@ -52,10 +76,49 @@ export function reportsPath(suffix = ""): string {
   return `/v1/reports${suffix}`;
 }
 
+export function reportExecutionsPath(
+  workspaceId: string,
+  reportId: string,
+): string {
+  return `/v1/workspaces/${workspaceId}/reports/${reportId}/executions`;
+}
+
+export function reportExecutionItemPath(
+  workspaceId: string,
+  executionId: string,
+  suffix = "",
+): string {
+  return `/v1/workspaces/${workspaceId}/report-executions/${executionId}${suffix}`;
+}
+
+export function reportSchedulesPath(
+  workspaceId: string,
+  reportId: string,
+  suffix = "",
+): string {
+  return `/v1/workspaces/${workspaceId}/reports/${reportId}/schedules${suffix}`;
+}
+
+export function apiExportFormat(format?: string): string {
+  const value = (format ?? "csv").toLowerCase();
+  if (value === "xlsx" || value === "xls" || value === "excel") return "excel";
+  if (value === "pdf") return "pdf";
+  return "csv";
+}
+
 async function resolveAuth() {
   const scoped = await ensureCrmSession();
   if (scoped) return scoped;
   return ensureCrmAccess();
+}
+
+async function workspaceIdOrThrow(): Promise<string> {
+  const session = await ensureCrmSession();
+  const workspaceId = session?.workspaceId?.trim();
+  if (!workspaceId) {
+    throw new Error("Sign in to a workspace to manage report runs");
+  }
+  return workspaceId;
 }
 
 function extractRecords(data: unknown): Record<string, unknown>[] {
@@ -274,20 +337,50 @@ async function reportsRequest(
   suffix: string,
   init?: RequestInit,
 ): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to manage reports");
-  return crmFetch(auth, reportsPath(suffix), init);
+  return crmWorkspaceFetch(reportsPath(suffix), init);
+}
+
+async function workspaceReportsRequest(
+  path: string,
+  init?: RequestInit,
+): Promise<unknown> {
+  return crmWorkspaceFetch(path, init);
+}
+
+function blobFromExportPayload(payload: unknown): Blob | null {
+  if (!payload || typeof payload !== "object") return null;
+  const rec = payload as Record<string, unknown>;
+  if (typeof rec.data !== "string") return null;
+  const binary = atob(rec.data);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  const blob = new Blob([bytes], {
+    type: pickStr(rec.contentType) || "application/octet-stream",
+  });
+  Object.assign(blob, { filename: pickStr(rec.filename) });
+  return blob;
 }
 
 async function reportsBlob(suffix: string): Promise<Blob> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to export a report");
-  const res = await fetch(`${auth.baseUrl}${reportsPath(suffix)}`, {
-    headers: {
-      Accept: "application/octet-stream,text/csv,application/json,*/*",
-      Authorization: `Bearer ${auth.accessToken}`,
-    },
-  });
+  const path = reportsPath(suffix);
+  const headers = {
+    Accept: "application/octet-stream,text/csv,application/json,*/*",
+  };
+  let res: Response;
+  if (isBoundCrmSession()) {
+    const auth = await resolveAuth();
+    if (!auth) throw new Error("Sign in to export a report");
+    res = await fetch(`${auth.baseUrl}${path}`, {
+      headers: {
+        ...headers,
+        Authorization: `Bearer ${auth.accessToken}`,
+      },
+    });
+  } else {
+    res = await fetch(`/api/auth/crm${path.slice(3)}`, {
+      credentials: "same-origin",
+      headers,
+    });
+  }
   if (!res.ok) {
     const text = await res.text();
     let json: unknown = null;
@@ -297,6 +390,18 @@ async function reportsBlob(suffix: string): Promise<Blob> {
       json = null;
     }
     throw new Error(crmErrorMessage(json, `Export failed (${res.status})`));
+  }
+  const type = res.headers.get("content-type") || "";
+  if (type.includes("json")) {
+    const json = await res.json();
+    const blob =
+      blobFromExportPayload(json) ??
+      blobFromExportPayload(
+        json && typeof json === "object" && "data" in json
+          ? (json as { data: unknown }).data
+          : null,
+      );
+    if (blob) return blob;
   }
   return res.blob();
 }
@@ -316,9 +421,10 @@ export async function listCrmReports(
   return normalizeReports(
     await reportsRequest(
       toQuery({
-        page: query.page,
-        limit: query.limit ?? 100,
         search: query.search,
+        reportType: query.reportType,
+        isTemplate:
+          query.isTemplate == null ? undefined : String(query.isTemplate),
       }),
     ),
   );
@@ -375,20 +481,10 @@ export async function exportCrmReport(
   id: string,
   format?: string,
 ): Promise<Blob> {
-  const q = format ? `?format=${encodeURIComponent(format)}` : "";
+  const q = `?format=${encodeURIComponent(apiExportFormat(format))}`;
   const payload = await reportsRequest(`/${id}/export${q}`);
-  if (payload && typeof payload === "object") {
-    const rec = payload as Record<string, unknown>;
-    if (typeof rec.data === "string") {
-      const binary = atob(rec.data);
-      const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-      const blob = new Blob([bytes], {
-        type: pickStr(rec.contentType) || "application/octet-stream",
-      });
-      Object.assign(blob, { filename: pickStr(rec.filename) });
-      return blob;
-    }
-  }
+  const blob = blobFromExportPayload(payload);
+  if (blob) return blob;
   return reportsBlob(`/${id}/export${q}`);
 }
 
@@ -410,7 +506,7 @@ export async function emailCrmReport(
 ): Promise<void> {
   await reportsRequest(`/${id}/email`, {
     method: "POST",
-    body: JSON.stringify({ to, format }),
+    body: JSON.stringify({ to, format: apiExportFormat(format) }),
   });
 }
 
@@ -423,6 +519,165 @@ export async function shareCrmReport(
       method: "POST",
       body: JSON.stringify({ sharedWith }),
     }),
+  );
+}
+
+function asExecution(
+  raw: Record<string, unknown>,
+  index: number,
+): CrmReportExecution {
+  return {
+    id: pickStr(raw.id) || `exec-${index}`,
+    reportId: pickStr(raw.reportId),
+    status: pickStr(raw.status, "QUEUED") || "QUEUED",
+    format: apiExportFormat(pickStr(raw.format, "csv")),
+    filename: pickStr(raw.filename) || undefined,
+    errorCode: pickStr(raw.errorCode) || undefined,
+    createdAt: formatAt(raw.createdAt) || undefined,
+    completedAt: formatAt(raw.completedAt) || undefined,
+  };
+}
+
+function asScheduleConfig(
+  raw: Record<string, unknown>,
+  index: number,
+): CrmReportScheduleConfig {
+  return {
+    id: pickStr(raw.id) || `sched-${index}`,
+    reportId: pickStr(raw.reportId),
+    frequency: mapReportSchedule(pickStr(raw.frequency, raw.schedule, "NONE")),
+    timezone: pickStr(raw.timezone, "UTC") || "UTC",
+    isPaused: Boolean(raw.isPaused ?? raw.paused),
+    createdAt: formatAt(raw.createdAt) || undefined,
+  };
+}
+
+export async function listCrmReportExecutions(
+  reportId: string,
+): Promise<CrmReportExecution[]> {
+  const workspaceId = await workspaceIdOrThrow();
+  return extractRecords(
+    await workspaceReportsRequest(reportExecutionsPath(workspaceId, reportId)),
+  ).map(asExecution);
+}
+
+export async function createCrmReportExecution(
+  reportId: string,
+  format?: string,
+): Promise<CrmReportExecution | null> {
+  const workspaceId = await workspaceIdOrThrow();
+  const payload = await workspaceReportsRequest(
+    reportExecutionsPath(workspaceId, reportId),
+    {
+      method: "POST",
+      body: JSON.stringify({
+        format: apiExportFormat(format),
+        idempotencyKey: `run:${reportId}:${Date.now()}`,
+      }),
+    },
+  );
+  const items = extractRecords(payload).map(asExecution);
+  if (items[0]) return items[0];
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    return asExecution(payload as Record<string, unknown>, 0);
+  }
+  return null;
+}
+
+export async function getCrmReportExecution(
+  executionId: string,
+): Promise<CrmReportExecution | null> {
+  const workspaceId = await workspaceIdOrThrow();
+  const payload = await workspaceReportsRequest(
+    reportExecutionItemPath(workspaceId, executionId),
+  );
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    return asExecution(payload as Record<string, unknown>, 0);
+  }
+  return extractRecords(payload).map(asExecution)[0] ?? null;
+}
+
+export async function cancelCrmReportExecution(
+  executionId: string,
+): Promise<CrmReportExecution | null> {
+  const workspaceId = await workspaceIdOrThrow();
+  const payload = await workspaceReportsRequest(
+    reportExecutionItemPath(workspaceId, executionId, "/cancel"),
+    { method: "POST", body: "{}" },
+  );
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    return asExecution(payload as Record<string, unknown>, 0);
+  }
+  return null;
+}
+
+export async function downloadCrmReportExecution(
+  executionId: string,
+): Promise<Blob> {
+  const workspaceId = await workspaceIdOrThrow();
+  const payload = await workspaceReportsRequest(
+    reportExecutionItemPath(workspaceId, executionId, "/download"),
+  );
+  const blob = blobFromExportPayload(payload);
+  if (blob) return blob;
+  throw new Error("Report download is not available yet");
+}
+
+export async function listCrmReportSchedules(
+  reportId: string,
+): Promise<CrmReportScheduleConfig[]> {
+  const workspaceId = await workspaceIdOrThrow();
+  return extractRecords(
+    await workspaceReportsRequest(reportSchedulesPath(workspaceId, reportId)),
+  ).map(asScheduleConfig);
+}
+
+export async function createCrmReportSchedule(
+  reportId: string,
+  frequency: ReportSchedule,
+  timezone?: string,
+): Promise<CrmReportScheduleConfig | null> {
+  const apiFrequency = apiSchedule(frequency);
+  if (!apiFrequency) return null;
+  const workspaceId = await workspaceIdOrThrow();
+  const payload = await workspaceReportsRequest(
+    reportSchedulesPath(workspaceId, reportId),
+    {
+      method: "POST",
+      body: JSON.stringify({
+        frequency: apiFrequency,
+        timezone:
+          timezone ||
+          Intl.DateTimeFormat().resolvedOptions().timeZone ||
+          "UTC",
+      }),
+    },
+  );
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    return asScheduleConfig(payload as Record<string, unknown>, 0);
+  }
+  return extractRecords(payload).map(asScheduleConfig)[0] ?? null;
+}
+
+export async function pauseCrmReportSchedule(
+  reportId: string,
+  scheduleId: string,
+): Promise<void> {
+  const workspaceId = await workspaceIdOrThrow();
+  await workspaceReportsRequest(
+    reportSchedulesPath(workspaceId, reportId, `/${scheduleId}/pause`),
+    { method: "POST", body: "{}" },
+  );
+}
+
+export async function resumeCrmReportSchedule(
+  reportId: string,
+  scheduleId: string,
+): Promise<void> {
+  const workspaceId = await workspaceIdOrThrow();
+  await workspaceReportsRequest(
+    reportSchedulesPath(workspaceId, reportId, `/${scheduleId}/resume`),
+    { method: "POST", body: "{}" },
   );
 }
 

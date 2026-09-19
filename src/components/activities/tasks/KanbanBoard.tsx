@@ -24,6 +24,11 @@ import {
 import { onRulesChange } from "@/lib/rules";
 import { taskMatchesFilters, taskMatchesSearch } from "@/lib/tasks/search";
 import { KanbanColumn } from "./KanbanColumn";
+import { KanbanDragGhost } from "@/components/common/KanbanDragGhost";
+import {
+  usePointerKanbanDrag,
+  type PointerKanbanDrop,
+} from "@/lib/kanban/use-pointer-kanban-drag";
 import type { Priority, TaskStatus } from "@/lib/tasks/types";
 
 interface DragInfo {
@@ -42,6 +47,8 @@ interface KanbanBoardProps {
   groupBy?: TaskGroupBy;
   selectedIds?: string[];
   onSelectedIdsChange?: (ids: string[]) => void;
+  visibleColumnIds?: string[];
+  columnTitles?: Record<string, string>;
 }
 
 export function KanbanBoard({
@@ -50,12 +57,10 @@ export function KanbanBoard({
   groupBy = "status",
   selectedIds: controlledSelectedIds,
   onSelectedIdsChange,
+  visibleColumnIds,
+  columnTitles,
 }: KanbanBoardProps) {
   const [columns, setColumns] = useState<TaskColumn[]>(() => listTaskColumns());
-  const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
-  const [dropTargetPos, setDropTargetPos] = useState<DropTargetPos | null>(
-    null,
-  );
 
   const [localSelectedIds, setLocalSelectedIds] = useState<string[]>([]);
   const selectedIds = controlledSelectedIds ?? localSelectedIds;
@@ -108,44 +113,29 @@ export function KanbanBoard({
     }
 
     const grouped = groupTaskColumns(sourceColumns, groupBy);
-    return grouped.map((col) => ({ ...col, count: col.tasks.length }));
-  }, [columns, filters, groupBy, search]);
+    return grouped
+      .filter((col) => !visibleColumnIds?.length || visibleColumnIds.includes(col.id))
+      .map((col) => ({ ...col, count: col.tasks.length }));
+  }, [columns, filters, groupBy, search, visibleColumnIds]);
 
-  function handleDragStartTask(
-    e: React.DragEvent<HTMLDivElement>,
-    taskId: string,
-    columnId: string,
-  ) {
-    setDragInfo({ taskId, sourceColumnId: columnId });
-    e.dataTransfer.effectAllowed = "move";
-  }
-
-  function handleDragEndTask() {
-    setDragInfo(null);
-    setDropTargetPos(null);
-  }
-
-  function handleDropTask(targetColumnId: string, targetIndex?: number) {
-    if (!dragInfo) return;
-    const { taskId, sourceColumnId } = dragInfo;
-
+  function handleDropTask({
+    itemId: taskId,
+    sourceColumnId,
+    targetColumnId,
+    targetIndex,
+  }: PointerKanbanDrop) {
     const targetColumn = visibleColumns.find((c) => c.id === targetColumnId);
-    if (!targetColumn) {
-      handleDragEndTask();
-      return;
-    }
+    if (!targetColumn) return;
 
     if (groupBy === "assignee") {
       reassignTask(taskId, targetColumn.title);
       setColumns(listTaskColumns());
-      handleDragEndTask();
       return;
     }
 
     if (groupBy === "priority") {
       updateTaskPriority(taskId, targetColumn.title as Priority);
       setColumns(listTaskColumns());
-      handleDragEndTask();
       return;
     }
 
@@ -154,10 +144,7 @@ export function KanbanBoard({
       sourceColumn?.tasks.find((t) => t.taskId === taskId) ??
       columns.flatMap((c) => c.tasks).find((t) => t.taskId === taskId);
 
-    if (!task) {
-      handleDragEndTask();
-      return;
-    }
+    if (!task) return;
 
     const moved = { ...task, status: targetColumn.title as TaskStatus };
 
@@ -169,7 +156,6 @@ export function KanbanBoard({
         persistRemoteTask(row);
         setColumns(listTaskColumns());
       });
-      handleDragEndTask();
       return;
     }
 
@@ -183,9 +169,9 @@ export function KanbanBoard({
         return { ...col, tasks: updatedTasks };
       }),
     );
-
-    handleDragEndTask();
   }
+
+  const drag = usePointerKanbanDrag({ onDrop: handleDropTask });
 
   function handleChangePriority(taskId: string, priority: Priority) {
     const updated = updateTaskPriority(taskId, priority);
@@ -207,18 +193,22 @@ export function KanbanBoard({
         <KanbanColumn
           key={column.id}
           column={column}
-          draggingTaskId={dragInfo?.taskId ?? null}
-          dropTargetPos={dropTargetPos}
-          setDropTargetPos={setDropTargetPos}
-          onDragStartTask={handleDragStartTask}
-          onDragEndTask={handleDragEndTask}
-          onDropTask={handleDropTask}
+          draggingTaskId={drag.dragInfo?.itemId ?? null}
+          dropTargetPos={drag.dropTargetPos}
+          setDropTargetPos={() => undefined}
+          onCardPointerDown={drag.onCardPointerDown}
+          onDragClickCapture={
+            drag.cardPointerProps({ id: "", columnId: "", name: "" })
+              .onClickCapture
+          }
           selectedIds={selectedIds}
           onToggleSelect={handleToggleSelect}
           onChangePriority={handleChangePriority}
           onChangeStatus={handleChangeStatus}
+          displayTitle={columnTitles?.[column.id]}
         />
       ))}
+      <KanbanDragGhost ghost={drag.ghost} />
     </div>
   );
 }

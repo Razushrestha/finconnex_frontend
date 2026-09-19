@@ -105,8 +105,8 @@ export function smokeCreditNotesWiring() {
   }
 
   const page = readSrc("src/app/(dashboard)/finance/credit-notes/page.tsx");
-  if (!page.includes("useCrmCreditNotes")) {
-    fail("credit-notes page does not call useCrmCreditNotes");
+  if (!page.includes('redirect("/finance/invoices")')) {
+    fail("credit-notes list page should redirect away from the removed UI");
   }
 
   const hook = readSrc("src/lib/finance/credit-notes/use-crm-credit-notes.ts");

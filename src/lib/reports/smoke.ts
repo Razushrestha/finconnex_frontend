@@ -7,14 +7,26 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { bindCrmSession, getCrmApiBaseUrl } from "@/lib/activity-timeline";
 import {
+  cancelCrmReportExecution,
   createCrmReport,
+  createCrmReportExecution,
+  createCrmReportSchedule,
   deleteCrmReport,
+  downloadCrmReportExecution,
   emailCrmReport,
   exportCrmReport,
   getCrmReport,
+  getCrmReportExecution,
+  listCrmReportExecutions,
+  listCrmReportSchedules,
   listCrmReports,
   normalizeReport,
+  pauseCrmReportSchedule,
+  reportExecutionItemPath,
+  reportExecutionsPath,
+  reportSchedulesPath,
   reportsPath,
+  resumeCrmReportSchedule,
   runCrmReport,
   saveCrmReportAsTemplate,
   shareCrmReport,
@@ -36,6 +48,8 @@ const SESSION = {
 };
 
 const ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const EXEC_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+const SCHED_ID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const DECOY_PATH = "/v1/__no_such_module_reports_probe__";
 
 const LIVE_ROUTES: Array<{ method: string; path: string }> = [
@@ -49,6 +63,42 @@ const LIVE_ROUTES: Array<{ method: string; path: string }> = [
   { method: "POST", path: `/v1/reports/${ID}/template` },
   { method: "POST", path: `/v1/reports/${ID}/email` },
   { method: "POST", path: `/v1/reports/${ID}/share` },
+  {
+    method: "GET",
+    path: `/v1/workspaces/${SESSION.workspaceId}/reports/${ID}/executions`,
+  },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/reports/${ID}/executions`,
+  },
+  {
+    method: "GET",
+    path: `/v1/workspaces/${SESSION.workspaceId}/report-executions/${EXEC_ID}`,
+  },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/report-executions/${EXEC_ID}/cancel`,
+  },
+  {
+    method: "GET",
+    path: `/v1/workspaces/${SESSION.workspaceId}/report-executions/${EXEC_ID}/download`,
+  },
+  {
+    method: "GET",
+    path: `/v1/workspaces/${SESSION.workspaceId}/reports/${ID}/schedules`,
+  },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/reports/${ID}/schedules`,
+  },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/reports/${ID}/schedules/${SCHED_ID}/pause`,
+  },
+  {
+    method: "POST",
+    path: `/v1/workspaces/${SESSION.workspaceId}/reports/${ID}/schedules/${SCHED_ID}/resume`,
+  },
 ];
 
 function repoRoot() {
@@ -74,6 +124,15 @@ export function smokeReportsWiring() {
     "saveCrmReportAsTemplate",
     "emailCrmReport",
     "shareCrmReport",
+    "listCrmReportExecutions",
+    "createCrmReportExecution",
+    "getCrmReportExecution",
+    "cancelCrmReportExecution",
+    "downloadCrmReportExecution",
+    "listCrmReportSchedules",
+    "createCrmReportSchedule",
+    "pauseCrmReportSchedule",
+    "resumeCrmReportSchedule",
   ]) {
     if (!api.includes(`export async function ${name}`)) {
       fail(`reports client missing ${name}`);
@@ -81,6 +140,15 @@ export function smokeReportsWiring() {
   }
   if (!api.includes("`/v1/reports${suffix}`")) {
     fail("reports client missing /v1/reports path");
+  }
+  if (api.includes("limit: query.limit")) {
+    fail("GET /v1/reports must not send page/limit (ReportListFiltersDto)");
+  }
+  if (!api.includes("`/v1/workspaces/${workspaceId}/reports/${reportId}/executions`")) {
+    fail("reports client missing execution path");
+  }
+  if (!api.includes("`/v1/workspaces/${workspaceId}/report-executions/${executionId}${suffix}`")) {
+    fail("reports client missing report-executions path");
   }
 
   const catalog = readSrc("src/lib/api/endpoints.ts");
@@ -92,10 +160,24 @@ export function smokeReportsWiring() {
     'path: "/reports/:id/template"',
     'path: "/reports/:id/email"',
     'path: "/reports/:id/share"',
+    'path: "/workspaces/:workspaceId/reports/:reportId/executions"',
+    'path: "/workspaces/:workspaceId/report-executions/:executionId"',
+    'path: "/workspaces/:workspaceId/reports/:reportId/schedules"',
   ]) {
     if (!catalog.includes(fragment)) {
       fail(`endpoint catalog missing ${fragment}`);
     }
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('"reports"')) {
+    fail("BFF proxy does not allow /v1/reports");
+  }
+  if (!bff.includes('path.includes("reports")')) {
+    fail("BFF proxy does not allow workspace report executions");
+  }
+  if (!bff.includes('path.includes("report-executions")')) {
+    fail("BFF proxy does not allow /report-executions");
   }
 
   const page = readSrc("src/app/(dashboard)/reports/page.tsx");
@@ -109,6 +191,9 @@ export function smokeReportsWiring() {
   }
   if (!hook.includes('setSource("api")')) {
     fail("reports hook must mark a successful empty list as Live CRM");
+  }
+  if (!hook.includes("ensureCrmSession")) {
+    fail("reports hook must wait for a workspace-scoped CRM session");
   }
 
   const create = readSrc("src/components/reports/CreateReportForm.tsx");
@@ -125,6 +210,14 @@ export function smokeReportsWiring() {
     "updateCrmReport",
     "emailCrmReport",
     "shareCrmReport",
+    "listCrmReportExecutions",
+    "createCrmReportExecution",
+    "cancelCrmReportExecution",
+    "downloadCrmReportExecution",
+    "listCrmReportSchedules",
+    "createCrmReportSchedule",
+    "pauseCrmReportSchedule",
+    "resumeCrmReportSchedule",
   ]) {
     if (!detail.includes(name)) {
       fail(`report detail does not call ${name}`);
@@ -182,7 +275,7 @@ export async function smokeReportsMock() {
     const method = (init?.method ?? "GET").toUpperCase();
     const parsed = new URL(String(input));
     hits.push(`${method} ${parsed.pathname}`);
-    if (parsed.pathname.endsWith("/export")) {
+    if (parsed.pathname.endsWith("/export") || parsed.pathname.endsWith("/download")) {
       return new Response(
         JSON.stringify({
           statusCode: 200,
@@ -191,6 +284,53 @@ export async function smokeReportsMock() {
             filename: "funnel.csv",
             contentType: "text/csv",
             data: Buffer.from("id,name\n1,funnel").toString("base64"),
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (parsed.pathname.includes("/executions") || parsed.pathname.includes("/report-executions")) {
+      return new Response(
+        JSON.stringify({
+          statusCode: 200,
+          data: {
+            id: EXEC_ID,
+            reportId: ID,
+            status: "COMPLETED",
+            format: "csv",
+            filename: "funnel.csv",
+            items: [
+              {
+                id: EXEC_ID,
+                reportId: ID,
+                status: "COMPLETED",
+                format: "csv",
+              },
+            ],
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (parsed.pathname.includes("/schedules")) {
+      return new Response(
+        JSON.stringify({
+          statusCode: 200,
+          data: {
+            id: SCHED_ID,
+            reportId: ID,
+            frequency: "DAILY",
+            timezone: "UTC",
+            isPaused: false,
+            items: [
+              {
+                id: SCHED_ID,
+                reportId: ID,
+                frequency: "DAILY",
+                timezone: "UTC",
+                isPaused: false,
+              },
+            ],
           },
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
@@ -225,6 +365,15 @@ export async function smokeReportsMock() {
     await emailCrmReport(ID, "finance@company.com");
     await shareCrmReport(ID, "Finance");
     await deleteCrmReport(ID);
+    await listCrmReportExecutions(ID);
+    await createCrmReportExecution(ID, "csv");
+    await getCrmReportExecution(EXEC_ID);
+    await cancelCrmReportExecution(EXEC_ID);
+    await downloadCrmReportExecution(EXEC_ID);
+    await listCrmReportSchedules(ID);
+    await createCrmReportSchedule(ID, "Daily");
+    await pauseCrmReportSchedule(ID, SCHED_ID);
+    await resumeCrmReportSchedule(ID, SCHED_ID);
 
     const expected = [
       `GET ${reportsPath()}`,
@@ -237,6 +386,15 @@ export async function smokeReportsMock() {
       `POST ${reportsPath(`/${ID}/email`)}`,
       `POST ${reportsPath(`/${ID}/share`)}`,
       `DELETE ${reportsPath(`/${ID}`)}`,
+      `GET ${reportExecutionsPath(SESSION.workspaceId, ID)}`,
+      `POST ${reportExecutionsPath(SESSION.workspaceId, ID)}`,
+      `GET ${reportExecutionItemPath(SESSION.workspaceId, EXEC_ID)}`,
+      `POST ${reportExecutionItemPath(SESSION.workspaceId, EXEC_ID, "/cancel")}`,
+      `GET ${reportExecutionItemPath(SESSION.workspaceId, EXEC_ID, "/download")}`,
+      `GET ${reportSchedulesPath(SESSION.workspaceId, ID)}`,
+      `POST ${reportSchedulesPath(SESSION.workspaceId, ID)}`,
+      `POST ${reportSchedulesPath(SESSION.workspaceId, ID, `/${SCHED_ID}/pause`)}`,
+      `POST ${reportSchedulesPath(SESSION.workspaceId, ID, `/${SCHED_ID}/resume`)}`,
     ];
     for (const hit of expected) {
       if (!hits.includes(hit)) {

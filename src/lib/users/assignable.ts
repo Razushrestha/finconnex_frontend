@@ -43,14 +43,19 @@ function mergeOwners(rows: AssignableOwner[]): AssignableOwner[] {
 }
 
 function toOwner(member: WorkspaceMember): AssignableOwner {
+  const email = member.email.trim();
+  const name =
+    member.name.trim() ||
+    (email.includes("@") ? email.split("@")[0] : email) ||
+    "Member";
   return {
     id: isUuid(member.userId)
       ? member.userId
       : isUuid(member.id)
         ? member.id
         : member.userId || member.id,
-    name: member.name,
-    email: member.email,
+    name,
+    email,
   };
 }
 
@@ -106,13 +111,56 @@ export function resolveAssignableOwnerNames(values?: string[]): string[] | undef
 }
 
 async function listRemoteMembers(): Promise<WorkspaceMember[]> {
-  try {
-    const page = await listCrmWorkspaceMembersAdmin({ limit: 100 });
-    if (page.items.length) return page.items;
-  } catch {
-    /* fall through */
+  const [members, admin] = await Promise.all([
+    listCrmWorkspaceMembers().catch(() => [] as WorkspaceMember[]),
+    listCrmWorkspaceMembersAdmin({ limit: 100 })
+      .then((page) => page.items)
+      .catch(() => [] as WorkspaceMember[]),
+  ]);
+  const byKey = new Map<string, WorkspaceMember>();
+  for (const member of [...members, ...admin]) {
+    const key = (
+      member.userId ||
+      member.id ||
+      member.email ||
+      member.name
+    ).toLowerCase();
+    if (!key) continue;
+    const prev = byKey.get(key);
+    if (!prev || (isUuid(member.userId) && !isUuid(prev.userId))) {
+      byKey.set(key, member);
+    }
   }
-  return listCrmWorkspaceMembers();
+  return [...byKey.values()];
+}
+
+function actorConsultant(): AssignableOwner | null {
+  const actor = getRulesActor();
+  const name = actor.name.trim();
+  const email = actor.email?.trim() ?? "";
+  if (!name && !email) return null;
+  return {
+    id: isUuid(actor.id) ? actor.id! : email || name,
+    name: name || email.split("@")[0] || "You",
+    email,
+  };
+}
+
+/**
+ * Every workspace member is a booking consultant. Unlike
+ * `loadAssignableOwners`, this does not drop people who lack a user UUID.
+ */
+export async function loadWorkspaceConsultants(): Promise<AssignableOwner[]> {
+  const local = fromDirectory();
+  const live = await listRemoteMembers()
+    .then((rows) => rows.map(toOwner))
+    .catch(() => [] as AssignableOwner[]);
+  const self = actorConsultant();
+  return mergeOwners([
+    ...live,
+    ...local,
+    ...(self ? [self] : []),
+  ]).filter((row) => row.name.trim() || row.email.trim());
 }
 
 export async function loadAssignableOwners(): Promise<AssignableOwner[]> {

@@ -16,7 +16,7 @@ export const entityCardShell =
 
 /** Drag affordance for board cards */
 export const entityCardInteractive =
-  "cursor-pointer select-none";
+  "cursor-grab touch-none select-none active:cursor-grabbing";
 
 /** Full CallCard-equivalent shell (shell + interactive). Pair with cardMotion. */
 export const entityCardBox = `${entityCardShell} ${entityCardInteractive} ${KANBAN_CARD}`;

@@ -67,6 +67,7 @@ import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
 import { SORT_OPTIONS } from "../leads/page";
 import { defaultActorName } from "@/lib/rules/actor";
+import { bindKanbanStageTitle } from "@/lib/kanban/stage-titles";
 import {
   type KanbanField,
   type KanbanViewConfig,
@@ -191,19 +192,47 @@ export default function DealsPage() {
       ) as Record<DealPipeline, KanbanViewConfig>,
   );
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("finconnex.deals.kanban-views");
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Record<string, KanbanViewConfig>;
+      setViewConfigs((prev) => {
+        const next = { ...prev };
+        for (const pipeline of DEAL_PIPELINES) {
+          if (parsed[pipeline]) next[pipeline] = { ...prev[pipeline], ...parsed[pipeline] };
+        }
+        return next;
+      });
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const activeViewConfig = viewConfigs[activePipeline];
 
   function updateActiveViewConfig(
     patch: Partial<KanbanViewConfig>,
     closeSettings = false,
   ) {
-    setViewConfigs((prev) => ({
-      ...prev,
-      [activePipeline]: {
-        ...prev[activePipeline],
-        ...patch,
-      },
-    }));
+    setViewConfigs((prev) => {
+      const next = {
+        ...prev,
+        [activePipeline]: {
+          ...prev[activePipeline],
+          ...patch,
+        },
+      };
+      try {
+        localStorage.setItem(
+          "finconnex.deals.kanban-views",
+          JSON.stringify(next),
+        );
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
     if (closeSettings) setIsSettingsOpen(false);
   }
 
@@ -250,6 +279,37 @@ export default function DealsPage() {
         [columnId]: nextLabel,
       },
     });
+  }
+
+  function addDealStageColumnTitle(title: string) {
+    const bound = bindKanbanStageTitle({
+      stages: dealAvailableStages,
+      selectedStageIds: visibleColumnIds,
+      stageLabels: activeViewConfig.stageLabels ?? {},
+      title,
+    });
+    if (!bound.ok) {
+      setBulkFlash(bound.error);
+      return;
+    }
+    applyStageVisibility(bound.selectedStageIds);
+    updateActiveViewConfig({
+      selectedStageIds: bound.selectedStageIds,
+      stageLabels: bound.stageLabels,
+    });
+  }
+
+  function reorderDealStageColumn(draggedId: string, targetId: string) {
+    const current = visibleColumnIds;
+    const from = current.indexOf(draggedId);
+    const to = current.indexOf(targetId);
+    if (from < 0 || to < 0 || from === to) return;
+    const next = [...current];
+    const [moved] = next.splice(from, 1);
+    if (!moved) return;
+    next.splice(to, 0, moved);
+    applyStageVisibility(next);
+    updateActiveViewConfig({ selectedStageIds: next });
   }
 
   function exportTasks() {
@@ -508,6 +568,12 @@ export default function DealsPage() {
         }
         onColumnRename={
           viewMode === "kanban" ? renameDealStageColumn : undefined
+        }
+        onColumnAdd={
+          viewMode === "kanban" ? addDealStageColumnTitle : undefined
+        }
+        onColumnReorder={
+          viewMode === "kanban" ? reorderDealStageColumn : undefined
         }
       />
 

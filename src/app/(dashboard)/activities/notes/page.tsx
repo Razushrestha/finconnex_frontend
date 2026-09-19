@@ -6,6 +6,7 @@ import {
   type Note,
   type NoteColumn,
   type NoteType,
+  noteColumns as NOTE_COLUMN_SEED,
 } from "@/lib/notes/types";
 import { listNoteColumns, saveNotes, deleteNote } from "@/lib/notes/store";
 import {
@@ -32,9 +33,20 @@ import {
 } from "@/components/activities/ActivityToolbar";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
+import { KanbanDragGhost } from "@/components/common/KanbanDragGhost";
 import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
 import { moreMenuItems, printViewItems } from "../tasks/page";
+import { kanbanPrefsFromCatalog } from "@/lib/kanban/column-prefs";
+import { useKanbanColumnPrefs } from "@/lib/kanban/use-kanban-column-prefs";
+import {
+  usePointerKanbanDrag,
+  type PointerKanbanDrop,
+} from "@/lib/kanban/use-pointer-kanban-drag";
+
+const NOTE_STAGE_DEFAULTS = kanbanPrefsFromCatalog(
+  NOTE_COLUMN_SEED.map((col) => ({ id: col.id, label: col.title })),
+);
 
 export default function NotesPage() {
   const router = useRouter();
@@ -44,12 +56,12 @@ export default function NotesPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortActive, setSortActive] = useState(true);
   const [columns, setColumns] = useState<NoteColumn[]>([]);
-  const [dragInfo, setDragInfo] = useState<{
-    noteId: string;
-    sourceColumnId: string;
-  } | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
+  const stagePrefs = useKanbanColumnPrefs(
+    "finconnex.notes.kanban-columns",
+    NOTE_STAGE_DEFAULTS,
+  );
 
   useEffect(() => {
     if (crm.loading) return;
@@ -78,30 +90,26 @@ export default function NotesPage() {
     const cols = filters.types.length
       ? columns.filter((c) => filters.types.includes(c.title as NoteType))
       : columns;
-    return cols.map((column) => {
+    return cols
+      .filter(
+        (column) =>
+          !stagePrefs.visibleIds.length ||
+          stagePrefs.visibleIds.includes(column.id),
+      )
+      .map((column) => {
       const notes = column.notes.filter((n) =>
         noteMatchesFilters({ ...n, noteType: column.title as NoteType }, filters),
       );
       return { ...column, notes, count: notes.length };
     });
-  }, [columns, filters]);
+  }, [columns, filters, stagePrefs.visibleIds]);
 
-  function handleDragStartNote(
-    e: React.DragEvent<HTMLDivElement>,
-    noteId: string,
-    columnId: string,
-  ) {
-    setDragInfo({ noteId, sourceColumnId: columnId });
-    e.dataTransfer.effectAllowed = "move";
-  }
-
-  function handleDropNote(targetColumnId: string) {
-    if (!dragInfo) return;
-    const { noteId, sourceColumnId } = dragInfo;
-    if (sourceColumnId === targetColumnId) {
-      setDragInfo(null);
-      return;
-    }
+  function handleDropNote({
+    itemId: noteId,
+    sourceColumnId,
+    targetColumnId,
+  }: PointerKanbanDrop) {
+    if (sourceColumnId === targetColumnId) return;
     setColumns((prev) => {
       const source = prev.find((c) => c.id === sourceColumnId);
       const note = source?.notes.find((n) => n.id === noteId);
@@ -128,8 +136,9 @@ export default function NotesPage() {
       }
       return next;
     });
-    setDragInfo(null);
   }
+
+  const drag = usePointerKanbanDrag({ onDrop: handleDropNote });
 
   function toggleSelected(id: string) {
     setSelectedIds((prev) =>
@@ -201,6 +210,21 @@ export default function NotesPage() {
           extraViewIcons={[TIMELINE_VIEW_TOGGLE]}
           moreMenuItems={moreMenuItems}
           printViewItems={printViewItems}
+          columnOptions={view === "kanban" ? stagePrefs.columns : undefined}
+          onColumnToggle={view === "kanban" ? stagePrefs.toggle : undefined}
+          onColumnRename={view === "kanban" ? stagePrefs.rename : undefined}
+          onColumnAdd={
+            view === "kanban"
+              ? (title) => {
+                  const error = stagePrefs.addTitle(title);
+                  if (error) {
+                    setBulkFlash(error);
+                    window.setTimeout(() => setBulkFlash(null), 2800);
+                  }
+                }
+              : undefined
+          }
+          onColumnReorder={view === "kanban" ? stagePrefs.reorder : undefined}
         />
 
         {bulkFlash ? (
@@ -239,23 +263,30 @@ export default function NotesPage() {
           ) : view === "timeline" ? (
             <NotesTimelineView notes={filteredNotes} />
           ) : (
-            <div className="flex h-full min-h-[420px] items-stretch gap-3 overflow-x-auto p-1">
-              {visibleColumns.map((column) => {
-                return (
+            <>
+              <div className="flex h-full min-h-[420px] items-stretch gap-3 overflow-x-auto p-1">
+                {visibleColumns.map((column) => (
                   <NotesKanbanColumn
                     key={column.id}
                     column={column}
-                    draggingNoteId={dragInfo?.noteId ?? null}
-                    onDragStartNote={handleDragStartNote}
-                    onDragEndNote={() => setDragInfo(null)}
-                    onDropNote={handleDropNote}
+                    draggingNoteId={drag.dragInfo?.itemId ?? null}
+                    onCardPointerDown={drag.onCardPointerDown}
+                    onDragClickCapture={
+                      drag.cardPointerProps({
+                        id: "",
+                        columnId: "",
+                        name: "",
+                      }).onClickCapture
+                    }
                     embedded
                     selectedIds={selectedIds}
                     onToggleSelect={toggleSelected}
+                    displayTitle={stagePrefs.titles[column.id]}
                   />
-                );
-              })}
-            </div>
+                ))}
+              </div>
+              <KanbanDragGhost ghost={drag.ghost} />
+            </>
           )}
         </div>
       </div>

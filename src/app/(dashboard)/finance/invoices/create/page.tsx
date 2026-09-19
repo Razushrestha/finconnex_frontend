@@ -1,11 +1,9 @@
-import { CreateInvoiceForm } from "@/components/finance/invoices/CreateInvoiceForm";
+import { redirect } from "next/navigation";
 
 export default async function CreateInvoicePage({
   searchParams,
 }: {
   searchParams: Promise<{
-    layoutid?: string;
-    redirect?: string;
     relatedKind?: string;
     relatedName?: string;
     relatedId?: string;
@@ -13,14 +11,10 @@ export default async function CreateInvoicePage({
   }>;
 }) {
   const sp = await searchParams;
-  return (
-    <CreateInvoiceForm
-      layoutId={sp.layoutid ?? "standard"}
-      redirect={sp.redirect !== "false"}
-      relatedKind={sp.relatedKind}
-      relatedName={sp.relatedName}
-      relatedId={sp.relatedId}
-      email={sp.to}
-    />
-  );
+  const qs = new URLSearchParams({ create: "1" });
+  if (sp.relatedKind) qs.set("relatedKind", sp.relatedKind);
+  if (sp.relatedName) qs.set("relatedName", sp.relatedName);
+  if (sp.relatedId) qs.set("relatedId", sp.relatedId);
+  if (sp.to) qs.set("to", sp.to);
+  redirect(`/finance/invoices?${qs.toString()}`);
 }

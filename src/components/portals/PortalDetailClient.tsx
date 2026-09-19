@@ -21,7 +21,6 @@ import {
 import {
   PORTAL_ACCESS_LEVELS,
   PORTAL_ACCESS_STYLE,
-  PORTAL_CLIENTS,
   PORTAL_MODULES,
   PORTAL_STATUSES,
   PORTAL_STATUS_STYLE,
@@ -31,8 +30,7 @@ import {
   exportPortalsCsv,
   formatPortalAt,
   getPortalById,
-  portalPublicPath,
-  uniqueSlug,
+  portalRecordPath,
   upsertPortal,
   type ClientPortal,
   type PortalAccessLevel,
@@ -113,14 +111,10 @@ export function PortalDetailClient({ id }: { id: string }) {
     void tryCrmPortal(() =>
       updateCrmClientPortal(next.id, {
         name: next.name,
-        slug: next.slug,
         status: next.status,
         accessLevel: next.accessLevel,
         modules: next.modules,
-        primaryContactName: next.primaryContactName,
-        primaryContactEmail: next.primaryContactEmail,
-        clientId: next.clientId,
-        clientName: next.clientName,
+        primaryContactId: next.primaryContactId,
       }),
     );
     if (msg) flash(msg);
@@ -199,25 +193,17 @@ export function PortalDetailClient({ id }: { id: string }) {
     const req = assertRequired(
       {
         name,
-        slug,
         contactName,
         contactEmail,
       },
-      ["name", "slug", "contactName", "contactEmail"],
+      ["name", "contactName", "contactEmail"],
     );
     if (!req.ok) {
       flash(req.message);
       return;
     }
-    const client =
-      PORTAL_CLIENTS.find((c) => c.id === clientId) ??
-      PORTAL_CLIENTS.find((c) => c.id === row.clientId);
-    const finalSlug = uniqueSlug(slug, row.id);
     const patch = stripSystemFields({
       name: name.trim(),
-      slug: finalSlug,
-      clientId: client?.id ?? row.clientId,
-      clientName: client?.name ?? row.clientName,
       primaryContactName: contactName.trim(),
       primaryContactEmail: contactEmail.trim(),
     });
@@ -227,17 +213,10 @@ export function PortalDetailClient({ id }: { id: string }) {
     const changes = fieldDiff(
       row as unknown as Record<string, unknown>,
       next as unknown as Record<string, unknown>,
-      [
-        "name",
-        "slug",
-        "clientId",
-        "primaryContactName",
-        "primaryContactEmail",
-      ],
+      ["name", "primaryContactName", "primaryContactEmail"],
     );
     logEdit("portals", row.createdBy, row.id, row.portalId, changes);
     save(next, "Changes saved");
-    setSlug(finalSlug);
     setDirty(false);
   }
 
@@ -289,7 +268,7 @@ export function PortalDetailClient({ id }: { id: string }) {
             </span>
           </div>
           <Link
-            href={portalPublicPath(row.slug)}
+            href={portalRecordPath(row)}
             target="_blank"
             className="inline-flex h-8 items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-semibold text-violet-700"
           >
@@ -451,7 +430,7 @@ export function PortalDetailClient({ id }: { id: string }) {
                   <InputShell>
                     <input
                       className={cn(inputSm(false), "cursor-not-allowed bg-slate-50 text-violet-700")}
-                      value={portalPublicPath(slug || row.slug)}
+                      value={portalRecordPath(row)}
                       readOnly
                     />
                   </InputShell>
@@ -468,48 +447,18 @@ export function PortalDetailClient({ id }: { id: string }) {
                     />
                   </InputShell>
                 </Field>
-                <Field label="Client *">
-                  <InputShell>
-                    <select
-                      className={selectSm(false)}
-                      value={clientId}
-                      onChange={(e) => {
-                        const c = PORTAL_CLIENTS.find(
-                          (x) => x.id === e.target.value,
-                        );
-                        setClientId(e.target.value);
-                        if (c) {
-                          setContactName(c.contact);
-                          setContactEmail(c.email);
-                        }
-                        setDirty(true);
-                      }}
-                    >
-                      {PORTAL_CLIENTS.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </InputShell>
-                </Field>
-                <Field label="URL slug *">
+                <Field label="Company">
                   <InputShell>
                     <input
-                      className={inputSm(false)}
-                      value={slug}
-                      onChange={(e) => {
-                        setSlug(
-                          e.target.value
-                            .toLowerCase()
-                            .replace(/[^a-z0-9-]/g, ""),
-                        );
-                        setDirty(true);
-                      }}
+                      className={cn(inputSm(false), "cursor-not-allowed bg-slate-50 text-slate-500")}
+                      value={row.clientName}
+                      readOnly
                     />
                   </InputShell>
-                  <p className="mt-1 text-[10px] text-violet-600">
-                    {portalPublicPath(slug || "…")}
+                </Field>
+                <Field label="Portal URL">
+                  <p className="mt-1 text-[11px] font-medium text-violet-700">
+                    {portalRecordPath(row)}
                   </p>
                 </Field>
                 <Field label="Status (lifecycle)">

@@ -207,8 +207,10 @@ export default function LoanRepaymentsView() {
     });
     toast.success(
       saved.source === "api"
-        ? "Saved to CRM calculations"
-        : "Saved locally — sign in to sync with CRM",
+        ? "Saved to CRM (GET /v1/calculations)."
+        : saved.error
+          ? `Saved on this device. CRM: ${saved.error}`
+          : "Saved locally — sign in to sync with CRM",
     );
   };
 

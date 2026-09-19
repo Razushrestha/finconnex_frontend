@@ -8,6 +8,7 @@ import {
   type ActionOption,
 } from "@/components/sales/EntityHeader";
 import {
+  addKanbanColumnPrefTitle,
   columnTitleMap,
   loadKanbanColumnPrefs,
   persistKanbanColumnPrefs,
@@ -158,6 +159,15 @@ export default function ContactsPage() {
         col.id === columnId ? { ...col, label: nextLabel } : col,
       ),
     );
+  }
+
+  function addContactStageColumnTitle(title: string) {
+    const result = addKanbanColumnPrefTitle(columns, title);
+    if (!result.ok) {
+      setBulkFlash(result.error);
+      return;
+    }
+    saveContactColumns(result.columns);
   }
 
   function reorderContactStageColumn(draggedId: string, targetId: string) {
@@ -388,6 +398,9 @@ export default function ContactsPage() {
         }
         onColumnRename={
           viewMode === "kanban" ? renameContactStageColumn : undefined
+        }
+        onColumnAdd={
+          viewMode === "kanban" ? addContactStageColumnTitle : undefined
         }
         onColumnReorder={
           viewMode === "kanban" ? reorderColumn : undefined

@@ -4,7 +4,7 @@ import {
   isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmBffFetch, crmFetch } from "@/lib/crm/request";
+import { crmFetch, crmWorkspaceFetch } from "@/lib/crm/request";
 import {
   DASHBOARD_WIDGETS,
   dateRangeBounds,
@@ -109,24 +109,45 @@ async function dashboardCrm<T>(path: string, init?: RequestInit): Promise<T> {
   if (isBoundCrmSession()) {
     return crmFetch(await requireSession(), path, init);
   }
-  return crmBffFetch<T>(path, init);
+  return crmWorkspaceFetch<T>(path, init);
 }
 
+/** Query keys allowed on GET /v1/dashboard and widget data (DashboardFiltersDto). */
 export function dashboardFilterQuery(
   filters?: DashboardFilters,
+  ownerId?: string,
 ): Record<string, string | undefined> {
-  if (!filters) return {};
+  if (!filters) {
+    return ownerId && isUuid(ownerId) ? { ownerId } : {};
+  }
   const bounds = dateRangeBounds(filters);
+  let start = bounds.start ?? new Date(Date.now() - 365 * 86_400_000);
+  const end = bounds.end ?? new Date();
+  if (end.getTime() - start.getTime() > 365 * 86_400_000) {
+    start = new Date(end.getTime() - 365 * 86_400_000);
+  }
   return {
-    dateRange: filters.dateRange,
-    owner: filters.owner !== "All" ? filters.owner : undefined,
-    team: filters.team !== "All teams" ? filters.team : undefined,
-    loanType:
-      filters.loanType !== "All Loan Types" ? filters.loanType : undefined,
-    dateFrom: filters.dateFrom,
-    dateTo: filters.dateTo,
-    startDate: bounds.start ? bounds.start.toISOString() : undefined,
-    endDate: bounds.end ? bounds.end.toISOString() : undefined,
+    startDate: start.toISOString(),
+    endDate: end.toISOString(),
+    ownerId: ownerId && isUuid(ownerId) ? ownerId : undefined,
+    timezone:
+      typeof Intl !== "undefined"
+        ? Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+        : "UTC",
+    compareTo: "previous_period",
+  };
+}
+
+export function dashboardWidgetQuery(
+  filters?: DashboardFilters,
+  ownerId?: string,
+): Record<string, string | undefined> {
+  const q = dashboardFilterQuery(filters, ownerId);
+  return {
+    startDate: q.startDate,
+    endDate: q.endDate,
+    ownerId: q.ownerId,
+    comparePeriod: "previous_period",
   };
 }
 
@@ -145,26 +166,21 @@ export type CrmDashboardWidget = {
 
 function layoutWidgetsPayload(layout: DashboardLayout) {
   return layout.order.map((id, index) => ({
-    key: id,
+    instanceId: id,
     widgetKey: id,
-    hidden: layout.hidden.includes(id),
-    order: index,
+    x: (index % 6) * 2,
+    y: Math.floor(index / 6) * 4,
+    width: 2,
+    height: 4,
+    visible: !layout.hidden.includes(id),
   }));
 }
 
 export function layoutWriteBody(layout: DashboardLayout, name?: string) {
   return {
     name: name?.trim() || "Executive",
-    isDefault: layout.isDefault,
+    scope: "USER",
     widgets: layoutWidgetsPayload(layout),
-    config: {
-      order: layout.order,
-      hidden: layout.hidden,
-      filters: layout.filters,
-    },
-    order: layout.order,
-    hidden: layout.hidden,
-    filters: layout.filters,
   };
 }
 
@@ -283,9 +299,10 @@ async function workspaceId(): Promise<string | null> {
 
 export async function getCrmDashboardMetrics(
   filters?: DashboardFilters,
+  ownerId?: string,
 ): Promise<unknown> {
   return dashboardCrm(
-    `${dashboardMetricsPath()}${toQuery(dashboardFilterQuery(filters))}`,
+    `${dashboardMetricsPath()}${toQuery(dashboardFilterQuery(filters, ownerId))}`,
   );
 }
 
@@ -423,27 +440,46 @@ export async function getCrmDashboardWidget(
 export async function getCrmDashboardWidgetData(
   widgetKey: string,
   filters?: DashboardFilters,
+  ownerId?: string,
 ): Promise<unknown> {
   const id = await workspaceId();
   if (!id || !widgetKey) return null;
   return dashboardCrm(
-    `${workspaceDashboardWidgetsPath(id, `/${encodeURIComponent(widgetKey)}/data`)}${toQuery(dashboardFilterQuery(filters))}`,
+    `${workspaceDashboardWidgetsPath(id, `/${encodeURIComponent(widgetKey)}/data`)}${toQuery(dashboardWidgetQuery(filters, ownerId))}`,
   );
 }
+
+export const DASHBOARD_ANALYTICS_WIDGETS = [
+  "TOTAL_LEADS",
+  "TOTAL_DEALS",
+  "LEAD_CONVERSION_RATE",
+  "DEAL_STAGE_FUNNEL",
+  "DEAL_WIN_LOSS_RATIO",
+  "OPEN_TASKS",
+  "OVERDUE_TASKS",
+  "ACTIVITY_COUNT",
+  "UPCOMING_MEETINGS",
+  "TASK_STATUS_BREAKDOWN",
+  "ACTIVITY_BY_TYPE",
+  "MEETING_STATUS_BREAKDOWN",
+] as const;
 
 export async function batchCrmDashboardWidgets(
   keys: string[],
   filters?: DashboardFilters,
+  ownerId?: string,
 ): Promise<unknown> {
   const id = await workspaceId();
   if (!id) return null;
-  return dashboardCrm(workspaceDashboardWidgetsPath(id, "/batch"), {
-    method: "POST",
-    body: JSON.stringify({
-      keys,
-      widgetKeys: keys,
-      ...dashboardFilterQuery(filters),
-      filters,
-    }),
-  });
+  const widgets = keys.slice(0, 20).map((key) => ({
+    key,
+    instanceId: key,
+  }));
+  return dashboardCrm(
+    `${workspaceDashboardWidgetsPath(id, "/batch")}${toQuery(dashboardWidgetQuery(filters, ownerId))}`,
+    {
+      method: "POST",
+      body: JSON.stringify({ widgets }),
+    },
+  );
 }

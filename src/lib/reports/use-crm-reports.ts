@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ensureCrmSession } from "@/lib/activity-timeline/auth";
 import { listCrmReports } from "@/lib/reports/api";
 import { replaceCrmReports } from "@/lib/reports/types";
 
@@ -21,6 +22,10 @@ export function useCrmReports() {
 
     void (async () => {
       try {
+        const session = await ensureCrmSession();
+        if (!session) {
+          throw new Error("Sign in to load live reports");
+        }
         const remote = await listCrmReports();
         if (cancelled) return;
         replaceCrmReports(remote);

@@ -35,11 +35,15 @@ import {
 } from "@/components/activities/ActivityToolbar";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import { FocusHighlight } from "@/components/shared/FocusHighlight";
+import { KanbanDragGhost } from "@/components/common/KanbanDragGhost";
 import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
 import { activityExportMenuItem } from "@/lib/activities/export";
-import { DropTargetPos } from "@/components/activities/meetings/MeetingsKanbanBoard";
 import { onRulesChange } from "@/lib/rules/storage";
+import {
+  usePointerKanbanDrag,
+  type PointerKanbanDrop,
+} from "@/lib/kanban/use-pointer-kanban-drag";
 
 export default function MeetingsPage() {
   const router = useRouter();
@@ -49,13 +53,6 @@ export default function MeetingsPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortActive, setSortActive] = useState(true);
   const [columns, setColumns] = useState<MeetingColumn[]>([]);
-  const [dragInfo, setDragInfo] = useState<{
-    meetingId: string;
-    sourceColumnId: string;
-  } | null>(null);
-  const [dropTargetPos, setDropTargetPos] = useState<DropTargetPos | null>(
-    null,
-  );
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
   const [scopeTab, setScopeTab] = useState("All Meetings");
@@ -107,22 +104,12 @@ export default function MeetingsPage() {
     });
   }, [columns, filters, scope]);
 
-  function handleDragStartMeeting(
-    e: React.DragEvent<HTMLDivElement>,
-    meetingId: string,
-    columnId: string,
-  ) {
-    setDragInfo({ meetingId, sourceColumnId: columnId });
-    e.dataTransfer.effectAllowed = "move";
-  }
-
-  function handleDropMeeting(targetColumnId: string) {
-    if (!dragInfo) return;
-    const { meetingId, sourceColumnId } = dragInfo;
-    if (sourceColumnId === targetColumnId) {
-      setDragInfo(null);
-      return;
-    }
+  function handleDropMeeting({
+    itemId: meetingId,
+    sourceColumnId,
+    targetColumnId,
+  }: PointerKanbanDrop) {
+    if (sourceColumnId === targetColumnId) return;
     setColumns((prev) => {
       const source = prev.find((c) => c.id === sourceColumnId);
       const meeting = source?.meetings.find((m) => m.id === meetingId);
@@ -152,8 +139,9 @@ export default function MeetingsPage() {
       }
       return next;
     });
-    setDragInfo(null);
   }
+
+  const drag = usePointerKanbanDrag({ onDrop: handleDropMeeting });
 
   function toggleSelected(id: string) {
     setSelectedIds((prev) =>
@@ -255,27 +243,30 @@ export default function MeetingsPage() {
               onSelectedIdsChange={setSelectedIds}
             />
           ) : (
-            <div className="flex h-full w-full min-h-[420px] min-w-0 items-stretch gap-3 overflow-x-auto p-1 pr-3">
-              {visibleColumns.map((column) => {
-                return (
+            <>
+              <div className="flex h-full w-full min-h-[420px] min-w-0 items-stretch gap-3 overflow-x-auto p-1 pr-3">
+                {visibleColumns.map((column) => (
                   <MeetingsKanbanColumn
                     key={column.id}
                     column={column}
-                    draggingMeetingId={dragInfo?.meetingId ?? null}
-                    dropTargetPos={dropTargetPos}
-                    setDropTargetPos={setDropTargetPos}
-                    onDragStartMeeting={handleDragStartMeeting}
-                    onDragEndMeeting={() => {
-                      setDragInfo(null);
-                      setDropTargetPos(null);
-                    }}
-                    onDropMeeting={handleDropMeeting}
+                    draggingMeetingId={drag.dragInfo?.itemId ?? null}
+                    dropTargetPos={drag.dropTargetPos}
+                    setDropTargetPos={() => {}}
+                    onCardPointerDown={drag.onCardPointerDown}
+                    onDragClickCapture={
+                      drag.cardPointerProps({
+                        id: "",
+                        columnId: "",
+                        name: "",
+                      }).onClickCapture
+                    }
                     selectedIds={selectedIds}
                     onToggleSelect={toggleSelected}
                   />
-                );
-              })}
-            </div>
+                ))}
+              </div>
+              <KanbanDragGhost ghost={drag.ghost} />
+            </>
           )}
         </div>
       </div>

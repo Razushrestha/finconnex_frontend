@@ -8,6 +8,7 @@ import {
   type SortDirection,
 } from "@/components/sales/EntityHeader";
 import {
+  addKanbanColumnPrefTitle,
   columnTitleMap,
   loadKanbanColumnPrefs,
   persistKanbanColumnPrefs,
@@ -144,6 +145,15 @@ export default function CompaniesPage() {
         col.id === columnId ? { ...col, label: nextLabel } : col,
       ),
     );
+  }
+
+  function addCompanyStageColumnTitle(title: string) {
+    const result = addKanbanColumnPrefTitle(columns, title);
+    if (!result.ok) {
+      setBulkFlash(result.error);
+      return;
+    }
+    saveCompanyColumns(result.columns);
   }
 
   function reorderCompanyStageColumn(draggedId: string, targetId: string) {
@@ -438,6 +448,9 @@ export default function CompaniesPage() {
         }
         onColumnRename={
           viewMode === "kanban" ? renameCompanyStageColumn : undefined
+        }
+        onColumnAdd={
+          viewMode === "kanban" ? addCompanyStageColumnTitle : undefined
         }
         onColumnReorder={
           viewMode === "kanban" ? reorderCompanyStageColumn : undefined

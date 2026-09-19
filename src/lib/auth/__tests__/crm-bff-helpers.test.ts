@@ -53,7 +53,7 @@ describe("isEmptySignedInListPath", () => {
     );
     expect(isHostedMissingSignatureListPath(["leads"], "GET")).toBe(false);
     expect(isHostedMissingCrmGet(["signature-requests"], "GET")).toBe(true);
-    expect(isHostedMissingCrmGet(["dashboard"], "GET")).toBe(true);
+    expect(isHostedMissingCrmGet(["dashboard"], "GET")).toBe(false);
     expect(isHostedMissingCrmGet(["leads"], "GET")).toBe(false);
   });
 
@@ -70,7 +70,7 @@ describe("isEmptySignedInListPath", () => {
   });
 
   it("treats dashboard and member lists as empty-list GETs", () => {
-    expect(isEmptySignedInListPath(["dashboard"], "GET")).toBe(true);
+    expect(isEmptySignedInListPath(["dashboard"], "GET")).toBe(false);
     expect(
       isEmptySignedInListPath(
         ["workspaces", workspace, "dashboard", "layouts"],

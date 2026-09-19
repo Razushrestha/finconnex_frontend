@@ -114,6 +114,9 @@ export function smokeCalculationsWiring() {
   if (body.type !== "LOAN" || "sharedWith" in body) {
     fail("create body must send LOAN and omit empty sharedWith");
   }
+  if (!api.includes("apiCalculatorKind")) {
+    fail("calculations client must map CalculatorKind enums");
+  }
 }
 
 export async function smokeCalculationsMock() {

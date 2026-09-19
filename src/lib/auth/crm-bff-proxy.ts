@@ -49,6 +49,7 @@ const ALLOWED_ROOTS = new Set([
   "emails",
   "tasks",
   "meetings",
+  "booking",
   "calendly",
   "calendar-sync",
   "integrations",
@@ -77,6 +78,8 @@ const ALLOWED_ROOTS = new Set([
   "notification-preferences",
   "notifications",
   "admin",
+  "client-portals",
+  "reports",
 ]);
 
 function isAllowed(path: string[]): boolean {
@@ -88,6 +91,7 @@ function isAllowed(path: string[]): boolean {
       path.includes("emails") ||
       path.includes("tasks") ||
       path.includes("meetings") ||
+      path.includes("booking") ||
       path.includes("calendly") ||
       path.includes("integrations") ||
       path.includes("documents") ||
@@ -102,6 +106,9 @@ function isAllowed(path: string[]): boolean {
       path.includes("tickets") ||
       path.includes("contacts") ||
       path.includes("notification-preferences") ||
+      path.includes("preferences") ||
+      path.includes("reports") ||
+      path.includes("report-executions") ||
       path[2] === "members" ||
       path[2] === "members-summary" ||
       path[2] === "members-admin" ||

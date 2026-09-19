@@ -28,7 +28,7 @@ import {
   formatCurrency,
   type DashboardFilters,
 } from "@/lib/dashboard/layout";
-import { computePerformanceDashboard } from "@/lib/dashboard/performance";
+import { computePerformanceDashboard, type PerformanceDashboard } from "@/lib/dashboard/performance";
 import { formatCompactMoney } from "@/lib/dashboard/executive";
 import {
   DashboardViewGrid,
@@ -105,6 +105,7 @@ function Donut({ value, label, color }: { value: number; label: string; color: s
 
 export function PerformanceDashboardView({
   filters,
+  data: live,
   hiddenWidgets = [],
   widgetOrder,
   reordering = false,
@@ -117,8 +118,10 @@ export function PerformanceDashboardView({
   onArchive,
 }: {
   filters: DashboardFilters;
+  data?: PerformanceDashboard;
 } & DashboardReorderProps) {
-  const data = useMemo(() => computePerformanceDashboard(filters), [filters]);
+  const computed = useMemo(() => computePerformanceDashboard(filters), [filters]);
+  const data = live ?? computed;
   const vs = data.comparisonLabel;
   const maxPipe = Math.max(...data.pipelineByStage.map((r) => r.value), 1);
   const loanTotal = data.loanTypes.reduce((n, r) => n + r.value, 0);

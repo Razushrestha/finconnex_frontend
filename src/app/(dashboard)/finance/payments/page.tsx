@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Download } from "lucide-react";
+import { Plus } from "lucide-react";
+import { useEffect, useState } from "react";
 import { listPayments, type Payment } from "@/lib/finance/payments/types";
 import { useCrmPayments } from "@/lib/finance/payments/use-crm-payments";
 import { onRecordsChange } from "@/lib/records-sync";
@@ -10,12 +10,23 @@ import { PaymentMetricsRow } from "@/components/finance/payments/PaymentMetricsR
 import { SettlementMethodsVelocityCard } from "@/components/finance/payments/SettlementMethodsVelocityCard";
 import { QuickPaymentActionsCard } from "@/components/finance/payments/QuickPaymentActionsCard";
 import { PaymentsTable } from "@/components/finance/payments/PaymentsTable";
+import { CreatePaymentForm } from "@/components/finance/payments/CreatePaymentForm";
 import { cn } from "@/lib/utils";
 
 export function PaymentsPage() {
   const router = useRouter();
   const crm = useCrmPayments();
   const [data, setData] = useState<Payment[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | undefined>();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("create") !== "1") return;
+    setPaymentInvoiceId(params.get("invoiceId") ?? undefined);
+    setCreateOpen(true);
+    router.replace("/finance/payments", { scroll: false });
+  }, [router]);
 
   useEffect(() => {
     if (crm.loading) return;
@@ -24,104 +35,58 @@ export function PaymentsPage() {
     return onRecordsChange(refresh);
   }, [crm.source, crm.loading]);
 
-  // Export CSV Handler
-  const exportCsv = () => {
-    const header = [
-      "Payment ID",
-      "Invoice",
-      "Client",
-      "Amount",
-      "Method",
-      "Status",
-      "Received At",
-    ];
-    const body = data.map((r) =>
-      [
-        r.paymentId,
-        r.invoiceRef,
-        r.clientName,
-        `$${r.amount}`,
-        r.method,
-        r.status,
-        r.receivedAt,
-      ]
-        .map((c) => `"${String(c).replace(/"/g, '""')}"`)
-        .join(","),
-    );
-    const blob = new Blob([[header.join(","), ...body].join("\n")], {
-      type: "text/csv",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "payments_report.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
-    <div className="min-h-full w-full bg-[#F8FAFC] p-4 sm:p-6 lg:p-8 text-slate-900 font-sans">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+    <div className="min-h-full w-full bg-[#F4F7FB] p-4 sm:p-6 lg:p-8 text-slate-900">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-              Payments
-            </h1>
+            <h1 className="text-[26px] font-bold tracking-tight text-slate-900">Payments</h1>
             <span
               className={cn(
-                "rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase",
+                "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
                 crm.source === "api"
-                  ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                  : "bg-slate-200/70 text-slate-600 border border-slate-300",
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-slate-200 text-slate-600",
               )}
             >
-              {crm.source === "api"
-                ? "Live CRM"
-                : crm.loading
-                  ? "Connecting…"
-                  : "Demo"}
+              {crm.source === "api" ? "Live CRM" : crm.loading ? "Connecting…" : "Demo"}
             </span>
           </div>
+          <p className="mt-1 text-[13px] text-slate-400">
+            Here&apos;s what&apos;s happening with your payments today.
+          </p>
         </div>
-
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={exportCsv}
-            className="inline-flex items-center justify-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all cursor-pointer shadow-xs"
-          >
-            <Download className="w-4 h-4 text-slate-500" />
-            <span>Export</span>
-          </button>
-          <button
-            onClick={() =>
-              router.push(
-                "/finance/payments/create?layoutid=standard&redirect=false",
-              )
-            }
-            className="inline-flex items-center justify-center gap-2 bg-[#635BFF] hover:bg-[#5249e0] text-white px-4 py-2 rounded-xl font-semibold text-sm shadow-md shadow-purple-500/10 transition-all cursor-pointer active:scale-[0.98]"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>Record payment</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setCreateOpen(true)}
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-[#6D5AE6] px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-500/20 hover:bg-[#5B4BD4]"
+        >
+          <Plus className="h-4 w-4" />
+          Record Payment
+        </button>
       </div>
 
-      {/* Reusable Component 1: Top Metric Cards Row */}
       <PaymentMetricsRow data={data} />
 
-      {/* Reusable Component 2 & 3: Settlement Velocity & Quick Actions Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <SettlementMethodsVelocityCard />
+          <SettlementMethodsVelocityCard data={data} />
         </div>
-        <div className="lg:col-span-1">
-          <QuickPaymentActionsCard />
-        </div>
+        <QuickPaymentActionsCard
+          live={crm.source === "api"}
+          onRecordPayment={() => setCreateOpen(true)}
+        />
       </div>
 
-      {/* Reusable Component 4: Payments Table with Status Tabs & Filters */}
       <PaymentsTable data={data} />
+
+      <CreatePaymentForm
+        variant="modal"
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={() => setData(listPayments())}
+        initialInvoiceId={paymentInvoiceId}
+      />
     </div>
   );
 }

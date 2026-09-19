@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { NotesKanbanColumn } from "./NotesKanbanColumn";
 import { NoteColumn, noteColumns } from "@/lib/notes/types";
+import { KanbanDragGhost } from "@/components/common/KanbanDragGhost";
+import {
+  usePointerKanbanDrag,
+  type PointerKanbanDrop,
+} from "@/lib/kanban/use-pointer-kanban-drag";
 
 interface DragInfo {
   noteId: string;
@@ -23,38 +28,20 @@ export function NotesKanbanBoard({
 }: NotesKanbanBoardProps) {
   const [internalColumns, setInternalColumns] =
     useState<NoteColumn[]>(noteColumns);
-  const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
 
   const columns = columnsOverride ?? internalColumns;
 
-  function handleDragStartNote(
-    e: React.DragEvent<HTMLDivElement>,
-    noteId: string,
-    columnId: string,
-  ) {
-    setDragInfo({ noteId, sourceColumnId: columnId });
-    e.dataTransfer.effectAllowed = "move";
-  }
-
-  function handleDragEndNote() {
-    setDragInfo(null);
-  }
-
-  function handleDropNote(targetColumnId: string) {
-    if (!dragInfo) return;
-
+  function handleDropNote({
+    itemId: noteId,
+    sourceColumnId,
+    targetColumnId,
+  }: PointerKanbanDrop) {
     if (onDropOverride) {
-      onDropOverride(targetColumnId, dragInfo);
-      setDragInfo(null);
+      onDropOverride(targetColumnId, { noteId, sourceColumnId });
       return;
     }
 
-    const { noteId, sourceColumnId } = dragInfo;
-
-    if (sourceColumnId === targetColumnId) {
-      setDragInfo(null);
-      return;
-    }
+    if (sourceColumnId === targetColumnId) return;
 
     setInternalColumns((prev) => {
       const sourceColumn = prev.find((c) => c.id === sourceColumnId);
@@ -79,9 +66,9 @@ export function NotesKanbanBoard({
         return col;
       });
     });
-
-    setDragInfo(null);
   }
+
+  const drag = usePointerKanbanDrag({ onDrop: handleDropNote });
 
   return (
     <div className="flex h-full w-full min-h-[420px] min-w-0 items-stretch gap-3 overflow-x-auto p-1">
@@ -89,13 +76,16 @@ export function NotesKanbanBoard({
         <NotesKanbanColumn
           key={column.id}
           column={column}
-          draggingNoteId={dragInfo?.noteId ?? null}
-          onDragStartNote={handleDragStartNote}
-          onDragEndNote={handleDragEndNote}
-          onDropNote={handleDropNote}
+          draggingNoteId={drag.dragInfo?.itemId ?? null}
+          onCardPointerDown={drag.onCardPointerDown}
+          onDragClickCapture={
+            drag.cardPointerProps({ id: "", columnId: "", name: "" })
+              .onClickCapture
+          }
           embedded={embedded}
         />
       ))}
+      <KanbanDragGhost ghost={drag.ghost} />
     </div>
   );
 }

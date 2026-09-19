@@ -1,20 +1,46 @@
+/**
+ * Native client-portals APIs (`GET/POST /v1/client-portals`, PATCH/DELETE,
+ * POST /:id/reset-password). Bodies match CreatePortalDto / UpdatePortalDto.
+ */
+
 import {
   ensureCrmAccess,
   ensureCrmSession,
+  isBoundCrmSession,
+  isUuid,
+  type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import type {
   ClientPortal,
   PortalAccessLevel,
   PortalModule,
   PortalStatus,
 } from "@/lib/portals/types";
+import { PORTAL_MODULES, slugifyPortalName } from "@/lib/portals/types";
 
 export type CrmPortalQuery = {
   page?: number;
   limit?: number;
   search?: string;
   status?: string;
+  companyId?: string;
+};
+
+export type CreateCrmPortalInput = {
+  name: string;
+  companyId: string;
+  primaryContactId: string;
+  accessLevel?: PortalAccessLevel;
+  modules?: PortalModule[];
+};
+
+export type UpdateCrmPortalInput = {
+  name?: string;
+  status?: PortalStatus;
+  accessLevel?: PortalAccessLevel;
+  primaryContactId?: string;
+  modules?: PortalModule[];
 };
 
 function pickStr(...values: unknown[]): string {
@@ -38,12 +64,6 @@ export function clientPortalsPath(suffix = ""): string {
   return `/v1/client-portals${suffix}`;
 }
 
-async function resolveAuth() {
-  const scoped = await ensureCrmSession();
-  if (scoped) return scoped;
-  return ensureCrmAccess();
-}
-
 function extractRecords(data: unknown): Record<string, unknown>[] {
   if (!data) return [];
   if (Array.isArray(data)) {
@@ -63,22 +83,24 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
     );
   }
   if (typeof data === "object") {
-    const rec = data as { items?: unknown; portals?: unknown };
-    if (Array.isArray(rec.items)) return extractRecords(rec.items);
-    if (Array.isArray(rec.portals)) return extractRecords(rec.portals);
+    const rec = data as Record<string, unknown>;
+    for (const key of ["items", "portals", "records", "rows", "result"]) {
+      if (Array.isArray(rec[key])) return extractRecords(rec[key]);
+    }
+    if (rec.data != null && rec.data !== data) return extractRecords(rec.data);
   }
   return [];
 }
 
 function mapStatus(raw: string): PortalStatus {
-  const value = raw.toLowerCase();
+  const value = raw.toLowerCase().replace(/[_-]+/g, " ");
   if (value.includes("suspend")) return "Suspended";
   if (value.includes("inactive") || value.includes("disabled")) return "Inactive";
   return "Active";
 }
 
 function mapAccess(raw: string): PortalAccessLevel {
-  const value = raw.toLowerCase();
+  const value = raw.toLowerCase().replace(/[_-]+/g, " ");
   if (value.includes("read")) return "Read-only";
   if (value.includes("limit")) return "Limited";
   return "Full";
@@ -86,20 +108,64 @@ function mapAccess(raw: string): PortalAccessLevel {
 
 function mapModules(raw: unknown): PortalModule[] {
   if (!Array.isArray(raw)) return ["Documents", "Tickets"];
+  const allowed = new Set<string>(PORTAL_MODULES);
   const out: PortalModule[] = [];
   for (const entry of raw) {
-    const label = pickStr(entry, typeof entry === "object" && entry
-      ? (entry as Record<string, unknown>).name
-      : "");
-    const normalized = label.toLowerCase();
-    if (normalized.includes("deal")) out.push("Deals");
-    else if (normalized.includes("doc")) out.push("Documents");
-    else if (normalized.includes("task")) out.push("Tasks");
-    else if (normalized.includes("ticket")) out.push("Tickets");
-    else if (normalized.includes("invoice")) out.push("Invoices");
-    else if (normalized.includes("report")) out.push("Reports");
+    const label = pickStr(
+      entry,
+      typeof entry === "object" && entry
+        ? (entry as Record<string, unknown>).name
+        : "",
+    );
+    if (allowed.has(label)) out.push(label as PortalModule);
   }
   return out.length ? [...new Set(out)] : ["Documents", "Tickets"];
+}
+
+export function apiPortalStatus(status: PortalStatus): "ACTIVE" | "INACTIVE" | "SUSPENDED" {
+  if (status === "Inactive") return "INACTIVE";
+  if (status === "Suspended") return "SUSPENDED";
+  return "ACTIVE";
+}
+
+export function apiPortalAccess(
+  access: PortalAccessLevel,
+): "FULL" | "LIMITED" | "READ_ONLY" {
+  if (access === "Read-only") return "READ_ONLY";
+  if (access === "Limited") return "LIMITED";
+  return "FULL";
+}
+
+export function toCreatePortalBody(input: CreateCrmPortalInput): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    name: input.name.trim(),
+    companyId: input.companyId,
+    primaryContactId: input.primaryContactId,
+  };
+  if (input.accessLevel) body.accessLevel = apiPortalAccess(input.accessLevel);
+  if (input.modules?.length) body.allowedModules = input.modules;
+  return body;
+}
+
+export function toUpdatePortalBody(input: UpdateCrmPortalInput): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (input.name?.trim()) body.name = input.name.trim();
+  if (input.status) body.status = apiPortalStatus(input.status);
+  if (input.accessLevel) body.accessLevel = apiPortalAccess(input.accessLevel);
+  if (input.primaryContactId && isUuid(input.primaryContactId)) {
+    body.primaryContactId = input.primaryContactId;
+  }
+  if (input.modules?.length) body.allowedModules = input.modules;
+  return body;
+}
+
+function slugFromPortalUrl(portalUrl: string, name: string, index: number) {
+  const fromUrl = portalUrl
+    .split("/")
+    .filter(Boolean)
+    .pop();
+  if (fromUrl && isUuid(fromUrl)) return slugifyPortalName(name) || `portal-${index}`;
+  return slugifyPortalName(fromUrl || name) || `portal-${index}`;
 }
 
 export function normalizeClientPortal(
@@ -112,40 +178,45 @@ export function normalizeClientPortal(
     raw.primaryContact && typeof raw.primaryContact === "object"
       ? (raw.primaryContact as Record<string, unknown>)
       : null;
-  const client =
-    raw.client && typeof raw.client === "object"
-      ? (raw.client as Record<string, unknown>)
-      : null;
+  const company =
+    raw.company && typeof raw.company === "object"
+      ? (raw.company as Record<string, unknown>)
+      : raw.client && typeof raw.client === "object"
+        ? (raw.client as Record<string, unknown>)
+        : null;
+  const portalUrl = pickStr(raw.portalUrl, raw.portal_url, raw.url);
+  const companyId = pickStr(raw.companyId, raw.clientId, company && company.id);
+  const contactId = pickStr(
+    raw.primaryContactId,
+    contact && contact.id,
+  );
 
   return {
     id,
-    portalId: pickStr(raw.portalCode, raw.code, raw.portalId, id),
+    portalId: pickStr(raw.portalCode, raw.code, id),
     name,
-    clientId: pickStr(raw.clientId, client && client.id, "crm-client"),
+    clientId: companyId || "crm-client",
     clientName: pickStr(
       raw.clientName,
-      client && pickStr(client.name, client.title),
+      company && pickStr(company.name, company.title),
       "Client",
     ),
-    slug: pickStr(raw.slug, raw.urlSlug, name)
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "") || `portal-${index}`,
+    slug: pickStr(raw.slug, raw.urlSlug) || slugFromPortalUrl(portalUrl, name, index),
     status: mapStatus(pickStr(raw.status, raw.state, "ACTIVE")),
     accessLevel: mapAccess(pickStr(raw.accessLevel, raw.access, "FULL")),
-    modules: mapModules(raw.modules ?? raw.allowedModules),
+    modules: mapModules(raw.allowedModules ?? raw.modules),
     primaryContactName: pickStr(
       raw.primaryContactName,
-      contact && pickStr(contact.name),
+      contact && pickStr(contact.name, contact.firstName),
       "Contact",
     ),
     primaryContactEmail: pickStr(
       raw.primaryContactEmail,
       contact && pickStr(contact.email),
-      "contact@example.com",
     ),
-    inviteSentAt: pickStr(raw.inviteSentAt) || undefined,
-    lastLoginAt: pickStr(raw.lastLoginAt) || undefined,
+    primaryContactId: isUuid(contactId) ? contactId : undefined,
+    portalUrl: portalUrl || undefined,
+    lastLoginAt: pickStr(raw.lastAccessedAt, raw.lastLoginAt) || undefined,
     createdBy: pickStr(raw.createdByName, raw.createdBy, "—"),
     createdAt: pickStr(raw.createdAt, ""),
     activity: [],
@@ -154,92 +225,114 @@ export function normalizeClientPortal(
 }
 
 export function normalizeClientPortals(data: unknown): ClientPortal[] {
-  return extractRecords(data).map((row, index) =>
-    normalizeClientPortal(row, index),
-  );
+  const rows = extractRecords(data);
+  if (
+    rows.length === 0 &&
+    data &&
+    typeof data === "object" &&
+    !Array.isArray(data) &&
+    pickStr((data as Record<string, unknown>).id, (data as Record<string, unknown>).name)
+  ) {
+    return [normalizeClientPortal(data as Record<string, unknown>, 0)];
+  }
+  return rows.map((row, index) => normalizeClientPortal(row, index));
 }
 
-async function portalsGet(suffix: string, query = ""): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to load client portals");
-  return crmFetch(auth, `${clientPortalsPath(suffix)}${query}`);
+async function portalsCall(suffix: string, init?: RequestInit): Promise<unknown> {
+  const path = clientPortalsPath(suffix);
+  if (isBoundCrmSession()) {
+    const scoped = await ensureCrmSession();
+    const access = scoped ?? (await ensureCrmAccess());
+    if (!access) throw new Error("Sign in to manage client portals");
+    return crmFetch(access as CrmSession, path, init);
+  }
+  return crmBffFetch(path, init);
 }
 
-async function portalsMutate(
-  suffix: string,
-  init: RequestInit,
-): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to manage client portals");
-  return crmFetch(auth, clientPortalsPath(suffix), init);
+function jsonInit(method: string, body?: unknown): RequestInit {
+  return {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body == null ? undefined : JSON.stringify(body),
+  };
+}
+
+function asPortal(data: unknown): ClientPortal | null {
+  const items = normalizeClientPortals(data);
+  if (items[0]) return items[0];
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const rec = data as Record<string, unknown>;
+    if (pickStr(rec.id, rec.name, rec.portalUrl)) {
+      return normalizeClientPortal(rec, 0);
+    }
+  }
+  return null;
 }
 
 export async function listCrmClientPortals(
   query: CrmPortalQuery = {},
 ): Promise<ClientPortal[]> {
-  return normalizeClientPortals(
-    await portalsGet(
-      "",
-      toQuery({
-        page: query.page,
-        limit: query.limit ?? 100,
-        search: query.search,
-        status: query.status,
-      }),
-    ),
-  );
+  const limit = Math.min(100, Math.max(1, query.limit ?? 100));
+  const startPage = query.page != null ? Math.max(1, query.page) : 1;
+  const maxPages = query.page != null ? 1 : 20;
+  const all: ClientPortal[] = [];
+  for (let i = 0; i < maxPages; i += 1) {
+    const batch = normalizeClientPortals(
+      await portalsCall(
+        toQuery({
+          page: startPage + i,
+          limit,
+          search: query.search,
+          status: query.status ? apiPortalStatus(query.status as PortalStatus) : undefined,
+          companyId: query.companyId && isUuid(query.companyId) ? query.companyId : undefined,
+        }),
+      ),
+    );
+    all.push(...batch);
+    if (batch.length < limit) break;
+  }
+  return all;
 }
 
 export async function getCrmClientPortal(id: string): Promise<ClientPortal | null> {
-  const data = await portalsGet(`/${id}`);
-  const items = normalizeClientPortals(data);
-  if (items[0]) return items[0];
-  if (data && typeof data === "object" && !Array.isArray(data)) {
-    return normalizeClientPortal(data as Record<string, unknown>, 0);
-  }
-  return null;
+  if (!isUuid(id)) return null;
+  return asPortal(await portalsCall(`/${id}`));
 }
 
 export async function createCrmClientPortal(
-  body: Record<string, unknown>,
+  input: CreateCrmPortalInput | Record<string, unknown>,
 ): Promise<ClientPortal | null> {
-  const data = await portalsMutate("", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-  const items = normalizeClientPortals(data);
-  if (items[0]) return items[0];
-  if (data && typeof data === "object" && !Array.isArray(data)) {
-    return normalizeClientPortal(data as Record<string, unknown>, 0);
-  }
-  return null;
+  const typed = input as CreateCrmPortalInput;
+  const body =
+    typeof typed.companyId === "string" && typeof typed.primaryContactId === "string"
+      ? toCreatePortalBody(typed)
+      : input;
+  return asPortal(await portalsCall("", jsonInit("POST", body)));
 }
 
 export async function updateCrmClientPortal(
   id: string,
-  patch: Record<string, unknown>,
+  patch: UpdateCrmPortalInput | Record<string, unknown>,
 ): Promise<ClientPortal | null> {
-  const data = await portalsMutate(`/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(patch),
-  });
-  const items = normalizeClientPortals(data);
-  return items[0] ?? null;
+  if (!isUuid(id)) return null;
+  const typed = patch as UpdateCrmPortalInput;
+  const body =
+    typed.modules || typed.status || typed.accessLevel || typed.primaryContactId || typed.name
+      ? toUpdatePortalBody(typed)
+      : patch;
+  return asPortal(await portalsCall(`/${id}`, jsonInit("PATCH", body)));
 }
 
 export async function deleteCrmClientPortal(id: string): Promise<void> {
-  await portalsMutate(`/${id}`, { method: "DELETE" });
+  if (!isUuid(id)) return;
+  await portalsCall(`/${id}`, { method: "DELETE" });
 }
 
 export async function resetCrmClientPortalPassword(
   id: string,
-): Promise<ClientPortal | null> {
-  const data = await portalsMutate(`/${id}/reset-password`, {
-    method: "POST",
-    body: "{}",
-  });
-  const items = normalizeClientPortals(data);
-  return items[0] ?? null;
+): Promise<unknown> {
+  if (!isUuid(id)) return null;
+  return portalsCall(`/${id}/reset-password`, jsonInit("POST", {}));
 }
 
 export async function tryCrmPortal<T>(run: () => Promise<T>): Promise<T | null> {

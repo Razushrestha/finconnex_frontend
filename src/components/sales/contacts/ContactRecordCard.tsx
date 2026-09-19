@@ -16,7 +16,7 @@ import {
 import type { ContactCardData } from "@/lib/contacts/types";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion, cardSubject, entityCardBox } from "@/lib/motion";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   CustomizeContactCardDrawer,
   DEFAULT_CONTACT_CARD_SETTINGS,
@@ -31,8 +31,8 @@ import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
 interface ContactRecordCardProps {
   contact: ContactCardData;
   isDragging: boolean;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragEnd: () => void;
+  onDragPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onDragClickCapture?: (e: React.MouseEvent) => void;
   onQuickAction?: (kind: ContactQuickActionKind) => void;
   /** Whether this card's checkbox is checked — driven by the board/page. */
   isSelected: boolean;
@@ -68,13 +68,14 @@ export { CONTACT_QUICK_ACTIONS };
 export function ContactRecordCard({
   contact,
   isDragging,
-  onDragStart,
-  onDragEnd,
+  onDragPointerDown,
+  onDragClickCapture,
   onQuickAction,
   isSelected,
   onToggleSelect,
   onSaveCardSettings,
 }: ContactRecordCardProps) {
+  const router = useRouter();
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customization, setCustomization] =
     useState<ContactCardCustomizationSettings>(DEFAULT_CONTACT_CARD_SETTINGS);
@@ -82,9 +83,13 @@ export function ContactRecordCard({
   return (
     <>
       <div
-        draggable
-        onDragStart={onDragStart}
-        onDragEnd={onDragEnd}
+        draggable={false}
+        onPointerDown={onDragPointerDown}
+        onClickCapture={onDragClickCapture}
+        onDragStart={(e) => e.preventDefault()}
+        onClick={() =>
+          router.push(`/sales/contacts/detail/${contact.id}`)
+        }
         data-focus-id={contact.id}
         data-contact-id={contact.id}
         className={cn(
@@ -95,22 +100,19 @@ export function ContactRecordCard({
         )}
       >
         <div className="mb-3 flex items-center justify-between gap-2">
-          <Link
-            href={`/sales/contacts/detail/${contact.id}`}
-            className="min-w-0"
+          <h3
+            className={cn(
+              "min-w-0 truncate text-[13px] font-semibold text-slate-800",
+              cardSubject,
+            )}
           >
-            <h3
-              className={cn(
-                "truncate text-[13px] font-semibold text-slate-800",
-                cardSubject,
-              )}
-            >
-              {contact.name}
-            </h3>
-          </Link>
+            {contact.name}
+          </h3>
 
           <input
             type="checkbox"
+            data-no-drag
+            draggable={false}
             checked={isSelected}
             onChange={() => onToggleSelect(contact.id)}
             onMouseDown={(e) => e.stopPropagation()}

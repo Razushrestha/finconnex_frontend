@@ -9,6 +9,7 @@ import {
   htmlToPlainText,
   plainTextToEmailHtml,
   rewriteEmailWithAi,
+  stripInstructionLeak,
   suggestSubjects,
 } from "@/lib/emails/ai-compose";
 import {
@@ -57,13 +58,16 @@ function instruction(body: Body) {
 
   const rules = [
     "Write a complete email body only. No subject line, no markdown fences, no commentary.",
+    "The user's prompt is an INSTRUCTION to you. Never copy the prompt into the email.",
+    "Never include phrases such as: write a email, write an email, Keep the same recipient, Current draft, Apply this instruction, or Current draft:.",
     "Replace the previous draft entirely. Do not quote it, do not append to it, and do not keep old greetings or sign-offs.",
+    "If the user asked for a follow-up, write a real follow-up about the recipient and subject. Do not mention signing or documents unless the prompt or existing draft does.",
     "Always write in a polished, descriptive, professional register — even when the selected tone is friendly, emotional, or loving.",
     "The selected tone should colour warmth and word choice. It must not make the email short, casual-only, or one-line.",
     "Structure: exactly one greeting, then exactly three body paragraphs, then one sign-off.",
     "Each of the three body paragraphs must contain at least two complete sentences (aim for two to four).",
     "Paragraph 1: a considered opening that sets context in the chosen tone.",
-    "Paragraph 2: the substance — what is happening, which documents or topic, status, and why it matters. Expand the user's request; do not repeat it as a raw instruction.",
+    "Paragraph 2: the substance of what the user asked you to write — follow-up, documents, a meeting, etc.",
     "Paragraph 3: a courteous close with a clear next step, still in the chosen tone.",
     "Do not write a one-line or two-sentence email. Do not use bullet lists unless the user asked for a list.",
     `Tone: ${tone}.`,
@@ -76,10 +80,10 @@ function instruction(body: Body) {
     .join("\n");
 
   if (body.mode === "draft" || (!existing && prompt)) {
-    return `${rules}\n\nWrite the email described here:\n${prompt || "A professional follow-up."}`;
+    return `${rules}\n\nWrite the email the user asked for. User instruction (do not copy this wording into the email):\n${prompt || "A professional follow-up."}`;
   }
   if (body.mode === "edit" || prompt) {
-    return `${rules}\n\nCurrent draft:\n${existing || "(empty)"}\n\nApply this instruction:\n${prompt}`;
+    return `${rules}\n\nExisting draft is context only — rewrite a fresh email, do not paste this block:\n${existing || "(empty)"}\n\nUser instruction (do not copy this wording into the email):\n${prompt}`;
   }
   const actionHint =
     action === "brief"
@@ -188,7 +192,11 @@ export async function POST(request: Request) {
     if (!text.trim()) {
       return NextResponse.json(localResult(body));
     }
-    return NextResponse.json({ html: plainTextToEmailHtml(text), text });
+    const cleaned = stripInstructionLeak(text);
+    return NextResponse.json({
+      html: plainTextToEmailHtml(cleaned || text),
+      text: cleaned || text,
+    });
   } catch {
     return NextResponse.json(localResult(body));
   }

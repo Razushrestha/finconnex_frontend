@@ -29,6 +29,7 @@ import {
   listCrmQuoteAttachments,
   persistRemoteQuote,
   sendCrmQuote,
+  toCreateQuoteBody,
   tryCrmQuote,
   updateCrmQuote,
 } from "@/lib/finance/quotations/api";
@@ -44,20 +45,13 @@ import {
   publicSignPath,
   sendQuotationContract,
 } from "@/lib/finance/quotations/signatureBridge";
-import {
-  appendInvoiceAudit,
-  nextInvoiceIds,
-  upsertInvoice,
-} from "@/lib/finance/invoices/types";
-import {
-  ensureJourneyForQuote,
-  getJourneyByQuotationId,
-  touchJourneyStatus,
-} from "@/lib/finance/journey/types";
+import { createInvoiceFromQuotation } from "@/lib/finance/quotations/convert";
+import { getJourneyByQuotationId } from "@/lib/finance/journey/types";
 import {
   formatAUD,
   formatFinanceAt,
-  formatFinanceDate,
+  totalsFromLines,
+  type FinanceLineItem,
 } from "@/lib/finance/shared";
 import { QUOTATION_STATUS_STYLE } from "@/lib/finance/statusStyles";
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
@@ -250,62 +244,59 @@ export function QuotationDetailClient({ id }: { id: string }) {
       router.push(`/finance/invoices/${row.invoiceId}`);
       return;
     }
-    const ids = nextInvoiceIds();
-    const inv = upsertInvoice(
-      appendInvoiceAudit(
-        {
-          id: ids.id,
-          invoiceId: ids.invoiceId,
-          title:
-            row.title.replace(/quotation/i, "invoice") ||
-            `${row.title} invoice`,
-          status: "Draft",
-          clientId: row.clientId,
+    const { quotation, invoice, created } = createInvoiceFromQuotation(row);
+    setRow(quotation);
+    flash(created ? "Converted to invoice" : "Invoice already linked");
+    router.push(`/finance/invoices/${invoice.id}`);
+  }
+
+  function onLineItemsChange(lineItems: FinanceLineItem[]) {
+    if (!row || row.status !== "Draft") return;
+    const t = totalsFromLines(lineItems);
+    setRow({ ...row, lineItems, subtotal: t.subtotal, tax: t.tax, total: t.total });
+  }
+
+  async function saveLineItems() {
+    if (!row || row.status !== "Draft" || busy) return;
+    setBusy(true);
+    try {
+      const next = appendQuotationAudit(
+        { ...row },
+        "Line items updated",
+      );
+      save(next, "Line items saved");
+      if (isCrmQuoteId(row.id)) {
+        const body = toCreateQuoteBody({
+          title: row.title,
           clientName: row.clientName,
+          clientId: row.clientId,
           contactName: row.contactName,
           contactEmail: row.contactEmail,
           dealName: row.dealName,
-          owner: row.owner,
-          issueDate: formatFinanceDate(),
-          dueDate: row.validUntil,
           notes: row.notes,
-          lineItems: row.lineItems.map((l) => ({ ...l, id: `ili-${l.id}` })),
-          subtotal: 0,
-          tax: 0,
-          total: 0,
-          amountPaid: 0,
-          amountDue: 0,
-          quotationId: row.id,
-          quotationRef: row.quotationId,
-          createdBy: row.owner,
-          createdAt: formatFinanceDate(),
-          audit: [],
-        },
-        "Created from quotation",
-        row.owner,
-      ),
-    );
-    const next = appendQuotationAudit(
-      { ...row, status: "Invoiced", invoiceId: inv.id },
-      "Converted to invoice",
-    );
-    upsertQuotation(next);
-    ensureJourneyForQuote({
-      quotationId: next.id,
-      clientId: next.clientId,
-      clientName: next.clientName,
-      contactName: next.contactName,
-      contactEmail: next.contactEmail,
-      dealName: next.dealName,
-      estimateId: next.estimateId,
-      signatureRequestId: next.signatureRequestId,
-      invoiceId: inv.id,
-      status: "Invoiced",
-    });
-    touchJourneyStatus(next.id, "Invoiced", { invoiceId: inv.id });
-    setRow(next);
-    flash("Converted to invoice");
-    router.push(`/finance/invoices/${inv.id}`);
+          status: row.status,
+          owner: row.owner,
+          validUntil: row.validUntil,
+          lineItems: row.lineItems,
+        });
+        const remote = await tryCrmQuote(() =>
+          updateCrmQuote(row.id, {
+            lineItems: body.lineItems,
+            subtotal: body.subtotal,
+            tax: body.tax,
+            taxTotal: body.taxTotal,
+            total: body.total,
+            amount: body.amount,
+          }),
+        );
+        if (remote) {
+          persistRemoteQuote(remote);
+          setRow(remote);
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (loading && !row) {
@@ -607,10 +598,25 @@ export function QuotationDetailClient({ id }: { id: string }) {
             ) : null}
           </div>
           <div className="px-5 py-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-[12px] font-bold tracking-wide text-slate-700 uppercase">
+                Line items
+              </h3>
+              {row.status === "Draft" ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void saveLineItems()}
+                  className="inline-flex h-8 items-center rounded-lg border border-violet-200 bg-violet-50 px-2.5 text-[11px] font-semibold text-violet-700 disabled:opacity-50"
+                >
+                  Save lines
+                </button>
+              ) : null}
+            </div>
             <LineItemsEditor
               items={row.lineItems}
-              onChange={() => {}}
-              readOnly
+              onChange={onLineItemsChange}
+              readOnly={row.status !== "Draft"}
             />
           </div>
           <div className="border-t border-slate-100 px-5 py-4">

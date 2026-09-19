@@ -28,7 +28,7 @@ import {
   formatCurrency,
   type DashboardFilters,
 } from "@/lib/dashboard/layout";
-import { computeSalesDashboard } from "@/lib/dashboard/sales";
+import { computeSalesDashboard, type SalesDashboard } from "@/lib/dashboard/sales";
 import { formatCompactMoney } from "@/lib/dashboard/executive";
 import {
   DashboardViewGrid,
@@ -146,6 +146,7 @@ function Card({
 
 export function SalesDashboardView({
   filters,
+  data: live,
   hiddenWidgets = [],
   widgetOrder,
   reordering = false,
@@ -158,9 +159,11 @@ export function SalesDashboardView({
   onArchive,
 }: {
   filters: DashboardFilters;
+  data?: SalesDashboard;
 } & DashboardReorderProps) {
   const [metric, setMetric] = useState<"deals" | "value">("deals");
-  const data = useMemo(() => computeSalesDashboard(filters), [filters]);
+  const computed = useMemo(() => computeSalesDashboard(filters), [filters]);
+  const data = live ?? computed;
   const vs = data.comparisonLabel;
   const top = Math.max(...data.funnel.map((r) => r.count), 1);
   const loanTotal = data.loanTypes.reduce((n, row) => n + row.value, 0);

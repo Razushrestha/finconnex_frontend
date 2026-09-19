@@ -5,28 +5,31 @@ import type { Email } from "@/lib/emails/types";
 import { cn } from "@/lib/utils";
 import { cardDragging, cardMotion, cardSubject, entityCardBox } from "@/lib/motion";
 import { CardOwnerRow } from "@/components/shared/CardInitialsAvatar";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface EmailCardProps {
   email: Email;
   columnId: string;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragEnd: () => void;
+  onDragPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onDragClickCapture?: (e: React.MouseEvent) => void;
   isDragging: boolean;
 }
 
 export function EmailCard({
   email,
   columnId,
-  onDragStart,
-  onDragEnd,
+  onDragPointerDown,
+  onDragClickCapture,
   isDragging,
 }: EmailCardProps) {
+  const router = useRouter();
   return (
     <div
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      draggable={false}
+      onPointerDown={onDragPointerDown}
+      onClickCapture={onDragClickCapture}
+      onDragStart={(e) => e.preventDefault()}
+      onClick={() => router.push(`/activities/emails/detail/${email.id}`)}
       data-focus-id={email.id}
       data-email-id={email.id}
       data-column-id={columnId}
@@ -42,19 +45,14 @@ export function EmailCard({
         {email.relatedTo ?? "Unrelated"}
       </div>
 
-      <Link
-        href={`/activities/emails/detail/${email.id}`}
-        className="block group cursor-pointer"
+      <h4
+        className={cn(
+          "mb-1.5 truncate text-sm font-semibold text-card-foreground",
+          cardSubject,
+        )}
       >
-        <h4
-          className={cn(
-            "mb-1.5 truncate text-sm font-semibold text-card-foreground transition-colors group-hover:text-primary",
-            cardSubject,
-          )}
-        >
-          {email.subject}
-        </h4>
-      </Link>
+        {email.subject}
+      </h4>
 
       {/*
         A failed send sits in Drafts alongside mail that was never sent (see

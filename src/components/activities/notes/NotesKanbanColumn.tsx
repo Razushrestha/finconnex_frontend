@@ -22,28 +22,28 @@ import {
 interface NotesKanbanColumnProps {
   column: NoteColumn;
   draggingNoteId: string | null;
-  onDragStartNote: (
-    e: React.DragEvent<HTMLDivElement>,
-    noteId: string,
-    columnId: string,
+  onCardPointerDown: (
+    e: React.PointerEvent<HTMLElement>,
+    item: { id: string; columnId: string; name: string },
   ) => void;
-  onDragEndNote: () => void;
-  onDropNote: (targetColumnId: string) => void;
+  onDragClickCapture?: (e: React.MouseEvent) => void;
   embedded?: boolean;
   selectedIds?: string[];
   onToggleSelect?: (noteId: string) => void;
+  displayTitle?: string;
 }
 
 export function NotesKanbanColumn({
   column,
   draggingNoteId,
-  onDragStartNote,
-  onDragEndNote,
-  onDropNote,
+  onCardPointerDown,
+  onDragClickCapture,
   embedded = false,
   selectedIds = [],
   onToggleSelect,
+  displayTitle,
 }: NotesKanbanColumnProps) {
+  const heading = displayTitle ?? column.title;
   const router = useRouter();
   const [isOver, setIsOver] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -51,7 +51,7 @@ export function NotesKanbanColumn({
   if (isCollapsed) {
     return (
       <KanbanCollapsedRail
-        title={column.title}
+        title={heading}
         count={column.notes.length}
         onExpand={() => setIsCollapsed(false)}
       />
@@ -59,7 +59,10 @@ export function NotesKanbanColumn({
   }
 
   return (
-    <div className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}>
+    <div
+      data-kanban-drop-column={column.id}
+      className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}
+    >
       <div className={cn("mb-2 shrink-0", KANBAN_HEADER)}>
         <div className="flex items-center justify-between gap-4">
           <button
@@ -68,11 +71,11 @@ export function NotesKanbanColumn({
             title="Collapse"
             className="flex items-center gap-1.5 rounded-sm hover:opacity-70"
             aria-expanded
-            aria-label={`Collapse ${column.title}`}
+            aria-label={`Collapse ${heading}`}
           >
             <ChevronDown className="h-4 w-4 shrink-0 text-slate-700" />
             <h3 className="text-sm font-semibold text-slate-900">
-              {column.title}
+              {heading}
             </h3>
           </button>
           <span className={KANBAN_HEADER_COUNT}>{column.notes.length}</span>
@@ -85,25 +88,15 @@ export function NotesKanbanColumn({
             createLabel="Create note"
             onCreate={() => router.push("/activities/notes/create")}
             onCollapse={() => setIsCollapsed(true)}
-            collapseLabel={`Collapse ${column.title}`}
+            collapseLabel={`Collapse ${heading}`}
           />
         }
       >
       <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setIsOver(true);
-        }}
-        onDragLeave={() => setIsOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setIsOver(false);
-          onDropNote(column.id);
-        }}
         className={cn(
           "flex min-h-full flex-col rounded-sm border border-transparent p-2",
           dropTargetIdle,
-          isOver ? dropTargetActive : KANBAN_WELL,
+          draggingNoteId ? dropTargetActive : KANBAN_WELL,
         )}
       >
         <div className="flex min-h-[180px] flex-1 flex-col space-y-3 pb-4">
@@ -111,18 +104,25 @@ export function NotesKanbanColumn({
             <div className={KANBAN_DROP_GHOST} />
           ) : null}
           {column.notes.map((note) => (
-            <NoteCard
-              key={note.id}
-              note={note}
-              columnId={column.id}
-              isDragging={draggingNoteId === note.id}
-              onDragStart={(e) => onDragStartNote(e, note.id, column.id)}
-              onDragEnd={onDragEndNote}
-              isSelected={selectedIds.includes(note.id)}
-              onSelect={
-                onToggleSelect ? () => onToggleSelect(note.id) : undefined
-              }
-            />
+            <div key={note.id} data-kanban-card-slot={note.id}>
+              <NoteCard
+                note={note}
+                columnId={column.id}
+                isDragging={draggingNoteId === note.id}
+                onDragPointerDown={(e) =>
+                  onCardPointerDown(e, {
+                    id: note.id,
+                    columnId: column.id,
+                    name: note.title || "Note",
+                  })
+                }
+                onDragClickCapture={onDragClickCapture}
+                isSelected={selectedIds.includes(note.id)}
+                onSelect={
+                  onToggleSelect ? () => onToggleSelect(note.id) : undefined
+                }
+              />
+            </div>
           ))}
 
           {column.notes.length === 0 ? (

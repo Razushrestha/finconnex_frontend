@@ -81,7 +81,7 @@ function accessToken(): string | null {
 export async function publishPublicSignSession(
   req: SignatureRequest,
   files?: File[],
-) {
+): Promise<SignatureRequest> {
   const blob = await resolveDocumentBlob(req, files);
   const form = new FormData();
   form.append(
@@ -115,8 +115,20 @@ export async function publishPublicSignSession(
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: form,
   });
+  const json = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    tokens?: Record<string, string>;
+  };
   if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error || "Could not publish the signing link");
+    throw new Error(json.error || "Could not publish the signing link");
   }
+  const tokens = json.tokens ?? {};
+  if (!Object.keys(tokens).length) return req;
+  return {
+    ...req,
+    signers: req.signers.map((signer) => ({
+      ...signer,
+      token: tokens[signer.token] ?? signer.token,
+    })),
+  };
 }

@@ -55,6 +55,7 @@ export function QuickActionsBar<TKind extends string>({
   return (
     <div
       role="toolbar"
+      data-no-drag
       aria-label={ariaLabel}
       className={cn("flex items-center justify-between gap-0.5", className)}
     >
@@ -69,6 +70,8 @@ export function QuickActionsBar<TKind extends string>({
           <button
             key={action.kind}
             type="button"
+            draggable={false}
+            onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();

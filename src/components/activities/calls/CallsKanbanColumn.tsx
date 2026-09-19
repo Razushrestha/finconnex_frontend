@@ -20,19 +20,18 @@ interface CallsKanbanColumnProps {
   draggingCallId: string | null;
   dropTargetPos: DropTargetPos | null;
   setDropTargetPos: React.Dispatch<React.SetStateAction<DropTargetPos | null>>;
-  onDragStartCall: (
-    e: React.DragEvent<HTMLDivElement>,
-    callId: string,
-    columnId: string,
+  onCardPointerDown: (
+    e: React.PointerEvent<HTMLElement>,
+    item: { id: string; columnId: string; name: string },
   ) => void;
-  onDragEndCall: () => void;
-  onDropCall: (targetColumnId: string, targetIndex?: number) => void;
+  onDragClickCapture?: (e: React.MouseEvent) => void;
   selectedCallIds?: string[];
   onToggleSelect?: (callId: string) => void;
   onChangeStatus?: (callId: string, status: CallStatus) => void;
   onChangePriority?: (callId: string, priority: Priority) => void;
   onAssignUser?: (callId: string, user: string) => void;
   onAddComment?: (callId: string, comment: string) => void;
+  displayTitle?: string;
 }
 
 export function CallsKanbanColumn({
@@ -40,16 +39,17 @@ export function CallsKanbanColumn({
   draggingCallId,
   dropTargetPos,
   setDropTargetPos,
-  onDragStartCall,
-  onDragEndCall,
-  onDropCall,
+  onCardPointerDown,
+  onDragClickCapture,
   selectedCallIds = [],
   onToggleSelect,
   onChangeStatus,
   onChangePriority,
   onAssignUser,
   onAddComment,
+  displayTitle,
 }: CallsKanbanColumnProps) {
+  const heading = displayTitle ?? column.title;
   const router = useRouter();
   const [isOver, setIsOver] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -81,7 +81,7 @@ export function CallsKanbanColumn({
   if (isCollapsed) {
     return (
       <KanbanCollapsedRail
-        title={column.title}
+        title={heading}
         count={column.count}
         onExpand={() => setIsCollapsed(false)}
       />
@@ -89,7 +89,10 @@ export function CallsKanbanColumn({
   }
 
   return (
-    <div className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}>
+    <div
+      data-kanban-drop-column={column.id}
+      className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}
+    >
       {/* Separate Header Box */}
       <div
         className={cn("mb-2 shrink-0", KANBAN_HEADER)}
@@ -101,11 +104,11 @@ export function CallsKanbanColumn({
             title="Collapse"
             className="flex items-center gap-1.5 rounded-sm hover:opacity-70"
             aria-expanded={true}
-            aria-label={`Collapse ${column.title}`}
+            aria-label={`Collapse ${heading}`}
           >
             <ChevronDown className="h-4 w-4 shrink-0 text-slate-700" />
             <h3 className="text-sm font-semibold text-slate-900">
-              {column.title}
+              {heading}
             </h3>
           </button>
           <span className={KANBAN_HEADER_COUNT}>
@@ -120,7 +123,7 @@ export function CallsKanbanColumn({
             createLabel="Create call"
             onCreate={() => router.push("/activities/calls/create")}
             onCollapse={() => setIsCollapsed(true)}
-            collapseLabel={`Collapse ${column.title}`}
+            collapseLabel={`Collapse ${heading}`}
           />
         }
       >
@@ -128,14 +131,10 @@ export function CallsKanbanColumn({
         onDragOver={handleDragOverContainer}
         onDragLeave={() => {
           setIsOver(false);
-          if (dropTargetPos?.columnId === column.id) {
-            setDropTargetPos(null);
-          }
         }}
         onDrop={(e) => {
           e.preventDefault();
           setIsOver(false);
-          onDropCall(column.id, dropTargetPos?.targetIndex);
         }}
         className={cn(
           "flex min-h-full flex-col rounded-sm border border-transparent p-2",
@@ -164,13 +163,19 @@ export function CallsKanbanColumn({
                   <div className={KANBAN_DROP_GHOST} />
                 )}
 
-                <div data-call-card>
+                <div data-call-card data-kanban-card-slot={call.id}>
                   <CallCard
                     call={call}
                     columnId={column.id}
                     isDragging={draggingCallId === call.id}
-                    onDragStart={(e) => onDragStartCall(e, call.id, column.id)}
-                    onDragEnd={onDragEndCall}
+                    onDragPointerDown={(e) =>
+                      onCardPointerDown(e, {
+                        id: call.id,
+                        columnId: column.id,
+                        name: call.subject || call.relatedTo || call.id,
+                      })
+                    }
+                    onDragClickCapture={onDragClickCapture}
                     isSelected={isSelected}
                     onSelect={
                       onToggleSelect ? () => onToggleSelect(call.id) : undefined

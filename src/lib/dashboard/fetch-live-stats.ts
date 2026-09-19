@@ -10,6 +10,7 @@ import {
   type DashboardLiveStats,
 } from "@/lib/dashboard/layout";
 import {
+  DASHBOARD_ANALYTICS_WIDGETS,
   batchCrmDashboardWidgets,
   getCrmDashboardMetrics,
   listCrmDashboardWidgetCatalog,
@@ -26,8 +27,19 @@ import {
 import {
   applyMetricsToStats,
   overlayExecutiveOverview,
+  overlayPerformanceDashboard,
+  overlaySalesDashboard,
   widgetPayloadMap,
 } from "@/lib/dashboard/overlay";
+import {
+  computePerformanceDashboard,
+  type PerformanceDashboard,
+} from "@/lib/dashboard/performance";
+import {
+  computeSalesDashboard,
+  type SalesDashboard,
+} from "@/lib/dashboard/sales";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import { listCrmWorkspaceMembers } from "@/lib/workspace-members/api";
 
 export type DashboardDataSource = "api" | "demo" | "partial";
@@ -40,6 +52,8 @@ export type LiveDashboardSnapshot = {
   owners: string[];
   liveHits: string[];
   executive: ExecutiveOverview;
+  sales: SalesDashboard;
+  performance: PerformanceDashboard;
 };
 
 async function settle<T>(fn: () => Promise<T>): Promise<T | null> {
@@ -50,9 +64,7 @@ async function settle<T>(fn: () => Promise<T>): Promise<T | null> {
   }
 }
 
-function localSnapshot(
-  filters: DashboardFilters,
-): LiveDashboardSnapshot {
+function localSnapshot(filters: DashboardFilters): LiveDashboardSnapshot {
   const stats = computeDashboardStats(filters);
   const executive = computeExecutiveOverview(filters);
   return {
@@ -63,30 +75,53 @@ function localSnapshot(
     owners: [],
     liveHits: [],
     executive,
+    sales: computeSalesDashboard(filters),
+    performance: computePerformanceDashboard(filters),
   };
+}
+
+export function dashboardFastWidgetKeys(catalogKeys: string[]): string[] {
+  const defaults = [...DASHBOARD_ANALYTICS_WIDGETS];
+  if (!catalogKeys.length) return defaults;
+  const allow = new Set(defaults);
+  const picked = catalogKeys.filter((key) => allow.has(key as (typeof defaults)[number]));
+  return picked.length ? picked : defaults;
+}
+
+function ownerUserId(
+  members: Array<{ name: string; userId: string }>,
+  owner: string,
+): string | undefined {
+  if (!owner || owner === "All") return undefined;
+  const match = members.find(
+    (row) => row.name === owner || row.userId === owner,
+  );
+  const id = match?.userId;
+  return id && isUuid(id) ? id : undefined;
 }
 
 export async function fetchLiveDashboardSnapshot(
   filters: DashboardFilters,
 ): Promise<LiveDashboardSnapshot> {
   const demo = localSnapshot(filters);
+  const members = (await settle(() => listCrmWorkspaceMembers())) ?? [];
+  const ownerId = ownerUserId(members, filters.owner);
   const [metrics, catalog] = await Promise.all([
-    settle(() => getCrmDashboardMetrics(filters)),
+    settle(() => getCrmDashboardMetrics(filters, ownerId)),
     settle(() => listCrmDashboardWidgetCatalog()),
   ]);
-  if (metrics == null && !catalog?.length) {
-    return demo;
-  }
-
-  const widgetKeys = catalog?.map((w) => w.key).filter(Boolean) ?? [];
-  const batchKeys = widgetKeys.length
-    ? widgetKeys
-    : ["kpis", "pipeline", "performance", "actions", "trend", "ranking", "alerts"];
   const widgetsRaw = await settle(() =>
-    batchCrmDashboardWidgets(batchKeys, filters),
+    batchCrmDashboardWidgets(
+      dashboardFastWidgetKeys(catalog?.map((w) => w.key).filter(Boolean) ?? []),
+      filters,
+      ownerId,
+    ),
   );
   if (metrics == null && widgetsRaw == null) {
-    return demo;
+    return {
+      ...demo,
+      owners: members.map((m) => m.name).filter(Boolean),
+    };
   }
 
   const widgetMap = widgetPayloadMap(widgetsRaw);
@@ -100,11 +135,15 @@ export async function fetchLiveDashboardSnapshot(
     metrics,
     widgetMap,
   );
-  const members = await settle(() => listCrmWorkspaceMembers());
-  const memberList = members ?? [];
+  const sales = overlaySalesDashboard(demo.sales, metrics, widgetMap);
+  const performance = overlayPerformanceDashboard(
+    demo.performance,
+    metrics,
+    widgetMap,
+  );
   const owners = [
     "All",
-    ...new Set(memberList.map((m) => m.name).filter(Boolean)),
+    ...new Set(members.map((m) => m.name).filter(Boolean)),
   ];
   const trendHasData = executive.trend.some(
     (p) => p.leads || p.deals || p.settlements,
@@ -130,5 +169,7 @@ export async function fetchLiveDashboardSnapshot(
     owners: owners.length > 1 ? owners : [],
     liveHits,
     executive,
+    sales,
+    performance,
   };
 }

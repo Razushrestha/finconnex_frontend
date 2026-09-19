@@ -26,7 +26,10 @@ import {
 } from "lucide-react";
 import type { ConsultationMode } from "@/lib/booking/types";
 import { AssignConsultantsStep } from "@/components/booking/AssignConsultantsStep";
-import { BookingAdditionalSettingsStep } from "@/components/booking/BookingAdditionalSettingsStep";
+import {
+  BookingAdditionalSettingsStep,
+  type AdditionalSettingsValues,
+} from "@/components/booking/BookingAdditionalSettingsStep";
 import {
   BookingFormStep,
   type BookingFormValues,
@@ -55,6 +58,13 @@ import { getRulesActor } from "@/lib/rules/actor";
 import { cn } from "@/lib/utils";
 import { initials } from "@/lib/activities/shared";
 import {
+  createCrmEventType,
+  listCrmEventTypePages,
+  mergeCrmEventTypePages,
+  tryCrmBooking,
+} from "@/lib/booking/api";
+import { mergeNotificationPrefs } from "@/lib/booking/notify-prefs";
+import {
   consultationModeLabel,
   deleteBookingPage,
   nextBookingPageId,
@@ -80,7 +90,17 @@ const SECTION_FILTERS = [
 type SectionFilter = (typeof SECTION_FILTERS)[number];
 
 async function loadConsultationPagesFromApi(): Promise<BookingPage[]> {
-  return listBookingPages();
+  const local = listBookingPages().filter((page) => page.eventType === "Consultation");
+  const remote = await tryCrmBooking(() => listCrmEventTypePages());
+  const merged = remote?.length
+    ? mergeCrmEventTypePages(local, remote).filter(
+        (page) => page.eventType === "Consultation",
+      )
+    : local;
+  for (const page of merged) {
+    if (page.status === "Live") upsertBookingPage(page);
+  }
+  return merged;
 }
 
 function matchesSection(
@@ -136,6 +156,8 @@ export function ConsultationsBoard() {
     null,
   );
   const [settingsStep, setSettingsStep] = useState(false);
+  const [additionalValues, setAdditionalValues] =
+    useState<AdditionalSettingsValues | null>(null);
   const [wizardFurthest, setWizardFurthest] = useState(0);
 
   function currentSetupStep(): ConsultationSetupStepId {
@@ -189,12 +211,16 @@ export function ConsultationsBoard() {
     setRulesValues(null);
     setFormValues(null);
     setNotifyValues(null);
+    setAdditionalValues(null);
     setDetailsValues(null);
     setDetailsChoice(null);
     setWizardFurthest(0);
   }
 
-  function finishConsultation(form: BookingFormValues | null) {
+  async function finishConsultation(
+    form: BookingFormValues | null,
+    additional?: AdditionalSettingsValues,
+  ) {
     if (!detailsChoice || !detailsValues || !rulesValues) return;
     const mapped = rulesToPageFields(rulesValues);
     const slug = detailsValues.name
@@ -202,6 +228,10 @@ export function ConsultationsBoard() {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "")
       .slice(0, 48);
+    const confirmationTemplate =
+      form?.freeButton ||
+      "Hi {{name}}, your consultation is confirmed for {{datetime}}.";
+    const inviteNotes = additional?.inviteNotes?.trim();
     const page: BookingPage = {
       id: nextBookingPageId(),
       title: detailsValues.name,
@@ -248,16 +278,47 @@ export function ConsultationsBoard() {
           required: f.required,
         })),
       confirmationTemplate:
-        form?.freeButton ||
-        "Hi {{name}}, your consultation is confirmed for {{datetime}}.",
+        additional?.calendarInvites !== false && inviteNotes
+          ? `${confirmationTemplate}\n\n${inviteNotes}`
+          : confirmationTemplate,
       reminderTemplate: "Consultation reminder: starting soon.",
       status: "Live",
       views: 0,
       bookingsCount: 0,
       cancelRate: 0,
       createdAt: new Date().toLocaleDateString("en-GB"),
+      calendarInvites: additional?.calendarInvites !== false,
+      inviteNotes,
+      allowReschedule: additional?.allowReschedule !== false,
+      allowCancel: additional?.allowCancel !== false,
+      notifyPrefs: mergeNotificationPrefs(notifyValues),
     };
-    upsertBookingPage(page);
+    const created = await tryCrmBooking(() =>
+      createCrmEventType({
+        name: page.title,
+        slug: page.slug,
+        durationMinutes: page.durationMinutes,
+        timezone: page.timezone,
+        description: page.description,
+        active: page.status === "Live",
+        meetingPlace: detailsValues.meetingPlace,
+        platform: detailsValues.platform,
+        locationDetail:
+          detailsValues.meetingPlace === "offline"
+            ? detailsValues.locationDetail
+            : detailsValues.phoneDetail,
+      }),
+    );
+    upsertBookingPage(
+      created?.id
+        ? {
+            ...page,
+            id: created.id,
+            slug: created.slug || page.slug,
+            crmEventTypeId: created.id,
+          }
+        : page,
+    );
     void loadConsultationPagesFromApi().then(setPages);
     resetWizard();
   }
@@ -301,8 +362,12 @@ export function ConsultationsBoard() {
   if (detailsChoice && settingsStep && detailsValues) {
     return wrapSetup(
       <BookingAdditionalSettingsStep
+        initial={additionalValues ?? undefined}
         onBack={() => goToSetupStep("notify")}
-        onFinish={() => finishConsultation(formValues)}
+        onFinish={(values) => {
+          setAdditionalValues(values);
+          void finishConsultation(formValues, values);
+        }}
       />,
     );
   }

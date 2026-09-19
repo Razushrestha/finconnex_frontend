@@ -96,7 +96,7 @@ export default function BorrowingCapacityView() {
     if (!currentResults) return;
 
     const summary = `Max Capacity: $${Math.round(currentResults.maxCapacity).toLocaleString()} AUD`;
-    await persistCalculatorResult({
+    const saved = await persistCalculatorResult({
       title: "Capacity Profile",
       type: "Custom",
       currency: "AUD",
@@ -132,6 +132,10 @@ export default function BorrowingCapacityView() {
         ],
       },
     });
+    if (saved.source === "api") return;
+    if (saved.error) {
+      console.warn("CRM calculation save failed", saved.error);
+    }
   };
 
   // Reset Form & Results

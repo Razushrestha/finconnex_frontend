@@ -33,6 +33,7 @@ import {
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { defaultActorName } from "@/lib/rules/actor";
+import { FinanceCreateDialog } from "@/components/finance/FinanceCreateDialog";
 import {
   CreateEntityFormShell,
   Field,
@@ -42,8 +43,12 @@ import {
 } from "@/components/sales/CreateEntityForm";
 
 interface Props extends RelatedFinancePrefill {
-  layoutId: string;
-  redirect: boolean;
+  layoutId?: string;
+  redirect?: boolean;
+  variant?: "page" | "modal";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onCreated?: () => void;
 }
 
 export function CreateInvoiceForm({
@@ -53,7 +58,13 @@ export function CreateInvoiceForm({
   relatedName,
   relatedId,
   email,
+  variant = "page",
+  open = true,
+  onOpenChange,
+  onCreated,
 }: Props) {
+  void _l;
+  void _r;
   const router = useRouter();
   const prefill = useMemo(
     () => ({ relatedKind, relatedName, relatedId, email }),
@@ -166,23 +177,16 @@ export function CreateInvoiceForm({
       setSaveError(null);
       return;
     }
+    if (variant === "modal") {
+      onCreated?.();
+      onOpenChange?.(false);
+      return;
+    }
     router.push(`/finance/invoices/${created.id}`);
   }
 
-  return (
-    <CreateEntityFormShell
-      breadcrumbParent={{ label: "Invoices", href: "/finance/invoices" }}
-      badge="§13.4"
-      title="Create Invoice"
-      subtitle="Generate and send sales invoices; track payment status."
-      tip="Title, Due date, and line items are required."
-      cardIcon={Receipt}
-      cardTitle="Invoice details"
-      cardDescription="SRS §20.3: standalone or from a signed quotation"
-      listHref="/finance/invoices"
-      saveLabel="Save invoice"
-      onSave={onSave}
-    >
+  const fields = (
+    <>
       {relatedTo ? (
         <Field label="Related to" className="sm:col-span-2">
           <InputShell icon={Building2}>
@@ -309,6 +313,40 @@ export function CreateInvoiceForm({
         ) : null}
         <LineItemsEditor items={lineItems} onChange={setLineItems} />
       </div>
+    </>
+  );
+
+  if (variant === "modal") {
+    return (
+      <FinanceCreateDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        title="Create Invoice"
+        icon={Receipt}
+        saving={saving}
+        saveLabel="Save invoice"
+        onSave={onSave}
+      >
+        {fields}
+      </FinanceCreateDialog>
+    );
+  }
+
+  return (
+    <CreateEntityFormShell
+      breadcrumbParent={{ label: "Invoices", href: "/finance/invoices" }}
+      badge="§13.4"
+      title="Create Invoice"
+      subtitle="Generate and send sales invoices; track payment status."
+      tip="Title, Due date, and line items are required."
+      cardIcon={Receipt}
+      cardTitle="Invoice details"
+      cardDescription="SRS §20.3: standalone or from a signed quotation"
+      listHref="/finance/invoices"
+      saveLabel="Save invoice"
+      onSave={onSave}
+    >
+      {fields}
     </CreateEntityFormShell>
   );
 }

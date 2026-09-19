@@ -10,6 +10,10 @@ import { messageMatchesFilters } from "@/lib/filters/records";
 import { MessagesListTable } from "@/components/activities/messages/MessagesListTable";
 import { MessagesTimelineView } from "@/components/activities/messages/MessagesTimelineView";
 import {
+  MessagesKanbanBoard,
+  MESSAGE_STAGE_CATALOG,
+} from "@/components/activities/messages/MessagesKanbanBoard";
+import {
   ActivityToolbar,
   TIMELINE_VIEW_TOGGLE,
   type ActivityView,
@@ -29,6 +33,8 @@ import { listMessages } from "@/lib/messages/store";
 import { useCrmMessages } from "@/lib/messages/use-crm-messages";
 import type { Message } from "@/lib/messages/types";
 import { cn } from "@/lib/utils";
+import { kanbanPrefsFromCatalog } from "@/lib/kanban/column-prefs";
+import { useKanbanColumnPrefs } from "@/lib/kanban/use-kanban-column-prefs";
 
 const moreMenuItems = [
   { key: "mass-transfer", icon: ArrowRightLeft, label: "Mass Transfer" },
@@ -39,13 +45,20 @@ const moreMenuItems = [
   activityExportMenuItem("messages"),
 ];
 
+const MESSAGE_STAGE_DEFAULTS = kanbanPrefsFromCatalog(MESSAGE_STAGE_CATALOG);
+
 export default function MessagesPage() {
-  const [view, setView] = useState<ActivityView>("list");
+  const [view, setView] = useState<ActivityView>("kanban");
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState<MessageFilters>(EMPTY_MESSAGE_FILTERS);
   const [sortActive, setSortActive] = useState(true);
   const [rows, setRows] = useState<Message[]>([]);
   const crm = useCrmMessages();
+  const [bulkFlash, setBulkFlash] = useState<string | null>(null);
+  const stagePrefs = useKanbanColumnPrefs(
+    "finconnex.messages.kanban-columns",
+    MESSAGE_STAGE_DEFAULTS,
+  );
 
   useEffect(() => {
     if (crm.loading) return;
@@ -92,7 +105,27 @@ export default function MessagesPage() {
           extraViewIcons={[TIMELINE_VIEW_TOGGLE]}
           moreMenuItems={moreMenuItems}
           printViewItems={printViewItems}
+          columnOptions={view === "kanban" ? stagePrefs.columns : undefined}
+          onColumnToggle={view === "kanban" ? stagePrefs.toggle : undefined}
+          onColumnRename={view === "kanban" ? stagePrefs.rename : undefined}
+          onColumnAdd={
+            view === "kanban"
+              ? (title) => {
+                  const error = stagePrefs.addTitle(title);
+                  if (error) {
+                    setBulkFlash(error);
+                    window.setTimeout(() => setBulkFlash(null), 2800);
+                  }
+                }
+              : undefined
+          }
+          onColumnReorder={view === "kanban" ? stagePrefs.reorder : undefined}
         />
+        {bulkFlash ? (
+          <p className="mt-1 text-[12px] font-medium text-violet-700">
+            {bulkFlash}
+          </p>
+        ) : null}
       </div>
       <div className="relative flex min-h-0 flex-1 items-stretch gap-4 overflow-hidden">
         {filterOpen && (
@@ -108,6 +141,13 @@ export default function MessagesPage() {
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-2xl">
           {view === "timeline" ? (
             <MessagesTimelineView data={visibleRows} />
+          ) : view === "kanban" ? (
+            <MessagesKanbanBoard
+              rows={visibleRows}
+              visibleColumnIds={stagePrefs.visibleIds}
+              columnTitles={stagePrefs.titles}
+              onChange={() => setRows(listMessages())}
+            />
           ) : (
             <MessagesListTable data={crm.loading ? undefined : visibleRows} />
           )}

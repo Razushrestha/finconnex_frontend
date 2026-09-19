@@ -22,6 +22,14 @@ import {
   type ExecutiveOverview,
 } from "@/lib/dashboard/executive";
 import {
+  computePerformanceDashboard,
+  type PerformanceDashboard,
+} from "@/lib/dashboard/performance";
+import {
+  computeSalesDashboard,
+  type SalesDashboard,
+} from "@/lib/dashboard/sales";
+import {
   fetchLiveDashboardSnapshot,
   type DashboardDataSource,
 } from "@/lib/dashboard/fetch-live-stats";
@@ -36,6 +44,12 @@ export function useCrmDashboardStats(filters: DashboardFilters) {
   );
   const [executive, setExecutive] = useState<ExecutiveOverview>(() =>
     emptyExecutiveOverview(),
+  );
+  const [sales, setSales] = useState<SalesDashboard>(() =>
+    computeSalesDashboard(filters),
+  );
+  const [performance, setPerformance] = useState<PerformanceDashboard>(() =>
+    computePerformanceDashboard(filters),
   );
   const [source, setSource] = useState<DashboardDataSource>("demo");
   const [owners, setOwners] = useState<string[]>([]);
@@ -52,6 +66,8 @@ export function useCrmDashboardStats(filters: DashboardFilters) {
     );
     setCharts(chartsFromStats(computeDashboardStats(filters)));
     setExecutive(computeExecutiveOverview(filters));
+    setSales(computeSalesDashboard(filters));
+    setPerformance(computePerformanceDashboard(filters));
 
     void (async () => {
       const snap = await fetchLiveDashboardSnapshot(filters);
@@ -60,6 +76,8 @@ export function useCrmDashboardStats(filters: DashboardFilters) {
       setIndustry(snap.industryTiles);
       setCharts(snap.charts);
       setExecutive(snap.executive);
+      setSales(snap.sales);
+      setPerformance(snap.performance);
       setSource(snap.source);
       if (snap.owners.length) setOwners(snap.owners);
     })();
@@ -74,6 +92,8 @@ export function useCrmDashboardStats(filters: DashboardFilters) {
     industry,
     charts,
     executive,
+    sales,
+    performance,
     source,
     owners,
     loading,

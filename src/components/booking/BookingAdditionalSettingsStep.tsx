@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import Link from "next/link";
 import { Info, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +16,7 @@ export type AdditionalSettingsValues = {
   allowCancel: boolean;
   cancelExpire: number;
   cancelUnit: "Minutes" | "Hours" | "Days";
-  thirdPartyInvites: boolean;
+  calendarInvites: boolean;
   inviteNotes: string;
 };
 
@@ -28,7 +29,7 @@ export const DEFAULT_ADDITIONAL_SETTINGS: AdditionalSettingsValues = {
   allowCancel: true,
   cancelExpire: 0,
   cancelUnit: "Minutes",
-  thirdPartyInvites: true,
+  calendarInvites: true,
   inviteNotes:
     "Phone:- {{contact.phone}}\nEmail:- {{contact.email}}\n\nNeed to make a change to this event?\nReschedule:-",
 };
@@ -128,7 +129,8 @@ export function BookingAdditionalSettingsStep({
           Additional settings
         </h1>
         <p className="mt-1 text-[13px] text-slate-500">
-          Configure additional settings for your calendar.
+          Configure policies and how this consultation appears on the FinConnex
+          calendar.
         </p>
 
         <div className="mt-4">
@@ -219,18 +221,36 @@ export function BookingAdditionalSettingsStep({
 
       <section className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:px-7">
         <h2 className="text-[18px] font-bold text-slate-900">
-          Third-party calendar settings
+          FinConnex calendar
         </h2>
         <p className="mt-1 text-[13px] text-slate-500">
-          Set up your preferences for third-party calendars.
+          Bookings use the FinConnex calendar (Activities → Calendar). Google or
+          Outlook are optional sync only — they are not required to send invites.
         </p>
         <div className="mt-4">
           <SettingRow
-            title="Allow Google / Outlook / iCloud calendar to send invitation & update emails to attendees."
-            on={values.thirdPartyInvites}
-            onChange={(thirdPartyInvites) => patch({ thirdPartyInvites })}
+            title="Add booked consultations to the FinConnex calendar and include invite notes in confirmation emails."
+            info="Events show on the in-app calendar. Confirmation still includes an .ics file guests can add to Google or Outlook if they want."
+            on={values.calendarInvites}
+            onChange={(calendarInvites) => patch({ calendarInvites })}
           />
         </div>
+        <p className="mt-2 text-[12px] text-slate-500">
+          Optional two-way sync:{" "}
+          <Link
+            href="/settings/integrations/google-calendar"
+            className="font-semibold text-[#5A32A3] hover:underline"
+          >
+            Google Calendar
+          </Link>
+          {" · "}
+          <Link
+            href="/settings/integrations/outlook-calendar"
+            className="font-semibold text-[#5A32A3] hover:underline"
+          >
+            Outlook
+          </Link>
+        </p>
         <div className="mt-4">
           <p className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-slate-800">
             Meeting invite notes

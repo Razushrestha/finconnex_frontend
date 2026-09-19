@@ -4,11 +4,10 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-    FileText,
+  FileText,
   Receipt,
   Banknote,
   Package,
-  LayoutGrid,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,12 +19,6 @@ export const FINANCE_MODULE_NAV: {
   icon: LucideIcon;
   match?: "exact" | "prefix";
 }[] = [
-  {
-    href: "/finance",
-    label: "Hub",
-    icon: LayoutGrid,
-    match: "exact",
-  },
   {
     href: "/finance/estimates",
     label: "Estimates",

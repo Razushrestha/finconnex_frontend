@@ -17,9 +17,9 @@ function asSessionPayload(
   data: Record<string, unknown>,
   hasLocalFile: boolean,
 ) {
-  const documentUrl =
-    publicDocumentUrl(data) ||
-    (hasLocalFile ? publicSignDocumentPath(token) : null);
+  const documentUrl = hasLocalFile
+    ? publicSignDocumentPath(token)
+    : publicDocumentUrl(data) || null;
   return {
     ...data,
     documentUrl,

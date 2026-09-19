@@ -58,7 +58,7 @@ export function hrefForRecordType(type: string, id: string): string {
   if (key.includes("estimate")) return `/finance/estimates/${id}`;
   if (key.includes("invoice")) return `/finance/invoices/${id}`;
   if (key.includes("payment")) return `/finance/payments/${id}`;
-  if (key.includes("credit")) return `/finance/credit-notes/${id}`;
+  if (key.includes("credit")) return `/finance/invoices/${id}`;
   if (key.includes("product")) return `/finance/products`;
   if (key.includes("email")) return `/activities/emails/detail/${id}`;
   if (key.includes("note")) return `/activities/notes/detail/${id}`;

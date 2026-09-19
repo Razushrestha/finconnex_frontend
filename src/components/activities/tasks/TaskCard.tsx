@@ -29,8 +29,8 @@ import { useRouter } from "next/navigation";
 interface TaskCardProps {
   task: Task;
   columnId: string;
-  onDragStart: (e: React.DragEvent<HTMLDivElement>) => void;
-  onDragEnd: () => void;
+  onDragPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onDragClickCapture?: (e: React.MouseEvent) => void;
   isDragging: boolean;
   onChangeStatus?: (taskId: string, status: TaskStatus) => void;
   onChangePriority?: (taskId: string, priority: Priority) => void;
@@ -88,8 +88,8 @@ type OpenMenu = "status" | "priority" | null;
 export function TaskCard({
   task,
   columnId,
-  onDragStart,
-  onDragEnd,
+  onDragPointerDown,
+  onDragClickCapture,
   isDragging,
   onChangeStatus,
   onChangePriority,
@@ -137,16 +137,8 @@ export function TaskCard({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [openMenu]);
 
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-    wasDragging.current = true;
-    onDragStart(e);
-  };
-
-  const handleDragEnd = () => {
-    onDragEnd();
-    setTimeout(() => {
-      wasDragging.current = false;
-    }, 0);
+  const handleDragStart = (e: React.PointerEvent<HTMLDivElement>) => {
+    onDragPointerDown(e);
   };
 
   const markComplete = () => {
@@ -196,9 +188,10 @@ export function TaskCard({
   return (
     <>
     <div
-      draggable
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
+      draggable={false}
+      onPointerDown={handleDragStart}
+      onClickCapture={onDragClickCapture}
+      onDragStart={(e) => e.preventDefault()}
         role="button"
         tabIndex={0}
         onClick={(e) => {

@@ -486,6 +486,184 @@ export const ENDPOINT_CATALOG = [
   },
   {
     method: "GET",
+    path: "/workspaces/:workspaceId/booking/event-types",
+    module: "booking",
+    notes: "List native booking event types",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/booking/event-types",
+    module: "booking",
+    notes: "Create a booking event type",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/booking/event-types/:eventTypeId",
+    module: "booking",
+  },
+  {
+    method: "PATCH",
+    path: "/workspaces/:workspaceId/booking/event-types/:eventTypeId",
+    module: "booking",
+  },
+  {
+    method: "DELETE",
+    path: "/workspaces/:workspaceId/booking/event-types/:eventTypeId",
+    module: "booking",
+    notes: "Retire a booking event type",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/booking/event-types/:eventTypeId/hosts",
+    module: "booking",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/booking/event-types/:eventTypeId/available-slots",
+    module: "booking",
+    notes: "Bookable slots for an event type",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/booking/hosts",
+    module: "booking",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/booking/hosts",
+    module: "booking",
+    notes: "Make a workspace member bookable",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/booking/hosts/consultants",
+    module: "booking",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/booking/hosts/home-consultants",
+    module: "booking",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/booking/hosts/:hostId",
+    module: "booking",
+  },
+  {
+    method: "PATCH",
+    path: "/workspaces/:workspaceId/booking/hosts/:hostId",
+    module: "booking",
+  },
+  {
+    method: "DELETE",
+    path: "/workspaces/:workspaceId/booking/hosts/:hostId",
+    module: "booking",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/booking/hosts/:hostId/schedules",
+    module: "booking",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/booking/hosts/:hostId/schedules",
+    module: "booking",
+  },
+  {
+    method: "PATCH",
+    path: "/workspaces/:workspaceId/booking/hosts/schedules/:scheduleId",
+    module: "booking",
+  },
+  {
+    method: "DELETE",
+    path: "/workspaces/:workspaceId/booking/hosts/schedules/:scheduleId",
+    module: "booking",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/booking/hosts/schedules/:scheduleId/overrides",
+    module: "booking",
+  },
+  {
+    method: "DELETE",
+    path: "/workspaces/:workspaceId/booking/hosts/schedules/:scheduleId/overrides/:overrideId",
+    module: "booking",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/booking/bookings",
+    module: "booking",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/booking/bookings",
+    module: "booking",
+    notes: "Book a slot on behalf of a lead or contact",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/booking/bookings/summary",
+    module: "booking",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/booking/bookings/analytics",
+    module: "booking",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/booking/bookings/:bookingId",
+    module: "booking",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/booking/bookings/:bookingId/reschedule",
+    module: "booking",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/booking/bookings/:bookingId/cancel",
+    module: "booking",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/booking/bookings/:bookingId/no-show",
+    module: "booking",
+  },
+  {
+    method: "DELETE",
+    path: "/workspaces/:workspaceId/booking/bookings/:bookingId/no-show",
+    module: "booking",
+  },
+  {
+    method: "PATCH",
+    path: "/workspaces/:workspaceId/booking/bookings/:bookingId/crm-link",
+    module: "booking",
+    notes: "Link a booking to a CRM record",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/booking/links",
+    module: "booking",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/booking/links",
+    module: "booking",
+    notes: "Create a shareable scheduling link",
+  },
+  {
+    method: "PATCH",
+    path: "/workspaces/:workspaceId/booking/links/:linkId",
+    module: "booking",
+  },
+  {
+    method: "DELETE",
+    path: "/workspaces/:workspaceId/booking/links/:linkId",
+    module: "booking",
+  },
+  {
+    method: "GET",
     path: "/workspaces/:workspaceId/calendly/hosts",
     module: "calendly",
     notes: "List Calendly hosts and consultant mappings",
@@ -834,6 +1012,54 @@ export const ENDPOINT_CATALOG = [
   { method: "POST", path: "/reports/:id/template", module: "reports", notes: "Save as reusable template" },
   { method: "POST", path: "/reports/:id/email", module: "reports", notes: "Email report export" },
   { method: "POST", path: "/reports/:id/share", module: "reports", notes: "Share with team or role" },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/reports/:reportId/executions",
+    module: "reports",
+    notes: "List queued report runs",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/reports/:reportId/executions",
+    module: "reports",
+    notes: "Queue a report export run",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/report-executions/:executionId",
+    module: "reports",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/report-executions/:executionId/cancel",
+    module: "reports",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/report-executions/:executionId/download",
+    module: "reports",
+  },
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/reports/:reportId/schedules",
+    module: "reports",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/reports/:reportId/schedules",
+    module: "reports",
+    notes: "Create a DAILY/WEEKLY/MONTHLY schedule",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/reports/:reportId/schedules/:scheduleId/pause",
+    module: "reports",
+  },
+  {
+    method: "POST",
+    path: "/workspaces/:workspaceId/reports/:reportId/schedules/:scheduleId/resume",
+    module: "reports",
+  },
 
   // Calculator history (JWT)
   { method: "GET", path: "/calculations", module: "calculations", notes: "List saved calculator results" },
@@ -1127,6 +1353,19 @@ export const ENDPOINT_CATALOG = [
     path: "/workspaces/:workspaceId/preferences/tables/:tableKey",
     module: "table-preferences",
     notes: "Reset my table preference to safe defaults",
+  },
+
+  {
+    method: "GET",
+    path: "/workspaces/:workspaceId/preferences/kanban/leads",
+    module: "kanban-preferences",
+    notes: "Get my Lead Kanban card preference",
+  },
+  {
+    method: "PUT",
+    path: "/workspaces/:workspaceId/preferences/kanban/leads",
+    module: "kanban-preferences",
+    notes: "Replace my validated Lead Kanban card preference",
   },
 
   // CRM notifications inbox (JWT; workspace-scoped URL preferred when token has workspaceId)

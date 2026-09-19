@@ -55,8 +55,8 @@ interface LeadCardProps {
   card: LeadCardData;
   status: LeadStatus;
   isDragging: boolean;
-  onDragStart: (e: React.DragEvent<HTMLElement>) => void;
-  onDragEnd: () => void;
+  onDragPointerDown: (e: React.PointerEvent<HTMLElement>) => void;
+  onDragClickCapture?: (e: React.MouseEvent) => void;
   viewModel?: LeadCardViewModel;
   cardSettings?: LeadCardSettings;
   /** From Kanban Select Fields — which dynamic rows to show on the card. */
@@ -97,8 +97,8 @@ export function LeadCard({
   card,
   status,
   isDragging,
-  onDragStart,
-  onDragEnd,
+  onDragPointerDown,
+  onDragClickCapture,
   viewModel: viewModelProp,
   cardSettings,
   dynamicFieldKeys,
@@ -115,6 +115,17 @@ export function LeadCard({
   const nameId = useId();
   const dragMovedRef = useRef(false);
   const isMounted = useHasMounted();
+
+  useEffect(() => {
+    if (isDragging) {
+      dragMovedRef.current = true;
+      return;
+    }
+    const id = window.setTimeout(() => {
+      dragMovedRef.current = false;
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [isDragging]);
   const [selected, setSelected] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [customization, setCustomization] =
@@ -191,18 +202,17 @@ export function LeadCard({
   return (
     <>
       <article
-        draggable
-        onDragStart={(e) => {
-          dragMovedRef.current = true;
-          onDragStart(e);
+        draggable={false}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          const target = e.target as HTMLElement | null;
+          if (target?.closest("input, textarea, select, [data-no-drag]")) {
+            return;
+          }
+          onDragPointerDown(e);
         }}
-        onDragEnd={() => {
-          onDragEnd();
-          // Allow click again after a drag settles
-          window.setTimeout(() => {
-            dragMovedRef.current = false;
-          }, 0);
-        }}
+        onClickCapture={onDragClickCapture}
+        onDragStart={(e) => e.preventDefault()}
         onClick={openDetail}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -210,14 +220,13 @@ export function LeadCard({
             openDetail();
           }
         }}
-        role="link"
         tabIndex={0}
         data-focus-id={card.id}
         data-lead-id={card.id}
         aria-label={`Open ${vm.name}`}
         aria-labelledby={nameId}
         className={cn(
-          "group/card w-full shrink-0 cursor-pointer",
+          "group/card w-full shrink-0 cursor-grab touch-none select-none active:cursor-grabbing",
           entityCardShell,
           KANBAN_CARD,
           cardMotion,
@@ -244,6 +253,8 @@ export function LeadCard({
           <div className="relative flex shrink-0 items-center gap-1.5">
             <input
               type="checkbox"
+              data-no-drag
+              draggable={false}
               checked={isSelected}
               onChange={() => onToggleSelect(card.id)}
               onMouseDown={(e) => e.stopPropagation()}
@@ -329,15 +340,23 @@ export function LeadCard({
 
         {/* §5 Activity Summary — omit entirely when empty (§12) */}
         {summary.primary && summary.urgency && (
-          <button
-            type="button"
-            onMouseDown={(e) => e.stopPropagation()}
+          <div
+            role="button"
+            tabIndex={0}
             onClick={(e) => {
               e.stopPropagation();
+              if (dragMovedRef.current) return;
               onOpenActivitySummary?.();
             }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                onOpenActivitySummary?.();
+              }
+            }}
             className={cn(
-              "mb-1.5 w-full rounded-md px-2 py-1.5 text-left transition-colors",
+              "mb-1.5 w-full cursor-grab rounded-md px-2 py-1.5 text-left transition-colors",
               URGENCY_SURFACE[summary.urgency],
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1",
             )}
@@ -375,24 +394,32 @@ export function LeadCard({
               </span>
               {summary.dueLabel}
             </div>
-          </button>
+          </div>
         )}
 
         {/* §6 Last Activity — neutral / muted only */}
         {vm.lastActivity && (
-          <button
-            type="button"
-            onMouseDown={(e) => e.stopPropagation()}
+          <div
+            role="button"
+            tabIndex={0}
             onClick={(e) => {
               e.stopPropagation();
+              if (dragMovedRef.current) return;
               onOpenLastActivity?.();
             }}
-            className="mb-1.5 block w-full truncate text-left text-[10px] text-foreground/70 transition-colors hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-1"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                onOpenLastActivity?.();
+              }
+            }}
+            className="mb-1.5 block w-full cursor-grab truncate text-left text-[10px] text-foreground/70 transition-colors hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-offset-1"
             aria-label={`Last activity: ${vm.lastActivity.label}, ${isMounted ? vm.lastActivity.relativeTime : ""}. Open activity history.`}
             title={`${vm.lastActivity.label} · ${isMounted ? vm.lastActivity.relativeTime : ""}`}
           >
             Last activity {isMounted ? vm.lastActivity.relativeTime : "..."}
-          </button>
+          </div>
         )}
 
         <QuickActionsBar

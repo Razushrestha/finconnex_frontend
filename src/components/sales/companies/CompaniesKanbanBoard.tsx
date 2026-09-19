@@ -17,6 +17,11 @@ import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
 import { KanbanEmptyStage } from "@/components/common/KanbanEmptyStage";
 import { KanbanStageScroll } from "@/components/common/KanbanStageScroll";
 import { KanbanCollapsedRail } from "@/components/common/KanbanCollapsedRail";
+import { KanbanDragGhost } from "@/components/common/KanbanDragGhost";
+import {
+  usePointerKanbanDrag,
+  type PointerKanbanDrop,
+} from "@/lib/kanban/use-pointer-kanban-drag";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
@@ -31,16 +36,6 @@ import {
 } from "@/lib/layout";
 import { useRouter } from "next/navigation";
 import type { CompanyCardCustomizationSettings } from "@/components/sales/companies/CustomizeCompanyCardDrawer";
-
-interface DragInfo {
-  companyId: string;
-  sourceGroupId: string;
-}
-
-interface DropTargetPosition {
-  groupId: string;
-  targetIndex: number;
-}
 
 type CompanyRecord = CompanyGroup["companies"][number];
 
@@ -75,11 +70,6 @@ export function CompaniesKanbanBoard({
   const [groups, setGroups] = useState<CompanyGroup[]>(() =>
     listCompanyGroups(),
   );
-  const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
-  const [dropTargetPos, setDropTargetPos] = useState<DropTargetPosition | null>(
-    null,
-  );
-  const [overGroupId, setOverGroupId] = useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     () => new Set(),
   );
@@ -130,28 +120,6 @@ export function CompaniesKanbanBoard({
       }));
   }, [groups, filters, visibleColumnIds, sortValue, sortDirection]);
 
-  function visibleCompanyCount(group: CompanyGroup) {
-    if (dragInfo && dragInfo.sourceGroupId === group.id) {
-      return group.companies.length - 1;
-    }
-    return group.companies.length;
-  }
-
-  function handleDragStart(
-    e: React.DragEvent<HTMLDivElement>,
-    companyId: string,
-    groupId: string,
-  ) {
-    setDragInfo({ companyId, sourceGroupId: groupId });
-    e.dataTransfer.effectAllowed = "move";
-  }
-
-  function handleDragEnd() {
-    setDragInfo(null);
-    setDropTargetPos(null);
-    setOverGroupId(null);
-  }
-
   /** Shared move: pulls the company out of the source group, drops it into the target at targetIndex. */
   function moveCompany(
     company: CompanyRecord,
@@ -190,20 +158,17 @@ export function CompaniesKanbanBoard({
     );
   }
 
-  function handleDrop(targetGroupId: string, targetIndex?: number) {
-    setOverGroupId(null);
-    setDropTargetPos(null);
-    if (!dragInfo) return;
-    const { companyId, sourceGroupId } = dragInfo;
+  function commitDrop({
+    itemId,
+    sourceColumnId,
+    targetColumnId,
+    targetIndex,
+  }: PointerKanbanDrop) {
+    const sourceGroup = groups.find((g) => g.id === sourceColumnId);
+    const targetGroup = groups.find((g) => g.id === targetColumnId);
+    const company = sourceGroup?.companies.find((c) => c.id === itemId);
 
-    const sourceGroup = groups.find((g) => g.id === sourceGroupId);
-    const targetGroup = groups.find((g) => g.id === targetGroupId);
-    const company = sourceGroup?.companies.find((c) => c.id === companyId);
-
-    if (!company || !sourceGroup || !targetGroup) {
-      setDragInfo(null);
-      return;
-    }
+    if (!company || !sourceGroup || !targetGroup) return;
 
     const updatedCompany =
       sourceGroup.id === targetGroup.id
@@ -238,30 +203,21 @@ export function CompaniesKanbanBoard({
         },
       );
     }
-    setDragInfo(null);
   }
+
+  const drag = usePointerKanbanDrag({ onDrop: commitDrop });
 
   return (
     <div className="relative h-full w-full overflow-x-auto overflow-y-hidden bg-slate-50">
       <div className={KANBAN_BOARD_ROW}>
         {visibleGroups.map((group) => {
-          const isOver = overGroupId === group.id;
+          const isOver = drag.overColumnId === group.id;
           const isCollapsed = collapsedGroups.has(group.id);
 
           return (
             <div
               key={group.id}
-              onDragOver={(e) => {
-                e.preventDefault();
-                if (dragInfo) setOverGroupId(group.id);
-              }}
-              onDragLeave={() =>
-                setOverGroupId((prev) => (prev === group.id ? null : prev))
-              }
-              onDrop={(e) => {
-                e.preventDefault();
-                handleDrop(group.id);
-              }}
+              data-kanban-drop-column={group.id}
               className={cn(
                 "group/stage relative flex h-full min-h-0 flex-col gap-2 transition-all duration-200",
                 isCollapsed ? KANBAN_COL_COLLAPSED : KANBAN_COL,
@@ -302,6 +258,7 @@ export function CompaniesKanbanBoard({
                         }
                         onCollapse={() => toggleCollapsed(group.id)}
                         collapseLabel={`Collapse ${columnTitles?.[group.id] ?? group.title}`}
+                        inert={drag.isDragging}
                       />
                     }
                   >
@@ -314,41 +271,20 @@ export function CompaniesKanbanBoard({
                         : KANBAN_WELL,
                     )}
                   >
-                    <div
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        if (dragInfo) {
-                          setOverGroupId(group.id);
-                          if (
-                            !dropTargetPos ||
-                            dropTargetPos.groupId !== group.id
-                          ) {
-                            setDropTargetPos({
-                              groupId: group.id,
-                              targetIndex: visibleCompanyCount(group),
-                            });
-                          }
-                        }
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleDrop(group.id, dropTargetPos?.targetIndex);
-                      }}
-                      className="flex min-h-[180px] flex-1 flex-col gap-3 pb-8"
-                    >
+                    <div className="flex min-h-[180px] flex-1 flex-col gap-3 pb-8">
                       {(() => {
                         let visibleIndex = 0;
                         const rendered: React.ReactNode[] = [];
 
                         const showPlaceholderAt = (idx: number) =>
-                          dragInfo &&
-                          dropTargetPos?.groupId === group.id &&
-                          dropTargetPos.targetIndex === idx;
+                          drag.dragInfo &&
+                          drag.dropTargetPos?.columnId === group.id &&
+                          drag.dropTargetPos.targetIndex === idx;
 
                         group.companies.forEach((company) => {
-                          const isDraggedCompany =
-                            dragInfo?.companyId === company.id;
+                          const isDraggedCompany = drag.isDraggingItem(
+                            company.id,
+                          );
                           const myIndex = visibleIndex;
 
                           if (!isDraggedCompany && showPlaceholderAt(myIndex)) {
@@ -360,25 +296,16 @@ export function CompaniesKanbanBoard({
                             );
                           }
 
+                          const pointer = drag.cardPointerProps({
+                            id: company.id,
+                            columnId: group.id,
+                            name: company.name,
+                          });
+
                           rendered.push(
                             <div
                               key={company.id}
-                              onDragOver={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (!dragInfo || isDraggedCompany) return;
-
-                                const rect =
-                                  e.currentTarget.getBoundingClientRect();
-                                const midpoint = rect.top + rect.height / 2;
-                                const insertIndex =
-                                  e.clientY < midpoint ? myIndex : myIndex + 1;
-
-                                setDropTargetPos({
-                                  groupId: group.id,
-                                  targetIndex: insertIndex,
-                                });
-                              }}
+                              data-kanban-card-slot={company.id}
                             >
                               <CompanyCard
                                 company={company}
@@ -387,10 +314,8 @@ export function CompaniesKanbanBoard({
                                 onToggleSelect={() =>
                                   onToggleSelect?.(company.id)
                                 }
-                                onDragStart={(e) =>
-                                  handleDragStart(e, company.id, group.id)
-                                }
-                                onDragEnd={handleDragEnd}
+                                onDragPointerDown={pointer.onPointerDown}
+                                onDragClickCapture={pointer.onClickCapture}
                                 onQuickAction={(kind) =>
                                   onQuickAction?.(kind, company)
                                 }
@@ -437,6 +362,7 @@ export function CompaniesKanbanBoard({
           </div>
         )}
       </div>
+      <KanbanDragGhost ghost={drag.ghost} />
     </div>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronRight } from "lucide-react";
 import { emptyContactGroups, type ContactGroup, type ContactStatus } from "@/lib/contacts/types";
 import {
   listContactGroups,
@@ -22,6 +21,13 @@ import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
 import { KanbanEmptyStage } from "@/components/common/KanbanEmptyStage";
 import { KanbanStageScroll } from "@/components/common/KanbanStageScroll";
 import { KanbanCollapsedRail } from "@/components/common/KanbanCollapsedRail";
+import { KanbanDragGhost } from "@/components/common/KanbanDragGhost";
+import {
+  KANBAN_CARD_SLOT_ATTR,
+  KANBAN_DROP_COLUMN_ATTR,
+  usePointerKanbanDrag,
+  type PointerKanbanDrop,
+} from "@/lib/kanban/use-pointer-kanban-drag";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
@@ -36,16 +42,6 @@ import {
 } from "@/lib/layout";
 import { useRouter } from "next/navigation";
 import { notify } from "@/lib/notify/toast";
-
-interface DragInfo {
-  contactId: string;
-  sourceGroupId: string;
-}
-
-interface DropTargetPosition {
-  groupId: string;
-  targetIndex: number;
-}
 
 type ContactRecord = ContactGroup["contacts"][number];
 
@@ -73,11 +69,6 @@ export function ContactsKanbanBoard({
   const router = useRouter();
 
   const [groups, setGroups] = useState<ContactGroup[]>(() => emptyContactGroups());
-  const [dragInfo, setDragInfo] = useState<DragInfo | null>(null);
-  const [dropTargetPos, setDropTargetPos] = useState<DropTargetPosition | null>(
-    null,
-  );
-  const [overGroupId, setOverGroupId] = useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
     () => new Set(),
   );
@@ -126,28 +117,6 @@ export function ContactsKanbanBoard({
       }));
   }, [groups, filters, visibleColumnIds]);
 
-  function visibleContactCount(group: ContactGroup) {
-    if (dragInfo && dragInfo.sourceGroupId === group.id) {
-      return group.contacts.length - 1;
-    }
-    return group.contacts.length;
-  }
-
-  function handleDragStart(
-    e: React.DragEvent<HTMLDivElement>,
-    contactId: string,
-    groupId: string,
-  ) {
-    setDragInfo({ contactId, sourceGroupId: groupId });
-    e.dataTransfer.effectAllowed = "move";
-  }
-
-  function handleDragEnd() {
-    setDragInfo(null);
-    setDropTargetPos(null);
-    setOverGroupId(null);
-  }
-
   /** Shared move: pulls the contact out of the source group, drops it into the target at targetIndex. */
   function moveContact(
     contact: ContactRecord,
@@ -185,20 +154,17 @@ export function ContactsKanbanBoard({
     );
   }
 
-  function handleDrop(targetGroupId: string, targetIndex?: number) {
-    setOverGroupId(null);
-    setDropTargetPos(null);
-    if (!dragInfo) return;
-    const { contactId, sourceGroupId } = dragInfo;
+  function commitDrop({
+    itemId,
+    sourceColumnId,
+    targetColumnId,
+    targetIndex,
+  }: PointerKanbanDrop) {
+    const sourceGroup = groups.find((g) => g.id === sourceColumnId);
+    const targetGroup = groups.find((g) => g.id === targetColumnId);
+    const contact = sourceGroup?.contacts.find((c) => c.id === itemId);
 
-    const sourceGroup = groups.find((g) => g.id === sourceGroupId);
-    const targetGroup = groups.find((g) => g.id === targetGroupId);
-    const contact = sourceGroup?.contacts.find((c) => c.id === contactId);
-
-    if (!contact || !sourceGroup || !targetGroup) {
-      setDragInfo(null);
-      return;
-    }
+    if (!contact || !sourceGroup || !targetGroup) return;
 
     const updatedContact =
       sourceGroup.id === targetGroup.id
@@ -216,30 +182,21 @@ export function ContactsKanbanBoard({
       });
       flash(`${contact.name} moved to ${targetGroup.title}`);
     }
-    setDragInfo(null);
   }
+
+  const drag = usePointerKanbanDrag({ onDrop: commitDrop });
 
   return (
     <div className="relative h-full w-full overflow-x-auto overflow-y-hidden bg-slate-50">
       <div className={KANBAN_BOARD_ROW}>
         {visibleGroups.map((group) => {
-          const isOver = overGroupId === group.id;
+          const isOver = drag.overColumnId === group.id;
           const isCollapsed = collapsedGroups.has(group.id);
 
           return (
             <div
               key={group.id}
-              onDragOver={(e) => {
-                e.preventDefault();
-                if (dragInfo) setOverGroupId(group.id);
-              }}
-              onDragLeave={() =>
-                setOverGroupId((prev) => (prev === group.id ? null : prev))
-              }
-              onDrop={(e) => {
-                e.preventDefault();
-                handleDrop(group.id);
-              }}
+              {...{ [KANBAN_DROP_COLUMN_ATTR]: group.id }}
               className={cn(
                 "group/stage relative flex h-full min-h-0 flex-col gap-2 transition-all duration-200",
                 isCollapsed ? KANBAN_COL_COLLAPSED : KANBAN_COL,
@@ -281,6 +238,7 @@ export function ContactsKanbanBoard({
                         }
                         onCollapse={() => toggleCollapsed(group.id)}
                         collapseLabel={`Collapse ${columnTitles?.[group.id] ?? group.title}`}
+                        inert={drag.isDragging}
                       />
                     }
                   >
@@ -293,41 +251,20 @@ export function ContactsKanbanBoard({
                         : KANBAN_WELL,
                     )}
                   >
-                    <div
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        if (dragInfo) {
-                          setOverGroupId(group.id);
-                          if (
-                            !dropTargetPos ||
-                            dropTargetPos.groupId !== group.id
-                          ) {
-                            setDropTargetPos({
-                              groupId: group.id,
-                              targetIndex: visibleContactCount(group),
-                            });
-                          }
-                        }
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleDrop(group.id, dropTargetPos?.targetIndex);
-                      }}
-                      className="flex min-h-[180px] flex-1 flex-col gap-3 pb-8"
-                    >
+                    <div className="flex min-h-[180px] flex-1 flex-col gap-3 pb-8">
                       {(() => {
                         let visibleIndex = 0;
                         const rendered: React.ReactNode[] = [];
 
                         const showPlaceholderAt = (idx: number) =>
-                          dragInfo &&
-                          dropTargetPos?.groupId === group.id &&
-                          dropTargetPos.targetIndex === idx;
+                          drag.dragInfo &&
+                          drag.dropTargetPos?.columnId === group.id &&
+                          drag.dropTargetPos.targetIndex === idx;
 
                         group.contacts.forEach((contact) => {
-                          const isDraggedContact =
-                            dragInfo?.contactId === contact.id;
+                          const isDraggedContact = drag.isDraggingItem(
+                            contact.id,
+                          );
                           const myIndex = visibleIndex;
 
                           if (!isDraggedContact && showPlaceholderAt(myIndex)) {
@@ -339,33 +276,22 @@ export function ContactsKanbanBoard({
                             );
                           }
 
+                          const pointer = drag.cardPointerProps({
+                            id: contact.id,
+                            columnId: group.id,
+                            name: contact.name,
+                          });
+
                           rendered.push(
                             <div
                               key={contact.id}
-                              onDragOver={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (!dragInfo || isDraggedContact) return;
-
-                                const rect =
-                                  e.currentTarget.getBoundingClientRect();
-                                const midpoint = rect.top + rect.height / 2;
-                                const insertIndex =
-                                  e.clientY < midpoint ? myIndex : myIndex + 1;
-
-                                setDropTargetPos({
-                                  groupId: group.id,
-                                  targetIndex: insertIndex,
-                                });
-                              }}
+                              {...{ [KANBAN_CARD_SLOT_ATTR]: contact.id }}
                             >
                               <ContactRecordCard
                                 contact={contact}
                                 isDragging={isDraggedContact}
-                                onDragStart={(e) =>
-                                  handleDragStart(e, contact.id, group.id)
-                                }
-                                onDragEnd={handleDragEnd}
+                                onDragPointerDown={pointer.onPointerDown}
+                                onDragClickCapture={pointer.onClickCapture}
                                 onQuickAction={(kind: ContactQuickActionKind) => {
                                   if (kind === "call") {
                                     void import("@/lib/softphone/events").then(
@@ -433,6 +359,8 @@ export function ContactsKanbanBoard({
           </div>
         )}
       </div>
+
+      <KanbanDragGhost ghost={drag.ghost} />
 
       <ContactCardPanelHost
         panel={panel}

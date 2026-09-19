@@ -19,13 +19,11 @@ interface EmailsKanbanColumnProps {
   draggingEmailId: string | null;
   dropTargetPos: DropTargetPos | null;
   setDropTargetPos: React.Dispatch<React.SetStateAction<DropTargetPos | null>>;
-  onDragStartEmail: (
-    e: React.DragEvent<HTMLDivElement>,
-    emailId: string,
-    columnId: string,
+  onCardPointerDown: (
+    e: React.PointerEvent<HTMLElement>,
+    item: { id: string; columnId: string; name: string },
   ) => void;
-  onDragEndEmail: () => void;
-  onDropEmail: (targetColumnId: string, targetIndex?: number) => void;
+  onDragClickCapture?: (e: React.MouseEvent) => void;
 }
 
 export function EmailsKanbanColumn({
@@ -33,9 +31,8 @@ export function EmailsKanbanColumn({
   draggingEmailId,
   dropTargetPos,
   setDropTargetPos,
-  onDragStartEmail,
-  onDragEndEmail,
-  onDropEmail,
+  onCardPointerDown,
+  onDragClickCapture,
 }: EmailsKanbanColumnProps) {
   const router = useRouter();
   const [isOver, setIsOver] = useState(false);
@@ -76,7 +73,10 @@ export function EmailsKanbanColumn({
   }
 
   return (
-    <div className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}>
+    <div
+      data-kanban-drop-column={column.id}
+      className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}
+    >
       {/* Separate Header Box */}
       <div
         className={cn("mb-2 shrink-0", KANBAN_HEADER)}
@@ -122,7 +122,6 @@ export function EmailsKanbanColumn({
         onDrop={(e) => {
           e.preventDefault();
           setIsOver(false);
-          onDropEmail(column.id, dropTargetPos?.targetIndex);
         }}
         className={cn(
           "flex min-h-full flex-col rounded-sm border border-transparent p-2",
@@ -149,15 +148,19 @@ export function EmailsKanbanColumn({
                   <div className={KANBAN_DROP_GHOST} />
                 )}
 
-                <div data-email-card>
+                <div data-email-card data-kanban-card-slot={email.id}>
                   <EmailCard
                     email={email}
                     columnId={column.id}
                     isDragging={draggingEmailId === email.id}
-                    onDragStart={(e) =>
-                      onDragStartEmail(e, email.id, column.id)
+                    onDragPointerDown={(e) =>
+                      onCardPointerDown(e, {
+                        id: email.id,
+                        columnId: column.id,
+                        name: email.subject,
+                      })
                     }
-                    onDragEnd={onDragEndEmail}
+                    onDragClickCapture={onDragClickCapture}
                   />
                 </div>
 
