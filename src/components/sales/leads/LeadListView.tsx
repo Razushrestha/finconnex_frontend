@@ -51,6 +51,7 @@ import {
   ManageColumnsModal,
   type ManageColumn,
 } from "@/components/work-queue/ManageColumnsModal";
+import { notify } from "@/lib/notify/toast";
 
 interface LeadListViewProps {
   columns?: KanbanColumn[];
@@ -350,7 +351,6 @@ export function LeadListView({
   );
   const [revision, setRevision] = useState(0);
   const [panel, setPanel] = useState<LeadPanelState | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [internalPageSize, setInternalPageSize] = useState<number>(10);
   const [manageColumnsOpen, setManageColumnsOpen] = useState(false);
@@ -474,8 +474,7 @@ export function LeadListView({
   }
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2400);
+    notify(msg);
   }
 
   return (
@@ -600,11 +599,6 @@ export function LeadListView({
         }}
       />
 
-      {toast && (
-        <div className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

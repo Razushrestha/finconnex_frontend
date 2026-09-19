@@ -47,6 +47,7 @@ import {
   persistRemoteTicket,
   tryCrmTicket,
 } from "@/lib/support/api";
+import { toast } from "@/lib/notify/toast";
 
 interface Props {
   layoutId: string;
@@ -79,7 +80,7 @@ export function CreateTicketForm({ layoutId: _l, redirect: _r }: Props) {
     if (!validate()) return;
     const gate = requireAction("support.tickets.create");
     if (!gate.ok) {
-      window.alert(gate.message);
+      toast.error(gate.message);
       return;
     }
     const ids = nextTicketIds();

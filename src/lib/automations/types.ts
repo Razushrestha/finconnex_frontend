@@ -264,7 +264,7 @@ export const ACTION_CATALOG: Record<
   DELETE_LEAD: { label: "Delete Lead", category: "Records", icon: "user-minus" },
   CREATE_CONTACT: { label: "Create Contact", category: "Records", icon: "user-plus" },
   DELETE_CONTACT: { label: "Delete Contact", category: "Records", icon: "user-minus" },
-  CREATE_COMPANY: { label: "Create Organization", category: "Records", icon: "building" },
+  CREATE_COMPANY: { label: "Create Company", category: "Records", icon: "building" },
   DELETE_COMPANY: { label: "Delete Organization", category: "Records", icon: "building" },
   CREATE_DEAL: { label: "Create Deal", category: "Records", icon: "circle-dollar-sign" },
   DELETE_DEAL: { label: "Delete Deal", category: "Records", icon: "circle-dollar-sign" },
@@ -506,23 +506,27 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: ["url"],
   },
   CREATE_LEAD: {
-    allowed: ["firstName", "lastName", "email", "phone", "mobilePhone", "jobTitle", "department", "linkedinUrl", "websiteUrl", "twitterUrl", "street", "city", "state", "country", "postalCode", "companyId", "companyName", "companyWebsite", "industry", "companySize", "pipelineStage", "tags", "source", "lifecycleStage", "score", "rating", "doNotContact", "productInterest", "budgetRange", "estimatedValue", "currency", "probability", "expectedCloseDate", "description", "notes", "ownerId", "avatarKey"],
-    required: ["firstName", "lastName", "email"],
+    // The Create Lead form's shape (name + contact) first; the explicit
+    // firstName/lastName/email keys remain for steps saved before it.
+    allowed: ["name", "contactId", "secondaryContactId", "followerIds", "loanPurpose", "firstName", "lastName", "email", "phone", "mobilePhone", "jobTitle", "department", "linkedinUrl", "websiteUrl", "twitterUrl", "street", "city", "state", "country", "postalCode", "companyId", "companyName", "companyWebsite", "industry", "companySize", "pipelineStage", "tags", "source", "lifecycleStage", "score", "rating", "doNotContact", "productInterest", "budgetRange", "estimatedValue", "currency", "probability", "expectedCloseDate", "description", "notes", "ownerId", "avatarKey"],
+    // Either `name` or firstName/lastName/email — the step form checks which.
+    required: [],
   },
   DELETE_LEAD: {
     allowed: ["recordId"],
     required: [],
   },
   CREATE_CONTACT: {
-    allowed: ["firstName", "lastName", "email", "phone", "mobilePhone", "jobTitle", "department", "linkedinUrl", "lifecycleStage", "source", "doNotContact", "notes", "companyId", "ownerId", "avatarKey"],
-    required: ["email"],
+    allowed: ["firstName", "lastName", "email", "phone", "mobilePhone", "jobTitle", "department", "linkedinUrl", "lifecycleStage", "source", "doNotContact", "notes", "companyId", "ownerId", "avatarKey", "status", "copyFromTrigger"],
+    // `email`, unless copied from the trigger lead — the step form checks which.
+    required: [],
   },
   DELETE_CONTACT: {
     allowed: ["recordId"],
     required: [],
   },
   CREATE_COMPANY: {
-    allowed: ["name", "website", "industry", "size", "employeeCount", "annualRevenue", "description", "street", "city", "state", "country", "postalCode", "linkedinUrl", "twitterUrl", "phone", "parentId", "ownerId"],
+    allowed: ["name", "website", "industry", "size", "employeeCount", "annualRevenue", "description", "street", "city", "state", "country", "postalCode", "linkedinUrl", "twitterUrl", "phone", "parentId", "ownerId", "status"],
     required: ["name"],
   },
   DELETE_COMPANY: {
@@ -530,7 +534,7 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: [],
   },
   CREATE_DEAL: {
-    allowed: ["name", "stage", "value", "currency", "probability", "expectedCloseDate", "source", "description", "lostReason", "competitor", "pipeline", "companyId", "ownerId"],
+    allowed: ["name", "stage", "value", "currency", "probability", "expectedCloseDate", "source", "description", "lostReason", "competitor", "pipeline", "companyId", "ownerId", "contactId", "contactFromTrigger", "expectedCloseInMs"],
     required: ["name"],
   },
   DELETE_DEAL: {
@@ -574,8 +578,9 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: ["toPhone", "body"],
   },
   REQUEST_DOCUMENTS: {
-    allowed: ["title", "documentType", "requestedFromId", "dueDate", "notes", "relatedType", "leadId", "contactId", "companyId", "dealId"],
-    required: ["title", "documentType", "requestedFromId"],
+    allowed: ["title", "documentType", "requestedFromId", "dueDate", "notes", "relatedType", "leadId", "contactId", "companyId", "dealId", "requestedFromTrigger", "dueInMs", "requestedById", "items"],
+    // `requestedFromId` unless `requestedFromTrigger` — the step form checks which.
+    required: ["title"],
   },
   UPDATE_DOCUMENT_STATUS: {
     allowed: ["status"],

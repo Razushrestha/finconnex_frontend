@@ -34,6 +34,7 @@ import { ThemeModeToggle } from "@/components/layout/ThemeModeToggle";
 import { uploadCrmStorageFile, type CrmStorageObject } from "@/lib/storage/api";
 import { loadSignature, saveSignature } from "@/lib/emails/signature";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 export function SettingsFormClient({
   categorySlug,
@@ -60,7 +61,6 @@ export function SettingsFormClient({
   const [values, setValues] = useState<SettingsValues>(() =>
     defaultsFromSchema(schema),
   );
-  const [toast, setToast] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -99,8 +99,7 @@ export function SettingsFormClient({
   function onCancel() {
     crm.setPreviewBrand(null);
     setValues(hydrateSettingsForm(schema, schemaKey, crm, memberPrefs.preferences));
-    setToast("Reverted to last saved");
-    window.setTimeout(() => setToast(null), 1800);
+    notify("Reverted to last saved");
   }
 
   async function onSave() {
@@ -147,20 +146,18 @@ export function SettingsFormClient({
                 crm.settings?.revision,
               );
         crm.setSettings(patched);
-        setToast("Saved to CRM");
+        notify("Saved to CRM");
       } catch (err) {
-        setToast(
+        notify(
           err instanceof Error ? err.message : "CRM rejected these settings",
         );
         setSaving(false);
-        window.setTimeout(() => setToast(null), 2800);
         return;
       }
     } else {
-      setToast(memberPrefs.source === "api" ? "Saved to CRM" : "Saved");
+      notify(memberPrefs.source === "api" ? "Saved to CRM" : "Saved");
     }
     setSaving(false);
-    window.setTimeout(() => setToast(null), 1800);
   }
 
   return (
@@ -249,18 +246,6 @@ export function SettingsFormClient({
       </div>
 
       <div className="space-y-2 border-t border-slate-100 bg-slate-50/95 px-5 py-4">
-        {toast ? (
-          <p
-            className={cn(
-              "text-[12px] font-medium",
-              /reject|fail|error|forbidden|permission|conflict/i.test(toast)
-                ? "text-rose-600"
-                : "text-emerald-700",
-            )}
-          >
-            {toast}
-          </p>
-        ) : null}
         <div className="flex justify-end gap-2">
           <button
             type="button"

@@ -24,6 +24,7 @@ import {
 } from "@/lib/settings/api";
 import { useCrmSettings } from "@/lib/settings/use-crm-settings";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 export function LeadCardSettingsClient() {
   useCrmCustomFields();
@@ -31,7 +32,6 @@ export function LeadCardSettingsClient() {
   const [settings, setSettings] = useState<LeadCardSettings>(() =>
     loadLeadCardSettings(),
   );
-  const [toast, setToast] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [fieldOptionsTick, setFieldOptionsTick] = useState(0);
 
@@ -57,8 +57,7 @@ export function LeadCardSettingsClient() {
   }, [fieldOptionsTick]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 1800);
+    notify(msg);
   }
 
   function toggleField(key: LeadCardFieldKey) {
@@ -314,14 +313,6 @@ export function LeadCardSettingsClient() {
         </button>
       </div>
 
-      {toast && (
-        <div
-          className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg"
-          role="status"
-        >
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

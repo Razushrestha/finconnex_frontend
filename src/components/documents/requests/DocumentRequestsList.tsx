@@ -47,6 +47,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import { EditRemindersModal } from "@/components/documents/requests/EditRemindersModal";
+import { notify } from "@/lib/notify/toast";
 
 const AVATAR_SOLID = [
   "bg-violet-500",
@@ -506,7 +507,6 @@ export function DocumentRequestsList({
   columnChrome = true,
 }: DocumentRequestsListProps) {
   const router = useRouter();
-  const [toast, setToast] = useState<string | null>(null);
   const [localSort, setLocalSort] = useState<DocumentSortKey>(
     sortProp ?? "updated-desc",
   );
@@ -524,8 +524,7 @@ export function DocumentRequestsList({
   const visible = limit ? sorted.slice(0, limit) : sorted;
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2800);
+    notify(msg);
   }
   const allSelected = visible.length > 0 && selectedIds.length === visible.length;
 
@@ -768,11 +767,6 @@ export function DocumentRequestsList({
       ) : (
         table
       )}
-      {toast ? (
-        <div className="fixed right-4 bottom-4 z-50 rounded-xl bg-emerald-700 px-4 py-2.5 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
     </div>
   );
 }

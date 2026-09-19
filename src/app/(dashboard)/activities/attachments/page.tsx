@@ -35,6 +35,7 @@ import { FocusHighlight } from "@/components/shared/FocusHighlight";
 import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
 import { defaultActorName } from "@/lib/rules/actor";
+import { notify } from "@/lib/notify/toast";
 
 /** "Lead: Jane Doe" -> "Jane Doe" */
 export function clientNameFromRelatedTo(relatedTo?: string): string {
@@ -98,15 +99,13 @@ export default function AttachmentsPage() {
   );
   const [relatedKind, setRelatedKind] = useState("Lead");
   const [notes, setNotes] = useState("");
-  const [toast, setToast] = useState<string | null>(null);
 
   function refresh() {
     setItems(listAttachments());
   }
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2000);
+    notify(msg);
   }
 
   const folders = useMemo((): ClientFolder[] => {
@@ -549,14 +548,6 @@ export default function AttachmentsPage() {
         </div>
       )}
 
-      {toast && (
-        <div
-          className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg"
-          role="status"
-        >
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

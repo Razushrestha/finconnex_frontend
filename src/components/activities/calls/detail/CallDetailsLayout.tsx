@@ -1,6 +1,6 @@
 "use client";
 
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import type { Call, CallFollowUp, CallStatus, CallType } from "@/lib/calls/types";
 import type { TaskReminder } from "@/lib/tasks/types";
 import {

@@ -11,6 +11,7 @@ import {
   type Weekday,
 } from "@/lib/ticket-sla/types";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 const PRIORITY_LABEL: Record<TicketPriorityCode, string> = {
   CRITICAL: "Critical",
@@ -37,11 +38,9 @@ export function TicketSlaSettingsClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
 
   function flash(message: string) {
-    setToast(message);
-    window.setTimeout(() => setToast(null), 2400);
+    notify(message);
   }
 
   async function load() {
@@ -400,11 +399,6 @@ export function TicketSlaSettingsClient() {
         )}
       </div>
 
-      {toast ? (
-        <div className="fixed right-4 bottom-4 rounded-lg bg-slate-900 px-4 py-2 text-[12px] font-semibold text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
     </div>
   );
 }

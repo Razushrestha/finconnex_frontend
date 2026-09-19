@@ -15,7 +15,7 @@ import {
   saveSettingsValues,
   type SettingsValues,
 } from "@/lib/settings/settings-store";
-import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 export function CrmPicklistSettingsClient({
   spec,
@@ -28,7 +28,6 @@ export function CrmPicklistSettingsClient({
   const [preferredDefault, setPreferredDefault] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     const local = loadSettingsValues(pageKey);
@@ -58,15 +57,14 @@ export function CrmPicklistSettingsClient({
           crm.settings?.revision,
         );
         crm.setSettings(patched);
-        setToast("Saved to CRM");
+        notify("Saved to CRM");
       } else {
-        setToast("Saved on this device");
+        notify("Saved on this device");
       }
     } catch (err) {
-      setToast(err instanceof Error ? err.message : "Could not save");
+      notify(err instanceof Error ? err.message : "Could not save");
     }
     setSaving(false);
-    window.setTimeout(() => setToast(null), 2200);
   }
 
   return (
@@ -154,18 +152,6 @@ export function CrmPicklistSettingsClient({
       </div>
 
       <div className="flex items-center justify-end gap-2 border-t border-slate-100 px-5 py-3 sm:px-6">
-        {toast ? (
-          <p
-            className={cn(
-              "mr-auto text-[12px] font-medium",
-              /could not|reject|fail|error/i.test(toast)
-                ? "text-rose-600"
-                : "text-emerald-700",
-            )}
-          >
-            {toast}
-          </p>
-        ) : null}
         <button
           type="button"
           onClick={() => void onSave()}

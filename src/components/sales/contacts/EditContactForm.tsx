@@ -31,6 +31,7 @@ import {
   elevatedInputClass,
   elevatedSelectClass,
 } from "@/components/sales/CreateEntityForm";
+import { toast } from "@/lib/notify/toast";
 
 interface FormState {
   firstName: string;
@@ -149,7 +150,7 @@ export function EditContactForm({ contactId }: { contactId: string }) {
     if (!validate(form)) return;
     const gate = requireAction("sales.contacts.edit");
     if (!gate.ok) {
-      window.alert(gate.message);
+      toast.error(gate.message);
       return;
     }
     const name = `${form.firstName.trim()} ${form.lastName.trim()}`.trim();
@@ -172,7 +173,7 @@ export function EditContactForm({ contactId }: { contactId: string }) {
       notes: form.notes || undefined,
     });
     if (!updated) {
-      window.alert("Could not save contact.");
+      toast.error("Could not save contact.");
       return;
     }
     logEdit("sales.contacts", form.owner, contactId, name, [

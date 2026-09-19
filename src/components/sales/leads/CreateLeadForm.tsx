@@ -55,6 +55,7 @@ import {
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { toast } from "@/lib/notify/toast";
 
 interface CreateLeadFormProps {
   layoutId?: string;
@@ -294,7 +295,7 @@ export function CreateLeadForm({
     if (!validate()) return;
     const gate = requireAction("sales.leads.create");
     if (!gate.ok) {
-      window.alert(gate.message);
+      toast.error(gate.message);
       return;
     }
     const primary = form.contacts[0];

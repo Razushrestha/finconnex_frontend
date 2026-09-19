@@ -3,6 +3,7 @@
 import { CalendarClock, Mail, MessageSquare, Repeat, UserRound } from "lucide-react";
 import type { RequestDocItem } from "@/lib/documents/requests/catalog";
 import type { RequestNotifyMethod } from "@/components/documents/requests/RequestScheduleCard";
+import { cn } from "@/lib/utils";
 
 export interface ReviewDocGroup {
   applicant: string;
@@ -45,6 +46,7 @@ export function RequestQuickReview({
   notifyBy,
   notes,
   onNotesChange,
+  compact = false,
 }: {
   clientName: string;
   sendOnBehalfOf: string;
@@ -57,11 +59,18 @@ export function RequestQuickReview({
   notifyBy: RequestNotifyMethod[];
   notes: string;
   onNotesChange: (value: string) => void;
+  /** Narrow layout for a sidebar: its breakpoints follow the screen, not the panel. */
+  compact?: boolean;
 }) {
   const total = groups.reduce((sum, group) => sum + group.items.length, 0);
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl bg-white p-5 shadow-[0_8px_30px_rgba(90,50,163,0.08)] sm:p-6">
+    <section
+      className={cn(
+        "flex min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl bg-white",
+        compact ? "p-3" : "p-5 shadow-[0_8px_30px_rgba(90,50,163,0.08)] sm:p-6",
+      )}
+    >
       <h2 className="shrink-0 text-[20px] font-bold tracking-tight text-slate-900">
         Quick review
       </h2>
@@ -84,7 +93,12 @@ export function RequestQuickReview({
         edit it.
       </p>
 
-      <div className="mt-4 grid shrink-0 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      <div
+        className={cn(
+          "mt-4 grid shrink-0 gap-2",
+          compact ? "grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-3",
+        )}
+      >
         <ReviewRow label="Client" value={clientName} icon={UserRound} />
         <ReviewRow
           label="Send on behalf of"
@@ -124,7 +138,7 @@ export function RequestQuickReview({
         </div>
 
         <div className="mt-2">
-          <div className="grid grid-cols-1 content-start gap-3 md:grid-cols-2">
+          <div className={cn("grid grid-cols-1 content-start gap-3", !compact && "md:grid-cols-2")}>
             {groups.map((group) => (
               <div
                 key={group.applicant}

@@ -34,6 +34,7 @@ import { sendSmsDemoLive } from "@/lib/comms/send-gateway";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
+import { notify, toast } from "@/lib/notify/toast";
 
 const STATUS_STYLE: Record<SmsCampaignStatus, string> = {
   Draft: "bg-slate-100 text-slate-600",
@@ -47,7 +48,6 @@ const STATUS_STYLE: Record<SmsCampaignStatus, string> = {
 export function SmsCampaignDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const [campaign, setCampaign] = useState<SmsCampaign | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
@@ -55,8 +55,7 @@ export function SmsCampaignDetailClient({ id }: { id: string }) {
   }, [id]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2600);
+    notify(msg);
   }
 
   function save(next: SmsCampaign, msg?: string) {
@@ -376,7 +375,7 @@ export function SmsCampaignDetailClient({ id }: { id: string }) {
                       snapshot: campaign,
                     });
                     if (!gate.ok) {
-                      window.alert(gate.message);
+                      toast.error(gate.message);
                       return;
                     }
                     deleteSmsCampaign(campaign.id);
@@ -436,11 +435,6 @@ export function SmsCampaignDetailClient({ id }: { id: string }) {
         </div>
       ) : null}
 
-      {toast ? (
-        <div className="fixed right-4 bottom-4 z-50 rounded-xl bg-slate-900 px-4 py-2.5 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
     </div>
   );
 }

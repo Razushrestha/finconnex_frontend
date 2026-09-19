@@ -43,7 +43,7 @@ import {
   LeadBoardMassActionDialog,
   type LeadMassAction,
 } from "@/components/sales/leads/LeadBoardMassActionDialog";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import {
   Sparkles,
   ArrowLeftRight,

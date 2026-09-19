@@ -24,6 +24,7 @@ import {
 import { RecordDetailModal } from "@/components/shared/RecordDetailModal";
 import { onRulesChange } from "@/lib/rules";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
+import { notify } from "@/lib/notify/toast";
 
 const statusStyles: Record<MessageStatus, string> = {
   Draft: "bg-slate-100 text-slate-600",
@@ -50,7 +51,6 @@ export function MessagesListTable({ data }: MessagesListTableProps) {
   const [detail, setDetail] = useState<Message | null>(null);
   const [rows, setRows] = useState(() => data ?? listMessages());
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     setRows(data ?? listMessages());
@@ -78,8 +78,7 @@ export function MessagesListTable({ data }: MessagesListTableProps) {
   }, [detail?.id]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2600);
+    notify(msg);
   }
 
   async function runAction(
@@ -156,11 +155,6 @@ export function MessagesListTable({ data }: MessagesListTableProps) {
 
   return (
     <div className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-200 bg-white">
-      {toast ? (
-        <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
       <ResizableColumns
         storageKey="messages-list"
         className="min-h-0 flex-1 overflow-auto"

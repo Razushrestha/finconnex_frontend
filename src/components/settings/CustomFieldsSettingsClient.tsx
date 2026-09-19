@@ -30,11 +30,11 @@ import {
 import { useCrmCustomFields } from "@/lib/custom-fields/use-crm-custom-fields";
 import { newRulesId } from "@/lib/rules/storage";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 export function CustomFieldsSettingsClient() {
   const crm = useCrmCustomFields();
   const [fields, setFields] = useState<CustomFieldDef[]>([]);
-  const [toast, setToast] = useState<string | null>(null);
   const [entityFilter, setEntityFilter] =
     useState<CustomFieldEntity | "All">("Lead");
   const [busy, setBusy] = useState(false);
@@ -58,8 +58,7 @@ export function CustomFieldsSettingsClient() {
   }, []);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2200);
+    notify(msg);
   }
 
   function refreshLocal() {
@@ -469,14 +468,6 @@ export function CustomFieldsSettingsClient() {
         </ul>
       </div>
 
-      {toast && (
-        <div
-          className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg"
-          role="status"
-        >
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

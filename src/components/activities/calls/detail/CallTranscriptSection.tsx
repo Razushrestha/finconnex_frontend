@@ -7,6 +7,7 @@ import { initials, avatarColor } from "@/lib/activities/shared";
 import type { CallAttachment } from "@/lib/calls/types";
 import AttachmentUpload from "@/components/activities/tasks/AttachmentUpload";
 import { getUploadAdapter } from "@/lib/attachments/upload";
+import { toast } from "@/lib/notify/toast";
 
 interface CallTranscriptProps {
   hasTranscript?: boolean;
@@ -69,7 +70,7 @@ export function CallTranscriptSection({
       });
       if (!result.ok) {
         setUploading(false);
-        window.alert(`Failed to upload "${file.name}": ${result.message}`);
+        toast.error(`Failed to upload "${file.name}": ${result.message}`);
         return;
       }
       uploaded.push({

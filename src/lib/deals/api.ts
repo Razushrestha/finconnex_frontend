@@ -473,7 +473,7 @@ export async function getCrmDeal(
   return asDeal(await dealsGet(`/${id}`));
 }
 
-function mapDealSource(raw?: string): string | undefined {
+export function mapDealSource(raw?: string): string | undefined {
   const value = raw?.trim().toLowerCase() ?? "";
   if (!value) return undefined;
   if (value.includes("refer")) return "REFERRAL";
@@ -488,7 +488,7 @@ function mapDealSource(raw?: string): string | undefined {
   return undefined;
 }
 
-function mapLostReason(raw?: string): string | undefined {
+export function mapLostReason(raw?: string): string | undefined {
   const value = raw?.trim().toLowerCase().replace(/\s+/g, "_") ?? "";
   if (!value) return undefined;
   if (value.includes("price")) return "PRICE";

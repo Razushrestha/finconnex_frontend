@@ -43,6 +43,7 @@ import { SignatureDocumentDetailView } from "./documents/detail/SignatureDocumen
 import { ExtendExpiryModal } from "./documents/detail/ExtendExpiryModal";
 import type { DocumentSummaryData } from "./documents/detail/DocumentSummaryCard";
 import type { RecipientStatusData } from "./documents/detail/RecipientStatusRow";
+import { notify } from "@/lib/notify/toast";
 
 function formatDetailStamp(value?: string) {
   if (!value) return "N/A";
@@ -140,7 +141,6 @@ function mapRequestToView(req: SignatureRequest): {
 export function SignatureDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const [req, setReq] = useState<SignatureRequest | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
   const [isPrintOpen, setIsPrintOpen] = useState(false);
@@ -209,8 +209,7 @@ export function SignatureDetailClient({ id }: { id: string }) {
   const expiryIso = expiryToIso(req?.expiryDate);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2600);
+    notify(msg);
   }
 
   function save(next: SignatureRequest, msg?: string) {
@@ -582,11 +581,6 @@ export function SignatureDetailClient({ id }: { id: string }) {
         </div>
       ) : null}
 
-      {toast ? (
-        <div className="fixed right-4 bottom-4 z-50 rounded-xl bg-slate-900 px-4 py-2.5 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
     </div>
   );
 }

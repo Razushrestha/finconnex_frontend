@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MeetingHeader } from "@/components/activities/meetings/create/MeetingHeader";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import { MeetingType } from "@/lib/meetings/types";
 import {
   MeetingFormCard,

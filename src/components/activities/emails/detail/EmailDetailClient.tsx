@@ -20,13 +20,13 @@ import { EmailAttachment } from "@/components/activities/emails/detail/EmailAtta
 import { CrmProfileCard } from "@/components/activities/emails/detail/CrmProfileCard";
 import { ActivityTimeline } from "@/components/activities/emails/detail/ActivityTimeline";
 import { onRulesChange } from "@/lib/rules";
+import { notify } from "@/lib/notify/toast";
 
 export function EmailDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const [email, setEmail] = useState<Email | null>(null);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     function load() {
@@ -45,8 +45,7 @@ export function EmailDetailClient({ id }: { id: string }) {
   }, [id]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2600);
+    notify(msg);
   }
 
   async function runAction(
@@ -107,11 +106,6 @@ export function EmailDetailClient({ id }: { id: string }) {
 
   return (
     <div className="relative flex h-screen bg-background text-foreground">
-      {toast ? (
-        <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="flex flex-1 flex-col border-r border-border">
         <div className="flex items-center justify-between border-b border-border bg-white px-6 py-4 backdrop-blur-md">

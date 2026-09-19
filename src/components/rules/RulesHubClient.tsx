@@ -29,6 +29,7 @@ import {
 } from "@/lib/recycle-bin/api";
 import { useCrmRecycleBin } from "@/lib/recycle-bin/use-crm-recycle-bin";
 import { cn } from "@/lib/utils";
+import { toast } from "@/lib/notify/toast";
 
 const SECTION_ICONS = {
   "28.1": Shield,
@@ -224,7 +225,7 @@ export function RulesHubClient() {
                             );
                             crmBin.refresh();
                           } catch (err) {
-                            window.alert(
+                            toast.error(
                               err instanceof Error
                                 ? err.message
                                 : "Restore failed",
@@ -234,7 +235,7 @@ export function RulesHubClient() {
                         }
                         const result = restoreRecord(item.id);
                         if (!result.ok) {
-                          window.alert(result.message);
+                          toast.error(result.message);
                           return;
                         }
                         refresh();

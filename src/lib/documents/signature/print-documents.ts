@@ -3,6 +3,7 @@ import {
   completionCertificateFromRequest,
 } from "./completion-certificate";
 import { getRequestDocuments, type SignatureRequest } from "./types";
+import { toast } from "@/lib/notify/toast";
 
 export type PrintDocumentsMode = "documents" | "documents-and-certificate";
 
@@ -43,13 +44,13 @@ export function printSignatureDocuments(
   }
 
   if (frames.length === 0) {
-    window.alert("No printable document file is available yet.");
+    toast.error("No printable document file is available yet.");
     return;
   }
 
   const popup = window.open("", "_blank", "noopener,noreferrer,width=920,height=800");
   if (!popup) {
-    window.alert("Allow pop-ups to print these documents.");
+    toast.error("Allow pop-ups to print these documents.");
     return;
   }
 

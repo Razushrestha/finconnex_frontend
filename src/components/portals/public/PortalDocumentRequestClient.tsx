@@ -28,6 +28,7 @@ import {
   requestItems,
 } from "@/lib/documents/requests/pack";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 export function PortalDocumentRequestClient({
   slug,
@@ -39,7 +40,6 @@ export function PortalDocumentRequestClient({
   const { portal, logActivity, canWrite, isReadOnly } = usePortalContext(slug);
   const [request, setRequest] = useState<DocumentRequest | null>(null);
   const [note, setNote] = useState("");
-  const [toast, setToast] = useState<string | null>(null);
   const uploadFor = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -70,8 +70,7 @@ export function PortalDocumentRequestClient({
   }, [portal?.id, request?.id]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2800);
+    notify(msg);
   }
 
   function persist(next: DocumentRequest, msg: string) {
@@ -329,11 +328,6 @@ export function PortalDocumentRequestClient({
         ) : null}
       </div>
 
-      {toast ? (
-        <div className="fixed right-4 bottom-4 z-50 rounded-xl bg-emerald-700 px-4 py-2.5 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
     </div>
   );
 }

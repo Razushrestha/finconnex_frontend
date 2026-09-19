@@ -18,7 +18,7 @@ import {
 } from "@/lib/documents/signature/types";
 import type { PlacedField } from "@/components/documents/signature/create/PdfFieldEditor";
 import AddRecipients from "@/components/documents/signature/templates/AddRecipients";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import {
   isCrmSignatureRequestId,
   persistRemoteSignatureRequest,

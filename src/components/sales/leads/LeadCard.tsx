@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useState, useRef } from "react";
 import { useHasMounted } from "@/lib/use-has-mounted";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import {
   Phone,
   MessageSquare,

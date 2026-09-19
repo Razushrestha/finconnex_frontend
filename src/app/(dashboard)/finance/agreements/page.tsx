@@ -7,6 +7,7 @@ import MetricsCards from "@/components/finance/agreements/MetricsCards";
 import AgreementFilters from "@/components/finance/agreements/AgreementFilters";
 import AgreementTable from "@/components/finance/agreements/AgreementTable";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { toast } from "@/lib/notify/toast";
 
 interface Agreement {
   id: string;
@@ -74,7 +75,7 @@ export default function ServiceAgreementsPage() {
   };
 
   const handleDownload = (agreementId: string) => {
-    alert(`Downloading agreement document for reference: ${agreementId}`);
+    toast.info(`Downloading agreement document for reference: ${agreementId}`);
   };
 
   const handleDeletePrompt = (agreementId: string) => {

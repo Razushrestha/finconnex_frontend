@@ -45,11 +45,11 @@ import {
 } from "@/lib/rules";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
 import { defaultActorName } from "@/lib/rules/actor";
+import { notify } from "@/lib/notify/toast";
 
 export function TimeEntryDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const [row, setRow] = useState<TimeEntry | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [description, setDescription] = useState("");
   const [hours, setHours] = useState("0");
   const [rate, setRate] = useState("0");
@@ -72,8 +72,7 @@ export function TimeEntryDetailClient({ id }: { id: string }) {
   }
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2400);
+    notify(msg);
   }
 
   function reload() {
@@ -453,11 +452,6 @@ export function TimeEntryDetailClient({ id }: { id: string }) {
         </div>
       </div>
 
-      {toast && (
-        <div className="fixed right-4 bottom-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      )}
     </div>
   );
 }

@@ -84,6 +84,7 @@ import {
 } from "@/lib/marketing/inbox/ai-suggest";
 import { uniqueTags } from "@/lib/tags";
 import { RecordTagChip, RecordTagPicker } from "@/components/shared/tags/RecordTags";
+import { notify } from "@/lib/notify/toast";
 
 const CHANNEL_SOFT: Record<InboxChannel, string> = {
   "Facebook Messenger": "bg-blue-100 text-blue-700",
@@ -560,7 +561,6 @@ export function UnifiedInboxClient() {
   const [agentFilter, setAgentFilter] = useState<string>("All");
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState("");
-  const [toast, setToast] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<InboxMessage | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
@@ -755,8 +755,7 @@ export function UnifiedInboxClient() {
   }, [scoped, filtered, activeId]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2600);
+    notify(msg);
   }
 
   function persist(next: InboxConversation) {
@@ -2197,11 +2196,6 @@ export function UnifiedInboxClient() {
         </>
       ) : null}
 
-      {toast ? (
-        <div className="fixed right-4 bottom-16 z-[60] rounded-xl bg-slate-900 px-4 py-2.5 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
     </div>
   );
 }

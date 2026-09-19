@@ -4,7 +4,6 @@ import { Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { Providers } from "./providers";
-import { Toaster } from "sonner";
 import {
   parseTheme,
   THEME_COOKIE_NAME,
@@ -46,7 +45,6 @@ export default async function RootLayout({
       </head>
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <Script src="/strip-bis-skin.js" strategy="beforeInteractive" />
-        <Toaster />
         <Providers>{children}</Providers>
       </body>
     </html>

@@ -51,6 +51,7 @@ import {
   type AutomationTriggerType,
 } from "@/lib/automations/types";
 import { cn } from "@/lib/utils";
+import { toast } from "@/lib/notify/toast";
 
 function fmt(value?: string | null): string {
   if (!value) return "—";
@@ -169,7 +170,7 @@ export function WorkflowListClient({ folderId }: { folderId: string | null }) {
       await action();
       refresh();
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Action failed");
+      toast.error(err instanceof Error ? err.message : "Action failed");
     } finally {
       setBusy(null);
     }
@@ -183,7 +184,7 @@ export function WorkflowListClient({ folderId }: { folderId: string | null }) {
       setDeletingFolder(null);
       refresh();
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Could not delete the folder");
+      toast.error(err instanceof Error ? err.message : "Could not delete the folder");
     } finally {
       setDeleteBusy(false);
     }

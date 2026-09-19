@@ -14,6 +14,7 @@ import {
   type AssignableOwner,
 } from "@/lib/users/assignable";
 import { getRulesActor } from "@/lib/rules/actor";
+import { toast } from "@/lib/notify/toast";
 
 export default function LoanRepaymentsView() {
   const [currency, setCurrency] = useState("AUD ($)");
@@ -130,7 +131,7 @@ export default function LoanRepaymentsView() {
     const extra = parseFloat(extraPayment) || 0;
 
     if (isNaN(P) || isNaN(annualRate) || isNaN(years) || P <= 0 || years <= 0) {
-      alert(
+      toast.error(
         "Please enter valid numbers for Loan Amount, Interest Rate, and Term.",
       );
       return null;
@@ -204,7 +205,7 @@ export default function LoanRepaymentsView() {
       sharedWith: shareWith.trim() || undefined,
       savedBy: savedBy.trim() || undefined,
     });
-    alert(
+    toast.success(
       saved.source === "api"
         ? "Saved to CRM calculations"
         : "Saved locally — sign in to sync with CRM",

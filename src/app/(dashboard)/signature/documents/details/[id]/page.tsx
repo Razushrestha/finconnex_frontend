@@ -22,6 +22,7 @@ import { onRecordsChange } from "@/lib/records-sync";
 import { syncSignatureRequestFromPublicLinks } from "@/lib/documents/signature/sync-public-status";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { toast } from "@/lib/notify/toast";
 
 interface MockSignatureDocument {
   document: DocumentSummaryData;
@@ -221,7 +222,7 @@ export default function SignatureDocumentDetailPage() {
   const handleExecuteSendReminder = async () => {
     setIsSendReminderModalOpen(false);
     if (USE_MOCK_DATA) {
-      alert(
+      toast.success(
         `Reminder sent successfully via ${reminderType.toUpperCase()} to pending recipients!`,
       );
       return;
@@ -235,7 +236,7 @@ export default function SignatureDocumentDetailPage() {
           body: JSON.stringify({ reminderType }),
         },
       );
-      alert(`Reminder sent successfully via ${reminderType.toUpperCase()}!`);
+      toast.success(`Reminder sent successfully via ${reminderType.toUpperCase()}!`);
     } catch (error) {
       console.error("Failed to send reminder:", error);
     }
@@ -279,20 +280,20 @@ export default function SignatureDocumentDetailPage() {
         onEdit={() => setIsEditOpen(true)}
         onCompletionCertificate={() => {
           if (!sourceReq && !findSignatureRequest(documentId)) {
-            alert("Completion certificate is not available yet.");
+            toast.error("Completion certificate is not available yet.");
             return;
           }
           setIsCertificateOpen(true);
         }}
         onCorrectDocument={() => {
-          alert("Opening document correction workflow for active signers.");
+          toast.info("Opening document correction workflow for active signers.");
         }}
         onExtend={() => setIsExtendModalOpen(true)}
         onSendReminder={() => setIsSendReminderModalOpen(true)}
         onReminderSettings={() => setIsReminderSettingsOpen(true)}
         onRecall={async () => {
           if (USE_MOCK_DATA) {
-            alert("Mock document recalled.");
+            toast.success("Mock document recalled.");
             return;
           }
           await fetch(
@@ -309,17 +310,17 @@ export default function SignatureDocumentDetailPage() {
             sourceReq?.signers[0]?.email ||
             documentData.recipients[0]?.email;
           if (!to?.includes("@")) {
-            alert("No recipient email is available for this document.");
+            toast.error("No recipient email is available for this document.");
             return;
           }
           setIsComposeOpen(true);
         }}
         onSaveToCloud={() => {
-          alert("Saved to cloud.");
+          toast.success("Saved to cloud.");
         }}
         onDownload={() => {
           if (USE_MOCK_DATA) {
-            alert("Mock download triggered.");
+            toast.info("Mock download triggered.");
             return;
           }
           window.open(
@@ -485,7 +486,7 @@ export default function SignatureDocumentDetailPage() {
           onPrint={(mode) => {
             const req = sourceReq ?? findSignatureRequest(documentId);
             if (!req) {
-              alert("No document is available to print yet.");
+              toast.error("No document is available to print yet.");
               return;
             }
             printSignatureDocuments(req, mode);
@@ -695,7 +696,7 @@ export default function SignatureDocumentDetailPage() {
               </button>
               <button
                 onClick={() => {
-                  alert("Changes saved locally!");
+                  toast.success("Changes saved locally!");
                   setIsEditOpen(false);
                 }}
                 className="px-4 py-2 bg-blue-600 text-white rounded text-sm"
@@ -810,11 +811,11 @@ export default function SignatureDocumentDetailPage() {
                 onClick={() => {
                   const todayStr = getTodayIsoDate();
                   if (modalExpiryDate < todayStr) {
-                    alert("Expiration date cannot be earlier than today.");
+                    toast.error("Expiration date cannot be earlier than today.");
                     return;
                   }
                   handleSetExpiry(modalExpiryDate);
-                  alert(
+                  toast.success(
                     `Settings & reminder rules saved successfully! (Remind every ${reminderFrequencyDays}, Max: ${maxReminders})`,
                   );
                   setIsReminderSettingsOpen(false);

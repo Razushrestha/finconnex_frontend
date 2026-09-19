@@ -13,18 +13,17 @@ import {
   type InboxChannelConnection,
 } from "@/lib/marketing/inbox/types";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 export default function InboxSettingsPage() {
   const [connections, setConnections] = useState<InboxChannelConnection[]>([]);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     setConnections(listChannelConnections());
   }, []);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2400);
+    notify(msg);
   }
 
   function toggle(conn: InboxChannelConnection) {
@@ -109,11 +108,6 @@ export default function InboxSettingsPage() {
         </div>
       </div>
 
-      {toast ? (
-        <div className="fixed right-4 bottom-4 z-50 rounded-xl bg-slate-900 px-4 py-2.5 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
     </div>
   );
 }

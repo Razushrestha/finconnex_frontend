@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import { Phone } from "lucide-react";
 import type { LeadCardData } from "@/lib/leads/types";
 import {

@@ -76,6 +76,7 @@ import { ActionPickerPanel, TriggerPickerPanel } from "./StepPickerPanel";
 import { StepConfigPanel } from "./StepConfigPanel";
 import { TriggerStatsPanel } from "./TriggerStatsPanel";
 import { TriggerConfigPanel } from "./TriggerConfigPanel";
+import { toast } from "@/lib/notify/toast";
 
 const nodeTypes = {
   trigger: TriggerNode,
@@ -493,7 +494,7 @@ function BuilderInner({ id, folderId: initialFolderId }: { id: string; folderId:
   ): Promise<string | null> {
     const unset = triggers.findIndex((trigger) => !trigger.type);
     if (unset !== -1) {
-      window.alert(
+      toast.error(
         triggers.length === 1
           ? "Choose a trigger before saving."
           : `Trigger ${unset + 1} has no type yet — choose one or remove it before saving.`
@@ -525,7 +526,7 @@ function BuilderInner({ id, folderId: initialFolderId }: { id: string; folderId:
       }
       return automationId;
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Failed to save workflow");
+      toast.error(err instanceof Error ? err.message : "Failed to save workflow");
       return null;
     } finally {
       setSaving(false);
@@ -544,7 +545,7 @@ function BuilderInner({ id, folderId: initialFolderId }: { id: string; folderId:
         setStatus("DISABLED");
       }
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Failed to update workflow status");
+      toast.error(err instanceof Error ? err.message : "Failed to update workflow status");
       // Re-read rather than assume: the save above may already have moved it.
       try {
         setStatus((await getAutomation(savedId)).status);

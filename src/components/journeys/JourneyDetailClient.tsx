@@ -48,6 +48,7 @@ import {
   JourneyStepInspector,
 } from "@/components/journeys/JourneyCanvas";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 export function JourneyDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -57,7 +58,6 @@ export function JourneyDetailClient({ id }: { id: string }) {
   >("canvas");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
   const [stepFilter, setStepFilter] = useState<string>("all");
 
   const stepPushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -93,8 +93,7 @@ export function JourneyDetailClient({ id }: { id: string }) {
   }
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2200);
+    notify(msg);
   }
 
   function persist(next: LifecycleJourney, msg?: string) {
@@ -225,11 +224,6 @@ export function JourneyDetailClient({ id }: { id: string }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50">
-      {toast ? (
-        <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[11px] font-semibold text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="relative mx-auto flex min-h-0 w-full max-w-[1920px] flex-1 flex-col overflow-hidden p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex shrink-0 flex-wrap items-start justify-between gap-2">

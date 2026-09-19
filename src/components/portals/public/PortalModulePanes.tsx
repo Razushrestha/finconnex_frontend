@@ -32,6 +32,7 @@ import {
 } from "@/lib/support/types";
 import { canPayInPortal, canSignInPortal } from "@/lib/portals/types";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 export function PortalDealsPane({ slug }: { slug: string }) {
   const { portal, logActivity } = usePortalContext(slug);
@@ -221,7 +222,6 @@ export function PortalTasksPane({ slug }: { slug: string }) {
 
 export function PortalInvoicesPane({ slug }: { slug: string }) {
   const { portal, logActivity, refresh } = usePortalContext(slug);
-  const [toast, setToast] = useState<string | null>(null);
 
   const [payingId, setPayingId] = useState<string | null>(null);
 
@@ -250,14 +250,12 @@ export function PortalInvoicesPane({ slug }: { slug: string }) {
     });
     setPayingId(null);
     if (!result.ok) {
-      setToast(result.message);
-      window.setTimeout(() => setToast(null), 3200);
+      notify(result.message);
       return;
     }
     logActivity(`Paid invoice ${inv.invoiceId} via gateway`);
     refresh();
-    setToast(`Paid ${formatAUD(result.payment.amount)} · ${result.providerId}`);
-    window.setTimeout(() => setToast(null), 2800);
+    notify(`Paid ${formatAUD(result.payment.amount)} · ${result.providerId}`);
   }
 
   return (
@@ -268,11 +266,6 @@ export function PortalInvoicesPane({ slug }: { slug: string }) {
             ? "Read-only access: invoices are view-only."
             : "Limited access: contact your broker to pay invoices."}
         </p>
-      ) : null}
-      {toast ? (
-        <div className="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-[12px] font-medium text-emerald-800">
-          {toast}
-        </div>
       ) : null}
       {invoices.length === 0 ? (
         <Empty>No invoices</Empty>

@@ -64,11 +64,11 @@ import {
   stripSystemFields,
 } from "@/lib/rules";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
+import { notify } from "@/lib/notify/toast";
 
 export function PortalDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const [row, setRow] = useState<ClientPortal | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [tab, setTab] = useState<"edit" | "access" | "activity">("edit");
 
   // Editable draft fields
@@ -104,8 +104,7 @@ export function PortalDetailClient({ id }: { id: string }) {
   }, [id]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2600);
+    notify(msg);
   }
 
   function save(next: ClientPortal, msg?: string) {
@@ -257,11 +256,6 @@ export function PortalDetailClient({ id }: { id: string }) {
 
   return (
     <div className="relative flex min-h-full flex-col overflow-hidden bg-slate-50">
-      {toast ? (
-        <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="relative mx-auto flex w-full max-w-[1920px] flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
         {/* Header */}

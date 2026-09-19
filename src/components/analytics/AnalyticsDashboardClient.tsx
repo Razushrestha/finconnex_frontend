@@ -58,6 +58,7 @@ import {
 } from "@/lib/analytics/types";
 import { useCrmAnalytics } from "@/lib/analytics/use-crm-analytics";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 const SOURCE_COLORS = ["#7c3aed", "#0d9488", "#f59e0b", "#38bdf8", "#64748b"];
 const OWNER_COLORS = ["#7c3aed", "#0d9488", "#f59e0b", "#38bdf8"];
@@ -430,7 +431,6 @@ export function AnalyticsDashboardClient() {
   const [benchmarksOpen, setBenchmarksOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [benchmarks, setBenchmarks] = useState<BenchmarkMap>(DEFAULT_BENCHMARKS);
-  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     setBenchmarks(loadBenchmarks());
@@ -481,8 +481,7 @@ export function AnalyticsDashboardClient() {
   }, [snap, benchmarks]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2400);
+    notify(msg);
   }
 
   function share() {
@@ -525,11 +524,6 @@ th{text-align:left;padding:8px;border-bottom:2px solid #cbd5e1;color:#64748b;fon
 
   return (
     <div className="relative h-auto w-full min-h-full shrink-0 overflow-y-auto bg-slate-50 pb-10">
-      {toast ? (
-        <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="relative mx-auto flex max-w-[1920px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">

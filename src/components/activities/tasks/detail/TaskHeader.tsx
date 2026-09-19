@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/notify/toast";
 import Link from "next/link";
 import { ArrowLeft, Check, CheckCircle2, History, Pencil, X } from "lucide-react";
 import type { TaskStatus } from "@/lib/tasks/types";

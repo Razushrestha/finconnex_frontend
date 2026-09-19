@@ -148,6 +148,11 @@ export const HIDDEN_ACTION_CONFIG_KEYS: Partial<
     "companyId",
     "dealId",
   ],
+  // Billing is not something a workflow decides; a step that already set
+  // it still shows it, so it can be seen and cleared.
+  CREATE_TASK: ["isBillable"],
+  ADD_TO_WORK_QUEUE: ["isBillable"],
+  CREATE_FOLLOW_UP: ["isBillable"],
 };
 
 /**
@@ -376,6 +381,26 @@ export const FIELD_META: Record<string, FieldMeta> = {
   },
   requestedFromId: { label: "Requested From (Contact)", widget: "text", helpText: "Contact UUID" },
   dueDate: { label: "Due Date", widget: "datetime" },
+  // Request Documents' form renders these itself.
+  requestedFromTrigger: { label: "Send to the contact that started this workflow", widget: "checkbox" },
+  requestedById: { label: "Send on behalf of", widget: "member" },
+  items: { label: "Documents", widget: "json" },
+  // Create Deal's form renders these itself.
+  contactFromTrigger: { label: "Use the contact that started this workflow", widget: "checkbox" },
+  expectedCloseInMs: { label: "Closes After Workflow Runs (ms)", widget: "number" },
+  // Create Contact's form renders this itself.
+  copyFromTrigger: { label: "Copy details from the trigger lead", widget: "checkbox" },
+  // Create Lead's form renders these itself.
+  secondaryContactId: { label: "Secondary contact", widget: "record", target: "CONTACT" },
+  loanPurpose: {
+    label: "Loan purpose",
+    widget: "select",
+    options: [
+      { label: "Purchase", value: "Purchase" },
+      { label: "Refinance", value: "Refinance" },
+      { label: "Investment", value: "Investment" },
+    ],
+  },
   // Create Task's relative schedule; its own form renders these as amount + unit.
   dueInMs: { label: "Due After Workflow Runs (ms)", widget: "number" },
   reminderBeforeDueMs: { label: "Reminder Before Due (ms)", widget: "number" },

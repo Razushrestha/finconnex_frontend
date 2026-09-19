@@ -67,11 +67,11 @@ import {
   elevatedSelectClass,
   elevatedTextareaClass,
 } from "@/components/sales/CreateEntityForm";
+import { notify, toast } from "@/lib/notify/toast";
 
 export function TicketDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const [row, setRow] = useState<SupportTicket | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [noteBody, setNoteBody] = useState("");
   const [noteKind, setNoteKind] = useState<TicketNoteKind>("internal");
   const [mergeTarget, setMergeTarget] = useState("");
@@ -102,8 +102,7 @@ export function TicketDetailClient({ id }: { id: string }) {
   }, [row]);
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2600);
+    notify(msg);
   }
 
   function save(next: SupportTicket, msg?: string) {
@@ -386,11 +385,6 @@ export function TicketDetailClient({ id }: { id: string }) {
 
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
-      {toast ? (
-        <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="relative mx-auto flex w-full max-w-[1600px] flex-col p-3 sm:p-4 lg:px-6 2xl:px-8">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
@@ -493,7 +487,7 @@ export function TicketDetailClient({ id }: { id: string }) {
                   snapshot: row,
                 });
                 if (!gate.ok) {
-                  window.alert(gate.message);
+                  toast.error(gate.message);
                   return;
                 }
                 deleteTicket(row.id);

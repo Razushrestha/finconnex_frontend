@@ -78,11 +78,11 @@ import {
   stripSystemFields,
 } from "@/lib/rules";
 import { RecordAuditHistory } from "@/components/rules/RecordAuditHistory";
+import { notify } from "@/lib/notify/toast";
 
 export function ReportDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const [row, setRow] = useState<SavedReport | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<"results" | "edit" | "activity">("results");
@@ -153,8 +153,7 @@ export function ReportDetailClient({ id }: { id: string }) {
   }
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2600);
+    notify(msg);
   }
 
   function save(next: SavedReport, msg?: string) {
@@ -444,11 +443,6 @@ export function ReportDetailClient({ id }: { id: string }) {
 
   return (
     <div className="relative min-h-full overflow-hidden bg-slate-50">
-      {toast ? (
-        <div className="fixed top-4 right-4 z-50 rounded-lg bg-slate-900 px-3 py-2 text-[12px] font-medium text-white shadow-lg">
-          {toast}
-        </div>
-      ) : null}
 
       <div className="relative mx-auto flex max-w-[1920px] flex-col p-2.5 sm:p-3 lg:p-4">
         <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">

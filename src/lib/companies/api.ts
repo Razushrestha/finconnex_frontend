@@ -278,7 +278,7 @@ function asHttpUrl(raw?: string): string | undefined {
   }
 }
 
-function asDecimalMoney(raw?: string): string | undefined {
+export function asDecimalMoney(raw?: string): string | undefined {
   const value = raw?.trim() ?? "";
   if (!value) return undefined;
   const numeric = value.replace(/[^0-9.]/g, "");
@@ -292,7 +292,7 @@ function asCompanySize(raw?: string): string | undefined {
   return uiCompanySizeToCrm(raw);
 }
 
-function asEmployeeCount(raw?: string): number | undefined {
+export function asEmployeeCount(raw?: string): number | undefined {
   const value = raw?.trim() ?? "";
   if (!/^\d+$/.test(value)) return undefined;
   const n = Number(value);

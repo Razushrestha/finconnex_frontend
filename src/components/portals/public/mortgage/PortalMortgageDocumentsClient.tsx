@@ -34,6 +34,7 @@ import {
   type MortgageDocumentFile,
 } from "@/lib/portals/mortgage";
 import { cn } from "@/lib/utils";
+import { notify } from "@/lib/notify/toast";
 
 const STEPS = [
   { id: "documents", n: 1, title: "Documents", blurb: "Upload required documents" },
@@ -66,7 +67,6 @@ export function PortalMortgageDocumentsClient({ slug }: { slug: string }) {
   const { portal, mortgage, update, logActivity, canWrite, isReadOnly } =
     useMortgagePortal(slug);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [viewing, setViewing] = useState<MortgageDocument | null>(null);
   const [reasonDoc, setReasonDoc] = useState<MortgageDocument | null>(null);
   const [reasonDraft, setReasonDraft] = useState("");
@@ -116,8 +116,7 @@ export function PortalMortgageDocumentsClient({ slug }: { slug: string }) {
   const canUpload = canWrite && !isReadOnly;
 
   function flash(msg: string) {
-    setToast(msg);
-    window.setTimeout(() => setToast(null), 2600);
+    notify(msg);
   }
 
   function pickFile(id: string) {
@@ -327,11 +326,6 @@ export function PortalMortgageDocumentsClient({ slug }: { slug: string }) {
         </p>
       </div>
 
-      {toast ? (
-        <div className="mb-4 rounded-xl bg-emerald-50 px-4 py-2.5 text-[12px] font-medium text-emerald-800">
-          {toast}
-        </div>
-      ) : null}
 
       <ProcessStepper slug={slug} docsDone={progress.pending === 0 && progress.total > 0} />
 
