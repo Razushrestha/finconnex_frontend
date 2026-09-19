@@ -534,7 +534,7 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: [],
   },
   CREATE_DEAL: {
-    allowed: ["name", "stage", "value", "currency", "probability", "expectedCloseDate", "source", "description", "lostReason", "competitor", "pipeline", "companyId", "ownerId"],
+    allowed: ["name", "stage", "value", "currency", "probability", "expectedCloseDate", "source", "description", "lostReason", "competitor", "pipeline", "companyId", "ownerId", "contactId", "contactFromTrigger", "expectedCloseInMs"],
     required: ["name"],
   },
   DELETE_DEAL: {

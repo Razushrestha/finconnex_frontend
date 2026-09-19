@@ -44,6 +44,7 @@ import { entityNoun } from "@/lib/automations/trigger-scope";
 import { supportsRecordPicker } from "@/lib/automations/record-search";
 
 import { CreateCompanyActionForm, createCompanyActionProblems } from "./CreateCompanyActionForm";
+import { CreateDealActionForm, createDealActionProblems } from "./CreateDealActionForm";
 import { CreateContactActionForm, createContactActionProblems } from "./CreateContactActionForm";
 import { CreateLeadActionForm, createLeadActionProblems } from "./CreateLeadActionForm";
 import { CreateTaskActionForm, createTaskActionProblems } from "./CreateTaskActionForm";
@@ -123,6 +124,10 @@ function ActionConfigForm({
   // Create Task is the task page's own form, not the generic key list.
   if (step.action === "CREATE_TASK") {
     return <CreateTaskActionForm config={config} onChange={onChange} />;
+  }
+  // Create Deal is the Create Deal modal's own form.
+  if (step.action === "CREATE_DEAL") {
+    return <CreateDealActionForm config={config} entityType={entityType} onChange={onChange} />;
   }
   // Create Company is the Create Company modal's own form.
   if (step.action === "CREATE_COMPANY") {
@@ -518,7 +523,9 @@ export function StepConfigPanel({ step, entityType, onClose, onSave, onDelete }:
           ? createContactActionProblems(draft.config ?? {}, entityType)
           : draft.type === "ACTION" && draft.action === "CREATE_COMPANY"
             ? createCompanyActionProblems(draft.config ?? {})
-            : [];
+            : draft.type === "ACTION" && draft.action === "CREATE_DEAL"
+              ? createDealActionProblems(draft.config ?? {}, entityType)
+              : [];
   const blocked =
     missingRequired.length > 0 || recipientProblems.length > 0 || taskProblems.length > 0;
 
