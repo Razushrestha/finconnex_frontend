@@ -517,8 +517,9 @@ export const AUTOMATION_ACTION_KEYS: Record<
     required: [],
   },
   CREATE_CONTACT: {
-    allowed: ["firstName", "lastName", "email", "phone", "mobilePhone", "jobTitle", "department", "linkedinUrl", "lifecycleStage", "source", "doNotContact", "notes", "companyId", "ownerId", "avatarKey"],
-    required: ["email"],
+    allowed: ["firstName", "lastName", "email", "phone", "mobilePhone", "jobTitle", "department", "linkedinUrl", "lifecycleStage", "source", "doNotContact", "notes", "companyId", "ownerId", "avatarKey", "status", "copyFromTrigger"],
+    // `email`, unless copied from the trigger lead — the step form checks which.
+    required: [],
   },
   DELETE_CONTACT: {
     allowed: ["recordId"],
