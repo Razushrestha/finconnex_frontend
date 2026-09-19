@@ -200,6 +200,14 @@ export function upsertMarketingForm(f: MarketingForm) {
   return normalized;
 }
 
+export function replaceCrmMarketingForms(remote: MarketingForm[]) {
+  writeStore(remote.map((f) => normalizeForm({ ...f })));
+}
+
+export function deleteMarketingForm(id: string) {
+  writeStore(listMarketingForms().filter((f) => f.id !== id));
+}
+
 export function getFormBySlug(slug: string) {
   return listMarketingForms().find((f) => f.embedSlug === slug);
 }

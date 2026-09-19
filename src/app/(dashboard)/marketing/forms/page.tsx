@@ -14,9 +14,12 @@ import {
 } from "lucide-react";
 import {
   FORM_STATUSES,
+  listMarketingForms,
   type FormStatus,
   type MarketingForm,
 } from "@/lib/marketing/forms/types";
+import { useCrmForms } from "@/lib/forms/use-crm-forms";
+import { cn } from "@/lib/utils";
 import {
   CampaignHeader,
   MarketingListShell,
@@ -60,18 +63,11 @@ export default function MarketingFormsPage() {
 
   const [page, setPage] = useState(1);
   const pageSize = 8;
+  const crm = useCrmForms();
 
-  // Load stored forms from localStorage on mount
   useEffect(() => {
-    const savedForms = localStorage.getItem("marketing_forms_storage");
-    if (savedForms) {
-      try {
-        setRows(JSON.parse(savedForms));
-      } catch (e) {
-        console.error("Failed to parse saved forms", e);
-      }
-    }
-  }, []);
+    setRows(listMarketingForms());
+  }, [crm.source, crm.loading]);
 
   useEffect(() => {
     setPage(1);
@@ -121,14 +117,14 @@ export default function MarketingFormsPage() {
 
   const confirmDeleteForm = () => {
     if (!formToDelete) return;
-
-    setRows((prev) => {
-      const updated = prev.filter((r) => r.id !== formToDelete.id);
-      localStorage.setItem("marketing_forms_storage", JSON.stringify(updated));
-      return updated;
+    const id = formToDelete.id;
+    setRows((prev) => prev.filter((r) => r.id !== id));
+    void import("@/lib/marketing/forms/types").then(({ deleteMarketingForm }) => {
+      deleteMarketingForm(id);
     });
-
-    // Clean up schema storage
+    void import("@/lib/forms/api").then(({ archiveCrmForm, tryCrmForm }) => {
+      void tryCrmForm(() => archiveCrmForm(id));
+    });
     localStorage.removeItem(`form_schema_${formToDelete.embedSlug}`);
     setDeleteModalOpen(false);
     setFormToDelete(null);
@@ -323,6 +319,25 @@ export default function MarketingFormsPage() {
         onCreate={() => setCreateModalOpen(true)}
         createLabel="New form"
       />
+      <div className="mb-1 flex items-center gap-2 px-1">
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            crm.source === "api"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-slate-100 text-slate-500",
+          )}
+        >
+          {crm.source === "api"
+            ? "Live CRM"
+            : crm.loading
+              ? "Connecting…"
+              : "Demo"}
+        </span>
+        {crm.error && crm.source === "demo" ? (
+          <span className="text-[10px] text-slate-500">{crm.error}</span>
+        ) : null}
+      </div>
 
       <CreateFormModal
         open={createModalOpen}

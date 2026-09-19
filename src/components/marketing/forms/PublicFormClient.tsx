@@ -90,6 +90,30 @@ export function PublicFormClient({ slug }: { slug: string }) {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form) return;
+    try {
+      const { submitPublicCrmForm } = await import("@/lib/forms/api");
+      const payload: Record<string, string> = {};
+      for (const field of form.fieldDefs) {
+        const value = values[field.id];
+        if (value != null && value !== "") payload[field.id] = value;
+      }
+      await submitPublicCrmForm(slug, payload);
+      setErrors({});
+      setThankYou(
+        form.thankYouMessage || "Thanks — we received your submission.",
+      );
+      setRecordRef(form.destination);
+      if (form.bookingSlug) {
+        setBookingCta({
+          slug: form.bookingSlug,
+          label: form.bookingLabel || "Book a call",
+        });
+      }
+      return;
+    } catch {
+      /* fall through to local routing */
+    }
     const out = await processFormSubmission(slug, values);
     if (!out.ok) {
       setErrors(out.errors);

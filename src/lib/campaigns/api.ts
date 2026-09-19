@@ -13,8 +13,15 @@ import type {
   SmsCampaignStatus,
   SmsCampaignType,
 } from "@/lib/marketing/sms/types";
+import type {
+  WhatsAppApprovalStatus,
+  WhatsAppCampaign,
+  WhatsAppCampaignStatus,
+} from "@/lib/marketing/whatsapp/types";
+import { ensureCrmSegment } from "@/lib/segments/api";
+import { ensureCrmEmailTemplate } from "@/lib/templates/api";
 
-export type CrmCampaignChannel = "EMAIL" | "SMS" | "UNKNOWN";
+export type CrmCampaignChannel = "EMAIL" | "SMS" | "WHATSAPP" | "UNKNOWN";
 
 export type CrmCampaignQuery = {
   page?: number;
@@ -89,7 +96,7 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
 function mapEmailStatus(raw: string): EmailCampaignStatus {
   const value = raw.toLowerCase().replace(/[_-]/g, " ");
   if (value.includes("schedul")) return "Scheduled";
-  if (value.includes("run") || value.includes("launch") || value.includes("active")) {
+  if (value.includes("run") || value.includes("launch") || value.includes("active") || value.includes("process")) {
     return "Running";
   }
   if (value.includes("pause")) return "Paused";
@@ -104,8 +111,12 @@ function mapSmsStatus(raw: string): SmsCampaignStatus {
   return mapEmailStatus(raw) as SmsCampaignStatus;
 }
 
+function mapWaStatus(raw: string): WhatsAppCampaignStatus {
+  return mapEmailStatus(raw) as WhatsAppCampaignStatus;
+}
+
 function mapEmailType(raw: string): EmailCampaignType {
-  const value = raw.toLowerCase();
+  const value = raw.toLowerCase().replace(/[_-]/g, " ");
   if (value.includes("news")) return "Newsletter";
   if (value.includes("promo")) return "Promotional";
   if (value.includes("drip")) return "Drip";
@@ -114,11 +125,39 @@ function mapEmailType(raw: string): EmailCampaignType {
 }
 
 function mapSmsType(raw: string): SmsCampaignType {
-  const value = raw.toLowerCase();
+  const value = raw.toLowerCase().replace(/[_-]/g, " ");
   if (value.includes("promo")) return "Promotional";
   if (value.includes("auto") || value.includes("alert")) return "Automated";
   if (value.includes("remind")) return "Reminder";
   return "Transactional";
+}
+
+export function toNestEmailCampaignType(type: EmailCampaignType): string {
+  switch (type) {
+    case "Newsletter":
+      return "NEWSLETTER";
+    case "Promotional":
+      return "PROMOTIONAL";
+    case "Drip":
+      return "DRIP";
+    case "Automated":
+      return "AUTOMATED";
+    default:
+      return "ONE_TIME";
+  }
+}
+
+export function toNestSmsCampaignType(type: SmsCampaignType): string {
+  switch (type) {
+    case "Promotional":
+      return "PROMOTIONAL";
+    case "Automated":
+      return "AUTOMATED";
+    case "Reminder":
+      return "REMINDER";
+    default:
+      return "TRANSACTIONAL";
+  }
 }
 
 function detectChannel(raw: Record<string, unknown>): CrmCampaignChannel {
@@ -128,9 +167,11 @@ function detectChannel(raw: Record<string, unknown>): CrmCampaignChannel {
     raw.campaignChannel,
     raw.type,
   ).toUpperCase();
+  if (channel.includes("WHATSAPP") || channel.includes("WA")) return "WHATSAPP";
   if (channel.includes("SMS") || channel.includes("TEXT")) return "SMS";
   if (channel.includes("EMAIL") || channel.includes("MAIL")) return "EMAIL";
-  if (pickStr(raw.message) && !pickStr(raw.subject, raw.bodyHtml, raw.body)) {
+  if (pickStr(raw.contentSid)) return "WHATSAPP";
+  if (pickStr(raw.messageBody, raw.message) && !pickStr(raw.subjectLine, raw.subject, raw.bodyHtml, raw.body)) {
     return "SMS";
   }
   return "EMAIL";
@@ -145,17 +186,24 @@ export function normalizeEmailCampaign(
   index: number,
 ): EmailCampaign {
   const id = pickStr(raw.id, raw.uuid, raw.campaignId) || `crm-camp-${index}`;
-  const name = pickStr(raw.name, raw.title, raw.subject, "Untitled campaign");
+  const name = pickStr(raw.name, raw.title, raw.subjectLine, raw.subject, "Untitled campaign");
   return {
     id,
     campaignId: pickStr(raw.campaignCode, raw.code, raw.campaignId, id),
     name,
     type: mapEmailType(pickStr(raw.campaignType, raw.type, "One-time")),
     status: mapEmailStatus(pickStr(raw.status, raw.state, "DRAFT")),
-    audience: pickStr(raw.audience, raw.audienceName, raw.segment, "All"),
+    audience: pickStr(
+      raw.audience,
+      raw.audienceName,
+      raw.segment && typeof raw.segment === "object"
+        ? (raw.segment as { name?: unknown }).name
+        : raw.segment,
+      "All",
+    ),
     templateId: pickStr(raw.templateId, "et1"),
     templateName: pickStr(raw.templateName, raw.template, "CRM template"),
-    subject: pickStr(raw.subject, name),
+    subject: pickStr(raw.subjectLine, raw.subject, name),
     fromName: pickStr(raw.fromName, raw.senderName, "FinConnex"),
     fromEmail: pickStr(raw.fromEmail, raw.senderEmail, "noreply@finconnex.example"),
     scheduledAt: pickStr(raw.scheduledAt, raw.startsAt) || undefined,
@@ -165,7 +213,7 @@ export function normalizeEmailCampaign(
     bounceCount: toNum(raw.bounceCount ?? raw.bounces),
     unsubscribeCount: toNum(raw.unsubscribeCount ?? raw.unsubscribes),
     previewText: pickStr(raw.previewText, raw.preheader) || undefined,
-    body: pickStr(raw.body, raw.bodyHtml, raw.content) || undefined,
+    body: pickStr(raw.messageBody, raw.body, raw.bodyHtml, raw.content) || undefined,
     createdBy: pickStr(raw.createdByName, raw.createdBy, raw.ownerName, "—"),
     createdAt: pickStr(raw.createdAt, raw.createdOn, ""),
     audit: [],
@@ -184,11 +232,48 @@ export function normalizeSmsCampaign(
     name,
     type: mapSmsType(pickStr(raw.campaignType, raw.type, "Transactional")),
     status: mapSmsStatus(pickStr(raw.status, raw.state, "DRAFT")),
-    audience: pickStr(raw.audience, raw.audienceName, raw.segment, "All"),
-    message: pickStr(raw.message, raw.body, raw.content, name),
+    audience: pickStr(
+      raw.audience,
+      raw.audienceName,
+      raw.segment && typeof raw.segment === "object"
+        ? (raw.segment as { name?: unknown }).name
+        : raw.segment,
+      "All",
+    ),
+    message: pickStr(raw.messageBody, raw.message, raw.body, raw.content, name),
     scheduledAt: pickStr(raw.scheduledAt, raw.startsAt) || undefined,
     sentCount: toNum(raw.sentCount ?? raw.sent),
     deliveredCount: toNum(raw.deliveredCount ?? raw.delivered),
+    failedCount: toNum(raw.failedCount ?? raw.failed),
+    replyCount: toNum(raw.replyCount ?? raw.replies),
+    createdBy: pickStr(raw.createdByName, raw.createdBy, raw.ownerName, "—"),
+    createdAt: pickStr(raw.createdAt, raw.createdOn, ""),
+    audit: [],
+  };
+}
+
+export function normalizeWhatsAppCampaign(
+  raw: Record<string, unknown>,
+  index: number,
+): WhatsAppCampaign {
+  const id = pickStr(raw.id, raw.uuid, raw.campaignId) || `crm-wa-${index}`;
+  const name = pickStr(raw.name, raw.title, "Untitled WhatsApp");
+  const contentSid = pickStr(raw.contentSid);
+  const approval: WhatsAppApprovalStatus = contentSid ? "Approved" : "Draft";
+  return {
+    id,
+    campaignId: pickStr(raw.campaignCode, raw.code, raw.campaignId, id),
+    name,
+    templateId: contentSid || pickStr(raw.templateId, "wt1"),
+    templateName: pickStr(raw.templateName, contentSid || "WhatsApp template"),
+    templateApproval: approval,
+    templateBody: pickStr(raw.messageBody, raw.body, ""),
+    audience: pickStr(raw.audience, raw.audienceName, "All"),
+    status: mapWaStatus(pickStr(raw.status, raw.state, "DRAFT")),
+    scheduledAt: pickStr(raw.scheduledAt, raw.startsAt) || undefined,
+    sentCount: toNum(raw.sentCount ?? raw.sent),
+    deliveredCount: toNum(raw.deliveredCount ?? raw.delivered),
+    readCount: toNum(raw.openCount ?? raw.readCount ?? raw.reads),
     failedCount: toNum(raw.failedCount ?? raw.failed),
     replyCount: toNum(raw.replyCount ?? raw.replies),
     createdBy: pickStr(raw.createdByName, raw.createdBy, raw.ownerName, "—"),
@@ -212,6 +297,15 @@ async function campaignsMutate(
   return crmFetch(auth, campaignsPath(suffix), init);
 }
 
+function asCampaignRow(data: unknown): Record<string, unknown> | null {
+  const rows = extractRecords(data);
+  if (rows[0]) return rows[0];
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    return data as Record<string, unknown>;
+  }
+  return null;
+}
+
 export async function listCrmCampaigns(
   query: CrmCampaignQuery = {},
 ): Promise<Record<string, unknown>[]> {
@@ -231,35 +325,57 @@ export async function listCrmCampaigns(
 export async function listCrmEmailCampaigns(
   query: CrmCampaignQuery = {},
 ): Promise<EmailCampaign[]> {
-  const rows = await listCrmCampaigns(query);
-  return rows
-    .filter((row) => detectChannel(row) !== "SMS")
+  const rows = await listCrmCampaigns({
+    ...query,
+    channel: query.channel ?? "EMAIL",
+  });
+  const email = rows
+    .filter((row) => detectChannel(row) === "EMAIL")
+    .map((row, index) => normalizeEmailCampaign(row, index));
+  if (email.length) return email;
+  const all = await listCrmCampaigns(query);
+  return all
+    .filter((row) => detectChannel(row) === "EMAIL")
     .map((row, index) => normalizeEmailCampaign(row, index));
 }
 
 export async function listCrmSmsCampaigns(
   query: CrmCampaignQuery = {},
 ): Promise<SmsCampaign[]> {
-  const rows = await listCrmCampaigns({ ...query, channel: query.channel ?? "SMS" });
+  const rows = await listCrmCampaigns({
+    ...query,
+    channel: query.channel ?? "SMS",
+  });
   const sms = rows
     .filter((row) => detectChannel(row) === "SMS")
     .map((row, index) => normalizeSmsCampaign(row, index));
   if (sms.length) return sms;
-  // Some backends omit channel; re-list all and filter.
   const all = await listCrmCampaigns(query);
   return all
     .filter((row) => detectChannel(row) === "SMS")
     .map((row, index) => normalizeSmsCampaign(row, index));
 }
 
+export async function listCrmWhatsAppCampaigns(
+  query: CrmCampaignQuery = {},
+): Promise<WhatsAppCampaign[]> {
+  const rows = await listCrmCampaigns({
+    ...query,
+    channel: query.channel ?? "WHATSAPP",
+  });
+  const wa = rows
+    .filter((row) => detectChannel(row) === "WHATSAPP")
+    .map((row, index) => normalizeWhatsAppCampaign(row, index));
+  if (wa.length) return wa;
+  const all = await listCrmCampaigns(query);
+  return all
+    .filter((row) => detectChannel(row) === "WHATSAPP")
+    .map((row, index) => normalizeWhatsAppCampaign(row, index));
+}
+
 export async function getCrmCampaign(id: string): Promise<Record<string, unknown> | null> {
   const data = await campaignsGet(`/${id}`);
-  const rows = extractRecords(data);
-  if (rows[0]) return rows[0];
-  if (data && typeof data === "object" && !Array.isArray(data)) {
-    return data as Record<string, unknown>;
-  }
-  return null;
+  return asCampaignRow(data);
 }
 
 export async function createCrmCampaign(
@@ -269,12 +385,82 @@ export async function createCrmCampaign(
     method: "POST",
     body: JSON.stringify(body),
   });
-  const rows = extractRecords(data);
-  if (rows[0]) return rows[0];
-  if (data && typeof data === "object" && !Array.isArray(data)) {
-    return data as Record<string, unknown>;
-  }
-  return null;
+  return asCampaignRow(data);
+}
+
+export async function createCrmEmailCampaign(input: {
+  name: string;
+  subject: string;
+  fromName: string;
+  fromEmail: string;
+  audience: string;
+  type: EmailCampaignType;
+  body?: string;
+  templateName?: string;
+  scheduledAt?: string;
+}): Promise<EmailCampaign> {
+  const [segment, template] = await Promise.all([
+    ensureCrmSegment(input.audience),
+    ensureCrmEmailTemplate({
+      name: input.templateName || input.name,
+      subject: input.subject,
+      body: input.body || `<p>${input.subject}</p>`,
+    }),
+  ]);
+  const remote = await createCrmCampaign({
+    channel: "EMAIL",
+    name: input.name,
+    subjectLine: input.subject,
+    fromName: input.fromName,
+    fromEmail: input.fromEmail,
+    templateId: template.id,
+    segmentId: segment.id,
+    campaignType: toNestEmailCampaignType(input.type),
+    scheduledAt: input.scheduledAt || undefined,
+  });
+  if (!remote) throw new Error("Email campaign was not created");
+  return normalizeEmailCampaign(remote, 0);
+}
+
+export async function createCrmSmsCampaign(input: {
+  name: string;
+  message: string;
+  audience: string;
+  type: SmsCampaignType;
+  scheduledAt?: string;
+}): Promise<SmsCampaign> {
+  const segment = await ensureCrmSegment(input.audience);
+  const remote = await createCrmCampaign({
+    channel: "SMS",
+    name: input.name,
+    messageBody: input.message,
+    segmentId: segment.id,
+    campaignType: toNestSmsCampaignType(input.type),
+    scheduledAt: input.scheduledAt || undefined,
+  });
+  if (!remote) throw new Error("SMS campaign was not created");
+  return normalizeSmsCampaign(remote, 0);
+}
+
+export async function createCrmWhatsAppCampaign(input: {
+  name: string;
+  contentSid: string;
+  audience: string;
+  messageBody?: string;
+  scheduledAt?: string;
+}): Promise<WhatsAppCampaign> {
+  const segment = await ensureCrmSegment(input.audience);
+  const remote = await createCrmCampaign({
+    channel: "WHATSAPP",
+    name: input.name,
+    contentSid: input.contentSid,
+    messageBody: input.messageBody || undefined,
+    segmentId: segment.id,
+    campaignType: "REMINDER",
+    scheduledAt: input.scheduledAt || undefined,
+  });
+  if (!remote) throw new Error("WhatsApp campaign was not created");
+  return normalizeWhatsAppCampaign(remote, 0);
 }
 
 export async function updateCrmCampaign(
@@ -285,8 +471,7 @@ export async function updateCrmCampaign(
     method: "PATCH",
     body: JSON.stringify(patch),
   });
-  const rows = extractRecords(data);
-  return rows[0] ?? null;
+  return asCampaignRow(data);
 }
 
 export async function deleteCrmCampaign(id: string): Promise<void> {
@@ -298,8 +483,7 @@ export async function launchCrmCampaign(id: string): Promise<Record<string, unkn
     method: "POST",
     body: "{}",
   });
-  const rows = extractRecords(data);
-  return rows[0] ?? null;
+  return asCampaignRow(data);
 }
 
 export async function tryCrm<T>(run: () => Promise<T>): Promise<T | null> {

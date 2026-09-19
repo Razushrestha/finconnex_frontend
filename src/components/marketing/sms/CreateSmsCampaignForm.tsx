@@ -12,6 +12,7 @@ import {
   type SmsCampaignStatus,
   type SmsCampaignType,
 } from "@/lib/marketing/sms/types";
+import { tryCrm } from "@/lib/campaigns/api";
 import {
   AUDIENCE_OPTIONS,
   SMS_TEMPLATE_SEEDS,
@@ -29,13 +30,26 @@ import {
 } from "@/components/sales/CreateEntityForm";
 
 interface Props {
-  layoutId: string;
-  redirect: boolean;
+  layoutId?: string;
+  redirect?: boolean;
+  variant?: "page" | "modal";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onCreated?: () => void;
 }
 
 const SMS_LIMIT = 160;
 
-export function CreateSmsCampaignForm({ layoutId: _l, redirect: _r }: Props) {
+export function CreateSmsCampaignForm({
+  layoutId: _l,
+  redirect: _r,
+  variant = "page",
+  open = true,
+  onOpenChange,
+  onCreated,
+}: Props) {
+  void _l;
+  void _r;
   const router = useRouter();
   const [name, setName] = useState("");
   const [type, setType] = useState<SmsCampaignType>("Reminder");
@@ -46,6 +60,23 @@ export function CreateSmsCampaignForm({ layoutId: _l, redirect: _r }: Props) {
   const [scheduledAt, setScheduledAt] = useState("");
   const [createdBy, setCreatedBy] = useState<string>(defaultActorName());
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const modalResetKey = `${variant}|${open}`;
+  const [prevModalResetKey, setPrevModalResetKey] = useState(modalResetKey);
+  if (prevModalResetKey !== modalResetKey) {
+    setPrevModalResetKey(modalResetKey);
+    if (variant === "modal" && open) {
+      setName("");
+      setType("Reminder");
+      setStatus("Draft");
+      setAudience(AUDIENCE_OPTIONS[4]);
+      setTemplateId(SMS_TEMPLATE_SEEDS[0].id);
+      setMessage(SMS_TEMPLATE_SEEDS[0].body);
+      setScheduledAt("");
+      setCreatedBy(defaultActorName());
+      setErrors({});
+    }
+  }
 
   function onTemplateChange(id: string) {
     setTemplateId(id);
@@ -93,9 +124,29 @@ export function CreateSmsCampaignForm({ layoutId: _l, redirect: _r }: Props) {
         },
       ],
     });
+    void tryCrm(async () => {
+      const { createCrmSmsCampaign } = await import("@/lib/campaigns/api");
+      const normalized = await createCrmSmsCampaign({
+        name: created.name,
+        message: created.message,
+        audience: created.audience,
+        type: created.type,
+        scheduledAt: created.scheduledAt,
+      });
+      if (normalized.id !== created.id) {
+        const { deleteSmsCampaign } = await import("@/lib/marketing/sms/types");
+        deleteSmsCampaign(created.id);
+      }
+      upsertSmsCampaign(normalized);
+    });
     if (createAnother) {
       setName("");
       setErrors({});
+      return;
+    }
+    if (variant === "modal") {
+      onCreated?.();
+      onOpenChange?.(false);
       return;
     }
     router.push(`/marketing/sms/${created.id}`);
@@ -114,6 +165,9 @@ export function CreateSmsCampaignForm({ layoutId: _l, redirect: _r }: Props) {
       listHref="/marketing/sms"
       saveLabel="Save draft"
       onSave={onSave}
+      variant={variant}
+      open={open}
+      onOpenChange={onOpenChange}
     >
       <Field label="Name" required error={errors.name} className="sm:col-span-2">
         <InputShell icon={MessageSquare} error={!!errors.name}>

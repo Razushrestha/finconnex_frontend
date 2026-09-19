@@ -20,11 +20,7 @@ import {
   type EmailCampaignStatus,
   type EmailCampaignType,
 } from "@/lib/marketing/email/types";
-import {
-  createCrmCampaign,
-  normalizeEmailCampaign,
-  tryCrm,
-} from "@/lib/campaigns/api";
+import { tryCrm } from "@/lib/campaigns/api";
 import {
   AUDIENCE_OPTIONS,
   EMAIL_TEMPLATE_SEEDS,
@@ -42,14 +38,24 @@ import {
 } from "@/components/sales/CreateEntityForm";
 
 interface Props {
-  layoutId: string;
-  redirect: boolean;
+  layoutId?: string;
+  redirect?: boolean;
+  variant?: "page" | "modal";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onCreated?: () => void;
 }
 
 export function CreateEmailCampaignForm({
   layoutId: _l,
   redirect: _r,
+  variant = "page",
+  open = true,
+  onOpenChange,
+  onCreated,
 }: Props) {
+  void _l;
+  void _r;
   const router = useRouter();
   const [name, setName] = useState("");
   const [type, setType] = useState<EmailCampaignType>("One-time");
@@ -66,6 +72,27 @@ export function CreateEmailCampaignForm({
   const [body, setBody] = useState(EMAIL_TEMPLATE_SEEDS[0].bodyHtml);
   const [createdBy, setCreatedBy] = useState<string>(defaultActorName());
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const modalResetKey = `${variant}|${open}`;
+  const [prevModalResetKey, setPrevModalResetKey] = useState(modalResetKey);
+  if (prevModalResetKey !== modalResetKey) {
+    setPrevModalResetKey(modalResetKey);
+    if (variant === "modal" && open) {
+      setName("");
+      setType("One-time");
+      setStatus("Draft");
+      setAudience(AUDIENCE_OPTIONS[0]);
+      setTemplateId(EMAIL_TEMPLATE_SEEDS[0].id);
+      setSubject(EMAIL_TEMPLATE_SEEDS[0].subject);
+      setFromName(defaultActorName());
+      setFromEmail("john@finconnex.example");
+      setScheduledAt("");
+      setPreviewText(EMAIL_TEMPLATE_SEEDS[0].previewText);
+      setBody(EMAIL_TEMPLATE_SEEDS[0].bodyHtml);
+      setCreatedBy(defaultActorName());
+      setErrors({});
+    }
+  }
 
   function onTemplateChange(id: string) {
     setTemplateId(id);
@@ -126,21 +153,18 @@ export function CreateEmailCampaignForm({
       ],
     });
     void tryCrm(async () => {
-      const remote = await createCrmCampaign({
+      const { createCrmEmailCampaign } = await import("@/lib/campaigns/api");
+      const normalized = await createCrmEmailCampaign({
         name: created.name,
-        channel: "EMAIL",
-        type: created.type,
-        status: created.status,
-        audience: created.audience,
         subject: created.subject,
         fromName: created.fromName,
         fromEmail: created.fromEmail,
-        scheduledAt: created.scheduledAt,
+        audience: created.audience,
+        type: created.type,
         body: created.body,
-        previewText: created.previewText,
+        templateName: created.templateName,
+        scheduledAt: created.scheduledAt,
       });
-      if (!remote) return;
-      const normalized = normalizeEmailCampaign(remote, 0);
       if (normalized.id !== created.id) {
         const { deleteEmailCampaign } = await import(
           "@/lib/marketing/email/types"
@@ -152,6 +176,11 @@ export function CreateEmailCampaignForm({
     if (createAnother) {
       setName("");
       setErrors({});
+      return;
+    }
+    if (variant === "modal") {
+      onCreated?.();
+      onOpenChange?.(false);
       return;
     }
     router.push(`/marketing/email/${created.id}`);
@@ -173,6 +202,9 @@ export function CreateEmailCampaignForm({
       listHref="/marketing/email"
       saveLabel="Save draft"
       onSave={onSave}
+      variant={variant}
+      open={open}
+      onOpenChange={onOpenChange}
     >
       <Field
         label="Name"

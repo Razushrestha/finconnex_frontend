@@ -80,6 +80,11 @@ const ALLOWED_ROOTS = new Set([
   "admin",
   "client-portals",
   "reports",
+  "campaigns",
+  "forms",
+  "segments",
+  "inbox",
+  "templates",
 ]);
 
 function isAllowed(path: string[]): boolean {
@@ -124,7 +129,11 @@ function isAllowed(path: string[]): boolean {
   }
   if (!ALLOWED_ROOTS.has(root)) return false;
   if (root === "public") {
-    return path[1] === "smart-hubs" || path[1] === "smart-short-links";
+    return (
+      path[1] === "smart-hubs" ||
+      path[1] === "smart-short-links" ||
+      path[1] === "forms"
+    );
   }
   return true;
 }

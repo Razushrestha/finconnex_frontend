@@ -285,7 +285,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { MessageSquare } from "lucide-react";
 import {
   SMS_CAMPAIGN_STATUSES,
@@ -298,6 +298,7 @@ import {
   type SmsCampaignType,
 } from "@/lib/marketing/sms/types";
 import { useCrmCampaigns } from "@/lib/campaigns/use-crm-campaigns";
+import { CreateSmsCampaignForm } from "@/components/marketing/sms/CreateSmsCampaignForm";
 import {
   CampaignHeader,
   MarketingListShell,
@@ -385,17 +386,25 @@ const columns: DataTableColumn<SmsCampaign>[] = [
 
 export default function SmsCampaignsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<SmsCampaign[]>(seed);
   const [statusTab, setStatusTab] = useState<SmsCampaignStatus | "All">("All");
   const [typeFilter, setTypeFilter] = useState<SmsCampaignType | "All">("All");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [createOpen, setCreateOpen] = useState(
+    () => searchParams.get("create") === "1",
+  );
   const pageSize = 8;
   const crm = useCrmCampaigns("sms");
 
   useEffect(() => {
     setRows(listSmsCampaigns());
-  }, [crm.source, crm.loading]);
+  }, [crm.source, crm.loading, createOpen]);
+
+  useEffect(() => {
+    if (searchParams.get("create") === "1") setCreateOpen(true);
+  }, [searchParams]);
 
   useEffect(() => {
     setPage(1);
@@ -482,12 +491,22 @@ export default function SmsCampaignsPage() {
         title="SMS Campaigns"
         totalCount={filtered.length}
         onExport={exportCsv}
-        onCreate={() =>
-          router.push(
-            "/marketing/sms/create?layoutid=standard&redirect=false",
-          )
-        }
+        onCreate={() => setCreateOpen(true)}
         createLabel="New SMS"
+      />
+      <CreateSmsCampaignForm
+        variant="modal"
+        open={createOpen}
+        onOpenChange={(next) => {
+          setCreateOpen(next);
+          if (!next && searchParams.get("create") === "1") {
+            router.replace("/marketing/sms");
+          }
+        }}
+        onCreated={() => {
+          setRows(listSmsCampaigns());
+          crm.refresh();
+        }}
       />
       <div className="mb-1 flex items-center gap-2 px-1">
         <span

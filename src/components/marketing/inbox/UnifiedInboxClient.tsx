@@ -49,6 +49,12 @@ import {
   type InboxAttachment,
   type InboxStatus,
 } from "@/lib/marketing/inbox/types";
+import { useCrmInbox } from "@/lib/inbox/use-crm-inbox";
+import {
+  replyToCrmConversation,
+  setCrmConversationStatus,
+} from "@/lib/inbox/api";
+import { isUuid } from "@/lib/activity-timeline/auth";
 import {
   crmMessageToInbox,
   isDemoInboxMessageId,
@@ -552,6 +558,7 @@ const EMOJI_CATEGORIES: { id: string; label: string; emojis: string[] }[] = [
 ];
 
 export function UnifiedInboxClient() {
+  const crm = useCrmInbox();
   const [rows, setRows] = useState<InboxConversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [channelFilter, setChannelFilter] = useState<InboxChannel | "All">(
@@ -593,8 +600,10 @@ export function UnifiedInboxClient() {
     const firstOpen = list.find((c) => !c.archived) ?? list[0];
     if (firstOpen) {
       setActiveId(firstOpen.id);
+    } else {
+      setActiveId(null);
     }
-  }, []);
+  }, [crm.source, crm.loading]);
 
   const active = rows.find((c) => c.id === activeId) ?? null;
 
@@ -811,6 +820,17 @@ export function UnifiedInboxClient() {
       timestamp: formatInboxAt(),
       unreadCount: 0,
     });
+    if (isUuid(active.id) && body && !scheduled) {
+      const channel =
+        active.channel === "WhatsApp"
+          ? ("WHATSAPP" as const)
+          : active.channel === "SMS"
+            ? ("SMS" as const)
+            : undefined;
+      void replyToCrmConversation(active.id, body, { channel }).catch(() => {
+        /* local reply already persisted */
+      });
+    }
     const parent = resolveInboxCrmParent(active);
     if (parent && body && !scheduled) {
       void tryCrmMessage(async () => {
@@ -1001,6 +1021,17 @@ export function UnifiedInboxClient() {
   function setStatus(status: InboxStatus) {
     if (!active) return;
     persist({ ...active, status });
+    if (isUuid(active.id)) {
+      const nestStatus =
+        status === "Pending"
+          ? "PENDING"
+          : status === "Resolved"
+            ? "RESOLVED"
+            : "OPEN";
+      void setCrmConversationStatus(active.id, nestStatus).catch(() => {
+        /* local status already persisted */
+      });
+    }
     flash(`Status → ${status}`);
   }
 
@@ -1105,6 +1136,20 @@ export function UnifiedInboxClient() {
             <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
               Inbox
             </h1>
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                crm.source === "api"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-slate-100 text-slate-500",
+              )}
+            >
+              {crm.source === "api"
+                ? "Live CRM"
+                : crm.loading
+                  ? "Connecting…"
+                  : "Demo"}
+            </span>
             {unreadTotal > 0 ? (
               <span className="rounded-full bg-[#F3ECFB] px-2 py-0.5 text-[11px] font-semibold text-[#5A32A3]">
                 {unreadTotal} unread

@@ -4,14 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import {
   listCrmEmailCampaigns,
   listCrmSmsCampaigns,
-  tryCrm,
+  listCrmWhatsAppCampaigns,
 } from "@/lib/campaigns/api";
-import { mergeCrmEmailCampaigns } from "@/lib/marketing/email/types";
-import { mergeCrmSmsCampaigns } from "@/lib/marketing/sms/types";
+import { replaceCrmEmailCampaigns } from "@/lib/marketing/email/types";
+import { replaceCrmSmsCampaigns } from "@/lib/marketing/sms/types";
+import { replaceCrmWhatsAppCampaigns } from "@/lib/marketing/whatsapp/types";
 
 export type CampaignsDataSource = "api" | "demo";
 
-export function useCrmCampaigns(channel: "email" | "sms" | "all" = "all") {
+export function useCrmCampaigns(
+  channel: "email" | "sms" | "whatsapp" | "all" = "all",
+) {
   const [source, setSource] = useState<CampaignsDataSource>("demo");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,24 +29,22 @@ export function useCrmCampaigns(channel: "email" | "sms" | "all" = "all") {
 
     void (async () => {
       try {
-        let count = 0;
         if (channel === "email" || channel === "all") {
           const email = await listCrmEmailCampaigns();
           if (cancelled) return;
-          if (email.length) {
-            mergeCrmEmailCampaigns(email);
-            count += email.length;
-          }
+          replaceCrmEmailCampaigns(email);
         }
         if (channel === "sms" || channel === "all") {
-          const sms = await tryCrm(() => listCrmSmsCampaigns());
+          const sms = await listCrmSmsCampaigns();
           if (cancelled) return;
-          if (sms?.length) {
-            mergeCrmSmsCampaigns(sms);
-            count += sms.length;
-          }
+          replaceCrmSmsCampaigns(sms);
         }
-        setSource(count ? "api" : "demo");
+        if (channel === "whatsapp" || channel === "all") {
+          const wa = await listCrmWhatsAppCampaigns();
+          if (cancelled) return;
+          replaceCrmWhatsAppCampaigns(wa);
+        }
+        if (!cancelled) setSource("api");
       } catch (err) {
         if (cancelled) return;
         setSource("demo");

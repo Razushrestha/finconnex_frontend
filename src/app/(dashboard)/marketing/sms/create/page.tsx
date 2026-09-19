@@ -1,15 +1,5 @@
-import { CreateSmsCampaignForm } from "@/components/marketing/sms/CreateSmsCampaignForm";
+import { redirect } from "next/navigation";
 
-export default async function CreateSmsCampaignPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ layoutid?: string; redirect?: string }>;
-}) {
-  const sp = await searchParams;
-  return (
-    <CreateSmsCampaignForm
-      layoutId={sp.layoutid ?? "standard"}
-      redirect={sp.redirect !== "false"}
-    />
-  );
+export default function CreateSmsCampaignPage() {
+  redirect("/marketing/sms?create=1");
 }

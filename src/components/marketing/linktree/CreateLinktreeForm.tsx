@@ -28,11 +28,24 @@ import {
 } from "@/components/sales/CreateEntityForm";
 
 interface Props {
-  layoutId: string;
-  redirect: boolean;
+  layoutId?: string;
+  redirect?: boolean;
+  variant?: "page" | "modal";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onCreated?: () => void;
 }
 
-export function CreateLinktreeForm({ layoutId: _l, redirect: _r }: Props) {
+export function CreateLinktreeForm({
+  layoutId: _l,
+  redirect: _r,
+  variant = "page",
+  open = true,
+  onOpenChange,
+  onCreated,
+}: Props) {
+  void _l;
+  void _r;
   const router = useRouter();
   const [displayName, setDisplayName] = useState("");
   const [role, setRole] = useState("Mortgage broker");
@@ -59,6 +72,34 @@ export function CreateLinktreeForm({ layoutId: _l, redirect: _r }: Props) {
   useEffect(() => {
     setBooks(bookingOptions());
   }, []);
+
+  const modalResetKey = `${variant}|${open}`;
+  const [prevModalResetKey, setPrevModalResetKey] = useState(modalResetKey);
+  if (prevModalResetKey !== modalResetKey) {
+    setPrevModalResetKey(modalResetKey);
+    if (variant === "modal" && open) {
+      setDisplayName("");
+      setRole("Mortgage broker");
+      setBio("");
+      setPhone("");
+      setEmail("");
+      setWhatsapp("");
+      setBookingSlug("");
+      setBookingLabel("Book a consult");
+      setAccent("forest");
+      setStatus("Draft");
+      setOwner(defaultActorName());
+      setLinkItems([
+        {
+          id: "nl1",
+          type: "Form",
+          label: "Home loan enquiry",
+          url: "/f/home-loan-lead",
+        },
+      ]);
+      setErrors({});
+    }
+  }
 
   function validate() {
     const next: Record<string, string> = {};
@@ -97,6 +138,11 @@ export function CreateLinktreeForm({ layoutId: _l, redirect: _r }: Props) {
       setErrors({});
       return;
     }
+    if (variant === "modal") {
+      onCreated?.();
+      onOpenChange?.(false);
+      return;
+    }
     router.push(`/marketing/linktree/${created.id}`);
   }
 
@@ -113,6 +159,9 @@ export function CreateLinktreeForm({ layoutId: _l, redirect: _r }: Props) {
       listHref="/marketing/linktree"
       saveLabel="Save page"
       onSave={onSave}
+      variant={variant}
+      open={open}
+      onOpenChange={onOpenChange}
     >
       <Field
         label="Display name"

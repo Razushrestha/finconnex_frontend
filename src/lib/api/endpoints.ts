@@ -1392,13 +1392,37 @@ export const ENDPOINT_CATALOG = [
   { method: "DELETE", path: "/workspaces/:workspaceId/notifications/clear-read", module: "notifications" },
   { method: "DELETE", path: "/workspaces/:workspaceId/notifications/:id", module: "notifications" },
 
-  // Campaigns (email/SMS; JWT required)
-  { method: "GET", path: "/campaigns", module: "campaigns", notes: "List email/SMS campaigns" },
+  // Campaigns (email/SMS/WhatsApp; JWT required)
+  { method: "GET", path: "/campaigns", module: "campaigns", notes: "List email/SMS/WhatsApp campaigns" },
   { method: "GET", path: "/campaigns/:id", module: "campaigns" },
-  { method: "POST", path: "/campaigns", module: "campaigns", notes: "Create email or SMS campaign" },
+  { method: "POST", path: "/campaigns", module: "campaigns", notes: "Create email, SMS or WhatsApp campaign" },
   { method: "PATCH", path: "/campaigns/:id", module: "campaigns" },
   { method: "DELETE", path: "/campaigns/:id", module: "campaigns", notes: "Soft-delete" },
   { method: "POST", path: "/campaigns/:id/launch", module: "campaigns" },
+
+  // Segments (campaign audiences)
+  { method: "GET", path: "/segments", module: "segments", notes: "List contact segments" },
+  { method: "POST", path: "/segments", module: "segments", notes: "Create a contact segment" },
+
+  // Message templates (email/SMS reusable bodies)
+  { method: "GET", path: "/templates", module: "templates", notes: "List reusable templates" },
+  { method: "POST", path: "/templates", module: "templates", notes: "Create a template" },
+
+  // Marketing forms
+  { method: "GET", path: "/forms", module: "forms", notes: "List workspace forms" },
+  { method: "POST", path: "/forms", module: "forms", notes: "Create a form" },
+  { method: "GET", path: "/forms/:id", module: "forms" },
+  { method: "PATCH", path: "/forms/:id", module: "forms" },
+  { method: "POST", path: "/forms/:id/publish", module: "forms" },
+  { method: "POST", path: "/forms/:id/pause", module: "forms" },
+  { method: "POST", path: "/forms/:id/archive", module: "forms" },
+  { method: "POST", path: "/public/forms/:slug/submit", module: "forms", notes: "Public form submit" },
+
+  // Unified inbox
+  { method: "GET", path: "/inbox/conversations", module: "inbox", notes: "List inbox conversations" },
+  { method: "GET", path: "/inbox/conversations/:id", module: "inbox" },
+  { method: "POST", path: "/inbox/conversations/:id/reply", module: "inbox" },
+  { method: "POST", path: "/inbox/conversations/:id/status", module: "inbox" },
 
   // Team Chat (workspace-scoped)
   {

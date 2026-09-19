@@ -10,6 +10,7 @@ import {
   upsertWhatsAppCampaign,
   type WhatsAppCampaignStatus,
 } from "@/lib/marketing/whatsapp/types";
+import { tryCrm } from "@/lib/campaigns/api";
 import {
   AUDIENCE_OPTIONS,
   WHATSAPP_TEMPLATE_SEEDS,
@@ -25,14 +26,24 @@ import {
 } from "@/components/sales/CreateEntityForm";
 
 interface Props {
-  layoutId: string;
-  redirect: boolean;
+  layoutId?: string;
+  redirect?: boolean;
+  variant?: "page" | "modal";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onCreated?: () => void;
 }
 
 export function CreateWhatsAppCampaignForm({
   layoutId: _l,
   redirect: _r,
+  variant = "page",
+  open = true,
+  onOpenChange,
+  onCreated,
 }: Props) {
+  void _l;
+  void _r;
   const router = useRouter();
   const [name, setName] = useState("");
   const [templateId, setTemplateId] = useState(WHATSAPP_TEMPLATE_SEEDS[0].id);
@@ -44,11 +55,29 @@ export function CreateWhatsAppCampaignForm({
 
   const template = WHATSAPP_TEMPLATE_SEEDS.find((t) => t.id === templateId)!;
 
+  const modalResetKey = `${variant}|${open}`;
+  const [prevModalResetKey, setPrevModalResetKey] = useState(modalResetKey);
+  if (prevModalResetKey !== modalResetKey) {
+    setPrevModalResetKey(modalResetKey);
+    if (variant === "modal" && open) {
+      setName("");
+      setTemplateId(WHATSAPP_TEMPLATE_SEEDS[0].id);
+      setAudience(AUDIENCE_OPTIONS[4]);
+      setStatus("Draft");
+      setScheduledAt("");
+      setCreatedBy(defaultActorName());
+      setErrors({});
+    }
+  }
+
   function validate() {
     const next: Record<string, string> = {};
     if (!name.trim()) next.name = "Name is required";
     if (!templateId) next.templateId = "Approved WhatsApp template is required";
     if (!audience.trim()) next.audience = "Audience is required";
+    if (!/^HX[0-9a-f]{32}$/i.test(template.contentSid)) {
+      next.templateId = "Template needs a valid Twilio Content SID (HX…)";
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -60,7 +89,7 @@ export function CreateWhatsAppCampaignForm({
       id: ids.id,
       campaignId: ids.campaignId,
       name: name.trim(),
-      templateId,
+      templateId: template.contentSid,
       templateName: template.name,
       templateApproval: template.approvalStatus,
       templateBody: template.body,
@@ -85,9 +114,31 @@ export function CreateWhatsAppCampaignForm({
         },
       ],
     });
+    void tryCrm(async () => {
+      const { createCrmWhatsAppCampaign } = await import("@/lib/campaigns/api");
+      const normalized = await createCrmWhatsAppCampaign({
+        name: created.name,
+        contentSid: template.contentSid,
+        audience: created.audience,
+        messageBody: created.templateBody,
+        scheduledAt: created.scheduledAt,
+      });
+      if (normalized.id !== created.id) {
+        const { deleteWhatsAppCampaign } = await import(
+          "@/lib/marketing/whatsapp/types"
+        );
+        deleteWhatsAppCampaign(created.id);
+      }
+      upsertWhatsAppCampaign(normalized);
+    });
     if (createAnother) {
       setName("");
       setErrors({});
+      return;
+    }
+    if (variant === "modal") {
+      onCreated?.();
+      onOpenChange?.(false);
       return;
     }
     router.push(`/marketing/whatsapp/${created.id}`);
@@ -109,6 +160,9 @@ export function CreateWhatsAppCampaignForm({
       listHref="/marketing/whatsapp"
       saveLabel="Save draft"
       onSave={onSave}
+      variant={variant}
+      open={open}
+      onOpenChange={onOpenChange}
     >
       <Field
         label="Name"

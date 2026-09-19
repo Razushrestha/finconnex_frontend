@@ -104,6 +104,10 @@ export function mergeCrmEmailCampaigns(remote: EmailCampaign[]) {
   writeStore([...remote, ...local]);
 }
 
+export function replaceCrmEmailCampaigns(remote: EmailCampaign[]) {
+  writeStore(remote.map((c) => ({ ...c })));
+}
+
 export function deleteEmailCampaign(id: string) {
   writeStore(listEmailCampaigns().filter((c) => c.id !== id));
 }

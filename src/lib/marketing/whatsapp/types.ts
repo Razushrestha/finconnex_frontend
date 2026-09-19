@@ -86,6 +86,17 @@ export function upsertWhatsAppCampaign(c: WhatsAppCampaign) {
   return c;
 }
 
+export function replaceCrmWhatsAppCampaigns(remote: WhatsAppCampaign[]) {
+  writeStore(remote.map((c) => ({ ...c })));
+}
+
+export function mergeCrmWhatsAppCampaigns(remote: WhatsAppCampaign[]) {
+  if (!remote.length) return;
+  const remoteIds = new Set(remote.map((c) => c.id));
+  const local = listWhatsAppCampaigns().filter((c) => !remoteIds.has(c.id));
+  writeStore([...remote, ...local]);
+}
+
 export function deleteWhatsAppCampaign(id: string) {
   writeStore(listWhatsAppCampaigns().filter((c) => c.id !== id));
 }

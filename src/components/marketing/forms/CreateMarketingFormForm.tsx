@@ -15,6 +15,7 @@ import {
   type FormFieldType,
   type FormStatus,
 } from "@/lib/marketing/forms/types";
+import { tryCrmForm } from "@/lib/forms/api";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import { defaultActorName } from "@/lib/rules/actor";
 import {
@@ -129,6 +130,26 @@ export function CreateMarketingFormForm({
       createdBy,
       updatedAt: new Date().toLocaleDateString("en-AU"),
       embedSlug: ids.embedSlug,
+    });
+    void tryCrmForm(async () => {
+      const { createCrmForm, publishCrmForm } = await import("@/lib/forms/api");
+      let remote = await createCrmForm({
+        name: created.name,
+        slug: created.embedSlug,
+        destination: created.destination,
+        fieldDefs: created.fieldDefs,
+        thankYouMessage: created.thankYouMessage,
+      });
+      if (status === "Published") {
+        remote = (await publishCrmForm(remote.id)) ?? remote;
+      }
+      if (remote.id !== created.id) {
+        const { deleteMarketingForm } = await import(
+          "@/lib/marketing/forms/types"
+        );
+        deleteMarketingForm(created.id);
+      }
+      upsertMarketingForm(remote);
     });
     if (createAnother) {
       setName("");

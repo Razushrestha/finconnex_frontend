@@ -3,14 +3,20 @@
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import {
-    ChevronLeft,
+  ChevronLeft,
   CheckCircle2,
   ChevronDown,
   Loader2,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FORM_CANVAS } from "@/lib/layout";
 import { formEnter } from "@/lib/motion";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 /** Span the full form grid: use for notes, long text, section blocks. */
 export const formFullSpan = "col-span-full";
@@ -194,6 +200,10 @@ interface CreateEntityFormShellProps {
   saveLabel: string;
   onSave: (createAnother: boolean) => void | Promise<void>;
   children: React.ReactNode;
+  /** Match Create Lead: dialog popup vs full page. Default page. */
+  variant?: "page" | "modal";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function CreateEntityFormShell({
@@ -209,6 +219,9 @@ export function CreateEntityFormShell({
   saveLabel,
   onSave,
   children,
+  variant = "page",
+  open = true,
+  onOpenChange,
 }: CreateEntityFormShellProps) {
   const router = useRouter();
   void _breadcrumbParent;
@@ -223,9 +236,92 @@ export function CreateEntityFormShell({
     try {
       await Promise.resolve(onSave(createAnother));
     } finally {
-      // If we navigated away this unmounts; otherwise reset for Save & New / validation.
       window.setTimeout(() => setSaving(false), 350);
     }
+  }
+
+  function handleCancel() {
+    if (variant === "modal") {
+      onOpenChange?.(false);
+      return;
+    }
+    router.push(listHref);
+  }
+
+  const footerButtons = (
+    <>
+      <button
+        type="button"
+        onClick={handleCancel}
+        disabled={saving}
+        className="h-8 rounded-md border border-slate-200 bg-white px-3 text-[12px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-slate-300"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={() => void handleSave(true)}
+        disabled={saving}
+        className="h-8 rounded-md border border-violet-200 bg-violet-50 px-3 text-[12px] font-semibold text-violet-700 transition-colors hover:bg-violet-100 disabled:opacity-50 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300"
+      >
+        Save &amp; New
+      </button>
+      <button
+        type="button"
+        onClick={() => void handleSave(false)}
+        disabled={saving}
+        className="inline-flex h-8 min-w-[7.5rem] items-center justify-center gap-1.5 rounded-md bg-violet-600 px-4 text-[12px] font-semibold text-white transition-all hover:bg-violet-700 disabled:opacity-90 active:scale-[0.98]"
+      >
+        {saving ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Saving…
+          </>
+        ) : (
+          saveLabel
+        )}
+      </button>
+    </>
+  );
+
+  if (variant === "modal") {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          showCloseButton={false}
+          className="flex max-h-[min(90vh,840px)] w-full max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl"
+        >
+          <DialogTitle className="sr-only">{title}</DialogTitle>
+          <header className="flex shrink-0 items-center gap-3 border-b border-slate-200 px-5 py-3 dark:border-zinc-800">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-600 text-white">
+              <CardIcon className="h-4 w-4" />
+            </div>
+            <h2
+              title={subtitle}
+              className="min-w-0 flex-1 truncate text-[15px] font-bold tracking-tight text-slate-900 dark:text-white"
+            >
+              {title}
+            </h2>
+            <button
+              type="button"
+              onClick={() => onOpenChange?.(false)}
+              aria-label="Close"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-zinc-800"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </header>
+          <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 dark:bg-zinc-900/40">
+            <div className="grid grid-cols-1 content-start gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-2">
+              {children}
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+            {footerButtons}
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
   }
 
   return (
@@ -253,7 +349,6 @@ export function CreateEntityFormShell({
         </div>
       </header>
 
-      {/* Form body: fills remaining viewport */}
       <div className="min-h-0 flex-1 overflow-auto bg-slate-50/70 dark:bg-zinc-900/40">
         <div className={cn(FORM_CANVAS, formEnter)}>
           <div className="col-span-full flex justify-end">
@@ -263,45 +358,9 @@ export function CreateEntityFormShell({
         </div>
       </div>
 
-      {/* Actions: compact sticky bar */}
       <div className="shrink-0 border-t border-slate-200/80 bg-slate-50/95 px-3 py-2 sm:px-4 lg:px-5 dark:border-zinc-800 dark:bg-zinc-900/95">
-        <div className="flex w-full flex-wrap items-center justify-between gap-2">
-          <p className="hidden text-[11px] text-slate-400 sm:block">
-            {/* Local until you save */}
-          </p>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => router.push(listHref)}
-              disabled={saving}
-              className="h-8 rounded-md border border-slate-200 bg-white px-3 text-[12px] font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-950 dark:text-slate-300"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSave(true)}
-              disabled={saving}
-              className="h-8 rounded-md border border-violet-200 bg-violet-50 px-3 text-[12px] font-semibold text-violet-700 transition-colors hover:bg-violet-100 disabled:opacity-50 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300"
-            >
-              Save &amp; New
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSave(false)}
-              disabled={saving}
-              className="inline-flex h-8 min-w-[7.5rem] items-center justify-center gap-1.5 rounded-md bg-violet-600 px-4 text-[12px] font-semibold text-white transition-all hover:bg-violet-700 disabled:opacity-90 active:scale-[0.98]"
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Saving…
-                </>
-              ) : (
-                saveLabel
-              )}
-            </button>
-          </div>
+        <div className="flex w-full flex-wrap items-center justify-end gap-2">
+          {footerButtons}
         </div>
       </div>
     </div>

@@ -440,7 +440,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Mail } from "lucide-react";
 import {
   EMAIL_CAMPAIGN_STATUSES,
@@ -454,6 +454,7 @@ import {
   type EmailCampaignType,
 } from "@/lib/marketing/email/types";
 import { useCrmCampaigns } from "@/lib/campaigns/use-crm-campaigns";
+import { CreateEmailCampaignForm } from "@/components/marketing/email/CreateEmailCampaignForm";
 import {
   CampaignHeader,
   MarketingListShell,
@@ -539,6 +540,7 @@ const columns: DataTableColumn<EmailCampaign>[] = [
 
 export default function EmailCampaignsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<EmailCampaign[]>(seed);
   const [statusTab, setStatusTab] = useState<EmailCampaignStatus | "All">(
     "All",
@@ -548,12 +550,19 @@ export default function EmailCampaignsPage() {
   );
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [createOpen, setCreateOpen] = useState(
+    () => searchParams.get("create") === "1",
+  );
   const pageSize = 8;
   const crm = useCrmCampaigns("email");
 
   useEffect(() => {
     setRows(listEmailCampaigns());
-  }, [crm.source, crm.loading]);
+  }, [crm.source, crm.loading, createOpen]);
+
+  useEffect(() => {
+    if (searchParams.get("create") === "1") setCreateOpen(true);
+  }, [searchParams]);
 
   useEffect(() => {
     setPage(1);
@@ -645,12 +654,22 @@ export default function EmailCampaignsPage() {
         title="Email Campaigns"
         totalCount={filtered.length}
         onExport={exportCsv}
-        onCreate={() =>
-          router.push(
-            "/marketing/email/create?layoutid=standard&redirect=false",
-          )
-        }
+        onCreate={() => setCreateOpen(true)}
         createLabel="New campaign"
+      />
+      <CreateEmailCampaignForm
+        variant="modal"
+        open={createOpen}
+        onOpenChange={(next) => {
+          setCreateOpen(next);
+          if (!next && searchParams.get("create") === "1") {
+            router.replace("/marketing/email");
+          }
+        }}
+        onCreated={() => {
+          setRows(listEmailCampaigns());
+          crm.refresh();
+        }}
       />
       <div className="mb-1 flex items-center gap-2 px-1">
         <span

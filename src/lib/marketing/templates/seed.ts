@@ -19,6 +19,8 @@ export interface WhatsAppTemplateSeed {
   name: string;
   category: "Marketing" | "Utility" | "Authentication";
   approvalStatus: "Draft" | "Pending Meta" | "Approved" | "Rejected";
+  /** Twilio Content SID (HX…) required by Nest WhatsApp campaigns */
+  contentSid: string;
   body: string;
   header?: string;
   buttons?: string[];
@@ -78,6 +80,7 @@ export const WHATSAPP_TEMPLATE_SEEDS: WhatsAppTemplateSeed[] = [
     name: "appointment_reminder_v1",
     category: "Utility",
     approvalStatus: "Approved",
+    contentSid: "HXa1b2c3d4e5f678901234567890123456",
     header: "Appointment reminder",
     body: "Hi {{1}}, your FinConnex appointment is on {{2}} at {{3}}. Reply if you need to reschedule.",
     buttons: ["Confirm", "Reschedule"],
@@ -87,6 +90,7 @@ export const WHATSAPP_TEMPLATE_SEEDS: WhatsAppTemplateSeed[] = [
     name: "promo_rate_alert_v1",
     category: "Marketing",
     approvalStatus: "Pending Meta",
+    contentSid: "HXb2c3d4e5f6789012345678901234567a",
     body: "Hi {{1}}, special rate window this week for {{2}}. Tap below to book a call.",
     buttons: ["Book call"],
   },
@@ -95,6 +99,7 @@ export const WHATSAPP_TEMPLATE_SEEDS: WhatsAppTemplateSeed[] = [
     name: "doc_request_v1",
     category: "Utility",
     approvalStatus: "Draft",
+    contentSid: "HXc3d4e5f6789012345678901234567ab2",
     body: "Hi {{1}}, please upload {{2}} so we can continue your application.",
   },
 ];

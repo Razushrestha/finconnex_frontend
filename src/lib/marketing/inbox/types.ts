@@ -151,6 +151,10 @@ export function upsertInboxConversation(c: InboxConversation) {
   return c;
 }
 
+export function replaceCrmInboxConversations(remote: InboxConversation[]) {
+  writeStore(remote.map((c) => ({ ...c })));
+}
+
 export function getInboxConversationById(id: string) {
   return listInboxConversations().find((c) => c.id === id);
 }

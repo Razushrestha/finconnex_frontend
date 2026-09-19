@@ -268,7 +268,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { MessageCircle } from "lucide-react";
 import {
   WHATSAPP_CAMPAIGN_STATUSES,
@@ -278,6 +278,9 @@ import {
   type WhatsAppCampaign,
   type WhatsAppCampaignStatus,
 } from "@/lib/marketing/whatsapp/types";
+import { useCrmCampaigns } from "@/lib/campaigns/use-crm-campaigns";
+import { cn } from "@/lib/utils";
+import { CreateWhatsAppCampaignForm } from "@/components/marketing/whatsapp/CreateWhatsAppCampaignForm";
 import {
   CampaignHeader,
   MarketingListShell,
@@ -372,17 +375,26 @@ const columns: DataTableColumn<WhatsAppCampaign>[] = [
 
 export default function WhatsAppCampaignsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [rows, setRows] = useState<WhatsAppCampaign[]>(seed);
   const [statusTab, setStatusTab] = useState<WhatsAppCampaignStatus | "All">(
     "All",
   );
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [createOpen, setCreateOpen] = useState(
+    () => searchParams.get("create") === "1",
+  );
   const pageSize = 8;
+  const crm = useCrmCampaigns("whatsapp");
 
   useEffect(() => {
     setRows(listWhatsAppCampaigns());
-  }, []);
+  }, [crm.source, crm.loading, createOpen]);
+
+  useEffect(() => {
+    if (searchParams.get("create") === "1") setCreateOpen(true);
+  }, [searchParams]);
 
   useEffect(() => {
     setPage(1);
@@ -470,13 +482,42 @@ export default function WhatsAppCampaignsPage() {
         title="WhatsApp Campaigns"
         totalCount={filtered.length}
         onExport={exportCsv}
-        onCreate={() =>
-          router.push(
-            "/marketing/whatsapp/create?layoutid=standard&redirect=false",
-          )
-        }
+        onCreate={() => setCreateOpen(true)}
         createLabel="New campaign"
       />
+      <CreateWhatsAppCampaignForm
+        variant="modal"
+        open={createOpen}
+        onOpenChange={(next) => {
+          setCreateOpen(next);
+          if (!next && searchParams.get("create") === "1") {
+            router.replace("/marketing/whatsapp");
+          }
+        }}
+        onCreated={() => {
+          setRows(listWhatsAppCampaigns());
+          crm.refresh();
+        }}
+      />
+      <div className="mb-1 flex items-center gap-2 px-1">
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+            crm.source === "api"
+              ? "bg-emerald-50 text-emerald-700"
+              : "bg-slate-100 text-slate-500",
+          )}
+        >
+          {crm.source === "api"
+            ? "Live CRM"
+            : crm.loading
+              ? "Connecting…"
+              : "Demo"}
+        </span>
+        {crm.error && crm.source === "demo" ? (
+          <span className="text-[10px] text-slate-500">{crm.error}</span>
+        ) : null}
+      </div>
 
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-1 py-2">
         <StatusDropdown

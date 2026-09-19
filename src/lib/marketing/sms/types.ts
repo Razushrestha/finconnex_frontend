@@ -96,6 +96,10 @@ export function mergeCrmSmsCampaigns(remote: SmsCampaign[]) {
   writeStore([...remote, ...local]);
 }
 
+export function replaceCrmSmsCampaigns(remote: SmsCampaign[]) {
+  writeStore(remote.map((c) => ({ ...c })));
+}
+
 export function deleteSmsCampaign(id: string) {
   writeStore(listSmsCampaigns().filter((c) => c.id !== id));
 }
