@@ -93,13 +93,50 @@ function pushInApp(input: {
   });
 }
 
-async function sendEmailSafe(email: string, subject: string, body: string) {
+async function sendEmailSafe(
+  email: string,
+  subject: string,
+  body: string,
+  opts?: { html?: string; text?: string },
+): Promise<void> {
   if (!looksLikeEmail(email)) return;
-  await sendEmailDemoLive({
+  const onPublicBook =
+    typeof window !== "undefined" &&
+    /^\/book(\/|$)/i.test(window.location.pathname);
+
+  // Public /book must not depend on a host CRM cookie — SendGrid via a
+  // dedicated route. Failures used to be swallowed by sendEmailDemoLive.
+  if (onPublicBook && typeof window !== "undefined") {
+    const res = await fetch("/api/book/confirm-mail", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: email.trim(),
+        subject: subject.trim() || "Appointment update",
+        html: opts?.html?.trim() || body.trim() || subject,
+        text: opts?.text?.trim() || body.trim() || subject,
+      }),
+    });
+    if (!res.ok) {
+      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      throw new Error(
+        json.error ||
+          (res.status === 503
+            ? "Confirmation email is not configured on this server (SendGrid)."
+            : "Could not send the confirmation email."),
+      );
+    }
+    return;
+  }
+
+  const result = await sendEmailDemoLive({
     email,
     subject: subject.trim() || "Appointment update",
     body: body.trim() || subject,
   });
+  if (!result.ok) {
+    throw new Error(result.message || "Could not send email");
+  }
 }
 
 async function sendSmsSafe(phone: string, body: string) {
@@ -213,13 +250,13 @@ export async function dispatchBookingNotifications(input: {
   event: BookingNotifyEvent;
   page: BookingPage;
   booking: Booking;
-}): Promise<NotifyChannel[]> {
+}): Promise<{ channels: NotifyChannel[]; emailError?: string }> {
   const row = notificationRowFor(
     input.page.notifyPrefs as NotificationRow[] | undefined,
     input.event,
   );
   const channels = enabledNotifyChannels(row);
-  if (channels.length === 0) return [];
+  if (channels.length === 0) return { channels: [] };
 
   const tokens = tokensFor(input.page, input.booking);
   const subject = interpolateNotify(row.emailSubject, tokens);
@@ -230,18 +267,24 @@ export async function dispatchBookingNotifications(input: {
   const user = Boolean(row.notifyUser);
 
   const tasks: Array<Promise<unknown>> = [];
+  const emailTasks: Array<Promise<unknown>> = [];
 
   if (channels.includes("Email")) {
     if (contact) {
       if (input.event === "confirmed") {
         const copy = confirmEmailCopy(input.page, input.booking);
-        tasks.push(sendEmailSafe(tokens.email, copy.subject, copy.html));
+        emailTasks.push(
+          sendEmailSafe(tokens.email, copy.subject, copy.html, {
+            html: copy.html,
+            text: copy.text,
+          }),
+        );
       } else {
-        tasks.push(sendEmailSafe(tokens.email, subject, emailBody));
+        emailTasks.push(sendEmailSafe(tokens.email, subject, emailBody));
       }
     }
     if (user && tokens.ownerEmail) {
-      tasks.push(sendEmailSafe(tokens.ownerEmail, subject, emailBody));
+      emailTasks.push(sendEmailSafe(tokens.ownerEmail, subject, emailBody));
     }
   }
 
@@ -269,8 +312,18 @@ export async function dispatchBookingNotifications(input: {
     }
   }
 
+  const emailSettled = await Promise.allSettled(emailTasks);
   await Promise.allSettled(tasks);
-  return channels;
+  const emailFailure = emailSettled.find(
+    (row): row is PromiseRejectedResult => row.status === "rejected",
+  );
+  const emailError =
+    emailFailure?.reason instanceof Error
+      ? emailFailure.reason.message
+      : emailFailure
+        ? String(emailFailure.reason)
+        : undefined;
+  return { channels, emailError };
 }
 
 type QueuedNotify = {

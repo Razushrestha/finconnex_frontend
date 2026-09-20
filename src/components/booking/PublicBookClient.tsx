@@ -143,6 +143,7 @@ function BookFlow({
   );
   const [manageToken, setManageToken] = useState("");
   const [confirmed, setConfirmed] = useState<Booking | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [crmSlots, setCrmSlots] = useState<string[]>([]);
@@ -274,6 +275,7 @@ function BookFlow({
     if (!selectedDate || !selectedSlot) return;
 
     setSubmitting(true);
+    setEmailError(null);
     try {
       const dateStr = toLocalDateStr(selectedDate);
       const start = `${dateStr}T${selectedSlot}`;
@@ -290,6 +292,7 @@ function BookFlow({
       });
       setManageToken(result.manageToken);
       setConfirmed(result.booking);
+      if (result.emailError) setEmailError(result.emailError);
       setStep("done");
     } catch {
       setErrors((prev) => ({
@@ -700,6 +703,18 @@ function BookFlow({
                   <p className="mt-0.5 text-[13px] text-slate-500">
                     {guestTz} {timezoneGmtLabel}
                   </p>
+                  {confirmed.joinUrl ? (
+                    <p className="mt-3 text-[13px]">
+                      <a
+                        href={confirmed.joinUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-[#5B4BDB] hover:underline break-all"
+                      >
+                        Join meeting
+                      </a>
+                    </p>
+                  ) : null}
                   <p className="mt-5 text-[13px]">
                     <a
                       href={googleCalendarUrl({
@@ -739,6 +754,21 @@ function BookFlow({
                 </div>
               </div>
             </div>
+            {emailError ? (
+              <p className="mt-4 max-w-[520px] text-center text-[13px] text-amber-700">
+                Your appointment is booked, but the confirmation email could not
+                be sent ({emailError}). Save the details above or add them to
+                your calendar.
+              </p>
+            ) : confirmed.joinUrl ? (
+              <p className="mt-4 max-w-[520px] text-center text-[13px] text-slate-500">
+                A confirmation email with the meeting link was sent to{" "}
+                <span className="font-medium text-slate-700">
+                  {confirmed.guestEmail}
+                </span>
+                .
+              </p>
+            ) : null}
             {manageToken ? (
               <Link
                 href={publicManageUrl(page.slug, manageToken)}

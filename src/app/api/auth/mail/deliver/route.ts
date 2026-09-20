@@ -24,13 +24,15 @@ type AttachmentIn = {
 const BOOK_MAIL_HEADER = "x-finconnex-book-mail";
 
 function sameOrigin(request: Request): boolean {
+  const site = request.headers.get("sec-fetch-site");
+  if (site === "same-origin" || site === "same-site") return true;
   try {
     const origin = request.headers.get("origin");
     if (!origin) {
       // Same-origin navigations / some browsers omit Origin on POST from fetch
       // with credentials; Referer is enough to block arbitrary cross-site posts.
       const referer = request.headers.get("referer");
-      if (!referer) return false;
+      if (!referer) return site === null || site === "none";
       return new URL(referer).origin === new URL(request.url).origin;
     }
     return new URL(origin).origin === new URL(request.url).origin;

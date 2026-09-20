@@ -98,7 +98,11 @@ export async function confirmPublicBooking(input: {
   timezone?: string;
   /** Existing manage token when guest is rescheduling */
   rescheduleToken?: string;
-}): Promise<{ booking: Booking; manageToken: string }> {
+}): Promise<{
+  booking: Booking;
+  manageToken: string;
+  emailError?: string;
+}> {
   const page = input.page;
   const timezone = input.timezone?.trim() || page.timezone;
   const end = slotEndIso(input.start, page.durationMinutes);
@@ -283,15 +287,14 @@ export async function confirmPublicBooking(input: {
   upsertBooking(booking);
   recomputePageStats(page.id);
 
-  void dispatchBookingNotifications({
+  const notify = await dispatchBookingNotifications({
     event: existing ? "reschedule" : "confirmed",
     page: { ...page, timezone, videoLink: joinUrl || page.videoLink },
     booking,
-  }).then(() => {
-    if (!existing) queueBookingLifecycleNotifies(page, booking);
   });
+  if (!existing) queueBookingLifecycleNotifies(page, booking);
 
-  return { booking, manageToken };
+  return { booking, manageToken, emailError: notify.emailError };
 }
 
 export async function cancelPublicBooking(token: string): Promise<Booking | null> {
