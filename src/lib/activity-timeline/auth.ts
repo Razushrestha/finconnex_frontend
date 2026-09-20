@@ -78,6 +78,13 @@ export function clearCrmTokens() {
       /* ignore */
     }
   }
+  // Drop the previous account's cached profile so the next sign-in doesn't
+  // greet / label the UI with someone else's name.
+  try {
+    window.sessionStorage.removeItem("user-profile:v1");
+  } catch {
+    /* ignore */
+  }
 }
 
 export function getCrmApiBaseUrl(): string | null {

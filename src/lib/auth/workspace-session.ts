@@ -11,7 +11,9 @@ import type { SessionPayload } from "@/lib/auth/types";
 import {
   applyCrmTokenCookies,
   crmSelectWorkspace,
+  crmMe,
   crmWorkspaceRole,
+  sessionFromCrmUser,
   type CrmWorkspace,
 } from "@/lib/auth/crm-server";
 
@@ -46,16 +48,27 @@ export async function remintSessionForWorkspace(
     selected.refreshToken ?? tokens.refreshToken,
   );
 
+  // Re-read the account against the scoped token so name/email stay this
+  // person's — not whatever was baked into the previous session cookie.
+  const live = await crmMe(
+    selected.data.accessToken,
+    selected.refreshToken ?? tokens.refreshToken,
+  ).catch(() => null);
+
   const remember = sessionRememberMe(session);
+  const fromLive = live
+    ? sessionFromCrmUser(live.data, workspace, selected.data.accessToken)
+    : null;
   const nextSession = await createSessionToken(
     {
-      ...session,
+      ...(fromLive ?? session),
       tenantId: workspace.id,
       tenantSlug: workspace.slug,
       tenantName: workspace.name,
       hasWorkspace: true,
-      workspaceRole,
+      workspaceRole: fromLive?.workspaceRole ?? workspaceRole,
       rememberMe: remember,
+      mustChangePassword: false,
     },
     remember,
   );

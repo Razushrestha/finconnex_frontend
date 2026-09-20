@@ -22,12 +22,31 @@ interface DashboardShellProps {
   session: SessionPayload;
 }
 
+type ShellUser = {
+  name: string;
+  role: string;
+  workspaceRole?: string | null;
+  email?: string;
+  tenantName?: string;
+  avatarUrl?: string;
+};
+
 export function DashboardShell({ children, session }: DashboardShellProps) {
   return (
     <SettingsCrmProvider>
       <DashboardShellInner session={session}>{children}</DashboardShellInner>
     </SettingsCrmProvider>
   );
+}
+
+function shellUserFromSession(session: SessionPayload): ShellUser {
+  return {
+    name: session.name,
+    role: session.role,
+    workspaceRole: session.workspaceRole,
+    email: session.email,
+    tenantName: session.tenantName,
+  };
 }
 
 function DashboardShellInner({ children, session }: DashboardShellProps) {
@@ -39,6 +58,7 @@ function DashboardShellInner({ children, session }: DashboardShellProps) {
   }
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [user, setUser] = useState<ShellUser>(() => shellUserFromSession(session));
   const shellRef = useRef<HTMLDivElement>(null);
   const crm = useCrmSettings();
   const brand = useMemo(
@@ -54,6 +74,63 @@ function DashboardShellInner({ children, session }: DashboardShellProps) {
   );
 
   useEffect(() => {
+    setUser(shellUserFromSession(session));
+  }, [
+    session.userId,
+    session.name,
+    session.email,
+    session.role,
+    session.workspaceRole,
+    session.tenantName,
+  ]);
+
+  // Cookie session can lag the CRM (e.g. after switching accounts). Refresh
+  // name / email / workspace role from /api/auth/me so the profile menu shows
+  // whoever actually signed in.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/auth/me", { credentials: "same-origin" });
+        const data = (await res.json().catch(() => null)) as {
+          authenticated?: boolean;
+          user?: {
+            id?: string;
+            name?: string;
+            email?: string;
+            role?: string;
+            workspaceRole?: string | null;
+            avatar?: string | null;
+          };
+          tenant?: { name?: string };
+        } | null;
+        if (cancelled || !data?.authenticated || !data.user) return;
+        setUser({
+          name: data.user.name?.trim() || session.name,
+          email: data.user.email?.trim() || session.email,
+          role: data.user.role?.trim() || session.role,
+          workspaceRole:
+            data.user.workspaceRole ?? session.workspaceRole ?? null,
+          tenantName: data.tenant?.name?.trim() || session.tenantName,
+          avatarUrl: data.user.avatar?.trim() || undefined,
+        });
+      } catch {
+        /* keep cookie session */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    session.userId,
+    session.name,
+    session.email,
+    session.role,
+    session.workspaceRole,
+    session.tenantName,
+  ]);
+
+  useEffect(() => {
     /*
      * The permission engine must be told the role held *in this workspace*.
      * `session.role` is User.globalRole — the platform staff tier, USER for
@@ -62,21 +139,22 @@ function DashboardShellInner({ children, session }: DashboardShellProps) {
      * rest. Platform staff keep their own tier; everyone else is judged by
      * their membership, exactly as the Nest guards judge them.
      */
-    const role = isPlatformAdminRole(session.role)
+    const role = isPlatformAdminRole(user.role)
       ? "System Admin"
-      : (rulesRoleForWorkspaceRole(session.workspaceRole) ?? session.role);
+      : (rulesRoleForWorkspaceRole(user.workspaceRole) ?? user.role);
     setRulesActor({
       id: session.userId,
-      name: session.name,
-      email: session.email,
+      name: user.name,
+      email: user.email || session.email,
       role,
     });
   }, [
     session.userId,
-    session.name,
     session.email,
-    session.role,
-    session.workspaceRole,
+    user.name,
+    user.email,
+    user.role,
+    user.workspaceRole,
   ]);
 
   // Focus/scrollIntoView on overlays can shift this overflow-hidden shell and
@@ -108,7 +186,7 @@ function DashboardShellInner({ children, session }: DashboardShellProps) {
         >
           <Sidebar
             collapsed={collapsed}
-            tenantName={session.tenantName}
+            tenantName={user.tenantName ?? session.tenantName}
             mobileOpen={mobileOpen}
             onMobileOpenChange={setMobileOpen}
             onToggleSidebar={() => setCollapsed((c) => !c)}
@@ -119,13 +197,7 @@ function DashboardShellInner({ children, session }: DashboardShellProps) {
         <Suspense fallback={<div className="h-16 shrink-0 border-b border-border/60" />}>
           <Navbar
             onOpenMobileMenu={() => setMobileOpen(true)}
-            user={{
-              name: session.name,
-              role: session.role,
-              workspaceRole: session.workspaceRole,
-              email: session.email,
-              tenantName: session.tenantName,
-            }}
+            user={user}
           />
         </Suspense>
         <main className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-auto">

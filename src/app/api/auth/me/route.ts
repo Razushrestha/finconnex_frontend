@@ -29,7 +29,7 @@ export async function GET() {
         const mapped = sessionFromCrmUser(
           live.data,
           {
-            id: session.tenantId,
+            id: live.data.workspaceId || session.tenantId,
             name: session.tenantName,
             slug: session.tenantSlug,
           },

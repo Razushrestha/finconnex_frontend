@@ -16,6 +16,7 @@ import {
   applyCrmTokenCookies,
   crmListMyWorkspaces,
   crmLogin,
+  crmMe,
   crmWorkspaceRole,
   CrmAuthError,
   sessionFromCrmUser,
@@ -133,20 +134,27 @@ export async function POST(request: Request) {
               ReturnType<typeof activateWorkspace>
             >["workspaces"],
           }));
-      // The login response predates workspace selection, so it carries no
-      // workspace role. Read it against the now-scoped token, otherwise a
-      // user who owns the workspace they were just dropped into would sit in
-      // the session as their global tier (USER) until the next /api/auth/me.
-      const workspaceRole = scoped.workspace
-        ? await crmWorkspaceRole(scoped.accessToken, scoped.refreshToken)
+      // Login returns the account before workspace selection, so it has no
+      // workspaceRole. Prefer a fresh /auth/me against the scoped token so the
+      // session cookie carries this person's name/email/role — not a stale
+      // snapshot from a previous browser session.
+      const live = scoped.workspace
+        ? await crmMe(scoped.accessToken, scoped.refreshToken).catch(
+            () => null,
+          )
         : null;
+      const mapped = sessionFromCrmUser(
+        live?.data ?? loggedIn.user,
+        scoped.workspace,
+        live?.accessToken ?? scoped.accessToken,
+      );
       const sessionFields = {
-        ...sessionFromCrmUser(
-          loggedIn.user,
-          scoped.workspace,
-          scoped.accessToken,
-        ),
-        workspaceRole,
+        ...mapped,
+        workspaceRole:
+          mapped.workspaceRole ??
+          (scoped.workspace
+            ? await crmWorkspaceRole(scoped.accessToken, scoped.refreshToken)
+            : null),
       };
       const token = await createSessionToken(
         { ...sessionFields, rememberMe: Boolean(rememberMe) },

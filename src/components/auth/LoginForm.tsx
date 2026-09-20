@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { logAuth } from "@/lib/rules";
 import { isPendingVerificationEmail } from "@/lib/auth/pending-verification";
-import { persistCrmTokens } from "@/lib/activity-timeline/auth";
+import { clearCrmTokens, persistCrmTokens } from "@/lib/activity-timeline/auth";
 
 function getSafeDashboardUrl(callbackUrl: string | null): string {
   if (
@@ -136,6 +136,10 @@ export function LoginForm() {
         accessToken?: string | null;
         refreshToken?: string | null;
       };
+      // Wipe the previous account's CRM tokens + cached profile before storing
+      // the new ones — otherwise the navbar / greeting can keep showing the
+      // last person who signed in on this browser.
+      clearCrmTokens();
       if (payload.accessToken) {
         persistCrmTokens({
           accessToken: payload.accessToken,

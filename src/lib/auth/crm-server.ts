@@ -111,9 +111,59 @@ function workspaceIdFromToken(token: string): string | null {
   return typeof id === "string" && id.length > 0 ? id : null;
 }
 
+function pickCrmStr(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+/**
+ * CRM payloads sometimes use snake_case or a single `name` / `displayName`
+ * instead of first/last. Normalize before we mint the FinConnex session so the
+ * navbar shows the signed-in person, not a blank / synthetic username.
+ */
+export function normalizeCrmUser(raw: unknown): CrmUser {
+  const r =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  let firstName = pickCrmStr(r.firstName, r.first_name) || null;
+  let lastName = pickCrmStr(r.lastName, r.last_name) || null;
+  const explicitName = pickCrmStr(r.name, r.displayName, r.display_name);
+  if (!firstName && !lastName && explicitName) {
+    const parts = explicitName.split(/\s+/).filter(Boolean);
+    firstName = parts[0] ?? null;
+    lastName = parts.slice(1).join(" ") || null;
+  }
+  const email = pickCrmStr(r.email);
+  const userName = pickCrmStr(r.userName, r.username, r.handle);
+  return {
+    id: pickCrmStr(r.id, r.userId) || String(r.id ?? ""),
+    email,
+    firstName,
+    lastName,
+    userName: userName || email || "user",
+    avatar: pickCrmStr(r.avatar, r.avatarUrl, r.photoUrl) || null,
+    globalRole: pickCrmStr(r.globalRole, r.global_role) || "USER",
+    isVerified: r.isVerified === true || r.is_verified === true,
+    workspaceRole: pickCrmStr(r.workspaceRole, r.workspace_role) || null,
+    workspaceId: pickCrmStr(r.workspaceId, r.workspace_id) || null,
+    mustChangePassword:
+      r.mustChangePassword === true || r.must_change_password === true,
+  };
+}
+
+function isSyntheticUsername(userName: string): boolean {
+  // `systemUsername()` → `{email-local}-{12 hex chars}`
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*-[a-f0-9]{8,}$/i.test(userName);
+}
+
 function displayName(user: CrmUser): string {
   const joined = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
-  return joined || user.userName || user.email;
+  if (joined) return joined;
+  if (user.userName && !isSyntheticUsername(user.userName)) return user.userName;
+  return user.email;
 }
 
 export function sessionFromCrmUser(
@@ -121,20 +171,23 @@ export function sessionFromCrmUser(
   workspace?: CrmWorkspace | null,
   accessToken?: string,
 ): SessionPayload {
+  const normalized = normalizeCrmUser(user);
   const fromJwt = accessToken ? workspaceIdFromToken(accessToken) : null;
+  const workspaceId =
+    workspace?.id || fromJwt || normalized.workspaceId || normalized.id;
   return {
-    userId: user.id,
-    email: user.email,
-    name: displayName(user),
+    userId: normalized.id,
+    email: normalized.email,
+    name: displayName(normalized),
     // Stays the platform tier. What someone may do *inside* a workspace is
     // `workspaceRole` — see the note on SessionPayload.
-    role: user.globalRole || "USER",
-    tenantId: workspace?.id || fromJwt || user.id,
+    role: normalized.globalRole || "USER",
+    tenantId: workspaceId,
     tenantSlug: workspace?.slug || "workspace",
     tenantName: workspace?.name || "Workspace",
-    hasWorkspace: !!(workspace?.id || fromJwt),
-    workspaceRole: asWorkspaceRole(user.workspaceRole),
-    mustChangePassword: user.mustChangePassword === true,
+    hasWorkspace: !!(workspace?.id || fromJwt || normalized.workspaceId),
+    workspaceRole: asWorkspaceRole(normalized.workspaceRole),
+    mustChangePassword: normalized.mustChangePassword === true,
   };
 }
 
@@ -445,7 +498,10 @@ export async function crmLogin(
   if (!data?.accessToken || !data?.refreshToken || !data?.user) {
     throw new CrmAuthError(502, "CRM login response was incomplete");
   }
-  return data;
+  return {
+    ...data,
+    user: normalizeCrmUser(data.user),
+  };
 }
 
 export async function refreshCrmTokens(refreshToken: string): Promise<{
@@ -475,7 +531,11 @@ export async function refreshCrmTokens(refreshToken: string): Promise<{
 }
 
 export async function crmMe(accessToken: string, refreshToken?: string | null) {
-  return crmFetch<CrmUser>("/auth/me", { accessToken, refreshToken });
+  const result = await crmFetch<CrmUser>("/auth/me", {
+    accessToken,
+    refreshToken,
+  });
+  return { ...result, data: normalizeCrmUser(result.data) };
 }
 
 /**
