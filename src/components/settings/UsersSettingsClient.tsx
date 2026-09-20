@@ -38,6 +38,7 @@ import {
   transferCrmWorkspaceOwnership,
   updateCrmWorkspaceMember,
 } from "@/lib/workspace-members/api";
+import { sendMemberWelcomeEmail } from "@/lib/workspace-members/welcome-email";
 import { notify, toast } from "@/lib/notify/toast";
 import {
   activateCrmWorkspaceMember,
@@ -303,21 +304,38 @@ export function UsersSettingsClient() {
       }
 
       const email = draft.email.trim();
+      const password = draft.password.trim();
+      const fullName = draft.name.trim();
       const { member, credentialsIssued } = await createCrmWorkspaceMember({
-        fullName: draft.name,
+        fullName,
         email,
-        password: draft.password,
+        password,
         role: draft.role,
         team: draft.team,
       });
       persistRemoteWorkspaceMember(member);
       if (credentialsIssued) {
-        toast.success(`${draft.name.trim()} added`, {
-          description: `Sign-in details were emailed to ${email}. They'll choose their own password when they first sign in.`,
-        });
+        try {
+          await sendMemberWelcomeEmail({
+            to: email,
+            fullName,
+            password,
+          });
+          toast.success(`${fullName} added`, {
+            description: `Sign-in details were emailed to ${email}. They'll choose their own password when they first sign in.`,
+          });
+        } catch (mailErr) {
+          toast.warning(`${fullName} was created`, {
+            description:
+              mailErr instanceof Error
+                ? `Account works, but email failed: ${mailErr.message} Share the password with them, or use Re-issue credentials.`
+                : "Account works, but the welcome email could not be sent.",
+            duration: 12_000,
+          });
+        }
       } else {
         // The CRM kept their existing password; the one typed here is void.
-        toast.warning(`${draft.name.trim()} already had an account`, {
+        toast.warning(`${fullName} already had an account`, {
           description: `They were added to this workspace and sign in with their existing password — not the one you entered.`,
           duration: 10_000,
         });
@@ -366,11 +384,29 @@ export function UsersSettingsClient() {
     }
     setBusy(true);
     try {
-      // No password: the CRM generates a strong one and mails it.
-      persistRemoteWorkspaceMember(await resendCrmWorkspaceCredentials(row.id));
-      toast.success("Sign-in details sent", {
-        description: `${row.email} will choose a new password at their next sign-in.`,
-      });
+      // Pass a generated password so we can also email it from FinConnex if CRM mail fails.
+      const password = generateMemberPassword();
+      persistRemoteWorkspaceMember(
+        await resendCrmWorkspaceCredentials(row.id, password),
+      );
+      try {
+        await sendMemberWelcomeEmail({
+          to: row.email,
+          fullName: row.name,
+          password,
+        });
+        toast.success("Sign-in details sent", {
+          description: `${row.email} will choose a new password at their next sign-in.`,
+        });
+      } catch (mailErr) {
+        toast.warning("Credentials were reset on the CRM", {
+          description:
+            mailErr instanceof Error
+              ? `Email failed: ${mailErr.message}`
+              : "Email could not be sent. Share the new password another way.",
+          duration: 12_000,
+        });
+      }
       crm.refresh();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
