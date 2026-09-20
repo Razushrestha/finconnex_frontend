@@ -21,7 +21,7 @@ describe("isEmptySignedInListPath", () => {
     }
   });
 
-  it("treats signature request and template lists as empty-list GETs", () => {
+  it("treats signature lists as empty-list GETs but does not stub them as missing", () => {
     expect(
       isEmptySignedInListPath(
         ["workspaces", workspace, "signature-requests"],
@@ -45,14 +45,15 @@ describe("isEmptySignedInListPath", () => {
     expect(
       isEmptySignedInListPath(["signature-requests", ""], "GET"),
     ).toBe(true);
+    // Live Nest serves these — BFF must proxy GET, not return [].
     expect(isHostedMissingSignatureListPath(["signature-requests"], "GET")).toBe(
-      true,
+      false,
     );
     expect(isHostedMissingSignatureListPath(["signature-templates"], "GET")).toBe(
-      true,
+      false,
     );
     expect(isHostedMissingSignatureListPath(["leads"], "GET")).toBe(false);
-    expect(isHostedMissingCrmGet(["signature-requests"], "GET")).toBe(true);
+    expect(isHostedMissingCrmGet(["signature-requests"], "GET")).toBe(false);
     expect(isHostedMissingCrmGet(["dashboard"], "GET")).toBe(false);
     expect(isHostedMissingCrmGet(["leads"], "GET")).toBe(false);
   });

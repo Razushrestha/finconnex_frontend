@@ -60,14 +60,12 @@ export function isEmptySignedInListPath(path: string[], method: string) {
   return !rest;
 }
 
-/** Hosted CRM 404s these modules; keep the UI on local drafts. */
+/** Hosted Nest serves these lists now — do not stub empty GETs. */
 export function isHostedMissingSignatureListPath(
-  path: string[],
-  method: string,
+  _path: string[],
+  _method: string,
 ) {
-  if (!isEmptySignedInListPath(path, method)) return false;
-  const resource = resourceSegments(path)[0];
-  return resource === "signature-requests" || resource === "signature-templates";
+  return false;
 }
 
 /** Skip the hosted round-trip so the Next access log is 200, not 404. */

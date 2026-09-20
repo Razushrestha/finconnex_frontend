@@ -50,9 +50,12 @@ import {
   isCrmSignatureTemplateId,
   persistRemoteSignatureTemplate,
   toCreateSignatureTemplateBody,
+  toUpdateSignatureTemplateBody,
   tryCrmSignatureTemplate,
   updateCrmSignatureTemplate,
 } from "@/lib/documents/signature/templates-api";
+import { uploadPrimaryAsCrmDocument } from "@/lib/documents/signature/send-request";
+import { isUuid } from "@/lib/activity-timeline/auth";
 
 let additionalDocIdCounter = 0;
 const nextAdditionalDocId = () =>
@@ -589,31 +592,61 @@ function CreateTemplateForm() {
           },
         ],
       });
-      const body = toCreateSignatureTemplateBody(saved);
       if (isCrmSignatureTemplateId(saved.id)) {
-        await tryCrmSignatureTemplate(() =>
-          updateCrmSignatureTemplate(saved.id, body),
-        );
-      } else {
         const remote = await tryCrmSignatureTemplate(() =>
-          createCrmSignatureTemplate(body),
+          updateCrmSignatureTemplate(
+            saved.id,
+            toUpdateSignatureTemplateBody(saved),
+          ),
         );
         if (remote) {
-          deleteSignatureRequest(saved.id);
           persistRemoteSignatureTemplate({
             ...saved,
             ...remote,
             recordType: "template",
           });
         }
+        toast.success("Template saved successfully!", {
+          description: "Redirecting to templates...",
+        });
+        router.push("/signature/templates");
+        return;
       }
+
+      const documentId = await uploadPrimaryAsCrmDocument(saved);
+      if (!documentId || !isUuid(documentId)) {
+        toast.error(
+          "Could not upload the PDF to CRM. Check your session and try again.",
+        );
+        return;
+      }
+      const remote = await tryCrmSignatureTemplate(() =>
+        createCrmSignatureTemplate(
+          toCreateSignatureTemplateBody(saved, documentId),
+        ),
+      );
+      if (!remote) {
+        toast.error(
+          "CRM could not save this template. It was kept as a local draft — open Templates again after fixing CRM access.",
+        );
+        router.push("/signature/templates");
+        return;
+      }
+      deleteSignatureRequest(saved.id);
+      persistRemoteSignatureTemplate({
+        ...saved,
+        ...remote,
+        recordType: "template",
+      });
       toast.success("Template saved successfully!", {
         description: "Redirecting to templates...",
       });
       router.push("/signature/templates");
     } catch (error) {
       console.error("Failed to save template:", error);
-      toast.error("Failed to save template.");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save template.",
+      );
     } finally {
       setIsSaving(false);
     }

@@ -7,11 +7,15 @@ import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import {
   normalizeSignatureRequestRemote,
   normalizeSignatureRequests,
+  toCrmFieldGeometry,
+  toCrmSignatureFieldType,
   tryCrmSignatureRequest,
 } from "@/lib/documents/signature/api";
 import {
+  PREFILL_RECIPIENT_ID,
   upsertSignatureRequest,
   type SignatureRequest,
+  type SignerRole,
 } from "@/lib/documents/signature/types";
 
 function pickStr(...values: unknown[]): string {
@@ -30,6 +34,12 @@ function compactBody(input: Record<string, unknown>): Record<string, unknown> {
       return true;
     }),
   );
+}
+
+function crmTemplateRole(role: SignerRole): string {
+  if (role === "Approver") return "APPROVER";
+  if (role === "CC") return "CC";
+  return "SIGNER";
 }
 
 export function workspaceSignatureTemplatesPath(
@@ -92,36 +102,60 @@ function asTemplate(data: unknown): SignatureRequest | null {
   return null;
 }
 
+/** Nest CreateSignatureTemplateDto — requires documentId + roles[].label. */
 export function toCreateSignatureTemplateBody(
+  input: SignatureRequest,
+  documentId: string,
+): Record<string, unknown> {
+  const roles = input.signers.map((signer) =>
+    compactBody({
+      label:
+        (signer.roleLabel ?? "").trim() ||
+        signer.name.trim() ||
+        signer.role,
+      role: crmTemplateRole(signer.role),
+      deliverVia: signer.deliveryMethod === "email_sms" ? "EMAIL_SMS" : "EMAIL",
+    }),
+  );
+  const roleIndexBySigner = new Map(
+    input.signers.map((signer, index) => [signer.id, index]),
+  );
+  const fields = input.fields.flatMap((field) => {
+    if (field.signerId === PREFILL_RECIPIENT_ID) return [];
+    const roleIndex = roleIndexBySigner.get(field.signerId);
+    if (roleIndex == null) return [];
+    const box = toCrmFieldGeometry(field);
+    return [
+      compactBody({
+        roleIndex,
+        type: toCrmSignatureFieldType(field.kind),
+        pageNumber: box.pageNumber,
+        x: box.x,
+        y: box.y,
+        width: box.width,
+        height: box.height,
+        required: field.required !== false,
+      }),
+    ];
+  });
+
+  return compactBody({
+    name: input.documentName.trim(),
+    description: pickStr(input.relatedTo),
+    documentId,
+    signingOrder: input.signingOrder === "parallel" ? "PARALLEL" : "SEQUENTIAL",
+    roles,
+    fields,
+  });
+}
+
+export function toUpdateSignatureTemplateBody(
   input: SignatureRequest,
 ): Record<string, unknown> {
   return compactBody({
-    title: input.documentName.trim(),
     name: input.documentName.trim(),
-    description: pickStr(input.relatedTo, input.documentFile),
-    signingOrder: input.signingOrder.toUpperCase(),
-    roles: input.signers.map((signer) =>
-      compactBody({
-        name:
-          (signer.roleLabel ?? "").trim() ||
-          signer.name.trim() ||
-          signer.role,
-        role: signer.role.toUpperCase(),
-        order: signer.order,
-      }),
-    ),
-    fields: input.fields.map((field) =>
-      compactBody({
-        type: field.kind.toUpperCase(),
-        page: field.page || 1,
-        x: field.x,
-        y: field.y,
-        width: field.w,
-        height: field.h,
-        required: field.required,
-        label: field.label,
-      }),
-    ),
+    description: pickStr(input.relatedTo),
+    signingOrder: input.signingOrder === "parallel" ? "PARALLEL" : "SEQUENTIAL",
   });
 }
 

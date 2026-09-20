@@ -1048,12 +1048,22 @@ export function replaceCrmSignatureRequests(remote: SignatureRequest[]) {
   ]);
 }
 
-/** Replace CRM template rows for the active workspace; keep documents. */
+/** Replace CRM template rows; keep unsynced local drafts (non-UUID ids). */
 export function replaceCrmSignatureTemplates(remote: SignatureRequest[]) {
   const previous = loadStored();
+  const remoteIds = new Set(remote.map((row) => row.id));
   const documents = previous.filter((row) => row.recordType !== "template");
+  const localDrafts = previous.filter(
+    (row) =>
+      row.recordType === "template" &&
+      !remoteIds.has(row.id) &&
+      !isCrmUuid(row.id),
+  );
   writeStore([
     ...documents.map((row) =>
+      normalizeSignatureRequest(row, { allowEmptyFields: true }),
+    ),
+    ...localDrafts.map((row) =>
       normalizeSignatureRequest(row, { allowEmptyFields: true }),
     ),
     ...remote.map((row) =>

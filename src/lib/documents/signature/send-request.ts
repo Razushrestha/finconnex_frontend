@@ -23,7 +23,7 @@ import {
 import { loadCachedSignatureFile } from "@/lib/documents/signature/file-cache";
 import { publishPublicSignSession } from "@/lib/documents/signature/publish-public-sign";
 
-async function uploadPrimaryAsCrmDocument(
+export async function uploadPrimaryAsCrmDocument(
   req: SignatureRequest,
 ): Promise<string | undefined> {
   const docs = getRequestDocuments(req);
