@@ -45,3 +45,10 @@ next-env.d.ts
 /data/settings-catalog/
 /data/public-sign/
 
+# Nested Nest CRM clone — own repo: kachhuwagroup/multi-crm-backend
+/multi-crm-backend-main/
+
+# Local API probe scripts (not part of the app)
+/scripts/probe-*.mjs
+/scripts/_pdf_extract.txt
+
