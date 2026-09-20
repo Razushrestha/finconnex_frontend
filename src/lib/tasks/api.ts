@@ -700,7 +700,8 @@ export async function updateCrmTask(
   if (patch.title) body.subject = patch.title;
   if (patch.taskType) body.taskType = apiTaskType(patch.taskType);
   if (patch.priority) body.priority = apiTaskPriority(patch.priority);
-  if (patch.status) body.status = apiTaskStatus(patch.status);
+  // Status is not on UpdateTaskDto — Nest forbidNonWhitelisted rejects it.
+  // Use syncTaskStatus / applyCrmTaskStatus (start, defer, complete, …).
   if (patch.dueDate) {
     const dueDate = toTaskIso(patch.dueDate);
     body.dueDate = dueDate;
@@ -937,9 +938,16 @@ export async function syncTaskStatus(
     await tryCrmTask(() => reopenCrmTask(id));
   }
 
-  const remote = await updateCrmTask(id, { status });
-  if (!remote) return null;
-  return remote.status === status ? remote : { ...remote, status };
+  // PATCH cannot set status; only lifecycle endpoints can.
+  const remote = await applyCrmTaskStatus(id, status);
+  if (remote) {
+    return remote.status === status ? remote : { ...remote, status };
+  }
+
+  // Not Started / Review: no lifecycle path (reopen already ran if needed).
+  const latest = await tryCrmTask(() => getCrmTask(id));
+  if (!latest) return null;
+  return latest.status === status ? latest : { ...latest, status };
 }
 
 export async function tryCrmTask<T>(run: () => Promise<T>): Promise<T | null> {

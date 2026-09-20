@@ -4,6 +4,7 @@ import { prepareEmailPayload } from "@/lib/emails/attach-files";
 import { createEmail } from "@/lib/emails/store";
 import { deliverQueuedCrmEmail } from "@/lib/emails/deliver";
 import type { Email } from "@/lib/emails/types";
+import { silentRequest } from "@/lib/notify/fetch-notifier";
 
 function uniqueEmails(list: Array<string | undefined>) {
   const seen = new Set<string>();
@@ -58,10 +59,15 @@ async function deliverThroughFinConnexMail(input: {
   });
   const files = input.files ?? [];
   if (typeof window !== "undefined") {
-    const res = await fetch("/api/auth/mail/deliver", {
+    const publicBook = isPublicBookSurface();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (publicBook) headers["x-finconnex-book-mail"] = "1";
+    const init: RequestInit = {
       method: "POST",
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({
         to: local.to,
         cc: local.cc,
@@ -70,14 +76,22 @@ async function deliverThroughFinConnexMail(input: {
         text: input.body,
         html: input.body,
       }),
-    });
+    };
+    // Booking already confirmed — don't toast a secondary mail failure as if
+    // the appointment itself failed.
+    const res = await fetch(
+      "/api/auth/mail/deliver",
+      publicBook ? silentRequest(init) : init,
+    );
     if (!res.ok) {
       const json = (await res.json().catch(() => ({}))) as { error?: string };
       throw new Error(
         json.error ||
           (res.status === 503
             ? "Email sending is not configured. Set SendGrid on this server, then retry."
-            : "Could not send the signing email."),
+            : publicBook
+              ? "Could not send the confirmation email."
+              : "Could not send the signing email."),
       );
     }
     if (files.length) {

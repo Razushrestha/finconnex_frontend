@@ -20,9 +20,30 @@ type AttachmentIn = {
   contentId?: string;
 };
 
+/** Guest /book confirmation mail sets this; no dashboard session required. */
+const BOOK_MAIL_HEADER = "x-finconnex-book-mail";
+
+function sameOrigin(request: Request): boolean {
+  try {
+    const origin = request.headers.get("origin");
+    if (!origin) {
+      // Same-origin navigations / some browsers omit Origin on POST from fetch
+      // with credentials; Referer is enough to block arbitrary cross-site posts.
+      const referer = request.headers.get("referer");
+      if (!referer) return false;
+      return new URL(referer).origin === new URL(request.url).origin;
+    }
+    return new URL(origin).origin === new URL(request.url).origin;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
+  const bookMail =
+    request.headers.get(BOOK_MAIL_HEADER) === "1" && sameOrigin(request);
   const session = await getSession();
-  if (!session) {
+  if (!session && !bookMail) {
     return NextResponse.json(
       { error: "Session has expired. Sign in again to send mail." },
       { status: 401 },

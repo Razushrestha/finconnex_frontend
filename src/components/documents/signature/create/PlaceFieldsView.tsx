@@ -373,13 +373,22 @@ export function PlaceFieldsView({
       }
     } catch (error) {
       console.error("Failed to process submission:", error);
-      toast.error(
-        isTemplate
-          ? "Failed to save template."
-          : error instanceof Error && error.message
-            ? error.message
-            : "Failed to send signature request.",
-      );
+      const message =
+        error instanceof Error && error.message.trim()
+          ? error.message
+          : isTemplate
+            ? "Failed to save template."
+            : "Failed to send signature request.";
+      toast.error(message);
+      if (
+        /CRM session expired|Session is invalid or expired|session has expired|sign out and sign in/i.test(
+          message,
+        )
+      ) {
+        window.setTimeout(() => {
+          window.location.href = "/login?reason=session_expired&callbackUrl=/signature/documents";
+        }, 1600);
+      }
     } finally {
       setIsSubmitting(false);
     }

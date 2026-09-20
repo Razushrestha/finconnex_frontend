@@ -112,6 +112,12 @@ const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
     "CRM session token unavailable. Sign out and sign in again so email sending can refresh your token.",
   "Session has expired. Sign in again.":
     "Session has expired. Sign out and sign in again.",
+  "Session is invalid or expired":
+    "Your CRM session expired. Sign out and sign in again, then resend the document.",
+  "auth.sessionUnauthorized":
+    "Your CRM session expired. Sign out and sign in again, then resend the document.",
+  "auth.error.sessionUnauthorized":
+    "Your CRM session expired. Sign out and sign in again, then resend the document.",
   "sms.error.phoneNumberNotConfigured":
     "Twilio from-number is missing on the CRM server.",
   "calendly.error.notConfigured":
@@ -124,12 +130,16 @@ export function crmErrorMessage(json: unknown, fallback: string): string {
   if (json && typeof json === "object") {
     const rec = json as Record<string, unknown>;
     const msg = rec.message;
+    const errField =
+      typeof rec.error === "string" && rec.error.trim() ? rec.error.trim() : null;
     const base = Array.isArray(msg) && msg.length
       ? msg.map(String).join(", ")
       : typeof msg === "string" && msg.trim()
         ? FRIENDLY_MESSAGE_KEYS[msg.trim()] ??
           (msg.trim().toLowerCase() !== "bad request" ? msg.trim() : null)
-        : null;
+        : errField
+          ? FRIENDLY_MESSAGE_KEYS[errField] ?? errField
+          : null;
     const detail = Array.isArray(rec.errors) && rec.errors.length
       ? rec.errors
           .map((item) => {

@@ -223,11 +223,11 @@ export function smokeTasksWiring() {
   if (!api.includes("workspaceTasksPath")) {
     fail("tasks client missing workspaceTasksPath");
   }
-  if (!api.includes("if (patch.status) body.status")) {
-    fail("updateCrmTask must persist status changes");
+  if (api.includes("if (patch.status) body.status")) {
+    fail("updateCrmTask must not PATCH status (API rejects it on UpdateTaskDto)");
   }
-  if (!api.includes("await updateCrmTask(id, { status })")) {
-    fail("syncTaskStatus must PATCH status, not only GET the current task");
+  if (!api.includes("await applyCrmTaskStatus(id, status)")) {
+    fail("syncTaskStatus must use lifecycle endpoints, not PATCH status");
   }
 
   const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
