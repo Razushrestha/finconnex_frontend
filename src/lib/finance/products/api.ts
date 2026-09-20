@@ -1,9 +1,5 @@
-import {
-  ensureCrmAccess,
-  ensureCrmSession,
-  isUuid,
-} from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import { crmWorkspaceFetch } from "@/lib/crm/request";
 import { formatFinanceDate } from "@/lib/finance/shared";
 import { defaultActorName } from "@/lib/rules/actor";
 import {
@@ -49,12 +45,6 @@ function toQuery(params: Record<string, string | number | undefined>): string {
 
 export function productsPath(suffix = ""): string {
   return `/v1/products${suffix}`;
-}
-
-async function resolveAuth() {
-  const scoped = await ensureCrmSession();
-  if (scoped) return scoped;
-  return ensureCrmAccess();
 }
 
 function extractRecords(data: unknown): Record<string, unknown>[] {
@@ -217,9 +207,7 @@ async function productsRequest(
   suffix: string,
   init?: RequestInit,
 ): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to manage products");
-  return crmFetch(auth, productsPath(suffix), init);
+  return crmWorkspaceFetch(productsPath(suffix), init);
 }
 
 function asProduct(data: unknown): FinanceProduct | null {

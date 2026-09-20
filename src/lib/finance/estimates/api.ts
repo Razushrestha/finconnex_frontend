@@ -2,7 +2,10 @@ import {
   ensureCrmAccess,
   ensureCrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmErrorMessage, crmFetch, unwrapCrmData } from "@/lib/crm/request";
+import {
+  crmErrorMessage,
+  crmWorkspaceFetch,
+} from "@/lib/crm/request";
 import type { FinanceLineItem } from "@/lib/finance/shared";
 import {
   type Estimate,
@@ -213,53 +216,11 @@ export function normalizeEstimates(data: unknown): Estimate[] {
   return extractRecords(data).map((row, index) => normalizeEstimate(row, index));
 }
 
-async function estimatesSend(
-  auth: { baseUrl: string; accessToken: string },
-  suffix: string,
-  init?: RequestInit,
-) {
-  const form = init?.body instanceof FormData;
-  const res = await fetch(`${auth.baseUrl}${estimatesPath(suffix)}`, {
-    ...init,
-    headers: {
-      Accept: form ? "*/*" : "application/json",
-      Authorization: `Bearer ${auth.accessToken}`,
-      ...(init?.body && !form ? { "Content-Type": "application/json" } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  const text = await res.text();
-  let json: unknown = null;
-  if (text) {
-    try {
-      json = JSON.parse(text);
-    } catch {
-      json = null;
-    }
-  }
-  return { res, json };
-}
-
 async function estimatesRequest(
   suffix: string,
   init?: RequestInit,
 ): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to manage estimates");
-  if (init?.body instanceof FormData) {
-    let { res, json } = await estimatesSend(auth, suffix, init);
-    if ([401, 403, 404, 405].includes(res.status)) {
-      const retried = await resolveAuth();
-      if (retried?.accessToken && retried.accessToken !== auth.accessToken) {
-        ({ res, json } = await estimatesSend(retried, suffix, init));
-      }
-    }
-    if (!res.ok) {
-      throw new Error(crmErrorMessage(json, `Estimate failed (${res.status})`));
-    }
-    return unwrapCrmData(json);
-  }
-  return crmFetch(auth, estimatesPath(suffix), init);
+  return crmWorkspaceFetch(estimatesPath(suffix), init);
 }
 
 async function estimatesBlob(suffix: string): Promise<Blob> {

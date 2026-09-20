@@ -2,7 +2,10 @@ import {
   ensureCrmAccess,
   ensureCrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmErrorMessage, crmFetch, unwrapCrmData } from "@/lib/crm/request";
+import {
+  crmErrorMessage,
+  crmWorkspaceFetch,
+} from "@/lib/crm/request";
 import type { FinanceLineItem } from "@/lib/finance/shared";
 import {
   type Quotation,
@@ -222,53 +225,11 @@ export function normalizeQuotes(data: unknown): Quotation[] {
   return extractRecords(data).map((row, index) => normalizeQuote(row, index));
 }
 
-async function quotesSend(
-  auth: { baseUrl: string; accessToken: string },
-  suffix: string,
-  init?: RequestInit,
-) {
-  const form = init?.body instanceof FormData;
-  const res = await fetch(`${auth.baseUrl}${quotesPath(suffix)}`, {
-    ...init,
-    headers: {
-      Accept: form ? "*/*" : "application/json",
-      Authorization: `Bearer ${auth.accessToken}`,
-      ...(init?.body && !form ? { "Content-Type": "application/json" } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  const text = await res.text();
-  let json: unknown = null;
-  if (text) {
-    try {
-      json = JSON.parse(text);
-    } catch {
-      json = null;
-    }
-  }
-  return { res, json };
-}
-
 async function quotesRequest(
   suffix: string,
   init?: RequestInit,
 ): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to manage quotes");
-  if (init?.body instanceof FormData) {
-    let { res, json } = await quotesSend(auth, suffix, init);
-    if ([401, 403, 404, 405].includes(res.status)) {
-      const retried = await resolveAuth();
-      if (retried?.accessToken && retried.accessToken !== auth.accessToken) {
-        ({ res, json } = await quotesSend(retried, suffix, init));
-      }
-    }
-    if (!res.ok) {
-      throw new Error(crmErrorMessage(json, `Quote failed (${res.status})`));
-    }
-    return unwrapCrmData(json);
-  }
-  return crmFetch(auth, quotesPath(suffix), init);
+  return crmWorkspaceFetch(quotesPath(suffix), init);
 }
 
 async function quotesBlob(suffix: string): Promise<Blob> {
@@ -355,6 +316,41 @@ export async function sendCrmQuote(id: string): Promise<Quotation | null> {
       body: "{}",
     }),
   );
+}
+
+/**
+ * POST /v1/quotes/:id/send-for-signature — CRM starts the e-sign flow for this
+ * quote (QuoteSignatureController). Returns the quote plus any signing URL the
+ * backend includes.
+ */
+export async function sendCrmQuoteForSignature(
+  id: string,
+  body: Record<string, unknown> = {},
+): Promise<{ quote: Quotation | null; signUrl?: string }> {
+  const data = await quotesRequest(`/${id}/send-for-signature`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  const quote = asQuote(data);
+  let signUrl = "";
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const rec = data as Record<string, unknown>;
+    signUrl = pickStr(
+      rec.signUrl,
+      rec.signingUrl,
+      rec.url,
+      rec.publicLink,
+      rec.href,
+    );
+    const nested =
+      rec.signature && typeof rec.signature === "object"
+        ? (rec.signature as Record<string, unknown>)
+        : null;
+    if (!signUrl && nested) {
+      signUrl = pickStr(nested.signUrl, nested.signingUrl, nested.url, nested.href);
+    }
+  }
+  return { quote, signUrl: signUrl || undefined };
 }
 
 export async function getCrmQuotePublicLink(

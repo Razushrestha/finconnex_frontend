@@ -191,6 +191,7 @@ const dashboardItems: NavItem[] = [
       { label: "Estimates", href: "/finance/estimates" },
       { label: "Quotations", href: "/finance/quotations" },
       { label: "Invoices", href: "/finance/invoices" },
+      { label: "Credit notes", href: "/finance/credit-notes" },
       { label: "Payments", href: "/finance/payments" },
       { label: "Items / Services", href: "/finance/products" },
       { label: "Equifax", href: "/finance/equifax" },

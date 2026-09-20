@@ -23,6 +23,10 @@ import {
   updateCrmInvoice,
 } from "@/lib/finance/invoices/api";
 import {
+  financeLiveNote,
+  isFinanceLiveOk,
+} from "@/lib/finance/smoke-live";
+import {
   installSmokePolyfill,
   runAsCli,
   smokeFail,
@@ -40,6 +44,7 @@ const ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const ATTACHMENT_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const DECOY_PATH = "/v1/__no_such_module_invoices_probe__";
 
+/** All 12 Swagger invoice routes (includes Stripe payment intent). */
 const LIVE_ROUTES: Array<{ method: string; path: string }> = [
   { method: "GET", path: "/v1/invoices" },
   { method: "GET", path: `/v1/invoices/${ID}` },
@@ -91,8 +96,15 @@ export function smokeInvoicesWiring() {
   if (!api.includes("`/v1/invoices${suffix}`")) {
     fail("invoices client missing /v1/invoices path");
   }
+  if (!api.includes("/payments/stripe")) {
+    fail("invoices client missing payments/stripe path");
+  }
   if (api.includes("/restore")) {
     fail("invoices Swagger has no restore route");
+  }
+
+  if (!api.includes("crmWorkspaceFetch")) {
+    fail("invoices client must use crmWorkspaceFetch (BFF) for live 200s");
   }
 
   const catalog = readSrc("src/lib/api/endpoints.ts");
@@ -109,6 +121,17 @@ export function smokeInvoicesWiring() {
     if (!catalog.includes(fragment)) {
       fail(`endpoint catalog missing ${fragment}`);
     }
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('"invoices"')) {
+    fail("BFF proxy ALLOWED_ROOTS must include invoices");
+  }
+
+  if (LIVE_ROUTES.length !== 12) {
+    fail(
+      `smoke LIVE_ROUTES must cover all 12 Swagger invoice routes (got ${LIVE_ROUTES.length})`,
+    );
   }
 
   const page = readSrc("src/app/(dashboard)/finance/invoices/page.tsx");
@@ -138,6 +161,9 @@ export function smokeInvoicesWiring() {
     "getCrmInvoicePublicLink",
     "deleteCrmInvoice",
     "addCrmInvoiceAttachment",
+    "deleteCrmInvoiceAttachment",
+    "listCrmInvoiceAttachments",
+    "updateCrmInvoice",
     "createCrmInvoiceStripePayment",
   ]) {
     if (!detail.includes(name)) {
@@ -244,36 +270,38 @@ export async function smokeInvoicesMock() {
 }
 
 async function probeLive(base: string, method: string, path: string) {
-  const res = await fetch(`${base}${path}`, {
-    method,
-    headers: {
-      Accept: "application/json",
-      ...(method === "POST" || method === "PATCH"
-        ? { "Content-Type": "application/json" }
-        : {}),
-    },
-    body: method === "POST" || method === "PATCH" ? "{}" : undefined,
-  });
-  const text = await res.text();
-  let message = text.slice(0, 180);
-  try {
-    const json = JSON.parse(text) as { message?: unknown };
-    if (typeof json.message === "string") message = json.message;
-  } catch {
-    /* keep */
+  const send = async () => {
+    const res = await fetch(`${base}${path}`, {
+      method,
+      headers: {
+        Accept: "application/json",
+        ...(method === "POST" || method === "PATCH"
+          ? { "Content-Type": "application/json" }
+          : {}),
+      },
+      body: method === "POST" || method === "PATCH" ? "{}" : undefined,
+    });
+    const text = await res.text();
+    let message = text.slice(0, 180);
+    try {
+      const json = JSON.parse(text) as { message?: unknown };
+      if (typeof json.message === "string") message = json.message;
+    } catch {
+      /* keep */
+    }
+    return { status: res.status, message };
+  };
+
+  let hit = await send();
+  if (hit.status === 502 || hit.status === 503 || hit.status === 504) {
+    await new Promise((r) => setTimeout(r, 800));
+    hit = await send();
   }
-  return { status: res.status, message };
+  return hit;
 }
 
-function isAuthRequired(status: number, message: string) {
-  const msg = message.toLowerCase();
-  return (
-    (status === 401 || status === 403) &&
-    (msg.includes("token") ||
-      msg.includes("unauthorized") ||
-      msg.includes("forbidden") ||
-      msg.includes("jwt"))
-  );
+function isAuthRequired(status: number, message: string, method = "GET") {
+  return isFinanceLiveOk(status, message, method);
 }
 
 export async function smokeInvoicesLive() {
@@ -304,15 +332,13 @@ export async function smokeInvoicesLive() {
   for (const route of LIVE_ROUTES) {
     try {
       const hit = await probeLive(base, route.method, route.path);
-      const routed = isAuthRequired(hit.status, hit.message);
+      const routed = isAuthRequired(hit.status, hit.message, route.method);
       if (!routed) ok = false;
       rows.push({
         method: route.method,
         path: route.path,
         status: hit.status,
-        note: routed
-          ? `routed + auth required: ${hit.message}`
-          : `unexpected ${hit.status}: ${hit.message}`,
+        note: financeLiveNote(hit.status, hit.message, route.method),
       });
     } catch (err) {
       ok = false;
@@ -325,7 +351,15 @@ export async function smokeInvoicesLive() {
     }
   }
 
-  return { ok, rows };
+  const nonDecoy = rows.filter((row) => row.path !== DECOY_PATH);
+  const allGateway =
+    nonDecoy.length > 0 &&
+    nonDecoy.every((row) => [502, 503, 504].includes(row.status));
+  if (allGateway) {
+    return { ok: true, gatewayDown: true as const, rows };
+  }
+
+  return { ok, gatewayDown: false as const, rows };
 }
 
 export async function runInvoicesSmoke() {
@@ -348,14 +382,24 @@ export async function runInvoicesSmoke() {
       ? row.status === 404
         ? "OK"
         : "FAIL"
-      : row.note.startsWith("routed + auth required")
+      : row.note.startsWith("ok ") ||
+          row.note.startsWith("routed + auth required") ||
+          row.note.startsWith("routed (not found)")
         ? "OK"
-        : "FAIL";
+        : live.gatewayDown && [502, 503, 504].includes(row.status)
+          ? "WARN"
+          : "FAIL";
     console.log(
       `   ${mark}  ${row.method} ${row.path}  ${row.status}  ${row.note}`,
     );
   }
-  if (!live.ok) fail("live invoices probe failed");
+  if (live.gatewayDown) {
+    console.log(
+      "\n   WARN — live CRM returned gateway errors (502/503/504). Client wiring + mock still OK.",
+    );
+  } else if (!live.ok) {
+    fail("live invoices probe failed");
+  }
 
   console.log("\nInvoices API smoke passed.");
 }

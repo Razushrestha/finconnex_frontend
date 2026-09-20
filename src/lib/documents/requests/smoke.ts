@@ -189,6 +189,12 @@ export function smokeDocumentRequestsWiring() {
   if (!create.includes("createCrmDocumentRequest")) {
     fail("create form does not call createCrmDocumentRequest");
   }
+  if (!create.includes("sendCrmDocumentRequest")) {
+    fail("create form does not call sendCrmDocumentRequest after create");
+  }
+  if (!create.includes("sendDocumentRequestInviteEmail")) {
+    fail("create form does not email the client the document request invite");
+  }
 
   const detail = readSrc(
     "src/components/documents/requests/DocumentRequestDetailClient.tsx",

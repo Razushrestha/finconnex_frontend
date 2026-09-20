@@ -85,6 +85,12 @@ const ALLOWED_ROOTS = new Set([
   "segments",
   "inbox",
   "templates",
+  "estimates",
+  "quotes",
+  "invoices",
+  "payments",
+  "products",
+  "credit-notes",
 ]);
 
 function isAllowed(path: string[]): boolean {
@@ -132,7 +138,8 @@ function isAllowed(path: string[]): boolean {
     return (
       path[1] === "smart-hubs" ||
       path[1] === "smart-short-links" ||
-      path[1] === "forms"
+      path[1] === "forms" ||
+      path[1] === "sales"
     );
   }
   return true;

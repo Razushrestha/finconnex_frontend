@@ -22,6 +22,10 @@ import {
   updateCrmEstimate,
 } from "@/lib/finance/estimates/api";
 import {
+  financeLiveNote,
+  isFinanceLiveOk,
+} from "@/lib/finance/smoke-live";
+import {
   installSmokePolyfill,
   runAsCli,
   smokeFail,
@@ -89,6 +93,10 @@ export function smokeEstimatesWiring() {
     fail("estimates client missing /v1/estimates path");
   }
 
+  if (!api.includes("crmWorkspaceFetch")) {
+    fail("estimates client must use crmWorkspaceFetch (BFF) for live 200s");
+  }
+
   const catalog = readSrc("src/lib/api/endpoints.ts");
   for (const fragment of [
     'path: "/estimates"',
@@ -102,6 +110,15 @@ export function smokeEstimatesWiring() {
     if (!catalog.includes(fragment)) {
       fail(`endpoint catalog missing ${fragment}`);
     }
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('"estimates"')) {
+    fail("BFF proxy ALLOWED_ROOTS must include estimates");
+  }
+
+  if (LIVE_ROUTES.length !== 11) {
+    fail(`smoke LIVE_ROUTES must cover all 11 Swagger estimate routes (got ${LIVE_ROUTES.length})`);
   }
 
   const page = readSrc("src/app/(dashboard)/finance/estimates/page.tsx");
@@ -131,6 +148,9 @@ export function smokeEstimatesWiring() {
     "getCrmEstimatePublicLink",
     "deleteCrmEstimate",
     "addCrmEstimateAttachment",
+    "deleteCrmEstimateAttachment",
+    "listCrmEstimateAttachments",
+    "updateCrmEstimate",
   ]) {
     if (!detail.includes(name)) {
       fail(`estimate detail does not call ${name}`);
@@ -250,15 +270,8 @@ async function probeLive(base: string, method: string, path: string) {
   return { status: res.status, message };
 }
 
-function isAuthRequired(status: number, message: string) {
-  const msg = message.toLowerCase();
-  return (
-    (status === 401 || status === 403) &&
-    (msg.includes("token") ||
-      msg.includes("unauthorized") ||
-      msg.includes("forbidden") ||
-      msg.includes("jwt"))
-  );
+function isAuthRequired(status: number, message: string, method = "GET") {
+  return isFinanceLiveOk(status, message, method);
 }
 
 export async function smokeEstimatesLive() {
@@ -289,15 +302,13 @@ export async function smokeEstimatesLive() {
   for (const route of LIVE_ROUTES) {
     try {
       const hit = await probeLive(base, route.method, route.path);
-      const routed = isAuthRequired(hit.status, hit.message);
+      const routed = isAuthRequired(hit.status, hit.message, route.method);
       if (!routed) ok = false;
       rows.push({
         method: route.method,
         path: route.path,
         status: hit.status,
-        note: routed
-          ? `routed + auth required: ${hit.message}`
-          : `unexpected ${hit.status}: ${hit.message}`,
+        note: financeLiveNote(hit.status, hit.message, route.method),
       });
     } catch (err) {
       ok = false;
@@ -325,7 +336,7 @@ export async function runEstimatesSmoke() {
   await smokeEstimatesMock();
   console.log("   OK — all 11 Swagger routes hit");
 
-  console.log("\n3) Live CRM probe (decoy 404 vs estimates 401)…");
+  console.log("\n3) Live CRM probe (decoy 404 vs estimates 401/200)…");
   const live = await smokeEstimatesLive();
   for (const row of live.rows) {
     const isDecoy = row.path === DECOY_PATH;
@@ -333,7 +344,9 @@ export async function runEstimatesSmoke() {
       ? row.status === 404
         ? "OK"
         : "FAIL"
-      : row.note.startsWith("routed + auth required")
+      : row.note.startsWith("ok ") ||
+          row.note.startsWith("routed + auth required") ||
+          row.note.startsWith("routed (not found)")
         ? "OK"
         : "FAIL";
     console.log(

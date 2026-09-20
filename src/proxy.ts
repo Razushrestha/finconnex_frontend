@@ -23,6 +23,7 @@ const PUBLIC_PREFIXES = [
   "/p/", // Client portal
   "/sign/", // E-signature
   "/book/", // Public booking
+  "/provide/", // Public document-request upload link
   "/s/", // Short / one-time booking links
   "/go/", // Smart-link URL shortener
   "/h/", // Published Smart Link hubs
@@ -36,6 +37,9 @@ const PUBLIC_PREFIXES = [
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_EXACT.has(pathname)) return true;
   if (pathname.startsWith("/api/book/") && pathname !== "/api/book/publish") {
+    return true;
+  }
+  if (pathname.startsWith("/api/provide/")) {
     return true;
   }
   return PUBLIC_PREFIXES.some(

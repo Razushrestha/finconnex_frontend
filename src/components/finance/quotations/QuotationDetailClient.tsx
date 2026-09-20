@@ -29,6 +29,7 @@ import {
   listCrmQuoteAttachments,
   persistRemoteQuote,
   sendCrmQuote,
+  sendCrmQuoteForSignature,
   toCreateQuoteBody,
   tryCrmQuote,
   updateCrmQuote,
@@ -215,16 +216,56 @@ export function QuotationDetailClient({ id }: { id: string }) {
     }
   }
 
-  function sendForSignature() {
-    if (!row) return;
-    const { quotation, signUrl } = sendQuotationContract(row);
-    setRow(quotation);
-    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      void navigator.clipboard.writeText(
-        `${window.location.origin}${signUrl}`,
-      );
+  async function sendForSignature() {
+    if (!row || busy) return;
+    setBusy(true);
+    try {
+      if (isCrmQuoteId(row.id)) {
+        const remote = await tryCrmQuote(() =>
+          sendCrmQuoteForSignature(row.id, {
+            signerName: row.contactName,
+            signerEmail: row.contactEmail,
+          }),
+        );
+        if (remote?.quote) {
+          const next = appendQuotationAudit(
+            {
+              ...row,
+              ...remote.quote,
+              signatureStatus: remote.quote.signatureStatus || "Pending",
+            },
+            "Sent for e-signature (CRM)",
+          );
+          persistRemoteQuote(next);
+          setRow(next);
+          if (
+            remote.signUrl &&
+            typeof navigator !== "undefined" &&
+            navigator.clipboard?.writeText
+          ) {
+            void navigator.clipboard.writeText(remote.signUrl);
+          }
+          flash(
+            remote.signUrl
+              ? "Contract sent via CRM — sign link copied"
+              : "Contract sent for e-signature via CRM",
+          );
+          return;
+        }
+      }
+      const { quotation, signUrl } = sendQuotationContract(row);
+      setRow(quotation);
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        void navigator.clipboard.writeText(
+          `${window.location.origin}${signUrl}`,
+        );
+      }
+      flash("Contract sent — sign link copied");
+    } catch (err) {
+      flash(err instanceof Error ? err.message : "Could not send for signature");
+    } finally {
+      setBusy(false);
     }
-    flash("Contract sent: sign link copied");
   }
 
   function copySignLink() {

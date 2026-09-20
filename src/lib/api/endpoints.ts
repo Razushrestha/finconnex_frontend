@@ -239,6 +239,12 @@ export const ENDPOINT_CATALOG = [
   { method: "PATCH", path: "/quotes/:id", module: "quotes" },
   { method: "DELETE", path: "/quotes/:id", module: "quotes", notes: "Soft-delete" },
   { method: "POST", path: "/quotes/:id/send", module: "quotes" },
+  {
+    method: "POST",
+    path: "/quotes/:id/send-for-signature",
+    module: "quotes",
+    notes: "Start e-signature for this quote",
+  },
   { method: "GET", path: "/quotes/:id/pdf", module: "quotes" },
   { method: "GET", path: "/quotes/:id/public-link", module: "quotes" },
   { method: "GET", path: "/quotes/:id/attachments", module: "quotes" },

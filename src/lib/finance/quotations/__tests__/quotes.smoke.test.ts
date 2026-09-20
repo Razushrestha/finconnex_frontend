@@ -9,7 +9,7 @@ describe("Quotes API smoke (CI)", () => {
     smokeQuotesWiring();
   });
 
-  it("mocks all 11 Swagger routes", async () => {
+  it("mocks all 12 Swagger routes", async () => {
     await smokeQuotesMock();
   });
 

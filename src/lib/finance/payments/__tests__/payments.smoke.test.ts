@@ -9,7 +9,7 @@ describe("Payments API smoke (CI)", () => {
     smokePaymentsWiring();
   });
 
-  it("mocks payments routes", async () => {
+  it("mocks all 5 Swagger routes", async () => {
     await smokePaymentsMock();
   });
 

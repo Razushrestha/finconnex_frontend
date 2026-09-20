@@ -21,9 +21,12 @@ import {
 } from "@/lib/documents/requests/types";
 import {
   createCrmDocumentRequest,
+  sendCrmDocumentRequest,
   toCreateDocumentRequestBody,
   tryCrmDocumentRequest,
 } from "@/lib/documents/requests/api";
+import { sendDocumentRequestInviteEmail } from "@/lib/documents/requests/invite-email";
+import { notify } from "@/lib/notify/toast";
 import { matchPortalForApplicant } from "@/lib/documents/requests/pack";
 import { getRulesActor, defaultActorName } from "@/lib/rules/actor";
 import { cn } from "@/lib/utils";
@@ -892,6 +895,22 @@ export function CreateDocumentRequestForm({
 
   async function handleCreate() {
     if (!validateStep(2)) return;
+    const clientEmail = (
+      applicants[0]?.email.trim() ||
+      email.trim() ||
+      ""
+    ).toLowerCase();
+    if (!clientEmail.includes("@")) {
+      setErrors({ applicants: "Add a client email so we can send the request." });
+      setStep(1);
+      return;
+    }
+    if (reviewGroups.every((g) => g.items.length === 0)) {
+      setErrors({ documents: "Select at least one document to request." });
+      setStep(2);
+      return;
+    }
+
     setSaving(true);
     try {
       const ids = nextDocumentRequestIds();
@@ -924,79 +943,16 @@ export function CreateDocumentRequestForm({
       );
       const portal = matchPortalForApplicant(
         applicant1.trim() || requestedFrom,
-        email.trim() || undefined,
+        clientEmail,
       );
       const relatedTo = prefill.relatedName
         ? `${prefill.relatedKind || "Lead"}: ${prefill.relatedName}`
         : portal
           ? `${portal.clientName}: ${applicant1.trim() || "Client"}`
           : `Lead: ${applicant1.trim() || "Client"}`;
-      const created = upsertDocumentRequest({
-        id: ids.id,
-        requestId: ids.requestId,
-        title,
-        requestedFrom: requestedFrom || "Client",
-        relatedTo,
-        documentType,
-        status: "Requested",
-        dueDate: due,
-        reminderDate: reminderOn && reminderDate
-          ? formatRequestDateTime(reminderDate)
-          : undefined,
-        repeat:
-          reminderOn && reminderRepeat.preset !== "none"
-            ? formatRequestRepeat(reminderRepeat)
-            : undefined,
-        notifyBy: reminderOn ? notifyBy : undefined,
-        requestedBy: sendOnBehalfOf || defaultActorName(),
-        requestedDate: started,
-        lastUpdated: started,
-        progress: 0,
-        notes: notes.trim() || undefined,
-        items,
-        timeline: [
-          {
-            id: `${ids.id}-t-created`,
-            at: started,
-            by: sendOnBehalfOf || defaultActorName(),
-            label: "Request created",
-            detail: `Invitation sent to ${requestedFrom || "client"}. Visible in the client portal.`,
-          },
-          ...(reminderOn && reminderDate
-            ? [
-                {
-                  id: `${ids.id}-t-reminder`,
-                  at: formatRequestDateTime(reminderDate),
-                  by: sendOnBehalfOf || defaultActorName(),
-                  label: "Reminder scheduled",
-                  detail: [
-                    formatRequestDateTime(reminderDate),
-                    reminderRepeat.preset !== "none"
-                      ? formatRequestRepeat(reminderRepeat)
-                      : "Does not repeat",
-                    notifyBy.length ? `Notify by ${notifyBy.join(", ")}` : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" · "),
-                },
-              ]
-            : []),
-        ],
-        messages: notes.trim()
-          ? [
-              {
-                id: `${ids.id}-m-note`,
-                at: started,
-                by: sendOnBehalfOf || defaultActorName(),
-                from: "team",
-                text: notes.trim(),
-              },
-            ]
-          : [],
-        clientName: portal?.clientName,
-        clientEmail: email.trim() || portal?.primaryContactEmail,
-      });
-      const relatedKindKey = (prefill.relatedKind || relatedKind || "").toLowerCase();
+      const brokerName = sendOnBehalfOf || defaultActorName();
+      const documentTitles = items.map((item) => item.title);
+
       let requestedFromId = "";
       try {
         requestedFromId = await resolveApplicantContactId(applicants[0]);
@@ -1010,6 +966,8 @@ export function CreateDocumentRequestForm({
         setStep(1);
         return;
       }
+
+      const relatedKindKey = (prefill.relatedKind || relatedKind || "").toLowerCase();
       const parentIds = relatedKindKey.includes("contact")
         ? { contactId: relatedId }
         : relatedKindKey.includes("compan")
@@ -1019,29 +977,183 @@ export function CreateDocumentRequestForm({
             : relatedId
               ? { leadId: relatedId }
               : {};
-      const remote = await tryCrmDocumentRequest(() =>
+
+      const draft = {
+        id: ids.id,
+        requestId: ids.requestId,
+        title,
+        requestedFrom: requestedFrom || "Client",
+        relatedTo,
+        documentType,
+        status: "Requested" as const,
+        dueDate: due,
+        reminderDate: reminderOn && reminderDate
+          ? formatRequestDateTime(reminderDate)
+          : undefined,
+        repeat:
+          reminderOn && reminderRepeat.preset !== "none"
+            ? formatRequestRepeat(reminderRepeat)
+            : undefined,
+        notifyBy: reminderOn ? notifyBy : undefined,
+        requestedBy: brokerName,
+        requestedDate: started,
+        lastUpdated: started,
+        progress: 0,
+        notes: notes.trim() || undefined,
+        items,
+        timeline: [] as Array<{
+          id: string;
+          at: string;
+          by: string;
+          label: string;
+          detail: string;
+        }>,
+        messages: notes.trim()
+          ? [
+              {
+                id: `${ids.id}-m-note`,
+                at: started,
+                by: brokerName,
+                from: "team" as const,
+                text: notes.trim(),
+              },
+            ]
+          : [],
+        clientName: portal?.clientName || requestedFrom || applicants[0]?.name,
+        clientEmail,
+      };
+
+      let remote = await tryCrmDocumentRequest(() =>
         createCrmDocumentRequest(
           toCreateDocumentRequestBody({
-            ...created,
+            ...draft,
             dueDate,
             requestedFromId,
             ...parentIds,
           }),
         ),
       );
-      if (remote) {
-        if (remote.id !== created.id) removeDocumentRequest(created.id);
-        upsertDocumentRequest({
-          ...created,
-          ...remote,
-          items: created.items,
-          timeline: created.timeline,
-          messages: created.messages,
-        });
-        router.push(`/documents/requests/${remote.id}?created=1`);
+
+      if (!remote) {
+        notify(
+          "Could not create this request in the CRM. Check the contact and try again.",
+        );
         return;
       }
-      router.push(`/documents/requests/${created.id}?created=1`);
+
+      const sent = await tryCrmDocumentRequest(() =>
+        sendCrmDocumentRequest(remote!.id),
+      );
+      if (sent) remote = { ...remote, ...sent, status: "Pending" };
+
+      let provideUrl = "";
+      let inviteError: string | null = null;
+      try {
+        const publishRes = await fetch("/api/documents/provide/publish", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            requestId: remote.id,
+            title,
+            clientName: draft.clientName || requestedFrom,
+            clientEmail,
+            dueDate: due,
+            notes: notes.trim() || undefined,
+            items: items.map((item) => ({
+              id: item.id,
+              title: item.title,
+              description: item.description,
+              applicant: item.applicant,
+            })),
+          }),
+        });
+        const published = (await publishRes.json().catch(() => ({}))) as {
+          url?: string;
+          error?: string;
+        };
+        if (!publishRes.ok || !published.url) {
+          throw new Error(
+            published.error || "Could not build the client upload link.",
+          );
+        }
+        provideUrl = published.url;
+        await sendDocumentRequestInviteEmail({
+          to: clientEmail,
+          clientName: String(draft.clientName || requestedFrom || "Client"),
+          brokerName,
+          title,
+          documents: documentTitles,
+          provideUrl,
+          dueDate: due,
+          notes: notes.trim() || undefined,
+        });
+      } catch (err) {
+        inviteError =
+          err instanceof Error
+            ? err.message
+            : "Could not email the client this request.";
+      }
+
+      const timeline = [
+        {
+          id: `${remote.id}-t-created`,
+          at: started,
+          by: brokerName,
+          label: "Request created",
+          detail: inviteError
+            ? `Saved in CRM. Invite email failed: ${inviteError}`
+            : `Invitation emailed to ${clientEmail} with ${documentTitles.length} document${documentTitles.length === 1 ? "" : "s"} to provide.`,
+        },
+        ...(provideUrl && !inviteError
+          ? [
+              {
+                id: `${remote.id}-t-invite`,
+                at: started,
+                by: brokerName,
+                label: "Invite sent",
+                detail: `Emailed ${documentTitles.join(", ")} · ${provideUrl}`,
+              },
+            ]
+          : []),
+        ...(reminderOn && reminderDate
+          ? [
+              {
+                id: `${remote.id}-t-reminder`,
+                at: formatRequestDateTime(reminderDate),
+                by: brokerName,
+                label: "Reminder scheduled",
+                detail: [
+                  formatRequestDateTime(reminderDate),
+                  reminderRepeat.preset !== "none"
+                    ? formatRequestRepeat(reminderRepeat)
+                    : "Does not repeat",
+                  notifyBy.length ? `Notify by ${notifyBy.join(", ")}` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · "),
+              },
+            ]
+          : []),
+      ];
+
+      if (remote.id !== draft.id) removeDocumentRequest(draft.id);
+      upsertDocumentRequest({
+        ...draft,
+        ...remote,
+        items: draft.items,
+        timeline,
+        messages: draft.messages,
+        clientEmail,
+        status: sent ? "Pending" : draft.status,
+      });
+
+      if (inviteError) {
+        notify(`Request created, but email failed: ${inviteError}`);
+      } else {
+        notify(`Request created — invite emailed to ${clientEmail}`);
+      }
+      router.push(`/documents/requests/${remote.id}?created=1`);
     } finally {
       setSaving(false);
     }

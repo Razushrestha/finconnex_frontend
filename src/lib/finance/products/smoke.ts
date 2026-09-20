@@ -1,5 +1,5 @@
 /**
- * Cross-check Products Swagger routes.
+ * Cross-check Products (Items / Services) Swagger routes.
  * Run: npx tsx --tsconfig tsconfig.json src/lib/finance/products/smoke.ts
  */
 
@@ -15,6 +15,10 @@ import {
   productsPath,
   updateCrmProduct,
 } from "@/lib/finance/products/api";
+import {
+  financeLiveNote,
+  isFinanceLiveOk,
+} from "@/lib/finance/smoke-live";
 import {
   installSmokePolyfill,
   runAsCli,
@@ -32,6 +36,7 @@ const SESSION = {
 const ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const DECOY_PATH = "/v1/__no_such_module_products_probe__";
 
+/** All 5 Swagger product routes. */
 const LIVE_ROUTES: Array<{ method: string; path: string }> = [
   { method: "GET", path: "/v1/products" },
   { method: "GET", path: `/v1/products/${ID}` },
@@ -67,6 +72,10 @@ export function smokeProductsWiring() {
     fail("products client missing /v1/products path");
   }
 
+  if (!api.includes("crmWorkspaceFetch")) {
+    fail("products client must use crmWorkspaceFetch (BFF) for live 200s");
+  }
+
   const catalog = readSrc("src/lib/api/endpoints.ts");
   for (const fragment of [
     'path: "/products"',
@@ -76,13 +85,34 @@ export function smokeProductsWiring() {
       fail(`endpoint catalog missing ${fragment}`);
     }
   }
+  if (!catalog.includes('module: "products"')) {
+    fail("endpoint catalog missing products module");
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('"products"')) {
+    fail("BFF proxy ALLOWED_ROOTS must include products");
+  }
+
+  if (LIVE_ROUTES.length !== 5) {
+    fail(
+      `smoke LIVE_ROUTES must cover all 5 Swagger product routes (got ${LIVE_ROUTES.length})`,
+    );
+  }
 
   const page = readSrc("src/app/(dashboard)/finance/products/page.tsx");
   if (!page.includes("useCrmProducts")) {
     fail("products page does not call useCrmProducts");
   }
+  for (const name of ["updateCrmProduct", "deleteCrmProduct"]) {
+    if (!page.includes(name)) {
+      fail(`products page does not call ${name}`);
+    }
+  }
 
-  const createForm = readSrc("src/components/finance/products/CreateProductForm.tsx");
+  const createForm = readSrc(
+    "src/components/finance/products/CreateProductForm.tsx",
+  );
   if (!createForm.includes("createCrmProduct")) {
     fail("create product form does not call createCrmProduct");
   }
@@ -93,6 +123,11 @@ export function smokeProductsWiring() {
   }
   if (!hook.includes('setSource("api")')) {
     fail("products hook must mark a successful empty list as Live CRM");
+  }
+
+  const legacy = readSrc("src/app/(dashboard)/finance/ps/page.tsx");
+  if (!legacy.includes('/finance/products')) {
+    fail("legacy /finance/ps must redirect to /finance/products");
   }
 
   const normalized = normalizeProduct(
@@ -123,7 +158,10 @@ export async function smokeProductsMock() {
   bindCrmSession(SESSION);
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const method = (init?.method ?? "GET").toUpperCase();
-    const raw = typeof input === "string" ? input : (input as Request).url ?? String(input);
+    const raw =
+      typeof input === "string"
+        ? input
+        : ((input as Request).url ?? String(input));
     const parsed = new URL(raw, SESSION.baseUrl);
     hits.push(`${method} ${parsed.pathname}`);
     return new Response(
@@ -173,43 +211,44 @@ export async function smokeProductsMock() {
 }
 
 async function probeLive(base: string, method: string, path: string) {
-  const res = await fetch(`${base}${path}`, {
-    method,
-    headers: {
-      Accept: "application/json",
-      ...(method === "POST" || method === "PATCH"
-        ? { "Content-Type": "application/json" }
-        : {}),
-    },
-    body: method === "POST" || method === "PATCH" ? "{}" : undefined,
-  });
-  const text = await res.text();
-  let message = text.slice(0, 180);
-  try {
-    const json = JSON.parse(text) as { message?: unknown };
-    if (typeof json.message === "string") message = json.message;
-  } catch {
-    /* keep */
+  const send = async () => {
+    const res = await fetch(`${base}${path}`, {
+      method,
+      headers: {
+        Accept: "application/json",
+        ...(method === "POST" || method === "PATCH"
+          ? { "Content-Type": "application/json" }
+          : {}),
+      },
+      body: method === "POST" || method === "PATCH" ? "{}" : undefined,
+    });
+    const text = await res.text();
+    let message = text.slice(0, 180);
+    try {
+      const json = JSON.parse(text) as { message?: unknown };
+      if (typeof json.message === "string") message = json.message;
+    } catch {
+      /* keep */
+    }
+    return { status: res.status, message };
+  };
+
+  let hit = await send();
+  if (hit.status === 502 || hit.status === 503 || hit.status === 504) {
+    await new Promise((r) => setTimeout(r, 800));
+    hit = await send();
   }
-  return { status: res.status, message };
+  return hit;
 }
 
-function isAuthRequired(status: number, message: string) {
-  const msg = message.toLowerCase();
-  return (
-    (status === 401 || status === 403) &&
-    (msg.includes("token") ||
-      msg.includes("unauthorized") ||
-      msg.includes("forbidden") ||
-      msg.includes("jwt"))
-  );
+function isAuthRequired(status: number, message: string, method = "GET") {
+  return isFinanceLiveOk(status, message, method);
 }
 
 export async function smokeProductsLive() {
-  const base = (getCrmApiBaseUrl() || "https://finconnex.payperless.app").replace(
-    /\/$/,
-    "",
-  );
+  const base = (
+    getCrmApiBaseUrl() || "https://finconnex.payperless.app"
+  ).replace(/\/$/, "");
   const rows: Array<{
     method: string;
     path: string;
@@ -233,15 +272,13 @@ export async function smokeProductsLive() {
   for (const route of LIVE_ROUTES) {
     try {
       const hit = await probeLive(base, route.method, route.path);
-      const routed = isAuthRequired(hit.status, hit.message);
+      const routed = isAuthRequired(hit.status, hit.message, route.method);
       if (!routed) ok = false;
       rows.push({
         method: route.method,
         path: route.path,
         status: hit.status,
-        note: routed
-          ? `routed + auth required: ${hit.message}`
-          : `unexpected ${hit.status}: ${hit.message}`,
+        note: financeLiveNote(hit.status, hit.message, route.method),
       });
     } catch (err) {
       ok = false;
@@ -254,7 +291,15 @@ export async function smokeProductsLive() {
     }
   }
 
-  return { ok, rows };
+  const nonDecoy = rows.filter((row) => row.path !== DECOY_PATH);
+  const allGateway =
+    nonDecoy.length > 0 &&
+    nonDecoy.every((row) => [502, 503, 504].includes(row.status));
+  if (allGateway) {
+    return { ok: true, gatewayDown: true as const, rows };
+  }
+
+  return { ok, gatewayDown: false as const, rows };
 }
 
 export async function runProductsSmoke() {
@@ -263,11 +308,11 @@ export async function runProductsSmoke() {
 
   console.log("\n1) Client + UI wiring…");
   smokeProductsWiring();
-  console.log("   OK — client, catalog, page, form");
+  console.log("   OK — client, catalog, Items/Services page, form");
 
   console.log("\n2) Mock fetch…");
   await smokeProductsMock();
-  console.log("   OK — products routes hit");
+  console.log("   OK — all 5 Swagger routes hit");
 
   console.log("\n3) Live CRM probe (decoy 404 vs products 401)…");
   const live = await smokeProductsLive();
@@ -277,14 +322,24 @@ export async function runProductsSmoke() {
       ? row.status === 404
         ? "OK"
         : "FAIL"
-      : row.note.startsWith("routed + auth required")
+      : row.note.startsWith("ok ") ||
+          row.note.startsWith("routed + auth required") ||
+          row.note.startsWith("routed (not found)")
         ? "OK"
-        : "FAIL";
+        : live.gatewayDown && [502, 503, 504].includes(row.status)
+          ? "WARN"
+          : "FAIL";
     console.log(
       `   ${mark}  ${row.method} ${row.path}  ${row.status}  ${row.note}`,
     );
   }
-  if (!live.ok) fail("live products probe failed");
+  if (live.gatewayDown) {
+    console.log(
+      "\n   WARN — live CRM returned gateway errors (502/503/504). Client wiring + mock still OK.",
+    );
+  } else if (!live.ok) {
+    fail("live products probe failed");
+  }
 
   console.log("\nProducts API smoke passed.");
 }

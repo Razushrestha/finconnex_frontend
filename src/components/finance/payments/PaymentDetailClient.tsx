@@ -156,29 +156,47 @@ export function PaymentDetailClient({ id }: { id: string }) {
             <button
               type="button"
               onClick={() => {
-                if (!window.confirm(`Delete ${row.paymentId}?`)) return;
-                const gate = softDeleteRecord({
-                  action: "finance.payments.delete",
-                  module: "finance.payments",
-                  recordId: row.id,
-                  recordLabel: row.paymentId,
-                  recordType: "Payment",
-                  snapshot: row,
-                });
-                if (!gate.ok) {
-                  toast.error(gate.message);
-                  return;
-                }
-                if (isCrmPaymentId(row.id)) {
-                  void tryCrmPayment(() => refundCrmPayment(row.id));
-                }
-                deletePayment(row.id);
-                router.push("/finance/payments");
+                void (async () => {
+                  if (
+                    !window.confirm(
+                      `Refund payment ${row.paymentId}? This cannot be undone.`,
+                    )
+                  ) {
+                    return;
+                  }
+                  const gate = softDeleteRecord({
+                    action: "finance.payments.delete",
+                    module: "finance.payments",
+                    recordId: row.id,
+                    recordLabel: row.paymentId,
+                    recordType: "Payment",
+                    snapshot: row,
+                  });
+                  if (!gate.ok) {
+                    toast.error(gate.message);
+                    return;
+                  }
+                  if (isCrmPaymentId(row.id)) {
+                    try {
+                      await refundCrmPayment(row.id);
+                    } catch (err) {
+                      toast.error(
+                        err instanceof Error
+                          ? err.message
+                          : "Could not refund this payment in the CRM",
+                      );
+                      return;
+                    }
+                  }
+                  deletePayment(row.id);
+                  toast.success("Payment refunded");
+                  router.push("/finance/payments");
+                })();
               }}
               className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-rose-600"
             >
               <Trash2 className="h-3.5 w-3.5" />
-              Delete
+              Refund
             </button>
           </div>
         </div>

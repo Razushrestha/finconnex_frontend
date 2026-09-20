@@ -115,29 +115,40 @@ export default function ProductsPage() {
   const allVisibleSelected =
     paginated.length > 0 && paginated.every((r) => selected.includes(r.id));
 
-  function toggleStatus(p: FinanceProduct) {
+  async function toggleStatus(p: FinanceProduct) {
     const nextStatus = p.status === "Active" ? "Inactive" : "Active";
     const updated: FinanceProduct = { ...p, status: nextStatus };
     upsertProduct(updated);
     refresh();
     if (isCrmProductId(p.id)) {
-      void tryCrmProduct(() =>
+      const remote = await tryCrmProduct(() =>
         updateCrmProduct(p.id, toUpdateProductBody({ status: nextStatus })),
-      ).then((remote) => {
-        if (remote) persistRemoteProduct(remote);
-      });
+      );
+      if (remote) {
+        persistRemoteProduct(remote);
+        refresh();
+      }
     }
   }
 
-  function onDeleteItem(e: React.MouseEvent, p: FinanceProduct) {
+  async function onDeleteItem(e: React.MouseEvent, p: FinanceProduct) {
     e.stopPropagation();
     if (!window.confirm(`Delete ${p.name}?`)) return;
+    if (isCrmProductId(p.id)) {
+      try {
+        await deleteCrmProduct(p.id);
+      } catch (err) {
+        window.alert(
+          err instanceof Error
+            ? err.message
+            : "Could not delete this item in the CRM",
+        );
+        return;
+      }
+    }
     deleteProduct(p.id);
     setSelected((ids) => ids.filter((id) => id !== p.id));
     refresh();
-    if (isCrmProductId(p.id)) {
-      void tryCrmProduct(() => deleteCrmProduct(p.id));
-    }
   }
 
   function goCreate() {

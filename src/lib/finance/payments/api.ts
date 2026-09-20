@@ -1,9 +1,5 @@
-import {
-  ensureCrmAccess,
-  ensureCrmSession,
-  isUuid,
-} from "@/lib/activity-timeline/auth";
-import { crmErrorMessage, crmFetch, unwrapCrmData } from "@/lib/crm/request";
+import { isUuid } from "@/lib/activity-timeline/auth";
+import { crmWorkspaceFetch } from "@/lib/crm/request";
 import { formatFinanceAt, formatFinanceDate } from "@/lib/finance/shared";
 import { defaultActorName } from "@/lib/rules/actor";
 import {
@@ -49,12 +45,6 @@ function toQuery(params: Record<string, string | number | undefined>): string {
 
 export function paymentsPath(suffix = ""): string {
   return `/v1/payments${suffix}`;
-}
-
-async function resolveAuth() {
-  const scoped = await ensureCrmSession();
-  if (scoped) return scoped;
-  return ensureCrmAccess();
 }
 
 function extractRecords(data: unknown): Record<string, unknown>[] {
@@ -324,9 +314,7 @@ async function paymentsRequest(
   suffix: string,
   init?: RequestInit,
 ): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to manage payments");
-  return crmFetch(auth, paymentsPath(suffix), init);
+  return crmWorkspaceFetch(paymentsPath(suffix), init);
 }
 
 function asPayment(data: unknown): Payment | null {

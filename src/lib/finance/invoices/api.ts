@@ -2,7 +2,10 @@ import {
   ensureCrmAccess,
   ensureCrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmErrorMessage, crmFetch, unwrapCrmData } from "@/lib/crm/request";
+import {
+  crmErrorMessage,
+  crmWorkspaceFetch,
+} from "@/lib/crm/request";
 import type { FinanceLineItem } from "@/lib/finance/shared";
 import {
   type Invoice,
@@ -229,53 +232,11 @@ export function normalizeInvoices(data: unknown): Invoice[] {
   return extractRecords(data).map((row, index) => normalizeInvoice(row, index));
 }
 
-async function invoicesSend(
-  auth: { baseUrl: string; accessToken: string },
-  suffix: string,
-  init?: RequestInit,
-) {
-  const form = init?.body instanceof FormData;
-  const res = await fetch(`${auth.baseUrl}${invoicesPath(suffix)}`, {
-    ...init,
-    headers: {
-      Accept: form ? "*/*" : "application/json",
-      Authorization: `Bearer ${auth.accessToken}`,
-      ...(init?.body && !form ? { "Content-Type": "application/json" } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
-  const text = await res.text();
-  let json: unknown = null;
-  if (text) {
-    try {
-      json = JSON.parse(text);
-    } catch {
-      json = null;
-    }
-  }
-  return { res, json };
-}
-
 async function invoicesRequest(
   suffix: string,
   init?: RequestInit,
 ): Promise<unknown> {
-  const auth = await resolveAuth();
-  if (!auth) throw new Error("Sign in to manage invoices");
-  if (init?.body instanceof FormData) {
-    let { res, json } = await invoicesSend(auth, suffix, init);
-    if ([401, 403, 404, 405].includes(res.status)) {
-      const retried = await resolveAuth();
-      if (retried?.accessToken && retried.accessToken !== auth.accessToken) {
-        ({ res, json } = await invoicesSend(retried, suffix, init));
-      }
-    }
-    if (!res.ok) {
-      throw new Error(crmErrorMessage(json, `Invoice failed (${res.status})`));
-    }
-    return unwrapCrmData(json);
-  }
-  return crmFetch(auth, invoicesPath(suffix), init);
+  return crmWorkspaceFetch(invoicesPath(suffix), init);
 }
 
 async function invoicesBlob(suffix: string): Promise<Blob> {

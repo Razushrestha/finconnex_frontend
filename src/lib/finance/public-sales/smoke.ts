@@ -19,6 +19,10 @@ import {
   rewritePublicSalesUrl,
 } from "@/lib/finance/public-sales/api";
 import {
+  financeLiveNote,
+  isFinanceLiveOk,
+} from "@/lib/finance/smoke-live";
+import {
   installSmokePolyfill,
   runAsCli,
   smokeFail,
@@ -63,6 +67,10 @@ export function smokePublicSalesWiring() {
     }
   }
 
+  if (!api.includes("crmBffFetch")) {
+    fail("public-sales client must use crmBffFetch in the browser");
+  }
+
   const catalog = readSrc("src/lib/api/endpoints.ts");
   for (const fragment of [
     'path: "/public/sales/quotes/:id/:hash"',
@@ -98,6 +106,23 @@ export function smokePublicSalesWiring() {
   );
   if (rewritten !== appPublicSalesPath("quotes", ID, HASH)) {
     fail("rewritePublicSalesUrl did not map CRM URL to app path");
+  }
+
+  const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
+  if (!bff.includes('path[1] === "sales"')) {
+    fail("BFF proxy must allow public/sales routes");
+  }
+
+  for (const kind of ["quotes", "estimates", "invoices"] as const) {
+    const page = readSrc(
+      `src/app/(public)/public/sales/${kind}/[id]/[hash]/page.tsx`,
+    );
+    if (!page.includes("PublicSalesDocumentClient")) {
+      fail(`public sales ${kind} page missing PublicSalesDocumentClient`);
+    }
+    if (!page.includes(`kind="${kind}"`)) {
+      fail(`public sales ${kind} page must pass kind="${kind}"`);
+    }
   }
 
   const normalized = normalizePublicSalesDocument("quotes", {
@@ -166,27 +191,36 @@ export async function smokePublicSalesMock() {
 }
 
 async function probeLive(base: string, method: string, path: string) {
-  const res = await fetch(`${base}${path}`, {
-    method,
-    headers: {
-      Accept: "application/json",
-      ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
-    },
-    body: method === "POST" ? "{}" : undefined,
-  });
-  const text = await res.text();
-  let message = text.slice(0, 180);
-  try {
-    const json = JSON.parse(text) as { message?: unknown };
-    if (typeof json.message === "string") message = json.message;
-  } catch {
-    /* keep */
+  const send = async () => {
+    const res = await fetch(`${base}${path}`, {
+      method,
+      headers: {
+        Accept: "application/json",
+        ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+      },
+      body: method === "POST" ? "{}" : undefined,
+    });
+    const text = await res.text();
+    let message = text.slice(0, 180);
+    try {
+      const json = JSON.parse(text) as { message?: unknown };
+      if (typeof json.message === "string") message = json.message;
+    } catch {
+      /* keep */
+    }
+    return { status: res.status, message };
+  };
+
+  let hit = await send();
+  if (hit.status === 502 || hit.status === 503 || hit.status === 504) {
+    await new Promise((r) => setTimeout(r, 800));
+    hit = await send();
   }
-  return { status: res.status, message };
+  return hit;
 }
 
-function isRouted(status: number, message: string) {
-  return !(status === 404 && message.toLowerCase().includes("cannot"));
+function isRouted(status: number, message: string, method = "GET") {
+  return isFinanceLiveOk(status, message, method);
 }
 
 export async function smokePublicSalesLive() {
@@ -217,15 +251,13 @@ export async function smokePublicSalesLive() {
   for (const route of LIVE_ROUTES) {
     try {
       const hit = await probeLive(base, route.method, route.path);
-      const routed = isRouted(hit.status, hit.message);
+      const routed = isRouted(hit.status, hit.message, route.method);
       if (!routed) ok = false;
       rows.push({
         method: route.method,
         path: route.path,
         status: hit.status,
-        note: routed
-          ? `routed: ${hit.message}`
-          : `unexpected ${hit.status}: ${hit.message}`,
+        note: financeLiveNote(hit.status, hit.message, route.method),
       });
     } catch (err) {
       ok = false;
@@ -238,7 +270,15 @@ export async function smokePublicSalesLive() {
     }
   }
 
-  return { ok, rows };
+  const nonDecoy = rows.filter((row) => row.path !== DECOY_PATH);
+  const allGateway =
+    nonDecoy.length > 0 &&
+    nonDecoy.every((row) => [502, 503, 504].includes(row.status));
+  if (allGateway) {
+    return { ok: true, gatewayDown: true as const, rows };
+  }
+
+  return { ok, gatewayDown: false as const, rows };
 }
 
 export async function runPublicSalesSmoke() {
@@ -261,14 +301,24 @@ export async function runPublicSalesSmoke() {
       ? row.status === 404
         ? "OK"
         : "FAIL"
-      : row.note.startsWith("routed:")
+      : row.note.startsWith("ok ") ||
+          row.note.startsWith("routed + auth required") ||
+          row.note.startsWith("routed (not found)")
         ? "OK"
-        : "FAIL";
+        : live.gatewayDown && [502, 503, 504].includes(row.status)
+          ? "WARN"
+          : "FAIL";
     console.log(
       `   ${mark}  ${row.method} ${row.path}  ${row.status}  ${row.note}`,
     );
   }
-  if (!live.ok) fail("live public sales probe failed");
+  if (live.gatewayDown) {
+    console.log(
+      "\n   WARN — live CRM returned gateway errors (502/503/504). Client wiring + mock still OK.",
+    );
+  } else if (!live.ok) {
+    fail("live public sales probe failed");
+  }
 
   console.log("\nPublic sales API smoke passed.");
 }

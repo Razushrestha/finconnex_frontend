@@ -187,17 +187,23 @@ async function publicSalesRequest(
   suffix = "",
   init?: RequestInit,
 ): Promise<unknown> {
-  const res = await fetch(
-    `${crmBase()}${publicSalesPath(kind, id, hash, suffix)}`,
-    {
-      ...init,
-      headers: {
-        Accept: "application/json",
-        ...(init?.body ? { "Content-Type": "application/json" } : {}),
-        ...(init?.headers ?? {}),
-      },
+  const path = publicSalesPath(kind, id, hash, suffix);
+  // Real browser only (smoke polyfill may define `window` without `document`).
+  const inBrowser =
+    typeof window !== "undefined" &&
+    typeof document !== "undefined";
+  if (inBrowser) {
+    const { crmBffFetch } = await import("@/lib/crm/request");
+    return crmBffFetch(path, init);
+  }
+  const res = await fetch(`${crmBase()}${path}`, {
+    ...init,
+    headers: {
+      Accept: "application/json",
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.headers ?? {}),
     },
-  );
+  });
   const text = await res.text();
   let json: unknown = null;
   if (text) {
