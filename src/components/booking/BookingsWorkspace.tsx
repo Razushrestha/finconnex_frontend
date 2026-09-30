@@ -25,13 +25,14 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
-import { initials } from "@/lib/activities/shared";
 import { publicBookUrl, type BookingPage } from "@/lib/booking/types";
 import { ConsultationsBoard } from "@/components/booking/ConsultationsBoard";
 import { NewBookingModal } from "@/components/booking/NewBookingModal";
 import {
   appointmentDateKey,
+  appointmentInitials,
   appointmentMatchesKpi,
+  appointmentRelatedLabel,
   bookingKpiStats,
   consultantById,
   dateKeyFromDate,
@@ -75,7 +76,7 @@ function ConsultantFace({
         className,
       )}
     >
-      {initials(name)}
+      {appointmentInitials(name)}
     </span>
   );
 }
@@ -186,9 +187,9 @@ export function BookingsWorkspace({
   }
 
   return (
-    <div className="flex min-h-full min-w-0 flex-1 flex-col bg-[#F8F9FB]">
-      <div className="flex min-h-full min-w-0 flex-1 flex-col">
-        <div className="mx-auto flex min-h-full w-full max-w-[1600px] flex-1 flex-col px-3 pt-4 pb-8 sm:px-5 sm:pt-5 sm:pb-10 lg:px-7">
+    <div className="flex h-full min-h-full min-w-0 flex-1 flex-col bg-[#F8F9FB]">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="mx-auto flex h-full min-h-0 w-full max-w-[1600px] flex-1 flex-col px-3 pt-4 pb-3 sm:px-5 sm:pt-5 lg:px-7">
           {section === "home" ? (
             <HomeView
               appointments={crm.appointments}
@@ -268,7 +269,7 @@ function HomeView({
   });
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<DashboardAppointment | null>(null);
-  const pageSize = 6;
+  const [pageSize, setPageSize] = useState(10);
 
   const kpi = useMemo(
     () => bookingKpiStats(appointments, now),
@@ -308,7 +309,7 @@ function HomeView({
   const todayKey = dateKeyFromDate(now);
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-h-[calc(100dvh-5.25rem)] flex-1 flex-col">
       <div className="mb-3 flex shrink-0 justify-end">
         <NewBookingButton onClick={onNewBooking} />
       </div>
@@ -372,8 +373,8 @@ function HomeView({
         })}
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
-        <section className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
+        <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
           <div className="flex flex-col gap-3 border-b border-[#E5E7EB] px-3 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
             <h2 className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
               <CalendarDays className="h-4 w-4 shrink-0" style={{ color: BRAND }} />
@@ -415,8 +416,8 @@ function HomeView({
           {error ? (
             <p className="px-5 py-2 text-[12px] text-rose-600">{error}</p>
           ) : null}
-          <div className="min-w-0">
-          <div className="divide-y divide-[#F3F4F6] lg:hidden">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-[#F3F4F6] lg:hidden">
             {loading && pageRows.length === 0 ? (
               <p className="px-4 py-10 text-center text-[13px] text-slate-400">
                 Loading appointments…
@@ -439,17 +440,26 @@ function HomeView({
             ))}
           </div>
 
-          <div className="hidden min-w-0 overflow-x-auto lg:block">
-            <table className="w-full min-w-[860px] text-left">
-              <thead>
+          <div className="hidden min-h-0 min-w-0 flex-1 overflow-auto lg:block">
+            <table className="w-full min-w-[960px] table-fixed text-left">
+              <colgroup>
+                <col className="w-[24%]" />
+                <col className="w-[16%]" />
+                <col className="w-[18%]" />
+                <col className="w-[16%]" />
+                <col className="w-[10%]" />
+                <col className="w-[12%]" />
+                <col className="w-[88px]" />
+              </colgroup>
+              <thead className="sticky top-0 z-10 bg-white">
                 <tr className="border-b border-[#E5E7EB] text-[11px] font-bold tracking-wide text-slate-500 uppercase">
-                  <th className="px-5 py-3">Appointment</th>
-                  <th className="px-3 py-3">Related To</th>
-                  <th className="px-3 py-3">Consultant</th>
-                  <th className="px-3 py-3 whitespace-nowrap">Date & Time</th>
-                  <th className="px-3 py-3">Status</th>
-                  <th className="px-3 py-3">Channel</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3 font-bold">Appointment</th>
+                  <th className="px-3 py-3 font-bold">Related To</th>
+                  <th className="px-3 py-3 font-bold">Consultant</th>
+                  <th className="px-3 py-3 font-bold whitespace-nowrap">Date & Time</th>
+                  <th className="px-3 py-3 font-bold">Status</th>
+                  <th className="px-3 py-3 font-bold">Channel</th>
+                  <th className="px-3 py-3 text-right font-bold">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -510,16 +520,22 @@ function HomeView({
                 <ChevronRight className="h-4 w-4" />
               </button>
               <select
-                defaultValue="10"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value) || 10);
+                  setPage(1);
+                }}
                 className="ml-2 h-8 rounded-lg border border-[#E5E7EB] bg-white px-2 text-[11px] font-medium text-slate-600"
               >
-                <option>10 / page</option>
+                <option value={10}>10 / page</option>
+                <option value={25}>25 / page</option>
+                <option value={50}>50 / page</option>
               </select>
             </div>
           </div>
         </section>
 
-        <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-1">
+        <div className="grid min-h-0 min-w-0 grid-cols-1 content-start gap-4 md:grid-cols-2 xl:grid-cols-1">
           <section className="shrink-0 rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-[14px] font-bold text-slate-900">
@@ -602,8 +618,17 @@ function AppointmentCard({
 
   return (
     <article
+      role="button"
+      tabIndex={0}
+      onClick={onView}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onView();
+        }
+      }}
       className={cn(
-        "px-3 py-3.5 sm:px-4",
+        "cursor-pointer px-3 py-3.5 sm:px-4",
         dimmed && "pointer-events-none opacity-40 blur-[2px]",
       )}
     >
@@ -614,7 +639,7 @@ function AppointmentCard({
             row.avatarClass,
           )}
         >
-          {initials(row.guestName)}
+          {appointmentInitials(row.guestName)}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
@@ -624,7 +649,11 @@ function AppointmentCard({
               </p>
               <p className="truncate text-[11px] text-slate-500">{row.topic}</p>
             </div>
-            <div className="inline-flex shrink-0 overflow-hidden rounded-lg border border-[#E5E7EB]">
+            <div
+              className="inline-flex shrink-0 overflow-hidden rounded-lg border border-[#E5E7EB]"
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
               <button
                 type="button"
                 onClick={onView}
@@ -645,10 +674,7 @@ function AppointmentCard({
           <div className="mt-2.5 grid grid-cols-1 gap-1.5 text-[12px] text-slate-600 min-[480px]:grid-cols-2">
             <p className="flex items-center gap-1.5">
               <RelatedIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-              <span className="truncate">
-                {row.relatedKind}{" "}
-                <span className="text-slate-400">{row.relatedId}</span>
-              </span>
+              <span className="truncate">{appointmentRelatedLabel(row)}</span>
             </p>
             {consultant ? (
               <p className="flex items-center gap-1.5">
@@ -704,45 +730,53 @@ function AppointmentRow({
 
   return (
     <tr
+      role="button"
+      tabIndex={0}
+      onClick={onView}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onView();
+        }
+      }}
       className={cn(
-        "border-b border-[#F3F4F6] last:border-0 hover:bg-slate-50/80",
+        "cursor-pointer border-b border-[#F3F4F6] last:border-0 hover:bg-slate-50/80",
         dimmed && "pointer-events-none opacity-40 blur-[2px]",
       )}
     >
-      <td className="px-5 py-3.5">
-        <div className="flex items-center gap-2.5">
+      <td className="px-4 py-3 align-middle">
+        <div className="flex min-w-0 items-center gap-2.5">
           <span
             className={cn(
               "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
               row.avatarClass,
             )}
           >
-            {initials(row.guestName)}
+            {appointmentInitials(row.guestName)}
           </span>
           <div className="min-w-0">
             <p className="truncate text-[13px] font-semibold text-slate-900">
               {row.guestName}
             </p>
-            <p className="truncate text-[11px] text-slate-500">{row.topic}</p>
+            {row.topic && row.topic !== row.guestName ? (
+              <p className="truncate text-[11px] text-slate-500">{row.topic}</p>
+            ) : null}
           </div>
         </div>
       </td>
-      <td className="px-3 py-3.5">
-        <div className="flex items-center gap-1.5 text-[12px] text-slate-600">
-          <RelatedIcon className="h-3.5 w-3.5 text-slate-400" />
-          <span>
-            {row.relatedKind}{" "}
-            <span className="text-slate-400">{row.relatedId}</span>
-          </span>
+      <td className="px-3 py-3 align-middle">
+        <div className="flex min-w-0 items-center gap-1.5 text-[12px] text-slate-600">
+          <RelatedIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+          <span className="truncate">{appointmentRelatedLabel(row)}</span>
         </div>
       </td>
-      <td className="px-3 py-3.5">
+      <td className="px-3 py-3 align-middle">
         {consultant ? (
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <ConsultantFace
               name={consultant.name}
               photo={consultant.photo}
-              className="h-7 w-7 text-[10px]"
+              className="h-7 w-7 shrink-0 text-[10px]"
             />
             <div className="min-w-0">
               <p className="truncate text-[12px] font-semibold text-slate-800">
@@ -753,21 +787,23 @@ function AppointmentRow({
               </p>
             </div>
           </div>
-        ) : null}
+        ) : (
+          <span className="text-[12px] text-slate-400">Unassigned</span>
+        )}
       </td>
-      <td className="px-3 py-3.5 whitespace-nowrap">
-        <div className="grid w-[7.5rem] grid-cols-[14px_minmax(0,1fr)] items-center gap-x-1.5 gap-y-1">
+      <td className="px-3 py-3 align-middle">
+        <div className="grid grid-cols-[14px_minmax(0,1fr)] items-center gap-x-1.5 gap-y-0.5">
           <CalendarDays className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-          <span className="text-[12px] font-medium tabular-nums text-slate-700">
+          <span className="truncate text-[12px] font-medium tabular-nums text-slate-700">
             {formatApptDate(row.start)}
           </span>
           <Clock className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-          <span className="text-[11px] tabular-nums text-slate-500">
+          <span className="truncate text-[11px] tabular-nums text-slate-500">
             {formatApptTime(row.start)}
           </span>
         </div>
       </td>
-      <td className="px-3 py-3.5">
+      <td className="px-3 py-3 align-middle">
         <span
           className={cn(
             "inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
@@ -777,13 +813,13 @@ function AppointmentRow({
           {row.status}
         </span>
       </td>
-      <td className="px-3 py-3.5">
-        <span className="inline-flex items-center gap-1.5 text-[12px] text-slate-600">
-          <ChannelIcon className="h-3.5 w-3.5 text-slate-400" />
-          {row.channel}
+      <td className="px-3 py-3 align-middle">
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-[12px] text-slate-600">
+          <ChannelIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+          <span className="truncate">{row.channel}</span>
         </span>
       </td>
-      <td className="px-4 py-3.5">
+      <td className="px-3 py-3 align-middle text-right" onClick={(e) => e.stopPropagation()}>
         <div className="inline-flex items-center justify-end overflow-hidden rounded-lg border border-[#E5E7EB]">
           <button
             type="button"
@@ -949,7 +985,7 @@ function AppointmentDrawer({
                 row.avatarClass,
               )}
             >
-              {initials(row.guestName)}
+              {appointmentInitials(row.guestName)}
             </span>
             <div>
               <p className="text-[16px] font-bold text-slate-900">
@@ -1093,7 +1129,7 @@ function ConsultantsPanel({
         >
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F3ECFB] text-[13px] font-bold text-[#5A32A3]">
-              {initials(c.name)}
+              {appointmentInitials(c.name)}
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-slate-900">{c.name}</p>

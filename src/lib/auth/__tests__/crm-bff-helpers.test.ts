@@ -15,6 +15,10 @@ import {
   taskLifecycleOkBody,
   parseTaskRecordGet,
   taskRecordOkBody,
+  parseLeadKanbanPreferencePath,
+  leadKanbanPreferenceOkBody,
+  parseWorkspaceScopedListRetry,
+  tryMissingCrmFallback,
   parseEmailRecordGet,
   emailRecordOkBody,
   parseMeetingCancelPath,
@@ -36,21 +40,21 @@ describe("isEmptySignedInListPath", () => {
     }
   });
 
-  it("treats signature lists as empty-list GETs but does not stub them as missing", () => {
+  it("does not stub live signature lists as empty", () => {
     expect(
       isEmptySignedInListPath(
         ["workspaces", workspace, "signature-requests"],
         "GET",
       ),
-    ).toBe(true);
-    expect(isEmptySignedInListPath(["signature-requests"], "GET")).toBe(true);
+    ).toBe(false);
+    expect(isEmptySignedInListPath(["signature-requests"], "GET")).toBe(false);
     expect(
       isEmptySignedInListPath(
         ["workspaces", workspace, "signature-templates"],
         "GET",
       ),
-    ).toBe(true);
-    expect(isEmptySignedInListPath(["signature-templates"], "GET")).toBe(true);
+    ).toBe(false);
+    expect(isEmptySignedInListPath(["signature-templates"], "GET")).toBe(false);
     expect(
       isEmptySignedInListPath(
         ["workspaces", workspace, "signature-requests", "abc"],
@@ -59,7 +63,7 @@ describe("isEmptySignedInListPath", () => {
     ).toBe(false);
     expect(
       isEmptySignedInListPath(["signature-requests", ""], "GET"),
-    ).toBe(true);
+    ).toBe(false);
     // Live Nest serves these — BFF must proxy GET, not return [].
     expect(isHostedMissingSignatureListPath(["signature-requests"], "GET")).toBe(
       false,
@@ -134,6 +138,60 @@ describe("isEmptySignedInListPath", () => {
     const payload = JSON.parse(taskRecordOkBody(taskId));
     expect(payload.statusCode).toBe(200);
     expect(payload.data.id).toBe(taskId);
+  });
+
+  it("treats workspace lead kanban preference GET/PUT as 200", () => {
+    const path = [
+      "workspaces",
+      workspace,
+      "preferences",
+      "kanban",
+      "leads",
+    ];
+    expect(parseLeadKanbanPreferencePath(path, "GET")).toEqual({
+      workspaceId: workspace,
+    });
+    expect(parseLeadKanbanPreferencePath(path, "PUT")).toEqual({
+      workspaceId: workspace,
+    });
+    expect(parseLeadKanbanPreferencePath(path, "POST")).toBeNull();
+    expect(
+      parseLeadKanbanPreferencePath(["preferences", "kanban"], "GET"),
+    ).toBeNull();
+    const fallback = tryMissingCrmFallback(path, "GET");
+    expect(fallback?.status).toBe(200);
+    const payload = JSON.parse(
+      leadKanbanPreferenceOkBody(
+        '{"showOwnerAvatar":false,"dynamicFieldKeys":["phone"],"unrepliedThresholdHours":12}',
+      ),
+    );
+    expect(payload.statusCode).toBe(200);
+    expect(payload.data.showOwnerAvatar).toBe(false);
+    expect(payload.data.dynamicFieldKeys).toEqual(["phone"]);
+    expect(payload.data.unrepliedThresholdHours).toBe(12);
+  });
+
+  it("does not stub live lead or contact lists as empty", () => {
+    expect(isEmptySignedInListPath(["leads"], "GET")).toBe(false);
+    expect(
+      isEmptySignedInListPath(["workspaces", workspace, "leads"], "GET"),
+    ).toBe(false);
+    expect(isEmptySignedInListPath(["contacts"], "GET")).toBe(false);
+    expect(isEmptySignedInListPath(["deals"], "GET")).toBe(false);
+    expect(isEmptySignedInListPath(["companies"], "GET")).toBe(false);
+    expect(tryMissingCrmFallback(["leads"], "GET")).toBeNull();
+    expect(parseWorkspaceScopedListRetry(["leads", "kanban"], "GET")).toEqual({
+      rest: ["leads", "kanban"],
+    });
+    expect(parseWorkspaceScopedListRetry(["contacts"], "GET")).toEqual({
+      rest: ["contacts"],
+    });
+    expect(
+      parseWorkspaceScopedListRetry(
+        ["workspaces", workspace, "leads"],
+        "GET",
+      ),
+    ).toBeNull();
   });
 
   it("recognizes POST /tasks/:id/start", () => {
@@ -224,7 +282,7 @@ describe("isEmptySignedInListPath", () => {
       "signature-templates",
     ]);
     expect(isEmptySignedInListPath(normalizeCrmProxyPath("signature-requests"), "GET")).toBe(
-      true,
+      false,
     );
   });
 
@@ -244,7 +302,7 @@ describe("isEmptySignedInListPath", () => {
     ).toBe(true);
     expect(
       isEmptySignedInListPath(["workspaces", workspace, "members"], "GET"),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       isEmptySignedInListPath(
         ["workspaces", workspace, "dashboard", "layouts", "abc"],

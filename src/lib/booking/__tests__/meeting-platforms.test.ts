@@ -24,13 +24,18 @@ describe("online meeting platforms", () => {
     expect(
       eventTypeLocationPayload({ meetingPlace: "online", platform: "Zoom" }),
     ).toEqual({ locationType: "ZOOM", location: "Zoom" });
-    expect(
-      toCreateEventTypeBody({
-        name: "Intro",
-        meetingPlace: "online",
-        platform: "Zoom",
-      }).locationType,
-    ).toBe("ZOOM");
+    const zoomBody = toCreateEventTypeBody({
+      name: "Intro",
+      meetingPlace: "online",
+      platform: "Zoom",
+      timezone: "Australia/Sydney",
+    });
+    expect(zoomBody.locationType).toBe("ZOOM");
+    expect(zoomBody).not.toHaveProperty("title");
+    expect(zoomBody).not.toHaveProperty("timezone");
+    expect(zoomBody).not.toHaveProperty("active");
+    expect(zoomBody.isActive).toBe(true);
+    expect(zoomBody.durationMinutes).toBe(30);
   });
 
   it("hydrates consultation pages from CRM locationType", () => {

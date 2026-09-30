@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
+  appointmentPersonName,
   hostsToConsultants,
   meetingToAppointment,
+  toLocalStart,
   replaceDashboardAppointments,
   replaceDashboardConsultants,
   type AppointmentStatus,
@@ -39,14 +41,20 @@ function bookingToAppointment(row: CrmBookingRecord): DashboardAppointment | nul
         ? "Company"
         : "Contact";
   const relatedId = row.leadId || row.dealId || row.companyId || row.contactId || "—";
+  const guestName =
+    appointmentPersonName(
+      row.guestName,
+      typeof row.raw.title === "string" ? row.raw.title : undefined,
+      typeof row.raw.eventTypeName === "string" ? row.raw.eventTypeName : undefined,
+    ) || "Guest";
   return {
     id: row.id,
-    guestName: row.guestName || "Guest",
-    topic: row.guestEmail || "Consultation",
+    guestName,
+    topic: row.guestEmail || guestName,
     relatedKind,
     relatedId,
     consultantId: row.hostId,
-    start: row.startTime,
+    start: toLocalStart(row.startTime),
     type: "Consultation",
     status,
     channel: "Video Call",

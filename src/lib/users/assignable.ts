@@ -8,6 +8,12 @@ import {
 import { listCrmWorkspaceMembersAdmin } from "@/lib/workspace-operations/api";
 import { OWNERS } from "@/lib/leads/types";
 import { getRulesActor } from "@/lib/rules/actor";
+import {
+  listCrmBookingHosts,
+  listCrmConsultants,
+  tryCrmBooking,
+  type CrmBookingHost,
+} from "@/lib/booking/api";
 
 export type AssignableOwner = {
   id: string;
@@ -146,18 +152,32 @@ function actorConsultant(): AssignableOwner | null {
   };
 }
 
+function hostToOwner(host: CrmBookingHost): AssignableOwner {
+  const name = host.name.trim() || host.email.trim() || "Member";
+  return {
+    id: host.crmUserId || host.id,
+    name,
+    email: host.email.trim(),
+  };
+}
+
 /**
- * Every workspace member is a booking consultant. Unlike
- * `loadAssignableOwners`, this does not drop people who lack a user UUID.
+ * Every workspace user is a booking consultant (hosts, members, and directory).
  */
 export async function loadWorkspaceConsultants(): Promise<AssignableOwner[]> {
   const local = fromDirectory();
-  const live = await listRemoteMembers()
-    .then((rows) => rows.map(toOwner))
-    .catch(() => [] as AssignableOwner[]);
+  const [live, hosts, consultants] = await Promise.all([
+    listRemoteMembers()
+      .then((rows) => rows.map(toOwner))
+      .catch(() => [] as AssignableOwner[]),
+    tryCrmBooking(() => listCrmBookingHosts()).then((rows) => rows ?? []),
+    tryCrmBooking(() => listCrmConsultants()).then((rows) => rows ?? []),
+  ]);
   const self = actorConsultant();
   return mergeOwners([
     ...live,
+    ...hosts.map(hostToOwner),
+    ...consultants.map(hostToOwner),
     ...local,
     ...(self ? [self] : []),
   ]).filter((row) => row.name.trim() || row.email.trim());

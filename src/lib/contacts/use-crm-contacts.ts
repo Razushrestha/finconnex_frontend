@@ -18,17 +18,15 @@ export function useCrmContacts() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    replaceCrmContactsOnBoard([]);
 
     void (async () => {
       try {
         const remote = await loadCrmContacts();
         if (cancelled) return;
-        replaceCrmContactsOnBoard(remote);
-        setSource("api");
+        if (remote.length) replaceCrmContactsOnBoard(remote);
+        setSource(remote.length ? "api" : "empty");
       } catch (err) {
         if (cancelled) return;
-        replaceCrmContactsOnBoard([]);
         setSource("empty");
         setError(err instanceof Error ? err.message : "Contacts unavailable");
       } finally {

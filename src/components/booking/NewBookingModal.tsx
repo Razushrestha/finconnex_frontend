@@ -466,6 +466,15 @@ export function NewBookingModal({
           agenda: description.trim() || undefined,
           notes: note || undefined,
           timezone,
+          externalAttendees:
+            client?.email
+              ? [
+                  {
+                    email: client.email,
+                    name: clientName || client.name || title.trim(),
+                  },
+                ]
+              : undefined,
         });
       }
       onCreated();

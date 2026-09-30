@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import {
   CalendarDays,
   ChevronDown,
@@ -58,6 +57,7 @@ import {
   type AvailabilityPanelId,
   type ConsultationSetupStepId,
 } from "@/components/booking/ConsultationWizardLayout";
+import { ConsultationOverview } from "@/components/booking/ConsultationOverview";
 import { ShareConsultationModal } from "@/components/booking/ShareConsultationModal";
 import { getRulesActor } from "@/lib/rules/actor";
 import { cn } from "@/lib/utils";
@@ -130,8 +130,8 @@ function matchesSection(
 }
 
 export function ConsultationsBoard() {
-  const router = useRouter();
   const [pages, setPages] = useState<BookingPage[]>([]);
+  const [viewingPage, setViewingPage] = useState<BookingPage | null>(null);
   const [pagesLoading, setPagesLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [view, setView] = useState<ViewMode>("grid");
@@ -340,7 +340,6 @@ export function ConsultationsBoard() {
         name: page.title,
         slug: page.slug,
         durationMinutes: page.durationMinutes,
-        timezone: page.timezone,
         description: page.description,
         active: page.status === "Live",
         meetingPlace: detailsValues.meetingPlace,
@@ -350,6 +349,9 @@ export function ConsultationsBoard() {
             ? detailsValues.locationDetail
             : detailsValues.phoneDetail,
         hostIds: availabilityHostIds,
+        bufferBeforeMinutes: page.bufferMinutes,
+        minimumNoticeMinutes: Math.round((page.minNoticeHours ?? 2) * 60),
+        maxDaysInFuture: page.maxAdvanceDays,
       }),
     );
     upsertBookingPage(
@@ -488,6 +490,12 @@ export function ConsultationsBoard() {
       <AssignConsultantsStep
         choice={detailsChoice}
         consultationName={detailsValues.name}
+        coverImageUrl={detailsValues.coverImageUrl}
+        onCoverChange={(url) =>
+          setDetailsValues((current) =>
+            current ? { ...current, coverImageUrl: url } : current,
+          )
+        }
         onBack={() => goToSetupStep("details")}
         onCreate={(consultants, priorities, userIds) => {
           setAssignedConsultants(consultants);
@@ -516,6 +524,52 @@ export function ConsultationsBoard() {
           reachSetupStep("consultants");
         }}
       />,
+    );
+  }
+
+  if (viewingPage) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <ConsultationOverview
+          page={viewingPage}
+          onClose={() => setViewingPage(null)}
+          onEdit={() => {
+          const page = viewingPage;
+          setViewingPage(null);
+          setDetailsChoice({
+            mode: page.consultationMode ?? "one_to_one",
+            title: page.title,
+          });
+          setDetailsValues({
+            name: page.title,
+            durationMinutes: page.durationMinutes,
+            isFree: !(page.price && page.price > 0),
+            price: page.price ?? 0,
+            online: page.meetingVia !== "in_person",
+            meetingPlace:
+              page.meetingVia === "in_person"
+                ? "offline"
+                : page.meetingVia === "phone"
+                  ? "phone"
+                  : "online",
+            platform: page.meetingViaDetail || "Zoom",
+            locationDetail: page.location || "",
+            phoneDetail:
+              page.meetingVia === "phone" ? page.meetingViaDetail || "" : "",
+            coverImageUrl: page.coverImageUrl,
+          });
+          setAssignedConsultants(
+            page.consultants?.length
+              ? page.consultants
+              : page.owner
+                ? [page.owner]
+                : [],
+          );
+          setAssignedPriorities(page.consultantPriorities ?? {});
+          setWizardFurthest(0);
+        }}
+      />
+      </div>
     );
   }
 
@@ -640,7 +694,7 @@ export function ConsultationsBoard() {
             <ConsultationCard
               key={page.id}
               page={page}
-              onOpen={() => router.push(`/booking/${page.id}`)}
+              onOpen={() => setViewingPage(page)}
               onRefresh={refreshPages}
             />
           ))}
@@ -651,7 +705,7 @@ export function ConsultationsBoard() {
             <ConsultationRow
               key={page.id}
               page={page}
-              onOpen={() => router.push(`/booking/${page.id}`)}
+              onOpen={() => setViewingPage(page)}
               onRefresh={refreshPages}
             />
           ))}
@@ -825,7 +879,7 @@ function ConsultationCard({
           </div>
         </div>
         <div onClick={(e) => e.stopPropagation()}>
-          <CardMenu page={page} onRefresh={onRefresh} />
+          <CardMenu page={page} onOpen={onOpen} onRefresh={onRefresh} />
         </div>
       </div>
       <div className="mt-8 flex items-center justify-between gap-3">
@@ -886,7 +940,7 @@ function ConsultationRow({
           slug={page.slug}
           title={page.title}
         />
-        <CardMenu page={page} onRefresh={onRefresh} />
+        <CardMenu page={page} onOpen={onOpen} onRefresh={onRefresh} />
       </div>
     </div>
   );
@@ -894,12 +948,13 @@ function ConsultationRow({
 
 function CardMenu({
   page,
+  onOpen,
   onRefresh,
 }: {
   page: BookingPage;
+  onOpen: () => void;
   onRefresh: () => void;
 }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -946,7 +1001,7 @@ function CardMenu({
             label="Edit"
             onClick={() => {
               setOpen(false);
-              router.push(`/booking/${page.id}`);
+              onOpen();
             }}
           />
           <MenuRow

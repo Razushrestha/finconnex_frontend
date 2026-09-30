@@ -25,7 +25,6 @@ export type MeetingLocationKind = (typeof MEETING_LOCATION_KINDS)[number];
 export type EventTypeLocationType =
   | "GOOGLE_MEET"
   | "ZOOM"
-  | "MICROSOFT_TEAMS"
   | "IN_PERSON"
   | "PHONE"
   | "CUSTOM";
@@ -114,7 +113,6 @@ export function apiLocationTypeFromPlatform(
 ): EventTypeLocationType {
   if (platform === "Google Meet") return "GOOGLE_MEET";
   if (platform === "Zoom") return "ZOOM";
-  if (platform === "Microsoft Teams") return "MICROSOFT_TEAMS";
   return "CUSTOM";
 }
 
@@ -130,17 +128,30 @@ export function platformLabelFromLocationType(raw: string): string {
   return raw;
 }
 
+const HTTP_URL = /^https?:\/\/\S+$/i;
+
 export function eventTypeLocationPayload(input: {
   meetingPlace: "online" | "offline" | "phone";
   platform?: string;
   locationDetail?: string;
-}): { locationType: EventTypeLocationType; location: string } {
+}): {
+  locationType: EventTypeLocationType;
+  location: string;
+  customLocationUrl?: string;
+} {
   if (input.meetingPlace === "online") {
     const platform = input.platform?.trim() || "Zoom";
-    return {
-      locationType: apiLocationTypeFromPlatform(platform),
-      location: platform,
-    };
+    const locationType = apiLocationTypeFromPlatform(platform);
+    const detail = input.locationDetail?.trim();
+    if (locationType === "CUSTOM") {
+      const customLocationUrl = HTTP_URL.test(detail || "")
+        ? detail
+        : platform === "Microsoft Teams"
+          ? "https://teams.microsoft.com"
+          : "https://meet.google.com";
+      return { locationType, location: platform, customLocationUrl };
+    }
+    return { locationType, location: platform };
   }
   if (input.meetingPlace === "offline") {
     return {

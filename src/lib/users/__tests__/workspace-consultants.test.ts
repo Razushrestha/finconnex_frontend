@@ -27,6 +27,17 @@ vi.mock("@/lib/workspace-members/types", async () => {
 vi.mock("@/lib/rules/actor", () => ({
   getRulesActor: () => actorMock(),
 }));
+vi.mock("@/lib/booking/api", () => ({
+  tryCrmBooking: async (run: () => Promise<unknown>) => {
+    try {
+      return await run();
+    } catch {
+      return null;
+    }
+  },
+  listCrmBookingHosts: async () => [],
+  listCrmConsultants: async () => [],
+}));
 
 const { loadWorkspaceConsultants } = await import("@/lib/users/assignable");
 

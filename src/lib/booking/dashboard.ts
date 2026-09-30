@@ -60,7 +60,35 @@ export function dateKeyFromDate(date: Date) {
 }
 
 export function parseAppointmentStart(iso: string) {
-  return new Date(iso);
+  const raw = iso?.trim() ?? "";
+  if (!raw) return new Date(NaN);
+  const ymd = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/,
+  );
+  if (ymd) {
+    return new Date(
+      Number(ymd[1]),
+      Number(ymd[2]) - 1,
+      Number(ymd[3]),
+      Number(ymd[4] ?? 0),
+      Number(ymd[5] ?? 0),
+      Number(ymd[6] ?? 0),
+    );
+  }
+  const dmy = raw.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[,\s]+(\d{1,2}):(\d{2}))?/,
+  );
+  if (dmy) {
+    return new Date(
+      Number(dmy[3]),
+      Number(dmy[2]) - 1,
+      Number(dmy[1]),
+      Number(dmy[4] ?? 0),
+      Number(dmy[5] ?? 0),
+    );
+  }
+  const parsed = new Date(raw);
+  return parsed;
 }
 
 function startOfDay(date: Date) {
@@ -92,23 +120,11 @@ export function appointmentMatchesKpi(
   key: BookingKpiKey,
   now = new Date(),
 ): boolean {
+  if (key === "upcoming") return true;
+  if (key === "confirmed") return row.status === "Confirmed";
+  if (key === "pending") return row.status === "Pending";
   const start = parseAppointmentStart(row.start);
   if (Number.isNaN(start.getTime())) return false;
-  if (key === "upcoming") return start >= startOfDay(now);
-  if (key === "confirmed") {
-    return (
-      row.status === "Confirmed" &&
-      start.getMonth() === now.getMonth() &&
-      start.getFullYear() === now.getFullYear()
-    );
-  }
-  if (key === "pending") {
-    return (
-      row.status === "Pending" &&
-      start.getMonth() === now.getMonth() &&
-      start.getFullYear() === now.getFullYear()
-    );
-  }
   if (key === "today") return dateKeyFromDate(start) === dateKeyFromDate(now);
   if (key === "week") {
     const weekStart = startOfWeek(now);
@@ -263,10 +279,50 @@ export function appointmentDateKey(iso: string) {
   return dateKeyFromDate(parsed);
 }
 
-function toLocalStart(raw: string) {
-  const parsed = new Date(raw);
+export function toLocalStart(raw: string) {
+  const parsed = parseAppointmentStart(raw);
   if (Number.isNaN(parsed.getTime())) return raw;
   return `${parsed.getFullYear()}-${pad2(parsed.getMonth() + 1)}-${pad2(parsed.getDate())}T${pad2(parsed.getHours())}:${pad2(parsed.getMinutes())}`;
+}
+
+export function appointmentPersonName(...candidates: (string | undefined)[]) {
+  for (const raw of candidates) {
+    const value = raw?.trim() ?? "";
+    if (!value) continue;
+    if (value === "—" || value === "-" || value === "–" || value === "?") continue;
+    if (/^guest$/i.test(value)) continue;
+    if (value.includes("@")) continue;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+      continue;
+    }
+    return value;
+  }
+  return "";
+}
+
+export function appointmentRelatedLabel(row: {
+  relatedKind: RelatedKind;
+  relatedId: string;
+  guestName?: string;
+}) {
+  const id = appointmentPersonName(row.relatedId);
+  if (id && id !== row.guestName) return `${row.relatedKind} · ${id}`;
+  return row.relatedKind;
+}
+
+/** Avatar letters: first letter, plus second letter when the name is one word. */
+export function appointmentInitials(name: string) {
+  const display = appointmentPersonName(name);
+  const words = display.split(/\s+/).filter(Boolean);
+  const letterAt = (word: string, index: number) => {
+    const chars = [...word].filter((ch) => /[A-Za-z0-9]/.test(ch));
+    return (chars[index] ?? "").toUpperCase();
+  };
+  if (!words.length) return "?";
+  if (words.length === 1) {
+    return letterAt(words[0], 0) || "?";
+  }
+  return `${letterAt(words[0], 0)}${letterAt(words[words.length - 1], 0)}` || "?";
 }
 
 function parseRelated(raw?: string): { kind: RelatedKind; id: string } {
@@ -309,10 +365,21 @@ export function meetingToAppointment(
       row.name === meeting.organizer ||
       (row.email && row.email === meeting.organizer),
   );
+  const guestName =
+    appointmentPersonName(
+      guest?.name,
+      related.id,
+      meeting.title,
+      meeting.organizer,
+    ) || "Guest";
   return {
     id: meeting.id,
-    guestName: guest?.name || meeting.organizer || "Guest",
-    topic: meeting.title,
+    guestName,
+    topic:
+      appointmentPersonName(meeting.title) &&
+      appointmentPersonName(meeting.title) !== guestName
+        ? appointmentPersonName(meeting.title)
+        : guest?.email || related.kind,
     relatedKind: related.kind,
     relatedId: related.id,
     consultantId: host?.id || meeting.organizer,

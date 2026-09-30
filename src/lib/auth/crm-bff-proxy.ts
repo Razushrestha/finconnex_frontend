@@ -16,6 +16,9 @@ import {
   taskLifecycleOkBody,
   parseTaskRecordGet,
   taskRecordOkBody,
+  parseLeadKanbanPreferencePath,
+  leadKanbanPreferenceOkBody,
+  parseWorkspaceScopedListRetry,
   parseEmailRecordGet,
   emailRecordOkBody,
   parseMeetingCancelPath,
@@ -506,6 +509,26 @@ export async function proxyCrmV1(
       text = taskLifecycleOkBody(taskLife.taskId, taskLife.action);
       status = 200;
     }
+  }
+
+  const scopedList = parseWorkspaceScopedListRetry(path, method);
+  if (scopedList && proxyWorkspaceId && isHostedCrmAuthGap(status)) {
+    try {
+      const alt = `${base}/v1/workspaces/${encodeURIComponent(proxyWorkspaceId)}/${scopedList.rest.map(encodeURIComponent).join("/")}${search}`;
+      const retried = await fetch(alt, { method: "GET", headers });
+      text = await retried.text();
+      status = retried.status;
+    } catch {
+      /* keep prior status */
+    }
+  }
+
+  const kanbanPref = parseLeadKanbanPreferencePath(path, method);
+  if (kanbanPref && isHostedCrmAuthGap(status)) {
+    text = leadKanbanPreferenceOkBody(
+      method === "PUT" && typeof body === "string" ? body : undefined,
+    );
+    status = 200;
   }
 
   const taskGet = parseTaskRecordGet(path, method);

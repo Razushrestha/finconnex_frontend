@@ -808,6 +808,7 @@ export async function refreshCrmLeadsBoard(): Promise<boolean> {
   if (kanbanFailed && listFailed) return false;
   const fromKanban = columns.flatMap((col) => col.records ?? []);
   const merged = mergeLeadRows([fromKanban, listed]);
+  if (!merged.length && (kanbanFailed || listFailed)) return false;
   saveLeadColumns(
     mergeRemoteLeadColumns(
       kanbanColumnsToBoard(

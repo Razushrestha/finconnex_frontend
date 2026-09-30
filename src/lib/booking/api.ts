@@ -495,6 +495,21 @@ export function listCrmEventTypes(): Promise<CrmEventType[]> {
   );
 }
 
+const EVENT_TYPE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const LOCATION_TYPES = new Set([
+  "GOOGLE_MEET",
+  "ZOOM",
+  "IN_PERSON",
+  "PHONE",
+  "CUSTOM",
+]);
+
+function clampInt(value: unknown, min: number, max: number, fallback: number) {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(n)));
+}
+
 export function toCreateEventTypeBody(input: {
   name: string;
   slug?: string;
@@ -504,10 +519,17 @@ export function toCreateEventTypeBody(input: {
   active?: boolean;
   locationType?: EventTypeLocationType | string;
   location?: string;
+  customLocationUrl?: string;
   meetingPlace?: "online" | "offline" | "phone";
   platform?: string;
   locationDetail?: string;
   hostIds?: string[];
+  ownerHostId?: string;
+  meetingType?: string;
+  bufferBeforeMinutes?: number;
+  bufferAfterMinutes?: number;
+  minimumNoticeMinutes?: number;
+  maxDaysInFuture?: number;
 }): Record<string, unknown> {
   const fromPlace =
     input.meetingPlace != null
@@ -517,21 +539,68 @@ export function toCreateEventTypeBody(input: {
           locationDetail: input.locationDetail,
         })
       : null;
-  const locationType = input.locationType || fromPlace?.locationType;
-  const location = input.location || fromPlace?.location;
-  const body: Record<string, unknown> = {
-    name: input.name,
-    title: input.name,
-    slug: input.slug,
-    durationMinutes: input.durationMinutes,
-    timezone: input.timezone,
-    description: input.description,
-    active: input.active !== false,
-  };
-  if (locationType) body.locationType = locationType;
-  if (location) body.location = location;
+  const rawType = String(input.locationType || fromPlace?.locationType || "ZOOM")
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+  const locationType = LOCATION_TYPES.has(rawType) ? rawType : "CUSTOM";
+  const location = (input.location || fromPlace?.location || "").trim();
+  const customLocationUrl = (
+    input.customLocationUrl ||
+    fromPlace?.customLocationUrl ||
+    ""
+  ).trim();
+  const meetingType =
+    input.meetingType ||
+    (input.meetingPlace === "offline"
+      ? "IN_PERSON"
+      : input.meetingPlace === "phone"
+        ? "PHONE_CALL"
+        : "CONSULTATION");
   const hostIds = (input.hostIds ?? []).filter((id) => isUuid(id));
-  if (hostIds.length) body.hostIds = hostIds;
+  const ownerHostId = isUuid(input.ownerHostId || "")
+    ? input.ownerHostId
+    : hostIds[0];
+
+  const body: Record<string, unknown> = {
+    name: input.name.trim(),
+    durationMinutes: clampInt(input.durationMinutes, 5, 1440, 30),
+    meetingType,
+    locationType,
+    isActive: input.active !== false,
+    isPublic: true,
+  };
+  const slug = input.slug?.trim().toLowerCase();
+  if (slug && EVENT_TYPE_SLUG.test(slug) && slug.length <= 80) body.slug = slug;
+  const description = input.description?.trim();
+  if (description) body.description = description.slice(0, 5000);
+  if (location) body.location = location.slice(0, 500);
+  if (locationType === "CUSTOM") {
+    body.customLocationUrl =
+      /^https?:\/\//i.test(customLocationUrl)
+        ? customLocationUrl.slice(0, 2048)
+        : "https://meet.google.com";
+  }
+  if (input.bufferBeforeMinutes != null) {
+    body.bufferBeforeMinutes = clampInt(input.bufferBeforeMinutes, 0, 480, 0);
+  }
+  if (input.bufferAfterMinutes != null) {
+    body.bufferAfterMinutes = clampInt(input.bufferAfterMinutes, 0, 480, 0);
+  }
+  if (input.minimumNoticeMinutes != null) {
+    body.minimumNoticeMinutes = clampInt(
+      input.minimumNoticeMinutes,
+      0,
+      20160,
+      60,
+    );
+  }
+  if (input.maxDaysInFuture != null) {
+    body.maxDaysInFuture = clampInt(input.maxDaysInFuture, 1, 365, 60);
+  }
+  if (hostIds.length) {
+    body.hostIds = hostIds;
+    if (ownerHostId) body.ownerHostId = ownerHostId;
+  }
   return body;
 }
 
@@ -549,10 +618,15 @@ export async function createCrmEventType(input: {
   active?: boolean;
   locationType?: EventTypeLocationType | string;
   location?: string;
+  customLocationUrl?: string;
   meetingPlace?: "online" | "offline" | "phone";
   platform?: string;
   locationDetail?: string;
   hostIds?: string[];
+  bufferBeforeMinutes?: number;
+  bufferAfterMinutes?: number;
+  minimumNoticeMinutes?: number;
+  maxDaysInFuture?: number;
 }): Promise<CrmEventType> {
   const full = toCreateEventTypeBody(input);
   try {
@@ -562,12 +636,20 @@ export async function createCrmEventType(input: {
     if (!isWhitelistRejection(err)) throw err;
     const message = err instanceof Error ? err.message : String(err ?? "");
     const slim = { ...full };
-    if (/hostIds/i.test(message)) delete slim.hostIds;
-    else {
+    if (/hostIds|ownerHostId/i.test(message)) {
+      delete slim.hostIds;
+      delete slim.ownerHostId;
+    } else if (/customLocationUrl/i.test(message)) {
+      delete slim.customLocationUrl;
+    } else if (/locationType|location/i.test(message)) {
       delete slim.locationType;
       delete slim.location;
+      delete slim.customLocationUrl;
+    } else if (/meetingType/i.test(message)) {
+      delete slim.meetingType;
+    } else {
+      throw err;
     }
-    if (!full.locationType && !full.hostIds) throw err;
     const data = await bookingCall("/event-types", jsonInit("POST", slim));
     return normalizeCrmEventType(asRecord(data) ?? extractRecords(data)[0] ?? {});
   }

@@ -133,7 +133,7 @@ async function hydrateStores(sectionId: AnalyticsSectionId) {
   if (sectionId === "customers") {
     await quiet(async () => {
       const rows = await loadCrmContacts();
-      replaceCrmContactsOnBoard(rows);
+      if (rows.length) replaceCrmContactsOnBoard(rows);
     });
   }
 }

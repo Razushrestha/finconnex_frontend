@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ImagePlus, ChevronDown, LocateFixed, MapPin, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, LocateFixed, MapPin, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ConsultationCoverPicker } from "@/components/booking/ConsultationCoverPicker";
 import type { ConsultationMode } from "@/lib/booking/types";
 import {
   defaultOfficeAddress,
@@ -61,6 +62,12 @@ export function ConsultationDetailsStep({
   );
   const [isFree, setIsFree] = useState(initial?.isFree ?? true);
   const [price, setPrice] = useState(initial?.price ?? 0);
+  const [priceDraft, setPriceDraft] = useState(() => {
+    if (initial?.isFree === false && (initial.price ?? 0) > 0) {
+      return String(initial.price);
+    }
+    return "";
+  });
   const [meetingPlace, setMeetingPlace] = useState<MeetingPlace>(() => {
     const place =
       initial?.meetingPlace ??
@@ -92,7 +99,6 @@ export function ConsultationDetailsStep({
   const [platformOpen, setPlatformOpen] = useState(false);
   const [platformQuery, setPlatformQuery] = useState("");
   const [error, setError] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const platforms = useMemo(() => {
     const q = platformQuery.trim().toLowerCase();
@@ -119,28 +125,6 @@ export function ConsultationDetailsStep({
 
   const heading = name.trim() || "Consultation title";
   const subtitle = modeSubtitle(choice);
-
-  function handleImagePick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setError("Please choose an image file");
-      return;
-    }
-    if (file.size > 2 * 1024 * 1024) {
-      setError("Image must be under 2 MB");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") {
-        setCoverImageUrl(reader.result);
-        if (error) setError("");
-      }
-    };
-    reader.readAsDataURL(file);
-  }
 
   function applyOfflineKind(kind: OfflineKind) {
     setOfflineKind(kind);
@@ -197,7 +181,11 @@ export function ConsultationDetailsStep({
       setError("Duration must be at least 5 minutes");
       return;
     }
-    if (!isFree && price <= 0) {
+    const paidAmount = Number(priceDraft);
+    if (
+      !isFree &&
+      (priceDraft.trim() === "" || !Number.isFinite(paidAmount) || paidAmount <= 0)
+    ) {
       setError("Enter a price for paid consultations");
       return;
     }
@@ -221,7 +209,7 @@ export function ConsultationDetailsStep({
       name: name.trim(),
       durationMinutes,
       isFree,
-      price: isFree ? 0 : price,
+      price: isFree ? 0 : paidAmount,
       online: meetingPlace === "online",
       meetingPlace,
       platform,
@@ -237,40 +225,13 @@ export function ConsultationDetailsStep({
   return (
     <div className="mx-auto w-full max-w-[720px] pb-8">
       <div className="mb-4 flex items-center gap-3 rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleImagePick}
+        <ConsultationCoverPicker
+          value={coverImageUrl}
+          onChange={(url) => {
+            setCoverImageUrl(url);
+            if (error) setError("");
+          }}
         />
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg text-white transition hover:brightness-110"
-          style={{ backgroundColor: BRAND }}
-          title={
-            coverImageUrl
-              ? "Change consultation logo"
-              : "Upload consultation logo"
-          }
-          aria-label={
-            coverImageUrl
-              ? "Change consultation logo"
-              : "Upload consultation logo"
-          }
-        >
-          {coverImageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={coverImageUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <ImagePlus className="h-5 w-5" strokeWidth={2} />
-          )}
-        </button>
         <div className="min-w-0">
           <p className="truncate text-[15px] font-bold text-slate-800">
             {heading}
@@ -360,6 +321,7 @@ export function ConsultationDetailsStep({
                   onClick={() => {
                     setIsFree(true);
                     setPrice(0);
+                    setPriceDraft("");
                   }}
                   className={cn(
                     "h-11 min-w-[88px] px-5 text-[13px] font-semibold",
@@ -374,7 +336,7 @@ export function ConsultationDetailsStep({
                   type="button"
                   onClick={() => {
                     setIsFree(false);
-                    setPrice((current) => Math.max(0, current));
+                    if (price <= 0) setPriceDraft("");
                   }}
                   className={cn(
                     "h-11 min-w-[88px] border-l border-[#E5E7EB] px-5 text-[13px] font-semibold",
@@ -391,11 +353,11 @@ export function ConsultationDetailsStep({
                   $
                 </span>
                 <input
-                  type="number"
-                  min={0}
-                  step="1"
+                  type="text"
                   inputMode="decimal"
-                  value={price}
+                  autoComplete="off"
+                  placeholder="Enter amount"
+                  value={isFree ? "0" : priceDraft}
                   disabled={isFree}
                   onKeyDown={(e) => {
                     if (e.key === "-" || e.key === "e" || e.key === "E" || e.key === "+") {
@@ -403,12 +365,16 @@ export function ConsultationDetailsStep({
                     }
                   }}
                   onChange={(e) => {
-                    const next = Number(e.target.value);
-                    if (!Number.isFinite(next) || next < 0) {
+                    const raw = e.target.value.trim();
+                    if (raw === "") {
+                      setPriceDraft("");
                       setPrice(0);
                       return;
                     }
-                    setPrice(next);
+                    if (!/^\d*\.?\d{0,2}$/.test(raw)) return;
+                    setPriceDraft(raw);
+                    const next = Number(raw);
+                    if (Number.isFinite(next) && next >= 0) setPrice(next);
                   }}
                   className="h-11 w-full rounded-lg border border-[#E5E7EB] bg-white pr-3 pl-7 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/45 disabled:bg-slate-50 disabled:text-slate-400"
                 />

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Camera, Info, Search } from "lucide-react";
-import { loadWorkspaceConsultants } from "@/lib/users/assignable";
+import { Info, Search } from "lucide-react";
+import { ConsultationCoverPicker } from "@/components/booking/ConsultationCoverPicker";
+import { loadWorkspaceConsultants, listAssignableOwnersLocal, type AssignableOwner } from "@/lib/users/assignable";
 import {
   CONSULTANT_PRIORITIES,
   type ConsultantPriority,
@@ -21,11 +22,15 @@ function priorityLabel(priority: ConsultantPriority) {
 export function AssignConsultantsStep({
   choice,
   consultationName,
+  coverImageUrl,
+  onCoverChange,
   onBack,
   onCreate,
 }: {
   choice: CalendarTypeChoice;
   consultationName: string;
+  coverImageUrl?: string;
+  onCoverChange?: (url: string) => void;
   onBack: () => void;
   onCreate: (
     consultants: string[],
@@ -39,32 +44,37 @@ export function AssignConsultantsStep({
     Record<string, ConsultantPriority>
   >({});
   const [error, setError] = useState("");
-  const [hostNames, setHostNames] = useState<string[]>([]);
-  const [userIds, setUserIds] = useState<Record<string, string>>({});
+  const [owners, setOwners] = useState<AssignableOwner[]>(() =>
+    listAssignableOwnersLocal(),
+  );
 
   useEffect(() => {
     let alive = true;
     void loadWorkspaceConsultants()
-      .then((owners) => {
+      .then((rows) => {
         if (!alive) return;
-        setHostNames(owners.map((owner) => owner.name));
-        setUserIds(
-          Object.fromEntries(owners.map((owner) => [owner.name, owner.id])),
-        );
+        setOwners(rows);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!alive) return;
+        setOwners((prev) => (prev.length ? prev : listAssignableOwnersLocal()));
+      });
     return () => {
       alive = false;
     };
   }, []);
 
-  const allNames = useMemo(() => hostNames, [hostNames]);
-
-  const names = useMemo(() => {
+  const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return allNames;
-    return allNames.filter((n) => n.toLowerCase().includes(q));
-  }, [allNames, query]);
+    if (!q) return owners;
+    return owners.filter(
+      (owner) =>
+        owner.name.toLowerCase().includes(q) ||
+        owner.email.toLowerCase().includes(q),
+    );
+  }, [owners, query]);
+
+  const names = useMemo(() => visible.map((owner) => owner.name), [visible]);
 
   const allVisibleSelected =
     names.length > 0 && names.every((n) => selected.includes(n));
@@ -96,12 +106,10 @@ export function AssignConsultantsStep({
   return (
     <div className="mx-auto flex max-h-full min-h-0 w-full max-w-[720px] flex-1 flex-col overflow-hidden">
       <div className="mb-4 flex shrink-0 items-center gap-3 rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-        <span
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-white"
-          style={{ backgroundColor: BRAND }}
-        >
-          <Camera className="h-5 w-5" strokeWidth={2} />
-        </span>
+        <ConsultationCoverPicker
+          value={coverImageUrl}
+          onChange={(url) => onCoverChange?.(url)}
+        />
         <div className="min-w-0">
           <p className="truncate text-[15px] font-bold uppercase text-slate-800">
             {consultationName}
@@ -145,14 +153,24 @@ export function AssignConsultantsStep({
         </div>
 
         <ul className="min-h-0 flex-1 divide-y divide-[#F3F4F6] overflow-y-auto border-t border-[#F3F4F6] [overflow-anchor:none]">
-          {names.map((name) => {
+          {visible.map((owner) => {
+            const name = owner.name;
             const checked = selected.includes(name);
             return (
-              <li key={name} className="px-5 py-3.5 sm:px-7">
+              <li key={owner.id || owner.email || name} className="px-5 py-3.5 sm:px-7">
                 <div className="flex items-center gap-3">
-                  <span className="h-9 w-9 shrink-0 rounded-full bg-slate-200/80" />
-                  <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-slate-800">
-                    {name}
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F3ECFB] text-[11px] font-bold text-[#5A32A3]">
+                    {name.slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] font-medium text-slate-800">
+                      {name}
+                    </span>
+                    {owner.email ? (
+                      <span className="block truncate text-[12px] text-slate-400">
+                        {owner.email}
+                      </span>
+                    ) : null}
                   </span>
                   <div className="flex shrink-0 items-center gap-2.5">
                     <label className="sr-only">
@@ -191,7 +209,7 @@ export function AssignConsultantsStep({
           })}
           {names.length === 0 ? (
             <li className="px-5 py-10 text-center text-[13px] text-slate-400">
-              {hostNames.length === 0
+              {owners.length === 0
                 ? "No workspace members available to assign."
                 : "No consultants match your search."}
             </li>
@@ -238,7 +256,10 @@ export function AssignConsultantsStep({
             const next: Record<string, ConsultantPriority> = {};
             for (const name of selected) next[name] = priorityOf(name);
             const ids: Record<string, string> = {};
-            for (const name of selected) ids[name] = userIds[name] ?? "";
+            for (const name of selected) {
+              ids[name] =
+                owners.find((owner) => owner.name === name)?.id ?? "";
+            }
             onCreate(selected, next, ids);
           }}
           className="h-10 min-w-[96px] rounded-lg px-6 text-[13px] font-semibold text-white hover:brightness-110"

@@ -1,18 +1,7 @@
 import { NextResponse } from "next/server";
 
-const LIST_ROOTS = new Set([
-  "tasks",
-  "deals",
-  "companies",
-  "contacts",
-  "leads",
-  "signature-requests",
-  "signature-templates",
-  "documents",
-  "document-requests",
-  "members",
-  "notes",
-]);
+/** Stub empty only for routes hosted Nest still 404s. Live lists must not 200 `[]`. */
+const LIST_ROOTS = new Set(["tasks", "notes"]);
 
 export function normalizeCrmProxyPath(
   path: string[] | string | undefined,
@@ -73,6 +62,22 @@ export const isHostedMissingCrmGet = (
   path: string[],
   method: string,
 ): boolean => method === "GET" && isHostedMissingSignatureListPath(path, method);
+
+/** Global GET that Nest often 401s unless scoped under /workspaces/:id. */
+export function parseWorkspaceScopedListRetry(
+  path: string[],
+  method: string,
+) {
+  if (method.toUpperCase() !== "GET") return null;
+  if (path[0] === "workspaces") return null;
+  if (path[0] === "leads" && (!path[1] || path[1] === "kanban")) {
+    return { rest: path };
+  }
+  if (path[0] === "contacts" && !path[1]) {
+    return { rest: path };
+  }
+  return null;
+}
 
 export function parseEmailRecordGet(path: string[], method: string) {
   if (method !== "GET") return null;
@@ -194,6 +199,66 @@ export function isHostedCrmAuthGap(status: number) {
     status === 405 ||
     status === 501
   );
+}
+
+const DEFAULT_LEAD_KANBAN_PREFERENCE = {
+  showOwnerAvatar: true,
+  dynamicFieldKeys: ["company", "email", "pipelineSla", "lastActivity"],
+  unrepliedThresholdHours: 24,
+};
+
+export function parseLeadKanbanPreferencePath(
+  path: string[],
+  method: string,
+) {
+  const verb = method.toUpperCase();
+  if (verb !== "GET" && verb !== "PUT") return null;
+  const workspaceId = path[0] === "workspaces" ? path[1] ?? null : null;
+  const segs = resourceSegments(path);
+  if (
+    segs[0] !== "preferences" ||
+    segs[1] !== "kanban" ||
+    segs[2] !== "leads" ||
+    segs[3]
+  ) {
+    return null;
+  }
+  return { workspaceId };
+}
+
+export function leadKanbanPreferenceOkBody(rawBody?: string) {
+  let data = { ...DEFAULT_LEAD_KANBAN_PREFERENCE };
+  if (rawBody?.trim()) {
+    try {
+      const parsed = JSON.parse(rawBody) as Record<string, unknown>;
+      const nested =
+        parsed.data && typeof parsed.data === "object" && !Array.isArray(parsed.data)
+          ? (parsed.data as Record<string, unknown>)
+          : parsed;
+      if (typeof nested.showOwnerAvatar === "boolean") {
+        data = { ...data, showOwnerAvatar: nested.showOwnerAvatar };
+      }
+      if (Array.isArray(nested.dynamicFieldKeys)) {
+        data = {
+          ...data,
+          dynamicFieldKeys: nested.dynamicFieldKeys.filter(
+            (key): key is string => typeof key === "string",
+          ),
+        };
+      }
+      const hours = Number(nested.unrepliedThresholdHours);
+      if (Number.isFinite(hours)) {
+        data = { ...data, unrepliedThresholdHours: Math.round(hours) };
+      }
+    } catch {
+      /* keep defaults */
+    }
+  }
+  return JSON.stringify({
+    statusCode: 200,
+    message: "OK",
+    data,
+  });
 }
 
 const TASK_RECORD_RESERVED = new Set([
@@ -342,6 +407,12 @@ export function tryMissingCrmFallback(path: string[], method: string) {
   }
   if (isEmptyDashboardLayoutWritePath(path, method)) {
     return emptyEnvelope({});
+  }
+  if (parseLeadKanbanPreferencePath(path, method)) {
+    return new NextResponse(leadKanbanPreferenceOkBody(), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   }
   return null;
 }

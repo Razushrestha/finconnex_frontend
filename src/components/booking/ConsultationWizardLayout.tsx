@@ -94,12 +94,12 @@ export function ConsultationWizardLayout({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-hidden lg:flex-row lg:items-stretch lg:gap-8">
-      <aside className="w-full shrink-0 lg:max-h-full lg:w-[260px] lg:overflow-y-auto">
+      <aside className="w-full shrink-0 lg:max-h-full lg:w-[280px] lg:overflow-y-auto">
         <nav className="rounded-xl border border-[#E5E7EB] bg-white p-2 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
           {CONSULTATION_SETUP_STEPS.map((step, index) => {
             const reached = index <= furthest;
             return (
-              <div key={step.id}>
+              <div key={step.id} className="flex flex-col">
                 <SidebarItem
                   icon={step.icon}
                   title={step.title}
@@ -113,7 +113,7 @@ export function ConsultationWizardLayout({
                           availabilityOpen && "rotate-180 text-[#5A32A3]",
                         )}
                       />
-                    ) : null
+                    ) : undefined
                   }
                   onClick={() => {
                     if (!reached) return;
@@ -122,27 +122,18 @@ export function ConsultationWizardLayout({
                   }}
                 />
                 {step.id === "availability" && availabilityOpen ? (
-                  <div className="mb-1 ml-4 space-y-0.5 border-l border-[#E5E7EB] pl-2">
-                    {AVAILABILITY_PANELS.map((panel) => {
-                      const Icon = panel.icon;
-                      const selected = availabilityPanel === panel.id;
-                      return (
-                        <button
-                          key={panel.id}
-                          type="button"
-                          onClick={() => onAvailabilityPanel?.(panel.id)}
-                          className={cn(
-                            "flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12px] font-semibold",
-                            selected
-                              ? "bg-[#F3ECFB] text-[#5A32A3]"
-                              : "text-slate-600 hover:bg-slate-50",
-                          )}
-                        >
-                          <Icon className="h-3.5 w-3.5 shrink-0" />
-                          {panel.title}
-                        </button>
-                      );
-                    })}
+                  <div className="flex flex-col gap-0.5 px-0 pb-1">
+                    {AVAILABILITY_PANELS.map((panel) => (
+                      <SidebarItem
+                        key={panel.id}
+                        icon={panel.icon}
+                        title={panel.title}
+                        nested
+                        active={availabilityPanel === panel.id}
+                        reached
+                        onClick={() => onAvailabilityPanel?.(panel.id)}
+                      />
+                    ))}
                   </div>
                 ) : null}
               </div>
@@ -162,6 +153,7 @@ function SidebarItem({
   title,
   active,
   reached,
+  nested = false,
   trailing,
   onClick,
 }: {
@@ -169,6 +161,7 @@ function SidebarItem({
   title: string;
   active: boolean;
   reached: boolean;
+  nested?: boolean;
   trailing?: ReactNode;
   onClick: () => void;
 }) {
@@ -178,7 +171,10 @@ function SidebarItem({
       onClick={onClick}
       disabled={!reached}
       className={cn(
-        "flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition",
+        "grid w-full items-center gap-x-3 rounded-lg px-2.5 text-left transition",
+        nested
+          ? "h-10 grid-cols-[2rem_2rem_minmax(0,1fr)_2rem]"
+          : "h-11 grid-cols-[2rem_minmax(0,1fr)_2rem]",
         active
           ? "bg-[#F3ECFB]"
           : reached
@@ -186,25 +182,26 @@ function SidebarItem({
             : "cursor-default opacity-55",
       )}
     >
+      {nested ? <span className="h-8 w-8" aria-hidden /> : null}
       <span
         className={cn(
-          "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
-          active ? "bg-white text-[#5A32A3]" : "bg-slate-50 text-slate-400",
+          "flex h-8 w-8 items-center justify-center justify-self-center rounded-md",
+          active ? "bg-white text-[#5A32A3]" : "bg-slate-100 text-slate-500",
         )}
       >
-        <Icon className="h-4 w-4" strokeWidth={2} />
+        <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
       </span>
-      <span className="min-w-0">
-        <span
-          className={cn(
-            "block text-[13px] font-semibold",
-            active ? "text-[#5A32A3]" : "text-slate-800",
-          )}
-        >
-          {title}
-        </span>
+      <span
+        className={cn(
+          "min-w-0 truncate text-[13px] font-semibold",
+          active ? "text-[#5A32A3]" : nested ? "text-slate-600" : "text-slate-800",
+        )}
+      >
+        {title}
       </span>
-      {trailing ? <span className="ml-auto pt-1">{trailing}</span> : null}
+      <span className="flex h-8 w-8 items-center justify-center justify-self-center">
+        {trailing ?? null}
+      </span>
     </button>
   );
 }
