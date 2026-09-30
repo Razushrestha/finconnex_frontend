@@ -1,5 +1,8 @@
 import { ensureCrmSession } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmBffFetch, crmFetch } from "@/lib/crm/request";
+import type { AnalyticsSectionId } from "@/lib/analytics/library";
+import type { SectionPageModel } from "@/lib/analytics/section-page";
+import { formatCurrency, type DashboardDateRange } from "@/lib/dashboard/layout";
 import {
   formatBenchmark,
   LOWER_IS_BETTER,
@@ -108,26 +111,66 @@ function monthLabel(raw: unknown): string {
   return s || "—";
 }
 
+export function dashboardRangeToAnalyticsPeriod(
+  range: DashboardDateRange,
+): AnalyticsPeriod {
+  if (
+    range === "7d" ||
+    range === "today" ||
+    range === "yesterday" ||
+    range === "this-week"
+  ) {
+    return "7d";
+  }
+  if (
+    range === "30d" ||
+    range === "this-month" ||
+    range === "last-month" ||
+    range === "last-week" ||
+    range === "month"
+  ) {
+    return "30d";
+  }
+  if (
+    range === "90d" ||
+    range === "this-quarter" ||
+    range === "last-quarter"
+  ) {
+    return "quarter";
+  }
+  return "year";
+}
+
+async function fetchOneAnalyticsWidget(
+  path: string,
+): Promise<AnalyticsWidgetResponse | null> {
+  try {
+    return await crmBffFetch<AnalyticsWidgetResponse>(path);
+  } catch {
+    const session = await ensureCrmSession();
+    if (!session) return null;
+    try {
+      return await crmFetch<AnalyticsWidgetResponse>(session, path);
+    } catch {
+      return null;
+    }
+  }
+}
+
 export async function fetchAnalyticsWidgets(opts: {
   period: AnalyticsPeriod;
   compare: boolean;
 }): Promise<Map<string, AnalyticsWidgetResponse>> {
-  const session = await ensureCrmSession();
-  if (!session) return new Map();
-
   const range = analyticsPeriodRange(opts.period);
   const results = await Promise.allSettled(
-    ANALYTICS_WIDGETS.map((widget) => {
+    ANALYTICS_WIDGETS.map(async (widget) => {
       const params = new URLSearchParams({
         widget,
         startDate: range.startDate,
         endDate: range.endDate,
       });
       if (opts.compare) params.set("comparePeriod", "previous_period");
-      return crmFetch<AnalyticsWidgetResponse>(
-        session,
-        `/v1/analytics?${params.toString()}`,
-      );
+      return fetchOneAnalyticsWidget(`/v1/analytics?${params.toString()}`);
     }),
   );
 
@@ -244,3 +287,126 @@ export function overlayAnalyticsSnapshot(
     csat,
   };
 }
+
+export const SECTION_WIDGET_KPIS: Record<
+  AnalyticsSectionId,
+  Record<string, AnalyticsWidgetId>
+> = {
+  business: {
+    conversion: "LEAD_CONVERSION_RATE",
+    win: "DEAL_WIN_RATE",
+    revenue: "AVERAGE_DEAL_SIZE",
+  },
+  leads: { rate: "LEAD_CONVERSION_RATE" },
+  deals: {
+    win: "DEAL_WIN_RATE",
+    cycle: "SALES_CYCLE_LENGTH",
+    pipe: "PIPELINE_VELOCITY",
+  },
+  marketing: { conv: "CAMPAIGN_ROI" },
+  activity: {
+    total: "ACTIVITIES_COMPLETED",
+    sla: "TASKS_OVERDUE_RATE",
+  },
+  team: { activities: "ACTIVITIES_COMPLETED" },
+  revenue: {
+    conversion: "LEAD_CONVERSION_RATE",
+    win: "DEAL_WIN_RATE",
+    revenue: "AVERAGE_DEAL_SIZE",
+  },
+  operations: { overdue: "SUPPORT_TICKET_RESOLUTION_TIME" },
+  customers: { retention: "CUSTOMER_SATISFACTION_SCORE" },
+  forecast: { weighted: "PIPELINE_VELOCITY" },
+};
+
+function formatOverlayValue(existing: string, n: number, points?: boolean) {
+  if (points || existing.includes("%")) return `${Math.round(n * 10) / 10}%`;
+  if (existing.startsWith("$")) return formatCurrency(n);
+  return String(Math.round(n * 10) / 10);
+}
+
+export function overlaySectionPage(
+  sectionId: AnalyticsSectionId,
+  base: SectionPageModel,
+  widgets: Map<string, AnalyticsWidgetResponse>,
+): SectionPageModel {
+  if (widgets.size === 0) return base;
+  const map = SECTION_WIDGET_KPIS[sectionId];
+  const kpis = base.kpis.map((kpi) => {
+    const widgetId = map[kpi.id];
+    if (!widgetId) return kpi;
+    const widget = widgets.get(widgetId);
+    if (!widget) return kpi;
+    const n = toNum(widget.period.value);
+    if (n == null) return kpi;
+    const prev = widget.comparison ? toNum(widget.comparison.value) : null;
+    let delta = kpi.delta;
+    let previous = kpi.previous;
+    if (prev != null) {
+      previous = formatOverlayValue(kpi.previous, prev, kpi.points);
+      if (!prev) delta = n ? 100 : 0;
+      else delta = Math.round(((n - prev) / Math.abs(prev)) * 1000) / 10;
+    }
+    return {
+      ...kpi,
+      value: formatOverlayValue(kpi.value, n, kpi.points),
+      delta,
+      previous,
+    };
+  });
+
+  let trend = base.trend;
+  const months = overlayMonth(
+    base.trend.map((row) => ({ month: row.label, revenue: row.primary, target: 0 })),
+    widgets,
+  );
+  if (widgets.get("REVENUE_BY_MONTH") && months.length) {
+    trend = months.map((row, i) => ({
+      label: row.month,
+      primary: row.revenue,
+      secondary: base.trend[i]?.secondary ?? 0,
+    }));
+  }
+
+  let slices = base.slices;
+  const sources = overlaySource(
+    base.slices.map((row) => ({ name: row.name, value: row.value })),
+    widgets,
+  );
+  if (widgets.get("REVENUE_BY_SOURCE") && sources.length) {
+    slices = sources.map((row) => ({ name: row.name, value: row.value }));
+  }
+
+  let list = base.list;
+  const owners = overlayOwner(
+    base.list.map((row) => ({ name: row.name, revenue: 0 })),
+    widgets,
+  );
+  if (widgets.get("REVENUE_BY_OWNER") && owners.length) {
+    const max = Math.max(1, ...owners.map((row) => row.revenue));
+    list = owners.map((row) => ({
+      name: row.name,
+      detail: formatCurrency(row.revenue),
+      bar: (row.revenue / max) * 100,
+    }));
+  }
+  const top = overlayTopUsers([], widgets);
+  if (widgets.get("TOP_PERFORMING_USERS") && top.length && sectionId === "team") {
+    const max = Math.max(1, ...top.map((row) => row.revenue || row.activities));
+    list = top.map((row) => ({
+      name: row.name,
+      detail: `${row.dealsWon} won · ${formatCurrency(row.revenue)}`,
+      bar: ((row.revenue || row.activities) / max) * 100,
+    }));
+  }
+
+  return {
+    ...base,
+    kpis,
+    trend,
+    slices,
+    sliceTotal: slices.reduce((n, row) => n + row.value, 0) || base.sliceTotal,
+    list,
+  };
+}
+

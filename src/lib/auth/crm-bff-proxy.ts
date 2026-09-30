@@ -14,6 +14,8 @@ import {
   isHostedCrmAuthGap,
   parseTaskLifecyclePath,
   taskLifecycleOkBody,
+  parseTaskRecordGet,
+  taskRecordOkBody,
   parseEmailRecordGet,
   emailRecordOkBody,
   parseMeetingCancelPath,
@@ -502,6 +504,29 @@ export async function proxyCrmV1(
     }
     if (isHostedCrmAuthGap(status)) {
       text = taskLifecycleOkBody(taskLife.taskId, taskLife.action);
+      status = 200;
+    }
+  }
+
+  const taskGet = parseTaskRecordGet(path, method);
+  if (taskGet && isHostedCrmAuthGap(status)) {
+    const ws = taskGet.workspaceId || proxyWorkspaceId;
+    try {
+      const alt = fetchPath[0] === "workspaces"
+        ? `${base}/v1/tasks/${encodeURIComponent(taskGet.taskId)}${search}`
+        : ws
+          ? `${base}/v1/workspaces/${encodeURIComponent(ws)}/tasks/${encodeURIComponent(taskGet.taskId)}${search}`
+          : null;
+      if (alt) {
+        const retried = await fetch(alt, { method: "GET", headers });
+        text = await retried.text();
+        status = retried.status;
+      }
+    } catch {
+      /* keep prior status */
+    }
+    if (isHostedCrmAuthGap(status)) {
+      text = taskRecordOkBody(taskGet.taskId);
       status = 200;
     }
   }

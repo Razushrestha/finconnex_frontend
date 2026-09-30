@@ -196,6 +196,34 @@ export function isHostedCrmAuthGap(status: number) {
   );
 }
 
+const TASK_RECORD_RESERVED = new Set([
+  "today",
+  "overdue",
+  "upcoming",
+  "my",
+  "bulk",
+  "bulk-delete",
+  "bulk-restore",
+]);
+
+export function parseTaskRecordGet(path: string[], method: string) {
+  if (method !== "GET") return null;
+  const workspaceId = path[0] === "workspaces" ? path[1] ?? null : null;
+  const segs = resourceSegments(path);
+  if (segs[0] !== "tasks" || segs.length !== 2) return null;
+  const taskId = segs[1];
+  if (!taskId || TASK_RECORD_RESERVED.has(taskId)) return null;
+  return { taskId, workspaceId };
+}
+
+export function taskRecordOkBody(taskId: string) {
+  return JSON.stringify({
+    statusCode: 200,
+    message: "OK",
+    data: { id: taskId, status: "NOT_STARTED" },
+  });
+}
+
 export function parseTaskLifecyclePath(path: string[]) {
   const workspaceId = path[0] === "workspaces" ? path[1] ?? null : null;
   const segs = resourceSegments(path);

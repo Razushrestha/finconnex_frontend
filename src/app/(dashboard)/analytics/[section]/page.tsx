@@ -1,4 +1,5 @@
 import { AnalyticsSection } from "@/components/analytics/AnalyticsSection";
+import { getSession } from "@/lib/auth/session";
 
 export default async function AnalyticsSectionPage({
   params,
@@ -6,5 +7,6 @@ export default async function AnalyticsSectionPage({
   params: Promise<{ section: string }>;
 }) {
   const { section } = await params;
-  return <AnalyticsSection sectionId={section} />;
+  const session = await getSession();
+  return <AnalyticsSection sectionId={section} sessionName={session?.name ?? ""} />;
 }

@@ -25,4 +25,17 @@ describe("business analytics", () => {
     expect(data.owners.length).toBeGreaterThan(0);
     expect(data.trend.length).toBeGreaterThan(0);
   });
+
+  it("keeps the source legend and a daily 30-day trend", () => {
+    const data = computeBusinessAnalytics({ dateRange: "30d", owner: "All" }, july);
+    expect(data.sources.map((row) => row.name)).toEqual([
+      "Direct",
+      "Organic Search",
+      "Social Media",
+      "Referral",
+      "Other",
+    ]);
+    expect(data.trend.length).toBeGreaterThanOrEqual(30);
+    expect(data.kpis[0]?.spark?.length).toBeGreaterThan(0);
+  });
 });

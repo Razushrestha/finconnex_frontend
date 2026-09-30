@@ -173,6 +173,202 @@ function monthTrend(
     });
 }
 
+export const BUSINESS_SOURCE_CHANNELS = [
+  "Direct",
+  "Organic Search",
+  "Social Media",
+  "Referral",
+  "Other",
+] as const;
+
+export type BusinessSourceChannel = (typeof BUSINESS_SOURCE_CHANNELS)[number];
+
+export type BusinessTrendSpan = "7d" | "30d" | "3m" | "1y";
+
+export function filtersForTrendSpan(
+  span: BusinessTrendSpan,
+  owner: string,
+  now = new Date(),
+): BusinessAnalyticsFilters {
+  if (span === "7d") return { dateRange: "7d", owner };
+  if (span === "30d") return { dateRange: "30d", owner };
+  if (span === "3m") return { dateRange: "90d", owner };
+  const from = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    dateRange: "custom",
+    dateFrom: `${from.getFullYear()}-${pad(from.getMonth() + 1)}-${pad(from.getDate())}`,
+    dateTo: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+    owner,
+  };
+}
+
+function startOfLocalDay(at: Date) {
+  return new Date(at.getFullYear(), at.getMonth(), at.getDate());
+}
+
+function dayKey(at: Date) {
+  return `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, "0")}-${String(at.getDate()).padStart(2, "0")}`;
+}
+
+function classifySource(name: string): BusinessSourceChannel {
+  const n = name.trim().toLowerCase();
+  if (!n) return "Other";
+  if (
+    n.includes("refer") ||
+    n.includes("existing client") ||
+    n.includes("employee") ||
+    n.includes("partner")
+  ) {
+    return "Referral";
+  }
+  if (
+    n.includes("facebook") ||
+    n.includes("instagram") ||
+    n.includes("tiktok") ||
+    n.includes("social") ||
+    n.includes("linkedin")
+  ) {
+    return "Social Media";
+  }
+  if (
+    n.includes("google") ||
+    n.includes("organic") ||
+    n.includes("seo") ||
+    n.includes("website") ||
+    n.includes("ads")
+  ) {
+    return "Organic Search";
+  }
+  if (n.includes("direct") || n.includes("walk") || n.includes("imported") || n.includes("manual")) {
+    return "Direct";
+  }
+  if (n === "other" || n.includes("phone") || n.includes("event")) return "Other";
+  return "Direct";
+}
+
+function addToBucket(
+  buckets: Map<string, { order: number; revenue: number; leads: number; settlements: number }>,
+  key: string,
+  order: number,
+  patch: Partial<{ revenue: number; leads: number; settlements: number }>,
+) {
+  const current =
+    buckets.get(key) ?? { order, revenue: 0, leads: 0, settlements: 0 };
+  current.revenue += patch.revenue ?? 0;
+  current.leads += patch.leads ?? 0;
+  current.settlements += patch.settlements ?? 0;
+  buckets.set(key, current);
+}
+
+function fillTrendFromRecords(
+  buckets: Map<string, { order: number; revenue: number; leads: number; settlements: number }>,
+  start: Date | null,
+  end: Date,
+  settled: ReturnType<typeof loadDeals>,
+  leads: ReturnType<typeof loadLeads>,
+  keyFor: (at: Date) => { key: string; order: number },
+) {
+  for (const deal of settled) {
+    if (!deal.closeAt || !inBounds(deal.closeAt, start, end)) continue;
+    const { key, order } = keyFor(deal.closeAt);
+    addToBucket(buckets, key, order, { revenue: deal.value, settlements: 1 });
+  }
+  const usedDealSettlements = settled.some(
+    (deal) => deal.won && inBounds(deal.closeAt, start, end),
+  );
+  for (const lead of leads) {
+    if (lead.converted && !usedDealSettlements) {
+      const at = lead.convertedAt ?? lead.createdAt;
+      if (at && inBounds(at, start, end)) {
+        const { key, order } = keyFor(at);
+        addToBucket(buckets, key, order, { revenue: lead.value, settlements: 1 });
+      }
+    }
+    if (!lead.createdAt || !inBounds(lead.createdAt, start, end)) continue;
+    const { key, order } = keyFor(lead.createdAt);
+    addToBucket(buckets, key, order, { leads: 1 });
+  }
+}
+
+function dailyTrend(
+  start: Date,
+  end: Date,
+  settled: ReturnType<typeof loadDeals>,
+  leads: ReturnType<typeof loadLeads>,
+) {
+  const buckets = new Map<
+    string,
+    { order: number; revenue: number; leads: number; settlements: number }
+  >();
+  const cursor = startOfLocalDay(start);
+  const last = startOfLocalDay(end);
+  while (cursor <= last) {
+    addToBucket(buckets, dayKey(cursor), cursor.getTime(), {});
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  fillTrendFromRecords(buckets, start, end, settled, leads, (at) => ({
+    key: dayKey(at),
+    order: startOfLocalDay(at).getTime(),
+  }));
+  return [...buckets.entries()]
+    .sort((a, b) => a[1].order - b[1].order)
+    .map(([key, bucket]) => {
+      const [year, month, day] = key.split("-").map(Number);
+      return {
+        label: new Date(year, (month ?? 1) - 1, day ?? 1).toLocaleDateString("en-AU", {
+          month: "short",
+          day: "numeric",
+        }),
+        revenue: bucket.revenue,
+        leads: bucket.leads,
+        settlements: bucket.settlements,
+      };
+    });
+}
+
+function weeklyTrend(
+  start: Date,
+  end: Date,
+  settled: ReturnType<typeof loadDeals>,
+  leads: ReturnType<typeof loadLeads>,
+) {
+  const buckets = new Map<
+    string,
+    { order: number; revenue: number; leads: number; settlements: number }
+  >();
+  const weekStart = (at: Date) => {
+    const day = startOfLocalDay(at);
+    const offset = (day.getDay() + 6) % 7;
+    day.setDate(day.getDate() - offset);
+    return day;
+  };
+  const cursor = weekStart(start);
+  const last = weekStart(end);
+  while (cursor <= last) {
+    addToBucket(buckets, dayKey(cursor), cursor.getTime(), {});
+    cursor.setDate(cursor.getDate() + 7);
+  }
+  fillTrendFromRecords(buckets, start, end, settled, leads, (at) => {
+    const ws = weekStart(at);
+    return { key: dayKey(ws), order: ws.getTime() };
+  });
+  return [...buckets.entries()]
+    .sort((a, b) => a[1].order - b[1].order)
+    .map(([key, bucket]) => {
+      const [year, month, day] = key.split("-").map(Number);
+      return {
+        label: new Date(year, (month ?? 1) - 1, day ?? 1).toLocaleDateString("en-AU", {
+          month: "short",
+          day: "numeric",
+        }),
+        revenue: bucket.revenue,
+        leads: bucket.leads,
+        settlements: bucket.settlements,
+      };
+    });
+}
+
 export function computeBusinessAnalytics(
   filters: BusinessAnalyticsFilters,
   now = new Date(),
@@ -186,23 +382,26 @@ export function computeBusinessAnalytics(
     ? snapshotFor(leads, deals, previous.start, previous.end, filters.owner)
     : null;
 
-  const sources = new Map<string, { revenue: number; deals: number }>();
+  const sources = new Map<BusinessSourceChannel, { revenue: number; deals: number }>();
+  for (const name of BUSINESS_SOURCE_CHANNELS) {
+    sources.set(name, { revenue: 0, deals: 0 });
+  }
   for (const deal of current.settledRows) {
     const lead = leads.find(
       (row) =>
         row.name.toLowerCase() === deal.contact.toLowerCase() ||
         row.company.toLowerCase() === deal.account.toLowerCase(),
     );
-    const name = deal.source || lead?.source || "Other";
+    const name = classifySource(deal.source || lead?.source || "Other");
     const bucket = sources.get(name) ?? { revenue: 0, deals: 0 };
     bucket.revenue += deal.value;
     bucket.deals += 1;
     sources.set(name, bucket);
   }
-  const sourceSlices = [...sources.entries()]
-    .map(([name, row]) => ({ name, revenue: row.revenue, deals: row.deals }))
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 6);
+  const sourceSlices = BUSINESS_SOURCE_CHANNELS.map((name) => {
+    const row = sources.get(name) ?? { revenue: 0, deals: 0 };
+    return { name, revenue: row.revenue, deals: row.deals };
+  });
   const sourceTotal = sourceSlices.reduce((n, row) => n + row.revenue, 0);
 
   const owners = new Map<string, { revenue: number; settlements: number }>();
@@ -242,6 +441,31 @@ export function computeBusinessAnalytics(
       ? deltaPct(current.revenue, prior.revenue)
       : deltaPct(current.newLeads, prior?.newLeads ?? 0);
 
+  const ownedLeads = leads.filter((lead) => matchesOwner(lead.owner, filters.owner));
+  const ownedDeals = deals.filter((deal) => matchesOwner(deal.owner, filters.owner));
+  const dayCount =
+    bounds.start != null
+      ? Math.round(
+          (startOfLocalDay(bounds.end).getTime() - startOfLocalDay(bounds.start).getTime()) /
+            86400000,
+        ) + 1
+      : 400;
+  const trend =
+    bounds.start && dayCount <= 45
+      ? dailyTrend(bounds.start, bounds.end, ownedDeals, ownedLeads)
+      : bounds.start && dayCount <= 120
+        ? weeklyTrend(bounds.start, bounds.end, ownedDeals, ownedLeads)
+        : monthTrend(bounds.start, bounds.end, ownedDeals, ownedLeads);
+  const sparkSource =
+    bounds.start && dayCount > 45
+      ? dailyTrend(
+          new Date(bounds.end.getTime() - 29 * 86400000),
+          bounds.end,
+          ownedDeals,
+          ownedLeads,
+        )
+      : trend;
+
   return {
     periodLabel: dateRangeLabel({
       ...defaultDashboardFilters(),
@@ -249,7 +473,7 @@ export function computeBusinessAnalytics(
       dateFrom: filters.dateFrom,
       dateTo: filters.dateTo,
     }),
-    comparisonShort: previous ? "vs last period" : "",
+    comparisonShort: previous ? "last period" : "",
     asOf: now,
     growth,
     kpis: [
@@ -259,6 +483,7 @@ export function computeBusinessAnalytics(
         value: String(current.newLeads),
         delta: deltaPct(current.newLeads, prior?.newLeads ?? 0),
         previous: String(prior?.newLeads ?? 0),
+        spark: sparkSource.map((row) => row.leads),
       },
       {
         id: "conversion",
@@ -267,6 +492,7 @@ export function computeBusinessAnalytics(
         delta: deltaPoints(current.conversion, prior?.conversion ?? 0),
         previous: `${prior?.conversion ?? 0}%`,
         points: true,
+        spark: sparkSource.map((row) => row.leads),
       },
       {
         id: "revenue",
@@ -274,6 +500,7 @@ export function computeBusinessAnalytics(
         value: formatCurrency(current.revenue),
         delta: deltaPct(current.revenue, prior?.revenue ?? 0),
         previous: formatCurrency(prior?.revenue ?? 0),
+        spark: sparkSource.map((row) => row.revenue),
       },
       {
         id: "settlements",
@@ -281,6 +508,7 @@ export function computeBusinessAnalytics(
         value: String(current.settled),
         delta: deltaPct(current.settled, prior?.settled ?? 0),
         previous: String(prior?.settled ?? 0),
+        spark: sparkSource.map((row) => row.settlements),
       },
       {
         id: "win",
@@ -289,6 +517,7 @@ export function computeBusinessAnalytics(
         delta: deltaPoints(current.winRate, prior?.winRate ?? 0),
         previous: `${prior?.winRate ?? 0}%`,
         points: true,
+        spark: sparkSource.map((row) => row.settlements),
       },
       {
         id: "pipeline",
@@ -296,9 +525,10 @@ export function computeBusinessAnalytics(
         value: formatCurrency(current.pipeline),
         delta: deltaPct(current.pipeline, prior?.pipeline ?? 0),
         previous: formatCurrency(prior?.pipeline ?? 0),
+        spark: sparkSource.map((row) => row.revenue),
       },
     ],
-    trend: monthTrend(bounds.start, bounds.end, deals, leads.filter((lead) => matchesOwner(lead.owner, filters.owner))),
+    trend,
     sources: sourceSlices,
     sourceTotal,
     funnel,

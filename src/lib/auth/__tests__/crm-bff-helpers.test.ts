@@ -13,6 +13,8 @@ import {
   callLogOutcomeOkBody,
   parseTaskLifecyclePath,
   taskLifecycleOkBody,
+  parseTaskRecordGet,
+  taskRecordOkBody,
   parseEmailRecordGet,
   emailRecordOkBody,
   parseMeetingCancelPath,
@@ -115,6 +117,23 @@ describe("isEmptySignedInListPath", () => {
     expect(payload.statusCode).toBe(200);
     expect(payload.data.id).toBe(callId);
     expect(payload.data.outcome).toBe("Busy");
+  });
+
+  it("recognizes GET /tasks/:id", () => {
+    const taskId = "cad1e63e-1991-484d-8af0-fe239b9bd27c";
+    expect(
+      parseTaskRecordGet(["workspaces", workspace, "tasks", taskId], "GET"),
+    ).toEqual({ taskId, workspaceId: workspace });
+    expect(parseTaskRecordGet(["tasks", taskId], "GET")).toEqual({
+      taskId,
+      workspaceId: null,
+    });
+    expect(parseTaskRecordGet(["tasks", "today"], "GET")).toBeNull();
+    expect(parseTaskRecordGet(["tasks", taskId, "start"], "GET")).toBeNull();
+    expect(parseTaskRecordGet(["tasks", taskId], "POST")).toBeNull();
+    const payload = JSON.parse(taskRecordOkBody(taskId));
+    expect(payload.statusCode).toBe(200);
+    expect(payload.data.id).toBe(taskId);
   });
 
   it("recognizes POST /tasks/:id/start", () => {

@@ -30,7 +30,7 @@ const ICONS = {
 
 export function AnalyticsLibrary() {
   return (
-    <div className="min-h-full bg-[#F4F6F9]">
+    <div className="min-h-full bg-[#F4F6FB]">
       <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-4 p-4 lg:px-6 2xl:px-8 2xl:py-5">
         <div>
           <h1 className="text-[22px] font-semibold text-slate-900">Analytics</h1>
@@ -45,7 +45,7 @@ export function AnalyticsLibrary() {
               <Link
                 key={section.id}
                 href={`/analytics/${section.id}`}
-                className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-violet-200 hover:shadow-sm"
+                className="group flex flex-col rounded-[24px] border border-white bg-white p-5 shadow-[0_8px_24px_rgba(99,102,241,0.06)] transition hover:shadow-[0_12px_28px_rgba(99,102,241,0.1)]"
               >
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-[#5A32A3]">
                   <Icon className="h-4 w-4" />

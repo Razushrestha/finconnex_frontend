@@ -26,7 +26,7 @@
     "smoke:phase17": "npx tsx src/lib/leads/smoke-session17.ts",
     "smoke:leads": "npx tsx src/lib/leads/smoke-leads-api.ts",
     "smoke:screenshot": "npx tsx --tsconfig tsconfig.json src/lib/crm/smoke-screenshot-apis.ts",
-    "smoke:audit-logs": "npx tsx --tsconfig tsconfig.json src/lib/audit-logs/smoke.ts",
+    "smoke:analytics": "npx tsx --tsconfig tsconfig.json src/lib/analytics/smoke.ts",
     "smoke:calendar": "npx tsx --tsconfig tsconfig.json src/lib/calendar/smoke.ts",
     "smoke:calls": "npx tsx --tsconfig tsconfig.json src/lib/calls/smoke.ts",
     "smoke:campaigns": "npx tsx --tsconfig tsconfig.json src/lib/campaigns/smoke.ts",
