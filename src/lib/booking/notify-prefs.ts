@@ -8,7 +8,8 @@ export type BookingNotifyEvent =
   | "cancel"
   | "reschedule"
   | "reminder"
-  | "followup";
+  | "followup"
+  | "noshow";
 
 export type NotificationRow = {
   id: BookingNotifyEvent;
@@ -122,6 +123,21 @@ export const DEFAULT_NOTIFICATIONS: NotificationRow[] = [
     fromName: "{{appointment.user.name}}",
     fromAddress: "{{appointment.user.email}}",
     smsBody: "Thanks for your appointment with {{appointment.user.name}}.",
+    notifyContact: true,
+    notifyUser: false,
+  },
+  {
+    id: "noshow",
+    title: "No Show",
+    description: "Notifies when an appointment is marked as a no-show.",
+    info: "This notification is sent when an appointment is marked as a no-show.",
+    channels: { Email: false, "In-app": false, SMS: false, WhatsApp: false },
+    emailSubject: "No-show: {{appointment.title}}",
+    emailBody:
+      "Hi {{contact.first_name}},\n\nYou were marked as a no-show for your appointment.",
+    fromName: "{{appointment.user.name}}",
+    fromAddress: "{{appointment.user.email}}",
+    smsBody: "No-show recorded for {{appointment.title}}.",
     notifyContact: true,
     notifyUser: false,
   },

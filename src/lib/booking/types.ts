@@ -15,6 +15,14 @@ export const CONSULTANT_PRIORITIES = [
 ] as const;
 export type ConsultantPriority = (typeof CONSULTANT_PRIORITIES)[number];
 
+export const APPOINTMENT_DISTRIBUTIONS = [
+  "Default",
+  "Round robin",
+  "Load based",
+  "Priority-based",
+] as const;
+export type AppointmentDistribution = (typeof APPOINTMENT_DISTRIBUTIONS)[number];
+
 export type BookingStatus =
   | "Confirmed"
   | "Rescheduled"
@@ -122,12 +130,17 @@ export interface BookingPage {
   consultants?: string[];
   /** Priority per assigned consultant name. */
   consultantPriorities?: Record<string, ConsultantPriority>;
+  /** How bookings are assigned across consultants. */
+  appointmentDistribution?: AppointmentDistribution;
   calendlyEventTypeId?: string;
   calendlyHostId?: string;
   crmEventTypeId?: string;
+  /** Unauthenticated booking page listing. Defaults to Live status. */
+  isPublic?: boolean;
   /** Put confirmed bookings on the FinConnex calendar (default on). */
   calendarInvites?: boolean;
   inviteNotes?: string;
+  notifyReminders?: Array<{ minutes: number }>;
   allowReschedule?: boolean;
   allowCancel?: boolean;
   /** Per-consultation hours and appointment caps from Availability and Limits. */

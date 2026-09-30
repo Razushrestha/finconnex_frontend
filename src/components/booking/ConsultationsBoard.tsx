@@ -533,42 +533,16 @@ export function ConsultationsBoard() {
         <ConsultationOverview
           page={viewingPage}
           onClose={() => setViewingPage(null)}
-          onEdit={() => {
-          const page = viewingPage;
-          setViewingPage(null);
-          setDetailsChoice({
-            mode: page.consultationMode ?? "one_to_one",
-            title: page.title,
-          });
-          setDetailsValues({
-            name: page.title,
-            durationMinutes: page.durationMinutes,
-            isFree: !(page.price && page.price > 0),
-            price: page.price ?? 0,
-            online: page.meetingVia !== "in_person",
-            meetingPlace:
-              page.meetingVia === "in_person"
-                ? "offline"
-                : page.meetingVia === "phone"
-                  ? "phone"
-                  : "online",
-            platform: page.meetingViaDetail || "Zoom",
-            locationDetail: page.location || "",
-            phoneDetail:
-              page.meetingVia === "phone" ? page.meetingViaDetail || "" : "",
-            coverImageUrl: page.coverImageUrl,
-          });
-          setAssignedConsultants(
-            page.consultants?.length
-              ? page.consultants
-              : page.owner
-                ? [page.owner]
-                : [],
-          );
-          setAssignedPriorities(page.consultantPriorities ?? {});
-          setWizardFurthest(0);
-        }}
-      />
+          onSaved={(next) => {
+            upsertBookingPage(next);
+            setViewingPage(next);
+            setPages((list) =>
+              list.some((item) => item.id === next.id)
+                ? list.map((item) => (item.id === next.id ? next : item))
+                : [next, ...list],
+            );
+          }}
+        />
       </div>
     );
   }

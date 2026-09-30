@@ -66,6 +66,7 @@ export type CrmEventType = {
   description: string;
   active: boolean;
   hostId: string;
+  isPublic?: boolean;
   locationType?: string;
   location?: string;
 };
@@ -312,6 +313,10 @@ export function normalizeCrmEventType(
     timezone: pickStr(row.timezone, row.timeZone, row.time_zone) || "Australia/Sydney",
     description: pickStr(row.description, row.details),
     active: row.active === false ? false : active,
+    isPublic:
+      row.isPublic === false || row.is_public === false
+        ? false
+        : pickBool(row.isPublic, row.is_public) || undefined,
     hostId: pickStr(row.hostId, row.host_id, row.ownerId, row.owner_id),
     locationType: locationType || undefined,
     location: location || undefined,
@@ -434,6 +439,7 @@ export function crmEventTypeToBookingPage(
     meetingViaDetail: meetingViaDetail || undefined,
     location: meetingVia === "in_person" ? eventType.location : undefined,
     videoLink: meetingVia === "video" ? eventType.location : undefined,
+    isPublic: eventType.isPublic,
   };
 }
 
@@ -526,6 +532,8 @@ export function toCreateEventTypeBody(input: {
   hostIds?: string[];
   ownerHostId?: string;
   meetingType?: string;
+  isPublic?: boolean;
+  assignRoundRobin?: boolean;
   bufferBeforeMinutes?: number;
   bufferAfterMinutes?: number;
   minimumNoticeMinutes?: number;
@@ -567,8 +575,11 @@ export function toCreateEventTypeBody(input: {
     meetingType,
     locationType,
     isActive: input.active !== false,
-    isPublic: true,
+    isPublic: input.isPublic !== false,
   };
+  if (input.assignRoundRobin != null) {
+    body.assignRoundRobin = input.assignRoundRobin;
+  }
   const slug = input.slug?.trim().toLowerCase();
   if (slug && EVENT_TYPE_SLUG.test(slug) && slug.length <= 80) body.slug = slug;
   const description = input.description?.trim();
@@ -653,6 +664,43 @@ export async function createCrmEventType(input: {
     const data = await bookingCall("/event-types", jsonInit("POST", slim));
     return normalizeCrmEventType(asRecord(data) ?? extractRecords(data)[0] ?? {});
   }
+}
+
+export async function updateCrmEventType(
+  eventTypeId: string,
+  input: {
+    name: string;
+    durationMinutes?: number;
+    description?: string;
+    active?: boolean;
+    isPublic?: boolean;
+    assignRoundRobin?: boolean;
+    meetingPlace?: "online" | "offline" | "phone";
+    platform?: string;
+    locationDetail?: string;
+  },
+): Promise<CrmEventType> {
+  const body = { ...toCreateEventTypeBody(input) };
+  delete body.slug;
+  delete body.hostIds;
+  delete body.ownerHostId;
+  body.description = (input.description ?? "").slice(0, 5000);
+  const data = await bookingCall(
+    `/event-types/${eventTypeId}`,
+    jsonInit("PATCH", body),
+  );
+  return normalizeCrmEventType(asRecord(data) ?? extractRecords(data)[0] ?? {});
+}
+
+export async function patchCrmEventType(
+  eventTypeId: string,
+  body: Record<string, unknown>,
+): Promise<CrmEventType> {
+  const data = await bookingCall(
+    `/event-types/${eventTypeId}`,
+    jsonInit("PATCH", body),
+  );
+  return normalizeCrmEventType(asRecord(data) ?? extractRecords(data)[0] ?? {});
 }
 
 export function crmEventTypeIdOf(page: {

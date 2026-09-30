@@ -5,7 +5,7 @@ import {
   loadConsultationAvailability,
   syncConsultationAvailability,
 } from "@/lib/booking/availability-sync";
-import { Calendar, Info, Pencil } from "lucide-react";
+import { Calendar, Info, Pencil, Plus } from "lucide-react";
 import type { AvailabilityPanelId } from "@/components/booking/ConsultationWizardLayout";
 import {
   WEEKDAYS,
@@ -125,18 +125,21 @@ function Check({
 function OutlineButton({
   children,
   onClick,
+  icon = "pencil",
 }: {
   children: React.ReactNode;
   onClick: () => void;
+  icon?: "pencil" | "plus";
 }) {
+  const Icon = icon === "plus" ? Plus : Pencil;
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-semibold hover:bg-[#F3ECFB]"
+      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-semibold hover:bg-[#F3ECFB]"
       style={{ borderColor: BRAND, color: BRAND }}
     >
-      <Pencil className="h-3.5 w-3.5" />
+      <Icon className="h-3.5 w-3.5" />
       {children}
     </button>
   );
@@ -146,17 +149,26 @@ function SlotSelect({
   value,
   onChange,
   label,
+  className,
 }: {
   value: string;
   onChange: (value: string) => void;
   label: string;
+  className?: string;
 }) {
   return (
     <select
       aria-label={label}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="h-10 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/40"
+      className={cn(
+        "h-10 w-full appearance-none rounded-lg border border-[#E5E7EB] bg-white bg-[length:16px] bg-[right_12px_center] bg-no-repeat px-3 pr-9 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/40",
+        className,
+      )}
+      style={{
+        backgroundImage:
+          "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")",
+      }}
     >
       {SLOT_OPTIONS.map((option) => (
         <option key={option} value={option}>
@@ -220,6 +232,7 @@ export function AvailabilityLimitsStep({
   onBack,
   onNext,
   onChange,
+  embedded = false,
 }: {
   panel: AvailabilityPanelId;
   consultants: string[];
@@ -228,6 +241,7 @@ export function AvailabilityLimitsStep({
   onBack: () => void;
   onNext: (values: AvailabilityLimitsValues, hostIds: string[]) => void;
   onChange?: (values: AvailabilityLimitsValues) => void;
+  embedded?: boolean;
 }) {
   const [values, setValues] = useState<AvailabilityLimitsValues>(
     initial ?? defaultAvailabilityLimits(),
@@ -332,8 +346,19 @@ export function AvailabilityLimitsStep({
     (activeUser && values.userHours[activeUser]) || defaultWeek();
 
   return (
-    <div className="mx-auto flex w-full max-w-[920px] flex-col pb-8">
-      <div className="rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+    <div
+      className={cn(
+        "flex w-full flex-col",
+        embedded ? "pb-2" : "mx-auto max-w-[920px] pb-8",
+      )}
+    >
+      <div
+        className={cn(
+          embedded
+            ? ""
+            : "rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]",
+        )}
+      >
         {panel === "dates" ? (
           <div className="px-5 py-5 sm:px-6">
             <div className="mb-4 flex items-center justify-between">
@@ -354,6 +379,9 @@ export function AvailabilityLimitsStep({
                   <div>
                     <p className="text-[14px] font-semibold text-slate-900">
                       Default Hours
+                    </p>
+                    <p className="mt-0.5 text-[12px] text-slate-500">
+                      Set availability specific to this event type.
                     </p>
                   </div>
                 </div>
@@ -409,9 +437,13 @@ export function AvailabilityLimitsStep({
                     <p className="text-[14px] font-semibold text-slate-900">
                       User-specific Hours
                     </p>
+                    <p className="mt-0.5 text-[12px] text-slate-500">
+                      Set different availability for specific Users.
+                    </p>
                   </div>
                 </div>
                 <OutlineButton
+                  icon="plus"
                   onClick={() =>
                     setEditingUser((current) =>
                       current ? null : consultants[0] ?? "",
@@ -461,18 +493,30 @@ export function AvailabilityLimitsStep({
           </div>
         ) : (
           <div className="px-5 py-5 sm:px-6">
-            <h1 className="text-[16px] font-semibold text-slate-900">
-              Appointment Limits
-            </h1>
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <span
+                  className="h-5 w-[3px] rounded-full"
+                  style={{ backgroundColor: BRAND }}
+                />
+                <h1 className="text-[16px] font-semibold text-slate-900">
+                  Appointment Limits
+                </h1>
+              </div>
+              <Tip text="Cap how often this event type can be booked." />
+            </div>
 
-            <div className="mt-5">
+            <div>
               <div className="flex items-center gap-1.5">
                 <p className="text-[14px] font-semibold text-slate-900">
                   Slots per Event Type
                 </p>
                 <Tip text="How many times this consultation can be booked in a day." />
               </div>
-              <div className="mt-2 max-w-md">
+              <p className="mt-1 max-w-xl text-[12px] leading-relaxed text-slate-500">
+                Set the number of times this event type can be booked per day
+              </p>
+              <div className="mt-2 max-w-[240px]">
                 <SlotSelect
                   label="Slots per event type"
                   value={values.slotsPerEvent}
@@ -481,14 +525,19 @@ export function AvailabilityLimitsStep({
               </div>
             </div>
 
-            <div className="mt-5">
+            <div className="mt-6">
               <div className="flex items-center gap-1.5">
                 <p className="text-[14px] font-semibold text-slate-900">
                   Slots per Customer
                 </p>
                 <Tip text="How often the same customer can book before the previous appointment is finished." />
               </div>
-              <div className="mt-2 max-w-md">
+              <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-slate-500">
+                Set how often a Customer can book this event type or prevent the
+                customer from rebooking until the previous appointment is
+                completed, cancelled, or marked as a no-show.
+              </p>
+              <div className="mt-2 max-w-[240px]">
                 <SlotSelect
                   label="Slots per customer"
                   value={values.slotsPerCustomer}
@@ -504,6 +553,10 @@ export function AvailabilityLimitsStep({
                 </p>
                 <Tip text="These limits replace the default for the dates you pick." />
               </div>
+              <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-slate-500">
+                Set booking limits for a specific date or date range. Custom date
+                limits will override the default limit for the selected period.
+              </p>
 
               {values.customLimits.length > 0 ? (
                 <ul className="mt-3 space-y-2">
@@ -537,33 +590,42 @@ export function AvailabilityLimitsStep({
                 </ul>
               ) : null}
 
-              <div className="mt-3 rounded-xl bg-[#F7F5FB] p-4">
-                <label className="block text-[12px] font-medium text-slate-600">
+              <div className="mt-3 rounded-xl bg-[#F3ECFB]/70 p-4">
+                <p className="text-[12px] font-medium text-slate-600">
                   Select Date Range
-                </label>
-                <div className="relative mt-1.5 flex max-w-xs items-center gap-2 rounded-lg border border-[#E5E7EB] bg-white px-3">
+                </p>
+                <button
+                  type="button"
+                  onClick={() => startDateRef.current?.showPicker?.() ?? startDateRef.current?.focus()}
+                  className="relative mt-1.5 flex h-10 w-full max-w-sm items-center rounded-lg border border-[#E5E7EB] bg-white px-3 text-left"
+                >
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1 truncate text-[13px]",
+                      draftStart ? "text-slate-800" : "text-slate-400",
+                    )}
+                  >
+                    {draftStart && draftEnd
+                      ? `${draftStart} – ${draftEnd}`
+                      : draftStart || "Select Date Range"}
+                  </span>
                   <Calendar className="h-4 w-4 shrink-0 text-slate-400" />
                   <input
                     ref={startDateRef}
                     type="date"
                     aria-label="Limit start date"
                     value={draftStart}
-                    onChange={(e) => setDraftStart(e.target.value)}
-                    className="h-10 min-w-0 flex-1 bg-transparent text-[13px] outline-none"
+                    onChange={(e) => {
+                      setDraftStart(e.target.value);
+                      if (!draftEnd) setDraftEnd(e.target.value);
+                    }}
+                    className="absolute inset-0 cursor-pointer opacity-0"
                   />
-                  <span className="text-[12px] text-slate-400">to</span>
-                  <input
-                    type="date"
-                    aria-label="Limit end date"
-                    value={draftEnd}
-                    onChange={(e) => setDraftEnd(e.target.value)}
-                    className="h-10 min-w-0 flex-1 bg-transparent text-[13px] outline-none"
-                  />
-                </div>
+                </button>
 
                 <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
-                  <div className="flex flex-wrap gap-3">
-                    <div className="w-[160px]">
+                  <div className="flex flex-wrap gap-6">
+                    <div className="w-[168px]">
                       <p className="mb-1.5 text-[12px] text-slate-600">
                         Slots per Event Type
                       </p>
@@ -573,7 +635,7 @@ export function AvailabilityLimitsStep({
                         onChange={setDraftEvent}
                       />
                     </div>
-                    <div className="w-[160px]">
+                    <div className="w-[168px]">
                       <p className="mb-1.5 text-[12px] text-slate-600">
                         Slots per Customer
                       </p>
@@ -617,7 +679,9 @@ export function AvailabilityLimitsStep({
 
               <button
                 type="button"
-                onClick={() => startDateRef.current?.focus()}
+                onClick={() =>
+                  startDateRef.current?.showPicker?.() ?? startDateRef.current?.focus()
+                }
                 className="mt-3 text-[13px] font-semibold text-[#5A32A3] hover:underline"
               >
                 + Add Limit
@@ -627,6 +691,8 @@ export function AvailabilityLimitsStep({
         )}
       </div>
 
+      {embedded ? null : (
+        <>
       <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
         <button
           type="button"
@@ -652,6 +718,8 @@ export function AvailabilityLimitsStep({
           {saveError}
         </p>
       ) : null}
+        </>
+      )}
     </div>
   );
 }
