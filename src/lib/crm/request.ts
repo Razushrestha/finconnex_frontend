@@ -126,33 +126,237 @@ const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
     "Google/Outlook calendar OAuth is not configured on the CRM server.",
 };
 
+const GENERIC_HTTP_MESSAGES = new Set([
+  "bad request",
+  "request failed",
+  "internal server error",
+  "unauthorized",
+  "forbidden",
+]);
+
+const API_FIELD_LABELS: Record<string, string> = {
+  eventtypeid: "Consultation",
+  starttime: "Date & time",
+  startat: "Date & time",
+  endat: "Date & time",
+  endtime: "Date & time",
+  timezone: "Timezone",
+  hostid: "Team member",
+  organizerid: "Team member",
+  organizername: "Team member",
+  organizer: "Team member",
+  name: "Main applicant",
+  email: "Main applicant email",
+  phone: "Phone",
+  contactid: "Related record",
+  leadid: "Related record",
+  companyid: "Related record",
+  dealid: "Related record",
+  relatedentityid: "Related record",
+  relatedentitytype: "Related entity",
+  relatedid: "Related record",
+  relatedtype: "Related entity",
+  title: "Appointment title",
+  location: "Meeting location",
+  meetinglink: "Meeting location",
+  meetingtype: "Meeting location",
+  notes: "Internal note",
+  internalnotes: "Internal note",
+  agenda: "Description",
+};
+
+function humanizeField(field: string): string {
+  const key = field.replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+  if (API_FIELD_LABELS[key]) return API_FIELD_LABELS[key];
+  const spaced = field
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/[._]/g, " ")
+    .trim();
+  return spaced ? spaced.charAt(0).toUpperCase() + spaced.slice(1) : field;
+}
+
+function pushIssue(
+  issues: { field?: string; message: string }[],
+  field: string | undefined,
+  message: string,
+) {
+  const text = message.trim();
+  if (!text) return;
+  const seen = issues.some(
+    (row) => row.field === field && row.message === text,
+  );
+  if (seen) return;
+  issues.push({ field: field || undefined, message: text });
+}
+
+function issuesFromClassValidatorLine(
+  line: string,
+): { field?: string; message: string } | null {
+  const text = line.trim();
+  if (!text) return null;
+  const extra = text.match(
+    /^property\s+([A-Za-z_][\w.]*)\s+should not exist$/i,
+  );
+  if (extra) {
+    return { field: extra[1], message: "is not allowed" };
+  }
+  const named = text.match(
+    /^([A-Za-z_][\w.]*)\s+(must |should |is |cannot |can't )/i,
+  );
+  if (named) {
+    return { field: named[1], message: text.slice(named[1].length).trim() };
+  }
+  return { message: text };
+}
+
+function collectFromUnknown(
+  value: unknown,
+  issues: { field?: string; message: string }[],
+  parentField?: string,
+  depth = 0,
+) {
+  if (depth > 5 || value == null) return;
+  if (typeof value === "string") {
+    const parsed = issuesFromClassValidatorLine(value);
+    if (parsed) {
+      pushIssue(issues, parsed.field || parentField, parsed.message);
+    }
+    return;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    pushIssue(issues, parentField, String(value));
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectFromUnknown(item, issues, parentField, depth + 1);
+    return;
+  }
+  if (typeof value !== "object") return;
+  const rec = value as Record<string, unknown>;
+  const fieldName =
+    (typeof rec.property === "string" && rec.property) ||
+    (typeof rec.field === "string" && rec.field) ||
+    (typeof rec.path === "string" && rec.path) ||
+    (typeof rec.name === "string" && rec.name) ||
+    parentField;
+  if (rec.constraints && typeof rec.constraints === "object") {
+    for (const text of Object.values(rec.constraints as Record<string, unknown>)) {
+      if (typeof text === "string") pushIssue(issues, fieldName, text);
+    }
+  }
+  if (typeof rec.message === "string") {
+    const parsed = issuesFromClassValidatorLine(rec.message);
+    pushIssue(
+      issues,
+      parsed?.field || fieldName,
+      parsed?.message || rec.message,
+    );
+  } else if (Array.isArray(rec.message) || (rec.message && typeof rec.message === "object")) {
+    collectFromUnknown(rec.message, issues, fieldName, depth + 1);
+  }
+  const nestedKeys = [
+    "errors",
+    "details",
+    "validationErrors",
+    "violations",
+    "children",
+    "fields",
+  ] as const;
+  for (const key of nestedKeys) {
+    if (key in rec) collectFromUnknown(rec[key], issues, fieldName, depth + 1);
+  }
+  const meta = new Set([
+    "statusCode",
+    "status",
+    "error",
+    "message",
+    "errors",
+    "details",
+    "validationErrors",
+    "violations",
+    "children",
+    "fields",
+    "constraints",
+    "property",
+    "field",
+    "path",
+    "name",
+    "data",
+  ]);
+  for (const [key, nested] of Object.entries(rec)) {
+    if (meta.has(key)) continue;
+    if (nested && typeof nested === "object") {
+      collectFromUnknown(nested, issues, key, depth + 1);
+    } else if (typeof nested === "string") {
+      pushIssue(issues, key, nested);
+    }
+  }
+}
+
+export function crmValidationIssues(
+  json: unknown,
+): { field?: string; message: string }[] {
+  const issues: { field?: string; message: string }[] = [];
+  if (!json || typeof json !== "object") return issues;
+  const rec = json as Record<string, unknown>;
+  collectFromUnknown(rec.message, issues);
+  collectFromUnknown(rec.errors, issues);
+  collectFromUnknown(rec.error, issues);
+  collectFromUnknown(rec.details, issues);
+  collectFromUnknown(rec.validationErrors, issues);
+  if (rec.data && typeof rec.data === "object") {
+    const data = rec.data as Record<string, unknown>;
+    collectFromUnknown(data.message, issues);
+    collectFromUnknown(data.errors, issues);
+    collectFromUnknown(data.details, issues);
+  }
+  return issues.filter((row) => {
+    const msg = row.message.trim();
+    if (FRIENDLY_MESSAGE_KEYS[msg]) return false;
+    return !GENERIC_HTTP_MESSAGES.has(msg.toLowerCase());
+  });
+}
+
+function formatValidationIssues(
+  issues: { field?: string; message: string }[],
+): string {
+  const parts = issues.map((row) => {
+    if (!row.field) return row.message;
+    const label = humanizeField(row.field);
+    const same = label.toLowerCase() === row.field.toLowerCase();
+    const heading = same ? label : `${label} (${row.field})`;
+    return `${heading}: ${row.message}`;
+  });
+  const unique = [...new Set(parts.filter(Boolean))];
+  return unique.join("; ");
+}
+
 export function crmErrorMessage(json: unknown, fallback: string): string {
   if (json && typeof json === "object") {
     const rec = json as Record<string, unknown>;
+    const issues = crmValidationIssues(json);
+    const formatted = formatValidationIssues(issues);
     const msg = rec.message;
     const errField =
       typeof rec.error === "string" && rec.error.trim() ? rec.error.trim() : null;
     const base = Array.isArray(msg) && msg.length
-      ? msg.map(String).join(", ")
+      ? null
       : typeof msg === "string" && msg.trim()
         ? FRIENDLY_MESSAGE_KEYS[msg.trim()] ??
           (msg.trim().toLowerCase() !== "bad request" ? msg.trim() : null)
-        : errField
+        : errField && !GENERIC_HTTP_MESSAGES.has(errField.toLowerCase())
           ? FRIENDLY_MESSAGE_KEYS[errField] ?? errField
           : null;
-    const detail = Array.isArray(rec.errors) && rec.errors.length
-      ? rec.errors
-          .map((item) => {
-            if (typeof item === "string") return item;
-            if (item && typeof item === "object" && "message" in item) {
-              return String((item as { message: unknown }).message);
-            }
-            return JSON.stringify(item);
-          })
-          .join(", ")
-      : null;
-    if (base && detail && base !== detail) return `${base}: ${detail}`;
-    if (detail) return detail;
+    if (formatted) {
+      if (
+        base &&
+        FRIENDLY_MESSAGE_KEYS[String(msg ?? "").trim()] &&
+        !formatted.includes(base)
+      ) {
+        return `${base}: ${formatted}`;
+      }
+      return formatted;
+    }
     if (base) {
       if (/enoent|mkdir ['"]?\/var\/task|erofs|read-only file system/i.test(base)) {
         return "File storage cannot write on this host. Retry the upload — FinConnex will keep the file without using /var/task/data.";
@@ -164,7 +368,7 @@ export function crmErrorMessage(json: unknown, fallback: string): string {
       return "This integration is not configured on the CRM server yet.";
     }
     if (status === 400) {
-      return "The CRM could not save this. One of the fields is not allowed or is the wrong type.";
+      return "The CRM could not save this. Check the highlighted field and try again.";
     }
   }
   return fallback;

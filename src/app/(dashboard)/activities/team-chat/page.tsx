@@ -37,29 +37,32 @@ import {
   ChevronRight,
   X,
   Bell,
+  CheckCheck,
 } from "lucide-react";
 import {
   chatChannels as seedChannels,
-  chatContacts,
   chatMessages,
   canEditMessage,
   CURRENT_CHAT_USER,
   type ChatChannel,
+  type ChatContact,
   type ChatMessage,
   type ChatPresence,
 } from "@/lib/chat/types";
 import {
-  addCrmConversationMember,
   addCrmMessageReaction,
+  chatActorLabelFromToken,
+  chatActorUserIdFromToken,
   createCrmChatMessage,
   createCrmConversation,
   deleteCrmChatMessage,
   deleteCrmConversation,
+  markCrmConversationRead,
   removeCrmMessageReaction,
   tryCrmChat,
   updateCrmChatMessage,
 } from "@/lib/chat/api";
-import { isUuid } from "@/lib/activity-timeline/auth";
+import { ensureCrmSession, isUuid } from "@/lib/activity-timeline/auth";
 import { useCrmChat } from "@/lib/chat/use-crm-chat";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { createTask } from "@/lib/tasks/store";
@@ -68,8 +71,16 @@ import {
   notifyTaskAssigned,
 } from "@/lib/rules/notify";
 import { cn } from "@/lib/utils";
-import { defaultActorName } from "@/lib/rules/actor";
+import { getRulesActor } from "@/lib/rules/actor";
+import { onRulesChange } from "@/lib/rules/storage";
+import { loadAssignableOwners } from "@/lib/users/assignable";
 import { toast } from "@/lib/notify/toast";
+import { menuEnter } from "@/lib/motion";
+import {
+  listNotifications,
+  markNotificationRead,
+  writeAllNotifications,
+} from "@/lib/notifications/types";
 
 const EMOJIS = ["😀", "👍", "🙏", "🔥", "✅", "🎉", "😂", "❤️"];
 
@@ -119,10 +130,19 @@ export default function TeamChatPage() {
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [notifyOpen, setNotifyOpen] = useState(false);
+  const [profileName, setProfileName] = useState("You");
+  const [chatMentions, setChatMentions] = useState<
+    ReturnType<typeof listNotifications>
+  >([]);
   const feedRef = useRef<HTMLDivElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
   const plusMenuRef = useRef<HTMLDivElement>(null);
+  const chatNotifyRef = useRef<HTMLDivElement>(null);
+  const [selfUserId, setSelfUserId] = useState("");
   const crm = useCrmChat({ activeConversationId: activeId });
+  const [directory, setDirectory] = useState<ChatContact[]>([]);
+  const [directoryLoading, setDirectoryLoading] = useState(true);
 
   useEffect(() => {
     if (crm.source !== "api" || crm.channels == null) return;
@@ -139,6 +159,117 @@ export default function TeamChatPage() {
     if (crm.source !== "api" || !crm.messages) return;
     setMessages((prev) => ({ ...prev, ...crm.messages }));
   }, [crm.source, crm.messages]);
+
+  useEffect(() => {
+    let alive = true;
+    setDirectoryLoading(true);
+    void (async () => {
+      const session = await ensureCrmSession().catch(() => null);
+      const tokenId = session
+        ? chatActorUserIdFromToken(session.accessToken)
+        : "";
+      const actor = getRulesActor();
+      const meId = tokenId || (isUuid(actor.id) ? actor.id! : "");
+      if (alive && meId) setSelfUserId(meId);
+      const tokenLabel = session
+        ? chatActorLabelFromToken(session.accessToken)
+        : "";
+      const meName = (
+        actor.name ||
+        tokenLabel ||
+        CURRENT_CHAT_USER.name
+      )
+        .trim()
+        .toLowerCase();
+      const meEmail = (actor.email ?? "").trim().toLowerCase();
+      try {
+        const owners = await loadAssignableOwners();
+        if (!alive) return;
+        const seen = new Set<string>();
+        const rows: ChatContact[] = [];
+        for (const owner of owners) {
+          const name =
+            owner.name.trim() || owner.email.split("@")[0] || "Member";
+          const email = owner.email.trim();
+          if (meId && owner.id === meId) continue;
+          if (meEmail && email.toLowerCase() === meEmail) continue;
+          if (meName && meName !== "you" && name.toLowerCase() === meName) {
+            continue;
+          }
+          const key = (owner.id || email || name).toLowerCase();
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          rows.push({
+            id: owner.id || email || name,
+            name,
+            role: email || "Teammate",
+            presence: "offline",
+          });
+        }
+        rows.sort((a, b) => a.name.localeCompare(b.name));
+        setDirectory(rows);
+      } catch {
+        if (alive) setDirectory([]);
+      } finally {
+        if (alive) setDirectoryLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const applyActor = () => {
+      const label = CURRENT_CHAT_USER.name;
+      if (label) setProfileName(label);
+    };
+    applyActor();
+    const stop = onRulesChange(applyActor);
+    void ensureCrmSession()
+      .then((session) => {
+        if (!alive || !session) return;
+        const tokenId = chatActorUserIdFromToken(session.accessToken);
+        if (tokenId) setSelfUserId(tokenId);
+        const tokenLabel = chatActorLabelFromToken(session.accessToken);
+        const actorLabel = CURRENT_CHAT_USER.name;
+        setProfileName(
+          actorLabel && actorLabel !== "You"
+            ? actorLabel
+            : tokenLabel || actorLabel || "You",
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+      stop();
+    };
+  }, []);
+
+  const profileInitials = initials(profileName);
+
+  const unreadChats = channels.filter((c) => (c.unread ?? 0) > 0);
+  const unreadFromChannels = unreadChats.reduce(
+    (sum, c) => sum + (c.unread ?? 0),
+    0,
+  );
+
+  useEffect(() => {
+    setChatMentions(
+      listNotifications().filter(
+        (n) =>
+          n.status === "Unread" &&
+          (n.type === "Mention" || n.relatedHref.includes("team-chat")),
+      ),
+    );
+  }, [notifyOpen, crm.unreadTotal]);
+
+  const chatUnreadBadge = Math.max(
+    crm.unreadTotal,
+    unreadFromChannels,
+    chatMentions.length,
+  );
 
   const active =
     channels.find((c) => c.id === activeId) ?? channels[0] ?? null;
@@ -160,10 +291,20 @@ export default function TeamChatPage() {
   const archivedChats = channels
     .filter((ch) => ch.archived && matchesQuery(ch))
     .sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned));
-  const filteredContacts = chatContacts.filter(
-    (c) =>
-      c.name.toLowerCase().includes(q) || c.role.toLowerCase().includes(q),
-  );
+  const filteredContacts = directory
+    .map((person) => {
+      const dm = channels.find(
+        (ch) =>
+          isDm(ch) &&
+          channelLabel(ch).trim().toLowerCase() === person.name.toLowerCase(),
+      );
+      return { ...person, channelId: dm?.id ?? person.channelId };
+    })
+    .filter(
+      (c) =>
+        (!selfUserId || c.id !== selfUserId) &&
+        (c.name.toLowerCase().includes(q) || c.role.toLowerCase().includes(q)),
+    );
 
   useEffect(() => {
     feedRef.current?.scrollTo({
@@ -180,6 +321,9 @@ export default function TeamChatPage() {
       }
       if (plusMenuRef.current && !plusMenuRef.current.contains(t)) {
         setPlusMenuOpen(false);
+      }
+      if (chatNotifyRef.current && !chatNotifyRef.current.contains(t)) {
+        setNotifyOpen(false);
       }
     }
     document.addEventListener("mousedown", onDoc);
@@ -241,20 +385,31 @@ export default function TeamChatPage() {
     setEmojiOpen(false);
 
     if (crm.source === "api" && extras?.kind !== "voice") {
-      void tryCrmChat(() =>
-        createCrmChatMessage(activeId, {
-          body: text,
-          replyToId: replySnapshot?.id,
-        }),
-      ).then((live) => {
-        if (!live) return;
-        setMessages((prev) => ({
-          ...prev,
-          [activeId]: (prev[activeId] ?? []).map((m) =>
-            m.id === localId ? { ...live, isOwn: true, author: "You" } : m,
-          ),
-        }));
-      });
+      void createCrmChatMessage(activeId, {
+        body: text,
+        replyToId: replySnapshot?.id,
+      })
+        .then((live) => {
+          if (!live) {
+            flash("Message was sent but the chat reply was empty");
+            return;
+          }
+          setMessages((prev) => ({
+            ...prev,
+            [activeId]: (prev[activeId] ?? []).map((m) =>
+              m.id === localId ? { ...live, isOwn: true, author: "You" } : m,
+            ),
+          }));
+        })
+        .catch((err) => {
+          setMessages((prev) => ({
+            ...prev,
+            [activeId]: (prev[activeId] ?? []).filter((m) => m.id !== localId),
+          }));
+          const raw =
+            err instanceof Error ? err.message : "Couldn't send message";
+          flash(raw);
+        });
     }
 
     // Mentions → in-app notification (demo: notify current user when @name appears)
@@ -339,22 +494,40 @@ export default function TeamChatPage() {
       flash("Sign in to start a live conversation");
       return;
     }
-    const created = await tryCrmChat(() => createCrmConversation(input));
-    if (!created) {
-      flash("Could not create conversation");
-      return;
-    }
-    const memberId = input.memberIds?.[0];
-    if (memberId && isUuid(memberId)) {
-      void tryCrmChat(() => addCrmConversationMember(created.id, memberId));
-    }
-    setChannels((prev) =>
-      prev.some((c) => c.id === created.id) ? prev : [created, ...prev],
+    const memberIds = [...new Set((input.memberIds ?? []).filter(isUuid))].filter(
+      (id) => !selfUserId || id !== selfUserId,
     );
-    setActiveId(created.id);
-    setSidebarTab(input.type === "GROUP" ? "groups" : "chat");
-    crm.refresh();
-    flash(`Opened ${channelLabel(created)}`);
+    if (input.type === "DIRECT") {
+      if (memberIds.length !== 1) {
+        flash("Pick a teammate to message — you cannot start a chat with yourself");
+        return;
+      }
+    }
+    try {
+      const created = await createCrmConversation({
+        title: input.name,
+        type: input.type,
+        memberIds,
+      });
+      setChannels((prev) =>
+        prev.some((c) => c.id === created.id) ? prev : [created, ...prev],
+      );
+      setActiveId(created.id);
+      setSidebarTab(input.type === "GROUP" ? "groups" : "chat");
+      crm.refresh();
+      flash(`Opened ${channelLabel(created)}`);
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : "Could not create conversation";
+      if (/directMemberCount/i.test(raw)) {
+        flash("Direct messages need one teammate besides you");
+        return;
+      }
+      if (/groupTitleRequired/i.test(raw)) {
+        flash("Enter a group name");
+        return;
+      }
+      flash(raw);
+    }
   }
 
   function onPlusAction(label: string) {
@@ -373,70 +546,199 @@ export default function TeamChatPage() {
   return (
     <div className="relative flex h-[calc(100dvh-0px)] min-h-full flex-col overflow-hidden bg-slate-50">
       <div className="relative flex min-h-0 flex-1 flex-col p-2.5 sm:p-3 lg:p-4">
-        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="text-[15px] font-bold tracking-tight text-slate-900">
-              Team Chat
-            </h1>
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-                crm.source === "api"
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-slate-100 text-slate-500",
-              )}
-            >
-              {crm.source === "api"
-                ? "Live CRM"
-                : crm.loading
-                  ? "Connecting…"
-                  : "Demo"}
-            </span>
-            {crm.error && crm.source === "demo" ? (
-              <span className="text-[10px] text-slate-500">{crm.error}</span>
-            ) : null}
-          </div>
-        </div>
-
         <div className="flex min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_rgba(15,23,42,0.06)]">
           {/* Left rail — Skote-style chat sidebar */}
           <aside className="flex w-[280px] shrink-0 flex-col border-r border-slate-200 bg-white">
             <div className="border-b border-slate-100 px-4 pt-4 pb-3">
-              <h2 className="text-[13px] font-bold tracking-[0.08em] text-slate-800 uppercase">
-                Chat
-              </h2>
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-[13px] font-bold tracking-[0.08em] text-slate-800 uppercase">
+                  Chat
+                </h2>
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                    crm.source === "api"
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "bg-slate-100 text-slate-500",
+                  )}
+                >
+                  {crm.source === "api"
+                    ? "Live CRM"
+                    : crm.loading
+                      ? "Connecting…"
+                      : "Demo"}
+                </span>
+              </div>
+              {crm.error && crm.source === "demo" ? (
+                <p className="mt-1 text-[10px] text-slate-500">{crm.error}</p>
+              ) : null}
               <div className="mt-3 flex items-center gap-2.5">
                 <span
                   className={cn(
-                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold",
-                    avatarColor(CURRENT_CHAT_USER.name),
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold tracking-wide",
+                    avatarColor(profileName),
                   )}
+                  title={profileName}
                 >
-                  {initials(CURRENT_CHAT_USER.name)}
+                  {profileInitials}
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-semibold text-slate-900">
-                    {CURRENT_CHAT_USER.name}
+                    {profileName}
                   </p>
                   <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                     {CURRENT_CHAT_USER.status}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  aria-label="Notifications"
-                  title="Notifications"
-                  onClick={() => {
-                    flash("Opening notifications",
-                      2200,
-                      "/notifications",
-                    );
-                  }}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"
-                >
-                  <Bell className="h-4 w-4" />
-                </button>
+                <div className="relative" ref={chatNotifyRef}>
+                  <button
+                    type="button"
+                    aria-label="Chat notifications"
+                    aria-expanded={notifyOpen}
+                    title="Chat notifications"
+                    onClick={() => {
+                      setNotifyOpen((open) => {
+                        if (!open) crm.refresh();
+                        return !open;
+                      });
+                    }}
+                    className="relative flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700"
+                  >
+                    <Bell className="h-4 w-4" />
+                    {chatUnreadBadge > 0 ? (
+                      <span className="absolute top-0.5 right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-600 px-0.5 text-[9px] font-bold text-white">
+                        {chatUnreadBadge > 9 ? "9+" : chatUnreadBadge}
+                      </span>
+                    ) : null}
+                  </button>
+                  {notifyOpen ? (
+                    <div
+                      className={cn(
+                        "absolute right-0 z-50 mt-1.5 w-[248px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg",
+                        menuEnter,
+                      )}
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
+                        <div>
+                          <p className="text-[12px] font-semibold text-slate-900">
+                            Chat notifications
+                          </p>
+                          <p className="text-[10px] text-slate-500">
+                            {chatUnreadBadge} unread
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          title="Mark all read"
+                          disabled={chatUnreadBadge === 0}
+                          onClick={() => {
+                            unreadChats.forEach((ch) => {
+                              if (isUuid(ch.id)) {
+                                void tryCrmChat(() =>
+                                  markCrmConversationRead(ch.id),
+                                );
+                              }
+                            });
+                            setChannels((prev) =>
+                              prev.map((c) => ({ ...c, unread: 0 })),
+                            );
+                            const next = listNotifications().map((n) =>
+                              n.status === "Unread" &&
+                              (n.type === "Mention" ||
+                                n.relatedHref.includes("team-chat"))
+                                ? markNotificationRead(n)
+                                : n,
+                            );
+                            writeAllNotifications(next);
+                            crm.refresh();
+                            setNotifyOpen(false);
+                          }}
+                          className="rounded-md p-1.5 text-slate-400 hover:bg-slate-50 hover:text-slate-700 disabled:opacity-40"
+                        >
+                          <CheckCheck className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <ul className="max-h-[280px] overflow-y-auto">
+                        {unreadChats.map((ch) => (
+                          <li key={ch.id}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveId(ch.id);
+                                setSidebarTab(isDm(ch) ? "chat" : "groups");
+                                setNotifyOpen(false);
+                              }}
+                              className="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-slate-50"
+                            >
+                              <span
+                                className={cn(
+                                  "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
+                                  avatarColor(channelLabel(ch)),
+                                )}
+                              >
+                                {initials(channelLabel(ch))}
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-[12px] font-semibold text-slate-800">
+                                  {channelLabel(ch)}
+                                </span>
+                                <span className="block truncate text-[10px] text-slate-500">
+                                  {ch.unread} new message
+                                  {ch.unread === 1 ? "" : "s"}
+                                  {ch.lastMessagePreview
+                                    ? ` · ${ch.lastMessagePreview}`
+                                    : ""}
+                                </span>
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                        {chatMentions.map((n) => (
+                          <li key={n.id}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                writeAllNotifications(
+                                  listNotifications().map((row) =>
+                                    row.id === n.id
+                                      ? markNotificationRead(row)
+                                      : row,
+                                  ),
+                                );
+                                setNotifyOpen(false);
+                                if (n.relatedHref.includes("team-chat")) {
+                                  const match = unreadChats.find((ch) =>
+                                    n.relatedTo
+                                      .toLowerCase()
+                                      .includes(channelLabel(ch).toLowerCase()),
+                                  );
+                                  if (match) setActiveId(match.id);
+                                } else if (n.relatedHref) {
+                                  window.location.assign(n.relatedHref);
+                                }
+                              }}
+                              className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-slate-50"
+                            >
+                              <span className="text-[12px] font-semibold text-slate-800">
+                                {n.title}
+                              </span>
+                              <span className="line-clamp-2 text-[10px] text-slate-500">
+                                {n.message}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                        {unreadChats.length === 0 &&
+                        chatMentions.length === 0 ? (
+                          <li className="px-3 py-6 text-center text-[11px] text-slate-400">
+                            No new chat notifications
+                          </li>
+                        ) : null}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
               <div className="relative mt-3">
@@ -564,7 +866,7 @@ export default function TeamChatPage() {
                           void startConversation({
                             name: c.name,
                             type: "DIRECT",
-                            memberIds: isUuid(c.id) ? [c.id] : undefined,
+                            memberIds: isUuid(c.id) ? [c.id] : [],
                           });
                         }}
                         className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-slate-50"
@@ -593,9 +895,14 @@ export default function TeamChatPage() {
                         </span>
                       </button>
                     ))}
-                    {filteredContacts.length === 0 ? (
+                    {directoryLoading ? (
                       <p className="px-2 py-8 text-center text-[11px] text-slate-400">
-                        No contacts match
+                        Loading teammates…
+                      </p>
+                    ) : null}
+                    {!directoryLoading && filteredContacts.length === 0 ? (
+                      <p className="px-2 py-8 text-center text-[11px] text-slate-400">
+                        {q ? "No contacts match" : "No teammates in this workspace yet"}
                       </p>
                     ) : null}
                   </div>
@@ -855,6 +1162,7 @@ export default function TeamChatPage() {
                       key={msg.id}
                       msg={msg}
                       showMeta={showMeta}
+                      selfName={profileName}
                       onReact={(emoji) => {
                         if (crm.source !== "api") {
                           flash(`${emoji} reacted`);
@@ -1323,15 +1631,22 @@ type MsgAction =
 function MessageBubble({
   msg,
   showMeta,
+  selfName,
   onAction,
   onReact,
 }: {
   msg: ChatMessage;
   showMeta: boolean;
+  selfName: string;
   onAction: (action: MsgAction) => void;
   onReact?: (emoji: string) => void;
 }) {
   const own = !!msg.isOwn;
+  const avatarLabel = own
+    ? selfName
+    : msg.author === "You"
+      ? selfName
+      : msg.author;
   const editable = canEditMessage(msg);
   const [menuOpen, setMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -1362,7 +1677,7 @@ function MessageBubble({
             own ? "bg-violet-100 text-violet-700" : avatarColor(msg.author),
           )}
         >
-          {initials(msg.author === "You" ? defaultActorName() : msg.author)}
+          {initials(avatarLabel)}
         </span>
       ) : (
         <span className="w-8 shrink-0" />

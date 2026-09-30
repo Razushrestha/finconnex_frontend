@@ -140,7 +140,20 @@ export interface BookingPage {
   /** Put confirmed bookings on the FinConnex calendar (default on). */
   calendarInvites?: boolean;
   inviteNotes?: string;
+  calendarInvite?: {
+    includeBufferTime: boolean;
+    eventTitle: string;
+    eventDescription: string;
+  };
   notifyReminders?: Array<{ minutes: number }>;
+  emailNotifyConfig?: {
+    sendFrom: string;
+    replyTo: string;
+    cc: string;
+  };
+  whatsappNotifyConfig?: {
+    sendFrom: string;
+  };
   allowReschedule?: boolean;
   allowCancel?: boolean;
   /** Per-consultation hours and appointment caps from Availability and Limits. */

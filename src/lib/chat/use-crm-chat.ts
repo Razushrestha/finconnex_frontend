@@ -31,7 +31,7 @@ export function useCrmChat(opts?: {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    if (tick === 0) setLoading(true);
     setError(null);
 
     void (async () => {
@@ -72,17 +72,31 @@ export function useCrmChat(opts?: {
       if (last?.id) {
         void tryCrmChat(() => markCrmMessageRead(last.id));
       }
-      setChannels((prev) =>
-        (prev ?? []).map((c) =>
+      setChannels((prev) => {
+        const list = prev ?? [];
+        const cleared = list.find((c) => c.id === activeId)?.unread ?? 0;
+        if (cleared > 0) {
+          setUnreadTotal((n) => Math.max(0, n - cleared));
+        }
+        return list.map((c) =>
           c.id === activeId ? { ...c, unread: 0 } : c,
-        ),
-      );
+        );
+      });
     })();
 
     return () => {
       cancelled = true;
     };
   }, [source, activeId, tick]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void tryCrmChat(() => getCrmChatUnreadCount()).then((count) => {
+        if (count != null) setUnreadTotal(count);
+      });
+    }, 15000);
+    return () => window.clearInterval(id);
+  }, []);
 
   return {
     source,

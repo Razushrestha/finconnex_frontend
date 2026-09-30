@@ -32,6 +32,57 @@ describe("appointment display name", () => {
     expect(appointmentInitials(row?.guestName ?? "")).toBe("T");
   });
 
+  it("keeps the assigned consultant on a booked meeting", () => {
+    const meeting: Meeting = {
+      id: "m2",
+      title: "Meeting",
+      relatedTo: "Contact: Ada",
+      type: "Video Call",
+      startDateTime: "2026-09-30T09:00",
+      endDateTime: "2026-09-30T09:30",
+      attendees: [
+        {
+          id: "u-mohit",
+          name: "Mohit Chapagain",
+          email: "mohit.chapagain@finconnex.com.au",
+          role: "Host",
+        },
+      ],
+      organizer: "",
+      organizerId: "u-mohit",
+      status: "Scheduled",
+    };
+    const row = meetingToAppointment(meeting, [
+      {
+        id: "u-mohit",
+        name: "Mohit Chapagain",
+        email: "mohit.chapagain@finconnex.com.au",
+      },
+    ]);
+    expect(row?.consultantId).toBe("u-mohit");
+    expect(row?.consultantName).toBe("Mohit Chapagain");
+  });
+
+  it("uses bookingHost and organizerId from the CRM meeting payload", () => {
+    const meeting: Meeting = {
+      id: "m3",
+      title: "Meeting",
+      relatedTo: "Contact: Ada",
+      type: "Video Call",
+      startDateTime: "2026-10-06T09:00",
+      endDateTime: "2026-10-06T09:30",
+      attendees: [],
+      organizer: "",
+      organizerId: "user-mohit",
+      bookingHostName: "Mohit Chapagain",
+      bookingHostUserId: "user-mohit",
+      status: "Scheduled",
+    };
+    const row = meetingToAppointment(meeting, []);
+    expect(row?.consultantId).toBe("user-mohit");
+    expect(row?.consultantName).toBe("Mohit Chapagain");
+  });
+
   it("counts a listed confirmed appointment on the KPI cards", () => {
     const now = new Date(2026, 8, 30, 12, 0, 0);
     const row = {

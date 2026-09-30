@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   CalendarDays,
@@ -22,12 +23,16 @@ import {
   UsersRound,
   Plus,
   X,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "@/lib/notify/toast";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import { publicBookUrl, type BookingPage } from "@/lib/booking/types";
 import { ConsultationsBoard } from "@/components/booking/ConsultationsBoard";
 import { NewBookingModal } from "@/components/booking/NewBookingModal";
+import { AppointmentDateField } from "@/components/booking/DateTimeSection";
 import {
   appointmentDateKey,
   appointmentInitials,
@@ -35,9 +40,11 @@ import {
   appointmentRelatedLabel,
   bookingKpiStats,
   consultantById,
+  appointmentConsultantName,
   dateKeyFromDate,
   formatApptDate,
   formatApptTime,
+  parseAppointmentStart,
   type AppointmentChannel,
   type AppointmentStatus,
   type BookingKpiKey,
@@ -46,6 +53,17 @@ import {
   type RelatedKind,
 } from "@/lib/booking/dashboard";
 import { useCrmBooking } from "@/lib/booking/use-crm-booking";
+import {
+  cancelCrmBooking,
+  rescheduleCrmBooking,
+  tryCrmBooking,
+} from "@/lib/booking/api";
+import {
+  deleteCrmMeeting,
+  tryCrmMeeting,
+  updateCrmMeeting,
+} from "@/lib/meetings/api";
+import { todayIsoInTimezone } from "@/lib/booking/timezones";
 
 export type BookingSection =
   | "home"
@@ -54,6 +72,38 @@ export type BookingSection =
   | "consultants";
 
 const BRAND = "#5A32A3";
+
+function ConsultantCell({
+  row,
+}: {
+  row: DashboardAppointment;
+}) {
+  const consultant = consultantById(row.consultantId);
+  const name =
+    consultant?.name ||
+    row.consultantName ||
+    appointmentConsultantName(row.consultantId);
+  if (!name) {
+    return <span className="text-[12px] text-slate-400">Unassigned</span>;
+  }
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <ConsultantFace
+        name={name}
+        photo={consultant?.photo}
+        className="h-7 w-7 shrink-0 text-[10px]"
+      />
+      <div className="min-w-0">
+        <p className="truncate text-[12px] font-semibold text-slate-800">
+          {name}
+        </p>
+        {consultant?.role ? (
+          <p className="truncate text-[10px] text-slate-400">{consultant.role}</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 function ConsultantFace({
   name,
@@ -187,9 +237,9 @@ export function BookingsWorkspace({
   }
 
   return (
-    <div className="flex h-full min-h-full min-w-0 flex-1 flex-col bg-[#F8F9FB]">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="mx-auto flex h-full min-h-0 w-full max-w-[1600px] flex-1 flex-col px-3 pt-4 pb-3 sm:px-5 sm:pt-5 lg:px-7">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#F8F9FB]">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="mx-auto flex h-full min-h-0 w-full max-w-[1600px] flex-1 flex-col overflow-hidden px-3 pt-4 pb-3 sm:px-5 sm:pt-5 lg:px-7">
           {section === "home" ? (
             <HomeView
               appointments={crm.appointments}
@@ -198,6 +248,7 @@ export function BookingsWorkspace({
               error={crm.error}
               onNewBooking={() => setBookOpen(true)}
               onViewConsultants={() => router.push("/booking/consultants")}
+              onRefresh={() => crm.refresh()}
             />
           ) : null}
           {section === "consultations" ? (
@@ -251,6 +302,7 @@ function HomeView({
   error,
   onNewBooking,
   onViewConsultants,
+  onRefresh,
 }: {
   appointments: DashboardAppointment[];
   consultants: DashboardConsultant[];
@@ -258,6 +310,7 @@ function HomeView({
   error: string | null;
   onNewBooking: () => void;
   onViewConsultants: () => void;
+  onRefresh: () => void;
 }) {
   const now = useMemo(() => new Date(), [appointments]);
   const [consultantFilter, setConsultantFilter] = useState("all");
@@ -269,6 +322,7 @@ function HomeView({
   });
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<DashboardAppointment | null>(null);
+  const [editing, setEditing] = useState(false);
   const [pageSize, setPageSize] = useState(10);
 
   const kpi = useMemo(
@@ -308,8 +362,33 @@ function HomeView({
   );
   const todayKey = dateKeyFromDate(now);
 
+  function openView(row: DashboardAppointment) {
+    setEditing(false);
+    setDetail(row);
+  }
+
+  function openEdit(row: DashboardAppointment) {
+    setEditing(true);
+    setDetail(row);
+  }
+
+  async function removeAppointment(row: DashboardAppointment) {
+    if (!window.confirm(`Delete appointment “${row.guestName}”?`)) return;
+    const meeting = await tryCrmMeeting(() => deleteCrmMeeting(row.id));
+    const booking = await tryCrmBooking(() =>
+      cancelCrmBooking(row.id, "Deleted from upcoming appointments"),
+    );
+    if (meeting === null && booking === null) {
+      toast.error("Could not delete this appointment.");
+      return;
+    }
+    toast.success("Appointment deleted");
+    if (detail?.id === row.id) setDetail(null);
+    onRefresh();
+  }
+
   return (
-    <div className="flex min-h-[calc(100dvh-5.25rem)] flex-1 flex-col">
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
       <div className="mb-3 flex shrink-0 justify-end">
         <NewBookingButton onClick={onNewBooking} />
       </div>
@@ -373,8 +452,8 @@ function HomeView({
         })}
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,300px)]">
-        <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden xl:flex-row xl:items-stretch">
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
           <div className="flex flex-col gap-3 border-b border-[#E5E7EB] px-3 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
             <h2 className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
               <CalendarDays className="h-4 w-4 shrink-0" style={{ color: BRAND }} />
@@ -435,13 +514,15 @@ function HomeView({
                 dimmed={
                   !!kpiFilter && !appointmentMatchesKpi(row, kpiFilter, now)
                 }
-                onView={() => setDetail(row)}
+                onView={() => openView(row)}
+                onEdit={() => openEdit(row)}
+                onDelete={() => void removeAppointment(row)}
               />
             ))}
           </div>
 
           <div className="hidden min-h-0 min-w-0 flex-1 overflow-auto lg:block">
-            <table className="w-full min-w-[960px] table-fixed text-left">
+            <table className="w-full table-fixed text-left">
               <colgroup>
                 <col className="w-[24%]" />
                 <col className="w-[16%]" />
@@ -484,7 +565,9 @@ function HomeView({
                     dimmed={
                       !!kpiFilter && !appointmentMatchesKpi(row, kpiFilter, now)
                     }
-                    onView={() => setDetail(row)}
+                    onView={() => openView(row)}
+                    onEdit={() => openEdit(row)}
+                    onDelete={() => void removeAppointment(row)}
                   />
                 ))}
               </tbody>
@@ -535,7 +618,7 @@ function HomeView({
           </div>
         </section>
 
-        <div className="grid min-h-0 min-w-0 grid-cols-1 content-start gap-4 md:grid-cols-2 xl:grid-cols-1">
+        <div className="flex w-full shrink-0 flex-col gap-4 xl:h-full xl:w-[300px]">
           <section className="shrink-0 rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-[14px] font-bold text-slate-900">
@@ -596,9 +679,114 @@ function HomeView({
       {detail ? (
         <AppointmentDrawer
           row={detail}
-          onClose={() => setDetail(null)}
+          editing={editing}
+          onClose={() => {
+            setDetail(null);
+            setEditing(false);
+          }}
+          onEdit={() => setEditing(true)}
+          onSaved={() => {
+            setEditing(false);
+            setDetail(null);
+            onRefresh();
+          }}
         />
       ) : null}
+    </div>
+  );
+}
+
+function appointmentParts(row: DashboardAppointment) {
+  const start = parseAppointmentStart(row.start);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  if (Number.isNaN(start.getTime())) {
+    return { date: row.start.slice(0, 10), time: "09:00" };
+  }
+  return {
+    date: dateKeyFromDate(start),
+    time: `${pad(start.getHours())}:${pad(start.getMinutes())}`,
+  };
+}
+
+function AppointmentActionsMenu({
+  onEdit,
+  onDelete,
+}: {
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(event: Event) {
+      const target = event.target as Node;
+      if (ref.current?.contains(target) || menuRef.current?.contains(target)) {
+        return;
+      }
+      setOpen(false);
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  function toggle(event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    setPos({
+      top: rect.bottom + 4,
+      left: Math.max(8, rect.right - 160),
+    });
+    setOpen((value) => !value);
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={toggle}
+        className="flex h-8 w-8 items-center justify-center border-l border-[#E5E7EB] text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+        aria-label="More"
+        aria-expanded={open}
+      >
+        <MoreVertical className="h-4 w-4" />
+      </button>
+      {open
+        ? createPortal(
+            <div
+              ref={menuRef}
+              className="fixed z-[80] w-40 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white py-1 shadow-[0_8px_24px_rgba(15,23,42,0.12)]"
+              style={{ top: pos.top, left: pos.left }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onEdit();
+                }}
+                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-slate-800 hover:bg-slate-50"
+              >
+                <Pencil className="h-4 w-4 shrink-0" />
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onDelete();
+                }}
+                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-[13px] font-medium text-rose-600 hover:bg-rose-50"
+              >
+                <Trash2 className="h-4 w-4 shrink-0" />
+                Delete
+              </button>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
@@ -607,10 +795,14 @@ function AppointmentCard({
   row,
   dimmed = false,
   onView,
+  onEdit,
+  onDelete,
 }: {
   row: DashboardAppointment;
   dimmed?: boolean;
   onView: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
   const consultant = consultantById(row.consultantId);
   const RelatedIcon = RELATED_ICON[row.relatedKind];
@@ -650,7 +842,7 @@ function AppointmentCard({
               <p className="truncate text-[11px] text-slate-500">{row.topic}</p>
             </div>
             <div
-              className="inline-flex shrink-0 overflow-hidden rounded-lg border border-[#E5E7EB]"
+              className="inline-flex shrink-0 items-center overflow-hidden rounded-lg border border-[#E5E7EB]"
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
             >
@@ -662,13 +854,7 @@ function AppointmentCard({
               >
                 <Eye className="h-4 w-4" />
               </button>
-              <button
-                type="button"
-                className="flex h-8 w-8 items-center justify-center border-l border-[#E5E7EB] text-slate-400 hover:bg-slate-50 hover:text-slate-700"
-                aria-label="More"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </button>
+              <AppointmentActionsMenu onEdit={onEdit} onDelete={onDelete} />
             </div>
           </div>
           <div className="mt-2.5 grid grid-cols-1 gap-1.5 text-[12px] text-slate-600 min-[480px]:grid-cols-2">
@@ -676,14 +862,24 @@ function AppointmentCard({
               <RelatedIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
               <span className="truncate">{appointmentRelatedLabel(row)}</span>
             </p>
-            {consultant ? (
+            {(consultant?.name ||
+              row.consultantName ||
+              appointmentConsultantName(row.consultantId)) ? (
               <p className="flex items-center gap-1.5">
                 <ConsultantFace
-                  name={consultant.name}
-                  photo={consultant.photo}
+                  name={
+                    consultant?.name ||
+                    row.consultantName ||
+                    appointmentConsultantName(row.consultantId)
+                  }
+                  photo={consultant?.photo}
                   className="h-4 w-4 text-[8px]"
                 />
-                <span className="truncate">{consultant.name}</span>
+                <span className="truncate">
+                  {consultant?.name ||
+                    row.consultantName ||
+                    appointmentConsultantName(row.consultantId)}
+                </span>
               </p>
             ) : null}
             <p className="flex items-center gap-1.5">
@@ -719,12 +915,15 @@ function AppointmentRow({
   row,
   dimmed = false,
   onView,
+  onEdit,
+  onDelete,
 }: {
   row: DashboardAppointment;
   dimmed?: boolean;
   onView: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
-  const consultant = consultantById(row.consultantId);
   const RelatedIcon = RELATED_ICON[row.relatedKind];
   const ChannelIcon = CHANNEL_ICON[row.channel];
 
@@ -771,25 +970,7 @@ function AppointmentRow({
         </div>
       </td>
       <td className="px-3 py-3 align-middle">
-        {consultant ? (
-          <div className="flex min-w-0 items-center gap-2">
-            <ConsultantFace
-              name={consultant.name}
-              photo={consultant.photo}
-              className="h-7 w-7 shrink-0 text-[10px]"
-            />
-            <div className="min-w-0">
-              <p className="truncate text-[12px] font-semibold text-slate-800">
-                {consultant.name}
-              </p>
-              <p className="truncate text-[10px] text-slate-400">
-                {consultant.role}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <span className="text-[12px] text-slate-400">Unassigned</span>
-        )}
+        <ConsultantCell row={row} />
       </td>
       <td className="px-3 py-3 align-middle">
         <div className="grid grid-cols-[14px_minmax(0,1fr)] items-center gap-x-1.5 gap-y-0.5">
@@ -829,13 +1010,7 @@ function AppointmentRow({
           >
             <Eye className="h-4 w-4" />
           </button>
-          <button
-            type="button"
-            className="flex h-8 w-8 items-center justify-center border-l border-[#E5E7EB] text-slate-400 hover:bg-slate-50 hover:text-slate-700"
-            aria-label="More"
-          >
-            <MoreVertical className="h-4 w-4" />
-          </button>
+          <AppointmentActionsMenu onEdit={onEdit} onDelete={onDelete} />
         </div>
       </td>
     </tr>
@@ -875,7 +1050,7 @@ function MiniCalendar({
   });
 
   return (
-    <section className="flex min-h-[280px] flex-col rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+    <section className="flex min-h-[280px] flex-1 flex-col rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
       <div className="mb-3 flex shrink-0 items-center justify-between">
         <h3 className="text-[14px] font-bold text-slate-900">{label}</h3>
         <div className="flex gap-1">
@@ -945,12 +1120,75 @@ function MiniCalendar({
 
 function AppointmentDrawer({
   row,
+  editing,
   onClose,
+  onEdit,
+  onSaved,
 }: {
   row: DashboardAppointment;
+  editing: boolean;
   onClose: () => void;
+  onEdit: () => void;
+  onSaved: () => void;
 }) {
   const consultant = consultantById(row.consultantId);
+  const initial = appointmentParts(row);
+  const minDate = todayIsoInTimezone();
+  const [date, setDate] = useState(initial.date);
+  const [time, setTime] = useState(initial.time);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const next = appointmentParts(row);
+    setDate(next.date);
+    setTime(next.time);
+    setError("");
+  }, [row.id, row.start]);
+
+  async function saveEdit() {
+    if (!date || !time) {
+      setError("Date & time is required");
+      return;
+    }
+    if (date < minDate) {
+      setError("Choose today or a future date and time.");
+      return;
+    }
+    const start = new Date(`${date}T${time}`);
+    if (Number.isNaN(start.getTime()) || start.getTime() < Date.now()) {
+      setError("Choose today or a future date and time.");
+      return;
+    }
+    const end = new Date(start.getTime() + 30 * 60 * 1000);
+    setSaving(true);
+    setError("");
+    try {
+      const meeting = await tryCrmMeeting(() =>
+        updateCrmMeeting(row.id, {
+          startDateTime: start.toISOString(),
+          endDateTime: end.toISOString(),
+        }),
+      );
+      const booking =
+        meeting
+          ? null
+          : await tryCrmBooking(() =>
+              rescheduleCrmBooking(row.id, start.toISOString()),
+            );
+      if (!meeting && !booking) {
+        setError("Could not save this appointment.");
+        setSaving(false);
+        return;
+      }
+      toast.success("Appointment updated");
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save");
+      setSaving(false);
+    }
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex justify-end bg-slate-900/20 backdrop-blur-[1px]"
@@ -967,7 +1205,7 @@ function AppointmentDrawer({
             id="appointment-detail-title"
             className="text-[15px] font-bold text-slate-900"
           >
-            Appointment detail
+            {editing ? "Edit appointment" : "Appointment detail"}
           </h3>
           <button
             type="button"
@@ -994,15 +1232,79 @@ function AppointmentDrawer({
               <p className="text-[13px] text-slate-500">{row.topic}</p>
             </div>
           </div>
-          <dl className="space-y-3 text-[13px]">
-            <Row label="Related to" value={`${row.relatedKind} · ${row.relatedId}`} />
-            <Row label="Consultant" value={consultant?.name ?? ""} />
-            <Row label="Role" value={consultant?.role ?? ""} />
-            <Row label="Date" value={formatApptDate(row.start)} />
-            <Row label="Time" value={formatApptTime(row.start)} />
-            <Row label="Status" value={row.status} />
-            <Row label="Channel" value={row.channel} />
-          </dl>
+          {editing ? (
+            <div className="space-y-3">
+              <label className="block text-[13px] font-medium text-slate-600">
+                Date
+                <div className="mt-1">
+                  <AppointmentDateField
+                    value={date}
+                    min={minDate}
+                    onChange={setDate}
+                  />
+                </div>
+              </label>
+              <label className="block text-[13px] font-medium text-slate-600">
+                Time
+                <input
+                  type="time"
+                  value={time}
+                  onChange={(event) => setTime(event.target.value)}
+                  className="mt-1 h-10 w-full rounded-md border border-gray-200 bg-white px-3 text-sm text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                />
+              </label>
+              {error ? (
+                <p className="text-[12px] font-medium text-rose-600">{error}</p>
+              ) : null}
+            </div>
+          ) : (
+            <dl className="space-y-3 text-[13px]">
+              <Row label="Related to" value={`${row.relatedKind} · ${row.relatedId}`} />
+              <Row
+                label="Consultant"
+                value={
+                  consultant?.name ||
+                  row.consultantName ||
+                  appointmentConsultantName(row.consultantId)
+                }
+              />
+              <Row label="Role" value={consultant?.role ?? ""} />
+              <Row label="Date" value={formatApptDate(row.start)} />
+              <Row label="Time" value={formatApptTime(row.start)} />
+              <Row label="Status" value={row.status} />
+              <Row label="Channel" value={row.channel} />
+            </dl>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 px-5 py-3">
+          {editing ? (
+            <>
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-9 items-center rounded-full border border-slate-200 bg-white px-4 text-[13px] font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void saveEdit()}
+                className="inline-flex h-9 items-center rounded-full bg-[#5A32A3] px-4 text-[13px] font-semibold text-white disabled:opacity-60"
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#5A32A3] px-4 text-[13px] font-semibold text-white"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Edit
+            </button>
+          )}
         </div>
       </div>
     </div>

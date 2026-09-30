@@ -37,6 +37,11 @@ import {
   type Booking,
   type BookingPage,
 } from "@/lib/booking/types";
+import {
+  isPastBookingDate,
+  isPastBookingStart,
+  todayIsoInTimezone,
+} from "@/lib/booking/timezones";
 import { avatarColor, initials } from "@/lib/activities/shared";
 import { cn } from "@/lib/utils";
 
@@ -226,14 +231,31 @@ function BookFlow({
     [page],
   );
 
+  const todayKey = todayIsoInTimezone(guestTz || page.timezone);
+  const nowMonth = new Date();
+  const canPrevMonth =
+    anchor.getFullYear() > nowMonth.getFullYear() ||
+    (anchor.getFullYear() === nowMonth.getFullYear() &&
+      anchor.getMonth() > nowMonth.getMonth());
+
   const localSlots = selectedDate
     ? slotsForDate(slotPage, selectedDate, slotOpts)
     : [];
-  const slots = (crmSlots.length ? crmSlots : localSlots).map((item) =>
-    typeof item === "string"
-      ? { start: item, label: formatPublicSlotLabel(item) }
-      : { start: item.start, label: formatPublicSlotLabel(item.start) },
-  );
+  const slots = (crmSlots.length ? crmSlots : localSlots)
+    .map((item) =>
+      typeof item === "string"
+        ? { start: item, label: formatPublicSlotLabel(item) }
+        : { start: item.start, label: formatPublicSlotLabel(item.start) },
+    )
+    .filter((item) => {
+      if (!selectedDate) return false;
+      const day = toLocalDateStr(selectedDate);
+      return !isPastBookingStart(
+        day,
+        item.start.slice(0, 5),
+        guestTz || page.timezone,
+      );
+    });
 
   const hostName = page.consultants?.[0] || page.owner || "Host";
 
@@ -247,6 +269,7 @@ function BookFlow({
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(anchor.getFullYear(), anchor.getMonth(), d);
       const dayKey = toLocalDateStr(date);
+      if (isPastBookingDate(dayKey, guestTz || page.timezone)) continue;
       const hasSlots = crmSlotDays.size
         ? crmSlotDays.has(dayKey)
         : slotsForDate(slotPage, date, slotOpts).length > 0;
@@ -258,6 +281,8 @@ function BookFlow({
   }, [anchor, crmSlotDays, page, selectedDate, slotOpts, slotPage]);
 
   function pickDate(d: Date) {
+    const dayKey = toLocalDateStr(d);
+    if (isPastBookingDate(dayKey, guestTz || page.timezone)) return;
     setSelectedDate(d);
     setSelectedSlot(null);
   }
@@ -273,6 +298,20 @@ function BookFlow({
     setErrors(next);
     if (Object.keys(next).length) return;
     if (!selectedDate || !selectedSlot) return;
+    const dateStr = toLocalDateStr(selectedDate);
+    if (
+      isPastBookingStart(
+        dateStr,
+        selectedSlot.slice(0, 5),
+        guestTz || page.timezone,
+      )
+    ) {
+      setErrors((prev) => ({
+        ...prev,
+        form: "Choose today or a future date and time.",
+      }));
+      return;
+    }
 
     setSubmitting(true);
     setEmailError(null);
@@ -393,9 +432,6 @@ function BookFlow({
                   {page.description}
                 </p>
               ) : null}
-              <div className="mt-auto hidden pt-10 lg:flex">
-                <PoweredByBookings />
-              </div>
             </aside>
 
             <section className="border-b border-slate-100 px-6 py-6 lg:border-r lg:border-b-0">
@@ -405,12 +441,13 @@ function BookFlow({
               <div className="mb-3 flex items-center justify-between px-1">
                 <button
                   type="button"
+                  disabled={!canPrevMonth}
                   onClick={() =>
                     setAnchor(
                       new Date(anchor.getFullYear(), anchor.getMonth() - 1, 1),
                     )
                   }
-                  className="rounded-md p-1 text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+                  className="rounded-md p-1 text-slate-400 hover:bg-slate-50 hover:text-slate-700 disabled:pointer-events-none disabled:opacity-30"
                   aria-label="Previous month"
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -448,15 +485,20 @@ function BookFlow({
                   const hasSlots = crmSlotDays.size
                     ? crmSlotDays.has(dayKey)
                     : slotsForDate(slotPage, d, slotOpts).length > 0;
+                  const isPast = isPastBookingDate(
+                    dayKey,
+                    guestTz || page.timezone,
+                  );
+                  const bookable = hasSlots && !isPast;
                   const selected =
                     selectedDate &&
                     d.toDateString() === selectedDate.toDateString();
-                  const isToday = d.toDateString() === new Date().toDateString();
+                  const isToday = dayKey === todayKey;
                   return (
                     <button
                       key={d.toISOString()}
                       type="button"
-                      disabled={!hasSlots}
+                      disabled={!bookable}
                       onClick={() => pickDate(d)}
                       className="relative flex h-11 items-center justify-center"
                     >
@@ -465,7 +507,7 @@ function BookFlow({
                           "flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-medium",
                           selected
                             ? "bg-[#5B4BDB] text-white"
-                            : hasSlots
+                            : bookable
                               ? "text-slate-800 hover:bg-slate-100"
                               : "text-slate-300",
                         )}
@@ -548,9 +590,6 @@ function BookFlow({
                     </button>
                   ),
                 )}
-              </div>
-              <div className="mt-4 lg:hidden">
-                <PoweredByBookings />
               </div>
             </section>
           </div>
@@ -757,8 +796,7 @@ function BookFlow({
             {emailError ? (
               <p className="mt-4 max-w-[520px] text-center text-[13px] text-amber-700">
                 Your appointment is booked, but the confirmation email could not
-                be sent ({emailError}). Save the details above or add them to
-                your calendar.
+                be sent. Save the details above or add them to your calendar.
               </p>
             ) : confirmed.joinUrl ? (
               <p className="mt-4 max-w-[520px] text-center text-[13px] text-slate-500">
@@ -861,21 +899,6 @@ function publicTimezoneLabel(tz: string) {
   } catch {
     return tz;
   }
-}
-
-function PoweredByBookings() {
-  return (
-    <div className="flex items-center gap-2 text-[11px] text-slate-400">
-      <span>Powered by</span>
-      <span className="grid grid-cols-2 gap-0.5">
-        <span className="h-2 w-2 rounded-[2px] bg-orange-400" />
-        <span className="h-2 w-2 rounded-[2px] bg-sky-400" />
-        <span className="h-2 w-2 rounded-[2px] bg-violet-500" />
-        <span className="h-2 w-2 rounded-[2px] bg-emerald-400" />
-      </span>
-      <span className="font-semibold text-slate-600">Bookings</span>
-    </div>
-  );
 }
 
 function Field({

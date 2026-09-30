@@ -155,7 +155,7 @@ export function BookingNotificationsStep({
   );
 }
 
-function NotificationEditModal({
+export function NotificationEditModal({
   row,
   onClose,
   onSave,

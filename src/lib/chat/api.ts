@@ -4,10 +4,13 @@
  */
 
 import {
+  decodeJwtPayload,
   ensureCrmSession,
+  isUuid,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
-import { crmFetch } from "@/lib/crm/request";
+import { crmWorkspaceFetch } from "@/lib/crm/request";
+import { silentRequest } from "@/lib/notify/fetch-notifier";
 import type { ChatChannel, ChatMessage } from "@/lib/chat/types";
 import { CURRENT_CHAT_USER } from "@/lib/chat/types";
 
@@ -218,9 +221,9 @@ export function normalizeCrmMessages(
 
 async function chatGet(suffix: string, query = ""): Promise<unknown> {
   const session = await resolveSession();
-  return crmFetch(
-    session,
+  return crmWorkspaceFetch(
     `${workspaceChatPath(session.workspaceId, suffix)}${query}`,
+    silentRequest(),
   );
 }
 
@@ -229,10 +232,9 @@ async function chatMutate(
   init: RequestInit,
 ): Promise<unknown> {
   const session = await resolveSession();
-  return crmFetch(
-    session,
+  return crmWorkspaceFetch(
     workspaceChatPath(session.workspaceId, suffix),
-    init,
+    silentRequest(init),
   );
 }
 
@@ -252,22 +254,56 @@ export async function getCrmConversation(
   return null;
 }
 
+export function chatActorUserIdFromToken(token: string): string {
+  const payload = decodeJwtPayload(token);
+  const id = payload?.sub ?? payload?.userId ?? payload?.id;
+  return typeof id === "string" && isUuid(id) ? id : "";
+}
+
+export function chatActorLabelFromToken(token: string): string {
+  const payload = decodeJwtPayload(token);
+  const name = pickStr(payload?.name, payload?.displayName, payload?.fullName);
+  if (name) return name;
+  const email = pickStr(payload?.email);
+  if (!email) return "";
+  const local = email.includes("@") ? email.split("@")[0] : email;
+  return local.replace(/[._-]+/g, " ").trim() || email;
+}
+
+/** Nest CreateChatConversationDto: type, title, memberIds (UUIDs). */
 export async function createCrmConversation(input: {
   name?: string;
+  title?: string;
   description?: string;
   memberIds?: string[];
   type?: "GROUP" | "DIRECT";
-}): Promise<ChatChannel | null> {
+}): Promise<ChatChannel> {
+  const memberIds = [...new Set((input.memberIds ?? []).filter(isUuid))];
+  const type: "GROUP" | "DIRECT" =
+    input.type ?? (memberIds.length === 1 ? "DIRECT" : "GROUP");
+  const title = (input.title ?? input.name)?.trim();
+  const body: { type: "GROUP" | "DIRECT"; memberIds: string[]; title?: string } =
+    { type, memberIds };
+  if (title) body.title = title;
+
   const data = await chatMutate("/conversations", {
     method: "POST",
-    body: JSON.stringify(input),
+    body: JSON.stringify(body),
   });
   const items = normalizeCrmConversations(data);
-  if (items[0]) return items[0];
-  if (data && typeof data === "object" && !Array.isArray(data)) {
-    return normalizeCrmConversation(data as Record<string, unknown>, 0);
+  if (items[0]) {
+    return type === "DIRECT" && title
+      ? { ...items[0], name: title }
+      : items[0];
   }
-  return null;
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const channel = normalizeCrmConversation(
+      data as Record<string, unknown>,
+      0,
+    );
+    return type === "DIRECT" && title ? { ...channel, name: title } : channel;
+  }
+  throw new Error("Conversation was created but the CRM sent an empty reply");
 }
 
 export async function updateCrmConversation(
@@ -324,14 +360,15 @@ export async function createCrmChatMessage(
   conversationId: string,
   input: { body: string; replyToId?: string },
 ): Promise<ChatMessage | null> {
+  const payload: { body: string; replyToId?: string } = {
+    body: input.body,
+  };
+  if (input.replyToId && isUuid(input.replyToId)) {
+    payload.replyToId = input.replyToId;
+  }
   const data = await chatMutate(`/conversations/${conversationId}/messages`, {
     method: "POST",
-    body: JSON.stringify({
-      body: input.body,
-      text: input.body,
-      content: input.body,
-      replyToId: input.replyToId,
-    }),
+    body: JSON.stringify(payload),
   });
   const items = normalizeCrmMessages(data, conversationId);
   if (items[0]) return items[0];
@@ -351,7 +388,7 @@ export async function updateCrmChatMessage(
 ): Promise<ChatMessage | null> {
   const data = await chatMutate(`/messages/${messageId}`, {
     method: "PATCH",
-    body: JSON.stringify({ body, text: body, content: body }),
+    body: JSON.stringify({ body }),
   });
   const items = normalizeCrmMessages(data, "");
   return items[0] ?? null;

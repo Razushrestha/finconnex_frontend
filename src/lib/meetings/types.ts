@@ -53,6 +53,9 @@ export interface Meeting {
   meetingLink?: string;
   attendees: Attendee[];
   organizer: string;
+  organizerId?: string;
+  bookingHostName?: string;
+  bookingHostUserId?: string;
   status: MeetingStatus;
   agenda?: string;
   notes?: string;

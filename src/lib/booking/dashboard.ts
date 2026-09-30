@@ -22,6 +22,7 @@ export interface DashboardAppointment {
   relatedKind: RelatedKind;
   relatedId: string;
   consultantId: string;
+  consultantName?: string;
   start: string;
   type: AppointmentType;
   status: AppointmentStatus;
@@ -227,8 +228,54 @@ export function addDashboardAppointment(row: DashboardAppointment) {
   return row;
 }
 
+export function appointmentConsultantLabel(
+  row: Pick<DashboardAppointment, "consultantId" | "consultantName">,
+  consultants: { id: string; name: string; email?: string }[] = listDashboardConsultants(),
+): string {
+  const match = resolveConsultantMatch(
+    [row.consultantId, row.consultantName],
+    consultants,
+  );
+  return appointmentPersonName(
+    match?.name,
+    row.consultantName,
+    appointmentConsultantName(row.consultantId),
+  );
+}
+
 export function consultantById(id: string) {
-  return liveConsultants.find((c) => c.id === id || c.name === id);
+  const key = id.trim().toLowerCase();
+  if (!key || key === "—" || key === "-") return undefined;
+  return liveConsultants.find(
+    (c) => c.id.toLowerCase() === key || c.name.trim().toLowerCase() === key,
+  );
+}
+
+export function appointmentConsultantName(id: string) {
+  const matched = consultantById(id);
+  if (matched) return matched.name;
+  const value = id.trim();
+  if (!value || value === "—" || value === "-") return "";
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+    return "";
+  }
+  return /[a-z]/i.test(value) ? value : "";
+}
+
+export function resolveConsultantMatch(
+  keys: Array<string | undefined>,
+  consultants: { id: string; name: string; email?: string }[],
+): { id: string; name: string } | undefined {
+  const needles = keys
+    .map((value) => value?.trim().toLowerCase() ?? "")
+    .filter((value) => value && value !== "—" && value !== "-");
+  if (!needles.length) return undefined;
+  return consultants.find((row) => {
+    const id = row.id.trim().toLowerCase();
+    const name = row.name.trim().toLowerCase();
+    const email = row.email?.trim().toLowerCase() ?? "";
+    return needles.includes(id) || needles.includes(name) || (email && needles.includes(email));
+  });
 }
 
 const MONTHS = [
@@ -354,24 +401,38 @@ export function meetingToAppointment(
 ): DashboardAppointment | null {
   const status = mapMeetingStatus(meeting.status);
   if (!status) return null;
+  const hostAttendee = meeting.attendees.find((row) => row.role === "Host");
+  const host = resolveConsultantMatch(
+    [
+      meeting.organizerId,
+      meeting.bookingHostUserId,
+      meeting.bookingHostName,
+      meeting.organizer,
+      hostAttendee?.id,
+      hostAttendee?.name,
+      hostAttendee?.email,
+    ],
+    consultants,
+  );
   const guest =
     meeting.attendees.find((row) => row.role === "Main Applicant") ??
+    meeting.attendees.find((row) => row.role === "Guest") ??
     meeting.attendees.find((row) => row.role !== "Host") ??
     meeting.attendees[0];
   const related = parseRelated(meeting.relatedTo);
-  const host = consultants.find(
-    (row) =>
-      row.id === meeting.organizer ||
-      row.name === meeting.organizer ||
-      (row.email && row.email === meeting.organizer),
-  );
   const guestName =
     appointmentPersonName(
-      guest?.name,
+      guest?.role === "Host" ? "" : guest?.name,
       related.id,
       meeting.title,
       meeting.organizer,
     ) || "Guest";
+  const consultantName = appointmentPersonName(
+    host?.name,
+    meeting.bookingHostName,
+    meeting.organizer,
+    hostAttendee?.name,
+  );
   return {
     id: meeting.id,
     guestName,
@@ -382,7 +443,12 @@ export function meetingToAppointment(
         : guest?.email || related.kind,
     relatedKind: related.kind,
     relatedId: related.id,
-    consultantId: host?.id || meeting.organizer,
+    consultantId:
+      host?.id ||
+      meeting.organizerId ||
+      meeting.bookingHostUserId ||
+      "",
+    consultantName,
     start: toLocalStart(meeting.startDateTime),
     type: "Consultation",
     status,

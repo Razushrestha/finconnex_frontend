@@ -21,8 +21,13 @@ import {
   Underline,
   Users,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { ShareConsultationModal } from "@/components/booking/ShareConsultationModal";
+import {
+  BookingFormStep,
+  bookingFormFromQuestions,
+} from "@/components/booking/BookingFormStep";
 import {
   AvailabilityLimitsStep,
   defaultAvailabilityLimits,
@@ -105,6 +110,41 @@ const SECTIONS = [
 
 type OverviewSection = (typeof SECTIONS)[number]["id"];
 
+function NestedNavLinks<T extends string>({
+  items,
+  activeId,
+  onSelect,
+}: {
+  items: { id: T; title: string; icon: LucideIcon }[];
+  activeId: T;
+  onSelect: (id: T) => void;
+}) {
+  return (
+    <div className="mb-1.5 ml-[3.25rem] mr-1 space-y-0.5 border-l border-[#EDE4F7] pl-2.5">
+      {items.map((panel) => {
+        const Icon = panel.icon;
+        const selected = panel.id === activeId;
+        return (
+          <button
+            key={panel.id}
+            type="button"
+            onClick={() => onSelect(panel.id)}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[12px] font-medium leading-snug",
+              selected
+                ? "bg-[#F3ECFB] text-[#5A32A3]"
+                : "text-slate-600 hover:bg-slate-50",
+            )}
+          >
+            <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
+            {panel.title}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 const SELECT_CLASS =
   "h-10 w-full appearance-none rounded-lg border border-[#E5E7EB] bg-white bg-[length:16px] bg-[right_12px_center] bg-no-repeat px-3 pr-9 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/45";
 const SELECT_BG =
@@ -162,17 +202,29 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Avatar({ name, cover }: { name: string; cover?: string }) {
+function Avatar({
+  name,
+  cover,
+  size = "md",
+}: {
+  name: string;
+  cover?: string;
+  size?: "sm" | "md";
+}) {
+  const box = size === "sm" ? "h-10 w-10 rounded-lg text-[11px]" : "h-11 w-11 rounded-xl text-[12px]";
   if (cover) {
     return (
-      <span className="flex h-11 w-11 shrink-0 overflow-hidden rounded-xl">
+      <span className={cn("flex shrink-0 overflow-hidden", box)}>
         <img src={cover} alt="" className="h-full w-full object-cover" />
       </span>
     );
   }
   return (
     <span
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-[12px] font-bold text-white"
+      className={cn(
+        "flex shrink-0 items-center justify-center font-bold text-white",
+        box,
+      )}
       style={{ backgroundColor: BRAND }}
     >
       {initials(name)}
@@ -694,7 +746,7 @@ export function ConsultationOverview({
   const [section, setSection] = useState<OverviewSection>("details");
   const [availabilityPanel, setAvailabilityPanel] =
     useState<AvailabilityPanelId>("dates");
-  const [notifyPanel, setNotifyPanel] = useState<NotifyPanelId>("sms");
+  const [notifyPanel, setNotifyPanel] = useState<NotifyPanelId>("email");
   const [editing, setEditing] = useState<"details" | "consultants" | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [owners, setOwners] = useState<AssignableOwner[]>(() =>
@@ -752,29 +804,31 @@ export function ConsultationOverview({
 
   return (
     <div className="-mx-3 -mt-4 flex min-h-0 flex-1 flex-col bg-[#F7F8FA] sm:-mx-5 sm:-mt-5 lg:-mx-7">
-      <header className="flex items-center justify-between gap-3 border-b border-[#E5E7EB] bg-white px-4 py-3 sm:px-6">
+      <header className="grid h-16 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center border-b border-[#E5E7EB] bg-white px-4 lg:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <Avatar name={page.title} cover={page.coverImageUrl} />
-          <div className="min-w-0">
-            <p className="truncate text-[16px] font-bold text-slate-900">
+          <Avatar name={page.title} cover={page.coverImageUrl} size="sm" />
+          <div className="flex h-10 min-w-0 flex-col justify-center">
+            <p className="truncate text-[14px] leading-5 font-semibold text-slate-900">
               {page.title}
             </p>
-            <p className="text-[12px] text-slate-500">{mode}</p>
+            <p className="truncate text-[12px] leading-4 text-slate-500">
+              {mode}
+            </p>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex h-10 items-center gap-2">
           <button
             type="button"
             onClick={() => setShareOpen(true)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
           >
-            <Share2 className="h-3.5 w-3.5" />
+            <Share2 className="h-4 w-4" />
             Share
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -783,8 +837,8 @@ export function ConsultationOverview({
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden p-4 lg:flex-row lg:p-6">
-        <aside className="w-full shrink-0 lg:w-[280px]">
-          <nav className="rounded-xl border border-[#E5E7EB] bg-white p-2 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+        <aside className="flex min-h-0 w-full shrink-0 flex-col lg:h-full lg:max-h-full lg:w-[280px]">
+          <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border border-[#E5E7EB] bg-white p-2 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
             {SECTIONS.map((item) => {
               const Icon = item.icon;
               const active = item.id === section;
@@ -798,18 +852,22 @@ export function ConsultationOverview({
                     setSection(item.id);
                     setEditing(null);
                     if (item.id === "availability") setAvailabilityPanel("dates");
-                    if (item.id === "notify") setNotifyPanel("sms");
+                    if (item.id === "notify") setNotifyPanel("email");
                   }}
                   className={cn(
                     "flex w-full items-start gap-3 rounded-lg px-2.5 py-2.5 text-left transition",
-                    active ? "bg-[#F3ECFB]" : "hover:bg-slate-50",
+                    active &&
+                      !(item.id === "availability" && availabilityOpen) &&
+                      !(item.id === "notify" && notifyOpen)
+                      ? "bg-[#F3ECFB]"
+                      : "hover:bg-slate-50",
                   )}
                 >
                   <span
                     className={cn(
                       "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
                       active
-                        ? "bg-white text-[#5A32A3]"
+                        ? "bg-[#F3ECFB] text-[#5A32A3]"
                         : "bg-slate-100 text-slate-500",
                     )}
                   >
@@ -839,88 +897,24 @@ export function ConsultationOverview({
                   ) : null}
                 </button>
                 {item.id === "notify" && notifyOpen ? (
-                  <div className="pb-1">
-                    {NOTIFY_PANELS.map((panel) => {
-                      const PanelIcon = panel.icon;
-                      const panelActive = notifyPanel === panel.id;
-                      return (
-                        <button
-                          key={panel.id}
-                          type="button"
-                          onClick={() => {
-                            setSection("notify");
-                            setNotifyPanel(panel.id);
-                          }}
-                          className={cn(
-                            "grid h-10 w-full grid-cols-[2rem_2rem_minmax(0,1fr)] items-center gap-x-3 rounded-lg px-2.5 text-left",
-                            panelActive ? "bg-[#F3ECFB]" : "hover:bg-slate-50",
-                          )}
-                        >
-                          <span className="h-8 w-8" aria-hidden />
-                          <span
-                            className={cn(
-                              "flex h-8 w-8 items-center justify-center rounded-md",
-                              panelActive
-                                ? "bg-white text-[#5A32A3]"
-                                : "bg-slate-100 text-slate-500",
-                            )}
-                          >
-                            <PanelIcon className="h-4 w-4" />
-                          </span>
-                          <span
-                            className={cn(
-                              "truncate text-[13px] font-semibold",
-                              panelActive ? "text-[#5A32A3]" : "text-slate-600",
-                            )}
-                          >
-                            {panel.title}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <NestedNavLinks
+                    items={[...NOTIFY_PANELS]}
+                    activeId={notifyPanel}
+                    onSelect={(id) => {
+                      setSection("notify");
+                      setNotifyPanel(id);
+                    }}
+                  />
                 ) : null}
                 {item.id === "availability" && availabilityOpen ? (
-                  <div className="pb-1">
-                    {AVAILABILITY_PANELS.map((panel) => {
-                      const PanelIcon = panel.id === "limits" ? CalendarClock : Clock;
-                      const panelActive = availabilityPanel === panel.id;
-                      return (
-                        <button
-                          key={panel.id}
-                          type="button"
-                          onClick={() => {
-                            setSection("availability");
-                            setAvailabilityPanel(panel.id);
-                          }}
-                          className={cn(
-                            "grid h-10 w-full grid-cols-[2rem_2rem_minmax(0,1fr)] items-center gap-x-3 rounded-lg px-2.5 text-left",
-                            panelActive ? "bg-[#F3ECFB]" : "hover:bg-slate-50",
-                          )}
-                        >
-                          <span className="h-8 w-8" aria-hidden />
-                          <span
-                            className={cn(
-                              "flex h-8 w-8 items-center justify-center rounded-md",
-                              panelActive
-                                ? "bg-white text-[#5A32A3]"
-                                : "bg-slate-100 text-slate-500",
-                            )}
-                          >
-                            <PanelIcon className="h-4 w-4" />
-                          </span>
-                          <span
-                            className={cn(
-                              "truncate text-[13px] font-semibold",
-                              panelActive ? "text-[#5A32A3]" : "text-slate-600",
-                            )}
-                          >
-                            {panel.title}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <NestedNavLinks
+                    items={[...AVAILABILITY_PANELS]}
+                    activeId={availabilityPanel}
+                    onSelect={(id) => {
+                      setSection("availability");
+                      setAvailabilityPanel(id);
+                    }}
+                  />
                 ) : null}
                 </div>
               );
@@ -929,7 +923,9 @@ export function ConsultationOverview({
         </aside>
 
         <section className="min-h-0 min-w-0 flex-1 overflow-y-auto rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
-          {section !== "availability" && section !== "notify" ? (
+          {section !== "availability" &&
+          section !== "notify" &&
+          section !== "form" ? (
           <div className="flex items-center justify-between border-b border-[#E5E7EB] px-5 py-4">
             <div className="flex items-center gap-2">
               <h2 className="text-[16px] font-bold text-slate-900">
@@ -1121,29 +1117,24 @@ export function ConsultationOverview({
           ) : null}
 
           {section === "form" ? (
-            <div className="px-5 py-5">
-              {page.questions.length ? (
-                <ul className="space-y-3">
-                  {page.questions.map((question) => (
-                    <li
-                      key={question.id}
-                      className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2.5"
-                    >
-                      <span className="text-[13px] font-medium text-slate-800">
-                        {question.label}
-                      </span>
-                      <span className="text-[11px] font-semibold text-slate-500">
-                        {question.required ? "Required" : "Optional"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-[13px] text-slate-500">
-                  No extra questions on this booking form.
-                </p>
-              )}
-            </div>
+            <BookingFormStep
+              key={page.id}
+              embedded
+              initial={bookingFormFromQuestions(page.questions)}
+              onNext={(values) => {
+                onSaved({
+                  ...page,
+                  questions: values.fields
+                    .filter((field) => !field.hidden)
+                    .map((field) => ({
+                      id: field.id,
+                      label: field.label,
+                      required: field.required,
+                    })),
+                  confirmationTemplate: values.freeButton,
+                });
+              }}
+            />
           ) : null}
         </section>
       </div>

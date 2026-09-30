@@ -179,3 +179,101 @@ export function ianaTimezoneFromLabel(label?: string): string {
   if (embedded?.[1] && IANA_TO_LABEL[embedded[1]]) return embedded[1];
   return Intl.DateTimeFormat().resolvedOptions().timeZone || "Australia/Sydney";
 }
+
+function zoneOffsetMs(instant: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(instant);
+  const num = (type: string) =>
+    Number(parts.find((part) => part.type === type)?.value);
+  const asUtc = Date.UTC(
+    num("year"),
+    num("month") - 1,
+    num("day"),
+    num("hour"),
+    num("minute"),
+    num("second"),
+  );
+  return asUtc - instant.getTime();
+}
+
+/** Interpret `YYYY-MM-DD` + `HH:mm` as wall clock in a CRM timezone label or IANA id. */
+export function dateInTimezone(
+  dateIso: string,
+  hhmm: string,
+  timeZoneInput?: string,
+): Date {
+  const [year, month, day] = dateIso.split("-").map(Number);
+  const [hour, minute] = hhmm.split(":").map(Number);
+  const timeZone = ianaTimezoneFromLabel(timeZoneInput);
+  const desiredUtc = Date.UTC(
+    year,
+    (month || 1) - 1,
+    day || 1,
+    hour || 0,
+    minute || 0,
+    0,
+  );
+  let utc = desiredUtc;
+  for (let i = 0; i < 3; i += 1) {
+    utc = desiredUtc - zoneOffsetMs(new Date(utc), timeZone);
+  }
+  const result = new Date(utc);
+  return Number.isNaN(result.getTime()) ? new Date(`${dateIso}T${hhmm}`) : result;
+}
+
+/** Calendar date (`YYYY-MM-DD`) for `now` in a CRM timezone. */
+export function todayIsoInTimezone(
+  timeZoneInput?: string,
+  now = new Date(),
+): string {
+  const timeZone = ianaTimezoneFromLabel(timeZoneInput);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(now);
+  const part = (type: string) =>
+    parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+export function isPastBookingDate(
+  dateIso: string,
+  timeZoneInput?: string,
+  now = new Date(),
+): boolean {
+  const day = dateIso.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
+  return day < todayIsoInTimezone(timeZoneInput, now);
+}
+
+export function isPastBookingStart(
+  dateIso: string,
+  hhmm: string,
+  timeZoneInput?: string,
+  now = new Date(),
+): boolean {
+  if (isPastBookingDate(dateIso, timeZoneInput, now)) return true;
+  const start = dateInTimezone(dateIso, hhmm || "00:00", timeZoneInput);
+  return start.getTime() < now.getTime();
+}
+
+export function clampBookableDate(
+  dateIso: string,
+  timeZoneInput?: string,
+  now = new Date(),
+): string {
+  const today = todayIsoInTimezone(timeZoneInput, now);
+  const day = dateIso.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || day < today) return today;
+  return day;
+}

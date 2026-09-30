@@ -30,11 +30,16 @@ export function formatRelatedTo(r?: RelatedTo | string) {
 }
 
 export function initials(name?: string | null) {
-  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  const raw = (name ?? "").trim();
+  if (!raw) return "?";
+  const withoutEmail = raw.includes("@") ? raw.split("@")[0] : raw;
+  const parts = withoutEmail
+    .split(/[\s._-]+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
   if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   const first = parts[0][0] ?? "";
-  const last = parts[parts.length - 1][0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1][0] ?? "") : "";
   return `${first}${last}`.toUpperCase() || "?";
 }
 

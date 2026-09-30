@@ -13,6 +13,7 @@ import type { RelatedEntityKind } from "@/lib/activities/shared";
 import type {
   Attendee,
   Meeting,
+  MeetingAttendeeRole,
   MeetingStatus,
   MeetingType,
 } from "@/lib/meetings/types";
@@ -146,11 +147,54 @@ export function toMeetingIso(raw: string): string {
   return value;
 }
 
+function mapAttendeeRole(raw: unknown): MeetingAttendeeRole | undefined {
+  const value = pickStr(raw).toLowerCase();
+  if (value === "host" || value === "organizer") return "Host";
+  if (value === "main applicant" || value === "main_applicant") return "Main Applicant";
+  if (value === "guest" || value === "attendee") return "Guest";
+  return undefined;
+}
+
 function mapAttendees(raw: unknown): Attendee[] {
+  return extractRecords(raw).map((row, index) => {
+    const user =
+      row.user && typeof row.user === "object"
+        ? (row.user as Record<string, unknown>)
+        : null;
+    const userId = pickStr(
+      row.userId,
+      row.user_id,
+      user && pickStr(user.id),
+      row.id,
+    );
+    const name = pickStr(
+      row.name,
+      user && pickStr(user.name, user.fullName),
+      row.fullName,
+      row.displayName,
+    );
+    const email = pickStr(row.email, user && pickStr(user.email), "");
+    const display =
+      name && !isUuid(name)
+        ? name
+        : email.includes("@")
+          ? email.split("@")[0]
+          : "";
+    return {
+      id: userId || `att-${index}`,
+      name: display,
+      email,
+      role: mapAttendeeRole(row.role ?? row.attendeeRole ?? row.type),
+    };
+  });
+}
+
+function mapExternalAttendees(raw: unknown): Attendee[] {
   return extractRecords(raw).map((row, index) => ({
-    id: pickStr(row.id, row.userId, row.uuid) || `att-${index}`,
-    name: pickStr(row.name, row.fullName, row.displayName, row.email, "Attendee"),
+    id: pickStr(row.id, row.email) || `ext-${index}`,
+    name: pickStr(row.name, row.email, "Guest"),
     email: pickStr(row.email, ""),
+    role: "Guest" as const,
   }));
 }
 
@@ -166,7 +210,49 @@ export function normalizeMeeting(
     raw.organizer && typeof raw.organizer === "object"
       ? (raw.organizer as Record<string, unknown>)
       : null;
-  return {
+  const bookingHost =
+    raw.bookingHost && typeof raw.bookingHost === "object"
+      ? (raw.bookingHost as Record<string, unknown>)
+      : null;
+  const createdBy =
+    raw.createdBy && typeof raw.createdBy === "object"
+      ? (raw.createdBy as Record<string, unknown>)
+      : null;
+  const organizerId =
+    pickStr(
+      organizer && pickStr(organizer.id, organizer.userId, organizer.user_id),
+      raw.organizerId,
+      raw.organizer_id,
+      bookingHost && pickStr(bookingHost.userId, bookingHost.user_id, bookingHost.id),
+      raw.hostUserId,
+      raw.host_user_id,
+      createdBy && pickStr(createdBy.id, createdBy.userId),
+      raw.createdById,
+      raw.created_by_id,
+      typeof raw.organizer === "string" && isUuid(raw.organizer)
+        ? raw.organizer
+        : "",
+    ) || undefined;
+  const hostLabel = [
+    bookingHost && pickStr(bookingHost.name, bookingHost.email),
+    organizer && pickStr(organizer.name, organizer.email),
+    pickStr(raw.organizerName, raw.organizer_name),
+    createdBy && pickStr(createdBy.name, createdBy.email),
+    typeof raw.organizer === "string" ? raw.organizer : "",
+    pickStr(raw.createdByName),
+  ]
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .find((value) => value && !isUuid(value)) ?? "";
+  const internals = mapAttendees(raw.attendees ?? raw.participants).map(
+    (row) =>
+      organizerId && row.id === organizerId
+        ? { ...row, role: "Host" as const }
+        : row,
+  );
+  const guests = mapExternalAttendees(
+    raw.externalAttendees ?? raw.external_attendees,
+  );
+  const meeting: Meeting = {
     id: pickStr(raw.id, raw.uuid, raw.meetingId) || `crm-meet-${index}`,
     title: pickStr(raw.title, raw.subject, raw.name, "Untitled meeting"),
     relatedTo:
@@ -187,18 +273,30 @@ export function normalizeMeeting(
     ),
     location: pickStr(raw.location, raw.venue) || undefined,
     meetingLink: pickStr(raw.meetingLink, raw.meetingUrl, raw.url, raw.joinUrl) || undefined,
-    attendees: mapAttendees(raw.attendees ?? raw.participants),
-    organizer: pickStr(
-      organizer && pickStr(organizer.name, organizer.email),
-      raw.organizerName,
-      raw.organizer,
-      raw.createdBy,
-      "—",
-    ),
+    attendees: [...internals, ...guests],
+    organizerId,
+    bookingHostName:
+      pickStr(bookingHost && pickStr(bookingHost.name, bookingHost.email)) &&
+      !isUuid(pickStr(bookingHost && pickStr(bookingHost.name, bookingHost.email)))
+        ? pickStr(bookingHost && pickStr(bookingHost.name, bookingHost.email))
+        : undefined,
+    bookingHostUserId:
+      pickStr(bookingHost && pickStr(bookingHost.userId, bookingHost.user_id)) ||
+      undefined,
+    organizer: hostLabel,
     status: mapMeetingStatus(pickStr(raw.status, raw.state, "SCHEDULED")),
     agenda: pickStr(raw.agenda, raw.description) || undefined,
     notes: pickStr(raw.notes) || undefined,
   };
+  if (!meeting.organizer) {
+    const host = meeting.attendees.find((row) => row.role === "Host");
+    meeting.organizer =
+      meeting.bookingHostName || host?.name || "";
+    if (!meeting.organizerId) {
+      meeting.organizerId = meeting.bookingHostUserId || host?.id;
+    }
+  }
+  return meeting;
 }
 
 export function normalizeMeetings(data: unknown): Meeting[] {
@@ -330,6 +428,7 @@ export function toCreateMeetingBody(input: {
   agenda?: string;
   notes?: string;
   timezone?: string;
+  organizerUserId?: string;
   externalAttendees?: Array<{ email: string; name?: string }>;
 }): Record<string, unknown> {
   const startAt = toMeetingIso(input.startDateTime);
@@ -370,18 +469,44 @@ export function toCreateMeetingBody(input: {
   if (input.externalAttendees?.length) {
     body.externalAttendees = input.externalAttendees;
   }
+  const organizerId =
+    input.organizerUserId && isUuid(input.organizerUserId)
+      ? input.organizerUserId
+      : isUuid(input.organizer)
+        ? input.organizer
+        : "";
+  if (organizerId) body.organizerId = organizerId;
+  const organizerName =
+    input.organizer && !isUuid(input.organizer) ? input.organizer.trim() : "";
+  if (organizerName) body.organizerName = organizerName;
   return body;
 }
 
 export async function createCrmMeeting(
   input: Parameters<typeof toCreateMeetingBody>[0],
 ): Promise<Meeting | null> {
-  return asMeeting(
-    await meetingsMutate("", {
-      method: "POST",
-      body: JSON.stringify(toCreateMeetingBody(input)),
-    }),
-  );
+  const body = toCreateMeetingBody(input);
+  try {
+    return asMeeting(
+      await meetingsMutate("", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err ?? "");
+    if (!/organizerId|organizerName|should not exist|whitelist/i.test(message)) {
+      throw err;
+    }
+    if (/organizerName/i.test(message)) delete body.organizerName;
+    if (/organizerId/i.test(message) || !body.organizerId) delete body.organizerId;
+    return asMeeting(
+      await meetingsMutate("", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    );
+  }
 }
 
 export async function updateCrmMeeting(

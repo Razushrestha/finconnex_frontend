@@ -1,10 +1,15 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Calendar, ChevronDown } from "lucide-react";
 import { TimezoneSelect } from "@/components/booking/TimezoneSelect";
 import { parseStartHHmm } from "@/components/booking/CustomTimePicker";
 import { prettyAppointmentDate } from "@/lib/booking/types";
+import {
+  clampBookableDate,
+  isPastBookingStart,
+  todayIsoInTimezone,
+} from "@/lib/booking/timezones";
 import { cn } from "@/lib/utils";
 
 const fieldLabelClass = "mb-1 block text-[13px] font-medium text-slate-600";
@@ -74,10 +79,12 @@ export function AppointmentDateField({
   value,
   onChange,
   invalid,
+  min,
 }: {
   value: string;
   onChange: (value: string) => void;
   invalid?: boolean;
+  min?: string;
 }) {
   return (
     <div className="relative">
@@ -93,7 +100,19 @@ export function AppointmentDateField({
       <input
         type="date"
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        min={min}
+        onChange={(event) => {
+          const next = event.target.value;
+          if (!next) {
+            onChange(min || value);
+            return;
+          }
+          if (min && next < min) {
+            onChange(min);
+            return;
+          }
+          onChange(next);
+        }}
         className="absolute inset-0 cursor-pointer opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0"
         aria-label="Date"
         aria-required
@@ -185,15 +204,36 @@ export function DateTimeSection({
   required?: boolean;
   error?: string;
 }) {
+  const bookableMin = todayIsoInTimezone(timezone);
   const showDuration = whenMode !== "custom" && Boolean(duration);
   const stacked = fieldsLayout === "stacked";
   const startValue = startDateTimeValue(date, slot);
   const minutes = Math.max(1, durationMinutes || 30);
   const endValue = addMinutes(startValue, minutes);
+  const nowStamp = toLocalDateTimeValue(new Date());
+  const minStartStamp =
+    bookableMin > nowStamp.slice(0, 10) ? `${bookableMin}T00:00` : nowStamp;
+  const bookableSlots = slots.filter((item) => {
+    const hhmm = parseStartHHmm(item.value);
+    if (!hhmm) return true;
+    return !isPastBookingStart(date, hhmm, timezone);
+  });
+
+  useEffect(() => {
+    const next = clampBookableDate(date, timezone);
+    if (next !== date) onDateChange(next);
+  }, [date, timezone, onDateChange]);
 
   function handleStartChange(next: string) {
     const parsed = parseLocalDateTime(next);
     if (!parsed) return;
+    if (next < minStartStamp) {
+      const minParsed = parseLocalDateTime(minStartStamp);
+      if (!minParsed) return;
+      onDateChange(toDateIso(minParsed));
+      onSlotChange(toHHmm(minParsed));
+      return;
+    }
     onDateChange(toDateIso(parsed));
     onSlotChange(toHHmm(parsed));
   }
@@ -256,6 +296,7 @@ export function DateTimeSection({
             <CustomDateTimeField
               label="Start time"
               value={startValue}
+              min={minStartStamp}
               onChange={handleStartChange}
               required={required}
               invalid={invalid}
@@ -289,6 +330,7 @@ export function DateTimeSection({
               </label>
               <AppointmentDateField
                 value={date}
+                min={bookableMin}
                 onChange={onDateChange}
                 invalid={invalid}
               />
@@ -310,12 +352,12 @@ export function DateTimeSection({
                   aria-required={required || undefined}
                   aria-invalid={invalid || undefined}
                 >
-                  {slots.length === 0 ? (
+                  {bookableSlots.length === 0 ? (
                     <option value="">
                       {emptySlotLabel ?? "No slots this day"}
                     </option>
                   ) : (
-                    slots.map((item) => (
+                    bookableSlots.map((item) => (
                       <option key={item.value} value={item.value}>
                         {item.label}
                       </option>

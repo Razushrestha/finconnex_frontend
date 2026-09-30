@@ -97,14 +97,13 @@ type SectionFilter = (typeof SECTION_FILTERS)[number];
 async function loadConsultationPagesFromApi(): Promise<BookingPage[]> {
   const local = listBookingPages().filter((page) => page.eventType === "Consultation");
   const remote = await tryCrmBooking(() => listCrmEventTypePages());
-  const merged = remote?.length
-    ? mergeCrmEventTypePages(local, remote).filter(
-        (page) => page.eventType === "Consultation",
-      )
-    : local;
-  for (const page of merged) {
-    if (page.status === "Live") upsertBookingPage(page);
-  }
+  const merged =
+    remote == null
+      ? local
+      : mergeCrmEventTypePages(local, remote).filter(
+          (page) => page.eventType === "Consultation",
+        );
+  for (const page of merged) upsertBookingPage(page);
   return merged;
 }
 
@@ -137,7 +136,7 @@ export function ConsultationsBoard() {
   const [view, setView] = useState<ViewMode>("grid");
   const [sectionOpen, setSectionOpen] = useState(false);
   const [sectionFilter, setSectionFilter] =
-    useState<SectionFilter>("Active Consultations");
+    useState<SectionFilter>("All Consultations");
   const sectionRef = useRef<HTMLDivElement>(null);
   const [chooseType, setChooseType] = useState(false);
   const [detailsChoice, setDetailsChoice] = useState<CalendarTypeChoice | null>(
@@ -348,7 +347,9 @@ export function ConsultationsBoard() {
           detailsValues.meetingPlace === "offline"
             ? detailsValues.locationDetail
             : detailsValues.phoneDetail,
-        hostIds: availabilityHostIds,
+        hostIds: availabilityHostIds.length
+          ? availabilityHostIds
+          : Object.values(assignedUserIds).filter(Boolean),
         bufferBeforeMinutes: page.bufferMinutes,
         minimumNoticeMinutes: Math.round((page.minNoticeHours ?? 2) * 60),
         maxDaysInFuture: page.maxAdvanceDays,

@@ -59,12 +59,12 @@ export type ConsultationSetupStepId =
 export const AVAILABILITY_PANELS = [
   {
     id: "dates",
-    title: "Available Dates and Times",
+    title: "Dates and times",
     icon: Clock,
   },
   {
     id: "limits",
-    title: "Appointment Limits",
+    title: "Appointment limits",
     icon: CalendarClock,
   },
 ] as const;
@@ -171,10 +171,8 @@ function SidebarItem({
       onClick={onClick}
       disabled={!reached}
       className={cn(
-        "grid w-full items-center gap-x-3 rounded-lg px-2.5 text-left transition",
-        nested
-          ? "h-10 grid-cols-[2rem_2rem_minmax(0,1fr)_2rem]"
-          : "h-11 grid-cols-[2rem_minmax(0,1fr)_2rem]",
+        "flex w-full items-center gap-2.5 rounded-lg text-left transition",
+        nested ? "py-2 pr-2.5 pl-12" : "h-11 px-2.5",
         active
           ? "bg-[#F3ECFB]"
           : reached
@@ -182,26 +180,29 @@ function SidebarItem({
             : "cursor-default opacity-55",
       )}
     >
-      {nested ? <span className="h-8 w-8" aria-hidden /> : null}
       <span
         className={cn(
-          "flex h-8 w-8 items-center justify-center justify-self-center rounded-md",
+          "flex shrink-0 items-center justify-center rounded-md",
+          nested ? "h-7 w-7" : "h-8 w-8",
           active ? "bg-white text-[#5A32A3]" : "bg-slate-100 text-slate-500",
         )}
       >
-        <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
+        <Icon className={nested ? "h-3.5 w-3.5" : "h-4 w-4"} strokeWidth={2} />
       </span>
       <span
         className={cn(
-          "min-w-0 truncate text-[13px] font-semibold",
+          "min-w-0 flex-1 font-semibold leading-snug",
+          nested ? "text-[12px]" : "truncate text-[13px]",
           active ? "text-[#5A32A3]" : nested ? "text-slate-600" : "text-slate-800",
         )}
       >
         {title}
       </span>
-      <span className="flex h-8 w-8 items-center justify-center justify-self-center">
-        {trailing ?? null}
-      </span>
+      {trailing ? (
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center">
+          {trailing}
+        </span>
+      ) : null}
     </button>
   );
 }

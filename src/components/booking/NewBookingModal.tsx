@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
-  ExternalLink,
-  Info,
   Link2,
   MapPin,
   Plus,
@@ -17,12 +15,12 @@ import {
   findContactById,
   listAllContacts,
 } from "@/lib/contacts/store";
-import { formatMeetingDateTime } from "@/lib/meetings/store";
 import { createCrmMeeting } from "@/lib/meetings/api";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import {
   bookingCrmLinkFromRelated,
   createCrmBooking,
+  ensureCrmBookingHost,
   linkCrmBooking,
   tryCrmBooking,
 } from "@/lib/booking/api";
@@ -42,7 +40,11 @@ import {
   listBookingPages,
   type BookingPage,
 } from "@/lib/booking/types";
-import { DEFAULT_TIMEZONE } from "@/lib/booking/timezones";
+import {
+  DEFAULT_TIMEZONE,
+  dateInTimezone,
+  ianaTimezoneFromLabel,
+} from "@/lib/booking/timezones";
 import { DateTimeSection } from "@/components/booking/DateTimeSection";
 import {
   nowHHmm,
@@ -65,7 +67,11 @@ import {
   RELATED_ENTITY_KINDS,
   type RelatedEntityKind,
 } from "@/lib/activities/shared";
-import { loadWorkspaceConsultants, type AssignableOwner } from "@/lib/users/assignable";
+import {
+  displayOwnerName,
+  loadWorkspaceConsultants,
+  type AssignableOwner,
+} from "@/lib/users/assignable";
 
 const LOCATIONS = ["Zoom", "Google Meet", "Phone", "Full address"] as const;
 type LocationKind = (typeof LOCATIONS)[number];
@@ -75,6 +81,29 @@ const ROLE_STYLE: Record<MeetingAttendeeRole, string> = {
   Guest: "bg-slate-100 text-slate-600",
   "Main Applicant": "bg-emerald-50 text-emerald-700",
 };
+
+function bookingFormFieldFromError(message: string): string {
+  const lower = message.toLowerCase();
+  if (/\btitle\b/.test(lower)) return "title";
+  if (/related entity|relatedtype|relatedentitytype/.test(lower)) {
+    return "relatedKind";
+  }
+  if (
+    /related record|relatedid|relatedentityid|contactid|leadid|companyid|dealid/.test(
+      lower,
+    )
+  ) {
+    return "relatedName";
+  }
+  if (/date & time|startat|starttime|endat|timezone|\bslot\b/.test(lower)) {
+    return "datetime";
+  }
+  if (/team member|hostid|organizer/.test(lower)) return "consultant";
+  if (/main applicant|\bemail\b/.test(lower)) return "client";
+  if (/meeting location|meetinglink|meetingtype/.test(lower)) return "location";
+  if (/consultation|eventtypeid|calendar/.test(lower)) return "calendar";
+  return "";
+}
 
 function toLocalDateValue(date: Date) {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -192,15 +221,29 @@ export function NewBookingModal({
   }, [open]);
 
   const calendar = calendars.find((item) => item.id === calendarId) ?? calendars[0];
+  const assignedMembers = assignedCalendarMembers(calendar);
   const teamMembers = [
     { id: "calendar-default", name: "Calendar Default" },
-    ...assignedCalendarMembers(calendar).map((name) => ({
-      id: name,
-      name,
-    })),
+    ...assignedMembers.map((label) => {
+      const owner =
+        owners.find((row) => row.id === label) ??
+        owners.find((row) => row.name === label);
+      return {
+        id: owner?.id || label,
+        name: displayOwnerName(owner, label) || "Host",
+      };
+    }),
     ...owners
-      .filter((owner) => !assignedCalendarMembers(calendar).includes(owner.name))
-      .map((owner) => ({ id: owner.id, name: owner.name })),
+      .filter(
+        (owner) =>
+          !assignedMembers.some(
+            (label) => owner.id === label || owner.name === label,
+          ),
+      )
+      .map((owner) => ({
+        id: owner.id,
+        name: displayOwnerName(owner) || owner.name,
+      })),
   ];
   const slotDuration = customDuration;
   const fallbackSlots = useMemo(
@@ -277,14 +320,26 @@ export function NewBookingModal({
 
   if (!open) return null;
 
-  const hostName =
+  const defaultHostLabel = calendarDefaultHost(calendar);
+  const selectedTeam =
     consultantId === "calendar-default"
-      ? calendarDefaultHost(calendar)
-      : consultantId;
+      ? undefined
+      : teamMembers.find((member) => member.id === consultantId);
   const consultant =
-    owners.find((owner) => owner.id === consultantId) ??
-    owners.find((owner) => owner.name === hostName) ??
-    owners.find((owner) => owner.name === calendar?.owner);
+    consultantId === "calendar-default"
+      ? owners.find((owner) => owner.id === defaultHostLabel) ??
+        owners.find((owner) => owner.name === defaultHostLabel) ??
+        owners.find((owner) => owner.name === calendar?.owner)
+      : owners.find((owner) => owner.id === consultantId) ??
+        owners.find((owner) => owner.name === consultantId) ??
+        owners.find((owner) => owner.name === selectedTeam?.name);
+  const hostName =
+    displayOwnerName(
+      consultant,
+      consultantId === "calendar-default"
+        ? defaultHostLabel
+        : selectedTeam?.name || consultantId,
+    ) || "Host";
   const client =
     findContactById(clientId)?.contact ??
     contacts.find((c) => c.id === clientId) ??
@@ -366,9 +421,14 @@ export function NewBookingModal({
       showFormError("Choose a consultation page to book.", "calendar");
       return;
     }
-    const firstStart = new Date(`${date}T${startHHmm}`);
+    const slotZone = ianaTimezoneFromLabel(timezone);
+    const firstStart = dateInTimezone(date, startHHmm, slotZone);
     if (Number.isNaN(firstStart.getTime())) {
       showFormError("Date & time is required", "datetime");
+      return;
+    }
+    if (firstStart.getTime() < Date.now()) {
+      showFormError("Choose today or a future date and time.", "datetime");
       return;
     }
     const minutes =
@@ -427,35 +487,63 @@ export function NewBookingModal({
           inferredRelatedKind,
           inferredRelatedId,
         );
+        const organizerUserId =
+          consultant?.id && isUuid(consultant.id) ? consultant.id : undefined;
+        let savedViaBooking = false;
         if (eventTypeId && isUuid(eventTypeId) && client?.email) {
-          const booked = await tryCrmBooking(() =>
-            createCrmBooking({
+          let bookingHostId = "";
+          try {
+            const host = await ensureCrmBookingHost({
+              name: hostName,
+              userId: organizerUserId,
+              email: consultant?.email,
+            });
+            bookingHostId = host?.id && isUuid(host.id) ? host.id : "";
+            const booked = await createCrmBooking({
               eventTypeId,
               startTime: startDate.toISOString(),
               name: clientName || client.email,
               email: client.email,
-              timezone,
+              timezone: slotZone,
               phone: client.phone,
+              hostId: bookingHostId || undefined,
               ...related,
-            }),
-          );
-          if (booked?.id) {
-            if (Object.keys(related).length) {
-              await tryCrmBooking(() => linkCrmBooking(booked.id, related));
+            });
+            if (booked) {
+              savedViaBooking = true;
+              if (isUuid(booked.id) && Object.keys(related).length) {
+                await tryCrmBooking(() => linkCrmBooking(booked.id, related));
+              }
             }
-            continue;
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            if (/overlap/i.test(message) && bookingHostId) {
+              throw err;
+            }
+            if (
+              /overlap/i.test(message) ||
+              /404|not found|whitelist|should not exist|is not allowed/i.test(
+                message,
+              )
+            ) {
+              savedViaBooking = false;
+            } else {
+              throw err;
+            }
           }
         }
+        if (savedViaBooking) continue;
         await createCrmMeeting({
           title: title.trim() || "Consultation",
           relatedTo: `${inferredRelatedKind}: ${inferredRelatedName}`,
           relatedKind: inferredRelatedKind,
           relatedId: inferredRelatedId || undefined,
           type: meetingType,
-          startDateTime: formatMeetingDateTime(startDate),
-          endDateTime: formatMeetingDateTime(endDate),
+          startDateTime: startDate.toISOString(),
+          endDateTime: endDate.toISOString(),
           status: "Scheduled",
-          organizer: consultant?.name || hostName,
+          organizer: hostName,
+          organizerUserId,
           location,
           meetingLink:
             locationMode === "default"
@@ -465,7 +553,7 @@ export function NewBookingModal({
                 : undefined,
           agenda: description.trim() || undefined,
           notes: note || undefined,
-          timezone,
+          timezone: slotZone,
           externalAttendees:
             client?.email
               ? [
@@ -480,12 +568,11 @@ export function NewBookingModal({
       onCreated();
       onClose();
     } catch (err) {
-      showFormError(
+      const message =
         err instanceof Error
           ? err.message
-          : "Could not create the CRM meeting.",
-        "calendar",
-      );
+          : "Could not create the CRM meeting.";
+      showFormError(message, bookingFormFieldFromError(message));
     } finally {
       setSaving(false);
     }
@@ -529,7 +616,11 @@ export function NewBookingModal({
                 Create a consultation page first, then book from that calendar.
               </p>
             ) : null}
-            <Field label="Calendar">
+            <Field
+              label="Calendar"
+              invalid={errorField === "calendar"}
+              error={errorField === "calendar" ? error : undefined}
+            >
               <select
                 value={calendarId}
                 onChange={(e) => applyCalendar(e.target.value)}
@@ -545,7 +636,12 @@ export function NewBookingModal({
                 ))}
               </select>
             </Field>
-            <Field label="Appointment title" required invalid={errorField === "title"}>
+            <Field
+              label="Appointment title"
+              required
+              invalid={errorField === "title"}
+              error={errorField === "title" ? error : undefined}
+            >
               <input
                 value={title}
                 onChange={(e) => {
@@ -599,10 +695,20 @@ export function NewBookingModal({
                 Add description
               </button>
             )}
-            <Field label="Team members">
+            <Field
+              label="Team members"
+              invalid={errorField === "consultant"}
+              error={errorField === "consultant" ? error : undefined}
+            >
               <select
                 value={consultantId}
-                onChange={(e) => setConsultantId(e.target.value)}
+                onChange={(e) => {
+                  setConsultantId(e.target.value);
+                  if (errorField === "consultant") {
+                    setError("");
+                    setErrorField("");
+                  }
+                }}
                 className={inputClass}
               >
                 {teamMembers.map((member) => (
@@ -619,6 +725,7 @@ export function NewBookingModal({
               <Field
                 label="Related Entity *"
                 invalid={errorField === "relatedKind"}
+                error={errorField === "relatedKind" ? error : undefined}
               >
                 <select
                   className={inputClass}
@@ -646,6 +753,7 @@ export function NewBookingModal({
               <Field
                 label="Related Record *"
                 invalid={errorField === "relatedName"}
+                error={errorField === "relatedName" ? error : undefined}
               >
                 <RelatedRecordCombobox
                   value={relatedName}
@@ -856,7 +964,11 @@ export function NewBookingModal({
               />
             ))}
 
-            <Field label="Main applicant" invalid={errorField === "client"}>
+            <Field
+              label="Main applicant"
+              invalid={errorField === "client"}
+              error={errorField === "client" ? error : undefined}
+            >
               <RelatedRecordCombobox
                 value={clientName}
                 onChange={(name) => {
@@ -970,7 +1082,7 @@ export function NewBookingModal({
           </label>
           <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
             {error ? (
-              <p className="max-w-[240px] text-right text-xs font-medium text-rose-600">
+              <p className="max-w-md text-right text-xs font-medium text-rose-600">
                 {error}
               </p>
             ) : null}
@@ -1003,11 +1115,13 @@ function Field({
   label,
   required,
   invalid,
+  error,
   children,
 }: {
   label: string;
   required?: boolean;
   invalid?: boolean;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -1025,6 +1139,9 @@ function Field({
       >
         {children}
       </div>
+      {invalid && error ? (
+        <p className="mt-1 text-[11px] font-medium text-rose-600">{error}</p>
+      ) : null}
     </label>
   );
 }
@@ -1074,15 +1191,16 @@ function AttendeeCard({
             Contact&apos;s local time ({zone})
           </p>
         </div>
-        <div className="flex gap-1 text-slate-400">
-          <Info className="h-3.5 w-3.5" />
-          <ExternalLink className="h-3.5 w-3.5" />
-          {onRemove ? (
-            <button type="button" onClick={onRemove} aria-label="Remove">
-              <X className="h-3.5 w-3.5" />
-            </button>
-          ) : null}
-        </div>
+        {onRemove ? (
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label="Remove"
+            className="text-slate-400 hover:text-slate-600"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
       </div>
     </div>
   );

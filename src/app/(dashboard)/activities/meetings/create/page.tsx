@@ -34,6 +34,7 @@ import {
   type BookingPage,
 } from "@/lib/booking/types";
 import { isOnlineLocationKind } from "@/lib/booking/meeting-platforms";
+import { dateInTimezone, isPastBookingStart } from "@/lib/booking/timezones";
 import { asRelatedKind } from "@/lib/activities/create-defaults";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
 import { nowHHmm, parseStartHHmm } from "@/components/booking/CustomTimePicker";
@@ -180,6 +181,14 @@ export default function ScheduleMeetingPage() {
     const first = formatSlot(date, time, duration);
     if (Number.isNaN(first.start.getTime())) {
       toast.error("Enter a valid date and time");
+      return;
+    }
+    const hhmm = parseStartHHmm(time) || time.slice(0, 5);
+    if (
+      isPastBookingStart(date, hhmm, timezone) ||
+      dateInTimezone(date, hhmm, timezone).getTime() < Date.now()
+    ) {
+      toast.error("Choose today or a future date and time.");
       return;
     }
     const host =

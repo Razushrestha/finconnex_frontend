@@ -47,6 +47,7 @@ export type BookingFormField = {
 export type BookingFormValues = {
   fields: BookingFormField[];
   terms: boolean;
+  captcha: boolean;
   emailVerification: boolean;
   freeButton: string;
   paidButton: string;
@@ -68,10 +69,37 @@ const DEFAULT_FIELDS: BookingFormField[] = [
 export const DEFAULT_BOOKING_FORM: BookingFormValues = {
   fields: DEFAULT_FIELDS,
   terms: false,
-  emailVerification: true,
+  captcha: false,
+  emailVerification: false,
   freeButton: "Schedule Appointment",
-  paidButton: "Pay and Schedule an Appointment",
+  paidButton: "Pay and Schedule Appointment",
 };
+
+export function bookingFormFromQuestions(
+  questions?: { id: string; label: string; required: boolean }[],
+): BookingFormValues {
+  if (!questions?.length) return { ...DEFAULT_BOOKING_FORM, fields: [...DEFAULT_FIELDS] };
+  const fields = DEFAULT_FIELDS.map((field) => {
+    const hit =
+      questions.find((row) => row.id === field.id) ??
+      questions.find((row) => row.label === field.label);
+    return hit
+      ? { ...field, label: hit.label, required: hit.required, hidden: false }
+      : field;
+  });
+  for (const row of questions) {
+    if (fields.some((field) => field.id === row.id || field.label === row.label)) {
+      continue;
+    }
+    fields.push({
+      id: row.id,
+      label: row.label,
+      required: row.required,
+      hidden: false,
+    });
+  }
+  return { ...DEFAULT_BOOKING_FORM, fields };
+}
 
 const FIELD_TYPES: {
   id: BookingFormFieldType;
@@ -226,29 +254,40 @@ export function BookingFormStep({
   initial,
   onBack,
   onNext,
+  embedded,
 }: {
   initial?: BookingFormValues;
-  onBack: () => void;
+  onBack?: () => void;
   onNext: (values: BookingFormValues) => void;
+  embedded?: boolean;
 }) {
   const [fields, setFields] = useState<BookingFormField[]>(
     initial?.fields ?? DEFAULT_FIELDS,
   );
   const [terms, setTerms] = useState(initial?.terms ?? false);
-  const [emailVerification, setEmailVerification] = useState(
-    initial?.emailVerification ?? true,
-  );
+  const [captcha, setCaptcha] = useState(initial?.captcha ?? false);
+  const [emailVerification] = useState(initial?.emailVerification ?? false);
   const [freeButton, setFreeButton] = useState(
     initial?.freeButton ?? DEFAULT_BOOKING_FORM.freeButton,
   );
   const [paidButton, setPaidButton] = useState(
     initial?.paidButton ?? DEFAULT_BOOKING_FORM.paidButton,
   );
-  const [activeId, setActiveId] = useState("guests");
+  const [activeId, setActiveId] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
   const [addFieldOpen, setAddFieldOpen] = useState(false);
-  const [editingButtons, setEditingButtons] = useState(false);
+
+  function commit() {
+    onNext({
+      fields,
+      terms,
+      captcha,
+      emailVerification,
+      freeButton,
+      paidButton,
+    });
+  }
 
   function move(from: number, to: number) {
     if (to < 0 || to >= fields.length) return;
@@ -281,18 +320,31 @@ export function BookingFormStep({
   }
 
   return (
-    <div className="mx-auto w-full max-w-[920px] pb-8">
-      <div className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:px-8 sm:py-7">
-        <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-          <h1 className="text-[18px] font-bold text-slate-900">Booking Form</h1>
+    <div className={embedded ? "" : "mx-auto w-full max-w-[920px] pb-8"}>
+      <div
+        className={
+          embedded
+            ? ""
+            : "rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]"
+        }
+      >
+        <div
+          className={cn(
+            "flex flex-wrap items-center justify-between gap-3",
+            embedded
+              ? "border-b border-[#E5E7EB] px-5 py-4"
+              : "px-5 pt-6 sm:px-8",
+          )}
+        >
+          <h2 className="text-[16px] font-bold text-slate-900">Booking Form</h2>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setAddFieldOpen(true)}
-              className="inline-flex h-9 items-center gap-1 rounded-lg border border-[#5A32A3]/30 px-3 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-[#5A32A3] px-3 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB]"
             >
               <Plus className="h-3.5 w-3.5" />
-              Add Field
+              Add field
             </button>
             <button
               type="button"
@@ -304,8 +356,9 @@ export function BookingFormStep({
           </div>
         </div>
 
-        <h2 className="mb-2 text-[14px] font-bold text-slate-800">Fields</h2>
-        <div className="overflow-hidden rounded-lg border border-[#E5E7EB]">
+        <div className={embedded ? "px-5 py-5" : "px-5 pt-5 pb-6 sm:px-8 sm:pb-7"}>
+        <h3 className="mb-2 text-[14px] font-bold text-slate-800">Fields</h3>
+        <div className="divide-y divide-[#E5E7EB] border-y border-[#E5E7EB]">
           {fields.map((field, index) => {
             const active = activeId === field.id;
             return (
@@ -313,8 +366,7 @@ export function BookingFormStep({
                 key={field.id}
                 onClick={() => setActiveId(field.id)}
                 className={cn(
-                  "group flex items-center gap-2 border-b border-[#F3F4F6] px-3 py-3 last:border-0 hover:bg-[#F3ECFB]",
-                  active && "bg-[#F3ECFB]",
+                  "group flex items-center gap-2 px-1 py-3.5 hover:bg-slate-50",
                   field.hidden && "opacity-50",
                 )}
               >
@@ -348,16 +400,18 @@ export function BookingFormStep({
                       className="h-8 w-full rounded border border-[#5A32A3]/30 px-2 text-[13px] outline-none"
                     />
                   ) : (
-                    <p className="text-[13px] font-medium text-slate-800">
-                      {field.label}
-                      {field.required ? (
-                        <span className="ml-0.5 text-rose-500">*</span>
-                      ) : null}
+                    <p className="flex flex-wrap items-center gap-x-3 text-[13px] font-medium text-slate-800">
+                      <span>
+                        {field.label}
+                        {field.required ? (
+                          <span className="ml-0.5 text-rose-500">*</span>
+                        ) : null}
+                      </span>
                       {field.badge ? (
-                        <span className="ml-2 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                        <span className="text-[11px] font-normal text-slate-400">
                           {emailVerification
                             ? "Verification enabled"
-                            : field.badge}
+                            : "Verification disabled"}
                         </span>
                       ) : null}
                     </p>
@@ -418,11 +472,11 @@ export function BookingFormStep({
           })}
         </div>
 
-        <h2 className="mt-7 mb-2 text-[14px] font-bold text-slate-800">
+        <h3 className="mt-8 mb-2 text-[14px] font-bold text-slate-800">
           Consent and Verification
-        </h2>
-        <div className="overflow-hidden rounded-lg border border-[#E5E7EB]">
-          <div className="flex items-center justify-between gap-3 border-b border-[#F3F4F6] px-3 py-3.5">
+        </h3>
+        <div className="divide-y divide-[#E5E7EB] border-y border-[#E5E7EB]">
+          <div className="flex items-center justify-between gap-3 py-3.5">
             <div className="flex items-center gap-2">
               <GripVertical className="h-4 w-4 text-slate-300" />
               <span className="text-[13px] font-medium text-slate-800">
@@ -431,83 +485,68 @@ export function BookingFormStep({
             </div>
             <Toggle on={terms} onChange={setTerms} />
           </div>
-          <div className="flex items-center justify-between gap-3 px-3 py-3.5">
+          <div className="flex items-center justify-between gap-3 py-3.5">
             <div className="flex items-center gap-2">
               <GripVertical className="h-4 w-4 text-slate-300" />
               <span className="text-[13px] font-medium text-slate-800">
-                Email verification
+                CAPTCHA
               </span>
             </div>
-            <Toggle on={emailVerification} onChange={setEmailVerification} />
+            <Toggle on={captcha} onChange={setCaptcha} />
           </div>
         </div>
 
-        <div className="mt-7 flex items-center justify-between gap-3">
-          <h2 className="text-[14px] font-bold text-slate-800">
-            Booking Confirmation Button
-          </h2>
-          <button
-            type="button"
-            onClick={() => setEditingButtons((v) => !v)}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50 hover:text-[#5A32A3]"
-            aria-label={
-              editingButtons
-                ? "Hide confirmation button labels"
-                : "Edit confirmation button labels"
-            }
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
+        <h3 className="mt-8 mb-3 text-[14px] font-bold text-slate-800">
+          Booking Confirmation Button
+        </h3>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1.5 block text-[12px] font-medium text-slate-600">
+              Free Appointments<span className="text-rose-500"> *</span>
+            </span>
+            <input
+              value={freeButton}
+              onChange={(e) => setFreeButton(e.target.value)}
+              className="h-10 w-full rounded-md border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/40"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-[12px] font-medium text-slate-600">
+              Paid Appointments<span className="text-rose-500"> *</span>
+            </span>
+            <input
+              value={paidButton}
+              onChange={(e) => setPaidButton(e.target.value)}
+              className="h-10 w-full rounded-md border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/40"
+            />
+          </label>
         </div>
-        {editingButtons ? (
-          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-semibold text-slate-600">
-                Free Appointments<span className="text-rose-500">*</span>
-              </span>
-              <input
-                value={freeButton}
-                onChange={(e) => setFreeButton(e.target.value)}
-                className="h-11 w-full rounded-lg border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/40"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] font-semibold text-slate-600">
-                Paid Appointments<span className="text-rose-500">*</span>
-              </span>
-              <input
-                value={paidButton}
-                onChange={(e) => setPaidButton(e.target.value)}
-                className="h-11 w-full rounded-lg border border-[#E5E7EB] px-3 text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/40"
-              />
-            </label>
-          </div>
-        ) : null}
 
-        <div className="mt-7 flex justify-end gap-2">
+        <div className="mt-8 flex justify-end gap-2">
           <button
             type="button"
-            onClick={() =>
-              onNext({
-                fields,
-                terms,
-                emailVerification,
-                freeButton,
-                paidButton,
-              })
-            }
-            className="h-9 rounded-lg px-5 text-[13px] font-semibold text-white hover:brightness-110"
+            onClick={commit}
+            className="h-9 rounded-md px-5 text-[13px] font-semibold text-white hover:brightness-110"
             style={{ backgroundColor: BRAND }}
           >
             Save
           </button>
           <button
             type="button"
-            onClick={onBack}
-            className="h-9 rounded-lg border border-[#E5E7EB] bg-white px-5 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+            onClick={() => {
+              setFields(initial?.fields ?? DEFAULT_FIELDS);
+              setTerms(initial?.terms ?? false);
+              setCaptcha(initial?.captcha ?? false);
+              setFreeButton(initial?.freeButton ?? DEFAULT_BOOKING_FORM.freeButton);
+              setPaidButton(initial?.paidButton ?? DEFAULT_BOOKING_FORM.paidButton);
+              setEditingId(null);
+              onBack?.();
+            }}
+            className="h-9 rounded-md border border-[#E5E7EB] bg-white px-5 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
           >
             Cancel
           </button>
+        </div>
         </div>
       </div>
 

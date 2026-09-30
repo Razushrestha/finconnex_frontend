@@ -152,12 +152,32 @@ function actorConsultant(): AssignableOwner | null {
   };
 }
 
+export function displayOwnerName(
+  owner?: Pick<AssignableOwner, "name" | "email"> | null,
+  fallback = "",
+): string {
+  const name = owner?.name.trim() ?? "";
+  if (name && !isUuid(name)) return name;
+  const email = owner?.email.trim() ?? "";
+  if (email.includes("@")) return email.split("@")[0] || email;
+  const extra = fallback.trim();
+  if (extra && !isUuid(extra)) return extra;
+  return "";
+}
+
 function hostToOwner(host: CrmBookingHost): AssignableOwner {
-  const name = host.name.trim() || host.email.trim() || "Member";
+  const email = host.email.trim();
+  const raw = host.name.trim();
+  const name =
+    raw && !isUuid(raw)
+      ? raw
+      : email.includes("@")
+        ? email.split("@")[0]
+        : "Member";
   return {
     id: host.crmUserId || host.id,
     name,
-    email: host.email.trim(),
+    email,
   };
 }
 

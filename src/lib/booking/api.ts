@@ -66,6 +66,7 @@ export type CrmEventType = {
   description: string;
   active: boolean;
   hostId: string;
+  hostNames?: string[];
   isPublic?: boolean;
   locationType?: string;
   location?: string;
@@ -81,6 +82,8 @@ export type CrmBookingRecord = {
   id: string;
   eventTypeId: string;
   hostId: string;
+  hostName?: string;
+  hostUserId?: string;
   guestName: string;
   guestEmail: string;
   startTime: string;
@@ -164,6 +167,80 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
   }
   if (rec.data != null && rec.data !== data) return extractRecords(rec.data);
   return [rec];
+}
+
+function looksLikeEventType(row: Record<string, unknown>): boolean {
+  if (pickNum(row.durationMinutes, row.duration_minutes, row.duration) > 0) {
+    return true;
+  }
+  if (pickStr(row.slug) && pickStr(row.name, row.title)) return true;
+  if (pickStr(row.eventTypeId, row.event_type_id)) return true;
+  return (
+    Boolean(pickStr(row.id)) &&
+    (row.isActive !== undefined ||
+      row.is_active !== undefined ||
+      row.isPublic !== undefined ||
+      row.locationType !== undefined)
+  );
+}
+
+/** Event-type lists must not treat nested `hosts` as the row set. */
+export function extractEventTypeRecords(
+  data: unknown,
+): Record<string, unknown>[] {
+  if (!data) return [];
+  if (Array.isArray(data)) {
+    if (
+      data.length === 2 &&
+      Array.isArray(data[0]) &&
+      (typeof data[1] === "number" || data[1] == null)
+    ) {
+      return extractEventTypeRecords(data[0]);
+    }
+    const rows = data.filter(
+      (row): row is Record<string, unknown> =>
+        !!row && typeof row === "object" && !Array.isArray(row),
+    );
+    const types = rows.filter(looksLikeEventType);
+    return types.length ? types : rows;
+  }
+  const rec = asRecord(data);
+  if (!rec) return [];
+  for (const key of [
+    "items",
+    "eventTypes",
+    "event_types",
+    "records",
+    "rows",
+    "result",
+    "collection",
+  ]) {
+    if (Array.isArray(rec[key])) return extractEventTypeRecords(rec[key]);
+  }
+  if (rec.data != null && rec.data !== data) {
+    return extractEventTypeRecords(rec.data);
+  }
+  return looksLikeEventType(rec) ? [rec] : [];
+}
+
+function hostNamesFromEventType(row: Record<string, unknown>): string[] {
+  const names: string[] = [];
+  const add = (value: string) => {
+    if (!value || isUuid(value) || names.includes(value)) return;
+    names.push(value);
+  };
+  if (Array.isArray(row.hosts)) {
+    for (const item of row.hosts) {
+      const rec = asRecord(item);
+      if (!rec) continue;
+      const nested = asRecord(rec.host) ?? rec;
+      add(pickStr(nested.name, nested.displayName, nested.display_name, nested.email));
+    }
+  }
+  const host = asRecord(row.host);
+  if (host) add(pickStr(host.name, host.email));
+  add(pickStr(row.hostName, row.host_name, row.ownerName, row.owner_name));
+  return names;
 }
 
 function toQuery(params: Record<string, string | number | boolean | undefined>): string {
@@ -293,9 +370,12 @@ export function normalizeCrmEventType(
       .slice(0, 48) ||
     `event-${index}`;
   const status = pickStr(row.status, row.state).toLowerCase();
-  const active =
-    pickBool(row.active, row.isActive, row.is_active, row.live) ||
-    (status ? !status.includes("draft") && !status.includes("inactiv") : true);
+  let active = true;
+  if (typeof row.isActive === "boolean") active = row.isActive;
+  else if (typeof row.active === "boolean") active = row.active;
+  else if (typeof row.is_active === "boolean") active = row.is_active;
+  else if (row.live === false) active = false;
+  else if (status.includes("draft") || status.includes("inactiv")) active = false;
   const locationType = pickStr(
     row.locationType,
     row.location_type,
@@ -304,6 +384,7 @@ export function normalizeCrmEventType(
     row.conferencing,
   );
   const location = pickStr(row.location, row.locationDetail, row.location_detail);
+  const hostNames = hostNamesFromEventType(row);
   return {
     id: pickStr(row.id, row.eventTypeId, row.event_type_id) || `et-${index}`,
     name,
@@ -312,12 +393,13 @@ export function normalizeCrmEventType(
       pickNum(row.durationMinutes, row.duration_minutes, row.duration) || 30,
     timezone: pickStr(row.timezone, row.timeZone, row.time_zone) || "Australia/Sydney",
     description: pickStr(row.description, row.details),
-    active: row.active === false ? false : active,
+    active,
     isPublic:
       row.isPublic === false || row.is_public === false
         ? false
         : pickBool(row.isPublic, row.is_public) || undefined,
     hostId: pickStr(row.hostId, row.host_id, row.ownerId, row.owner_id),
+    hostNames,
     locationType: locationType || undefined,
     location: location || undefined,
   };
@@ -373,6 +455,7 @@ export function normalizeCrmBooking(
     asRecord(row.invitee) ??
     asRecord(row.attendee) ??
     {};
+  const host = asRecord(row.host) ?? {};
   return {
     id: pickStr(row.id, row.bookingId, row.booking_id) || `bk-${index}`,
     eventTypeId: pickStr(
@@ -380,7 +463,11 @@ export function normalizeCrmBooking(
       row.event_type_id,
       asRecord(row.eventType)?.id,
     ),
-    hostId: pickStr(row.hostId, row.host_id, asRecord(row.host)?.id),
+    hostId: pickStr(row.hostId, row.host_id, host.id),
+    hostName: pickStr(host.name, row.hostName, row.host_name) || undefined,
+    hostUserId:
+      pickStr(host.userId, host.user_id, host.crmUserId, host.crm_user_id) ||
+      undefined,
     guestName: pickStr(
       row.guestName,
       row.guest_name,
@@ -409,11 +496,17 @@ export function crmEventTypeToBookingPage(
   const meetingViaDetail = eventType.locationType
     ? platformLabelFromLocationType(eventType.locationType)
     : eventType.location;
+  const consultants =
+    eventType.hostNames?.length
+      ? eventType.hostNames
+      : hostName
+        ? [hostName]
+        : undefined;
   return {
     id: eventType.id,
     title: eventType.name,
     slug: eventType.slug,
-    owner: hostName,
+    owner: hostName || consultants?.[0] || "",
     eventType: "Consultation",
     durationMinutes: eventType.durationMinutes || 30,
     bufferMinutes: 0,
@@ -435,6 +528,7 @@ export function crmEventTypeToBookingPage(
     createdAt: "",
     consultationMode: "one_to_one",
     crmEventTypeId: eventType.id,
+    consultants,
     meetingVia,
     meetingViaDetail: meetingViaDetail || undefined,
     location: meetingVia === "in_person" ? eventType.location : undefined,
@@ -448,33 +542,69 @@ export function mergeCrmEventTypePages(
   remote: BookingPage[],
 ): BookingPage[] {
   const byKey = new Map<string, BookingPage>();
-  const take = (page: BookingPage) => {
-    const key = page.crmEventTypeId || page.id;
-    const existing = byKey.get(key) ?? byKey.get(page.id);
+  const keyOf = (page: BookingPage) =>
+    page.crmEventTypeId || page.slug || page.id;
+
+  const preferredId = (primary: BookingPage, secondary: BookingPage) => {
+    if (isUuid(primary.id)) return primary.id;
+    if (isUuid(secondary.id)) return secondary.id;
+    if (primary.crmEventTypeId && primary.id === primary.crmEventTypeId) {
+      return primary.id;
+    }
+    if (secondary.crmEventTypeId && secondary.id === secondary.crmEventTypeId) {
+      return secondary.id;
+    }
+    return primary.crmEventTypeId || primary.id;
+  };
+
+  const take = (page: BookingPage, fromRemote: boolean) => {
+    const key = keyOf(page);
+    const existing =
+      byKey.get(key) ??
+      (page.crmEventTypeId ? byKey.get(page.crmEventTypeId) : undefined) ??
+      byKey.get(page.id) ??
+      (page.slug ? byKey.get(page.slug) : undefined);
     if (existing) {
-      const status: BookingPage["status"] =
-        existing.status === "Live" || page.status === "Live"
-          ? "Live"
-          : page.status;
-      const merged: BookingPage = {
-        ...existing,
-        ...page,
-        id: existing.id,
-        slug: existing.slug || page.slug,
-        status,
-        crmEventTypeId: page.crmEventTypeId || existing.crmEventTypeId,
-      };
-      byKey.set(merged.crmEventTypeId || merged.id, merged);
+      const crmId = page.crmEventTypeId || existing.crmEventTypeId;
+      const merged: BookingPage = fromRemote
+        ? {
+            ...existing,
+            ...page,
+            id: preferredId(page, existing),
+            slug: page.slug || existing.slug,
+            status:
+              page.status === "Live" || existing.status === "Live"
+                ? "Live"
+                : page.status,
+            crmEventTypeId: crmId,
+            notifyPrefs: existing.notifyPrefs ?? page.notifyPrefs,
+            coverImageUrl: existing.coverImageUrl || page.coverImageUrl,
+            consultants:
+              page.consultants?.length ? page.consultants : existing.consultants,
+            appointmentLimits: existing.appointmentLimits ?? page.appointmentLimits,
+            questions: page.questions?.length ? page.questions : existing.questions,
+          }
+        : {
+            ...page,
+            ...existing,
+            id: preferredId(existing, page),
+            crmEventTypeId: existing.crmEventTypeId || page.crmEventTypeId,
+          };
+      byKey.set(keyOf(merged), merged);
       byKey.set(merged.id, merged);
       return;
     }
     byKey.set(key, page);
     byKey.set(page.id, page);
+    if (page.crmEventTypeId) byKey.set(page.crmEventTypeId, page);
   };
-  for (const page of local) take(page);
-  for (const page of remote) take(page);
+
+  for (const page of remote) take(page, true);
+  for (const page of local) take(page, false);
   const unique = new Map<string, BookingPage>();
-  for (const page of byKey.values()) unique.set(page.id, page);
+  for (const page of byKey.values()) {
+    unique.set(page.crmEventTypeId || page.id, page);
+  }
   return [...unique.values()];
 }
 
@@ -496,9 +626,18 @@ export function bookingCrmLinkFromRelated(
 }
 
 export function listCrmEventTypes(): Promise<CrmEventType[]> {
-  return bookingCall("/event-types").then((data) =>
-    extractRecords(data).map(normalizeCrmEventType),
-  );
+  return bookingCall("/event-types").then((data) => {
+    const rows = extractEventTypeRecords(data).map(normalizeCrmEventType);
+    const seen = new Map<string, CrmEventType>();
+    for (const row of rows) {
+      if (!seen.has(row.id)) seen.set(row.id, row);
+    }
+    return [...seen.values()];
+  });
+}
+
+export function eventTypesFromCrmPayload(data: unknown): CrmEventType[] {
+  return extractEventTypeRecords(data).map(normalizeCrmEventType);
 }
 
 const EVENT_TYPE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -617,7 +756,29 @@ export function toCreateEventTypeBody(input: {
 
 function isWhitelistRejection(err: unknown) {
   const message = err instanceof Error ? err.message : String(err ?? "");
-  return /property |should not exist|whitelist|unknown property/i.test(message);
+  return /property |should not exist|whitelist|unknown property|is not allowed/i.test(
+    message,
+  );
+}
+
+function forbiddenKeysFromMessage(message: string): string[] {
+  const keys = new Set<string>();
+  for (const match of message.matchAll(/\(([A-Za-z_][\w]*)\)/g)) {
+    keys.add(match[1]);
+  }
+  for (const match of message.matchAll(/property\s+([A-Za-z_][\w]*)/gi)) {
+    keys.add(match[1]);
+  }
+  return [...keys];
+}
+
+function compactBookingBody(row: Record<string, unknown>) {
+  const body: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) {
+    if (value == null || value === "") continue;
+    body[key] = value;
+  }
+  return body;
 }
 
 export async function createCrmEventType(input: {
@@ -895,7 +1056,7 @@ export function listCrmBookings(filters?: {
   );
 }
 
-export function createCrmBooking(input: {
+export async function createCrmBooking(input: {
   eventTypeId: string;
   startTime: string;
   name: string;
@@ -910,30 +1071,64 @@ export function createCrmBooking(input: {
   companyId?: string;
   dealId?: string;
 }): Promise<CrmBookingRecord> {
-  return bookingCall(
-    "/bookings",
-    jsonInit("POST", {
-      eventTypeId: input.eventTypeId,
-      startTime: input.startTime,
-      startAt: input.startTime,
-      name: input.name,
-      email: input.email,
-      timezone: input.timezone,
-      hostId: input.hostId,
-      phone: input.phone,
-      notes: input.notes,
-      internalNotes: input.internalNotes,
-      leadId: input.leadId,
-      contactId: input.contactId,
-      companyId: input.companyId,
-      dealId: input.dealId,
-      ...(input.leadId
-        ? { relatedEntityType: "LEAD", relatedEntityId: input.leadId }
-        : {}),
-    }),
-  ).then((data) =>
-    normalizeCrmBooking(asRecord(data) ?? extractRecords(data)[0] ?? {}),
-  );
+  const iso = input.startTime;
+  const hostId = input.hostId && isUuid(input.hostId) ? input.hostId : "";
+  const base = compactBookingBody({
+    eventTypeId: input.eventTypeId,
+    startAt: iso,
+    name: input.name,
+    email: input.email,
+    timezone: input.timezone,
+    hostId: hostId || undefined,
+    phone: input.phone?.trim(),
+    notes: input.notes?.trim(),
+    leadId: input.leadId && isUuid(input.leadId) ? input.leadId : undefined,
+    contactId:
+      input.contactId && isUuid(input.contactId) ? input.contactId : undefined,
+    companyId:
+      input.companyId && isUuid(input.companyId) ? input.companyId : undefined,
+    dealId: input.dealId && isUuid(input.dealId) ? input.dealId : undefined,
+  });
+
+  async function post(
+    payload: Record<string, unknown>,
+  ): Promise<CrmBookingRecord> {
+    try {
+      const data = await bookingCall("/bookings", jsonInit("POST", payload));
+      return normalizeCrmBooking(
+        asRecord(data) ?? extractRecords(data)[0] ?? {},
+      );
+    } catch (err) {
+      if (!isWhitelistRejection(err)) throw err;
+      const message = err instanceof Error ? err.message : String(err ?? "");
+      const forbidden = forbiddenKeysFromMessage(message);
+      const next = { ...payload };
+      let changed = false;
+      for (const key of forbidden) {
+        if (key in next) {
+          delete next[key];
+          changed = true;
+        }
+        if (key === "startAt" && !next.startTime) {
+          next.startTime = iso;
+          changed = true;
+        }
+        if (key === "startTime" && !next.startAt) {
+          next.startAt = iso;
+          changed = true;
+        }
+      }
+      if (!changed && "startTime" in next) {
+        delete next.startTime;
+        if (!next.startAt) next.startAt = iso;
+        changed = true;
+      }
+      if (!changed) throw err;
+      return post(next);
+    }
+  }
+
+  return post(base);
 }
 
 export function linkCrmBooking(
@@ -957,7 +1152,7 @@ export function rescheduleCrmBooking(
 ): Promise<unknown> {
   return bookingCall(
     `/bookings/${bookingId}/reschedule`,
-    jsonInit("POST", { startTime, startAt: startTime }),
+    jsonInit("POST", { startAt: startTime }),
   );
 }
 

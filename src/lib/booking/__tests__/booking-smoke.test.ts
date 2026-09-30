@@ -3,7 +3,7 @@ import {
   smokeBookingMock,
   smokeBookingWiring,
 } from "@/lib/booking/booking-smoke";
-import { crmEventTypeIdOf, mergeCrmEventTypePages } from "@/lib/booking/api";
+import { crmEventTypeIdOf, eventTypesFromCrmPayload, mergeCrmEventTypePages } from "@/lib/booking/api";
 import { WEEKDAYS, type BookingPage } from "@/lib/booking/types";
 
 describe("native booking API smoke (CI)", () => {
@@ -56,8 +56,103 @@ describe("native booking API smoke (CI)", () => {
     const merged = mergeCrmEventTypePages([local], [remote]);
     expect(merged).toHaveLength(1);
     expect(merged[0]?.title).toBe("Discovery");
-    expect(merged[0]?.id).toBe("local-1");
+    expect(merged[0]?.id).toBe("et-1");
     expect(merged[0]?.crmEventTypeId).toBe("et-1");
+  });
+
+  it("keeps every remote consultation when listing the workspace API", () => {
+    const extra: BookingPage = {
+      id: "et-2",
+      title: "Follow up",
+      slug: "follow-up",
+      owner: "Ada",
+      eventType: "Consultation",
+      durationMinutes: 45,
+      bufferMinutes: 0,
+      timezone: "Australia/Sydney",
+      description: "",
+      availability: WEEKDAYS.map((day) => ({
+        day,
+        enabled: true,
+        start: "09:00",
+        end: "17:00",
+      })),
+      questions: [],
+      confirmationTemplate: "",
+      reminderTemplate: "",
+      status: "Draft",
+      views: 0,
+      bookingsCount: 0,
+      cancelRate: 0,
+      createdAt: "",
+      crmEventTypeId: "et-2",
+    };
+    const local: BookingPage = {
+      id: "local-1",
+      title: "Local",
+      slug: "discovery",
+      owner: "Ada",
+      eventType: "Consultation",
+      durationMinutes: 30,
+      bufferMinutes: 0,
+      timezone: "Australia/Sydney",
+      description: "",
+      availability: WEEKDAYS.map((day) => ({
+        day,
+        enabled: true,
+        start: "09:00",
+        end: "17:00",
+      })),
+      questions: [],
+      confirmationTemplate: "",
+      reminderTemplate: "",
+      status: "Live",
+      views: 0,
+      bookingsCount: 0,
+      cancelRate: 0,
+      createdAt: "",
+      crmEventTypeId: "et-1",
+    };
+    const remote: BookingPage = {
+      ...local,
+      id: "et-1",
+      title: "Discovery",
+      slug: "discovery",
+      crmEventTypeId: "et-1",
+    };
+    const merged = mergeCrmEventTypePages([local], [remote, extra]);
+    expect(merged.map((row) => row.crmEventTypeId).sort()).toEqual(["et-1", "et-2"]);
+    expect(merged).toHaveLength(2);
+  });
+
+  it("parses workspace event-type lists without treating hosts as rows", () => {
+    const rows = eventTypesFromCrmPayload({
+      items: [
+        {
+          id: "et-1",
+          name: "Intro",
+          slug: "intro",
+          durationMinutes: 30,
+          isActive: true,
+          hosts: [
+            { host: { id: "h-1", name: "Ada" } },
+            { host: { id: "h-2", name: "Lin" } },
+          ],
+        },
+        {
+          id: "et-2",
+          name: "Review",
+          slug: "review",
+          durationMinutes: 45,
+          isActive: false,
+        },
+      ],
+      metadata: { totalItems: 2 },
+    });
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.name)).toEqual(["Intro", "Review"]);
+    expect(rows[0]?.hostNames).toEqual(["Ada", "Lin"]);
+    expect(rows[1]?.active).toBe(false);
   });
 
   it("only treats UUID event types as CRM slot sources", () => {

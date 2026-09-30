@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { sendViaSendGrid } from "@/lib/emails/sendgrid-server";
+import {
+  sendViaSendGrid,
+  sendgridConfigured,
+} from "@/lib/emails/sendgrid-server";
 
 function sameSiteRequest(request: Request): boolean {
   const site = request.headers.get("sec-fetch-site");
@@ -48,6 +51,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Message is too large" }, { status: 413 });
   }
 
+  if (!sendgridConfigured()) {
+    return NextResponse.json({ ok: true, delivered: false });
+  }
+
   try {
     await sendViaSendGrid({
       to: [to],
@@ -59,7 +66,7 @@ export async function POST(request: Request) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Could not send email";
-    const status = /not configured/i.test(message) ? 503 : 502;
-    return NextResponse.json({ error: message }, { status });
+    console.error("[book/confirm-mail]", message);
+    return NextResponse.json({ ok: true, delivered: false });
   }
 }

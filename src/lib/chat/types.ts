@@ -54,9 +54,20 @@ export interface ChatContact {
 }
 
 /** The signed-in user, not a hardcoded demo persona. */
+export function chatProfileLabel() {
+  const actor = getRulesActor();
+  const name = actor.name.trim();
+  if (name) return name;
+  const email = actor.email?.trim() ?? "";
+  if (!email) return "You";
+  const local = email.includes("@") ? email.split("@")[0] : email;
+  const spaced = local.replace(/[._-]+/g, " ").trim();
+  return spaced || email;
+}
+
 export const CURRENT_CHAT_USER = {
   get name() {
-    return getRulesActor().name;
+    return chatProfileLabel();
   },
   status: "Active" as const,
 };

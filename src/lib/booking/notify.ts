@@ -27,9 +27,8 @@ import {
   type Booking,
   type BookingPage,
 } from "@/lib/booking/types";
-import {
-  bookingConfirmEmailHtml,
-} from "@/lib/booking/guest-confirm-email";
+import { bookingConfirmEmailHtml } from "@/lib/booking/guest-confirm-email";
+import { silentRequest } from "@/lib/notify/fetch-notifier";
 import {
   enabledNotifyChannels,
   interpolateNotify,
@@ -107,24 +106,24 @@ async function sendEmailSafe(
   // Public /book must not depend on a host CRM cookie — SendGrid via a
   // dedicated route. Failures used to be swallowed by sendEmailDemoLive.
   if (onPublicBook && typeof window !== "undefined") {
-    const res = await fetch("/api/book/confirm-mail", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        to: email.trim(),
-        subject: subject.trim() || "Appointment update",
-        html: opts?.html?.trim() || body.trim() || subject,
-        text: opts?.text?.trim() || body.trim() || subject,
+    const res = await fetch(
+      "/api/book/confirm-mail",
+      silentRequest({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: email.trim(),
+          subject: subject.trim() || "Appointment update",
+          html: opts?.html?.trim() || body.trim() || subject,
+          text: opts?.text?.trim() || body.trim() || subject,
+        }),
       }),
-    });
-    if (!res.ok) {
-      const json = (await res.json().catch(() => ({}))) as { error?: string };
-      throw new Error(
-        json.error ||
-          (res.status === 503
-            ? "Confirmation email is not configured on this server (SendGrid)."
-            : "Could not send the confirmation email."),
-      );
+    );
+    const json = (await res.json().catch(() => ({}))) as {
+      delivered?: unknown;
+    };
+    if (!res.ok || json.delivered !== "sendgrid") {
+      throw new Error("Could not send the confirmation email.");
     }
     return;
   }
@@ -317,12 +316,9 @@ export async function dispatchBookingNotifications(input: {
   const emailFailure = emailSettled.find(
     (row): row is PromiseRejectedResult => row.status === "rejected",
   );
-  const emailError =
-    emailFailure?.reason instanceof Error
-      ? emailFailure.reason.message
-      : emailFailure
-        ? String(emailFailure.reason)
-        : undefined;
+  const emailError = emailFailure
+    ? "Could not send the confirmation email."
+    : undefined;
   return { channels, emailError };
 }
 
