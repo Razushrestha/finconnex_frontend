@@ -10,15 +10,15 @@ export const LEAD_CARD_HYDRATE_KEY_OWNERS: Record<
   (typeof LEAD_CARD_HYDRATE_KEYS)[number],
   string
 > = {
-  "sales:leads:board:v6": "src/lib/leads/store.ts",
+  "sales:leads:board:v7": "src/lib/leads/store.ts",
   "sales:leads:activity-extras:v1": "src/lib/leads/lead-extras-store.ts",
-  "activities:calls:board:v1": "src/lib/calls/store.ts",
-  "activities:meetings:list:v1": "src/lib/meetings/store.ts",
-  "activities:messages:list:v1": "src/lib/messages/store.ts",
-  "activities:emails:list:v1": "src/lib/emails/store.ts",
-  "activities:notes:list:v1": "src/lib/notes/store.ts",
-  "activities:attachments:list:v1": "src/lib/attachments/store.ts",
-  "activities:tasks:board:v2": "src/lib/tasks/store.ts",
+  "activities:calls:board:v4": "src/lib/calls/store.ts",
+  "activities:meetings:list:v4": "src/lib/meetings/store.ts",
+  "activities:messages:list:v3": "src/lib/messages/store.ts",
+  "activities:emails:list:v4": "src/lib/emails/store.ts",
+  "activities:notes:list:v3": "src/lib/notes/store.ts",
+  "activities:attachments:list:v2": "src/lib/attachments/store.ts",
+  "activities:tasks:board:v6": "src/lib/tasks/store.ts",
   "settings:values:v1": "src/lib/settings/settings-store.ts",
   "settings:custom-fields:v1": "src/lib/custom-fields/store.ts",
 };

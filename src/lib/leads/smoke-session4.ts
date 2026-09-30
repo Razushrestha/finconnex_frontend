@@ -67,6 +67,7 @@ export function runSmokeSession4() {
   if (over.unrepliedThresholdHours !== 48) fail("threshold not parsed");
 
   const saved = saveLeadCardSettings({
+    ...DEFAULT_LEAD_CARD_SETTINGS,
     showOwnerAvatar: true,
     dynamicFieldKeys: ["phone", "source", "estimatedValue", "company", "email"],
     unrepliedThresholdHours: 12,
@@ -100,6 +101,7 @@ export function runSmokeSession4() {
 
   const on = buildLeadCardViewModelFromCard(william.card, william.status, {
     cardSettings: {
+      ...DEFAULT_LEAD_CARD_SETTINGS,
       showOwnerAvatar: true,
       dynamicFieldKeys: ["phone", "source"],
       unrepliedThresholdHours: 24,

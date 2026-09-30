@@ -61,10 +61,12 @@ export function isMailboxWeOwn(value: string) {
 
 export function isOutbound(email: Email) {
   if (email.outbound === true) return true;
+  if (email.outbound === false) return false;
   if (isMailboxWeOwn(email.from)) return true;
   if (email.to.some((addr) => isMailboxWeOwn(addr)) && !isMailboxWeOwn(email.from)) {
     return false;
   }
+  if (!email.from.trim()) return false;
   return email.status === "Sent";
 }
 

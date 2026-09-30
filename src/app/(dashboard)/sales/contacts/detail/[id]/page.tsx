@@ -10,7 +10,10 @@ import {
   getCrmContact,
   tryCrmContact,
 } from "@/lib/contacts/api";
-import { mergeCrmContactsIntoBoard } from "@/lib/contacts/store";
+import {
+  findContactById,
+  mergeCrmContactsIntoBoard,
+} from "@/lib/contacts/store";
 import { onRulesChange } from "@/lib/rules";
 
 export default function ContactDetailPage() {
@@ -25,6 +28,10 @@ export default function ContactDetailPage() {
   useEffect(() => {
     const id = params.id;
     if (!id) return;
+    if (findContactById(id)) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     void tryCrmContact(async () => {

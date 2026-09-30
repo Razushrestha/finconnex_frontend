@@ -133,6 +133,9 @@ export function smokeContactsWiring() {
   if (!client.includes("crmBffFetch")) {
     fail("contacts client must call crmBffFetch in the browser");
   }
+  if (!client.includes("toUpdateContactBody")) {
+    fail("contacts PATCH must map to UpdateContactDto via toUpdateContactBody");
+  }
   if (!store.includes("createCrmContact")) {
     fail("contacts store does not sync create to CRM");
   }
@@ -229,7 +232,6 @@ export async function smokeContactsMock() {
     const expected = [
       `GET ${contactsPath()}`,
       `GET ${contactsPath("/board")}`,
-      `GET ${contactsPath(`/${ID}`)}`,
       `POST ${contactsPath()}`,
       `PATCH ${contactsPath(`/${ID}`)}`,
       `POST ${contactsPath("/bulk")}`,

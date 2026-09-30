@@ -226,8 +226,14 @@ export function smokeTasksWiring() {
   if (api.includes("if (patch.status) body.status")) {
     fail("updateCrmTask must not PATCH status (API rejects it on UpdateTaskDto)");
   }
-  if (!api.includes("await applyCrmTaskStatus(id, status)")) {
+  if (!api.includes("await applyCrmTaskStatus(liveId, status)")) {
     fail("syncTaskStatus must use lifecycle endpoints, not PATCH status");
+  }
+  if (!api.includes("if (!isUuid(id)) return null")) {
+    fail("getCrmTask must skip hosted GET for local task-… ids");
+  }
+  if (!api.includes("export async function promoteLocalTaskToCrm")) {
+    fail("tasks client missing promoteLocalTaskToCrm");
   }
 
   const bff = readSrc("src/lib/auth/crm-bff-proxy.ts");
@@ -248,6 +254,8 @@ export function smokeTasksWiring() {
     'path: "/tasks/bulk-delete"',
     'path: "/tasks/bulk-restore"',
     'path: "/tasks/:id/complete"',
+    'path: "/tasks/:id/start"',
+    'path: "/tasks/:id/defer"',
     'path: "/tasks/:id/reopen"',
     'path: "/tasks/:id/cancel"',
     'path: "/tasks/:id/duplicate"',
@@ -260,6 +268,8 @@ export function smokeTasksWiring() {
     'path: "/workspaces/:workspaceId/tasks"',
     'path: "/workspaces/:workspaceId/tasks/today"',
     'path: "/workspaces/:workspaceId/tasks/:id/complete"',
+    'path: "/workspaces/:workspaceId/tasks/:id/start"',
+    'path: "/workspaces/:workspaceId/tasks/:id/defer"',
   ]) {
     if (!catalog.includes(fragment)) {
       fail(`endpoint catalog missing ${fragment}`);

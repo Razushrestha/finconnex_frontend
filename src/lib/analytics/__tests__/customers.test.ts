@@ -5,7 +5,7 @@ import { computeCustomerAnalytics } from "@/lib/analytics/customers";
 const july = new Date(2026, 6, 23, 12, 0, 0);
 
 describe("customer analytics", () => {
-  beforeEach(() => seedCrmFixtures());
+  beforeEach(() => seedCrmFixtures(july));
 
   it("builds KPIs, funnel, sources, and lifetime table from CRM stores", () => {
     const data = computeCustomerAnalytics(

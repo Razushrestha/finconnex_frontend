@@ -10,7 +10,6 @@ import {
   Tag,
   ShieldCheck,
   Download,
-  Pencil,
   ChevronDown,
   Copy,
 } from "lucide-react";
@@ -68,11 +67,7 @@ import { BOARD_PAGE } from "@/lib/layout";
 import { SORT_OPTIONS } from "../leads/page";
 import { defaultActorName } from "@/lib/rules/actor";
 import { bindKanbanStageTitle } from "@/lib/kanban/stage-titles";
-import {
-  type KanbanField,
-  type KanbanViewConfig,
-  KanbanViewSettingsModal,
-} from "@/components/common/KanbanViewControls";
+import { type KanbanViewConfig } from "@/components/common/KanbanViewControls";
 
 export interface PipelineOption {
   label: string;
@@ -88,16 +83,6 @@ const DEAL_SCOPE_OPTIONS: ScopeOption[] = [
   { label: "All Deals", value: "all" },
   { label: "My Deals", value: "mine" },
   { label: "Follower Deals", value: "follower" },
-];
-
-const DEAL_FIELDS: KanbanField[] = [
-  { id: "dealName", label: "Deal Name", required: true },
-  { id: "loanAmount", label: "Loan Amount" },
-  { id: "closeDate", label: "Close Date" },
-  { id: "broker", label: "Broker" },
-  { id: "dealOwner", label: "Deal Owner" },
-  { id: "lender", label: "Lender" },
-  { id: "tag", label: "Tag" },
 ];
 
 export default function DealsPage() {
@@ -119,7 +104,6 @@ export default function DealsPage() {
   const [activeSortDirection, setActiveSortDirection] =
     useState<SortDirection>("asc");
 
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
@@ -211,10 +195,7 @@ export default function DealsPage() {
 
   const activeViewConfig = viewConfigs[activePipeline];
 
-  function updateActiveViewConfig(
-    patch: Partial<KanbanViewConfig>,
-    closeSettings = false,
-  ) {
+  function updateActiveViewConfig(patch: Partial<KanbanViewConfig>) {
     setViewConfigs((prev) => {
       const next = {
         ...prev,
@@ -233,7 +214,6 @@ export default function DealsPage() {
       }
       return next;
     });
-    if (closeSettings) setIsSettingsOpen(false);
   }
 
   function applyStageVisibility(
@@ -633,51 +613,7 @@ export default function DealsPage() {
               </div>
             )}
           </div>
-
-          <button
-            type="button"
-            onClick={() => setIsSettingsOpen(true)}
-            aria-label="Edit Kanban view settings"
-            className="rounded-full border border-slate-200 bg-white p-1.5 text-slate-400 shadow-sm hover:text-slate-600 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:text-zinc-300"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
         </div>
-      )}
-      {isSettingsOpen && (
-        <KanbanViewSettingsModal
-          view={{
-            ...activeViewConfig,
-            selectedStageIds: visibleColumnIds,
-          }}
-          availableFields={DEAL_FIELDS}
-          availableStages={dealAvailableStages}
-          categorizeByOptions={["Stage", "Lender", "Broker"]}
-          aggregateByOptions={["Loan Amount", "Deal Count", "Commission"]}
-          headerStyleOptions={["Multi Colour", "Single Colour", "None"]}
-          onClose={() => setIsSettingsOpen(false)}
-          onSave={(next) => {
-            const stageIds =
-              next.selectedStageIds?.length
-                ? next.selectedStageIds
-                : visibleColumnIds;
-            applyStageVisibility(stageIds);
-            updateActiveViewConfig(
-              {
-                ...next,
-                selectedStageIds: stageIds,
-                stageLabels: {
-                  ...(activeViewConfig.stageLabels ?? {}),
-                  ...(next.stageLabels ?? {}),
-                },
-              },
-              true,
-            );
-          }}
-          onDelete={() => {
-            setIsSettingsOpen(false);
-          }}
-        />
       )}
 
       <div className="mt-3 flex min-h-0 flex-1 items-stretch gap-4 overflow-hidden">

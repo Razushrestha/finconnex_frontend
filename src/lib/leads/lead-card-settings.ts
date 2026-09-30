@@ -19,6 +19,38 @@ import {
   parseCustomCardFieldKey,
 } from "@/lib/custom-fields/types";
 import { listActiveCustomFieldsForEntity } from "@/lib/custom-fields/store";
+import { MORTGAGE_PIPELINE_STAGES } from "@/lib/pipeline-sla/types";
+import { stageColumnId } from "@/lib/pipeline-sla/board";
+
+/** Mirrors Kanban header palette (Settings → Lead Card). */
+export const LEAD_CARD_HEADER_PALETTE = [
+  "#3B82F6",
+  "#06B6D4",
+  "#8B5CF6",
+  "#EC4899",
+  "#F59E0B",
+  "#F97316",
+  "#10B981",
+  "#14B8A6",
+  "#EF4444",
+  "#64748B",
+] as const;
+
+export const DEFAULT_LEAD_CARD_HEADER_COLOR = "#6366F1";
+
+export type LeadCardHeaderStyle = "Multi Colour" | "Single Colour" | "None";
+
+function defaultMultiHeaderColors(): Record<string, string> {
+  return MORTGAGE_PIPELINE_STAGES.reduce(
+    (acc, stage, i) => {
+      acc[stageColumnId(stage)] =
+        LEAD_CARD_HEADER_PALETTE[i % LEAD_CARD_HEADER_PALETTE.length] ??
+        DEFAULT_LEAD_CARD_HEADER_COLOR;
+      return acc;
+    },
+    {} as Record<string, string>,
+  );
+}
 
 export const LEAD_CARD_SETTINGS_KEY = "crm-configuration/lead-card";
 export const LEAD_CARD_SETTINGS_PATH = "/settings/crm-configuration/lead-card";
@@ -60,12 +92,19 @@ export interface LeadCardSettings {
   dynamicFieldKeys: LeadCardFieldKey[];
   /** Hours before unreplied SMS/email counts as broken (default 24). */
   unrepliedThresholdHours: number;
+  /** Kanban column header style — configured in Settings, not on the board. */
+  headerStyle: LeadCardHeaderStyle | string;
+  singleHeaderColor: string;
+  multiHeaderColors: Record<string, string>;
 }
 
 export const DEFAULT_LEAD_CARD_SETTINGS: LeadCardSettings = {
   showOwnerAvatar: OWNER_AVATAR_DEFAULT,
   dynamicFieldKeys: ["company", "email", "phone"],
   unrepliedThresholdHours: UNREPLIED_THRESHOLD_HOURS_DEFAULT,
+  headerStyle: "Multi Colour",
+  singleHeaderColor: DEFAULT_LEAD_CARD_HEADER_COLOR,
+  multiHeaderColors: defaultMultiHeaderColors(),
 };
 
 const FIELD_KEY_SET = new Set<string>(
@@ -116,6 +155,33 @@ export function settingsValuesToLeadCard(
   values: SettingsValues,
 ): LeadCardSettings {
   const hours = Number(values.unrepliedThresholdHours);
+  const headerStyle =
+    typeof values.headerStyle === "string" && values.headerStyle.trim()
+      ? values.headerStyle.trim()
+      : DEFAULT_LEAD_CARD_SETTINGS.headerStyle;
+  const singleHeaderColor =
+    typeof values.singleHeaderColor === "string" &&
+    values.singleHeaderColor.trim()
+      ? values.singleHeaderColor.trim()
+      : DEFAULT_LEAD_CARD_SETTINGS.singleHeaderColor;
+  let multiHeaderColors = { ...DEFAULT_LEAD_CARD_SETTINGS.multiHeaderColors };
+  if (typeof values.multiHeaderColors === "string" && values.multiHeaderColors) {
+    try {
+      const parsed = JSON.parse(values.multiHeaderColors) as Record<
+        string,
+        unknown
+      >;
+      if (parsed && typeof parsed === "object") {
+        for (const [key, value] of Object.entries(parsed)) {
+          if (typeof value === "string" && value.trim()) {
+            multiHeaderColors[key] = value.trim();
+          }
+        }
+      }
+    } catch {
+      /* keep defaults */
+    }
+  }
   return {
     showOwnerAvatar: Boolean(values.showOwnerAvatar),
     dynamicFieldKeys: parseFieldKeys(values.dynamicFields),
@@ -123,6 +189,9 @@ export function settingsValuesToLeadCard(
       Number.isFinite(hours) && hours > 0
         ? Math.min(168, Math.round(hours))
         : DEFAULT_LEAD_CARD_SETTINGS.unrepliedThresholdHours,
+    headerStyle,
+    singleHeaderColor,
+    multiHeaderColors,
   };
 }
 
@@ -133,12 +202,20 @@ export function leadCardSettingsToValues(
     showOwnerAvatar: settings.showOwnerAvatar,
     dynamicFields: settings.dynamicFieldKeys.join(","),
     unrepliedThresholdHours: settings.unrepliedThresholdHours,
+    headerStyle: settings.headerStyle,
+    singleHeaderColor: settings.singleHeaderColor,
+    multiHeaderColors: JSON.stringify(settings.multiHeaderColors ?? {}),
   };
 }
 
 export function loadLeadCardSettings(): LeadCardSettings {
   const saved = loadSettingsValues(LEAD_CARD_SETTINGS_KEY);
-  if (!Object.keys(saved).length) return { ...DEFAULT_LEAD_CARD_SETTINGS };
+  if (!Object.keys(saved).length) {
+    return {
+      ...DEFAULT_LEAD_CARD_SETTINGS,
+      multiHeaderColors: defaultMultiHeaderColors(),
+    };
+  }
   return settingsValuesToLeadCard({
     ...leadCardSettingsToValues(DEFAULT_LEAD_CARD_SETTINGS),
     ...saved,
@@ -152,6 +229,13 @@ export function saveLeadCardSettings(settings: LeadCardSettings) {
       .filter(isLeadCardFieldKey)
       .slice(0, MAX_DYNAMIC_FIELDS),
     unrepliedThresholdHours: settings.unrepliedThresholdHours,
+    headerStyle: settings.headerStyle || "Multi Colour",
+    singleHeaderColor:
+      settings.singleHeaderColor || DEFAULT_LEAD_CARD_HEADER_COLOR,
+    multiHeaderColors: {
+      ...defaultMultiHeaderColors(),
+      ...(settings.multiHeaderColors ?? {}),
+    },
   };
   saveSettingsValues(
     LEAD_CARD_SETTINGS_KEY,

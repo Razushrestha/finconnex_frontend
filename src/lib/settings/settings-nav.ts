@@ -131,7 +131,7 @@ export const SETTINGS_CONTROL_PANEL: SettingsNavGroup[] = [
       },
       {
         title: "Lead card",
-        blurb: "Kanban card layout",
+        blurb: "Kanban card layout & header colours",
         href: "/settings/crm-configuration/lead-card",
         live: true,
       },
@@ -289,6 +289,12 @@ export const SETTINGS_CONTROL_PANEL: SettingsNavGroup[] = [
         title: "Recycle bin",
         blurb: "Restore deleted records",
         href: "/settings/data-management/recycle-bin",
+        live: true,
+      },
+      {
+        title: "Rules",
+        blurb: "Integrity, audit, recycle, and permissions",
+        href: "/settings/data-management/rules",
         live: true,
       },
       {

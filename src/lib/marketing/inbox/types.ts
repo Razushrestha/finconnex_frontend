@@ -1,5 +1,7 @@
 /** SRS §10.4 Unified Social Inbox */
 
+import { LEAD_SOURCES } from "@/lib/leads/types";
+
 export type InboxChannel =
   | "Facebook Messenger"
   | "Instagram DM"
@@ -24,6 +26,24 @@ export const INBOX_CHANNEL_LABELS: Record<InboxChannel, string> = {
 
 export function inboxChannelLabel(channel: InboxChannel) {
   return INBOX_CHANNEL_LABELS[channel];
+}
+
+/** Same names as the lead source picker. */
+export const INBOX_CHANNEL_FILTER_OPTIONS = [...LEAD_SOURCES] as const;
+
+export type InboxChannelFilterOption =
+  (typeof INBOX_CHANNEL_FILTER_OPTIONS)[number];
+
+export function conversationMatchesChannelFilter(
+  channel: InboxChannel,
+  filter: InboxChannelFilterOption | "All",
+) {
+  if (filter === "All") return true;
+  if ((channel as string) === filter) return true;
+  if (filter === "Facebook" && channel === "Facebook Messenger") return true;
+  if (filter === "Instagram" && channel === "Instagram DM") return true;
+  if (filter === "Phone" && channel === "SMS") return true;
+  return false;
 }
 
 export const INBOX_STATUSES: InboxStatus[] = ["Open", "Pending", "Resolved"];

@@ -198,9 +198,6 @@ export function BookingRulesStep({
     <div className="mx-auto w-full max-w-[920px] pb-8">
       <div className="rounded-xl border border-[#E5E7EB] bg-white px-5 py-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)] sm:px-8 sm:py-7">
         <h1 className="text-[18px] font-bold text-slate-900">Booking rules</h1>
-        <p className="mt-1 text-[13px] text-slate-500">
-          Control how and when meetings can be booked.
-        </p>
 
         <div className="mt-6 grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
           <div>

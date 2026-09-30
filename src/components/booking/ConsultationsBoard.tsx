@@ -27,6 +27,10 @@ import {
 import type { ConsultationMode } from "@/lib/booking/types";
 import { AssignConsultantsStep } from "@/components/booking/AssignConsultantsStep";
 import {
+  AvailabilityLimitsStep,
+  type AvailabilityLimitsValues,
+} from "@/components/booking/AvailabilityLimitsStep";
+import {
   BookingAdditionalSettingsStep,
   type AdditionalSettingsValues,
 } from "@/components/booking/BookingAdditionalSettingsStep";
@@ -51,6 +55,7 @@ import {
 import {
   ConsultationWizardLayout,
   consultationSetupIndex,
+  type AvailabilityPanelId,
   type ConsultationSetupStepId,
 } from "@/components/booking/ConsultationWizardLayout";
 import { ShareConsultationModal } from "@/components/booking/ShareConsultationModal";
@@ -145,6 +150,15 @@ export function ConsultationsBoard() {
   const [assignedPriorities, setAssignedPriorities] = useState<
     Record<string, ConsultantPriority>
   >({});
+  const [assignedUserIds, setAssignedUserIds] = useState<
+    Record<string, string>
+  >({});
+  const [availabilityHostIds, setAvailabilityHostIds] = useState<string[]>([]);
+  const [availabilityStep, setAvailabilityStep] = useState(false);
+  const [availabilityPanel, setAvailabilityPanel] =
+    useState<AvailabilityPanelId>("dates");
+  const [availabilityValues, setAvailabilityValues] =
+    useState<AvailabilityLimitsValues | null>(null);
   const [rulesStep, setRulesStep] = useState(false);
   const [rulesValues, setRulesValues] = useState<BookingRulesValues | null>(
     null,
@@ -165,6 +179,7 @@ export function ConsultationsBoard() {
     if (notifyStep) return "notify";
     if (formStep) return "form";
     if (rulesStep) return "rules";
+    if (availabilityStep) return "availability";
     if (assignStep) return "consultants";
     return "details";
   }
@@ -174,10 +189,11 @@ export function ConsultationsBoard() {
     if (index < 0) return;
     if (!force && index > wizardFurthest) return;
     setAssignStep(index >= 1);
-    setRulesStep(index >= 2);
-    setFormStep(index >= 3);
-    setNotifyStep(index >= 4);
-    setSettingsStep(index >= 5);
+    setAvailabilityStep(index >= 2);
+    setRulesStep(index >= 3);
+    setFormStep(index >= 4);
+    setNotifyStep(index >= 5);
+    setSettingsStep(index >= 6);
   }
 
   function reachSetupStep(id: ConsultationSetupStepId) {
@@ -193,6 +209,13 @@ export function ConsultationsBoard() {
           current={currentSetupStep()}
           furthest={wizardFurthest}
           onSelect={goToSetupStep}
+          availabilityPanel={availabilityPanel}
+          onAvailabilityPanel={(panel) => {
+            setAvailabilityPanel(panel);
+            if (currentSetupStep() !== "availability") {
+              goToSetupStep("availability");
+            }
+          }}
         >
           {node}
         </ConsultationWizardLayout>
@@ -206,8 +229,13 @@ export function ConsultationsBoard() {
     setFormStep(false);
     setRulesStep(false);
     setAssignStep(false);
+    setAvailabilityStep(false);
+    setAvailabilityPanel("dates");
+    setAvailabilityValues(null);
     setAssignedConsultants([]);
     setAssignedPriorities({});
+    setAssignedUserIds({});
+    setAvailabilityHostIds([]);
     setRulesValues(null);
     setFormValues(null);
     setNotifyValues(null);
@@ -264,12 +292,26 @@ export function ConsultationsBoard() {
       coverImageUrl: detailsValues.coverImageUrl,
       currency: "AUD",
       description: "",
-      availability: WEEKDAYS.map((day) => ({
-        day,
-        enabled: day !== "Saturday" && day !== "Sunday",
-        start: "09:00",
-        end: "17:00",
-      })),
+      availability:
+        availabilityValues?.defaultHours && availabilityValues.weekly.length
+          ? availabilityValues.weekly
+          : WEEKDAYS.map((day) => ({
+              day,
+              enabled: day !== "Saturday" && day !== "Sunday",
+              start: "09:00",
+              end: "17:00",
+            })),
+      appointmentLimits: availabilityValues
+        ? {
+            defaultHours: availabilityValues.defaultHours,
+            overrideUserHours: availabilityValues.overrideUserHours,
+            userSpecificHours: availabilityValues.userSpecificHours,
+            slotsPerEvent: availabilityValues.slotsPerEvent,
+            slotsPerCustomer: availabilityValues.slotsPerCustomer,
+            customLimits: availabilityValues.customLimits,
+            userHours: availabilityValues.userHours,
+          }
+        : undefined,
       questions: (form?.fields ?? [])
         .filter((f) => !f.hidden)
         .map((f) => ({
@@ -307,6 +349,7 @@ export function ConsultationsBoard() {
           detailsValues.meetingPlace === "offline"
             ? detailsValues.locationDetail
             : detailsValues.phoneDetail,
+        hostIds: availabilityHostIds,
       }),
     );
     upsertBookingPage(
@@ -403,10 +446,38 @@ export function ConsultationsBoard() {
       <BookingRulesStep
         durationMinutes={detailsValues.durationMinutes}
         initial={rulesValues}
-        onBack={() => goToSetupStep("consultants")}
+        onBack={() => goToSetupStep("availability")}
         onSave={(rules) => {
           setRulesValues(rules);
           reachSetupStep("form");
+        }}
+      />,
+    );
+  }
+
+  if (detailsChoice && availabilityStep && detailsValues) {
+    return wrapSetup(
+      <AvailabilityLimitsStep
+        panel={availabilityPanel}
+        consultants={assignedConsultants}
+        consultantUserIds={assignedUserIds}
+        initial={availabilityValues}
+        onChange={setAvailabilityValues}
+        onBack={() => {
+          if (availabilityPanel === "limits") {
+            setAvailabilityPanel("dates");
+            return;
+          }
+          goToSetupStep("consultants");
+        }}
+        onNext={(values, hostIds) => {
+          setAvailabilityValues(values);
+          setAvailabilityHostIds(hostIds);
+          if (availabilityPanel === "dates") {
+            setAvailabilityPanel("limits");
+            return;
+          }
+          reachSetupStep("rules");
         }}
       />,
     );
@@ -418,10 +489,12 @@ export function ConsultationsBoard() {
         choice={detailsChoice}
         consultationName={detailsValues.name}
         onBack={() => goToSetupStep("details")}
-        onCreate={(consultants, priorities) => {
+        onCreate={(consultants, priorities, userIds) => {
           setAssignedConsultants(consultants);
           setAssignedPriorities(priorities);
-          reachSetupStep("rules");
+          setAssignedUserIds(userIds);
+          setAvailabilityPanel("dates");
+          reachSetupStep("availability");
         }}
       />,
     );
@@ -607,36 +680,26 @@ export function ConsultationsBoard() {
 const CALENDAR_TYPES: {
   mode: ConsultationMode;
   title: string;
-  description: string;
-  example: string;
   icon: typeof Users;
 }[] = [
   {
     mode: "one_to_one",
     title: "Personal booking",
-    description: "Schedules one-on-one meetings with a specific team member.",
-    example: "Client meetings, private consultations.",
     icon: Users,
   },
   {
     mode: "one_to_one",
     title: "Round robin",
-    description: "Distributes appointments among team members in a rotating order.",
-    example: "Sales calls, onboarding sessions.",
     icon: RefreshCw,
   },
   {
     mode: "group",
     title: "Class booking",
-    description: "One host meets with multiple participants.",
-    example: "Webinars, group training, online classes.",
     icon: Presentation,
   },
   {
     mode: "collective",
     title: "Collective booking",
-    description: "Multiple hosts meet with one participant.",
-    example: "Panel interviews, committee reviews.",
     icon: UsersRound,
   },
 ];
@@ -645,8 +708,6 @@ const MORE_CALENDAR_TYPES: typeof CALENDAR_TYPES = [
   {
     mode: "resource",
     title: "Resource booking",
-    description: "Reserve a room, desk, or piece of equipment.",
-    example: "Conference rooms, equipment rentals.",
     icon: CalendarDays,
   },
 ];
@@ -687,10 +748,6 @@ function ChooseCalendarTypeModal({
           >
             Choose calendar type
           </h2>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-slate-500">
-            Select a calendar type to set up your calendar and customize how
-            appointments are scheduled.
-          </p>
         </div>
 
         <div className="min-h-0 overflow-y-auto px-5 py-5 sm:px-7 sm:pb-6">
@@ -702,18 +759,12 @@ function ChooseCalendarTypeModal({
                   key={t.title}
                   type="button"
                   onClick={() => onSelect({ mode: t.mode, title: t.title })}
-                  className="flex min-h-[118px] cursor-pointer items-start gap-3 rounded-xl border border-[#E5E7EB] bg-white px-4 py-4 text-left transition-colors hover:border-[#5A32A3]/40 hover:bg-[#F3ECFB] focus-visible:ring-2 focus-visible:ring-[#5A32A3]/25 focus-visible:outline-none"
+                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#E5E7EB] bg-white px-4 py-4 text-left transition-colors hover:border-[#5A32A3]/40 hover:bg-[#F3ECFB] focus-visible:ring-2 focus-visible:ring-[#5A32A3]/25 focus-visible:outline-none"
                 >
                   <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#5A32A3]" />
                   <div className="min-w-0">
                     <p className="text-[15px] font-bold text-[#5A32A3]">
                       {t.title}
-                    </p>
-                    <p className="mt-1 text-[13px] leading-relaxed text-slate-500">
-                      {t.description}
-                    </p>
-                    <p className="mt-0.5 text-[13px] leading-relaxed text-slate-400">
-                      E.g.: {t.example}
                     </p>
                   </div>
                 </button>

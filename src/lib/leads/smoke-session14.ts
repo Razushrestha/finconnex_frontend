@@ -55,7 +55,7 @@ export async function runSmokeSession14() {
   console.log("\n1) Module cutover with mock API…");
   const mock = createMockModuleApi();
   const tenantId = "tenant_finconnex";
-  const probeKey = "sales:leads:board:v6";
+  const probeKey = "sales:leads:board:v7";
   mock.seedModule(probeKey, { columns: [{ id: "new", title: "New" }] }, tenantId);
   mock.seedModule(
     "settings:values:v1",

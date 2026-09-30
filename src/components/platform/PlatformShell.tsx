@@ -7,7 +7,7 @@ import {
   LayoutGrid,
   LogOut,
   Shield,
-  UserRoundX,
+  Users,
 } from "lucide-react";
 import { CrmTokenKeepAlive } from "@/components/layout/CrmTokenKeepAlive";
 import { cn } from "@/lib/utils";
@@ -19,7 +19,7 @@ import { useState } from "react";
 const NAV = [
   { href: "/platform", label: "Overview", icon: LayoutGrid, exact: true },
   { href: "/platform/workspaces", label: "Workspaces", icon: Building2 },
-  { href: "/platform/users", label: "Users", icon: UserRoundX },
+  { href: "/platform/users", label: "Users", icon: Users },
 ];
 
 export function PlatformShell({

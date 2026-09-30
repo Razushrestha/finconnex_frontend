@@ -182,7 +182,7 @@ export function ZohoStyleSendForm({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(isTemplate);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
   const [crmResults, setCrmResults] = useState<SignatureCrmEntityOption[]>([]);
   const [crmSearching, setCrmSearching] = useState(false);

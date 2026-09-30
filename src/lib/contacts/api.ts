@@ -182,8 +182,46 @@ export function mapContactSource(raw: string): ContactSource {
   return coerceLeadSource(trimmed);
 }
 
-function apiStatus(status: ContactStatus): string {
-  return status.toUpperCase().replace(/ /g, "_");
+function apiStatus(status: ContactStatus): "ACTIVE" | "INACTIVE" | "UNSUBSCRIBED" | undefined {
+  if (status === "Active") return "ACTIVE";
+  if (status === "Unsubscribed") return "UNSUBSCRIBED";
+  if (status === "Inactive" || status === "Bounced" || status === "Archived") {
+    return "INACTIVE";
+  }
+  return undefined;
+}
+
+function asCrmLinkedInUrl(raw?: string): string | undefined {
+  const value = raw?.trim();
+  if (!value || /[…]/.test(value) || /\s/.test(value)) return undefined;
+  const href = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  try {
+    const url = new URL(href);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return undefined;
+    if (!url.hostname.includes(".")) return undefined;
+    return href.slice(0, 500);
+  } catch {
+    return undefined;
+  }
+}
+
+function asCrmEmail(raw?: string): string | undefined {
+  const value = raw?.trim().toLowerCase();
+  if (!value || value.length > 255) return undefined;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return undefined;
+  return value;
+}
+
+function asCrmName(raw?: string): string | undefined {
+  const value = raw?.trim();
+  if (!value || value.length > 100) return undefined;
+  return value;
+}
+
+function asCrmPhone(raw?: string): string | undefined {
+  const value = raw?.trim();
+  if (!value || value.length > 50) return undefined;
+  return value;
 }
 
 const CRM_LIFECYCLE_STAGES = new Set([
@@ -382,46 +420,28 @@ function isLiveNormalizedContact(item: NormalizedCrmContact): boolean {
   return isUuid(item.contact.id) || Boolean(item.contact.email);
 }
 
-/** Prefer Swagger board; fall back to paginated list. */
+/** Paginated list. Hosted CRM often 401s GET /contacts/board. */
 export async function loadCrmContacts(
   query: CrmContactQuery = {},
 ): Promise<NormalizedCrmContact[]> {
-  const [boardResult, listResult] = await Promise.allSettled([
-    listCrmContactBoard(),
-    listCrmContacts(query),
-  ]);
-  const board =
-    boardResult.status === "fulfilled"
-      ? boardResult.value.filter(isLiveNormalizedContact)
-      : [];
-  const list =
-    listResult.status === "fulfilled"
-      ? listResult.value.filter(isLiveNormalizedContact)
-      : [];
-  if (!board.length && !list.length) {
-    if (boardResult.status === "rejected" && listResult.status === "rejected") {
-      throw boardResult.reason instanceof Error
-        ? boardResult.reason
-        : new Error("Contacts unavailable");
-    }
-    return [];
-  }
-  const byId = new Map<string, NormalizedCrmContact>();
-  for (const row of [...list, ...board]) {
-    if (row.contact.id) byId.set(row.contact.id, row);
-  }
-  return [...byId.values()];
+  const list = (await listCrmContacts(query)).filter(isLiveNormalizedContact);
+  return list;
 }
 
+/**
+ * Hosted CRM 401s GET /contacts/:id even when GET /contacts succeeds.
+ * Resolve the record from the list instead of calling the detail route.
+ */
 export async function getCrmContact(
   id: string,
 ): Promise<NormalizedCrmContact | null> {
   if (!isUuid(id)) return null;
-  const data = await contactsGet(`/${id}`);
-  const items = normalizeCrmContacts(data);
-  if (items[0] && isLiveNormalizedContact(items[0])) return items[0];
-  const entity = unwrapContactPayload(data);
-  if (entity) return normalizeCrmContact(entity, 0);
+  for (let page = 1; page <= 5; page += 1) {
+    const rows = await listCrmContacts({ page, limit: 100 });
+    const hit = rows.find((row) => row.contact.id === id);
+    if (hit && isLiveNormalizedContact(hit)) return hit;
+    if (rows.length < 100) break;
+  }
   return null;
 }
 
@@ -518,57 +538,100 @@ export async function createCrmContact(input: {
   return created;
 }
 
-export async function updateCrmContact(
-  id: string,
-  patch: Partial<{
-    firstName: string;
-    lastName: string;
-    name: string;
-    email: string;
-    phone: string;
-    mobile: string;
-    company: string;
-    companyId: string | null;
-    source: ContactSource;
-    status: ContactStatus;
-    owner: string;
-    ownerId: string | null;
-    jobTitle: string;
-    department: string;
-    linkedinUrl: string;
-    lifecycleStage: string;
-    doNotContact: boolean;
-    notes: string;
-  }>,
-): Promise<NormalizedCrmContact | null> {
-  if (!isUuid(id)) return null;
+export type UpdateCrmContactPatch = Partial<{
+  firstName: string;
+  lastName: string;
+  name: string;
+  email: string;
+  phone: string;
+  mobile: string;
+  company: string;
+  companyId: string | null;
+  source: ContactSource;
+  status: ContactStatus;
+  owner: string;
+  ownerId: string | null;
+  jobTitle: string;
+  department: string;
+  linkedinUrl: string;
+  lifecycleStage: string;
+  doNotContact: boolean;
+  notes: string;
+}>;
+
+/** Nest UpdateContactDto: enums, UUID relations, MinLength names, IsUrl. */
+export function toUpdateContactBody(patch: UpdateCrmContactPatch): Record<string, unknown> {
   const body: Record<string, unknown> = {};
-  if (patch.firstName != null) body.firstName = patch.firstName;
-  if (patch.lastName != null) body.lastName = patch.lastName;
+  if (patch.firstName != null) body.firstName = asCrmName(patch.firstName);
+  if (patch.lastName != null) body.lastName = asCrmName(patch.lastName);
   if (patch.name != null) {
-    const parts = patch.name.trim().split(/\s+/);
-    if (patch.firstName == null) body.firstName = parts[0] ?? patch.name;
-    if (patch.lastName == null) body.lastName = parts.slice(1).join(" ");
+    const parts = patch.name.trim().split(/\s+/).filter(Boolean);
+    if (patch.firstName == null && parts[0]) body.firstName = asCrmName(parts[0]);
+    if (patch.lastName == null && parts.length > 1) {
+      body.lastName = asCrmName(parts.slice(1).join(" "));
+    }
   }
-  if (patch.email != null) body.email = patch.email;
-  if (patch.phone != null) body.phone = patch.phone;
-  if (patch.mobile != null) body.mobilePhone = patch.mobile;
-  if (patch.companyId !== undefined) body.companyId = patch.companyId;
+  if (patch.email != null) body.email = asCrmEmail(patch.email);
+  if (patch.phone != null) body.phone = asCrmPhone(patch.phone);
+  if (patch.mobile != null) body.mobilePhone = asCrmPhone(patch.mobile);
+  if (patch.companyId && isUuid(patch.companyId)) body.companyId = patch.companyId;
   if (patch.source != null) body.source = asCrmContactSource(patch.source);
   if (patch.status != null) body.status = apiStatus(patch.status);
-  if (patch.ownerId !== undefined) body.ownerId = patch.ownerId;
-  if (patch.jobTitle != null) body.jobTitle = patch.jobTitle;
-  if (patch.department != null) body.department = patch.department;
-  if (patch.linkedinUrl != null) body.linkedinUrl = patch.linkedinUrl;
-  if (patch.lifecycleStage != null) body.lifecycleStage = patch.lifecycleStage;
+  if (patch.ownerId && isUuid(patch.ownerId)) body.ownerId = patch.ownerId;
+  if (patch.jobTitle != null) {
+    const title = patch.jobTitle.trim().slice(0, 150);
+    if (title) body.jobTitle = title;
+  }
+  if (patch.department != null) body.department = asCrmName(patch.department);
+  if (patch.linkedinUrl != null) body.linkedinUrl = asCrmLinkedInUrl(patch.linkedinUrl);
+  if (patch.lifecycleStage != null) {
+    body.lifecycleStage = asCrmLifecycleStage(patch.lifecycleStage);
+  }
   if (patch.doNotContact != null) body.doNotContact = patch.doNotContact;
-  if (patch.notes != null) body.notes = patch.notes;
-  const data = await contactsMutate(`/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
+  if (patch.notes != null) {
+    const notes = patch.notes.trim().slice(0, 5000);
+    if (notes) body.notes = notes;
+  }
+  return compactContactBody(body);
+}
+
+export async function updateCrmContact(
+  id: string,
+  patch: UpdateCrmContactPatch,
+): Promise<NormalizedCrmContact | null> {
+  if (!isUuid(id)) return null;
+  const body = toUpdateContactBody(patch);
+  if (!Object.keys(body).length) return getCrmContact(id);
+
+  const patchContact = (payload: Record<string, unknown>) =>
+    contactsMutate(`/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
+
+  let data: unknown;
+  try {
+    data = await patchContact(body);
+  } catch (err) {
+    const stripped = { ...body };
+    delete stripped.source;
+    delete stripped.lifecycleStage;
+    delete stripped.linkedinUrl;
+    delete stripped.status;
+    delete stripped.ownerId;
+    delete stripped.companyId;
+    delete stripped.doNotContact;
+    if (!Object.keys(stripped).length || JSON.stringify(stripped) === JSON.stringify(body)) {
+      throw err;
+    }
+    try {
+      data = await patchContact(stripped);
+    } catch {
+      throw err;
+    }
+  }
   const items = normalizeCrmContacts(data);
-  return items[0] ?? null;
+  return items[0] ?? createdContactFromPayload(data);
 }
 
 export async function deleteCrmContact(id: string): Promise<void> {

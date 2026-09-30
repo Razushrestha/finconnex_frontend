@@ -77,10 +77,6 @@ export function BookingNotificationsStep({
       <div className="overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
         <div className="border-b border-[#E5E7EB] px-5 py-5 sm:px-7">
           <h1 className="text-[18px] font-bold text-slate-900">Notifications</h1>
-          <p className="mt-1 text-[13px] text-slate-500">
-            Purple channels send. Email goes to the guest, In-app to the FinConnex
-            inbox, SMS and WhatsApp to the guest phone.
-          </p>
         </div>
 
         <div className="divide-y divide-[#F3F4F6]">
@@ -106,9 +102,6 @@ export function BookingNotificationsStep({
                     />
                   ))}
                 </div>
-                <p className="mt-1 text-[12px] text-slate-500">
-                  {row.description}
-                </p>
               </div>
               <button
                 type="button"

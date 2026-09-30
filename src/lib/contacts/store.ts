@@ -129,28 +129,41 @@ export function updateContact(
   );
   saveContactGroups(groups);
 
-  void import("@/lib/contacts/api").then(({ updateCrmContact, tryCrmContact }) => {
-    void tryCrmContact(() =>
-      updateCrmContact(id, {
-        name: patch.name,
-        firstName: patch.firstName,
-        lastName: patch.lastName,
-        email: patch.email,
-        phone: patch.phone,
-        mobile: patch.mobile,
-        company: patch.company,
-        owner: patch.owner,
-        source: patch.source,
-        status: nextStatus,
-        jobTitle: patch.jobTitle,
-        department: patch.department,
-        linkedinUrl: patch.linkedinUrl,
-        lifecycleStage: patch.lifecycleStage,
-        doNotContact: patch.doNotContact,
-        notes: patch.notes,
-      }),
-    );
-  });
+  const crmPatch: {
+    name?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    mobile?: string;
+    source?: ContactCardData["source"];
+    status?: ContactStatus;
+    jobTitle?: string;
+    department?: string;
+    linkedinUrl?: string;
+    lifecycleStage?: string;
+    doNotContact?: boolean;
+    notes?: string;
+  } = {};
+  if (patch.name != null) crmPatch.name = patch.name;
+  if (patch.firstName != null) crmPatch.firstName = patch.firstName;
+  if (patch.lastName != null) crmPatch.lastName = patch.lastName;
+  if (patch.email != null) crmPatch.email = patch.email;
+  if (patch.phone != null) crmPatch.phone = patch.phone;
+  if (patch.mobile != null) crmPatch.mobile = patch.mobile;
+  if (patch.source != null) crmPatch.source = patch.source;
+  if (patch.status != null) crmPatch.status = patch.status;
+  if (patch.jobTitle != null) crmPatch.jobTitle = patch.jobTitle;
+  if (patch.department != null) crmPatch.department = patch.department;
+  if (patch.linkedinUrl != null) crmPatch.linkedinUrl = patch.linkedinUrl;
+  if (patch.lifecycleStage != null) crmPatch.lifecycleStage = patch.lifecycleStage;
+  if (patch.doNotContact != null) crmPatch.doNotContact = patch.doNotContact;
+  if (patch.notes != null) crmPatch.notes = patch.notes;
+  if (Object.keys(crmPatch).length) {
+    void import("@/lib/contacts/api").then(({ updateCrmContact, tryCrmContact }) => {
+      void tryCrmContact(() => updateCrmContact(id, crmPatch));
+    });
+  }
   return merged;
 }
 

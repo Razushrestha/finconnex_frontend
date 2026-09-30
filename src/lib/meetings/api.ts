@@ -416,12 +416,22 @@ export async function cancelCrmMeeting(
   id: string,
   extra: Record<string, unknown> = {},
 ): Promise<Meeting | null> {
-  return asMeeting(
-    await meetingsMutate(`/${id}/cancel`, {
-      method: "POST",
-      body: JSON.stringify(extra),
-    }),
-  );
+  try {
+    return asMeeting(
+      await meetingsMutate(`/${id}/cancel`, {
+        method: "POST",
+        body: JSON.stringify(extra),
+      }),
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (!/\(409\)|conflict|invalidTransition|alreadyRescheduled/i.test(message)) {
+      throw err;
+    }
+    const existing = await getCrmMeeting(id).catch(() => null);
+    if (existing) return { ...existing, status: "Cancelled" };
+    return asMeeting({ id, status: "CANCELLED" });
+  }
 }
 
 export async function startCrmMeeting(id: string): Promise<Meeting | null> {

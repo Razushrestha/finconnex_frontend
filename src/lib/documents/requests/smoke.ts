@@ -292,7 +292,12 @@ export async function smokeDocumentRequestsMock() {
   try {
     await listCrmDocumentRequests();
     await getCrmDocumentRequest(ID);
-    await createCrmDocumentRequest({ title: "New" });
+    await createCrmDocumentRequest(
+      toCreateDocumentRequestBody({
+        title: "New",
+        requestedFromId: ID,
+      }),
+    );
     await updateCrmDocumentRequest(ID, { title: "Updated" });
     await restoreCrmDocumentRequest(ID);
     await sendCrmDocumentRequest(ID);

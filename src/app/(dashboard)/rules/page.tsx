@@ -1,5 +1,5 @@
-import { RulesHubClient } from "@/components/rules/RulesHubClient";
+import { redirect } from "next/navigation";
 
 export default function CrossModuleRulesPage() {
-  return <RulesHubClient />;
+  redirect("/settings/data-management/rules");
 }

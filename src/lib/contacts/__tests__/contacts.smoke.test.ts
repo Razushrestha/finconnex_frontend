@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeCrmContacts } from "@/lib/contacts/api";
+import { normalizeCrmContacts, toUpdateContactBody } from "@/lib/contacts/api";
 import {
   smokeContactsMock,
   smokeContactsWiring,
@@ -55,5 +55,25 @@ describe("Contacts API smoke (CI)", () => {
   it("keeps SCREENSHOT_ENDPOINTS length at 5", async () => {
     const { SCREENSHOT_ENDPOINTS } = await import("@/lib/api/endpoints");
     expect(SCREENSHOT_ENDPOINTS).toHaveLength(5);
+  });
+
+  it("maps PATCH bodies to Nest UpdateContactDto", () => {
+    expect(
+      toUpdateContactBody({
+        name: "Ada",
+        status: "Bounced",
+        lifecycleStage: "Lead",
+        linkedinUrl: "linkedin.com/in/ada",
+        email: "not-an-email",
+      }),
+    ).toEqual({
+      firstName: "Ada",
+      status: "INACTIVE",
+      lifecycleStage: "LEAD",
+      linkedinUrl: "https://linkedin.com/in/ada",
+    });
+    expect(toUpdateContactBody({ status: "Unsubscribed" })).toEqual({
+      status: "UNSUBSCRIBED",
+    });
   });
 });

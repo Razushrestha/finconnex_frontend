@@ -8,7 +8,8 @@ import {
 import { crmBffFetch, crmErrorMessage, crmFetch } from "@/lib/crm/request";
 import { deliverQueuedCrmEmail } from "@/lib/emails/deliver";
 import { htmlToPlainText } from "@/lib/emails/ai-compose";
-import { upsertEmail } from "@/lib/emails/store";
+import { findEmailById, upsertEmail } from "@/lib/emails/store";
+import { silentRequest } from "@/lib/notify/fetch-notifier";
 import type {
   Email,
   EmailAttachmentMeta,
@@ -255,6 +256,14 @@ async function emailsPath(suffix: string, query = ""): Promise<string> {
   if (scoped) {
     return `${workspaceEmailsPath(scoped.workspaceId, suffix)}${query}`;
   }
+  const stored =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem("fc.crm.workspaceId") ||
+        window.sessionStorage.getItem("fc.crm.workspaceId")
+      : null;
+  if (stored && isUuid(stored)) {
+    return `${workspaceEmailsPath(stored, suffix)}${query}`;
+  }
   return `${globalEmailsPath(suffix)}${query}`;
 }
 
@@ -280,14 +289,16 @@ async function crmEmailsFetch<T>(
 }
 
 async function emailsGet(suffix: string, query = ""): Promise<unknown> {
+  const lookup = suffix.startsWith("/") ? suffix.slice(1) : suffix;
+  const init = lookup && !lookup.includes("/") && isUuid(lookup) ? silentRequest() : undefined;
   if (!isBoundCrmSession()) {
-    return crmBffFetch(await emailsPath(suffix, query));
+    return crmBffFetch(await emailsPath(suffix, query), init);
   }
   return withSession((session, scoped) => {
     const path = scoped
       ? workspaceEmailsPath((session as CrmSession).workspaceId, suffix)
       : globalEmailsPath(suffix);
-    return crmFetch(session, `${path}${query}`);
+    return crmFetch(session, `${path}${query}`, init);
   });
 }
 
@@ -558,6 +569,7 @@ export async function listCrmEmails(
 }
 
 export async function getCrmEmail(id: string): Promise<Email | null> {
+  if (!isUuid(id)) return null;
   return asEmail(await emailsGet(`/${id}`));
 }
 
@@ -749,9 +761,61 @@ export async function tryCrmEmail<T>(run: () => Promise<T>): Promise<T | null> {
   }
 }
 
+function isThinEmail(email: Email) {
+  const subject = email.subject.trim();
+  return (
+    (!subject || subject === "(no subject)") &&
+    !email.body.trim() &&
+    !email.from.trim() &&
+    email.to.length === 0
+  );
+}
+
+function mergeStoredEmail(remote: Email, local: Email): Email {
+  if (isThinEmail(remote) && !isThinEmail(local)) return local;
+  return {
+    ...local,
+    ...remote,
+    subject:
+      remote.subject.trim() && remote.subject !== "(no subject)"
+        ? remote.subject
+        : local.subject,
+    body: remote.body.trim() ? remote.body : local.body,
+    from: remote.from.trim() ? remote.from : local.from,
+    to: remote.to.length ? remote.to : local.to,
+    cc: remote.cc?.length ? remote.cc : local.cc,
+    bcc: remote.bcc?.length ? remote.bcc : local.bcc,
+    outbound: local.outbound ?? remote.outbound,
+    status: local.status === "Opened" ? "Opened" : remote.status || local.status,
+    sentDate: remote.sentDate || local.sentDate,
+  };
+}
+
 export function persistRemoteEmail(email: Email | null) {
-  if (email) upsertEmail(email);
-  return email;
+  if (!email) return null;
+  const local = findEmailById(email.id)?.email;
+  const next = local ? mergeStoredEmail(email, local) : email;
+  if (local && isThinEmail(next)) return local;
+  upsertEmail(next);
+  return next;
+}
+
+export async function resolveLiveEmail(id: string): Promise<Email | null> {
+  const decoded = (() => {
+    try {
+      return decodeURIComponent(id);
+    } catch {
+      return id;
+    }
+  })();
+  const fromStore =
+    findEmailById(decoded)?.email ?? findEmailById(id)?.email ?? null;
+  if (!isUuid(decoded)) return fromStore;
+  const remote = await tryCrmEmail(() => getCrmEmail(decoded));
+  if (remote) {
+    return persistRemoteEmail(remote) ?? fromStore ?? remote;
+  }
+  return fromStore;
 }
 
 export function isCrmEmailId(id: string): boolean {

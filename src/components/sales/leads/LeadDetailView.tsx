@@ -404,7 +404,7 @@ export function LeadDetailView({ card: initial }: { card: LeadCardData }) {
                 scheduledAt: values.sendAt,
                 files: values.attachments,
               });
-              setIsComposeOpen(false);
+          setIsComposeOpen(false);
               notify(
                 values.sendAt
                   ? "Email scheduled"

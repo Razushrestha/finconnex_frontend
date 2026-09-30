@@ -136,7 +136,10 @@ export function RecycleBinSettingsClient({
         <p className="mt-0.5 text-[12px] text-slate-500">
           Soft-deleted workspace records. Restore puts them back; purge deletes
           them permanently. Also see the{" "}
-          <Link href="/rules" className="font-semibold text-violet-600">
+          <Link
+            href="/settings/data-management/rules"
+            className="font-semibold text-violet-600"
+          >
             Cross-Module Rules
           </Link>{" "}
           hub.

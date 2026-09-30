@@ -9,6 +9,11 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:public": "playwright test --project=public",
+    "test:e2e:report": "playwright show-report",
     "smoke": "vitest run src/lib/leads/__tests__/lead-card-smokes.test.ts",
     "smoke:phase9": "npx tsx src/lib/leads/smoke-session9.ts",
     "smoke:phase10": "npx tsx src/lib/leads/smoke-session10.ts",
@@ -42,6 +47,7 @@
     "smoke:notification-preferences": "npx tsx --tsconfig tsconfig.json src/lib/notification-preferences/smoke.ts",
     "smoke:notifications": "npx tsx --tsconfig tsconfig.json src/lib/notifications/smoke.ts",
     "smoke:payments": "npx tsx --tsconfig tsconfig.json src/lib/finance/payments/smoke.ts",
+    "smoke:platform": "npx vitest run src/lib/platform/__tests__/platform.smoke.test.ts",
     "smoke:products": "npx tsx --tsconfig tsconfig.json src/lib/finance/products/smoke.ts",
     "smoke:public-auth": "npx tsx --tsconfig tsconfig.json src/lib/auth/smoke.ts",
     "smoke:public-sales": "npx tsx --tsconfig tsconfig.json src/lib/finance/public-sales/smoke.ts",
@@ -91,6 +97,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

@@ -18,18 +18,21 @@ describe("Workspace members API smoke (CI)", () => {
     expect(SCREENSHOT_ENDPOINTS).toHaveLength(5);
   });
 
-  it("builds a whitelist-safe invite body", async () => {
-    const { toInviteMemberBody } = await import("@/lib/workspace-members/api");
-    const body = toInviteMemberBody({
+  it("builds a whitelist-safe create-member body", async () => {
+    const { toCreateWorkspaceMemberBody } = await import(
+      "@/lib/workspace-members/api"
+    );
+    const body = toCreateWorkspaceMemberBody({
+      fullName: "Ada Lovelace",
       email: "Ada@Example.com",
-      name: "Ada Lovelace",
+      password: "TempPass123!",
       role: "User",
     });
     expect(body).toEqual({
+      fullName: "Ada Lovelace",
       email: "ada@example.com",
+      password: "TempPass123!",
       role: "MEMBER",
-      firstName: "Ada",
-      lastName: "Lovelace",
     });
   });
 });

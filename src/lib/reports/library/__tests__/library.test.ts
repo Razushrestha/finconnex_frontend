@@ -42,7 +42,9 @@ describe("report library", () => {
     expect(LIBRARY_REPORTS.every((r) => r.purpose.length > 12)).toBe(true);
   });
 
-  it("runs lead source performance from live CRM stores", () => {
+  it("runs lead source performance from live CRM stores", async () => {
+    const { seedCrmFixtures } = await import("@/test-support/crm-fixtures");
+    seedCrmFixtures(july);
     const data = runLibraryReport(
       "lead-source-performance",
       { ...defaultLibraryFilters(), dateRange: "all" },

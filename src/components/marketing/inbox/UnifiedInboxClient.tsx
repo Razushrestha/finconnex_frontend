@@ -37,13 +37,15 @@ import {
 } from "lucide-react";
 import {
   INBOX_AGENTS,
-  INBOX_CHANNELS,
+  INBOX_CHANNEL_FILTER_OPTIONS,
   INBOX_STATUSES,
+  conversationMatchesChannelFilter,
   formatInboxAt,
   inboxChannelLabel,
   listInboxConversations,
   upsertInboxConversation,
   type InboxChannel,
+  type InboxChannelFilterOption,
   type InboxConversation,
   type InboxMessage,
   type InboxAttachment,
@@ -336,11 +338,11 @@ const FOLLOWED_BY_ME = "Followed by me";
 
 function inInboxScope(
   c: InboxConversation,
-  channelFilter: InboxChannel | "All",
+  channelFilter: InboxChannelFilterOption | "All",
   agentFilter: string,
   me: string,
 ) {
-  if (channelFilter !== "All" && c.channel !== channelFilter) return false;
+  if (!conversationMatchesChannelFilter(c.channel, channelFilter)) return false;
   if (agentFilter === FOLLOWED_BY_ME) {
     const who = me.trim().toLowerCase();
     return (c.followers ?? []).some((name) => name.trim().toLowerCase() === who);
@@ -561,9 +563,9 @@ export function UnifiedInboxClient() {
   const crm = useCrmInbox();
   const [rows, setRows] = useState<InboxConversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [channelFilter, setChannelFilter] = useState<InboxChannel | "All">(
-    "All",
-  );
+  const [channelFilter, setChannelFilter] = useState<
+    InboxChannelFilterOption | "All"
+  >("All");
   const [listFilter, setListFilter] = useState<InboxListFilter>("All");
   const [agentFilter, setAgentFilter] = useState<string>("All");
   const [search, setSearch] = useState("");
@@ -1185,14 +1187,14 @@ export function UnifiedInboxClient() {
               <FilterSelect
                 value={channelFilter}
                 onChange={(v) =>
-                  setChannelFilter(v as InboxChannel | "All")
+                  setChannelFilter(v as InboxChannelFilterOption | "All")
                 }
                 ariaLabel="Filter by channel"
               >
                 <option value="All">All channels</option>
-                {INBOX_CHANNELS.map((ch) => (
+                {INBOX_CHANNEL_FILTER_OPTIONS.map((ch) => (
                   <option key={ch} value={ch}>
-                    {inboxChannelLabel(ch)}
+                    {ch}
                   </option>
                 ))}
               </FilterSelect>

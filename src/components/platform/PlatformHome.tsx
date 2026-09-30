@@ -6,10 +6,10 @@ import {
   Activity,
   ArrowRight,
   Building2,
-  ShieldAlert,
+  Shield,
   Users,
 } from "lucide-react";
-import { listAdminWorkspaces } from "@/lib/admin/api";
+import { getPlatformStats, type PlatformStats } from "@/lib/platform/api";
 
 type Health = {
   ok?: boolean;
@@ -18,22 +18,22 @@ type Health = {
 
 export function PlatformHome() {
   const [health, setHealth] = useState<Health | null>(null);
-  const [workspaceTotal, setWorkspaceTotal] = useState<number | null>(null);
+  const [stats, setStats] = useState<PlatformStats | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [h, workspaces] = await Promise.all([
+        const [h, platformStats] = await Promise.all([
           fetch("/api/platform/health", { credentials: "same-origin" }).then(
             (r) => r.json() as Promise<Health>,
           ),
-          listAdminWorkspaces({ page: 1, limit: 1 }),
+          getPlatformStats(),
         ]);
         if (cancelled) return;
         setHealth(h);
-        setWorkspaceTotal(workspaces.total);
+        setStats(platformStats);
       } catch (err) {
         if (!cancelled) {
           setError(
@@ -56,10 +56,10 @@ export function PlatformHome() {
           Operations overview
         </h2>
         <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
-          This console maps to Nest platform APIs only: list every workspace,
-          enter a tenant with a workspace-scoped token, and delete a global
-          user by id. Tenant Settings, CRM records, and billing stay inside a
-          selected workspace.
+          Super Admin console for Nest{" "}
+          <span className="font-mono text-[12px]">/v1/platform/*</span>. List
+          every tenant and user, manage lifecycle, and enter a workspace with a
+          scoped token. Tenant CRM data stays inside the selected workspace.
         </p>
       </div>
 
@@ -69,12 +69,25 @@ export function PlatformHome() {
         </p>
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           icon={Building2}
           label="Workspaces"
-          value={workspaceTotal == null ? "…" : String(workspaceTotal)}
-          hint="GET /v1/admin/workspaces"
+          value={stats == null ? "…" : String(stats.totalWorkspaces)}
+          hint="GET /v1/platform/stats"
+        />
+        <StatCard
+          icon={Shield}
+          label="Active"
+          value={stats == null ? "…" : String(stats.activeWorkspaces)}
+          hint={`${stats?.suspendedWorkspaces ?? "…"} suspended`}
+          tone="good"
+        />
+        <StatCard
+          icon={Users}
+          label="Users"
+          value={stats == null ? "…" : String(stats.totalUsers)}
+          hint={`${stats?.superAdmins ?? "…"} super admins`}
         />
         <StatCard
           icon={Activity}
@@ -83,15 +96,7 @@ export function PlatformHome() {
             health == null ? "…" : health.ok ? "Healthy" : health.status ?? "Down"
           }
           hint="GET /health"
-          tone={
-            health == null ? "neutral" : health.ok ? "good" : "bad"
-          }
-        />
-        <StatCard
-          icon={Users}
-          label="Platform users"
-          value="By id"
-          hint="No list API — delete only"
+          tone={health == null ? "neutral" : health.ok ? "good" : "bad"}
         />
       </div>
 
@@ -105,8 +110,8 @@ export function PlatformHome() {
           </div>
           <h3 className="mt-4 text-lg font-semibold">All workspaces</h3>
           <p className="mt-1 text-sm leading-relaxed text-slate-500">
-            Search tenants, then enter one. Entering mints a workspace JWT —
-            you then use the normal CRM dashboard and Settings for that tenant.
+            Search tenants, suspend or restore, then enter one. Entering mints a
+            workspace JWT for the normal CRM dashboard.
           </p>
           <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#5A32A3]">
             Open directory
@@ -117,16 +122,17 @@ export function PlatformHome() {
           href="/platform/users"
           className="group rounded-3xl border border-white bg-white p-6 shadow-sm shadow-slate-200/60 transition hover:-translate-y-0.5 hover:shadow-md"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
-            <ShieldAlert className="h-5 w-5" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-50 text-[#5A32A3]">
+            <Users className="h-5 w-5" />
           </div>
-          <h3 className="mt-4 text-lg font-semibold">Dangerous user delete</h3>
+          <h3 className="mt-4 text-lg font-semibold">Platform users</h3>
           <p className="mt-1 text-sm leading-relaxed text-slate-500">
-            Nest exposes DELETE /v1/admin/user/:id only. There is no platform
-            user directory until the backend adds one.
+            Directory of every account across tenants. Grant or revoke{" "}
+            <span className="font-mono text-[12px]">globalRole</span> including
+            Super Admin.
           </p>
-          <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-rose-600">
-            Open controls
+          <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#5A32A3]">
+            Open users
             <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
           </span>
         </Link>

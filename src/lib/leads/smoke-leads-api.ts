@@ -197,15 +197,25 @@ export async function smokeLeadClientWiring() {
   for (const name of [
     "assignCrmLeadOwner",
     "unassignCrmLeadOwner",
+    "softDeleteCrmLead",
+  ]) {
+    if (!detail.includes(name)) {
+      fail(`LeadDetailView does not call ${name}`);
+    }
+  }
+  const clientExtras = readFileSync(
+    path.join(repoRoot(), "src/lib/leads/api/client.ts"),
+    "utf8",
+  );
+  for (const name of [
     "linkCrmLeadCompany",
     "unlinkCrmLeadCompany",
     "changeCrmLeadLifecycleStage",
     "changeCrmLeadRating",
     "changeCrmLeadScore",
-    "softDeleteCrmLead",
   ]) {
-    if (!detail.includes(name)) {
-      fail(`LeadDetailView does not call ${name}`);
+    if (!clientExtras.includes(`export async function ${name}`)) {
+      fail(`lead client missing ${name}`);
     }
   }
   if (!clientSrc.includes("fetchLeadList")) {

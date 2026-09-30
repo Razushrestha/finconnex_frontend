@@ -8,6 +8,7 @@ import path from "node:path";
 import { bindCrmSession, getCrmApiBaseUrl } from "@/lib/activity-timeline";
 import {
   normalizeCrmStorageObject,
+  storageUploadBffPath,
   storageUploadPath,
   uploadCrmStorageFile,
 } from "@/lib/storage/api";
@@ -121,7 +122,8 @@ export async function smokeStorageMock() {
   bindCrmSession(SESSION);
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const method = (init?.method ?? "GET").toUpperCase();
-    const parsed = new URL(String(input));
+    const raw = String(input);
+    const parsed = new URL(raw, SESSION.baseUrl);
     hits.push(`${method} ${parsed.pathname}`);
     return new Response(
       JSON.stringify({
@@ -146,7 +148,7 @@ export async function smokeStorageMock() {
     if (stored.key !== "ws/docs/note.pdf") {
       fail("uploadCrmStorageFile did not return storage key");
     }
-    const expected = `POST ${storageUploadPath()}`;
+    const expected = `POST ${storageUploadBffPath()}`;
     if (!hits.includes(expected)) {
       fail(`mock fetch missed ${expected} (got ${hits.join(", ")})`);
     }

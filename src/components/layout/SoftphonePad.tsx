@@ -1403,7 +1403,7 @@ function CallNoteComposer({
           }
           className="h-8 w-full rounded-lg border border-slate-200 bg-white px-2 text-[12px] text-slate-700 outline-none focus:border-[#5A32A3]"
         >
-          <option value="">None — contact notes</option>
+          <option value="">None</option>
           <option value="Lead">Lead</option>
           <option value="Deal">Deal</option>
           <option value="Company">Organization</option>

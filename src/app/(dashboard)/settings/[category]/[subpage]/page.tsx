@@ -7,6 +7,7 @@ import {
 import { settingsSubnav } from "@/lib/settings/settings-nav";
 import { SettingsFormClient } from "@/components/settings/SettingsFormClient";
 import { RecycleBinSettingsClient } from "@/components/settings/RecycleBinSettingsClient";
+import { RulesHubClient } from "@/components/rules/RulesHubClient";
 import { LeadCardSettingsClient } from "@/components/settings/LeadCardSettingsClient";
 import { CustomFieldsSettingsClient } from "@/components/settings/CustomFieldsSettingsClient";
 import { PipelineSlaSettingsClient } from "@/components/settings/PipelineSlaSettingsClient";
@@ -63,6 +64,8 @@ export default async function SettingsSubPage({ params, searchParams }: PageProp
       <RecycleBinSettingsClient
         initialEntityType={Array.isArray(query.type) ? query.type[0] : query.type}
       />
+    ) : key === "data-management/rules" ? (
+      <RulesHubClient />
     ) : key === "crm-configuration/lead-card" ? (
       <LeadCardSettingsClient />
     ) : key === "crm-configuration/custom-fields" ? (

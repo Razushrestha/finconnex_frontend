@@ -130,6 +130,22 @@ export interface BookingPage {
   inviteNotes?: string;
   allowReschedule?: boolean;
   allowCancel?: boolean;
+  /** Per-consultation hours and appointment caps from Availability and Limits. */
+  appointmentLimits?: {
+    defaultHours: boolean;
+    overrideUserHours: boolean;
+    userSpecificHours: boolean;
+    slotsPerEvent: string;
+    slotsPerCustomer: string;
+    customLimits: Array<{
+      id: string;
+      start: string;
+      end: string;
+      slotsPerEvent: string;
+      slotsPerCustomer: string;
+    }>;
+    userHours?: Record<string, AvailabilityRule[]>;
+  };
   notifyPrefs?: Array<{
     id: string;
     title: string;

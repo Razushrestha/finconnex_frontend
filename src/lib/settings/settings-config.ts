@@ -136,7 +136,7 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
         title: "Lead Card",
         slug: "lead-card",
         blurb:
-          "Kanban card layout: owner avatar, dynamic fields (max 4), unreplied threshold",
+          "Kanban card layout, header colours, dynamic fields (max 4), unreplied threshold",
         moduleHref: "/sales/leads",
         moduleLabel: "Open Leads board",
       },
@@ -469,6 +469,11 @@ export const SETTINGS_CATEGORIES: SettingsCategory[] = [
       { title: "Backup & Restore", slug: "backup-and-restore" },
       { title: "Archive", slug: "archive" },
       { title: "Recycle Bin", slug: "recycle-bin" },
+      {
+        title: "Rules",
+        slug: "rules",
+        blurb: "Integrity, transitions, audit, and permissions",
+      },
       { title: "Merge Records", slug: "merge-records" },
       { title: "Storage Usage", slug: "storage-usage" },
       { title: "Scheduled Backups", slug: "scheduled-backups" },

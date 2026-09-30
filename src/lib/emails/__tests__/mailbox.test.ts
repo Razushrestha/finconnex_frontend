@@ -55,6 +55,20 @@ describe("mailbox folders", () => {
     expect(emailMatchesFolder(sent, "inbox", flags)).toBe(false);
   });
 
+  it("keeps inbound inbox mail after a hollow Sent stub", () => {
+    const inbox = mail({ status: "Delivered", from: "lead@example.com" });
+    const stub = mail({
+      status: "Sent",
+      from: "",
+      to: [],
+      subject: "(no subject)",
+      body: "",
+    });
+    expect(emailMatchesFolder(inbox, "inbox", flags)).toBe(true);
+    expect(emailMatchesFolder(stub, "inbox", flags)).toBe(true);
+    expect(emailMatchesFolder(stub, "sent", flags)).toBe(false);
+  });
+
   it("shows reported spam only in Spam", () => {
     const row = mail({ status: "Delivered" });
     const spam: MailboxFlags = { spam: true };

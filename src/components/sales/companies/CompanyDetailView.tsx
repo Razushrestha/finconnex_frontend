@@ -42,6 +42,7 @@ import type { Call } from "@/lib/calls/types";
 import type { Task } from "@/lib/tasks/types";
 import type { LibraryDocument } from "@/lib/documents/library/types";
 import { toast } from "@/lib/notify/toast";
+import { EditCompanyForm } from "@/components/sales/companies/EditCompanyForm";
 
 const RELATED_LIST_CATALOG: RelatedListItem[] = [
   { id: "deals", label: "Deals" },
@@ -109,6 +110,7 @@ export function CompanyDetailView({
   );
   const [revision, setRevision] = useState(0);
   const [flash, setFlash] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [crmEmails, setCrmEmails] = useState<Email[]>([]);
   const [crmCalls, setCrmCalls] = useState<Call[]>([]);
   const [crmTasks, setCrmTasks] = useState<Task[]>([]);
@@ -491,6 +493,7 @@ export function CompanyDetailView({
           },
         ]}
         moreMenuItems={[
+          { label: "Edit", onClick: () => setEditOpen(true) },
           { label: "Delete", destructive: true, onClick: handleDelete },
         ]}
         onBack={() => router.push(back.href)}
@@ -589,6 +592,14 @@ export function CompanyDetailView({
           </div>
         </div>
       </div>
+
+      <EditCompanyForm
+        companyId={company.id}
+        variant="modal"
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSaved={() => setRevision((n) => n + 1)}
+      />
     </div>
   );
 }

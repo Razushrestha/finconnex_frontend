@@ -68,7 +68,19 @@ function splitName(name: string, firstName?: string, lastName?: string) {
   };
 }
 
-export function EditContactForm({ contactId }: { contactId: string }) {
+export function EditContactForm({
+  contactId,
+  variant = "page",
+  open = true,
+  onOpenChange,
+  onSaved,
+}: {
+  contactId: string;
+  variant?: "page" | "modal";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  onSaved?: () => void;
+}) {
   const router = useRouter();
   const found = useMemo(() => findContactById(contactId), [contactId]);
   const initial = useMemo(() => {
@@ -109,7 +121,19 @@ export function EditContactForm({ contactId }: { contactId: string }) {
     listCompanyGroups().flatMap((g) => g.companies.map((c) => c.name)),
   );
 
+  const modalResetKey = `${variant}|${open}|${contactId}|${initial?.email ?? ""}`;
+  const [prevModalResetKey, setPrevModalResetKey] = useState(modalResetKey);
+  if (prevModalResetKey !== modalResetKey) {
+    setPrevModalResetKey(modalResetKey);
+    if (variant === "modal" && open && initial) {
+      setForm(initial);
+      setErrors({});
+      setSubmitted(false);
+    }
+  }
+
   if (!found || !form) {
+    if (variant === "modal") return null;
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
         Contact not found.
@@ -180,6 +204,12 @@ export function EditContactForm({ contactId }: { contactId: string }) {
       { field: "name", from: found.contact.name, to: name },
     ]);
     emitRulesChange("all");
+    toast.success("Contact updated");
+    onSaved?.();
+    if (variant === "modal") {
+      onOpenChange?.(false);
+      return;
+    }
     router.push(`/sales/contacts/detail/${contactId}`);
   }
 
@@ -188,7 +218,7 @@ export function EditContactForm({ contactId }: { contactId: string }) {
       breadcrumbParent={{ label: "Contacts", href: "/sales/contacts" }}
       badge="Edit contact"
       title={`Edit ${found.contact.name}`}
-      subtitle="Update contact details and preferences."
+      subtitle="Update contact details."
       tip="Changes sync to CRM when signed in with a UUID contact."
       cardIcon={User}
       cardTitle="Contact Information"
@@ -196,6 +226,10 @@ export function EditContactForm({ contactId }: { contactId: string }) {
       listHref={`/sales/contacts/detail/${contactId}`}
       saveLabel="Save Changes"
       onSave={handleSave}
+      variant={variant}
+      open={open}
+      onOpenChange={onOpenChange}
+      showCreateAnother={false}
     >
       <Field
         label="First Name"

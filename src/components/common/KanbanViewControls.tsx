@@ -2,7 +2,6 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import { ChevronDown, HelpCircle, Pencil, Search, X } from "lucide-react";
-import { ColorWheelPicker } from "@/components/common/ColorWheelPicker";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -129,7 +128,7 @@ export interface KanbanViewControlsProps {
   categorizeByOptions: string[];
   aggregateByOptions: string[];
   headerStyleOptions: string[];
-  /** Categories/stages shown in the Multi Colour palette picker. */
+  /** @deprecated Colour pickers were removed from Kanban View settings. */
   headerColorOptions?: KanbanHeaderColorOption[];
 
   /** Called when the "Lead Pipeline ▾" label itself is clicked (e.g. open a view switcher). */
@@ -155,7 +154,6 @@ export function KanbanViewControls({
   categorizeByOptions,
   aggregateByOptions,
   headerStyleOptions,
-  headerColorOptions,
   onSelectorClick,
   onSave,
   onDelete,
@@ -194,7 +192,6 @@ export function KanbanViewControls({
           categorizeByOptions={categorizeByOptions}
           aggregateByOptions={aggregateByOptions}
           headerStyleOptions={headerStyleOptions}
-          headerColorOptions={headerColorOptions}
           onHelp={onHelp}
           onClose={() => setIsSettingsOpen(false)}
           onDelete={
@@ -227,25 +224,10 @@ interface KanbanViewSettingsModalProps {
   categorizeByOptions: string[];
   aggregateByOptions: string[];
   headerStyleOptions: string[];
-  headerColorOptions?: KanbanHeaderColorOption[];
   onHelp?: () => void;
   onClose: () => void;
   onSave: (next: KanbanViewConfig) => void;
   onDelete?: () => void;
-}
-
-function ColorSwatchRow({
-  value,
-  onChange,
-  label,
-}: {
-  value: string;
-  onChange: (hex: string) => void;
-  label?: string;
-}) {
-  return (
-    <ColorWheelPicker value={value} onChange={onChange} label={label} />
-  );
 }
 
 export function KanbanViewSettingsModal({
@@ -254,8 +236,7 @@ export function KanbanViewSettingsModal({
   availableStages = [],
   categorizeByOptions,
   aggregateByOptions,
-  headerStyleOptions,
-  headerColorOptions = [],
+  headerStyleOptions: _headerStyleOptions,
   onHelp,
   onClose,
   onSave,
@@ -264,7 +245,6 @@ export function KanbanViewSettingsModal({
   const [name, setName] = useState(view.name);
   const [categorizeBy, setCategorizeBy] = useState(view.categorizeBy);
   const [aggregateBy, setAggregateBy] = useState(view.aggregateBy);
-  const [headerStyle, setHeaderStyle] = useState(view.headerStyle);
   const [shareWith, setShareWith] = useState<ShareWith>(view.shareWith);
   const [selectedIds, setSelectedIds] = useState<string[]>(
     view.selectedFieldIds,
@@ -280,22 +260,6 @@ export function KanbanViewSettingsModal({
   });
   const [search, setSearch] = useState("");
   const [stageSearch, setStageSearch] = useState("");
-  const [singleHeaderColor, setSingleHeaderColor] = useState(
-    view.singleHeaderColor || DEFAULT_SINGLE_HEADER_COLOR,
-  );
-  const [multiHeaderColors, setMultiHeaderColors] = useState<
-    Record<string, string>
-  >(() => {
-    const base: Record<string, string> = { ...(view.multiHeaderColors ?? {}) };
-    headerColorOptions.forEach((opt, i) => {
-      if (!base[opt.id]) {
-        base[opt.id] =
-          KANBAN_HEADER_PALETTE[i % KANBAN_HEADER_PALETTE.length] ??
-          DEFAULT_SINGLE_HEADER_COLOR;
-      }
-    });
-    return base;
-  });
 
   const fieldsById = useMemo(
     () => new Map(availableFields.map((f) => [f.id, f])),
@@ -348,10 +312,6 @@ export function KanbanViewSettingsModal({
     });
   };
 
-  const showColourNote =
-    headerStyle === "Multi Colour" &&
-    (categorizeBy === "Lead Status" || categorizeBy === "Status");
-
   const handleSave = () => {
     if (!name.trim()) return;
     onSave({
@@ -359,15 +319,12 @@ export function KanbanViewSettingsModal({
       name: name.trim(),
       categorizeBy,
       aggregateBy,
-      headerStyle,
       shareWith,
       selectedFieldIds: selectedIds,
       editableFieldIds: editableIds.filter((id) => selectedIds.includes(id)),
       selectedStageIds: availableStages.length
         ? selectedStageIds.filter((id) => stagesById.has(id))
         : view.selectedStageIds,
-      singleHeaderColor,
-      multiHeaderColors,
     });
   };
 
@@ -420,60 +377,6 @@ export function KanbanViewSettingsModal({
               onChange={setAggregateBy}
               options={aggregateByOptions}
             />
-          </Field>
-
-          <Field label="Header Style">
-            <Select
-              value={headerStyle}
-              onChange={setHeaderStyle}
-              options={headerStyleOptions}
-              highlighted
-            />
-            {showColourNote && (
-              <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-                Note: Coloring option is enabled for {categorizeBy} and the
-                colors assigned for each picklist option will be applied in the
-                header style.
-              </p>
-            )}
-
-            {headerStyle === "Single Colour" ? (
-              <div className="mt-3 rounded-md border border-slate-200 bg-slate-50/80 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
-                <p className="mb-2 text-[12px] font-medium text-slate-600 dark:text-zinc-300">
-                  Header colour
-                </p>
-                <ColorSwatchRow
-                  value={singleHeaderColor}
-                  onChange={setSingleHeaderColor}
-                />
-              </div>
-            ) : null}
-
-            {headerStyle === "Multi Colour" ? (
-              <div className="mt-3 max-h-48 space-y-3 overflow-y-auto rounded-md border border-slate-200 bg-slate-50/80 p-3 dark:border-zinc-700 dark:bg-zinc-800/50">
-                <p className="text-[12px] font-medium text-slate-600 dark:text-zinc-300">
-                  Colour per column
-                </p>
-                {(headerColorOptions.length
-                  ? headerColorOptions
-                  : [{ id: "default", label: "All columns" }]
-                ).map((opt) => (
-                  <ColorSwatchRow
-                    key={opt.id}
-                    label={opt.label}
-                    value={
-                      multiHeaderColors[opt.id] || DEFAULT_SINGLE_HEADER_COLOR
-                    }
-                    onChange={(hex) =>
-                      setMultiHeaderColors((prev) => ({
-                        ...prev,
-                        [opt.id]: hex,
-                      }))
-                    }
-                  />
-                ))}
-              </div>
-            ) : null}
           </Field>
 
           {/* Share with */}

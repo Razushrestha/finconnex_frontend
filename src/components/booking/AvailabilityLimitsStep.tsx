@@ -1,0 +1,657 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import {
+  loadConsultationAvailability,
+  syncConsultationAvailability,
+} from "@/lib/booking/availability-sync";
+import { Calendar, Info, Pencil } from "lucide-react";
+import type { AvailabilityPanelId } from "@/components/booking/ConsultationWizardLayout";
+import {
+  WEEKDAYS,
+  type AvailabilityRule,
+  type Weekday,
+} from "@/lib/booking/types";
+import { cn } from "@/lib/utils";
+
+const BRAND = "#5A32A3";
+
+const SLOT_OPTIONS = [
+  "No limit",
+  "1",
+  "2",
+  "3",
+  "5",
+  "10",
+  "15",
+  "20",
+  "25",
+  "50",
+];
+
+export type CustomDateLimit = {
+  id: string;
+  start: string;
+  end: string;
+  slotsPerEvent: string;
+  slotsPerCustomer: string;
+};
+
+export type AvailabilityLimitsValues = {
+  defaultHours: boolean;
+  overrideUserHours: boolean;
+  userSpecificHours: boolean;
+  weekly: AvailabilityRule[];
+  userHours: Record<string, AvailabilityRule[]>;
+  slotsPerEvent: string;
+  slotsPerCustomer: string;
+  customLimits: CustomDateLimit[];
+};
+
+function defaultWeek(): AvailabilityRule[] {
+  return WEEKDAYS.map((day) => ({
+    day,
+    enabled: day !== "Saturday" && day !== "Sunday",
+    start: "09:00",
+    end: "17:00",
+  }));
+}
+
+export function defaultAvailabilityLimits(): AvailabilityLimitsValues {
+  return {
+    defaultHours: true,
+    overrideUserHours: false,
+    userSpecificHours: true,
+    weekly: defaultWeek(),
+    userHours: {},
+    slotsPerEvent: "No limit",
+    slotsPerCustomer: "No limit",
+    customLimits: [],
+  };
+}
+
+function Tip({ text }: { text: string }) {
+  return (
+    <span className="group relative inline-flex">
+      <span className="flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 text-slate-400">
+        <Info className="h-2.5 w-2.5" />
+      </span>
+      <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-64 -translate-x-1/2 group-hover:block">
+        <span className="block rounded-md bg-slate-900 px-3 py-2 text-[11px] leading-relaxed text-white shadow-lg">
+          {text}
+        </span>
+      </span>
+    </span>
+  );
+}
+
+function Check({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border"
+      style={{
+        borderColor: checked ? BRAND : "#CBD5E1",
+        backgroundColor: checked ? BRAND : "white",
+      }}
+      aria-label={label}
+      aria-pressed={checked}
+    >
+      {checked ? (
+        <svg viewBox="0 0 12 12" className="h-3 w-3 text-white" aria-hidden>
+          <path
+            d="M2 6.2 4.6 8.8 10 3.2"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ) : null}
+    </button>
+  );
+}
+
+function OutlineButton({
+  children,
+  onClick,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-semibold hover:bg-[#F3ECFB]"
+      style={{ borderColor: BRAND, color: BRAND }}
+    >
+      <Pencil className="h-3.5 w-3.5" />
+      {children}
+    </button>
+  );
+}
+
+function SlotSelect({
+  value,
+  onChange,
+  label,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+}) {
+  return (
+    <select
+      aria-label={label}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="h-10 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/40"
+    >
+      {SLOT_OPTIONS.map((option) => (
+        <option key={option} value={option}>
+          {option}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function HoursEditor({
+  rules,
+  onChange,
+}: {
+  rules: AvailabilityRule[];
+  onChange: (next: AvailabilityRule[]) => void;
+}) {
+  function patch(day: Weekday, partial: Partial<AvailabilityRule>) {
+    onChange(rules.map((rule) => (rule.day === day ? { ...rule, ...partial } : rule)));
+  }
+
+  return (
+    <div className="mt-4 space-y-2 rounded-lg border border-[#E5E7EB] bg-[#FAF8FD] p-3">
+      {rules.map((rule) => (
+        <div key={rule.day} className="flex flex-wrap items-center gap-2">
+          <label className="flex w-28 items-center gap-2 text-[13px] text-slate-700">
+            <input
+              type="checkbox"
+              checked={rule.enabled}
+              onChange={(e) => patch(rule.day, { enabled: e.target.checked })}
+              className="h-3.5 w-3.5 accent-[#5A32A3]"
+            />
+            {rule.day.slice(0, 3)}
+          </label>
+          <input
+            type="time"
+            value={rule.start}
+            disabled={!rule.enabled}
+            onChange={(e) => patch(rule.day, { start: e.target.value })}
+            className="h-9 rounded-lg border border-[#E5E7EB] bg-white px-2 text-[13px] disabled:text-slate-300"
+          />
+          <span className="text-[12px] text-slate-400">to</span>
+          <input
+            type="time"
+            value={rule.end}
+            disabled={!rule.enabled}
+            onChange={(e) => patch(rule.day, { end: e.target.value })}
+            className="h-9 rounded-lg border border-[#E5E7EB] bg-white px-2 text-[13px] disabled:text-slate-300"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function AvailabilityLimitsStep({
+  panel,
+  consultants,
+  consultantUserIds,
+  initial,
+  onBack,
+  onNext,
+  onChange,
+}: {
+  panel: AvailabilityPanelId;
+  consultants: string[];
+  consultantUserIds?: Record<string, string>;
+  initial?: AvailabilityLimitsValues | null;
+  onBack: () => void;
+  onNext: (values: AvailabilityLimitsValues, hostIds: string[]) => void;
+  onChange?: (values: AvailabilityLimitsValues) => void;
+}) {
+  const [values, setValues] = useState<AvailabilityLimitsValues>(
+    initial ?? defaultAvailabilityLimits(),
+  );
+  const [editingDefault, setEditingDefault] = useState(false);
+  const [editingUser, setEditingUser] = useState<string | null>(null);
+  const [draftStart, setDraftStart] = useState("");
+  const [draftEnd, setDraftEnd] = useState("");
+  const [draftEvent, setDraftEvent] = useState("No limit");
+  const [draftCustomer, setDraftCustomer] = useState("No limit");
+  const [draftError, setDraftError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const startDateRef = useRef<HTMLInputElement>(null);
+  const hydrated = useRef(false);
+
+  useEffect(() => {
+    onChange?.(values);
+  }, [values, onChange]);
+
+  useEffect(() => {
+    if (hydrated.current || !consultants.length) return;
+    let alive = true;
+    void loadConsultationAvailability({
+      names: consultants,
+      userIds: consultantUserIds,
+    })
+      .then((loaded) => {
+        if (!alive || !loaded || hydrated.current) return;
+        hydrated.current = true;
+        setValues((prev) => ({
+          ...prev,
+          ...loaded,
+          weekly: loaded.weekly?.length ? loaded.weekly : prev.weekly,
+          userHours: { ...prev.userHours, ...loaded.userHours },
+          customLimits: loaded.customLimits?.length
+            ? loaded.customLimits
+            : prev.customLimits,
+        }));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [consultants, consultantUserIds]);
+
+  async function handleNext() {
+    setSaving(true);
+    setSaveError("");
+    try {
+      const hostIds = await syncConsultationAvailability({
+        names: consultants,
+        userIds: consultantUserIds,
+        values,
+      });
+      onNext(values, hostIds);
+    } catch (err) {
+      setSaveError(
+        err instanceof Error ? err.message : "Could not save availability",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function patch(partial: Partial<AvailabilityLimitsValues>) {
+    setValues((prev) => ({ ...prev, ...partial }));
+  }
+
+  function saveLimit() {
+    if (!draftStart || !draftEnd) {
+      setDraftError("Select a start and end date");
+      return;
+    }
+    if (draftEnd < draftStart) {
+      setDraftError("End date must be on or after the start date");
+      return;
+    }
+    setDraftError("");
+    patch({
+      customLimits: [
+        ...values.customLimits,
+        {
+          id: `limit-${Date.now()}`,
+          start: draftStart,
+          end: draftEnd,
+          slotsPerEvent: draftEvent,
+          slotsPerCustomer: draftCustomer,
+        },
+      ],
+    });
+    setDraftStart("");
+    setDraftEnd("");
+    setDraftEvent("No limit");
+    setDraftCustomer("No limit");
+  }
+
+  const activeUser = editingUser && consultants.includes(editingUser)
+    ? editingUser
+    : consultants[0] ?? null;
+  const userRules =
+    (activeUser && values.userHours[activeUser]) || defaultWeek();
+
+  return (
+    <div className="mx-auto flex w-full max-w-[920px] flex-col pb-8">
+      <div className="rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+        {panel === "dates" ? (
+          <div className="px-5 py-5 sm:px-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h1 className="text-[16px] font-semibold text-slate-900">
+                Event Type Availability
+              </h1>
+              <Tip text="Hours guests can book this consultation." />
+            </div>
+
+            <section className="rounded-xl border border-[#E5E7EB] px-4 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex gap-2.5">
+                  <Check
+                    checked={values.defaultHours}
+                    onChange={(defaultHours) => patch({ defaultHours })}
+                    label="Default Hours"
+                  />
+                  <div>
+                    <p className="text-[14px] font-semibold text-slate-900">
+                      Default Hours
+                    </p>
+                  </div>
+                </div>
+                <OutlineButton onClick={() => setEditingDefault((open) => !open)}>
+                  Customize
+                </OutlineButton>
+              </div>
+
+              {values.defaultHours ? (
+                <div className="mt-4 space-y-3 pl-6">
+                  <div>
+                    <p className="text-[13px] text-slate-700">Schedule Based On</p>
+                    <p className="mt-1 text-[14px] font-semibold text-slate-900">
+                      User Working Hours
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                      Available dates
+                    </p>
+                    <p className="mt-1 text-[14px] text-slate-800">Forever</p>
+                  </div>
+                  <label className="flex items-center gap-2 text-[13px] text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={values.overrideUserHours}
+                      onChange={(e) =>
+                        patch({ overrideUserHours: e.target.checked })
+                      }
+                      className="h-3.5 w-3.5 accent-[#5A32A3]"
+                    />
+                    Override User specific Hours
+                  </label>
+                  {editingDefault ? (
+                    <HoursEditor
+                      rules={values.weekly}
+                      onChange={(weekly) => patch({ weekly })}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+            </section>
+
+            <section className="mt-4 rounded-xl border border-[#E5E7EB] px-4 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex gap-2.5">
+                  <Check
+                    checked={values.userSpecificHours}
+                    onChange={(userSpecificHours) => patch({ userSpecificHours })}
+                    label="User-specific Hours"
+                  />
+                  <div>
+                    <p className="text-[14px] font-semibold text-slate-900">
+                      User-specific Hours
+                    </p>
+                  </div>
+                </div>
+                <OutlineButton
+                  onClick={() =>
+                    setEditingUser((current) =>
+                      current ? null : consultants[0] ?? "",
+                    )
+                  }
+                >
+                  Add Working Hours
+                </OutlineButton>
+              </div>
+              {values.userSpecificHours && editingUser !== null ? (
+                <div className="mt-4 pl-6">
+                  {consultants.length === 0 ? (
+                    <p className="text-[13px] text-slate-500">
+                      Assign a consultant first to set their hours.
+                    </p>
+                  ) : (
+                    <>
+                      <select
+                        value={activeUser ?? ""}
+                        onChange={(e) => setEditingUser(e.target.value)}
+                        className="h-10 w-full max-w-xs rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] text-slate-700 outline-none"
+                      >
+                        {consultants.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                      {activeUser ? (
+                        <HoursEditor
+                          rules={userRules}
+                          onChange={(weekly) =>
+                            patch({
+                              userHours: {
+                                ...values.userHours,
+                                [activeUser]: weekly,
+                              },
+                            })
+                          }
+                        />
+                      ) : null}
+                    </>
+                  )}
+                </div>
+              ) : null}
+            </section>
+          </div>
+        ) : (
+          <div className="px-5 py-5 sm:px-6">
+            <h1 className="text-[16px] font-semibold text-slate-900">
+              Appointment Limits
+            </h1>
+
+            <div className="mt-5">
+              <div className="flex items-center gap-1.5">
+                <p className="text-[14px] font-semibold text-slate-900">
+                  Slots per Event Type
+                </p>
+                <Tip text="How many times this consultation can be booked in a day." />
+              </div>
+              <div className="mt-2 max-w-md">
+                <SlotSelect
+                  label="Slots per event type"
+                  value={values.slotsPerEvent}
+                  onChange={(slotsPerEvent) => patch({ slotsPerEvent })}
+                />
+              </div>
+            </div>
+
+            <div className="mt-5">
+              <div className="flex items-center gap-1.5">
+                <p className="text-[14px] font-semibold text-slate-900">
+                  Slots per Customer
+                </p>
+                <Tip text="How often the same customer can book before the previous appointment is finished." />
+              </div>
+              <div className="mt-2 max-w-md">
+                <SlotSelect
+                  label="Slots per customer"
+                  value={values.slotsPerCustomer}
+                  onChange={(slotsPerCustomer) => patch({ slotsPerCustomer })}
+                />
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <div className="flex items-center gap-1.5">
+                <p className="text-[14px] font-semibold text-slate-900">
+                  Custom Date Limits
+                </p>
+                <Tip text="These limits replace the default for the dates you pick." />
+              </div>
+
+              {values.customLimits.length > 0 ? (
+                <ul className="mt-3 space-y-2">
+                  {values.customLimits.map((limit) => (
+                    <li
+                      key={limit.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#E5E7EB] px-3 py-2 text-[13px] text-slate-700"
+                    >
+                      <span>
+                        {limit.start} to {limit.end}
+                        <span className="ml-2 text-slate-400">
+                          Event {limit.slotsPerEvent} · Customer{" "}
+                          {limit.slotsPerCustomer}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          patch({
+                            customLimits: values.customLimits.filter(
+                              (row) => row.id !== limit.id,
+                            ),
+                          })
+                        }
+                        className="text-[12px] font-semibold text-rose-600 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+
+              <div className="mt-3 rounded-xl bg-[#F7F5FB] p-4">
+                <label className="block text-[12px] font-medium text-slate-600">
+                  Select Date Range
+                </label>
+                <div className="relative mt-1.5 flex max-w-xs items-center gap-2 rounded-lg border border-[#E5E7EB] bg-white px-3">
+                  <Calendar className="h-4 w-4 shrink-0 text-slate-400" />
+                  <input
+                    ref={startDateRef}
+                    type="date"
+                    aria-label="Limit start date"
+                    value={draftStart}
+                    onChange={(e) => setDraftStart(e.target.value)}
+                    className="h-10 min-w-0 flex-1 bg-transparent text-[13px] outline-none"
+                  />
+                  <span className="text-[12px] text-slate-400">to</span>
+                  <input
+                    type="date"
+                    aria-label="Limit end date"
+                    value={draftEnd}
+                    onChange={(e) => setDraftEnd(e.target.value)}
+                    className="h-10 min-w-0 flex-1 bg-transparent text-[13px] outline-none"
+                  />
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
+                  <div className="flex flex-wrap gap-3">
+                    <div className="w-[160px]">
+                      <p className="mb-1.5 text-[12px] text-slate-600">
+                        Slots per Event Type
+                      </p>
+                      <SlotSelect
+                        label="Custom slots per event type"
+                        value={draftEvent}
+                        onChange={setDraftEvent}
+                      />
+                    </div>
+                    <div className="w-[160px]">
+                      <p className="mb-1.5 text-[12px] text-slate-600">
+                        Slots per Customer
+                      </p>
+                      <SlotSelect
+                        label="Custom slots per customer"
+                        value={draftCustomer}
+                        onChange={setDraftCustomer}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={saveLimit}
+                      className="h-9 rounded-lg px-4 text-[13px] font-semibold text-white"
+                      style={{ backgroundColor: BRAND }}
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDraftStart("");
+                        setDraftEnd("");
+                        setDraftEvent("No limit");
+                        setDraftCustomer("No limit");
+                        setDraftError("");
+                      }}
+                      className="h-9 rounded-lg border border-[#E5E7EB] bg-white px-4 text-[13px] font-semibold text-slate-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+                {draftError ? (
+                  <p className="mt-2 text-[12px] font-medium text-rose-600">
+                    {draftError}
+                  </p>
+                ) : null}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => startDateRef.current?.focus()}
+                className="mt-3 text-[13px] font-semibold text-[#5A32A3] hover:underline"
+              >
+                + Add Limit
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className={cn(
+            "h-10 min-w-[96px] rounded-lg border border-[#E5E7EB] bg-white px-6 text-[13px] font-semibold text-slate-700 hover:bg-slate-50",
+          )}
+        >
+          Back
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleNext()}
+          disabled={saving}
+          className="h-10 min-w-[96px] rounded-lg px-6 text-[13px] font-semibold text-white hover:brightness-110 disabled:opacity-60"
+          style={{ backgroundColor: BRAND }}
+        >
+          {saving ? "Saving…" : "Next"}
+        </button>
+      </div>
+      {saveError ? (
+        <p className="mt-3 text-center text-[12px] font-medium text-rose-600">
+          {saveError}
+        </p>
+      ) : null}
+    </div>
+  );
+}

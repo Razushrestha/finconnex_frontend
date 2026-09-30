@@ -110,7 +110,6 @@ export function defaultActivityAnalyticsFilters(): ActivityAnalyticsFilters {
 export function computeActivityAnalytics(filters: ActivityAnalyticsFilters, now = new Date()) {
   const bounds = dateRangeBounds(filters, now);
   const previous = previousDateRangeBounds(filters, now);
-  const members = ACTIVITY_OWNERS.filter((name) => matchesOwner(name, filters));
   const leadsAll = loadLeads(now).filter((lead) => matchesOwner(lead.owner, filters));
   const deals = loadDeals(now).filter((deal) => matchesOwner(deal.owner, filters));
   const activities = loadActivities().filter((row) => matchesOwner(row.owner, filters));
@@ -119,6 +118,24 @@ export function computeActivityAnalytics(filters: ActivityAnalyticsFilters, now 
   const meetings = listMeetings().filter((row) => matchesOwner(row.organizer, filters));
   const tasks = listAllTasks().filter((task) => matchesOwner(task.assignedTo, filters));
   const followUps = listReminders().filter((row) => matchesOwner(row.owner, filters));
+
+  // Demo owner roster was removed; fall back to owners present on live rows.
+  const roster =
+    ACTIVITY_OWNERS.length > 0
+      ? [...ACTIVITY_OWNERS]
+      : Array.from(
+          new Set(
+            [
+              ...leadsAll.map((lead) => lead.owner),
+              ...activities.map((row) => row.owner),
+              ...calls.map((row) => row.assignedTo),
+              ...tasks.map((task) => task.assignedTo),
+              ...meetings.map((row) => row.organizer),
+              ...followUps.map((row) => row.owner),
+            ].filter(Boolean),
+          ),
+        );
+  const members = roster.filter((name) => matchesOwner(name, filters));
 
   const leads = leadsAll.filter((lead) => {
     if (filters.source !== "All" && lead.source !== filters.source) return false;

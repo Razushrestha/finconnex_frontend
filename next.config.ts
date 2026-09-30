@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
     "192.168.1.113",
     "192.168.1.68",
     "localhost",
+    "127.0.0.1",
   ],
   images: {
     remotePatterns: [

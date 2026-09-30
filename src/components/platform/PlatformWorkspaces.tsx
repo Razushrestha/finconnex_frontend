@@ -3,14 +3,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import {
+  activatePlatformWorkspace,
+  deletePlatformWorkspace,
   enterWorkspace,
-  listAdminWorkspaces,
-  type AdminWorkspace,
-} from "@/lib/admin/api";
+  listPlatformWorkspaces,
+  restorePlatformWorkspace,
+  suspendPlatformWorkspace,
+  type PlatformWorkspace,
+} from "@/lib/platform/api";
 
 function formatWhen(iso: string) {
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
+  if (Number.isNaN(date.getTime())) return iso || "—";
   return date.toLocaleDateString(undefined, {
     year: "numeric",
     month: "short",
@@ -21,26 +25,33 @@ function formatWhen(iso: string) {
 function statusTone(status: string) {
   const s = status.toUpperCase();
   if (s === "ACTIVE") return "bg-emerald-50 text-emerald-700";
-  if (s === "SUSPENDED" || s === "DISABLED") return "bg-rose-50 text-rose-700";
+  if (s === "SUSPENDED") return "bg-amber-50 text-amber-800";
+  if (s === "CANCELLED" || s === "DISABLED") return "bg-rose-50 text-rose-700";
   return "bg-slate-100 text-slate-600";
 }
 
 export function PlatformWorkspaces() {
-  const [items, setItems] = useState<AdminWorkspace[]>([]);
+  const [items, setItems] = useState<PlatformWorkspace[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
+  const [includeDeleted, setIncludeDeleted] = useState(false);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [entering, setEntering] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const limit = 20;
 
-  const refresh = useCallback(async (q: string, p: number) => {
+  const refresh = useCallback(async (q: string, p: number, deleted: boolean) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await listAdminWorkspaces({ page: p, limit, search: q });
+      const result = await listPlatformWorkspaces({
+        page: p,
+        limit,
+        search: q,
+        includeDeleted: deleted,
+      });
       setItems(result.items);
       setTotal(result.total);
     } catch (err) {
@@ -53,25 +64,39 @@ export function PlatformWorkspaces() {
   }, []);
 
   useEffect(() => {
-    void refresh(query, page);
-  }, [refresh, query, page]);
+    void refresh(query, page, includeDeleted);
+  }, [refresh, query, page, includeDeleted]);
 
-  async function enter(row: AdminWorkspace) {
-    if (
-      !window.confirm(
-        `Enter ${row.name}? You will leave the platform console and open this tenant’s CRM.`,
-      )
-    ) {
-      return;
-    }
-    setEntering(row.id);
+  async function runAction(
+    row: PlatformWorkspace,
+    action: "enter" | "suspend" | "activate" | "restore" | "delete",
+  ) {
+    const labels = {
+      enter: `Enter ${row.name}? You will leave the platform console and open this tenant’s CRM.`,
+      suspend: `Suspend ${row.name}? Members will be blocked until you activate it again.`,
+      activate: `Activate ${row.name}?`,
+      restore: `Restore soft-deleted ${row.name} and its records?`,
+      delete: `Soft-delete ${row.name}? You can restore it later from this directory.`,
+    };
+    if (!window.confirm(labels[action])) return;
+
+    setBusyId(row.id);
     setError(null);
     try {
-      await enterWorkspace({ id: row.id, name: row.name, slug: row.slug });
-      window.location.href = "/";
+      if (action === "enter") {
+        await enterWorkspace({ id: row.id, name: row.name, slug: row.slug });
+        window.location.href = "/";
+        return;
+      }
+      if (action === "suspend") await suspendPlatformWorkspace(row.id);
+      if (action === "activate") await activatePlatformWorkspace(row.id);
+      if (action === "restore") await restorePlatformWorkspace(row.id);
+      if (action === "delete") await deletePlatformWorkspace(row.id);
+      await refresh(query, page, includeDeleted);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not enter workspace");
-      setEntering(null);
+      setError(err instanceof Error ? err.message : "Action failed");
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -83,27 +108,41 @@ export function PlatformWorkspaces() {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Workspaces</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Every tenant on this CRM. Entering a row selects that workspace on
-            the access token — it does not grant cross-tenant data on one
-            screen.
+            Every tenant via{" "}
+            <span className="font-mono text-[12px]">GET /v1/platform/workspaces</span>
+            . Lifecycle actions call suspend, activate, restore, and soft-delete.
           </p>
         </div>
-        <form
-          className="relative w-full sm:max-w-xs"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setPage(1);
-            setQuery(search.trim());
-          }}
-        >
-          <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name or slug"
-            className="h-11 w-full rounded-full border border-slate-200 bg-white pr-4 pl-10 text-sm outline-none focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/15"
-          />
-        </form>
+        <div className="flex w-full flex-col gap-2 sm:max-w-md sm:flex-row sm:items-center">
+          <label className="flex items-center gap-2 text-[12px] text-slate-500">
+            <input
+              type="checkbox"
+              checked={includeDeleted}
+              onChange={(e) => {
+                setPage(1);
+                setIncludeDeleted(e.target.checked);
+              }}
+              className="rounded border-slate-300"
+            />
+            Include deleted
+          </label>
+          <form
+            className="relative flex-1"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setPage(1);
+              setQuery(search.trim());
+            }}
+          >
+            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name or slug"
+              className="h-11 w-full rounded-full border border-slate-200 bg-white pr-4 pl-10 text-sm outline-none focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/15"
+            />
+          </form>
+        </div>
       </div>
 
       {error ? (
@@ -139,42 +178,90 @@ export function PlatformWorkspaces() {
                   </td>
                 </tr>
               ) : (
-                items.map((row) => (
-                  <tr key={row.id} className="hover:bg-violet-50/40">
-                    <td className="px-5 py-3.5">
-                      <p className="font-semibold text-slate-900">{row.name}</p>
-                      <p className="font-mono text-[11px] text-slate-400">
-                        {row.slug}
-                      </p>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${statusTone(row.status)}`}
-                      >
-                        {row.status || "—"}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-600">
-                      {row.plan || "—"}
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-600">
-                      {row.memberCount ?? "—"}
-                    </td>
-                    <td className="px-5 py-3.5 text-slate-500">
-                      {row.createdAt ? formatWhen(row.createdAt) : "—"}
-                    </td>
-                    <td className="px-5 py-3.5 text-right">
-                      <button
-                        type="button"
-                        disabled={entering === row.id}
-                        onClick={() => void enter(row)}
-                        className="inline-flex h-9 items-center rounded-full bg-[#5A32A3] px-3.5 text-[12px] font-semibold text-white shadow-sm shadow-[#5A32A3]/25 hover:brightness-95 disabled:opacity-50"
-                      >
-                        {entering === row.id ? "Entering…" : "Enter"}
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                items.map((row) => {
+                  const deleted = !!row.deletedAt;
+                  const suspended = row.status.toUpperCase() === "SUSPENDED";
+                  const busy = busyId === row.id;
+                  return (
+                    <tr key={row.id} className="hover:bg-violet-50/40">
+                      <td className="px-5 py-3.5">
+                        <p className="font-semibold text-slate-900">{row.name}</p>
+                        <p className="font-mono text-[11px] text-slate-400">
+                          {row.slug}
+                          {deleted ? " · deleted" : ""}
+                        </p>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${statusTone(row.status)}`}
+                        >
+                          {row.status || "—"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-600">
+                        {row.plan || "—"}
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-600">
+                        {row.memberCount ?? "—"}
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-500">
+                        {formatWhen(row.createdAt)}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                          {!deleted ? (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void runAction(row, "enter")}
+                              className="inline-flex h-8 items-center rounded-full bg-[#5A32A3] px-3 text-[11px] font-semibold text-white disabled:opacity-50"
+                            >
+                              Enter
+                            </button>
+                          ) : null}
+                          {deleted ? (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void runAction(row, "restore")}
+                              className="inline-flex h-8 items-center rounded-full px-3 text-[11px] font-semibold ring-1 ring-slate-200 disabled:opacity-50"
+                            >
+                              Restore
+                            </button>
+                          ) : suspended ? (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void runAction(row, "activate")}
+                              className="inline-flex h-8 items-center rounded-full px-3 text-[11px] font-semibold ring-1 ring-emerald-200 text-emerald-700 disabled:opacity-50"
+                            >
+                              Activate
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void runAction(row, "suspend")}
+                              className="inline-flex h-8 items-center rounded-full px-3 text-[11px] font-semibold ring-1 ring-amber-200 text-amber-800 disabled:opacity-50"
+                            >
+                              Suspend
+                            </button>
+                          )}
+                          {!deleted ? (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void runAction(row, "delete")}
+                              className="inline-flex h-8 items-center rounded-full px-3 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-200 disabled:opacity-50"
+                            >
+                              Delete
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

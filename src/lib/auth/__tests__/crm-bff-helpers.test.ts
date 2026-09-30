@@ -4,8 +4,21 @@ import {
   isEmptyDashboardLayoutWritePath,
   isEmptyDashboardWidgetBatchPath,
   isEmptySignedInListPath,
-  isHostedMissingCrmGet,
   isHostedMissingSignatureListPath,
+  isContactRecordPatch,
+  contactPatchOkBody,
+  isCallLogOutcomePost,
+  parseCallLogOutcomePath,
+  outcomeFromCallLogBody,
+  callLogOutcomeOkBody,
+  parseTaskLifecyclePath,
+  taskLifecycleOkBody,
+  parseEmailRecordGet,
+  emailRecordOkBody,
+  parseMeetingCancelPath,
+  meetingCancelOkBody,
+  parseCallCompletePath,
+  callCompleteOkBody,
   normalizeCrmProxyPath,
 } from "@/lib/auth/crm-bff-helpers";
 
@@ -53,9 +66,135 @@ describe("isEmptySignedInListPath", () => {
       false,
     );
     expect(isHostedMissingSignatureListPath(["leads"], "GET")).toBe(false);
-    expect(isHostedMissingCrmGet(["signature-requests"], "GET")).toBe(false);
-    expect(isHostedMissingCrmGet(["dashboard"], "GET")).toBe(false);
-    expect(isHostedMissingCrmGet(["leads"], "GET")).toBe(false);
+  });
+
+  it("recognizes PATCH /contacts/:id", () => {
+    expect(
+      isContactRecordPatch(["contacts", "6739d58f-abfe-4d51-846b-d6e9b9687eb3"], "PATCH"),
+    ).toBe(true);
+    expect(
+      isContactRecordPatch(
+        ["workspaces", workspace, "contacts", "6739d58f-abfe-4d51-846b-d6e9b9687eb3"],
+        "PATCH",
+      ),
+    ).toBe(true);
+    expect(isContactRecordPatch(["contacts"], "PATCH")).toBe(false);
+    expect(isContactRecordPatch(["contacts", "x"], "GET")).toBe(false);
+    const payload = JSON.parse(
+      contactPatchOkBody("6739d58f-abfe-4d51-846b-d6e9b9687eb3", '{"firstName":"Ada"}'),
+    );
+    expect(payload.statusCode).toBe(200);
+    expect(payload.data.id).toBe("6739d58f-abfe-4d51-846b-d6e9b9687eb3");
+    expect(payload.data.firstName).toBe("Ada");
+  });
+
+  it("recognizes POST /calls/:id/log-outcome", () => {
+    const callId = "f09a1a16-ccdf-4be0-98f0-56fa819356ce";
+    expect(isCallLogOutcomePost(["calls", callId, "log-outcome"], "POST")).toBe(
+      true,
+    );
+    expect(
+      isCallLogOutcomePost(
+        ["workspaces", workspace, "calls", callId, "log-outcome"],
+        "POST",
+      ),
+    ).toBe(true);
+    expect(isCallLogOutcomePost(["calls", callId, "complete"], "POST")).toBe(
+      false,
+    );
+    expect(parseCallLogOutcomePath(["calls", callId, "log-outcome"])).toEqual({
+      callId,
+      workspaceId: null,
+    });
+    expect(outcomeFromCallLogBody('{"status":"NO_ANSWER","outcome":"Busy"}')).toBe(
+      "Busy",
+    );
+    const payload = JSON.parse(
+      callLogOutcomeOkBody(callId, '{"status":"NO_ANSWER","outcome":"Busy"}'),
+    );
+    expect(payload.statusCode).toBe(200);
+    expect(payload.data.id).toBe(callId);
+    expect(payload.data.outcome).toBe("Busy");
+  });
+
+  it("recognizes POST /tasks/:id/start", () => {
+    const taskId = "cad1e63e-1991-484d-8af0-fe239b9bd27c";
+    expect(
+      parseTaskLifecyclePath([
+        "workspaces",
+        workspace,
+        "tasks",
+        taskId,
+        "start",
+      ]),
+    ).toEqual({ taskId, workspaceId: workspace, action: "start" });
+    expect(parseTaskLifecyclePath(["tasks", taskId, "defer"])).toEqual({
+      taskId,
+      workspaceId: null,
+      action: "defer",
+    });
+    expect(parseTaskLifecyclePath(["tasks", taskId, "comments"])).toBeNull();
+    const payload = JSON.parse(taskLifecycleOkBody(taskId, "start"));
+    expect(payload.statusCode).toBe(200);
+    expect(payload.data.id).toBe(taskId);
+    expect(payload.data.status).toBe("IN_PROGRESS");
+  });
+
+  it("recognizes GET /emails/:id", () => {
+    const emailId = "f09a1a16-ccdf-4be0-98f0-56fa819356ce";
+    expect(parseEmailRecordGet(["emails", emailId], "GET")).toEqual({
+      emailId,
+      workspaceId: null,
+    });
+    expect(
+      parseEmailRecordGet(
+        ["workspaces", workspace, "emails", emailId],
+        "GET",
+      ),
+    ).toEqual({ emailId, workspaceId: workspace });
+    expect(parseEmailRecordGet(["emails", "templates"], "GET")).toBeNull();
+    const payload = JSON.parse(emailRecordOkBody(emailId));
+    expect(payload.statusCode).toBe(200);
+    expect(payload.data.id).toBe(emailId);
+  });
+
+  it("recognizes POST /meetings/:id/cancel", () => {
+    const meetingId = "b220390b-b9e2-49db-96dd-b72dba07a010";
+    expect(
+      parseMeetingCancelPath([
+        "workspaces",
+        workspace,
+        "meetings",
+        meetingId,
+        "cancel",
+      ]),
+    ).toEqual({ meetingId, workspaceId: workspace });
+    expect(parseMeetingCancelPath(["meetings", meetingId, "start"])).toBeNull();
+    const payload = JSON.parse(meetingCancelOkBody(meetingId));
+    expect(payload.statusCode).toBe(200);
+    expect(payload.data.id).toBe(meetingId);
+    expect(payload.data.status).toBe("CANCELLED");
+  });
+
+  it("recognizes POST /calls/:id/complete", () => {
+    const callId = "0b127b90-291a-4cc3-9521-9a7254d11456";
+    expect(
+      parseCallCompletePath([
+        "workspaces",
+        workspace,
+        "calls",
+        callId,
+        "complete",
+      ]),
+    ).toEqual({ callId, workspaceId: workspace });
+    expect(parseCallCompletePath(["calls", callId, "cancel"])).toBeNull();
+    const payload = JSON.parse(
+      callCompleteOkBody(callId, '{"outcome":"Wrapped up"}'),
+    );
+    expect(payload.statusCode).toBe(200);
+    expect(payload.data.id).toBe(callId);
+    expect(payload.data.status).toBe("COMPLETED");
+    expect(payload.data.outcome).toBe("Wrapped up");
   });
 
   it("normalizes catch-all path strings and v1 prefixes", () => {

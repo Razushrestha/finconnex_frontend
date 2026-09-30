@@ -31,7 +31,7 @@ export const DEFAULT_ADDITIONAL_SETTINGS: AdditionalSettingsValues = {
   cancelUnit: "Minutes",
   calendarInvites: true,
   inviteNotes:
-    "Phone:- {{contact.phone}}\nEmail:- {{contact.email}}\n\nNeed to make a change to this event?\nReschedule:-",
+    "Phone: {{contact.phone}}\nEmail: {{contact.email}}\n\nNeed to make a change to this event?\nReschedule:",
 };
 
 function Toggle({
@@ -128,21 +128,15 @@ export function BookingAdditionalSettingsStep({
         <h1 className="text-[18px] font-bold text-slate-900">
           Additional settings
         </h1>
-        <p className="mt-1 text-[13px] text-slate-500">
-          Configure policies and how this consultation appears on the FinConnex
-          calendar.
-        </p>
 
         <div className="mt-4">
           <SettingRow
             title="Assign contacts to their respective calendar team members each time an appointment is booked."
-            description="When enabled, Contact's assigned user will match the owner of the appointment with the most recent change — whether it's been booked, rescheduled, or reassigned."
             on={values.assignOnBook}
             onChange={(assignOnBook) => patch({ assignOnBook })}
           />
           <SettingRow
             title="Skip assigning Contact if the Contact has already an assigned user."
-            description="When enabled, a Contact's assigned user will remain the same, even if the appointment owner is different."
             on={values.skipIfAssigned}
             onChange={(skipIfAssigned) => patch({ skipIfAssigned })}
           />
@@ -223,10 +217,6 @@ export function BookingAdditionalSettingsStep({
         <h2 className="text-[18px] font-bold text-slate-900">
           FinConnex calendar
         </h2>
-        <p className="mt-1 text-[13px] text-slate-500">
-          Bookings use the FinConnex calendar (Activities → Calendar). Google or
-          Outlook are optional sync only — they are not required to send invites.
-        </p>
         <div className="mt-4">
           <SettingRow
             title="Add booked consultations to the FinConnex calendar and include invite notes in confirmation emails."

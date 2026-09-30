@@ -68,6 +68,12 @@ describe("creating a task with a status", () => {
     expect(await applyCrmTaskStatus(TASK, "Review")).toBeNull();
     expect(calls).toEqual([]);
   });
+
+  it("does not GET a local task-… id from hosted CRM", async () => {
+    const { getCrmTask } = await import("@/lib/tasks/api");
+    expect(await getCrmTask("task-1789419127065-e0c7c45e")).toBeNull();
+    expect(calls).toEqual([]);
+  });
 });
 
 describe("syncing task status", () => {
@@ -128,5 +134,13 @@ describe("syncing task status", () => {
     expect(calls.some((c) => c.method === "POST" && c.path.endsWith(`/${TASK}/defer`))).toBe(
       true,
     );
+  });
+
+  it("does not POST start against a local task-… id", async () => {
+    const { applyCrmTaskStatus } = await import("@/lib/tasks/api");
+    expect(
+      await applyCrmTaskStatus("task-1789419127065-e0c7c45e", "In Progress"),
+    ).toBeNull();
+    expect(calls.some((c) => c.path.includes("task-1789419127065"))).toBe(false);
   });
 });

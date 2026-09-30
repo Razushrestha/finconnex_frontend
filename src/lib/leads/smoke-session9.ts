@@ -108,7 +108,7 @@ export function runSmokeSession9() {
   ]);
   assertDoc(m.docs.apiRunbook, [
     "enableApiPersistence",
-    "sales:leads:board:v6",
+    "sales:leads:board:v7",
     "activities:attachments:list:v1",
     "X-Tenant-Id",
     "Phase 10",

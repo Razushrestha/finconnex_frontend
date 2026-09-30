@@ -271,7 +271,7 @@ export function runSmokeSession17() {
     path.join(repoRoot(), "src/lib/leads/store.ts"),
     "utf8",
   );
-  if (!storeBody.includes("sales:leads:board:v6")) {
+  if (!storeBody.includes("sales:leads:board:v7")) {
     fail("store key must be board:v6");
   }
   if (!storeBody.includes("normalizeMortgageBoard")) {

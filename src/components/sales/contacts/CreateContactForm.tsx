@@ -364,6 +364,7 @@ export function CreateContactForm({
       <Field
         label="Owner"
         required
+        className="relative z-10 sm:col-span-2"
         error={submitted ? errors.owner : undefined}
       >
         <InputShell icon={Users} error={!!(submitted && errors.owner)}>
@@ -408,7 +409,7 @@ export function CreateContactForm({
             </button>
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/70 dark:bg-zinc-900/40">
-            <div className="grid grid-cols-1 content-start gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 content-start gap-x-4 gap-y-3 px-5 py-4 pb-6 sm:grid-cols-2">
               {fields}
             </div>
           </div>

@@ -80,6 +80,9 @@ function TaskDetailPageInner() {
       if (!remote) return;
       const stored = persistRemoteTask(remote);
       if (stored) setTask(stored);
+      if (remote.taskId && remote.taskId !== id) {
+        router.replace(`/activities/tasks/detail/${encodeURIComponent(remote.taskId)}`);
+      }
     });
   }
 

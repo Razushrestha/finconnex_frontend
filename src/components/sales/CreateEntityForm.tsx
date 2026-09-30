@@ -204,6 +204,7 @@ interface CreateEntityFormShellProps {
   variant?: "page" | "modal";
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  showCreateAnother?: boolean;
 }
 
 export function CreateEntityFormShell({
@@ -222,6 +223,7 @@ export function CreateEntityFormShell({
   variant = "page",
   open = true,
   onOpenChange,
+  showCreateAnother = true,
 }: CreateEntityFormShellProps) {
   const router = useRouter();
   void _breadcrumbParent;
@@ -258,14 +260,16 @@ export function CreateEntityFormShell({
       >
         Cancel
       </button>
-      <button
-        type="button"
-        onClick={() => void handleSave(true)}
-        disabled={saving}
-        className="h-8 rounded-md border border-violet-200 bg-violet-50 px-3 text-[12px] font-semibold text-violet-700 transition-colors hover:bg-violet-100 disabled:opacity-50 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300"
-      >
-        Save &amp; New
-      </button>
+      {showCreateAnother ? (
+        <button
+          type="button"
+          onClick={() => void handleSave(true)}
+          disabled={saving}
+          className="h-8 rounded-md border border-violet-200 bg-violet-50 px-3 text-[12px] font-semibold text-violet-700 transition-colors hover:bg-violet-100 disabled:opacity-50 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-300"
+        >
+          Save &amp; New
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={() => void handleSave(false)}

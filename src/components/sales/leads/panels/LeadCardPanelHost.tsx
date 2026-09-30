@@ -41,8 +41,6 @@ interface LeadCardPanelHostProps {
 const QUICK_DIALOG_KINDS: QuickActionKind[] = ["call", "sms", "email"];
 
 // Remaining kinds route into LeadEditDialog's sidebar sections.
-// TODO: no "attachment" section exists in LeadEditDialog yet — defaulting to
-// "notes" for now. Revisit if attachments need their own tab.
 const EDIT_DIALOG_SECTION: Partial<
   Record<QuickActionKind, "appointment" | "tasks" | "notes" | "associated">
 > = {

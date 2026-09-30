@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import {
+  DEFAULT_LEAD_CARD_HEADER_COLOR,
   DEFAULT_LEAD_CARD_SETTINGS,
+  LEAD_CARD_HEADER_PALETTE,
   LEAD_CARD_SETTINGS_KEY,
   LEAD_CARD_SETTINGS_PATH,
   MAX_DYNAMIC_FIELDS,
@@ -14,6 +16,7 @@ import {
   saveLeadCardSettings,
   settingsValuesToLeadCard,
   type LeadCardFieldKey,
+  type LeadCardHeaderStyle,
   type LeadCardSettings,
 } from "@/lib/leads/lead-card-settings";
 import { onCustomFieldsChange } from "@/lib/custom-fields/store";
@@ -25,6 +28,21 @@ import {
 import { useCrmSettings } from "@/lib/settings/use-crm-settings";
 import { cn } from "@/lib/utils";
 import { notify } from "@/lib/notify/toast";
+import { ColorWheelPicker } from "@/components/common/ColorWheelPicker";
+import { MORTGAGE_PIPELINE_STAGES } from "@/lib/pipeline-sla/types";
+import { stageColumnId } from "@/lib/pipeline-sla/board";
+import { persistCrmLeadKanbanPreference } from "@/lib/kanban/preference-api";
+
+const HEADER_STYLE_OPTIONS: LeadCardHeaderStyle[] = [
+  "Multi Colour",
+  "Single Colour",
+  "None",
+];
+
+const HEADER_COLOR_OPTIONS = MORTGAGE_PIPELINE_STAGES.map((stage) => ({
+  id: stageColumnId(stage),
+  label: stage,
+}));
 
 export function LeadCardSettingsClient() {
   useCrmCustomFields();
@@ -88,6 +106,7 @@ export function LeadCardSettingsClient() {
   async function onSave() {
     const saved = saveLeadCardSettings(settings);
     setSettings(saved);
+    persistCrmLeadKanbanPreference(saved);
     setSaving(true);
     try {
       const next = await saveCrmSettingsFormPage(
@@ -118,9 +137,10 @@ export function LeadCardSettingsClient() {
               Lead Card
             </h2>
             <p className="mt-0.5 text-[12px] leading-relaxed text-slate-500">
-              Admin layout for Sales → Leads. Pick up to {MAX_DYNAMIC_FIELDS}{" "}
-              fields from Lead Details or Custom Fields. Locked defaults: owner
-              avatar off, unreplied threshold 24h, Note/Attachment stay
+              Kanban view settings for Sales → Leads live here (not on the
+              board). Pick up to {MAX_DYNAMIC_FIELDS} fields from Lead Details
+              or Custom Fields, and set Kanban header colours. Locked defaults:
+              owner avatar off, unreplied threshold 24h, Note/Attachment stay
               neutral (no escalation/push from the card).
             </p>
           </div>
@@ -167,6 +187,94 @@ export function LeadCardSettingsClient() {
               )}
             />
           </button>
+        </div>
+
+        <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-4">
+          <div>
+            <p className="text-[12px] font-semibold text-slate-800">
+              Header Style
+            </p>
+            <p className="mt-0.5 text-[11px] text-slate-400">
+              Column header colours for the Leads Kanban. Managed here in
+              Settings — not on the board settings modal.
+            </p>
+          </div>
+          <select
+            value={settings.headerStyle}
+            onChange={(e) =>
+              setSettings((s) => ({
+                ...s,
+                headerStyle: e.target.value as LeadCardHeaderStyle,
+              }))
+            }
+            className="h-10 w-full max-w-xs rounded-xl border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none focus:ring-2 focus:ring-violet-300"
+          >
+            {HEADER_STYLE_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+
+          {settings.headerStyle === "Single Colour" ? (
+            <div className="rounded-md border border-slate-200 bg-white p-3">
+              <p className="mb-2 text-[12px] font-medium text-slate-600">
+                Header colour
+              </p>
+              <ColorWheelPicker
+                value={settings.singleHeaderColor || DEFAULT_LEAD_CARD_HEADER_COLOR}
+                onChange={(hex) =>
+                  setSettings((s) => ({ ...s, singleHeaderColor: hex }))
+                }
+              />
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {LEAD_CARD_HEADER_PALETTE.map((hex) => (
+                  <button
+                    key={hex}
+                    type="button"
+                    aria-label={`Use ${hex}`}
+                    onClick={() =>
+                      setSettings((s) => ({ ...s, singleHeaderColor: hex }))
+                    }
+                    className={cn(
+                      "h-6 w-6 rounded-full border border-slate-200",
+                      settings.singleHeaderColor === hex &&
+                        "ring-2 ring-violet-500 ring-offset-1",
+                    )}
+                    style={{ backgroundColor: hex }}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {settings.headerStyle === "Multi Colour" ? (
+            <div className="max-h-56 space-y-3 overflow-y-auto rounded-md border border-slate-200 bg-white p-3">
+              <p className="text-[12px] font-medium text-slate-600">
+                Colour per column
+              </p>
+              {HEADER_COLOR_OPTIONS.map((opt, i) => (
+                <ColorWheelPicker
+                  key={opt.id}
+                  label={opt.label}
+                  value={
+                    settings.multiHeaderColors[opt.id] ||
+                    LEAD_CARD_HEADER_PALETTE[i % LEAD_CARD_HEADER_PALETTE.length] ||
+                    DEFAULT_LEAD_CARD_HEADER_COLOR
+                  }
+                  onChange={(hex) =>
+                    setSettings((s) => ({
+                      ...s,
+                      multiHeaderColors: {
+                        ...s.multiHeaderColors,
+                        [opt.id]: hex,
+                      },
+                    }))
+                  }
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <fieldset>

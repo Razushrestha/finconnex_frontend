@@ -30,6 +30,7 @@ export function AssignConsultantsStep({
   onCreate: (
     consultants: string[],
     priorities: Record<string, ConsultantPriority>,
+    userIds: Record<string, string>,
   ) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -39,6 +40,7 @@ export function AssignConsultantsStep({
   >({});
   const [error, setError] = useState("");
   const [hostNames, setHostNames] = useState<string[]>([]);
+  const [userIds, setUserIds] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let alive = true;
@@ -46,6 +48,9 @@ export function AssignConsultantsStep({
       .then((owners) => {
         if (!alive) return;
         setHostNames(owners.map((owner) => owner.name));
+        setUserIds(
+          Object.fromEntries(owners.map((owner) => [owner.name, owner.id])),
+        );
       })
       .catch(() => undefined);
     return () => {
@@ -232,7 +237,9 @@ export function AssignConsultantsStep({
             }
             const next: Record<string, ConsultantPriority> = {};
             for (const name of selected) next[name] = priorityOf(name);
-            onCreate(selected, next);
+            const ids: Record<string, string> = {};
+            for (const name of selected) ids[name] = userIds[name] ?? "";
+            onCreate(selected, next, ids);
           }}
           className="h-10 min-w-[96px] rounded-lg px-6 text-[13px] font-semibold text-white hover:brightness-110"
           style={{ backgroundColor: BRAND }}

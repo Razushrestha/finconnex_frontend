@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   EntityHeader,
@@ -52,7 +53,6 @@ import {
   Tag,
   ShieldCheck,
   Download,
-  Pencil,
   ArchiveRestore,
 } from "lucide-react";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
@@ -62,7 +62,6 @@ import {
   KANBAN_HEADER_PALETTE,
   KanbanField,
   KanbanViewConfig,
-  KanbanViewSettingsModal,
 } from "@/components/common/KanbanViewControls";
 import {
   ListViewSettingsModal,
@@ -88,9 +87,8 @@ import {
   tryCrmTablePreference,
 } from "@/lib/table-preferences/api";
 import {
-  applyKanbanPreferenceToView,
+  applyKanbanPreferenceToLeadCard,
   getCrmLeadKanbanPreference,
-  isEmptyLeadKanbanPreference,
   persistCrmLeadKanbanPreference,
   tryCrmLeadKanbanPreference,
 } from "@/lib/kanban/preference-api";
@@ -109,15 +107,6 @@ const LEAD_STAGES: KanbanField[] = LEAD_PIPELINE_STAGES.map((stage) => ({
 }));
 
 const ALL_LEAD_STAGE_IDS = LEAD_STAGES.map((stage) => stage.id);
-
-const LEAD_FIELDS: KanbanField[] = [
-  { id: "leadName", label: "Lead Name", required: true },
-  { id: "source", label: "Source" },
-  { id: "phone", label: "Phone" },
-  { id: "email", label: "Email" },
-  { id: "leadOwner", label: "Lead Owner" },
-  { id: "tag", label: "Tag" },
-];
 
 const HEADER_COLOR_OPTIONS = MORTGAGE_PIPELINE_STAGES.map((stage) => ({
   id: stageColumnId(stage),
@@ -273,12 +262,18 @@ function persistViewConfig(config: KanbanViewConfig) {
 function applyViewFieldsToCards(config: KanbanViewConfig) {
   const keys = kanbanSelectedIdsToCardKeys(config.selectedFieldIds);
   const current = loadLeadCardSettings();
-  // Settings store stays capped; Kanban cards use the full selection via props.
-  saveLeadCardSettings({
+  const next = {
     ...current,
     dynamicFieldKeys: keys.length ? keys : current.dynamicFieldKeys,
     showOwnerAvatar: kanbanShowsOwnerAvatar(config.selectedFieldIds),
-  });
+  };
+  const changed =
+    next.showOwnerAvatar !== current.showOwnerAvatar ||
+    next.dynamicFieldKeys.join(",") !== current.dynamicFieldKeys.join(",") ||
+    next.unrepliedThresholdHours !== current.unrepliedThresholdHours;
+  const saved = saveLeadCardSettings(next);
+  // Column title toggles must not spam PUT; only sync when card layout changes.
+  if (changed) persistCrmLeadKanbanPreference(saved);
 }
 
 const LEAD_SCOPE_OPTIONS: ScopeOption[] = [
@@ -323,7 +318,6 @@ export default function LeadsPage() {
   const [massBusy, setMassBusy] = useState(false);
   const [massError, setMassError] = useState<string | null>(null);
 
-  const [isKanbanSettingsOpen, setIsKanbanSettingsOpen] = useState(false);
   const [isListSettingsOpen, setIsListSettingsOpen] = useState(false);
   const [viewConfig, setViewConfig] = useState<KanbanViewConfig>(
     DEFAULT_VIEW_CONFIG,
@@ -511,14 +505,6 @@ export default function LeadsPage() {
     }
   }
 
-  function openViewSettings() {
-    if (viewMode === "list") {
-      setIsListSettingsOpen(true);
-      return;
-    }
-    setIsKanbanSettingsOpen(true);
-  }
-
   function openCreateLead(stage?: string) {
     if (!requireLiveCrm("create a lead")) return;
     setCreateStage(stage);
@@ -566,14 +552,12 @@ export default function LeadsPage() {
     );
     void tryCrmLeadKanbanPreference(() => getCrmLeadKanbanPreference()).then(
       (pref) => {
-        if (pref && !isEmptyLeadKanbanPreference(pref)) {
-          setViewConfig((current) => {
-            const next = applyKanbanPreferenceToView(current, pref);
-            persistViewConfig(next);
-            applyViewFieldsToCards(next);
-            return next;
-          });
-        }
+        if (!pref) return;
+        const next = applyKanbanPreferenceToLeadCard(
+          loadLeadCardSettings(),
+          pref,
+        );
+        saveLeadCardSettings(next);
       },
     );
   }, []);
@@ -588,7 +572,7 @@ export default function LeadsPage() {
     return onRulesChange(() => refresh());
   }, [viewMode]);
 
-  function persistKanbanView(next: KanbanViewConfig, closeSettings = true) {
+  function persistKanbanView(next: KanbanViewConfig) {
     const normalized: KanbanViewConfig = {
       ...next,
       selectedStageIds: normalizeSelectedStageIds(next.selectedStageIds),
@@ -597,12 +581,6 @@ export default function LeadsPage() {
     setViewConfig(normalized);
     persistViewConfig(normalized);
     applyViewFieldsToCards(normalized);
-    persistCrmLeadKanbanPreference(normalized);
-    if (closeSettings) setIsKanbanSettingsOpen(false);
-  }
-
-  function saveKanbanView(next: KanbanViewConfig) {
-    persistKanbanView(next, true);
   }
 
   function toggleLeadStageColumn(columnId: string) {
@@ -612,13 +590,10 @@ export default function LeadsPage() {
     const nextIds = current.includes(columnId)
       ? current.filter((id) => id !== columnId)
       : [...current, columnId];
-    persistKanbanView(
-      {
+    persistKanbanView({
         ...viewConfig,
         selectedStageIds: normalizeSelectedStageIds(nextIds),
-      },
-      false,
-    );
+      });
   }
 
   function addLeadStageColumnTitle(title: string) {
@@ -632,27 +607,21 @@ export default function LeadsPage() {
       notifyBoard(bound.error, "warn");
       return;
     }
-    persistKanbanView(
-      {
+    persistKanbanView({
         ...viewConfig,
         selectedStageIds: bound.selectedStageIds,
         stageLabels: bound.stageLabels,
-      },
-      false,
-    );
+      });
   }
 
   function renameLeadStageColumn(columnId: string, nextLabel: string) {
-    persistKanbanView(
-      {
+    persistKanbanView({
         ...viewConfig,
         stageLabels: {
           ...(viewConfig.stageLabels ?? {}),
           [columnId]: nextLabel,
         },
-      },
-      false,
-    );
+      });
   }
 
   function reorderLeadStageColumn(draggedId: string, targetId: string) {
@@ -664,13 +633,10 @@ export default function LeadsPage() {
     const [moved] = next.splice(from, 1);
     if (!moved) return;
     next.splice(to, 0, moved);
-    persistKanbanView(
-      {
+    persistKanbanView({
         ...viewConfig,
         selectedStageIds: normalizeSelectedStageIds(next),
-      },
-      false,
-    );
+      });
   }
 
   const stageColumnOptions = useMemo(
@@ -918,25 +884,6 @@ export default function LeadsPage() {
           hideTitle
           showSearch={false}
         totalCount={totalLeads}
-          afterScope={
-            <button
-              type="button"
-              onClick={openViewSettings}
-              aria-label={
-                viewMode === "list"
-                  ? "Edit list view settings"
-                  : "Edit Kanban view settings"
-              }
-              title={
-                viewMode === "list"
-                  ? "List View Settings"
-                  : "Kanban View Settings"
-              }
-              className="rounded-full border border-slate-200 bg-white p-1.5 text-slate-400 shadow-sm hover:text-slate-600 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:text-zinc-300"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-          }
         viewMode={viewMode}
         onViewChange={setViewMode}
         isFilterOpen={isFilterOpen}
@@ -1094,9 +1041,6 @@ export default function LeadsPage() {
               onToggleSelect={handleToggleSelect}
               cardFieldKeys={cardFieldKeys}
               showOwnerAvatar={showOwnerOnCard}
-              headerStyle={viewConfig.headerStyle}
-              singleHeaderColor={viewConfig.singleHeaderColor}
-              multiHeaderColors={viewConfig.multiHeaderColors}
               onAddLead={(columnId) => {
                 const column = columns.find((col) => col.id === columnId);
                 openCreateLead(
@@ -1119,23 +1063,6 @@ export default function LeadsPage() {
           )}
         </div>
       </div>
-
-      {isKanbanSettingsOpen && (
-        <KanbanViewSettingsModal
-          view={viewConfig}
-          availableFields={LEAD_FIELDS}
-          availableStages={LEAD_STAGES}
-          categorizeByOptions={["Status", "Source", "Lead Owner"]}
-          aggregateByOptions={["Lead Count"]}
-          headerStyleOptions={["Multi Colour", "Single Colour", "None"]}
-          headerColorOptions={HEADER_COLOR_OPTIONS}
-          onClose={() => setIsKanbanSettingsOpen(false)}
-          onSave={saveKanbanView}
-          onDelete={() => {
-            setIsKanbanSettingsOpen(false);
-          }}
-        />
-      )}
 
       {isListSettingsOpen && (
         <ListViewSettingsModal

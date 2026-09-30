@@ -4,7 +4,7 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ActivityRecordTimelinePage } from "@/components/activities/ActivityRecordTimelinePage";
 import { listEmailTimeline } from "@/lib/activities/record-timeline";
-import { findEmailById } from "@/lib/emails/store";
+import { resolveLiveEmail } from "@/lib/emails/api";
 import type { Email } from "@/lib/emails/types";
 import { onRulesChange } from "@/lib/rules";
 
@@ -16,14 +16,34 @@ export default function EmailTimelinePage({
   const { id } = use(params);
   const router = useRouter();
   const [email, setEmail] = useState<Email | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    function load() {
-      setEmail(findEmailById(id)?.email ?? null);
+    let cancelled = false;
+    async function load() {
+      const next = await resolveLiveEmail(id);
+      if (cancelled) return;
+      setEmail(next);
+      setReady(true);
     }
-    load();
-    return onRulesChange(load);
+    setReady(false);
+    void load();
+    const off = onRulesChange(() => {
+      void load();
+    });
+    return () => {
+      cancelled = true;
+      off();
+    };
   }, [id]);
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-[320px] items-center justify-center px-4">
+        <p className="text-sm text-slate-500">Loading email…</p>
+      </div>
+    );
+  }
 
   if (!email) {
     return (

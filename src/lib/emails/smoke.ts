@@ -211,6 +211,13 @@ export function smokeEmailsWiring() {
     }
   }
 
+  const detailPage = readSrc(
+    "src/app/(dashboard)/activities/emails/detail/[id]/page.tsx",
+  );
+  if (!detailPage.includes("resolveLiveEmail")) {
+    fail("email detail page must load the CRM email before showing not found");
+  }
+
   const create = readSrc(
     "src/components/activities/emails/create/CreateEmailForm.tsx",
   );

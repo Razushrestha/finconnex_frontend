@@ -1,4 +1,4 @@
-﻿import {
+import {
   ensureCrmSession,
   isBoundCrmSession,
   isUuid,
@@ -293,6 +293,13 @@ function newMemberBody(input: NewWorkspaceMember): Record<string, unknown> {
   const team = input.team?.trim();
   if (team) body.team = team;
   return body;
+}
+
+/** Whitelist-safe POST body for creating a workspace member. */
+export function toCreateWorkspaceMemberBody(
+  input: NewWorkspaceMember,
+): Record<string, unknown> {
+  return newMemberBody(input);
 }
 
 /**

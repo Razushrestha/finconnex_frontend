@@ -5,7 +5,7 @@ import { computeActivityAnalytics, defaultActivityAnalyticsFilters } from "@/lib
 const july = new Date(2026, 6, 23, 12, 0, 0);
 
 describe("activity analytics", () => {
-  beforeEach(() => seedCrmFixtures());
+  beforeEach(() => seedCrmFixtures(july));
 
   it("builds first-response, duration, outcome, and timeline data from CRM stores", () => {
     const data = computeActivityAnalytics(

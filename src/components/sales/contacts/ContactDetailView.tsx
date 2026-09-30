@@ -21,7 +21,6 @@ import { RelatedCrmMessages } from "@/components/shared/RelatedCrmMessages";
 import { TimelineFeed } from "@/components/sales/entity-detail";
 import { useParentActivityTimeline } from "@/lib/activity-timeline";
 import {
-  deleteContact,
   findContactById,
   linkDealToContact,
   listAllContacts,
@@ -37,7 +36,6 @@ import {
 } from "@/lib/deals/store";
 import { relatedToLabel } from "@/lib/related-entity";
 import { emitRulesChange } from "@/lib/rules/storage";
-import { softDeleteRecord } from "@/lib/rules";
 import type { ContactCardData, ContactStatus } from "@/lib/contacts/types";
 import { listRelatedCrmEmails, tryCrmEmail } from "@/lib/emails/api";
 import { composeEmailsHref } from "@/lib/emails/href";
@@ -49,7 +47,7 @@ import type { Email } from "@/lib/emails/types";
 import type { Call } from "@/lib/calls/types";
 import type { Task } from "@/lib/tasks/types";
 import type { LibraryDocument } from "@/lib/documents/library/types";
-import { toast } from "@/lib/notify/toast";
+import { EditContactForm } from "@/components/sales/contacts/EditContactForm";
 
 const RELATED_LIST_CATALOG: RelatedListItem[] = [
   { id: "deals", label: "Deals" },
@@ -110,6 +108,7 @@ export function ContactDetailView({
   const [revision, setRevision] = useState(0);
   const [linkDealId, setLinkDealId] = useState("");
   const [flash, setFlash] = useState<string | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [crmEmails, setCrmEmails] = useState<Email[]>([]);
   const [crmCalls, setCrmCalls] = useState<Call[]>([]);
   const [crmTasks, setCrmTasks] = useState<Task[]>([]);
@@ -193,25 +192,6 @@ export function ContactDetailView({
   function notify(msg: string) {
     setFlash(msg);
     window.setTimeout(() => setFlash(null), 2400);
-  }
-
-  function handleDelete() {
-    const gate = softDeleteRecord({
-      action: "sales.contacts.delete",
-      module: "sales.contacts",
-      recordId: contact.id,
-      recordLabel: contact.name,
-      recordType: "Contact",
-      snapshot: { contact, status: statusTitle },
-    });
-    if (!gate.ok) {
-      toast.error(gate.message);
-      return;
-    }
-    if (!window.confirm(`Delete ${contact.name}?`)) return;
-    deleteContact(contact.id);
-    emitRulesChange("all");
-    router.push(back.href);
   }
 
   const prevContact =
@@ -576,13 +556,8 @@ export function ContactDetailView({
           {
             label: "Edit",
             variant: "secondary",
-            onClick: () => router.push(`/sales/contacts/${contact.id}/edit`),
+            onClick: () => setEditOpen(true),
           },
-        ]}
-        moreMenuItems={[
-          { label: "Clone" },
-          { label: "Send SMS" },
-          { label: "Delete", destructive: true, onClick: handleDelete },
         ]}
         onBack={() => router.push(back.href)}
         onPrev={
@@ -676,6 +651,14 @@ export function ContactDetailView({
           </div>
         </div>
       </div>
+
+      <EditContactForm
+        contactId={contact.id}
+        variant="modal"
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSaved={() => setRevision((n) => n + 1)}
+      />
     </div>
   );
 }

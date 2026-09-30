@@ -63,23 +63,23 @@ const ROLE_CARD = {
   },
   "Org Admin": {
     icon: Building2,
-    wrap: "bg-sky-100 text-sky-700",
+    wrap: "bg-violet-100 text-violet-700",
   },
   Manager: {
     icon: Briefcase,
-    wrap: "bg-emerald-100 text-emerald-700",
+    wrap: "bg-violet-100 text-violet-700",
   },
   "Team Lead": {
     icon: Users,
-    wrap: "bg-amber-100 text-amber-700",
+    wrap: "bg-violet-100 text-violet-700",
   },
   User: {
     icon: UserRound,
-    wrap: "bg-indigo-100 text-indigo-700",
+    wrap: "bg-violet-100 text-violet-700",
   },
   "Read Only": {
     icon: Eye,
-    wrap: "bg-slate-100 text-slate-600",
+    wrap: "bg-violet-100 text-violet-700",
   },
 } as const;
 
@@ -581,11 +581,6 @@ export function UsersSettingsClient() {
             <h1 className="text-[22px] font-semibold tracking-tight text-slate-900">
               Users
             </h1>
-            <p className="mt-0.5 max-w-xl text-[13px] text-slate-500">
-              Create accounts for teammates and assign a workspace role. They&apos;re
-              emailed their sign-in details and choose their own password when
-              they first sign in.
-            </p>
           </div>
         </div>
         <form
@@ -649,9 +644,6 @@ export function UsersSettingsClient() {
               <p className="mt-3 text-[14px] font-semibold text-slate-900">
                 {role.name}
               </p>
-              <p className="mt-1 text-[12px] leading-snug text-slate-500">
-                {role.description}
-              </p>
             </button>
           );
         })}
@@ -660,7 +652,7 @@ export function UsersSettingsClient() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-[16px] font-semibold text-slate-900">Users</h2>
+            <h2 className="text-[16px] font-semibold text-violet-700">Users</h2>
             <span
               className={cn(
                 "rounded-full px-2 py-0.5 text-[10px] font-semibold",
@@ -672,11 +664,6 @@ export function UsersSettingsClient() {
               {live ? "Live CRM" : crm.loading ? "Connecting…" : "Demo"}
             </span>
           </div>
-          <p className="mt-1 max-w-2xl text-[12px] text-slate-500">
-            {live
-              ? "Workspace members — create accounts, update roles, re-issue sign-in details, remove, and transfer ownership."
-              : "Demo user directory — add and edit locally. Deleting a UUID user calls DELETE /v1/admin/user/:id (platform admin)."}
-          </p>
           {live ? (
             <p className="mt-1 text-[12px] font-medium text-slate-500">
               Joined {crm.summary.joined} · Awaiting first sign-in{" "}
@@ -740,12 +727,6 @@ export function UsersSettingsClient() {
               {editingId ? "Edit user" : "Add new user"}
             </h3>
           </div>
-          {!editingId && live ? (
-            <p className="-mt-2 mb-4 text-[12px] text-slate-500">
-              We&apos;ll email them these sign-in details. They&apos;ll be asked to
-              choose their own password the first time they sign in.
-            </p>
-          ) : null}
           <div
             className={cn(
               "grid gap-3 md:grid-cols-2",

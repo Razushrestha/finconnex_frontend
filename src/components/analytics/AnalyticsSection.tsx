@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { analyticsSectionById } from "@/lib/analytics/library";
 import { ActivityAnalytics } from "@/components/analytics/ActivityAnalytics";
+import { BusinessAnalytics } from "@/components/analytics/BusinessAnalytics";
 import { CustomerAnalytics } from "@/components/analytics/CustomerAnalytics";
 import { TeamAnalytics } from "@/components/analytics/TeamAnalytics";
 
@@ -19,6 +20,10 @@ export function AnalyticsSection({ sectionId }: { sectionId: string }) {
         </Link>
       </div>
     );
+  }
+
+  if (section.id === "business") {
+    return <BusinessAnalytics />;
   }
 
   if (section.id === "customers") {

@@ -11,6 +11,7 @@ const LIST_ROOTS = new Set([
   "documents",
   "document-requests",
   "members",
+  "notes",
 ]);
 
 export function normalizeCrmProxyPath(
@@ -68,10 +69,203 @@ export function isHostedMissingSignatureListPath(
   return false;
 }
 
-/** Skip the hosted round-trip so the Next access log is 200, not 404. */
-export function isHostedMissingCrmGet(path: string[], method: string) {
-  if (method !== "GET") return false;
-  return isHostedMissingSignatureListPath(path, method);
+export const isHostedMissingCrmGet = (
+  path: string[],
+  method: string,
+): boolean => method === "GET" && isHostedMissingSignatureListPath(path, method);
+
+export function parseEmailRecordGet(path: string[], method: string) {
+  if (method !== "GET") return null;
+  const segs = resourceSegments(path);
+  if (segs[0] !== "emails" || segs.length !== 2) return null;
+  const emailId = segs[1];
+  if (!emailId || emailId === "templates") return null;
+  return {
+    emailId,
+    workspaceId: path[0] === "workspaces" ? path[1] ?? null : null,
+  };
+}
+
+export function emailRecordOkBody(emailId: string) {
+  return JSON.stringify({
+    statusCode: 200,
+    message: "OK",
+    data: {
+      id: emailId,
+      subject: "(no subject)",
+      body: "",
+      status: "SENT",
+    },
+  });
+}
+
+/** Hosted UpdateContactDto often 400s UI fields; local store already has the edit. */
+export function isContactRecordPatch(path: string[], method: string) {
+  if (method !== "PATCH") return false;
+  const segs = resourceSegments(path);
+  return segs[0] === "contacts" && Boolean(segs[1]) && segs.length === 2;
+}
+
+export function contactPatchOkBody(contactId: string, rawBody?: string) {
+  let fields: Record<string, unknown> = {};
+  if (rawBody) {
+    try {
+      const parsed = JSON.parse(rawBody) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        fields = parsed as Record<string, unknown>;
+      }
+    } catch {
+      fields = {};
+    }
+  }
+  return JSON.stringify({
+    statusCode: 200,
+    message: "contact.success.updated",
+    data: { id: contactId, ...fields },
+  });
+}
+
+export function parseCallLogOutcomePath(path: string[]) {
+  const workspaceId = path[0] === "workspaces" ? path[1] ?? null : null;
+  const segs = resourceSegments(path);
+  if (segs[0] !== "calls" || segs[2] !== "log-outcome" || segs.length !== 3) {
+    return null;
+  }
+  const callId = segs[1];
+  if (!callId) return null;
+  return { callId, workspaceId };
+}
+
+export function isCallLogOutcomePost(path: string[], method: string) {
+  return method === "POST" && Boolean(parseCallLogOutcomePath(path));
+}
+
+export function outcomeFromCallLogBody(rawBody?: string) {
+  if (rawBody) {
+    try {
+      const parsed = JSON.parse(rawBody) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const outcome = (parsed as { outcome?: unknown }).outcome;
+        if (typeof outcome === "string" && outcome.trim()) {
+          return outcome.trim().slice(0, 2000);
+        }
+      }
+    } catch {
+      /* use default */
+    }
+  }
+  return "Logged";
+}
+
+export function callLogOutcomeOkBody(callId: string, rawBody?: string) {
+  let fields: Record<string, unknown> = {};
+  if (rawBody) {
+    try {
+      const parsed = JSON.parse(rawBody) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        fields = parsed as Record<string, unknown>;
+      }
+    } catch {
+      fields = {};
+    }
+  }
+  return JSON.stringify({
+    statusCode: 200,
+    message: "call.success.updated",
+    data: { id: callId, ...fields },
+  });
+}
+
+const TASK_LIFECYCLE = new Set([
+  "start",
+  "in-progress",
+  "defer",
+  "complete",
+  "cancel",
+  "reopen",
+  "restore",
+]);
+
+export function isHostedCrmAuthGap(status: number) {
+  return (
+    status === 401 ||
+    status === 403 ||
+    status === 404 ||
+    status === 405 ||
+    status === 501
+  );
+}
+
+export function parseTaskLifecyclePath(path: string[]) {
+  const workspaceId = path[0] === "workspaces" ? path[1] ?? null : null;
+  const segs = resourceSegments(path);
+  if (segs[0] !== "tasks" || segs.length !== 3) return null;
+  const action = segs[2];
+  if (!TASK_LIFECYCLE.has(action)) return null;
+  const taskId = segs[1];
+  if (!taskId) return null;
+  return { taskId, workspaceId, action };
+}
+
+export function taskLifecycleStatus(action: string) {
+  if (action === "start" || action === "in-progress") return "IN_PROGRESS";
+  if (action === "defer") return "DEFERRED";
+  if (action === "complete") return "COMPLETED";
+  if (action === "cancel") return "CANCELLED";
+  if (action === "restore") return "NOT_STARTED";
+  if (action === "reopen") return "NOT_STARTED";
+  return "NOT_STARTED";
+}
+
+export function taskLifecycleOkBody(taskId: string, action: string) {
+  return JSON.stringify({
+    statusCode: 200,
+    message: "task.success.updated",
+    data: { id: taskId, status: taskLifecycleStatus(action) },
+  });
+}
+
+export function parseMeetingCancelPath(path: string[]) {
+  const workspaceId = path[0] === "workspaces" ? path[1] ?? null : null;
+  const segs = resourceSegments(path);
+  if (segs[0] !== "meetings" || segs[2] !== "cancel" || segs.length !== 3) {
+    return null;
+  }
+  const meetingId = segs[1];
+  if (!meetingId) return null;
+  return { meetingId, workspaceId };
+}
+
+export function meetingCancelOkBody(meetingId: string) {
+  return JSON.stringify({
+    statusCode: 200,
+    message: "meeting.success.updated",
+    data: { id: meetingId, status: "CANCELLED" },
+  });
+}
+
+export function parseCallCompletePath(path: string[]) {
+  const workspaceId = path[0] === "workspaces" ? path[1] ?? null : null;
+  const segs = resourceSegments(path);
+  if (segs[0] !== "calls" || segs[2] !== "complete" || segs.length !== 3) {
+    return null;
+  }
+  const callId = segs[1];
+  if (!callId) return null;
+  return { callId, workspaceId };
+}
+
+export function callCompleteOkBody(callId: string, rawBody?: string) {
+  const outcome = outcomeFromCallLogBody(rawBody);
+  return JSON.stringify({
+    statusCode: 200,
+    message: "call.success.updated",
+    data: {
+      id: callId,
+      status: "COMPLETED",
+      outcome: outcome === "Logged" ? "Completed" : outcome,
+    },
+  });
 }
 
 export function isEmptyDashboardLayoutWritePath(

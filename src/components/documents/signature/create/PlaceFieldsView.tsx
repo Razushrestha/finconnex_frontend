@@ -246,8 +246,8 @@ export function PlaceFieldsView({
         colorIndex: drag.recipient?.colorIndex ?? 0,
         x: e.clientX,
         y: e.clientY,
-      });
-    };
+    });
+  };
     const onUp = (e: PointerEvent) => {
       const drag = paletteDragRef.current;
       if (!drag.active) return;
@@ -377,7 +377,7 @@ export function PlaceFieldsView({
         error instanceof Error && error.message.trim()
           ? error.message
           : isTemplate
-            ? "Failed to save template."
+          ? "Failed to save template."
             : "Failed to send signature request.";
       toast.error(message);
       if (
@@ -633,7 +633,7 @@ export function PlaceFieldsView({
           </button>
           <span className="min-w-[4.5rem] text-center text-[13px] tabular-nums">
             {activePageCount ? `${currentPage} of ${activePageCount}` : "—"}
-          </span>
+            </span>
           <button
             type="button"
             onClick={() => stepPage(1)}
@@ -816,7 +816,7 @@ export function PlaceFieldsView({
                       />
                       <span className="min-w-0">
                         <span className="block truncate text-[12px] font-medium text-slate-800">
-                          {doc.name}
+                        {doc.name}
                         </span>
                         <span className="text-[11px] text-slate-400">
                           {pages ? `${pages} page${pages === 1 ? "" : "s"}` : "…"}
@@ -850,7 +850,7 @@ export function PlaceFieldsView({
                           <span className="text-[11px] font-medium text-slate-500">
                             1
                           </span>
-                        </button>
+                    </button>
                       )
                     ) : null}
                   </div>
@@ -977,7 +977,7 @@ export function PlaceFieldsView({
                                             "input, textarea, select, button",
                                           )
                                         ) {
-                                          e.stopPropagation();
+                                        e.stopPropagation();
                                           return;
                                         }
                                         if (
@@ -1147,8 +1147,8 @@ export function PlaceFieldsView({
                               {doc.name}
                             </p>
                             <p>No preview available for this file.</p>
-                          </div>
-                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })()

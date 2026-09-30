@@ -37,7 +37,7 @@ describe("Create Company step form", () => {
     const config = companyActionConfigFromForm(filled());
     expect(config).toMatchObject({
       name: "Acme Lending",
-      website: "https://acme.com.au/",
+      website: "https://acme.com.au",
       industry: "Finance",
       employeeCount: 42,
       annualRevenue: "1250000.00",

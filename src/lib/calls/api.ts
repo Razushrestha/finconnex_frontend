@@ -226,6 +226,14 @@ async function callsPath(suffix: string, query = ""): Promise<string> {
   if (scoped) {
     return `${workspaceCallsPath(scoped.workspaceId, suffix)}${query}`;
   }
+  const stored =
+    typeof window !== "undefined"
+      ? window.localStorage.getItem("fc.crm.workspaceId") ||
+        window.sessionStorage.getItem("fc.crm.workspaceId")
+      : null;
+  if (stored && isUuid(stored)) {
+    return `${workspaceCallsPath(stored, suffix)}${query}`;
+  }
   return `${globalCallsPath(suffix)}${query}`;
 }
 
@@ -483,12 +491,18 @@ export async function completeCrmCall(
   extra: Record<string, unknown> = {},
 ): Promise<Call | null> {
   const outcome = pickStr(extra.outcome, extra.notes, "Completed").slice(0, 2000);
-  return asCall(
-    await callsMutate(`/${id}/complete`, {
-      method: "POST",
-      body: JSON.stringify({ outcome }),
-    }),
-  );
+  try {
+    return asCall(
+      await callsMutate(`/${id}/complete`, {
+        method: "POST",
+        body: JSON.stringify({ outcome }),
+      }),
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (!/\(409\)|conflict|invalidTransition/i.test(message)) throw err;
+    return asCall({ id, status: "COMPLETED", outcome });
+  }
 }
 
 export async function cancelCrmCall(

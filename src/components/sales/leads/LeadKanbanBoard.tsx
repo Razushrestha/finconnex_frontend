@@ -60,10 +60,6 @@ import {
   KANBAN_WELL,
 } from "@/lib/layout";
 import { useRouter } from "next/navigation";
-import {
-  kanbanHeaderSurfaceStyle,
-  resolveKanbanHeaderColor,
-} from "@/components/common/KanbanViewControls";
 import { notify } from "@/lib/notify/toast";
 
 type LeadCardRecord = KanbanColumn["cards"][number];
@@ -89,9 +85,6 @@ interface LeadKanbanBoardProps {
   /** Kanban Select Fields → which fields render on each card. */
   cardFieldKeys?: readonly string[];
   showOwnerAvatar?: boolean;
-  headerStyle?: string;
-  singleHeaderColor?: string;
-  multiHeaderColors?: Record<string, string>;
 }
 
 // Column height fills the board area so Create lead stays on-screen.
@@ -107,9 +100,6 @@ export function LeadKanbanBoard({
   onToggleSelect,
   cardFieldKeys,
   showOwnerAvatar,
-  headerStyle = "Multi Colour",
-  singleHeaderColor,
-  multiHeaderColors,
 }: LeadKanbanBoardProps) {
   const router = useRouter();
   const boardRef = useRef<HTMLDivElement>(null);
@@ -253,12 +243,12 @@ export function LeadKanbanBoard({
         return { ...col, cards: newCards, leadCount: newCards.length };
       }
       if (col.id === sourceColumn.id) {
-        return {
-          ...col,
+          return {
+            ...col,
           cards: col.cards.filter((c) => c.id !== card.id),
-          leadCount: col.leadCount - 1,
-        };
-      }
+            leadCount: col.leadCount - 1,
+          };
+        }
       if (col.id === targetColumn.id) {
         const filteredCards = col.cards.filter((c) => c.id !== card.id);
         const insertAt =
@@ -266,9 +256,9 @@ export function LeadKanbanBoard({
         const newCards = [...filteredCards];
         newCards.splice(insertAt, 0, updatedCard);
         return { ...col, cards: newCards, leadCount: newCards.length };
-      }
-      return col;
-    });
+        }
+        return col;
+      });
     persist(next);
 
     if (isUuid(card.id)) {
@@ -435,26 +425,11 @@ export function LeadKanbanBoard({
                 />
               ) : (
                 <>
-                  {/* Header box — driven by Kanban View → Header Style */}
+                  {/* Neutral column header (colours stay in saved view config only) */}
                   {(() => {
-                    const hex = resolveKanbanHeaderColor(
-                      {
-                        headerStyle,
-                        singleHeaderColor,
-                        multiHeaderColors,
-                      },
-                      column.id,
-                    );
-                    const surface = kanbanHeaderSurfaceStyle(hex);
                     const title = columnTitles?.[column.id] ?? column.title;
                     return (
-                      <div
-                        className={cn(
-                          "flex h-14 w-full shrink-0 flex-col justify-center overflow-hidden rounded-xs p-1.5",
-                          surface.className,
-                        )}
-                        style={surface.style}
-                      >
+                      <div className="flex h-14 w-full shrink-0 flex-col justify-center overflow-hidden rounded-xs border border-slate-200/80 bg-slate-50 p-1.5">
                         <div className="flex h-6 items-center justify-between gap-1">
                           <div className="flex min-w-0 items-center gap-2">
                             <h2 className={KANBAN_HEADER_TITLE} title={title}>
@@ -531,8 +506,8 @@ export function LeadKanbanBoard({
                               key={card.id}
                               {...{ [KANBAN_CARD_SLOT_ATTR]: card.id }}
                             >
-                              <LeadCard
-                                card={card}
+                  <LeadCard
+                    card={card}
                                 status={column.leadStatus}
                                 cardSettings={cardSettings}
                                 dynamicFieldKeys={cardFieldKeys}
@@ -599,11 +574,11 @@ export function LeadKanbanBoard({
                   </div>
                   </KanbanStageScroll>
                 </>
-              )}
+                )}
             </div>
           );
         })}
-      </div>
+          </div>
 
       <KanbanDragGhost ghost={drag.ghost} />
 

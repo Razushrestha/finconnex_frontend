@@ -144,6 +144,13 @@ export function smokeCompaniesWiring() {
     fail("mergeCompanies does not call mergeCrmCompanies");
   }
 
+  const detail = readSrc(
+    "src/components/sales/companies/CompanyDetailView.tsx",
+  );
+  if (!detail.includes("EditCompanyForm")) {
+    fail("company detail more menu must open EditCompanyForm");
+  }
+
   const form = readSrc("src/components/sales/companies/CreateCompanyForm.tsx");
   if (!form.includes("createCrmCompany")) {
     fail("create company form does not POST to CRM");

@@ -69,7 +69,7 @@ export async function runSmokeSession10() {
   }
 
   const mock = createMockKvBackend();
-  const probeKey = "sales:leads:board:v6";
+  const probeKey = "sales:leads:board:v7";
   const tenantId = "tenant-s10";
   mock.seed(
     tenantScopedKey(probeKey, tenantId),

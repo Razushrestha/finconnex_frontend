@@ -25,15 +25,15 @@ export const LEAD_CARD_PRODUCT_WALK = [
 
 /** Logical store keys to hydrate for Lead Card when API mode is on. */
 export const LEAD_CARD_HYDRATE_KEYS = [
-  "sales:leads:board:v6",
+  "sales:leads:board:v7",
   "sales:leads:activity-extras:v1",
-  "activities:calls:board:v1",
-  "activities:meetings:list:v1",
-  "activities:messages:list:v1",
-  "activities:emails:list:v1",
-  "activities:notes:list:v1",
-  "activities:attachments:list:v1",
-  "activities:tasks:board:v2",
+  "activities:calls:board:v4",
+  "activities:meetings:list:v4",
+  "activities:messages:list:v3",
+  "activities:emails:list:v4",
+  "activities:notes:list:v3",
+  "activities:attachments:list:v2",
+  "activities:tasks:board:v6",
   "settings:values:v1",
   "settings:custom-fields:v1",
 ] as const;

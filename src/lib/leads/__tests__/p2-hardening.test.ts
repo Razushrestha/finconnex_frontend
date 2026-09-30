@@ -185,9 +185,19 @@ describe("Phase 12 timeline", () => {
     const { LEAD_CARD_A11Y_SURFACE_FILES } = await import(
       "@/lib/leads/a11y-surface"
     );
+    const { logStatusChange } = await import("@/lib/rules/audit");
 
     expect(getPhase12Manifest().status).toBe("timeline_complete");
     expect(LEAD_CARD_A11Y_SURFACE_FILES.length).toBeGreaterThanOrEqual(4);
+
+    logStatusChange(
+      "sales.leads",
+      "Test Owner",
+      "lead-katherina",
+      "Katherina Brooks",
+      "New",
+      "Contacted",
+    );
 
     const status = statusHistoryToCandidates("Katherina Brooks");
     expect(status.some((c) => c.kind === "status_change")).toBe(true);

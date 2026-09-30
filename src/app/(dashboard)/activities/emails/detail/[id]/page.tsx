@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import type { Email } from "@/lib/emails/types";
+import { resolveLiveEmail } from "@/lib/emails/api";
 import { findEmailById } from "@/lib/emails/store";
 import { EmailDetailView } from "@/components/activities/emails/detail/EmailDetailView";
 import { useModuleBack } from "@/hooks/useModuleBack";
@@ -20,14 +21,38 @@ export default function EmailDetailsPage({
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    function load() {
-      setEmail(findEmailById(id)?.email ?? null);
+    let cancelled = false;
+
+    async function load() {
+      const decoded = (() => {
+        try {
+          return decodeURIComponent(id);
+        } catch {
+          return id;
+        }
+      })();
+      const local =
+        findEmailById(id)?.email ?? findEmailById(decoded)?.email ?? null;
+      if (local && !cancelled) {
+        setEmail(local);
+        setReady(true);
+      }
+      const next = await resolveLiveEmail(id);
+      if (cancelled) return;
+      setEmail(next ?? local);
       setReady(true);
     }
-    load();
-    const offRules = onRulesChange(load);
-    const offMail = onMailboxChange(load);
+
+    setReady(false);
+    void load();
+    const offRules = onRulesChange(() => {
+      void load();
+    });
+    const offMail = onMailboxChange(() => {
+      void load();
+    });
     return () => {
+      cancelled = true;
       offRules();
       offMail();
     };

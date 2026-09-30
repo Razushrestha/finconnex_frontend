@@ -132,6 +132,10 @@ export function smokeBookingWiring() {
     "createCrmBooking",
     "listCrmConsultants",
     "listCrmBookingHosts",
+    "listCrmHostSchedules",
+    "saveCrmHostSchedule",
+    "updateCrmBookingHost",
+    "resolveCrmBookingHosts",
     "linkCrmBooking",
     "rescheduleCrmBooking",
     "cancelCrmBooking",
@@ -144,6 +148,12 @@ export function smokeBookingWiring() {
   }
   if (!api.includes("crmBffFetch")) {
     fail("booking client must call crmBffFetch in the browser");
+  }
+  if (!api.includes("/hosts/${hostId}/schedules")) {
+    fail("host schedules path must match Swagger hosts/{hostId}/schedules");
+  }
+  if (!api.includes("/hosts/schedules/${scheduleId}/overrides")) {
+    fail("schedule override path must match Swagger hosts/schedules/{id}/overrides");
   }
   if (!api.includes("/event-types/${input.eventTypeId}/available-slots")) {
     fail("available-slots path must match Swagger event-types/{id}/available-slots");
@@ -179,6 +189,26 @@ export function smokeBookingWiring() {
   const modal = readSrc("src/components/booking/NewBookingModal.tsx");
   if (!modal.includes("createCrmBooking") || !modal.includes("linkCrmBooking")) {
     fail("NewBookingModal is not wired to CRM create booking + crm-link");
+  }
+
+  const leadMeetings = readSrc(
+    "src/components/sales/leads/panels/LeadEditDialog.tsx",
+  );
+  if (
+    !leadMeetings.includes("createCrmBooking") ||
+    !leadMeetings.includes("listCrmBookings")
+  ) {
+    fail("Lead Meetings tab is not wired to CRM booking create + list");
+  }
+
+  const availability = readSrc(
+    "src/components/booking/AvailabilityLimitsStep.tsx",
+  );
+  if (
+    !availability.includes("loadConsultationAvailability") ||
+    !availability.includes("syncConsultationAvailability")
+  ) {
+    fail("Availability and Limits must load and save booking host schedules");
   }
 
   const assign = readSrc("src/components/booking/AssignConsultantsStep.tsx");

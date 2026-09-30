@@ -30,6 +30,31 @@ export type CrmBookingHost = {
   isConsultant: boolean;
   isHomeConsultant: boolean;
   crmUserId: string;
+  timezone?: string;
+  dailyBookingLimit?: number | null;
+};
+
+export type CrmAvailabilityWindow = {
+  dayOfWeek: number;
+  startMinute: number;
+  endMinute: number;
+};
+
+export type CrmAvailabilityOverride = {
+  id: string;
+  date: string;
+  isUnavailable: boolean;
+  reason: string;
+};
+
+export type CrmAvailabilitySchedule = {
+  id: string;
+  hostId: string;
+  name: string;
+  timezone: string;
+  isDefault: boolean;
+  rules: CrmAvailabilityWindow[];
+  overrides: CrmAvailabilityOverride[];
 };
 
 export type CrmEventType = {
@@ -124,6 +149,8 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
     "bookings",
     "hosts",
     "consultants",
+    "schedules",
+    "overrides",
     "slots",
     "availableSlots",
     "available_slots",
@@ -200,6 +227,54 @@ export function normalizeCrmBookingHost(
       row.homeConsultant,
     ),
     crmUserId: pickStr(row.crmUserId, row.crm_user_id, row.userId, row.user_id),
+    timezone: pickStr(row.timezone, row.timeZone, row.time_zone) || undefined,
+    dailyBookingLimit:
+      row.dailyBookingLimit === null || row.daily_booking_limit === null
+        ? null
+        : pickNum(row.dailyBookingLimit, row.daily_booking_limit) || undefined,
+  };
+}
+
+function normalizeCrmAvailabilityWindow(row: Record<string, unknown>): CrmAvailabilityWindow | null {
+  const dayOfWeek = pickNum(row.dayOfWeek, row.day_of_week);
+  const startMinute = pickNum(row.startMinute, row.start_minute);
+  const endMinute = pickNum(row.endMinute, row.end_minute);
+  if (endMinute <= startMinute) return null;
+  return { dayOfWeek, startMinute, endMinute };
+}
+
+function normalizeCrmAvailabilitySchedule(
+  row: Record<string, unknown>,
+): CrmAvailabilitySchedule {
+  const rules = Array.isArray(row.rules)
+    ? row.rules
+        .map((rule) => normalizeCrmAvailabilityWindow(asRecord(rule) ?? {}))
+        .filter((rule): rule is CrmAvailabilityWindow => !!rule)
+    : [];
+  const overrides = Array.isArray(row.overrides)
+    ? row.overrides
+        .map((item) => {
+          const override = asRecord(item);
+          if (!override) return null;
+          const date = pickStr(override.date).slice(0, 10);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+          return {
+            id: pickStr(override.id),
+            date,
+            isUnavailable: pickBool(override.isUnavailable, override.is_unavailable),
+            reason: pickStr(override.reason),
+          };
+        })
+        .filter((item): item is CrmAvailabilityOverride => !!item)
+    : [];
+  return {
+    id: pickStr(row.id),
+    hostId: pickStr(row.hostId, row.host_id),
+    name: pickStr(row.name) || "Working hours",
+    timezone: pickStr(row.timezone) || "Australia/Sydney",
+    isDefault: pickBool(row.isDefault, row.is_default),
+    rules,
+    overrides,
   };
 }
 
@@ -432,6 +507,7 @@ export function toCreateEventTypeBody(input: {
   meetingPlace?: "online" | "offline" | "phone";
   platform?: string;
   locationDetail?: string;
+  hostIds?: string[];
 }): Record<string, unknown> {
   const fromPlace =
     input.meetingPlace != null
@@ -454,6 +530,8 @@ export function toCreateEventTypeBody(input: {
   };
   if (locationType) body.locationType = locationType;
   if (location) body.location = location;
+  const hostIds = (input.hostIds ?? []).filter((id) => isUuid(id));
+  if (hostIds.length) body.hostIds = hostIds;
   return body;
 }
 
@@ -474,16 +552,22 @@ export async function createCrmEventType(input: {
   meetingPlace?: "online" | "offline" | "phone";
   platform?: string;
   locationDetail?: string;
+  hostIds?: string[];
 }): Promise<CrmEventType> {
   const full = toCreateEventTypeBody(input);
   try {
     const data = await bookingCall("/event-types", jsonInit("POST", full));
     return normalizeCrmEventType(asRecord(data) ?? extractRecords(data)[0] ?? {});
   } catch (err) {
-    if (!full.locationType || !isWhitelistRejection(err)) throw err;
+    if (!isWhitelistRejection(err)) throw err;
+    const message = err instanceof Error ? err.message : String(err ?? "");
     const slim = { ...full };
-    delete slim.locationType;
-    delete slim.location;
+    if (/hostIds/i.test(message)) delete slim.hostIds;
+    else {
+      delete slim.locationType;
+      delete slim.location;
+    }
+    if (!full.locationType && !full.hostIds) throw err;
     const data = await bookingCall("/event-types", jsonInit("POST", slim));
     return normalizeCrmEventType(asRecord(data) ?? extractRecords(data)[0] ?? {});
   }
@@ -530,8 +614,153 @@ export function listCrmConsultants(): Promise<CrmBookingHost[]> {
   );
 }
 
-export function listCrmBookings(): Promise<CrmBookingRecord[]> {
-  return bookingCall("/bookings").then((data) =>
+export function listCrmHostSchedules(
+  hostId: string,
+): Promise<CrmAvailabilitySchedule[]> {
+  return bookingCall(`/hosts/${hostId}/schedules`).then((data) =>
+    extractRecords(data)
+      .map(normalizeCrmAvailabilitySchedule)
+      .filter((row) => isUuid(row.id)),
+  );
+}
+
+export function saveCrmHostSchedule(
+  hostId: string,
+  input: {
+    scheduleId?: string;
+    name?: string;
+    timezone?: string;
+    isDefault?: boolean;
+    rules: CrmAvailabilityWindow[];
+  },
+): Promise<CrmAvailabilitySchedule> {
+  const body = {
+    name: input.name || "Working hours",
+    timezone: input.timezone || "Australia/Sydney",
+    isDefault: input.isDefault !== false,
+    rules: input.rules,
+  };
+  const path = input.scheduleId
+    ? `/hosts/schedules/${input.scheduleId}`
+    : `/hosts/${hostId}/schedules`;
+  return bookingCall(
+    path,
+    jsonInit(input.scheduleId ? "PATCH" : "POST", body),
+  ).then((data) =>
+    normalizeCrmAvailabilitySchedule(
+      asRecord(data) ?? extractRecords(data)[0] ?? {},
+    ),
+  );
+}
+
+export function addCrmScheduleOverride(
+  scheduleId: string,
+  input: {
+    date: string;
+    isUnavailable?: boolean;
+    startMinute?: number;
+    endMinute?: number;
+    reason?: string;
+  },
+): Promise<unknown> {
+  return bookingCall(
+    `/hosts/schedules/${scheduleId}/overrides`,
+    jsonInit("POST", input),
+  );
+}
+
+export function removeCrmScheduleOverride(
+  scheduleId: string,
+  overrideId: string,
+): Promise<unknown> {
+  return bookingCall(
+    `/hosts/schedules/${scheduleId}/overrides/${overrideId}`,
+    jsonInit("DELETE"),
+  );
+}
+
+export function updateCrmBookingHost(
+  hostId: string,
+  body: { dailyBookingLimit?: number | null; isConsultant?: boolean },
+): Promise<CrmBookingHost> {
+  return bookingCall(`/hosts/${hostId}`, jsonInit("PATCH", body)).then((data) =>
+    normalizeCrmBookingHost(asRecord(data) ?? extractRecords(data)[0] ?? {}),
+  );
+}
+
+export async function resolveCrmBookingHosts(
+  people: Array<{ name: string; userId?: string }>,
+  create = true,
+): Promise<CrmBookingHost[]> {
+  const resolved: CrmBookingHost[] = [];
+  for (const person of people) {
+    const host = await ensureCrmBookingHost({
+      name: person.name,
+      userId: person.userId,
+      create,
+    });
+    if (host && isUuid(host.id) && !resolved.some((row) => row.id === host.id)) {
+      resolved.push(host);
+    }
+  }
+  return resolved;
+}
+
+export async function ensureCrmBookingHost(input: {
+  name: string;
+  userId?: string;
+  email?: string;
+  create?: boolean;
+}): Promise<CrmBookingHost | null> {
+  const hosts = await listCrmBookingHosts();
+  const nameKey = input.name.trim().toLowerCase();
+  const emailKey = input.email?.trim().toLowerCase() ?? "";
+  const userId = input.userId && isUuid(input.userId) ? input.userId : "";
+  const existing = hosts.find((host) => {
+    if (userId && host.crmUserId === userId) return true;
+    if (emailKey && host.email.trim().toLowerCase() === emailKey) return true;
+    return host.name.trim().toLowerCase() === nameKey;
+  });
+  if (existing && isUuid(existing.id)) return existing;
+  if (input.create === false || !userId) return null;
+  try {
+    const created = await bookingCall(
+      "/hosts",
+      jsonInit("POST", {
+        userId,
+        name: input.name,
+        email: input.email || undefined,
+        isConsultant: true,
+        isActive: true,
+        timezone: "Australia/Sydney",
+      }),
+    );
+    return normalizeCrmBookingHost(
+      asRecord(created) ?? extractRecords(created)[0] ?? {},
+    );
+  } catch {
+    const again = await listCrmBookingHosts();
+    return (
+      again.find((host) => userId && host.crmUserId === userId) ??
+      again.find((host) => host.name.trim().toLowerCase() === nameKey) ??
+      null
+    );
+  }
+}
+
+export function listCrmBookings(filters?: {
+  leadId?: string;
+  contactId?: string;
+  dealId?: string;
+  limit?: number;
+}): Promise<CrmBookingRecord[]> {
+  const q = toQuery({
+    leadId: filters?.leadId,
+    contactId: filters?.contactId,
+    dealId: filters?.dealId,
+    limit: filters?.limit ?? 100,
+  });
+  return bookingCall(`/bookings${q}`).then((data) =>
     extractRecords(data).map(normalizeCrmBooking),
   );
 }
@@ -544,6 +773,8 @@ export function createCrmBooking(input: {
   timezone?: string;
   hostId?: string;
   phone?: string;
+  notes?: string;
+  internalNotes?: string;
   leadId?: string;
   contactId?: string;
   companyId?: string;
@@ -560,10 +791,15 @@ export function createCrmBooking(input: {
       timezone: input.timezone,
       hostId: input.hostId,
       phone: input.phone,
+      notes: input.notes,
+      internalNotes: input.internalNotes,
       leadId: input.leadId,
       contactId: input.contactId,
       companyId: input.companyId,
       dealId: input.dealId,
+      ...(input.leadId
+        ? { relatedEntityType: "LEAD", relatedEntityId: input.leadId }
+        : {}),
     }),
   ).then((data) =>
     normalizeCrmBooking(asRecord(data) ?? extractRecords(data)[0] ?? {}),

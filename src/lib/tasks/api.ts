@@ -7,7 +7,7 @@ import {
 } from "@/lib/activity-timeline/auth";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
 import { formatRulesAt } from "@/lib/rules/storage";
-import { upsertTask, findTaskById } from "@/lib/tasks/store";
+import { deleteTask, upsertTask, findTaskById } from "@/lib/tasks/store";
 import {
   encodeActionItemsInDescription,
   parseActionItemsBlock,
@@ -584,10 +584,68 @@ export async function listMyCrmTasks(): Promise<Task[]> {
 }
 
 export async function getCrmTask(id: string): Promise<Task | null> {
+  if (!isUuid(id)) return null;
   return asTask(await tasksGet(`/${id}`));
 }
 
+function createInputFromLocalTask(local: Task): CreateCrmTaskInput {
+  return {
+    title: local.title,
+    taskType: local.taskType,
+    priority: local.priority,
+    status: "Not Started",
+    dueDate: local.dueDate,
+    assignedTo: local.assignedTo,
+    relatedTo: local.relatedTo,
+    relatedId: local.relatedTo?.id,
+    description: local.description,
+    notes: local.notes,
+    collaborators: local.collaborators,
+    reminderDate: local.reminderDate,
+    actionItems: local.actionItems,
+  };
+}
+
+/**
+ * Hosted task routes use ParseUUIDPipe. Local cards (`task-…`) 400 on
+ * GET/POST /:id/*. Create the CRM row once, then swap the local id.
+ */
+export async function promoteLocalTaskToCrm(id: string): Promise<Task | null> {
+  if (isUuid(id)) {
+    return (await tryCrmTask(() => getCrmTask(id))) ?? findTaskById(id)?.task ?? null;
+  }
+  const local = findTaskById(id)?.task;
+  if (!local) return null;
+  const remote = await createCrmTask(createInputFromLocalTask(local));
+  if (!remote) return null;
+  deleteTask(id);
+  return persistRemoteTask({
+    ...local,
+    ...remote,
+    taskId: remote.taskId,
+    assignedTo: local.assignedTo || remote.assignedTo,
+    collaborators: local.collaborators?.length
+      ? local.collaborators
+      : remote.collaborators,
+    relatedTo: local.relatedTo ?? remote.relatedTo,
+    description: local.description ?? remote.description,
+    notes: local.notes ?? remote.notes,
+    activityNotes: local.activityNotes,
+    reminders: local.reminders,
+    actionItems: local.actionItems,
+    notifyBy: local.notifyBy,
+  });
+}
+
+async function liveTaskId(id: string, promote: boolean): Promise<string | null> {
+  if (isUuid(id)) return id;
+  if (!promote) return null;
+  const remote = await promoteLocalTaskToCrm(id);
+  return remote && isUuid(remote.taskId) ? remote.taskId : null;
+}
+
 export async function listCrmTaskCollaborators(id: string): Promise<string[]> {
+  if (!isUuid(id)) return [];
   return mapNameList(await tasksGet(`/${id}/collaborators`));
 }
 
@@ -696,6 +754,8 @@ export async function updateCrmTask(
   id: string,
   patch: Partial<Task> & { relatedId?: string; attachmentKeys?: string[] },
 ): Promise<Task | null> {
+  const liveId = await liveTaskId(id, true);
+  if (!liveId) return null;
   const body: Record<string, unknown> = {};
   if (patch.title) body.subject = patch.title;
   if (patch.taskType) body.taskType = apiTaskType(patch.taskType);
@@ -713,7 +773,7 @@ export async function updateCrmTask(
     body.assigneeIds = [patch.assignedTo];
   }
   if (patch.description != null || patch.actionItems) {
-    const current = findTaskById(id)?.task;
+    const current = findTaskById(liveId)?.task;
     body.description =
       encodeActionItemsInDescription(
         patch.description ?? current?.description ?? "",
@@ -729,7 +789,7 @@ export async function updateCrmTask(
     if (ids.length) body.collaboratorIds = ids;
   }
   return asTask(
-    await tasksMutate(`/${id}`, {
+    await tasksMutate(`/${liveId}`, {
       method: "PATCH",
       body: JSON.stringify(compactBody(body)),
     }),
@@ -737,6 +797,7 @@ export async function updateCrmTask(
 }
 
 export async function deleteCrmTask(id: string): Promise<void> {
+  if (!isUuid(id)) return;
   await tasksMutate(`/${id}`, { method: "DELETE" });
 }
 
@@ -756,27 +817,39 @@ export async function applyCrmTaskStatus(
     CANCELLED: "cancel",
   }[apiTaskStatus(status)];
   if (!path) return null;
-  return asTask(await tasksMutate(`/${id}/${path}`, { method: "POST", body: "{}" }));
+  const liveId = await liveTaskId(id, true);
+  if (!liveId) return null;
+  return asTask(
+    await tasksMutate(`/${liveId}/${path}`, { method: "POST", body: "{}" }),
+  );
+}
+
+async function postTaskAction(id: string, action: string): Promise<Task | null> {
+  const liveId = await liveTaskId(id, true);
+  if (!liveId) return null;
+  return asTask(
+    await tasksMutate(`/${liveId}/${action}`, { method: "POST", body: "{}" }),
+  );
 }
 
 export async function completeCrmTask(id: string): Promise<Task | null> {
-  return asTask(await tasksMutate(`/${id}/complete`, { method: "POST", body: "{}" }));
+  return postTaskAction(id, "complete");
 }
 
 export async function reopenCrmTask(id: string): Promise<Task | null> {
-  return asTask(await tasksMutate(`/${id}/reopen`, { method: "POST", body: "{}" }));
+  return postTaskAction(id, "reopen");
 }
 
 export async function cancelCrmTask(id: string): Promise<Task | null> {
-  return asTask(await tasksMutate(`/${id}/cancel`, { method: "POST", body: "{}" }));
+  return postTaskAction(id, "cancel");
 }
 
 export async function restoreCrmTask(id: string): Promise<Task | null> {
-  return asTask(await tasksMutate(`/${id}/restore`, { method: "POST", body: "{}" }));
+  return postTaskAction(id, "restore");
 }
 
 export async function duplicateCrmTask(id: string): Promise<Task | null> {
-  return asTask(await tasksMutate(`/${id}/duplicate`, { method: "POST", body: "{}" }));
+  return postTaskAction(id, "duplicate");
 }
 
 export async function bulkCrmTasks(
@@ -927,25 +1000,27 @@ export async function syncTaskStatus(
   id: string,
   status: TaskStatus,
 ): Promise<Task | null> {
-  if (status === "Completed") return completeCrmTask(id);
-  if (status === "Cancelled") return cancelCrmTask(id);
+  const liveId = await liveTaskId(id, true);
+  if (!liveId) return null;
+  if (status === "Completed") return completeCrmTask(liveId);
+  if (status === "Cancelled") return cancelCrmTask(liveId);
 
-  const current = await tryCrmTask(() => getCrmTask(id));
+  const current = await tryCrmTask(() => getCrmTask(liveId));
   if (
     current &&
     (current.status === "Completed" || current.status === "Cancelled")
   ) {
-    await tryCrmTask(() => reopenCrmTask(id));
+    await tryCrmTask(() => reopenCrmTask(liveId));
   }
 
   // PATCH cannot set status; only lifecycle endpoints can.
-  const remote = await applyCrmTaskStatus(id, status);
+  const remote = await applyCrmTaskStatus(liveId, status);
   if (remote) {
     return remote.status === status ? remote : { ...remote, status };
   }
 
   // Not Started / Review: no lifecycle path (reopen already ran if needed).
-  const latest = await tryCrmTask(() => getCrmTask(id));
+  const latest = await tryCrmTask(() => getCrmTask(liveId));
   if (!latest) return null;
   return latest.status === status ? latest : { ...latest, status };
 }

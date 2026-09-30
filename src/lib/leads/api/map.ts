@@ -214,7 +214,11 @@ export function asHttpUrl(value: string | undefined): string | undefined {
     if (!url.hostname || url.hostname === "https" || !url.hostname.includes(".")) {
       return undefined;
     }
-    return url.toString();
+    // Prefer bare origins without a trailing slash (CRM + forms expect that).
+    if (url.pathname === "/" && !url.search && !url.hash) {
+      return `${url.protocol}//${url.host}`;
+    }
+    return url.toString().replace(/\/$/, "");
   } catch {
     return undefined;
   }

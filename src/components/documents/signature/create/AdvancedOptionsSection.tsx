@@ -49,7 +49,7 @@ interface AdvancedOptionsProps {
 export const AdvancedOptionsSection: React.FC<AdvancedOptionsProps> = ({
   settings,
   onChangeSettings,
-  defaultOpen = true,
+  defaultOpen = false,
 }) => {
   const [moreOpen, setMoreOpen] = useState(defaultOpen);
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Dialog,
@@ -13,7 +13,28 @@ import { Button } from "@/components/ui/button";
 import { ACTIVITY_OWNERS } from "@/lib/activities/shared";
 import type { Priority } from "@/lib/tasks/types";
 import { listTaskColumns, createTask } from "@/lib/tasks/store";
-import { listMeetings, createMeeting } from "@/lib/meetings/store";
+import {
+  listMeetings,
+  createMeeting,
+  formatMeetingDateTime,
+  upsertMeeting,
+} from "@/lib/meetings/store";
+import {
+  createCrmMeeting,
+  listRelatedCrmMeetings,
+  persistRemoteMeeting,
+  tryCrmMeeting,
+} from "@/lib/meetings/api";
+import {
+  bookingCrmLinkFromRelated,
+  createCrmBooking,
+  listCrmBookings,
+  listCrmConsultants,
+  listCrmEventTypes,
+  linkCrmBooking,
+  tryCrmBooking,
+  type CrmBookingRecord,
+} from "@/lib/booking/api";
 import { listNotes, createNote } from "@/lib/notes/store";
 import { isUuid } from "@/lib/activity-timeline/auth";
 import {
@@ -32,8 +53,17 @@ import {
   relatedMatchesLead,
 } from "@/lib/leads/activity-index";
 import { listAttachments } from "@/lib/attachments/store";
-import { listLibraryDocuments } from "@/lib/documents/library/types";
+import {
+  listLibraryDocuments,
+  upsertLibraryDocument,
+} from "@/lib/documents/library/types";
+import {
+  listCrmDocuments,
+  tryCrmDocument,
+} from "@/lib/documents/library/api";
+import { attachFileToLead } from "@/lib/leads/attachments";
 import { getRulesActor, defaultActorName } from "@/lib/rules/actor";
+import { formatRulesAt } from "@/lib/rules/storage";
 import {
   X,
   Plus,
@@ -130,22 +160,71 @@ function loadLeadTasks(leadName: string): TaskEntry[] {
   return [...open, ...previous];
 }
 
-function loadLeadAppointments(leadName: string): AppointmentEntry[] {
-  const fromStore: AppointmentEntry[] = listMeetings()
-    .filter((m) => matchesLead(m.relatedTo, leadName))
-    .map((m) => ({
-      id: m.id,
-      title: m.title,
-      whenLabel: m.startDateTime || "No date",
-      status: m.status,
-      location: m.location,
-      previous:
-        m.status === "Completed" ||
-        m.status === "Cancelled" ||
-        Boolean(m.startDateTime && new Date(m.startDateTime) < new Date()),
-    }));
+function appointmentIsPast(whenLabel: string, status: string): boolean {
+  const done =
+    /cancel|complete|no-show|noshow/i.test(status) ||
+    status === "Completed" ||
+    status === "Cancelled";
+  if (done) return true;
+  const at = Date.parse(whenLabel);
+  return !Number.isNaN(at) && at < Date.now();
+}
 
+function meetingToAppointmentEntry(
+  m: ReturnType<typeof listMeetings>[number],
+): AppointmentEntry {
+  return {
+    id: m.id,
+    title: m.title,
+    whenLabel: m.startDateTime || "No date",
+    status: m.status,
+    location: m.location,
+    previous: appointmentIsPast(m.startDateTime, m.status),
+  };
+}
+
+function bookingToAppointmentEntry(row: CrmBookingRecord): AppointmentEntry {
+  const when = row.startTime
+    ? Number.isNaN(Date.parse(row.startTime))
+      ? row.startTime
+      : formatRulesAt(new Date(row.startTime))
+    : "No date";
+  return {
+    id: row.id,
+    title: row.guestName ? `Appointment with ${row.guestName}` : "Appointment",
+    whenLabel: when,
+    status: row.status || "Scheduled",
+    previous: appointmentIsPast(row.startTime, row.status),
+  };
+}
+
+function mergeAppointmentEntries(
+  ...lists: AppointmentEntry[][]
+): AppointmentEntry[] {
+  const byId = new Map<string, AppointmentEntry>();
+  for (const list of lists) {
+    for (const item of list) {
+      if (!byId.has(item.id)) byId.set(item.id, item);
+    }
+  }
+  return [...byId.values()];
+}
+
+function loadLeadAppointments(
+  leadName: string,
+  leadId?: string,
+): AppointmentEntry[] {
+  const fromStore = listMeetings()
+    .filter((m) => {
+      if (leadId && isUuid(leadId) && m.relatedTo?.includes(leadId)) return true;
+      return matchesLead(m.relatedTo, leadName);
+    })
+    .map(meetingToAppointmentEntry);
   return fromStore;
+}
+
+function looksLikeEmail(value: string | undefined): value is string {
+  return Boolean(value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()));
 }
 
 function loadLeadNotes(leadName: string, leadId?: string): NoteEntry[] {
@@ -306,7 +385,13 @@ export function LeadEditDialog({
 
           <div className="min-h-0 flex-1 overflow-y-auto">
             {activeSection === "appointment" && (
-              <AppointmentSection leadName={leadName} onSuccess={onSuccess} />
+              <AppointmentSection
+                leadId={leadId}
+                leadName={leadName}
+                leadEmail={leadEmail}
+                leadPhone={leadPhone}
+                onSuccess={onSuccess}
+              />
             )}
             {activeSection === "detail" && (
               <ClientDetailsSection
@@ -328,7 +413,11 @@ export function LeadEditDialog({
               />
             )}
             {activeSection === "associated" && (
-              <AttachmentsSection leadId={leadId} leadName={leadName} />
+              <AttachmentsSection
+                leadId={leadId}
+                leadName={leadName}
+                pickOnOpen={initialSection === "associated"}
+              />
             )}
           </div>
         </div>
@@ -1038,73 +1127,254 @@ function NotesSection({
 /* ------------------------------- Appointment ------------------------------- */
 
 function AppointmentSection({
+  leadId,
   leadName,
+  leadEmail,
+  leadPhone,
   onSuccess,
 }: {
+  leadId?: string;
   leadName: string;
+  leadEmail?: string;
+  leadPhone?: string;
   onSuccess?: (message: string) => void;
 }) {
+  const card = findLeadCard(leadId, leadName);
+  const guestEmail = looksLikeEmail(leadEmail)
+    ? leadEmail.trim()
+    : looksLikeEmail(card?.email)
+      ? card.email.trim()
+      : "";
+  const guestPhone = leadPhone?.trim() || card?.phone?.trim() || "";
+
   const [appointments, setAppointments] = useState<AppointmentEntry[]>(() =>
-    loadLeadAppointments(leadName),
+    loadLeadAppointments(leadName, leadId),
   );
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [location, setLocation] = useState("");
   const [meetingLink, setMeetingLink] = useState("");
   const [agenda, setAgenda] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
-  // Sync `appointments` from `leadName` whenever it changes, per React's
-  // documented "adjusting state when a prop changes" pattern — computed
-  // during render instead of in an effect (react-hooks/set-state-in-effect).
-  const [prevAppointmentsLeadName, setPrevAppointmentsLeadName] =
-    useState(leadName);
-  if (prevAppointmentsLeadName !== leadName) {
-    setPrevAppointmentsLeadName(leadName);
-    setAppointments(loadLeadAppointments(leadName));
+  const appointmentsResetKey = `${leadId ?? ""}|${leadName}`;
+  const [prevAppointmentsResetKey, setPrevAppointmentsResetKey] =
+    useState(appointmentsResetKey);
+  if (prevAppointmentsResetKey !== appointmentsResetKey) {
+    setPrevAppointmentsResetKey(appointmentsResetKey);
+    setAppointments(loadLeadAppointments(leadName, leadId));
   }
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const remoteBookings =
+        leadId && isUuid(leadId)
+          ? await tryCrmBooking(() =>
+              listCrmBookings({ leadId, limit: 100 }),
+            )
+          : await tryCrmBooking(() => listCrmBookings({ limit: 100 }));
+      const relatedMeetings =
+        leadId && isUuid(leadId)
+          ? await tryCrmMeeting(() => listRelatedCrmMeetings("LEAD", leadId))
+          : null;
+      if (cancelled) return;
+      for (const meeting of relatedMeetings ?? []) {
+        persistRemoteMeeting({
+          ...meeting,
+          relatedTo: meeting.relatedTo || `Lead: ${leadName}`,
+        });
+      }
+      const bookingRows = (remoteBookings ?? []).filter((row) => {
+        if (leadId && isUuid(leadId)) return row.leadId === leadId;
+        return (
+          row.guestName.trim().toLowerCase() === leadName.trim().toLowerCase()
+        );
+      });
+      setAppointments(
+        mergeAppointmentEntries(
+          bookingRows.map(bookingToAppointmentEntry),
+          loadLeadAppointments(leadName, leadId),
+        ),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [leadId, leadName]);
 
   const upcoming = appointments.filter((a) => !a.previous);
   const previous = appointments.filter((a) => a.previous);
 
-  function handleSave(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!date) return;
-    const startDateTime = time ? `${date}T${time}` : date;
-    const end = new Date(startDateTime);
-    if (!Number.isNaN(end.getTime())) end.setHours(end.getHours() + 1);
-    const endDateTime = Number.isNaN(end.getTime())
-      ? startDateTime
-      : end.toISOString().slice(0, 16);
+    if (!date || saving) return;
+    const start = time
+      ? new Date(`${date}T${time}`)
+      : new Date(`${date}T09:00`);
+    if (Number.isNaN(start.getTime())) {
+      setSaveError("Enter a valid date and time.");
+      return;
+    }
+    const end = new Date(start.getTime() + 60 * 60 * 1000);
+    const startIso = start.toISOString();
+    const startLabel = formatMeetingDateTime(start);
+    const endLabel = formatMeetingDateTime(end);
+    const title = `Appointment with ${leadName}`;
+    const organizer = getRulesActor().name || defaultActorName() || "Me";
+    const meetingType =
+      meetingLink.trim()
+        ? "Video Call"
+        : /phone|call/i.test(location)
+          ? "Phone Call"
+          : location.trim()
+            ? "In-person"
+            : "Video Call";
+    const related = bookingCrmLinkFromRelated("Lead", leadId);
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const notes = [agenda.trim(), location.trim(), meetingLink.trim()]
+      .filter(Boolean)
+      .join("\n");
 
-    const created = createMeeting({
-      title: `Appointment with ${leadName}`,
-      type: "Video Call",
-      startDateTime,
-      endDateTime,
-      status: "Scheduled",
-      relatedTo: `Lead: ${leadName}`,
-      location: location || undefined,
-      meetingLink: meetingLink || undefined,
-      agenda: agenda || undefined,
-      organizer: getRulesActor().name || defaultActorName() || "Me",
-    });
-    setAppointments((prev) => [
-      {
-        id: created.id,
-        title: created.title,
-        whenLabel: created.startDateTime,
-        status: created.status,
-        location: created.location,
-        previous: false,
-      },
-      ...prev,
-    ]);
-    setDate("");
-    setTime("");
-    setLocation("");
-    setMeetingLink("");
-    setAgenda("");
-    onSuccess?.("Appointment booked");
+    setSaving(true);
+    setSaveError("");
+    try {
+      let createdId = "";
+      let createdWhen = startLabel;
+      let createdStatus = "Scheduled";
+      let createdLocation = location.trim() || undefined;
+
+      const eventTypes = await tryCrmBooking(() => listCrmEventTypes());
+      const eventType =
+        eventTypes?.find((row) => row.active && isUuid(row.id)) ??
+        eventTypes?.find((row) => isUuid(row.id));
+      const hosts = await tryCrmBooking(() => listCrmConsultants());
+      const hostId = hosts?.find((row) => row.active && isUuid(row.id))?.id;
+
+      if (eventType && guestEmail) {
+        const booked = await tryCrmBooking(() =>
+          createCrmBooking({
+            eventTypeId: eventType.id,
+            startTime: startIso,
+            name: leadName,
+            email: guestEmail,
+            timezone,
+            hostId,
+            phone: guestPhone || undefined,
+            notes: notes || undefined,
+            internalNotes: notes || undefined,
+            ...related,
+          }),
+        );
+        if (booked?.id) {
+          if (Object.keys(related).length) {
+            await tryCrmBooking(() => linkCrmBooking(booked.id, related));
+          }
+          createdId = booked.id;
+          createdWhen = bookingToAppointmentEntry(booked).whenLabel;
+          createdStatus = booked.status || "Scheduled";
+          upsertMeeting({
+            id: booked.id,
+            title,
+            relatedTo: `Lead: ${leadName}`,
+            type: meetingType,
+            startDateTime: createdWhen,
+            endDateTime: endLabel,
+            status: /cancel/i.test(createdStatus) ? "Cancelled" : "Scheduled",
+            organizer,
+            location: createdLocation,
+            meetingLink: meetingLink.trim() || undefined,
+            agenda: agenda.trim() || undefined,
+            attendees: guestEmail
+              ? [{ id: "invitee", name: leadName, email: guestEmail }]
+              : [],
+          });
+        }
+      }
+
+      if (!createdId) {
+        const remote = await tryCrmMeeting(() =>
+          createCrmMeeting({
+            title,
+            relatedTo: `Lead: ${leadName}`,
+            relatedKind: "Lead",
+            relatedId: leadId,
+            type: meetingType,
+            startDateTime: startLabel,
+            endDateTime: endLabel,
+            status: "Scheduled",
+            organizer,
+            location: createdLocation,
+            meetingLink: meetingLink.trim() || undefined,
+            agenda: agenda.trim() || undefined,
+            timezone,
+            externalAttendees: guestEmail
+              ? [{ email: guestEmail, name: leadName }]
+              : undefined,
+          }),
+        );
+        if (remote) {
+          persistRemoteMeeting(remote);
+          createdId = remote.id;
+          createdWhen = remote.startDateTime;
+          createdStatus = remote.status;
+          createdLocation = remote.location;
+        }
+      }
+
+      if (!createdId) {
+        const local = createMeeting({
+          title,
+          type: meetingType,
+          startDateTime: startLabel,
+          endDateTime: endLabel,
+          status: "Scheduled",
+          relatedTo: `Lead: ${leadName}`,
+          location: createdLocation,
+          meetingLink: meetingLink.trim() || undefined,
+          agenda: agenda.trim() || undefined,
+          organizer,
+        });
+        createdId = local.id;
+        createdWhen = local.startDateTime;
+        createdStatus = local.status;
+        createdLocation = local.location;
+        if (eventType && !guestEmail) {
+          setSaveError(
+            "Saved locally. Add an email on the lead to create a CRM booking.",
+          );
+        }
+      }
+
+      setAppointments((prev) =>
+        mergeAppointmentEntries(
+          [
+            {
+              id: createdId,
+              title,
+              whenLabel: createdWhen,
+              status: createdStatus,
+              location: createdLocation,
+              previous: false,
+            },
+          ],
+          prev,
+        ),
+      );
+      setDate("");
+      setTime("");
+      setLocation("");
+      setMeetingLink("");
+      setAgenda("");
+      onSuccess?.("Appointment booked");
+    } catch (err) {
+      setSaveError(
+        err instanceof Error ? err.message : "Could not save the appointment.",
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -1166,12 +1436,19 @@ function AppointmentSection({
           />
         </label>
 
+        {saveError && (
+          <p className="text-xs text-red-600" role="alert">
+            {saveError}
+          </p>
+        )}
+
         <div className="flex justify-end pt-1">
           <Button
             type="submit"
-            className="bg-violet-600 text-white hover:bg-violet-700"
+            disabled={saving}
+            className="bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50"
           >
-            Save appointment
+            {saving ? "Saving…" : "Save appointment"}
           </Button>
         </div>
       </form>
@@ -1238,38 +1515,113 @@ function AppointmentListBlock({
 function AttachmentsSection({
   leadId,
   leadName,
+  pickOnOpen,
 }: {
   leadId?: string;
   leadName: string;
+  pickOnOpen?: boolean;
 }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [tick, setTick] = useState(0);
+  const [file, setFile] = useState<File | null>(null);
+  const [fileName, setFileName] = useState("");
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
   const card = findLeadCard(leadId, leadName);
   const name = card?.name || leadName;
-  const files = [
-    ...listAttachments()
-      .filter((file) => relatedMatchesLead(file.relatedTo, name))
-      .map((file) => ({
-        id: file.id,
-        name: file.fileName,
-        kind: file.kind,
-        size: file.sizeLabel || "—",
-        uploadedBy: file.uploadedBy,
-        uploadedAt: file.uploadedAt,
-      })),
-    ...listLibraryDocuments()
-      .filter((doc) => relatedMatchesLead(doc.relatedTo, name))
-      .map((doc) => ({
-        id: `lib-${doc.id}`,
-        name: doc.fileName,
-        kind: "Document",
-        size: doc.sizeLabel || "—",
-        uploadedBy: doc.owner,
-        uploadedAt: doc.uploadedAt,
-      })),
-  ].filter(
-    (file, index, all) =>
-      all.findIndex((item) => item.name === file.name && item.uploadedAt === file.uploadedAt) ===
-      index,
-  );
+
+  useEffect(() => {
+    if (!leadId || !isUuid(leadId)) return;
+    let cancelled = false;
+    void tryCrmDocument(() =>
+      listCrmDocuments({ leadId, limit: 100 }),
+    ).then((rows) => {
+      if (cancelled || !rows) return;
+      for (const row of rows) {
+        upsertLibraryDocument({
+          ...row,
+          relatedTo: row.relatedTo || `Lead: ${name}`,
+          leadId,
+        });
+      }
+      setTick((n) => n + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [leadId, name]);
+
+  useEffect(() => {
+    if (!pickOnOpen) return;
+    const id = window.setTimeout(() => fileRef.current?.click(), 150);
+    return () => window.clearTimeout(id);
+  }, [pickOnOpen]);
+
+  const files = useMemo(() => {
+    void tick;
+    return [
+      ...listAttachments()
+        .filter((item) => relatedMatchesLead(item.relatedTo, name) || (leadId && item.relatedTo?.includes(leadId)))
+        .map((item) => ({
+          id: item.id,
+          name: item.fileName,
+          kind: item.kind,
+          size: item.sizeLabel || "—",
+          uploadedBy: item.uploadedBy,
+          uploadedAt: item.uploadedAt,
+        })),
+      ...listLibraryDocuments()
+        .filter(
+          (doc) =>
+            doc.leadId === leadId || relatedMatchesLead(doc.relatedTo, name),
+        )
+        .map((doc) => ({
+          id: `lib-${doc.id}`,
+          name: doc.fileName,
+          kind: "Document",
+          size: doc.sizeLabel || "—",
+          uploadedBy: doc.owner,
+          uploadedAt: doc.uploadedAt,
+        })),
+    ].filter(
+      (item, index, all) =>
+        all.findIndex(
+          (row) => row.name === item.name && row.uploadedAt === item.uploadedAt,
+        ) === index,
+    );
+  }, [tick, name, leadId]);
+
+  async function handleUpload(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file) {
+      setError("Choose a file to upload.");
+      fileRef.current?.click();
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await attachFileToLead({
+        file,
+        fileName: fileName.trim() || file.name,
+        notes,
+        leadId,
+        leadName: name,
+        owner: getRulesActor().name || defaultActorName() || "You",
+      });
+      setFile(null);
+      setFileName("");
+      setNotes("");
+      if (fileRef.current) fileRef.current.value = "";
+      setTick((n) => n + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="px-6 py-4">
@@ -1277,9 +1629,65 @@ function AttachmentsSection({
       <p className="mt-0.5 text-[12px] text-slate-500">
         Documents on this lead file.
       </p>
-      <div className="mt-4">
+
+      <form onSubmit={(e) => void handleUpload(e)} className="mt-4 flex flex-col gap-3">
+        <input
+          ref={fileRef}
+          type="file"
+          className="hidden"
+          onChange={(e) => {
+            const next = e.target.files?.[0] ?? null;
+            setFile(next);
+            if (next) setFileName(next.name);
+            setError("");
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-6 text-[13px] font-medium text-slate-600 hover:border-violet-300 hover:bg-violet-50/50 hover:text-violet-700"
+        >
+          <Paperclip className="h-4 w-4" />
+          {file ? file.name : "Choose file to upload"}
+        </button>
+        <label className="block text-xs font-medium text-slate-600">
+          File name
+          <input
+            value={fileName}
+            onChange={(e) => setFileName(e.target.value)}
+            placeholder="rate-lock.pdf"
+            className="mt-1 h-9 w-full border-b border-slate-200 bg-transparent px-0 text-[13px] outline-none focus:border-violet-500"
+          />
+        </label>
+        <label className="block text-xs font-medium text-slate-600">
+          Notes (optional)
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={2}
+            placeholder="What was uploaded…"
+            className="mt-1 w-full resize-none border-b border-slate-200 bg-transparent px-0 py-2 text-[13px] outline-none focus:border-violet-500"
+          />
+        </label>
+        {error && (
+          <p className="text-xs text-red-600" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="flex justify-end">
+          <Button
+            type="submit"
+            disabled={busy}
+            className="bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50"
+          >
+            {busy ? "Uploading…" : "Upload"}
+          </Button>
+        </div>
+      </form>
+
+      <div className="mt-6">
         {files.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-10 text-center">
+          <div className="flex flex-col items-center gap-2 py-8 text-center">
             <span className="flex h-11 w-11 items-center justify-center rounded-full bg-violet-50 text-violet-500">
               <Paperclip className="h-5 w-5" />
             </span>
@@ -1287,22 +1695,22 @@ function AttachmentsSection({
               No documents on this lead
             </p>
             <p className="text-[12px] text-slate-400">
-              Files uploaded to this lead will show here.
+              Choose a file above to attach it to this lead.
             </p>
           </div>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {files.map((file) => (
-              <li key={file.id} className="flex items-start gap-2.5 py-2.5">
+            {files.map((item) => (
+              <li key={item.id} className="flex items-start gap-2.5 py-2.5">
                 <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-[#5A32A3]">
                   <Paperclip className="h-4 w-4" />
                 </span>
                 <div className="min-w-0">
                   <p className="truncate text-[13px] font-medium text-slate-800">
-                    {file.name}
+                    {item.name}
                   </p>
                   <p className="text-[11px] text-slate-400">
-                    {[file.kind, file.size, file.uploadedAt, file.uploadedBy]
+                    {[item.kind, item.size, item.uploadedAt, item.uploadedBy]
                       .filter(Boolean)
                       .join(" · ")}
                   </p>

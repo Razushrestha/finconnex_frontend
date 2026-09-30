@@ -51,7 +51,7 @@ const MODULE_TITLES: { href: string; label: string }[] = [
   { href: "/time-tracking", label: "Time Tracking" },
   { href: "/journeys", label: "Journeys" },
   { href: "/automations", label: "Automations" },
-  { href: "/rules", label: "Rules" },
+  { href: "/settings/data-management/rules", label: "Rules" },
   { href: "/users", label: "Users" },
   { href: "/settings/my-preferences", label: "My Preferences" },
   { href: "/settings", label: "Settings" },
