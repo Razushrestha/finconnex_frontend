@@ -4,7 +4,6 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { DASHBOARD_VIEWS, dashboardViewHref } from "@/lib/dashboard/views";
 import { useCrmSettings } from "@/lib/settings/use-crm-settings";
 import { resolveWorkspaceBrand } from "@/lib/settings/brand";
 import {
@@ -103,13 +102,8 @@ const childNavClass = (active: boolean) =>
 const dashboardItems: NavItem[] = [
   {
     label: "Dashboard",
+    href: "/",
     icon: Package,
-    children: DASHBOARD_VIEWS.filter((item) => item.id !== "executive").map(
-      (item) => ({
-        label: item.label,
-        href: dashboardViewHref(item.id),
-      }),
-    ),
   },
   { label: "Work Queue", href: "/work-queue", icon: Rows4 },
   {
