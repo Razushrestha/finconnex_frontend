@@ -16,6 +16,11 @@ export function setWorkQueueCrmDirectory(people: WorkQueuePerson[]) {
   crmDirectory = people.filter((p) => p.id && p.name);
 }
 
+/** The role this teammate holds now, from the last directory load. */
+export function roleForWorkQueueId(id: string): string | undefined {
+  return crmDirectory.find((p) => p.id === id)?.role;
+}
+
 export function displayNameForWorkQueueId(id: string): string {
   if (!id) return "";
   const hit = crmDirectory.find((p) => p.id === id);

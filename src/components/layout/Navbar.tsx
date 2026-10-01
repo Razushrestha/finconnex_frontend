@@ -173,9 +173,7 @@ export function Navbar({
             <span className="absolute top-2 right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-violet-600 px-1 text-[9px] font-bold text-white">
               {inboxUnread > 9 ? "9+" : inboxUnread}
             </span>
-          ) : (
-            <span className="absolute top-2.5 right-2.5 h-1.5 w-1.5 rounded-full bg-violet-600" />
-          )}
+          ) : null}
         </Link>
 
         <NotificationBell />
