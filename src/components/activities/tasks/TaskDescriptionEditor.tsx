@@ -59,37 +59,53 @@ const FONT_FAMILIES = [
 ] as const;
 
 const FONT_STACKS: Record<(typeof FONT_FAMILIES)[number], string> = {
-  Aptos: 'Aptos, Inter, "Segoe UI", sans-serif',
-  Arial: "Arial, Helvetica, sans-serif",
-  Calibri: 'Calibri, "Source Sans 3", "Segoe UI", sans-serif',
-  Cambria: 'Cambria, "Libre Baskerville", Georgia, serif',
+  Aptos: 'Aptos, "Source Sans 3", sans-serif',
+  Arial: "Arial, Arimo, Helvetica, sans-serif",
+  Calibri: "Calibri, Carlito, sans-serif",
+  Cambria: "Cambria, Caladea, serif",
   "Comic Sans MS": '"Comic Sans MS", "Comic Neue", cursive',
-  Consolas: 'Consolas, "Roboto Mono", "Courier New", monospace',
-  "Courier New": '"Courier New", Courier, monospace',
-  Garamond: 'Garamond, "EB Garamond", Georgia, serif',
-  Georgia: "Georgia, serif",
-  Helvetica: 'Helvetica, "Helvetica Neue", Arial, sans-serif',
-  Impact: "Impact, Haettenschweiler, sans-serif",
-  "Lucida Sans": '"Lucida Sans", "Lucida Grande", sans-serif',
+  Consolas: 'Consolas, "Roboto Mono", monospace',
+  "Courier New": '"Courier New", Cousine, Courier, monospace',
+  Garamond: 'Garamond, "EB Garamond", "Times New Roman", serif',
+  Georgia: "Georgia, Gelasio, serif",
+  Helvetica: "Helvetica, Arial, Inter, sans-serif",
+  Impact: "Impact, Anton, Haettenschweiler, sans-serif",
+  "Lucida Sans": '"Lucida Sans", "Lucida Sans Unicode", "Nunito Sans", sans-serif',
   "Palatino Linotype": '"Palatino Linotype", Palatino, "Libre Baskerville", serif',
-  "Segoe UI": '"Segoe UI", Inter, Tahoma, sans-serif',
-  Tahoma: "Tahoma, Geneva, sans-serif",
-  "Times New Roman": '"Times New Roman", Times, serif',
-  "Trebuchet MS": '"Trebuchet MS", Trebuchet, sans-serif',
-  Verdana: "Verdana, Geneva, sans-serif",
+  "Segoe UI": '"Segoe UI", Manrope, sans-serif',
+  Tahoma: 'Tahoma, "Nunito Sans", sans-serif',
+  "Times New Roman": '"Times New Roman", Times, Tinos, serif',
+  "Trebuchet MS": '"Trebuchet MS", "Fira Sans", sans-serif',
+  Verdana: "Verdana, Lexend, sans-serif",
 };
 
 const EDITOR_FONT_STYLESHEET =
-  "https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;600&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Roboto+Mono:wght@400;500&family=Source+Sans+3:wght@400;600&display=swap";
+  "https://fonts.googleapis.com/css2?family=Anton&family=Arimo:ital,wght@0,400;0,700;1,400;1,700&family=Caladea:ital,wght@0,400;0,700;1,400;1,700&family=Carlito:ital,wght@0,400;0,700;1,400;1,700&family=Comic+Neue:ital,wght@0,400;0,700;1,400;1,700&family=Cousine:ital,wght@0,400;0,700;1,400;1,700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Fira+Sans:ital,wght@0,400;0,600;1,400&family=Gelasio:ital,wght@0,400;0,700;1,400;1,700&family=Inter:ital,wght@0,400;0,600;1,400&family=Lexend:wght@400;600&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Manrope:wght@400;600&family=Nunito+Sans:ital,wght@0,400;0,700;1,400&family=Roboto+Mono:ital,wght@0,400;0,500;1,400&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=Tinos:ital,wght@0,400;0,700;1,400;1,700&display=swap";
 
 function ensureEditorFonts() {
   if (typeof document === "undefined") return;
-  if (document.getElementById("finconnex-editor-fonts")) return;
-  const link = document.createElement("link");
-  link.id = "finconnex-editor-fonts";
-  link.rel = "stylesheet";
-  link.href = EDITOR_FONT_STYLESHEET;
-  document.head.appendChild(link);
+  if (!document.getElementById("finconnex-editor-fonts")) {
+    const link = document.createElement("link");
+    link.id = "finconnex-editor-fonts";
+    link.rel = "stylesheet";
+    link.href = EDITOR_FONT_STYLESHEET;
+    document.head.appendChild(link);
+  }
+  const css = [
+    ".fc-font-face{font-family:var(--fc-font)!important;}",
+    ".fc-rich-editor u{text-decoration-line:underline!important;text-decoration-style:solid!important;text-decoration-color:currentColor!important;text-underline-offset:2px!important;}",
+    ".fc-rich-editor b,.fc-rich-editor strong{font-weight:700!important;}",
+    ".fc-rich-editor i,.fc-rich-editor em{font-style:italic!important;}",
+    ".fc-rich-editor a[href]{color:#1155cc!important;text-decoration-line:underline!important;text-decoration-style:solid!important;text-decoration-color:#1155cc!important;text-underline-offset:2px!important;cursor:pointer;}",
+    ".fc-rich-editor ::spelling-error,.fc-rich-editor ::grammar-error{text-decoration:none!important;background:transparent!important;}",
+  ].join("");
+  let style = document.getElementById("finconnex-editor-font-faces");
+  if (!style) {
+    style = document.createElement("style");
+    style.id = "finconnex-editor-font-faces";
+    document.head.appendChild(style);
+  }
+  style.textContent = css;
 }
 
 const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36] as const;
@@ -203,8 +219,79 @@ function clearNestedFontFamily(root: ParentNode) {
 }
 
 function applyStylesToElement(el: HTMLElement, styles: Record<string, string>) {
+  const important = new Set([
+    "fontFamily",
+    "fontWeight",
+    "fontStyle",
+    "fontSize",
+    "textDecorationLine",
+  ]);
   Object.entries(styles).forEach(([key, value]) => {
-    el.style.setProperty(camelToKebab(key), value);
+    el.style.setProperty(camelToKebab(key), value, important.has(key) ? "important" : "");
+  });
+}
+
+function paintUnderlineElement(el: HTMLElement) {
+  el.style.setProperty("text-decoration-line", "underline", "important");
+  el.style.setProperty("text-decoration-style", "solid", "important");
+  el.style.setProperty("text-decoration-color", "currentColor", "important");
+  el.style.setProperty("text-underline-offset", "2px", "important");
+}
+
+function textNodesTouching(editor: HTMLElement, range: Range) {
+  const nodes: Text[] = [];
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    const text = node as Text;
+    if (text.data.replace(/\u200b/g, "")) {
+      try {
+        if (range.intersectsNode(text)) nodes.push(text);
+      } catch {
+        // Ignore a range the browser has already discarded.
+      }
+    }
+    node = walker.nextNode();
+  }
+  return nodes;
+}
+
+function selectionHasMark(
+  editor: HTMLElement,
+  range: Range | null,
+  mark: "bold" | "italic",
+) {
+  if (!range || range.collapsed) return false;
+  const texts = textNodesTouching(editor, range);
+  const elements = texts.length
+    ? texts.map((text) => text.parentElement).filter((el): el is HTMLElement => Boolean(el))
+    : [range.startContainer instanceof HTMLElement ? range.startContainer : range.startContainer.parentElement].filter(
+        (el): el is HTMLElement => Boolean(el),
+      );
+  if (!elements.length) return false;
+  return elements.every((el) => {
+    const computed = window.getComputedStyle(el);
+    if (mark === "bold") {
+      const weight = Number.parseInt(computed.fontWeight, 10);
+      return computed.fontWeight === "bold" || weight >= 600;
+    }
+    return computed.fontStyle === "italic" || computed.fontStyle === "oblique";
+  });
+}
+
+function unwrapUnderlineSelection(editor: HTMLElement) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return;
+  const range = selection.getRangeAt(0);
+  const hosts = textNodesTouching(editor, range)
+    .map((text) => text.parentElement?.closest("u"))
+    .filter((node): node is HTMLElement => Boolean(node && editor.contains(node)));
+  const unique = [...new Set(hosts)];
+  unique.forEach((u) => {
+    const parent = u.parentNode;
+    if (!parent) return;
+    while (u.firstChild) parent.insertBefore(u.firstChild, u);
+    parent.removeChild(u);
   });
 }
 
@@ -304,6 +391,13 @@ function insertTypingSpan(range: Range, styles: Record<string, string>) {
   return { span, caret };
 }
 
+function elementHasUnderline(element: HTMLElement) {
+  if (element.closest("u")) return true;
+  if (element.closest("a")) return false;
+  const line = window.getComputedStyle(element).textDecorationLine || "";
+  return line.split(/\s+/).includes("underline");
+}
+
 function elementAtCaret(selection: Selection | null) {
   const node = selection?.anchorNode;
   if (!node) return null;
@@ -312,26 +406,54 @@ function elementAtCaret(selection: Selection | null) {
     : node.parentElement;
 }
 
-function computedFontName(element: HTMLElement) {
-  const family = window.getComputedStyle(element).fontFamily.replace(/['"]/g, "").split(",")[0]?.trim();
-  if (!family) return null;
-  const resolved = family.toLowerCase();
+function stackTokens(stack: string) {
   const generics = new Set(["serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui"]);
+  return stack
+    .split(",")
+    .map((part) => part.replace(/['"]/g, "").trim().toLowerCase())
+    .filter((part) => part && !generics.has(part));
+}
+
+function fontNameFromStack(stack: string) {
+  const tokens = stackTokens(stack);
+  if (!tokens.length) return null;
   return (
+    FONT_FAMILIES.find((item) => item.toLowerCase() === tokens[0]) ??
     FONT_FAMILIES.find((item) => {
-      if (item.toLowerCase() === resolved) return true;
-      const tokens = FONT_STACKS[item]
-        .split(",")
-        .map((part) => part.replace(/['"]/g, "").trim().toLowerCase())
-        .filter((part) => part && !generics.has(part));
-      return tokens.includes(resolved);
-    }) ?? null
+      const own = stackTokens(FONT_STACKS[item]);
+      return own[0] === tokens[0] || own.includes(tokens[0]);
+    }) ??
+    null
   );
+}
+
+function computedFontName(element: HTMLElement) {
+  let el: HTMLElement | null = element;
+  while (el) {
+    if (el.style.fontFamily) {
+      const named = fontNameFromStack(el.style.fontFamily);
+      if (named) return named;
+    }
+    el = el.parentElement;
+  }
+  const family = window
+    .getComputedStyle(element)
+    .fontFamily.replace(/['"]/g, "")
+    .split(",")[0]
+    ?.trim();
+  if (!family) return null;
+  return fontNameFromStack(family);
 }
 
 function caretHasStyles(
   selection: Selection | null,
-  styles: { family?: string | null; size?: number | null },
+  styles: {
+    family?: string | null;
+    size?: number | null;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+  },
 ) {
   const element = elementAtCaret(selection);
   if (!element) return false;
@@ -344,7 +466,26 @@ function caretHasStyles(
     const size = Number.parseInt(computed.fontSize, 10);
     if (Number.isNaN(size) || Math.abs(size - styles.size) > 1) return false;
   }
+  if (typeof styles.bold === "boolean") {
+    const weight = Number.parseInt(computed.fontWeight, 10);
+    const isBold = computed.fontWeight === "bold" || weight >= 600;
+    if (isBold !== styles.bold) return false;
+  }
+  if (typeof styles.italic === "boolean") {
+    if ((computed.fontStyle === "italic") !== styles.italic) return false;
+  }
+  if (typeof styles.underline === "boolean") {
+    if (elementHasUnderline(element) !== styles.underline) return false;
+  }
   return true;
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function applyInlineStyleToSelection(
@@ -383,7 +524,7 @@ function applyInlineStyleToSelection(
     }
     spanParents.forEach((el) => {
       clearNestedFontFamily(el);
-      el.style.fontFamily = styles.fontFamily;
+      el.style.setProperty("font-family", styles.fontFamily, "important");
     });
   }
   try {
@@ -411,9 +552,100 @@ function restoreEditorSelection(savedRangeRef: React.MutableRefObject<Range | nu
   const selection = window.getSelection();
   const saved = savedRangeRef.current;
   if (!selection || !saved) return false;
+  try {
+    selection.removeAllRanges();
+    selection.addRange(saved);
+    return true;
+  } catch {
+    savedRangeRef.current = null;
+    return false;
+  }
+}
+
+function textPointOffset(root: HTMLElement, container: Node, offset: number) {
+  const range = document.createRange();
+  range.setStart(root, 0);
+  try {
+    range.setEnd(container, offset);
+  } catch {
+    return root.textContent?.length ?? 0;
+  }
+  return range.toString().length;
+}
+
+function bookmarkEditorSelection(editor: HTMLElement) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return null;
+  const range = selection.getRangeAt(0);
+  if (!editor.contains(range.commonAncestorContainer)) return null;
+  const start = textPointOffset(editor, range.startContainer, range.startOffset);
+  const end = textPointOffset(editor, range.endContainer, range.endOffset);
+  return { start: Math.min(start, end), end: Math.max(start, end) };
+}
+
+function selectTextBookmark(
+  editor: HTMLElement,
+  mark: { start: number; end: number },
+) {
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+  let index = 0;
+  let startNode: Text | null = null;
+  let startOffset = 0;
+  let endNode: Text | null = null;
+  let endOffset = 0;
+  let lastNode: Text | null = null;
+  let node = walker.nextNode();
+  while (node) {
+    const text = node as Text;
+    lastNode = text;
+    const next = index + text.length;
+    if (!startNode && mark.start <= next) {
+      startNode = text;
+      startOffset = Math.min(text.length, mark.start - index);
+    }
+    if (startNode && mark.end <= next) {
+      endNode = text;
+      endOffset = Math.min(text.length, mark.end - index);
+      break;
+    }
+    index = next;
+    node = walker.nextNode();
+  }
+  const range = document.createRange();
+  if (!startNode) {
+    if (lastNode) {
+      range.setStart(lastNode, lastNode.length);
+      range.collapse(true);
+    } else {
+      range.selectNodeContents(editor);
+      range.collapse(false);
+    }
+  } else if (!endNode) {
+    range.setStart(startNode, startOffset);
+    range.collapse(true);
+  } else {
+    range.setStart(startNode, startOffset);
+    range.setEnd(endNode, endOffset);
+  }
+  const selection = window.getSelection();
+  if (!selection) return null;
   selection.removeAllRanges();
-  selection.addRange(saved);
-  return true;
+  selection.addRange(range);
+  return range;
+}
+
+function focusEditorSelection(
+  editor: HTMLElement,
+  savedRangeRef: React.MutableRefObject<Range | null>,
+) {
+  editor.focus();
+  const selection = window.getSelection();
+  if (selection && selection.rangeCount > 0) {
+    const live = selection.getRangeAt(0);
+    if (editor.contains(live.commonAncestorContainer)) return selection;
+  }
+  restoreEditorSelection(savedRangeRef);
+  return window.getSelection();
 }
 
 function normalizeHtml(html: string) {
@@ -728,6 +960,10 @@ function FontFamilyDropdown({
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    ensureEditorFonts();
+  }, []);
+
+  useEffect(() => {
     if (!open) return;
     function handleClick(event: MouseEvent) {
       const target = event.target as Node;
@@ -751,12 +987,14 @@ function FontFamilyDropdown({
           setOpen((current) => !current);
         }}
         className={cn(
-          "inline-flex h-8 min-w-[108px] max-w-[140px] items-center justify-between gap-1.5 rounded-md border bg-white px-2.5 text-[12px] text-slate-700 transition-colors hover:bg-slate-50",
+          "inline-flex h-8 min-w-[108px] max-w-[148px] items-center justify-between gap-1.5 rounded-md border bg-white px-2.5 text-[15px] text-slate-800 transition-colors hover:bg-slate-50",
           open ? "border-violet-300 bg-violet-50" : "border-slate-200",
         )}
         style={{ fontFamily: cssFontFamily(value) }}
       >
-        <span className="truncate">{value}</span>
+        <span className="truncate" style={{ fontFamily: cssFontFamily(value) }}>
+          {value}
+        </span>
         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />
       </button>
       <FloatingMenu open={open} anchorRef={buttonRef} menuRef={menuRef} minWidth={200} maxHeight={280}>
@@ -770,12 +1008,12 @@ function FontFamilyDropdown({
               setOpen(false);
             }}
             className={cn(
-              "flex w-full items-center px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50",
-              family === value && "bg-violet-50 font-medium text-violet-700",
+              "flex w-full items-center px-3 py-1.5 text-left text-[18px] leading-7 text-slate-800 hover:bg-slate-50",
+              family === value && "bg-violet-50 text-violet-700",
             )}
             style={{ fontFamily: cssFontFamily(family) }}
           >
-            {family}
+            <span style={{ fontFamily: cssFontFamily(family) }}>{family}</span>
           </button>
         ))}
       </FloatingMenu>
@@ -1169,24 +1407,19 @@ function TableInsertButton({
 
 function MoreInsertMenu({
   onBeforeOpen,
-  onInsertLink,
-  onInsertTable,
   onInsertImage,
   onInsertEmoji,
   onInsertHr,
   onInsertQuote,
 }: {
   onBeforeOpen: () => void;
-  onInsertLink: () => void;
-  onInsertTable: (rows: number, cols: number) => void;
   onInsertImage: (file: File) => void;
   onInsertEmoji: (emoji: string) => void;
   onInsertHr: () => void;
   onInsertQuote: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [panel, setPanel] = useState<null | "table" | "emoji">(null);
-  const [hoverCell, setHoverCell] = useState({ rows: 1, cols: 1 });
+  const [panel, setPanel] = useState<null | "emoji">(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -1251,19 +1484,6 @@ function MoreInsertMenu({
           <div className="grid grid-cols-3 gap-0.5 p-1.5">
             <button
               type="button"
-              title="Insert link"
-              onMouseDown={preventFocusLoss}
-              onMouseEnter={() => setPanel(null)}
-              onClick={() => {
-                onInsertLink();
-                closeAll();
-              }}
-              className="flex h-9 w-9 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100"
-            >
-              <Link2 className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
               title="Insert image"
               onMouseDown={preventFocusLoss}
               onMouseEnter={() => setPanel(null)}
@@ -1311,65 +1531,7 @@ function MoreInsertMenu({
             >
               <Quote className="h-4 w-4" />
             </button>
-            <button
-              type="button"
-              title="Add a table"
-              onMouseDown={preventFocusLoss}
-              onMouseEnter={() => {
-                setPanel("table");
-                setHoverCell({ rows: 1, cols: 1 });
-              }}
-              onClick={() => {
-                setPanel("table");
-                setHoverCell({ rows: 1, cols: 1 });
-              }}
-              className={cn(
-                "flex h-9 w-9 items-center justify-center rounded-md text-slate-600 hover:bg-slate-100",
-                panel === "table" && "bg-slate-100",
-              )}
-            >
-              <Table className="h-4 w-4" />
-            </button>
           </div>
-          {panel === "table" ? (
-            <div
-              className="border-l border-slate-100 p-2"
-              onMouseEnter={() => setPanel("table")}
-            >
-              <p className="mb-1.5 text-[12px] font-semibold text-slate-700">Insert Table</p>
-              <div
-                className="grid gap-[3px]"
-                style={{ gridTemplateColumns: `repeat(${TABLE_GRID}, 14px)` }}
-              >
-                {Array.from({ length: TABLE_GRID * TABLE_GRID }, (_, index) => {
-                  const col = (index % TABLE_GRID) + 1;
-                  const row = Math.floor(index / TABLE_GRID) + 1;
-                  const active = row <= hoverCell.rows && col <= hoverCell.cols;
-                  return (
-                    <button
-                      key={index}
-                      type="button"
-                      onMouseDown={preventFocusLoss}
-                      onMouseEnter={() => setHoverCell({ rows: row, cols: col })}
-                      onClick={() => {
-                        onInsertTable(row, col);
-                        closeAll();
-                      }}
-                      className={cn(
-                        "h-[14px] w-[14px] rounded-[2px] border",
-                        active
-                          ? "border-[#5A32A3] bg-[#F3ECFB]"
-                          : "border-slate-300 bg-white",
-                      )}
-                    />
-                  );
-                })}
-              </div>
-              <p className="mt-1.5 text-center text-[11px] text-slate-500">
-                {hoverCell.rows} × {hoverCell.cols} table
-              </p>
-            </div>
-          ) : null}
           {panel === "emoji" ? (
             <div className="grid w-[184px] grid-cols-8 gap-0.5 border-l border-slate-100 p-1.5">
               {EMOJI_SET.map((emoji) => (
@@ -1411,7 +1573,19 @@ export function TaskDescriptionEditor({
   const editorRef = useRef<HTMLDivElement>(null);
   const lastHtmlRef = useRef(value);
   const savedRangeRef = useRef<Range | null>(null);
-  const pendingFormatRef = useRef({ family: "Aptos", size: 12 });
+  const linkBookmarkRef = useRef<{ start: number; end: number } | null>(null);
+  const restoringSelectionRef = useRef(false);
+  const pendingFormatRef = useRef({
+    family: "Aptos",
+    size: 12,
+    bold: false,
+    italic: false,
+    underline: false,
+  });
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkLabel, setLinkLabel] = useState("");
+  const [linkError, setLinkError] = useState("");
   const lockToolbarFontRef = useRef(false);
   const [fontFamily, setFontFamily] = useState<string>("Aptos");
   const [fontSize, setFontSize] = useState<number>(12);
@@ -1608,6 +1782,19 @@ export function TaskDescriptionEditor({
         setFontFamily(match);
         pendingFormatRef.current.family = match;
       }
+      const weight = Number.parseInt(computed.fontWeight, 10);
+      const isBold = computed.fontWeight === "bold" || weight >= 600;
+      const isItalic = computed.fontStyle === "italic" || computed.fontStyle === "oblique";
+      const isUnderline = elementHasUnderline(element);
+      pendingFormatRef.current.bold = isBold;
+      pendingFormatRef.current.italic = isItalic;
+      pendingFormatRef.current.underline = isUnderline;
+      setActiveFormats((current) => ({
+        ...current,
+        bold: isBold,
+        italic: isItalic,
+        underline: isUnderline,
+      }));
       if (!Number.isNaN(size)) {
         const nearest = FONT_SIZES.reduce((prev, curr) =>
           Math.abs(curr - size) < Math.abs(prev - size) ? curr : prev,
@@ -1638,16 +1825,24 @@ export function TaskDescriptionEditor({
     if (!editor.style.fontSize) {
       editor.style.fontSize = "12px";
     }
+    editor.spellcheck = false;
+    editor.setAttribute("spellcheck", "false");
+    editor.setAttribute("autocorrect", "off");
+    editor.setAttribute("autocapitalize", "off");
+    editor.setAttribute("data-gramm", "false");
+    editor.setAttribute("data-gramm_editor", "false");
+    editor.setAttribute("data-enable-grammarly", "false");
   }, []);
 
   useEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
     const incoming = value || "";
-    if (editor.innerHTML === incoming) {
+    if (editor.innerHTML === incoming || lastHtmlRef.current === incoming) {
       lastHtmlRef.current = incoming;
       return;
     }
+    if (linkBookmarkRef.current) return;
     editor.innerHTML = incoming;
     lastHtmlRef.current = incoming;
   }, [value]);
@@ -1659,11 +1854,100 @@ export function TaskDescriptionEditor({
     };
   }
 
+  function typingStyles() {
+    const pending = pendingFormatRef.current;
+    return {
+      ...currentFormatStyles(),
+      ...(pending.bold ? { fontWeight: "700" } : {}),
+      ...(pending.italic ? { fontStyle: "italic" } : {}),
+    };
+  }
+
+  function wrapWithUnderline(node: Node) {
+    const u = document.createElement("u");
+    paintUnderlineElement(u);
+    node.parentNode?.insertBefore(u, node);
+    u.appendChild(node);
+    return u;
+  }
+
+  function toggleMark(mark: "bold" | "italic" | "underline") {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const selection = focusEditorSelection(editor, savedRangeRef);
+    const range =
+      selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    const collapsed =
+      !range || range.collapsed || !editor.contains(range.commonAncestorContainer);
+
+    if (mark === "underline") {
+      if (!collapsed && range) {
+        const texts = textNodesTouching(editor, range);
+        const fully =
+          texts.length > 0 &&
+          texts.every((text) => Boolean(text.parentElement?.closest("u")));
+        if (fully) unwrapUnderlineSelection(editor);
+        else toggleUnderlineSelection(editor);
+        editor.querySelectorAll("u").forEach((node) => paintUnderlineElement(node as HTMLElement));
+      } else {
+        document.execCommand("styleWithCSS", false, "false");
+        document.execCommand("underline", false);
+        editor.querySelectorAll("u").forEach((node) => paintUnderlineElement(node as HTMLElement));
+      }
+      const anchorNode = window.getSelection()?.anchorNode ?? null;
+      const host =
+        anchorNode instanceof HTMLElement ? anchorNode : anchorNode?.parentElement ?? null;
+      const underlined = collapsed
+        ? document.queryCommandState("underline")
+        : Boolean(host?.closest("u"));
+      pendingFormatRef.current.underline = underlined;
+      setActiveFormats((current) => ({ ...current, underline: underlined }));
+      syncContent();
+      return;
+    }
+
+    const command = mark === "bold" ? "bold" : "italic";
+    const turningOn = collapsed
+      ? !document.queryCommandState(command)
+      : !selectionHasMark(editor, range, mark);
+    if (!collapsed && range) {
+      wrapRangeWithInlineStyles(
+        editor,
+        range,
+        mark === "bold"
+          ? { fontWeight: turningOn ? "700" : "400" }
+          : { fontStyle: turningOn ? "italic" : "normal" },
+      );
+    } else {
+      document.execCommand("styleWithCSS", false, "true");
+      document.execCommand(command, false);
+    }
+    pendingFormatRef.current[mark] = turningOn;
+    setActiveFormats((current) => ({ ...current, [mark]: turningOn }));
+    syncContent();
+  }
+
   function applyFontFamily(nextFamily: string) {
     pendingFormatRef.current.family = nextFamily;
     lockToolbarFontRef.current = true;
     setFontFamily(nextFamily);
-    applyInlineStyleToSelection(editorRef.current, savedRangeRef, currentFormatStyles(nextFamily));
+    const editor = editorRef.current;
+    if (!editor) return;
+    const selection = focusEditorSelection(editor, savedRangeRef);
+    const stack = cssFontFamily(nextFamily);
+    const range =
+      selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    if (range && !range.collapsed && editor.contains(range.commonAncestorContainer)) {
+      wrapRangeWithInlineStyles(editor, range, { fontFamily: stack });
+    }
+    document.execCommand("styleWithCSS", false, "false");
+    document.execCommand("fontName", false, nextFamily);
+    editor.querySelectorAll("font[face]").forEach((node) => {
+      const face = node.getAttribute("face")?.replace(/['"]/g, "") ?? "";
+      if (face.toLowerCase() === nextFamily.toLowerCase()) {
+        (node as HTMLElement).style.setProperty("font-family", stack, "important");
+      }
+    });
     syncContent();
   }
 
@@ -1671,16 +1955,37 @@ export function TaskDescriptionEditor({
     pendingFormatRef.current.size = nextSize;
     lockToolbarFontRef.current = true;
     setFontSize(nextSize);
-    applyInlineStyleToSelection(editorRef.current, savedRangeRef, currentFormatStyles(undefined, nextSize));
+    const editor = editorRef.current;
+    if (!editor) return;
+    focusEditorSelection(editor, savedRangeRef);
+    const live = window.getSelection();
+    const range = live && live.rangeCount > 0 ? live.getRangeAt(0) : null;
+    if (range && !range.collapsed && editor.contains(range.commonAncestorContainer)) {
+      wrapRangeWithInlineStyles(editor, range, { fontSize: `${nextSize}px` });
+    }
+    document.execCommand("styleWithCSS", false, "false");
+    document.execCommand("fontSize", false, "7");
+    editor.querySelectorAll('font[size="7"]').forEach((node) => {
+      const font = node as HTMLElement;
+      font.removeAttribute("size");
+      font.style.setProperty("font-size", `${nextSize}px`, "important");
+    });
     syncContent();
   }
 
   function insertPendingText(text: string) {
     const editor = editorRef.current;
     if (!editor) return;
-    editor.focus();
-    restoreEditorSelection(savedRangeRef);
-    const selection = window.getSelection();
+    let selection = window.getSelection();
+    if (
+      !selection ||
+      selection.rangeCount === 0 ||
+      !editor.contains(selection.getRangeAt(0).commonAncestorContainer)
+    ) {
+      editor.focus();
+      restoreEditorSelection(savedRangeRef);
+      selection = window.getSelection();
+    }
     if (!selection || selection.rangeCount === 0) return;
     const range = selection.getRangeAt(0);
     if (!editor.contains(range.commonAncestorContainer)) return;
@@ -1689,6 +1994,9 @@ export function TaskDescriptionEditor({
     if (anchor?.nodeType === Node.TEXT_NODE && (anchor.textContent === "\u200b" || anchor.textContent === "")) {
       const node = anchor as Text;
       node.data = text;
+      if (pendingFormatRef.current.underline && !node.parentElement?.closest("u")) {
+        wrapWithUnderline(node);
+      }
       const caret = document.createRange();
       caret.setStart(node, text.length);
       caret.collapse(true);
@@ -1701,9 +2009,10 @@ export function TaskDescriptionEditor({
 
     range.deleteContents();
     const span = document.createElement("span");
-    applyStylesToElement(span, currentFormatStyles());
+    applyStylesToElement(span, typingStyles());
     span.textContent = text;
-    range.insertNode(span);
+    if (pendingFormatRef.current.underline) wrapWithUnderline(span);
+    range.insertNode(pendingFormatRef.current.underline ? span.parentNode! : span);
     const caret = document.createRange();
     caret.setStart(span.firstChild ?? span, text.length);
     caret.collapse(true);
@@ -1722,10 +2031,10 @@ export function TaskDescriptionEditor({
     if (!range.collapsed || !editor.contains(range.commonAncestorContainer)) return;
     const block = blockAncestor(selection.anchorNode, editor);
     if (block && !(block.textContent ?? "").replace(/\u200b/g, "").trim()) {
-      applyStylesToElement(block, currentFormatStyles());
+      applyStylesToElement(block, typingStyles());
       return;
     }
-    const { caret } = insertTypingSpan(range, currentFormatStyles());
+    const { caret } = insertTypingSpan(range, typingStyles());
     selection.removeAllRanges();
     selection.addRange(caret);
     savedRangeRef.current = caret.cloneRange();
@@ -1733,15 +2042,94 @@ export function TaskDescriptionEditor({
 
   function handleBeforeInput(event: React.FormEvent<HTMLDivElement>) {
     const native = event.nativeEvent as InputEvent;
-    if (native.inputType === "insertParagraph" || native.inputType === "insertLineBreak") {
-      window.requestAnimationFrame(() => ensurePendingAtCaret());
-      return;
-    }
     if (native.inputType !== "insertText" || !native.data) return;
     const selection = window.getSelection();
-    if (selection?.isCollapsed && caretHasStyles(selection, pendingFormatRef.current)) return;
+    if (!selection?.isCollapsed || selection.rangeCount === 0) return;
+    const editor = editorRef.current;
+    const caret = elementAtCaret(selection);
+    const link = caret?.closest("a[href]");
+    if (editor && link && editor.contains(link) && caretAtEndOfLink(link, selection.getRangeAt(0))) {
+      native.preventDefault();
+      pendingFormatRef.current.underline = false;
+      placeCaretAfterLink(link);
+      insertPendingText(native.data);
+      return;
+    }
+    if (!caret) return;
+    const pending = pendingFormatRef.current;
+    const computed = window.getComputedStyle(caret);
+    const weight = Number.parseInt(computed.fontWeight, 10);
+    const size = Number.parseInt(computed.fontSize, 10);
+    const boldOk = !pending.bold || computed.fontWeight === "bold" || weight >= 600;
+    const italicOk = !pending.italic || computed.fontStyle === "italic";
+    const underlineOk = !pending.underline || Boolean(caret.closest("u"));
+    const fontOk = computedFontName(caret) === pending.family;
+    const sizeOk = !Number.isNaN(size) && Math.abs(size - pending.size) <= 1;
+    if (boldOk && italicOk && underlineOk && fontOk && sizeOk) return;
     native.preventDefault();
     insertPendingText(native.data);
+  }
+
+  function placeUnderlineCaret(on: boolean) {
+    const editor = editorRef.current;
+    const selection = window.getSelection();
+    if (!editor || !selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    if (!range.collapsed || !editor.contains(range.commonAncestorContainer)) return;
+    const host =
+      range.startContainer instanceof HTMLElement
+        ? range.startContainer
+        : range.startContainer.parentElement;
+    const current = host?.closest("u");
+    if (on && current && editor.contains(current)) return;
+    if (!on && current && editor.contains(current)) {
+      const after = document.createRange();
+      after.setStartAfter(current);
+      after.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(after);
+      savedRangeRef.current = after.cloneRange();
+      return;
+    }
+    if (!on) return;
+    const u = document.createElement("u");
+    paintUnderlineElement(u);
+    u.appendChild(document.createTextNode("\u200b"));
+    range.insertNode(u);
+    const caret = document.createRange();
+    caret.setStart(u.firstChild!, 1);
+    caret.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(caret);
+    savedRangeRef.current = caret.cloneRange();
+  }
+
+  function toggleUnderlineSelection(editor: HTMLElement) {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    const host =
+      range.commonAncestorContainer instanceof HTMLElement
+        ? range.commonAncestorContainer
+        : range.commonAncestorContainer.parentElement;
+    const existing = host?.closest("u");
+    if (existing && editor.contains(existing) && existing.textContent === range.toString()) {
+      const parent = existing.parentNode;
+      if (!parent) return;
+      while (existing.firstChild) parent.insertBefore(existing.firstChild, existing);
+      parent.removeChild(existing);
+      return;
+    }
+    const fragment = range.extractContents();
+    const u = document.createElement("u");
+    paintUnderlineElement(u);
+    u.appendChild(fragment);
+    range.insertNode(u);
+    const next = document.createRange();
+    next.selectNodeContents(u);
+    selection.removeAllRanges();
+    selection.addRange(next);
+    savedRangeRef.current = next.cloneRange();
   }
 
   function applyTextColor(color: string) {
@@ -1802,18 +2190,130 @@ export function TaskDescriptionEditor({
     readSelectionStyles();
   }
 
-  function insertLink() {
-    focusEditor();
-    restoreEditorSelection(savedRangeRef);
+  function openLinkEditor() {
+    const editor = editorRef.current;
+    if (editor) linkBookmarkRef.current = bookmarkEditorSelection(editor);
+    rememberSelection();
+    const selected = window.getSelection()?.toString().replace(/\u200b/g, "").trim() ?? "";
+    setLinkLabel(selected);
+    setLinkUrl("");
+    setLinkError("");
+    setLinkOpen(true);
+  }
+
+  function normalizeLinkHref(raw: string) {
+    const value = raw.trim();
+    if (!value || value === "https://" || value === "http://") return "";
+    if (/^(https?:|mailto:|tel:)/i.test(value)) return value;
+    if (value.includes("@") && !/\s/.test(value)) return `mailto:${value}`;
+    return `https://${value}`;
+  }
+
+  function paintLink(anchor: HTMLAnchorElement, href: string) {
+    anchor.href = href;
+    anchor.target = "_blank";
+    anchor.rel = "noopener noreferrer";
+    anchor.spellcheck = false;
+    anchor.title = href;
+    anchor.setAttribute("data-fc-link", "true");
+    anchor.style.setProperty("color", "#1155cc", "important");
+    anchor.style.setProperty("text-decoration-line", "underline", "important");
+    anchor.style.setProperty("text-decoration-style", "solid", "important");
+    anchor.style.setProperty("text-decoration-color", "#1155cc", "important");
+    anchor.style.setProperty("text-underline-offset", "2px", "important");
+    anchor.style.setProperty("cursor", "pointer", "important");
+  }
+
+  function placeCaretAfterLink(anchor: Element) {
+    const next = anchor.nextSibling;
+    const spacer = next instanceof Text ? next : document.createTextNode("\u200b");
+    if (spacer !== next) anchor.after(spacer);
+    const range = document.createRange();
+    range.setStart(spacer, next instanceof Text ? 0 : spacer.data.length);
+    range.collapse(true);
     const selection = window.getSelection();
-    const selected = selection?.toString().trim() ?? "";
-    const url = window.prompt("Enter URL", "https://");
-    if (!url) return;
-    if (!selected) {
-      runCommand("insertHTML", `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`);
-    } else {
-      runCommand("createLink", url);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    return range;
+  }
+
+  function caretAtEndOfLink(link: Element, range: Range) {
+    if (!range.collapsed || !link.contains(range.startContainer)) return false;
+    const end = document.createRange();
+    end.selectNodeContents(link);
+    end.collapse(false);
+    try {
+      return range.compareBoundaryPoints(Range.END_TO_END, end) === 0;
+    } catch {
+      return false;
     }
+  }
+
+  function openEditorLink(href: string) {
+    const opener = document.createElement("a");
+    opener.href = href;
+    opener.target = "_blank";
+    opener.rel = "noopener noreferrer";
+    document.body.appendChild(opener);
+    opener.click();
+    opener.remove();
+  }
+
+  function commitLink() {
+    const href = normalizeLinkHref(linkUrl);
+    if (!href) {
+      setLinkError("Enter a web address or email.");
+      return;
+    }
+    setLinkError("");
+    const editor = editorRef.current;
+    if (!editor) return;
+    const mark = linkBookmarkRef.current;
+    restoringSelectionRef.current = true;
+    editor.focus();
+    const bookmarked = mark ? selectTextBookmark(editor, mark) : null;
+    if (!bookmarked) restoreEditorSelection(savedRangeRef);
+    restoringSelectionRef.current = false;
+    const selection = window.getSelection();
+    if (!selection) return;
+    if (
+      selection.rangeCount === 0 ||
+      !editor.contains(selection.getRangeAt(0).commonAncestorContainer)
+    ) {
+      if (!bookmarked) {
+        const end = document.createRange();
+        end.selectNodeContents(editor);
+        end.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(end);
+      }
+    }
+    const range = selection.getRangeAt(0);
+    const selectedText = range.toString().replace(/\u200b/g, "");
+    const label = linkLabel.trim() || selectedText.trim() || href;
+    const reuseSelection =
+      !range.collapsed &&
+      Boolean(selectedText.trim()) &&
+      (!linkLabel.trim() || linkLabel.trim() === selectedText.trim());
+
+    const anchor = document.createElement("a");
+    paintLink(anchor, href);
+    if (reuseSelection) {
+      anchor.appendChild(range.extractContents());
+    } else {
+      if (!range.collapsed) range.deleteContents();
+      anchor.textContent = label;
+    }
+    if (!anchor.textContent?.replace(/\u200b/g, "").trim()) anchor.textContent = label;
+    range.insertNode(anchor);
+    paintLink(anchor, href);
+    const after = placeCaretAfterLink(anchor);
+    savedRangeRef.current = after.cloneRange();
+    pendingFormatRef.current.underline = false;
+    setActiveFormats((current) => ({ ...current, underline: false }));
+    linkBookmarkRef.current = null;
+    setLinkOpen(false);
+    syncContent();
     readSelectionStyles();
   }
 
@@ -1922,30 +2422,21 @@ export function TaskDescriptionEditor({
               <ToolButton
                 title="Bold"
                 active={activeFormats.bold}
-                onClick={() => {
-                  runCommand("bold");
-                  readSelectionStyles();
-                }}
+                onClick={() => toggleMark("bold")}
               >
                 <Bold className="h-4 w-4" />
               </ToolButton>
               <ToolButton
                 title="Underline"
                 active={activeFormats.underline}
-                onClick={() => {
-                  runCommand("underline");
-                  readSelectionStyles();
-                }}
+                onClick={() => toggleMark("underline")}
               >
                 <Underline className="h-4 w-4" />
               </ToolButton>
               <ToolButton
                 title="Italic"
                 active={activeFormats.italic}
-                onClick={() => {
-                  runCommand("italic");
-                  readSelectionStyles();
-                }}
+                onClick={() => toggleMark("italic")}
               >
                 <Italic className="h-4 w-4" />
               </ToolButton>
@@ -1983,7 +2474,7 @@ export function TaskDescriptionEditor({
                 onPick={pickListStyle}
                 onBeforeOpen={rememberSelection}
               />
-              <ToolButton title="Insert link" onClick={insertLink}>
+              <ToolButton title="Insert link" onClick={openLinkEditor}>
                 <Link2 className="h-4 w-4" />
               </ToolButton>
               <ToolButton title="Undo" onClick={() => runCommand("undo")}>
@@ -2015,30 +2506,21 @@ export function TaskDescriptionEditor({
           <ToolButton
             title="Bold"
             active={activeFormats.bold}
-            onClick={() => {
-              runCommand("bold");
-              readSelectionStyles();
-            }}
+            onClick={() => toggleMark("bold")}
           >
             <Bold className="h-4 w-4" />
           </ToolButton>
           <ToolButton
             title="Italic"
             active={activeFormats.italic}
-            onClick={() => {
-              runCommand("italic");
-              readSelectionStyles();
-            }}
+            onClick={() => toggleMark("italic")}
           >
             <Italic className="h-4 w-4" />
           </ToolButton>
           <ToolButton
             title="Underline"
             active={activeFormats.underline}
-            onClick={() => {
-              runCommand("underline");
-              readSelectionStyles();
-            }}
+            onClick={() => toggleMark("underline")}
           >
             <Underline className="h-4 w-4" />
           </ToolButton>
@@ -2097,7 +2579,7 @@ export function TaskDescriptionEditor({
             onBeforeOpen={rememberSelection}
             onInsertTable={insertTable}
           />
-          <ToolButton title="Insert link" onClick={insertLink}>
+          <ToolButton title="Insert link" onClick={openLinkEditor}>
             <Link2 className="h-4 w-4" />
           </ToolButton>
           {toolbarAfterLink ? toolbarAfterLink : null}
@@ -2181,8 +2663,6 @@ export function TaskDescriptionEditor({
           <ToolbarDivider />
           <MoreInsertMenu
             onBeforeOpen={rememberSelection}
-            onInsertLink={insertLink}
-            onInsertTable={insertTable}
             onInsertImage={insertImageFile}
             onInsertEmoji={insertEmoji}
             onInsertHr={insertHr}
@@ -2199,10 +2679,58 @@ export function TaskDescriptionEditor({
         ) : null}
       </div>
 
+      {linkOpen ? (
+        <form
+          className="absolute top-12 left-3 z-40 flex w-[min(420px,calc(100%-24px))] flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-lg"
+          onSubmit={(event) => {
+            event.preventDefault();
+            commitLink();
+          }}
+        >
+          <input
+            autoFocus
+            value={linkLabel}
+            onChange={(event) => setLinkLabel(event.target.value)}
+            placeholder="Link text"
+            className="h-8 min-w-[120px] flex-1 rounded-md border border-slate-200 px-2 text-[13px] outline-none focus:border-violet-300"
+          />
+          <input
+            value={linkUrl}
+            onChange={(event) => setLinkUrl(event.target.value)}
+            placeholder="https://example.com"
+            className="h-8 min-w-[160px] flex-[1.4] rounded-md border border-slate-200 px-2 text-[13px] outline-none focus:border-violet-300"
+          />
+          <button
+            type="submit"
+            onMouseDown={(event) => event.preventDefault()}
+            className="h-8 rounded-md bg-[#5A32A3] px-3 text-[12px] font-semibold text-white"
+          >
+            Insert
+          </button>
+          <button
+            type="button"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              linkBookmarkRef.current = null;
+              setLinkOpen(false);
+            }}
+            className="h-8 rounded-md px-2 text-[12px] font-medium text-slate-500 hover:bg-slate-100"
+          >
+            Cancel
+          </button>
+          {linkError ? (
+            <p className="w-full px-1 text-[12px] text-red-600">{linkError}</p>
+          ) : null}
+        </form>
+      ) : null}
+
       <div className={cn("relative", fillHeight && "flex min-h-0 flex-1 flex-col")}>
       <div
         ref={editorRef}
         contentEditable
+        spellCheck={false}
+        autoCorrect="off"
+        autoCapitalize="off"
         suppressContentEditableWarning
         role="textbox"
         aria-multiline
@@ -2216,6 +2744,14 @@ export function TaskDescriptionEditor({
         onBlur={syncContent}
         onKeyDown={(event) => {
           if (mentions.handleKeyDown(event)) return;
+        }}
+        onClick={(event) => {
+          const anchor = (event.target as HTMLElement).closest?.("a[href]");
+          if (!anchor || !editorRef.current?.contains(anchor)) return;
+          const href = anchor.getAttribute("href");
+          if (!href) return;
+          event.preventDefault();
+          openEditorLink(href);
         }}
         onMouseUp={() => {
           lockToolbarFontRef.current = false;
@@ -2238,6 +2774,7 @@ export function TaskDescriptionEditor({
           mentions.syncMention();
         }}
         onFocus={() => {
+          if (restoringSelectionRef.current) return;
           rememberSelection();
           if (!lockToolbarFontRef.current) readSelectionStyles();
         }}
@@ -2251,6 +2788,7 @@ export function TaskDescriptionEditor({
           "[&_table]:max-w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-300 [&_td]:p-1.5",
           "[&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:text-slate-600",
           "[&_.mention-tag]:rounded [&_.mention-tag]:bg-violet-100 [&_.mention-tag]:px-1 [&_.mention-tag]:py-0.5 [&_.mention-tag]:font-medium [&_.mention-tag]:text-violet-800",
+          "[&_a]:font-medium",
           showMarks && "[&_p]:relative [&_p]:border-b [&_p]:border-dashed [&_p]:border-slate-200 [&_p]:pb-1",
           editorClassName,
         )}

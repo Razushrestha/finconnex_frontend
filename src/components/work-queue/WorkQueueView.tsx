@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { WorkQueueSidebar } from "@/components/work-queue/WorkQueueSidebar";
 import { useWorkQueueScope } from "@/components/work-queue/WorkQueuePersonBar";
 import {
@@ -33,7 +32,11 @@ import {
   type QueueSortField,
   type WorkQueueTimeFilter,
 } from "@/lib/work-queue/live";
-import { completeCrmQueueItem } from "@/lib/work-queue/api";
+import {
+  completeCrmQueueItem,
+  deleteCrmQueueItem,
+  updateCrmQueueItem,
+} from "@/lib/work-queue/api";
 import { useCrmWorkQueue } from "@/lib/work-queue/use-crm-work-queue";
 import {
   mergeWorkQueueTabs,
@@ -53,7 +56,12 @@ import { initials } from "@/lib/activities/shared";
 import { onLeadActivityChange } from "@/lib/leads/lead-extras-store";
 import { onPipelineSlaChange } from "@/lib/pipeline-sla/settings";
 import { onRulesChange } from "@/lib/rules";
-import { completeTask, deleteTask, findTaskById } from "@/lib/tasks/store";
+import {
+  completeTask,
+  deleteTask,
+  findTaskById,
+  patchTask,
+} from "@/lib/tasks/store";
 import { viewEnter } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { notify } from "@/lib/notify/toast";
@@ -80,7 +88,6 @@ function readStoredCategories(): WorkqueueCategoryDef[] {
 }
 
 export function WorkQueueView() {
-  const router = useRouter();
   const scope = useWorkQueueScope();
   const [timeFilter, setTimeFilter] =
     React.useState<WorkQueueTimeFilter>("today-overdue");
@@ -102,6 +109,9 @@ export function WorkQueueView() {
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
 
   const [noteRow, setNoteRow] = React.useState<QueueRow | null>(null);
+  const [editRow, setEditRow] = React.useState<QueueRow | null>(null);
+  const [editSubject, setEditSubject] = React.useState("");
+  const [editSaving, setEditSaving] = React.useState(false);
   const crm = useCrmWorkQueue({
     nav: activeNav,
     scope,
@@ -265,20 +275,68 @@ export function WorkQueueView() {
   }
 
   function handleEditRow(row: QueueRow) {
-    router.push(row.href);
+    setEditRow(row);
+    setEditSubject(row.subject);
   }
 
-  function handleDeleteRow(row: QueueRow) {
-    const ok = window.confirm(`Delete “${row.subject}”?`);
-    if (!ok) return;
-    if (activeNav === "tasks" || findTaskById(row.id)) {
-      deleteTask(row.id);
-      refresh();
-      showToast("Task deleted");
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editRow) return;
+    const subject = editSubject.trim();
+    if (!subject) {
+      showToast("Subject is required");
       return;
     }
-    showToast("Open the record to delete it there");
-    router.push(row.href);
+    setEditSaving(true);
+    try {
+      const message = await updateCrmQueueItem(editRow, subject);
+      crm.patchRow(editRow, subject);
+      if (findTaskById(editRow.sourceId || editRow.id)) {
+        patchTask(editRow.sourceId || editRow.id, { title: subject });
+      }
+      setEditRow(null);
+      refresh();
+      showToast(message);
+    } catch {
+      if (findTaskById(editRow.sourceId || editRow.id)) {
+        patchTask(editRow.sourceId || editRow.id, { title: subject });
+        crm.patchRow(editRow, subject);
+        setEditRow(null);
+        refresh();
+        showToast("Task updated");
+        return;
+      }
+      showToast("Could not update this item");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function handleDeleteRow(row: QueueRow) {
+    const ok = window.confirm(`Delete “${row.subject}”?`);
+    if (!ok) return;
+    crm.removeRow(row);
+    try {
+      const message = await deleteCrmQueueItem(row);
+      const localId = row.sourceId || row.id;
+      if (findTaskById(localId) || findTaskById(row.id)) {
+        deleteTask(localId);
+        deleteTask(row.id);
+      }
+      refresh();
+      showToast(message);
+    } catch {
+      const localId = row.sourceId || row.id;
+      if (findTaskById(localId) || findTaskById(row.id)) {
+        deleteTask(localId);
+        deleteTask(row.id);
+        refresh();
+        showToast("Task deleted");
+        return;
+      }
+      refresh();
+      showToast("Could not delete this item");
+    }
   }
 
   async function handleCompleteRow(row: QueueRow) {
@@ -293,8 +351,7 @@ export function WorkQueueView() {
         showToast("Marked complete");
         return;
       }
-      showToast("Could not complete from the queue. Opening the record…");
-      router.push(row.href);
+      showToast("Could not complete from the queue");
     }
   }
 
@@ -414,6 +471,42 @@ export function WorkQueueView() {
             showToast(message);
           }}
         />
+      ) : null}
+
+      {editRow ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40 p-4">
+          <form
+            onSubmit={handleSaveEdit}
+            className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-xl"
+          >
+            <h2 className="text-base font-semibold text-slate-900">Edit item</h2>
+            <label className="mt-4 block text-[13px] font-medium text-slate-600">
+              Subject
+              <input
+                autoFocus
+                value={editSubject}
+                onChange={(e) => setEditSubject(e.target.value)}
+                className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditRow(null)}
+                className="rounded-lg px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={editSaving || !editSubject.trim()}
+                className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+              >
+                {editSaving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </form>
+        </div>
       ) : null}
 
     </div>

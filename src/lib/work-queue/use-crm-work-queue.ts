@@ -45,6 +45,22 @@ export function useCrmWorkQueue(opts: {
   const [localTick, setLocalTick] = useState(0);
 
   const refresh = useCallback(() => setLocalTick((n) => n + 1), []);
+  const removeRow = useCallback((row: QueueRow) => {
+    const ids = new Set([row.id, row.sourceId].filter(Boolean));
+    setAllRows((prev) =>
+      prev.filter((item) => !ids.has(item.id) && !ids.has(item.sourceId ?? "")),
+    );
+  }, []);
+  const patchRow = useCallback((row: QueueRow, subject: string) => {
+    const ids = new Set([row.id, row.sourceId].filter(Boolean));
+    setAllRows((prev) =>
+      prev.map((item) =>
+        ids.has(item.id) || ids.has(item.sourceId ?? "")
+          ? { ...item, subject }
+          : item,
+      ),
+    );
+  }, []);
   const specificKey = opts.specificDate?.toISOString() ?? "";
   const namesKey = JSON.stringify(opts.nameById ?? {});
   const activity = isActivityNav(opts.nav);
@@ -119,5 +135,7 @@ export function useCrmWorkQueue(opts: {
     counts,
     total: rows.length,
     refresh,
+    removeRow,
+    patchRow,
   };
 }

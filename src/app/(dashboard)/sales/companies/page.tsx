@@ -10,10 +10,12 @@ import {
 import {
   addKanbanColumnPrefTitle,
   columnTitleMap,
+  editKanbanColumnPref,
   loadKanbanColumnPrefs,
   persistKanbanColumnPrefs,
   type KanbanColumnPref,
 } from "@/lib/kanban/column-prefs";
+import { KANBAN_HEADER_PALETTE } from "@/components/common/KanbanViewControls";
 import { CompaniesKanbanBoard } from "@/components/sales/companies/CompaniesKanbanBoard";
 import { CompaniesListView } from "@/components/sales/companies/CompaniesListView";
 import { CreateCompanyForm } from "@/components/sales/companies/CreateCompanyForm";
@@ -87,6 +89,7 @@ const DEFAULT_COMPANY_COLUMNS: KanbanColumnPref[] = COMPANY_GROUPS.map(
     label: group.title,
     visible: true,
     required: index === 0,
+    color: KANBAN_HEADER_PALETTE[index % KANBAN_HEADER_PALETTE.length],
   }),
 );
 
@@ -147,8 +150,15 @@ export default function CompaniesPage() {
     );
   }
 
-  function addCompanyStageColumnTitle(title: string) {
-    const result = addKanbanColumnPrefTitle(columns, title);
+  function editCompanyStage(
+    columnId: string,
+    next: { label: string; color?: string },
+  ) {
+    saveCompanyColumns(editKanbanColumnPref(columns, columnId, next));
+  }
+
+  function addCompanyStageColumnTitle(title: string, color?: string) {
+    const result = addKanbanColumnPrefTitle(columns, title, color);
     if (!result.ok) {
       setBulkFlash(result.error);
       return;
@@ -156,13 +166,21 @@ export default function CompaniesPage() {
     saveCompanyColumns(result.columns);
   }
 
-  function reorderCompanyStageColumn(draggedId: string, targetId: string) {
+  function reorderCompanyStageColumn(
+    draggedId: string,
+    targetId: string,
+    place: "before" | "after" = "before",
+  ) {
     const next = [...columns];
     const fromIndex = next.findIndex((c) => c.id === draggedId);
     const toIndex = next.findIndex((c) => c.id === targetId);
     if (fromIndex === -1 || toIndex === -1) return;
+    let insert = place === "after" ? toIndex + 1 : toIndex;
     const [moved] = next.splice(fromIndex, 1);
-    next.splice(toIndex, 0, moved!);
+    if (!moved) return;
+    if (fromIndex < insert) insert -= 1;
+    if (insert === fromIndex) return;
+    next.splice(insert, 0, moved);
     saveCompanyColumns(next);
   }
 
@@ -170,6 +188,14 @@ export default function CompaniesPage() {
     () => columnTitleMap(columns),
     [columns],
   );
+
+  const companyStageColors = useMemo(() => {
+    const colors: Record<string, string> = {};
+    for (const col of columns) {
+      if (col.color) colors[col.id] = col.color;
+    }
+    return colors;
+  }, [columns]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -449,6 +475,11 @@ export default function CompaniesPage() {
         onColumnRename={
           viewMode === "kanban" ? renameCompanyStageColumn : undefined
         }
+        stageColors={viewMode === "kanban" ? companyStageColors : undefined}
+        stageColorPalette={
+          viewMode === "kanban" ? KANBAN_HEADER_PALETTE : undefined
+        }
+        onEditStage={viewMode === "kanban" ? editCompanyStage : undefined}
         onColumnAdd={
           viewMode === "kanban" ? addCompanyStageColumnTitle : undefined
         }
@@ -526,6 +557,7 @@ export default function CompaniesPage() {
               filters={filters}
               visibleColumnIds={visibleColumnIds}
               columnTitles={companyColumnTitles}
+              columnHeaderColors={companyStageColors}
               onQuickAction={handleQuickAction}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelected}

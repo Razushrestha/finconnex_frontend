@@ -48,6 +48,7 @@ import { BOARD_PAGE } from "@/lib/layout";
 import { defaultActorName } from "@/lib/rules/actor";
 import { kanbanPrefsFromCatalog } from "@/lib/kanban/column-prefs";
 import { useKanbanColumnPrefs } from "@/lib/kanban/use-kanban-column-prefs";
+import { KANBAN_HEADER_PALETTE } from "@/components/common/KanbanViewControls";
 
 const TASK_VIEW_MODE_KEY = "finconnex.tasks.view-mode";
 
@@ -284,10 +285,13 @@ export default function TasksPage() {
           columnOptions={view === "kanban" ? stagePrefs.columns : undefined}
           onColumnToggle={view === "kanban" ? stagePrefs.toggle : undefined}
           onColumnRename={view === "kanban" ? stagePrefs.rename : undefined}
+          stageColors={view === "kanban" ? stagePrefs.colors : undefined}
+          stageColorPalette={view === "kanban" ? KANBAN_HEADER_PALETTE : undefined}
+          onEditStage={view === "kanban" ? stagePrefs.edit : undefined}
           onColumnAdd={
             view === "kanban"
-              ? (title) => {
-                  const error = stagePrefs.addTitle(title);
+              ? (title, color) => {
+                  const error = stagePrefs.addTitle(title, color);
                   if (error) flash(error);
                 }
               : undefined
@@ -333,6 +337,7 @@ export default function TasksPage() {
               onSelectedIdsChange={setSelectedTaskIds}
               visibleColumnIds={stagePrefs.visibleIds}
               columnTitles={stagePrefs.titles}
+              columnHeaderColors={stagePrefs.colors}
             />
           ) : view === "calendar" ? (
             <TaskCalendarView filters={scopedFilters} search={search} />

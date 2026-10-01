@@ -104,10 +104,12 @@ const dashboardItems: NavItem[] = [
   {
     label: "Dashboard",
     icon: Package,
-    children: DASHBOARD_VIEWS.map((item) => ({
-      label: item.label,
-      href: dashboardViewHref(item.id),
-    })),
+    children: DASHBOARD_VIEWS.filter((item) => item.id !== "executive").map(
+      (item) => ({
+        label: item.label,
+        href: dashboardViewHref(item.id),
+      }),
+    ),
   },
   { label: "Work Queue", href: "/work-queue", icon: Rows4 },
   {
@@ -440,7 +442,10 @@ export function Sidebar({
           <nav className="flex flex-col gap-0.5">
             {dashboardItems.map((item) => {
               const hasChildren = !!item.children?.length;
+              const onDashboardHome =
+                item.label === "Dashboard" && pathname === "/";
               const isActive =
+                onDashboardHome ||
                 (item.href && isNavActive(pathname, item.href, search)) ||
                 (hasChildren &&
                   item.children!.some((c) =>

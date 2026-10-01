@@ -530,9 +530,27 @@ export async function listCrmWorkQueueForNav(
   return { items, total: items.length, all: page.items };
 }
 
+function queueItemId(row: QueueRow): string {
+  return row.sourceId || row.id;
+}
+
+function queueItemType(row: QueueRow): string {
+  const typed = (row.itemType ?? "").toUpperCase();
+  if (typed) return typed;
+  const href = row.href ?? "";
+  if (href.includes("/tasks")) return "TASK";
+  if (href.includes("/calls")) return "CALL";
+  if (href.includes("/meetings")) return "MEETING";
+  if (href.includes("/reminders")) return "REMINDER";
+  if (href.includes("/emails")) return "EMAIL";
+  if (href.includes("/messages")) return "MESSAGE";
+  if (href.includes("/team-chat") || href.includes("/chat")) return "CHAT";
+  return "";
+}
+
 export async function completeCrmQueueItem(row: QueueRow): Promise<string> {
-  const id = row.sourceId || row.id;
-  const type = (row.itemType ?? "").toUpperCase();
+  const id = queueItemId(row);
+  const type = queueItemType(row);
   if (type === "TASK") {
     const { completeCrmTask } = await import("@/lib/tasks/api");
     await completeCrmTask(id);
@@ -554,6 +572,93 @@ export async function completeCrmQueueItem(row: QueueRow): Promise<string> {
     return "Meeting completed";
   }
   throw new Error("Open this item to finish it — the queue cannot complete that type.");
+}
+
+export async function deleteCrmQueueItem(row: QueueRow): Promise<string> {
+  const id = queueItemId(row);
+  const type = queueItemType(row);
+  if (type === "TASK") {
+    const { deleteCrmTask } = await import("@/lib/tasks/api");
+    await deleteCrmTask(id);
+    return "Task deleted";
+  }
+  if (type === "CALL") {
+    const { deleteCrmCall } = await import("@/lib/calls/api");
+    await deleteCrmCall(id);
+    return "Call deleted";
+  }
+  if (type === "MEETING") {
+    const { deleteCrmMeeting } = await import("@/lib/meetings/api");
+    await deleteCrmMeeting(id);
+    return "Meeting deleted";
+  }
+  if (type === "REMINDER") {
+    const { dismissCrmReminder } = await import("@/lib/reminders/api");
+    await dismissCrmReminder(id);
+    return "Reminder deleted";
+  }
+  if (type === "MESSAGE") {
+    const { deleteCrmMessage } = await import("@/lib/messages/api");
+    await deleteCrmMessage(id);
+    return "Message deleted";
+  }
+  if (type === "EMAIL") {
+    const { deleteCrmEmail } = await import("@/lib/emails/api");
+    await deleteCrmEmail(id);
+    return "Email deleted";
+  }
+  if (type === "CHAT") {
+    const { deleteCrmConversation } = await import("@/lib/chat/api");
+    await deleteCrmConversation(id);
+    return "Chat deleted";
+  }
+  throw new Error("This item cannot be deleted from the queue.");
+}
+
+export async function updateCrmQueueItem(
+  row: QueueRow,
+  subject: string,
+): Promise<string> {
+  const id = queueItemId(row);
+  const type = queueItemType(row);
+  const title = subject.trim();
+  if (!title) throw new Error("Subject is required");
+  if (type === "TASK") {
+    const { updateCrmTask } = await import("@/lib/tasks/api");
+    await updateCrmTask(id, { title });
+    return "Task updated";
+  }
+  if (type === "CALL") {
+    const { updateCrmCall } = await import("@/lib/calls/api");
+    await updateCrmCall(id, { subject: title });
+    return "Call updated";
+  }
+  if (type === "MEETING") {
+    const { updateCrmMeeting } = await import("@/lib/meetings/api");
+    await updateCrmMeeting(id, { title });
+    return "Meeting updated";
+  }
+  if (type === "REMINDER") {
+    const { updateCrmReminder } = await import("@/lib/reminders/api");
+    await updateCrmReminder(id, { title });
+    return "Reminder updated";
+  }
+  if (type === "MESSAGE") {
+    const { updateCrmMessage } = await import("@/lib/messages/api");
+    await updateCrmMessage(id, { subject: title });
+    return "Message updated";
+  }
+  if (type === "EMAIL") {
+    const { updateCrmEmail } = await import("@/lib/emails/api");
+    await updateCrmEmail(id, { subject: title });
+    return "Email updated";
+  }
+  if (type === "CHAT") {
+    const { updateCrmConversation } = await import("@/lib/chat/api");
+    await updateCrmConversation(id, { name: title });
+    return "Chat updated";
+  }
+  throw new Error("This item cannot be edited from the queue.");
 }
 
 export async function tryCrmWorkQueue<T>(

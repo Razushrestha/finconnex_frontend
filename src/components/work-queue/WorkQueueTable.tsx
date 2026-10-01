@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowUpDown,
   Check,
@@ -247,6 +247,7 @@ export function WorkQueueTable({
   onCompleteRow,
   source,
 }: WorkQueueTableProps) {
+  const router = useRouter();
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [sortOpen, setSortOpen] = React.useState(false);
   const sortRef = React.useRef<HTMLDivElement>(null);
@@ -771,9 +772,27 @@ export function WorkQueueTable({
 
               return (
                 <li key={row.id} className="block">
-                <Link
-                  href={row.href}
+                <div
+                  role="link"
+                  tabIndex={0}
                   style={gridStyle}
+                  onClick={(e) => {
+                    if (
+                      (e.target as HTMLElement).closest(
+                        "button, [role='menu']",
+                      )
+                    ) {
+                      return;
+                    }
+                    router.push(row.href);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      router.push(row.href);
+                    }
+                  }}
                   className={cn(
                     "group/row grid w-full cursor-pointer items-center gap-x-3 border-b border-slate-100 px-5 py-2 text-left transition-colors last:border-b-0 hover:bg-slate-50/80 sm:px-6",
                     overdue && "bg-red-50/40 hover:bg-red-50/70",
@@ -796,6 +815,7 @@ export function WorkQueueTable({
                         aria-label="More actions"
                         title="More actions"
                         onClick={(e) => {
+                          e.preventDefault();
                           e.stopPropagation();
                           setActiveMenuId(isMenuOpen ? null : row.id);
                         }}
@@ -813,6 +833,7 @@ export function WorkQueueTable({
                           <button
                             type="button"
                             onClick={(e) => {
+                              e.preventDefault();
                               e.stopPropagation();
                               setActiveMenuId(null);
                               onEditRow?.(row);
@@ -826,6 +847,7 @@ export function WorkQueueTable({
                           <button
                             type="button"
                             onClick={(e) => {
+                              e.preventDefault();
                               e.stopPropagation();
                               setActiveMenuId(null);
                               onDeleteRow?.(row);
@@ -844,6 +866,7 @@ export function WorkQueueTable({
                       aria-label="Notes"
                       title="Notes"
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         onAddNote?.(row);
                       }}
@@ -920,7 +943,7 @@ export function WorkQueueTable({
                   })}
 
                   <span aria-hidden />
-                </Link>
+                </div>
                 </li>
               );
             })}

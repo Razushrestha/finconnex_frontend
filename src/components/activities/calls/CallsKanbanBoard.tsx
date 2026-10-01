@@ -11,6 +11,7 @@ import {
 import { callMatchesFilters } from "@/lib/filters/records";
 import type { CallFilters } from "@/lib/filters/module-filters";
 import { onRulesChange } from "@/lib/rules/storage";
+import { orderByVisibleIds } from "@/lib/kanban/column-prefs";
 import { CallsKanbanColumn } from "./CallsKanbanColumn";
 import { KanbanDragGhost } from "@/components/common/KanbanDragGhost";
 import {
@@ -36,6 +37,7 @@ export function CallsKanbanBoard({
   onSelectedIdsChange,
   visibleColumnIds,
   columnTitles,
+  columnHeaderColors,
 }: {
   scope?: CallScope;
   filters?: CallFilters;
@@ -43,6 +45,7 @@ export function CallsKanbanBoard({
   onSelectedIdsChange?: (ids: string[]) => void;
   visibleColumnIds?: string[];
   columnTitles?: Record<string, string>;
+  columnHeaderColors?: Record<string, string>;
 }) {
   const [columns, setColumns] = useState<CallColumn[]>(() => listCallColumns());
   const [localSelectedIds, setLocalSelectedIds] = useState<string[]>([]);
@@ -119,9 +122,7 @@ export function CallsKanbanBoard({
     });
   }
 
-  const visibleColumns = columns
-    .filter((column) => !visibleColumnIds?.length || visibleColumnIds.includes(column.id))
-    .map((column) => {
+  const visibleColumns = orderByVisibleIds(columns, visibleColumnIds).map((column) => {
     const calls = column.calls.filter(
       (call) => callMatchesScope(call, scope) && callMatchesFilters(call, filters),
     );
@@ -149,6 +150,7 @@ export function CallsKanbanBoard({
           onAssignUser={handleAssignUser}
           onAddComment={handleAddComment}
           displayTitle={columnTitles?.[column.id]}
+          headerColor={columnHeaderColors?.[column.id]}
         />
       ))}
       <KanbanDragGhost ghost={drag.ghost} />

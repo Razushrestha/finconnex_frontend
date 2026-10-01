@@ -13,16 +13,11 @@ import {
   RefreshCw,
   Search,
   Send,
-  Sparkles,
   Star,
   Trash2,
   FileText,
-  History,
-  List,
 } from "lucide-react";
 import { EmailListTable } from "@/components/activities/emails/EmailListTable";
-import { EmailsTimelineView } from "@/components/activities/emails/EmailsTimelineView";
-import { EmailCopilotPanel } from "@/components/activities/emails/EmailCopilotPanel";
 import {
   EMPTY_MAIL_FILTERS,
   EmailsFilterPanel,
@@ -34,6 +29,7 @@ import {
   emailMatchesCustomFolder,
   emailMatchesFolder,
   flagsFor,
+  isMailboxUnread,
   MAIL_LABELS,
   onMailboxChange,
   type MailFolder,
@@ -88,13 +84,11 @@ export function EmailsWorkspace({
   const [query, setQuery] = useState("");
   const [appliedQuery, setAppliedQuery] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
   const [filters, setFilters] = useState<MailListFilters>(EMPTY_MAIL_FILTERS);
   const [folderName, setFolderName] = useState("");
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
-  const [mailView, setMailView] = useState<"list" | "timeline">("list");
 
   useEffect(() => {
     const next = new URLSearchParams(window.location.search).get("folder");
@@ -127,7 +121,11 @@ export function EmailsWorkspace({
   const counts = useMemo(() => {
     const next = {} as Record<MailFolder, number>;
     for (const item of FOLDERS) {
-      next[item.id] = folderEmails(emails, item.id).length;
+      const rows = folderEmails(emails, item.id);
+      next[item.id] =
+        item.id === "inbox"
+          ? rows.filter((email) => isMailboxUnread(email)).length
+          : rows.length;
     }
     return next;
   }, [emails]);
@@ -444,50 +442,6 @@ export function EmailsWorkspace({
                 </span>
               ) : null}
             </button>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                title="List view"
-                aria-label="List view"
-                onClick={() => setMailView("list")}
-                className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-lg border",
-                  mailView === "list"
-                    ? "border-violet-200 bg-[#F3ECFB] text-[#5A32A3]"
-                    : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
-                )}
-              >
-                <List className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                title="Timeline"
-                aria-label="Timeline"
-                onClick={() => setMailView("timeline")}
-                className={cn(
-                  "inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-medium",
-                  mailView === "timeline"
-                    ? "border-violet-300 bg-violet-50 text-violet-700"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:text-violet-700",
-                )}
-              >
-                <History className="h-3.5 w-3.5" />
-                Timeline
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => setAiOpen((v) => !v)}
-              className={cn(
-                "inline-flex h-11 items-center gap-1.5 rounded-xl border px-3 text-[12px] font-semibold",
-                aiOpen
-                  ? "border-violet-200 bg-violet-50 text-[#5A32A3]"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
-              )}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              AI
-            </button>
             <button
               type="button"
               onClick={syncNow}
@@ -534,22 +488,15 @@ export function EmailsWorkspace({
                 onClose={() => setFilterOpen(false)}
               />
             ) : null}
-            {aiOpen ? (
-              <EmailCopilotPanel emails={emails} onClose={() => setAiOpen(false)} />
-            ) : null}
             <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
-              {mailView === "timeline" ? (
-                <EmailsTimelineView emails={visible} />
-              ) : (
-                <EmailListTable
-                  key={`${folder}-${customFolderId ?? ""}-${focusView}-${labelFilter ?? ""}`}
-                  data={visible}
-                  folderLabel={labelFilter ?? folderLabel}
-                  folder={customFolderId ? "all" : folder}
-                  customFolderId={customFolderId}
-                  onCompose={() => compose()}
-                />
-              )}
+              <EmailListTable
+                key={`${folder}-${customFolderId ?? ""}-${focusView}-${labelFilter ?? ""}`}
+                data={visible}
+                folderLabel={labelFilter ?? folderLabel}
+                folder={customFolderId ? "all" : folder}
+                customFolderId={customFolderId}
+                onCompose={() => compose()}
+              />
             </div>
           </div>
         </section>

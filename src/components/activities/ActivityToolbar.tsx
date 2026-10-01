@@ -96,8 +96,23 @@ export interface ActivityToolbarProps {
   columnOptions?: KanbanStageColumnOption[];
   onColumnToggle?: (columnId: string) => void;
   onColumnRename?: (columnId: string, nextLabel: string) => void;
-  onColumnAdd?: (title: string) => void;
-  onColumnReorder?: (draggedId: string, targetId: string) => void;
+  onColumnAdd?: (title: string, color?: string) => void;
+  onColumnReorder?: (
+    draggedId: string,
+    targetId: string,
+    place?: "before" | "after",
+  ) => void;
+  stageColors?: Record<string, string>;
+  stageColorPalette?: readonly string[];
+  onEditStage?: (
+    columnId: string,
+    next: { label: string; color?: string },
+  ) => void;
+  stageRecordCountById?: Record<string, number>;
+  onStageTransferAndRemove?: (
+    fromId: string,
+    toId: string,
+  ) => void | Promise<void>;
 }
 
 export const TIMELINE_VIEW_TOGGLE = {
@@ -143,6 +158,11 @@ export function ActivityToolbar({
   onColumnRename,
   onColumnAdd,
   onColumnReorder,
+  stageColors,
+  stageColorPalette,
+  onEditStage,
+  stageRecordCountById,
+  onStageTransferAndRemove,
 }: ActivityToolbarProps) {
   const router = useRouter();
   const [internalActiveTab, setInternalActiveTab] = useState(tabs[0]);
@@ -516,15 +536,20 @@ export function ActivityToolbar({
                   className="fixed inset-0 z-10"
                   onClick={() => setMoreMenuOpen(false)}
                 />
-                <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-slate-100 bg-white py-1 shadow-lg">
+                <div className="absolute right-0 z-20 mt-1 w-72 rounded-lg border border-slate-100 bg-white py-1 shadow-lg">
                   {hasStageMenu && columnOptions ? (
                     <div className="px-1.5 pb-1">
                       <KanbanStagesMenu
                         columns={columnOptions}
                         onToggle={onColumnToggle}
                         onRename={onColumnRename}
+                        stageColors={stageColors}
+                        colorPalette={stageColorPalette}
+                        onEditStage={onEditStage}
                         onAdd={onColumnAdd}
                         onReorder={onColumnReorder}
+                        recordCountById={stageRecordCountById}
+                        onTransferAndRemove={onStageTransferAndRemove}
                       />
                     </div>
                   ) : null}

@@ -184,10 +184,11 @@ export function replaceCrmEmails(remote: Email[]) {
         local.status === "Delivered" ||
         local.status === "Opened") &&
       (row.status === "Draft" || row.status === "Failed");
+    const keepOpened = local.status === "Opened";
     return cloneEmail({
       ...row,
       outbound: local.outbound || row.outbound,
-      status: keepSent ? local.status : row.status,
+      status: keepOpened || keepSent ? local.status : row.status,
       sentDate: row.sentDate || local.sentDate,
       from: row.from || local.from,
       to: row.to.length ? row.to : local.to,

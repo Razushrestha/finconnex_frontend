@@ -36,6 +36,7 @@ import {
   type PointerKanbanDrop,
   type PointerKanbanOutcomeDrop,
 } from "@/lib/kanban/use-pointer-kanban-drag";
+import { kanbanHeaderSurfaceStyle } from "@/components/common/KanbanViewControls";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
@@ -45,7 +46,6 @@ import {
   KANBAN_DROP_GHOST,
   KANBAN_HEADER,
   KANBAN_HEADER_COUNT,
-  KANBAN_HEADER_TITLE,
   KANBAN_WELL,
 } from "@/lib/layout";
 import { useRouter } from "next/navigation";
@@ -63,6 +63,45 @@ interface DropTargetPosition {
 
 type DealRecord = DealStage["deals"][number];
 
+function DealStageHeader({
+  title,
+  count,
+  subtitle,
+  color,
+}: {
+  title: string;
+  count: number;
+  subtitle: string;
+  color?: string;
+}) {
+  const surface = kanbanHeaderSurfaceStyle(color ?? null);
+  return (
+    <div
+      className={cn(
+        "flex min-h-14 w-full shrink-0 flex-col justify-center overflow-hidden rounded-xs p-1.5",
+        color ? surface.className : KANBAN_HEADER,
+      )}
+      style={color ? surface.style : undefined}
+    >
+      <div className="flex items-start justify-between gap-1">
+        <div className="flex min-w-0 flex-1 items-start gap-2">
+          <h2
+            className="line-clamp-2 min-w-0 flex-1 text-xs font-semibold leading-5 xl:text-sm"
+            title={title}
+            style={color ? { color } : undefined}
+          >
+            {title}
+          </h2>
+          <span className={cn(KANBAN_HEADER_COUNT, "mt-0.5")}>{count}</span>
+        </div>
+      </div>
+      <div className="truncate text-xs font-medium leading-5 text-slate-500">
+        {subtitle}
+      </div>
+    </div>
+  );
+}
+
 /** A "mark as lost" drop that's waiting on a reason before it's committed. */
 interface PendingLostDrop {
   deals: DealRecord[];
@@ -77,6 +116,8 @@ interface DealsKanbanBoardProps {
   visibleColumnIds?: string[];
   /** Optional display title overrides keyed by stage id. */
   columnTitles?: Record<string, string>;
+  /** Header accent color keyed by stage id. */
+  columnHeaderColors?: Record<string, string>;
   onAddDeal?: (stageId: string) => void;
   selectedIds?: string[];
   onToggleSelect?: (id: string) => void;
@@ -90,6 +131,7 @@ export function DealsKanbanBoard({
   filters,
   visibleColumnIds,
   columnTitles,
+  columnHeaderColors,
   onAddDeal,
   selectedIds = [],
   onToggleSelect,
@@ -636,28 +678,18 @@ export function DealsKanbanBoard({
                 />
               ) : (
                 <>
-                  <div className={KANBAN_HEADER}>
-                    <div className="flex h-6 items-center justify-between gap-1">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <h2
-                          className={KANBAN_HEADER_TITLE}
-                          title={columnTitles?.[stage.id] ?? stage.title}
-                        >
-                          {columnTitles?.[stage.id] ?? stage.title}
-                        </h2>
-                        <span className={KANBAN_HEADER_COUNT}>
-                          {stage.deals.length}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="truncate text-xs font-medium leading-5 text-slate-500">
-                      {stage.deals.length > 0
+                  <DealStageHeader
+                    title={columnTitles?.[stage.id] ?? stage.title}
+                    count={stage.deals.length}
+                    color={columnHeaderColors?.[stage.id]}
+                    subtitle={
+                      stage.deals.length > 0
                         ? `$${Math.round(
                             stageWeightedForecast(stage),
                           ).toLocaleString()} wtd`
-                        : "No deals"}
-                    </div>
-                  </div>
+                        : "No deals"
+                    }
+                  />
 
                   <KanbanStageScroll
                     footer={

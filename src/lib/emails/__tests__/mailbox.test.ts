@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   emailMatchesFolder,
+  isMailboxUnread,
   isSuccessfullySentStatus,
   isUnsentStatus,
   type MailboxFlags,
@@ -67,6 +68,14 @@ describe("mailbox folders", () => {
     expect(emailMatchesFolder(inbox, "inbox", flags)).toBe(true);
     expect(emailMatchesFolder(stub, "inbox", flags)).toBe(true);
     expect(emailMatchesFolder(stub, "sent", flags)).toBe(false);
+  });
+
+  it("keeps an opened inbox message read even when delivery status is still Delivered", () => {
+    const row = mail({ status: "Delivered", from: "lead@example.com" });
+    expect(isMailboxUnread(row, {})).toBe(true);
+    expect(isMailboxUnread(row, { read: true })).toBe(false);
+    expect(isMailboxUnread(row, { read: false })).toBe(true);
+    expect(isMailboxUnread(mail({ status: "Opened" }), {})).toBe(false);
   });
 
   it("shows reported spam only in Spam", () => {

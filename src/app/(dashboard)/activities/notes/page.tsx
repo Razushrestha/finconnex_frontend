@@ -37,8 +37,12 @@ import { KanbanDragGhost } from "@/components/common/KanbanDragGhost";
 import { cn } from "@/lib/utils";
 import { BOARD_PAGE } from "@/lib/layout";
 import { moreMenuItems, printViewItems } from "../tasks/page";
-import { kanbanPrefsFromCatalog } from "@/lib/kanban/column-prefs";
+import {
+  kanbanPrefsFromCatalog,
+  orderByVisibleIds,
+} from "@/lib/kanban/column-prefs";
 import { useKanbanColumnPrefs } from "@/lib/kanban/use-kanban-column-prefs";
+import { KANBAN_HEADER_PALETTE } from "@/components/common/KanbanViewControls";
 import {
   usePointerKanbanDrag,
   type PointerKanbanDrop,
@@ -90,13 +94,7 @@ export default function NotesPage() {
     const cols = filters.types.length
       ? columns.filter((c) => filters.types.includes(c.title as NoteType))
       : columns;
-    return cols
-      .filter(
-        (column) =>
-          !stagePrefs.visibleIds.length ||
-          stagePrefs.visibleIds.includes(column.id),
-      )
-      .map((column) => {
+    return orderByVisibleIds(cols, stagePrefs.visibleIds).map((column) => {
       const notes = column.notes.filter((n) =>
         noteMatchesFilters({ ...n, noteType: column.title as NoteType }, filters),
       );
@@ -213,10 +211,13 @@ export default function NotesPage() {
           columnOptions={view === "kanban" ? stagePrefs.columns : undefined}
           onColumnToggle={view === "kanban" ? stagePrefs.toggle : undefined}
           onColumnRename={view === "kanban" ? stagePrefs.rename : undefined}
+          stageColors={view === "kanban" ? stagePrefs.colors : undefined}
+          stageColorPalette={view === "kanban" ? KANBAN_HEADER_PALETTE : undefined}
+          onEditStage={view === "kanban" ? stagePrefs.edit : undefined}
           onColumnAdd={
             view === "kanban"
-              ? (title) => {
-                  const error = stagePrefs.addTitle(title);
+              ? (title, color) => {
+                  const error = stagePrefs.addTitle(title, color);
                   if (error) {
                     setBulkFlash(error);
                     window.setTimeout(() => setBulkFlash(null), 2800);
@@ -282,6 +283,7 @@ export default function NotesPage() {
                     selectedIds={selectedIds}
                     onToggleSelect={toggleSelected}
                     displayTitle={stagePrefs.titles[column.id]}
+                    headerColor={stagePrefs.colors[column.id]}
                   />
                 ))}
               </div>

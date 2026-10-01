@@ -10,7 +10,8 @@ import { KanbanStageScroll } from "@/components/common/KanbanStageScroll";
 import { KanbanCollapsedRail } from "@/components/common/KanbanCollapsedRail";
 import { cn } from "@/lib/utils";
 import { dropTargetActive, dropTargetIdle } from "@/lib/motion";
-import { KANBAN_COL, KANBAN_DROP_GHOST, KANBAN_HEADER, KANBAN_HEADER_COUNT, KANBAN_WELL } from "@/lib/layout";
+import { KANBAN_COL, KANBAN_DROP_GHOST, KANBAN_HEADER_COUNT, KANBAN_WELL } from "@/lib/layout";
+import { stageHeaderSurface } from "@/components/common/kanban-stage-surface";
 import { useRouter } from "next/navigation";
 import type { DropTargetPos } from "./MeetingsKanbanBoard";
 
@@ -27,6 +28,8 @@ interface MeetingsKanbanColumnProps {
   embedded?: boolean;
   selectedIds?: string[];
   onToggleSelect?: (meetingId: string) => void;
+  displayTitle?: string;
+  headerColor?: string;
 }
 
 export function MeetingsKanbanColumn({
@@ -38,7 +41,11 @@ export function MeetingsKanbanColumn({
   onDragClickCapture,
   selectedIds = [],
   onToggleSelect,
+  displayTitle,
+  headerColor,
 }: MeetingsKanbanColumnProps) {
+  const heading = displayTitle ?? column.title;
+  const header = stageHeaderSurface(headerColor);
   const router = useRouter();
   const [isOver, setIsOver] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -83,21 +90,22 @@ export function MeetingsKanbanColumn({
       className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}
     >
       {/* Separate Header Box */}
-      <div
-        className={cn("mb-2 shrink-0", KANBAN_HEADER)}
-      >
+      <div className={cn("mb-2 shrink-0", header.className)} style={header.style}>
         <div className="flex items-center justify-between gap-4">
           <button
             type="button"
             onClick={() => setIsCollapsed(true)}
             title="Collapse"
-            className="flex items-center gap-1.5 rounded-sm hover:opacity-70"
+            className="flex min-w-0 items-center gap-1.5 rounded-sm hover:opacity-70"
             aria-expanded={true}
-            aria-label={`Collapse ${column.title}`}
+            aria-label={`Collapse ${heading}`}
           >
             <ChevronDown className="h-4 w-4 shrink-0 text-slate-700" />
-            <h3 className="text-sm font-semibold text-slate-900">
-              {column.title}
+            <h3
+              className="line-clamp-2 text-left text-sm font-semibold text-slate-900"
+              style={header.titleStyle}
+            >
+              {heading}
             </h3>
           </button>
           <span className={KANBAN_HEADER_COUNT}>

@@ -9,12 +9,13 @@ import { KanbanColumnFooter } from "@/components/common/KanbanColumnFooter";
 import { KanbanEmptyStage } from "@/components/common/KanbanEmptyStage";
 import { KanbanStageScroll } from "@/components/common/KanbanStageScroll";
 import { KanbanCollapsedRail } from "@/components/common/KanbanCollapsedRail";
+import { stageHeaderSurface } from "@/components/common/kanban-stage-surface";
+import { orderByVisibleIds } from "@/lib/kanban/column-prefs";
 import { cn } from "@/lib/utils";
 import {
   KANBAN_BOARD_ROW,
   KANBAN_CARD,
   KANBAN_COL,
-  KANBAN_HEADER,
   KANBAN_HEADER_COUNT,
   KANBAN_WELL,
 } from "@/lib/layout";
@@ -39,20 +40,20 @@ export function MessagesKanbanBoard({
   rows,
   visibleColumnIds,
   columnTitles,
+  columnHeaderColors,
   onChange,
 }: {
   rows: Message[];
   visibleColumnIds?: string[];
   columnTitles?: Record<string, string>;
+  columnHeaderColors?: Record<string, string>;
   onChange?: () => void;
 }) {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const columns = useMemo(() => {
-    return COLUMN_IDS.filter(
-      (col) => !visibleColumnIds?.length || visibleColumnIds.includes(col.id),
-    ).map((col) => ({
+    return orderByVisibleIds(COLUMN_IDS, visibleColumnIds).map((col) => ({
       ...col,
       messages: rows.filter((row) => row.status === col.status),
     }));
@@ -74,6 +75,7 @@ export function MessagesKanbanBoard({
     <div className={KANBAN_BOARD_ROW}>
       {columns.map((col) => {
         const heading = columnTitles?.[col.id] ?? col.status;
+        const header = stageHeaderSurface(columnHeaderColors?.[col.id]);
         if (collapsed.has(col.id)) {
           return (
             <KanbanCollapsedRail
@@ -96,17 +98,20 @@ export function MessagesKanbanBoard({
             data-kanban-drop-column={col.id}
             className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}
           >
-            <div className={cn("mb-2 shrink-0", KANBAN_HEADER)}>
+            <div className={cn("mb-2 shrink-0", header.className)} style={header.style}>
               <div className="flex items-center justify-between gap-4">
                 <button
                   type="button"
                   onClick={() =>
                     setCollapsed((prev) => new Set(prev).add(col.id))
                   }
-                  className="flex items-center gap-1.5 rounded-sm hover:opacity-70"
+                  className="flex min-w-0 items-center gap-1.5 rounded-sm hover:opacity-70"
                 >
                   <ChevronDown className="h-4 w-4 text-slate-700" />
-                  <h3 className="text-sm font-semibold text-slate-900">
+                  <h3
+                    className="line-clamp-2 text-left text-sm font-semibold text-slate-900"
+                    style={header.titleStyle}
+                  >
                     {heading}
                   </h3>
                 </button>

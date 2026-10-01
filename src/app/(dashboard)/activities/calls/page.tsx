@@ -41,6 +41,7 @@ import { useCrmCalls } from "@/lib/calls/use-crm-calls";
 import { cn } from "@/lib/utils";
 import { kanbanPrefsFromCatalog } from "@/lib/kanban/column-prefs";
 import { useKanbanColumnPrefs } from "@/lib/kanban/use-kanban-column-prefs";
+import { KANBAN_HEADER_PALETTE } from "@/components/common/KanbanViewControls";
 
 const CALL_STAGE_DEFAULTS = kanbanPrefsFromCatalog(
   callColumns.map((col) => ({ id: col.id, label: col.title })),
@@ -277,10 +278,13 @@ export default function CallsPage() {
           columnOptions={view === "kanban" ? stagePrefs.columns : undefined}
           onColumnToggle={view === "kanban" ? stagePrefs.toggle : undefined}
           onColumnRename={view === "kanban" ? stagePrefs.rename : undefined}
+          stageColors={view === "kanban" ? stagePrefs.colors : undefined}
+          stageColorPalette={view === "kanban" ? KANBAN_HEADER_PALETTE : undefined}
+          onEditStage={view === "kanban" ? stagePrefs.edit : undefined}
           onColumnAdd={
             view === "kanban"
-              ? (title) => {
-                  const error = stagePrefs.addTitle(title);
+              ? (title, color) => {
+                  const error = stagePrefs.addTitle(title, color);
                   if (error) notify(error);
                 }
               : undefined
@@ -321,6 +325,7 @@ export default function CallsPage() {
               onSelectedIdsChange={setSelectedIds}
               visibleColumnIds={stagePrefs.visibleIds}
               columnTitles={stagePrefs.titles}
+              columnHeaderColors={stagePrefs.colors}
             />
           ) : (
             <CallsListTable

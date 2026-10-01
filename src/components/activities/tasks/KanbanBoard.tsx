@@ -23,6 +23,7 @@ import {
 } from "@/lib/tasks/api";
 import { onRulesChange } from "@/lib/rules";
 import { taskMatchesFilters, taskMatchesSearch } from "@/lib/tasks/search";
+import { orderByVisibleIds } from "@/lib/kanban/column-prefs";
 import { KanbanColumn } from "./KanbanColumn";
 import { KanbanDragGhost } from "@/components/common/KanbanDragGhost";
 import {
@@ -49,6 +50,7 @@ interface KanbanBoardProps {
   onSelectedIdsChange?: (ids: string[]) => void;
   visibleColumnIds?: string[];
   columnTitles?: Record<string, string>;
+  columnHeaderColors?: Record<string, string>;
 }
 
 export function KanbanBoard({
@@ -59,6 +61,7 @@ export function KanbanBoard({
   onSelectedIdsChange,
   visibleColumnIds,
   columnTitles,
+  columnHeaderColors,
 }: KanbanBoardProps) {
   const [columns, setColumns] = useState<TaskColumn[]>(() => listTaskColumns());
 
@@ -113,9 +116,11 @@ export function KanbanBoard({
     }
 
     const grouped = groupTaskColumns(sourceColumns, groupBy);
-    return grouped
-      .filter((col) => !visibleColumnIds?.length || visibleColumnIds.includes(col.id))
-      .map((col) => ({ ...col, count: col.tasks.length }));
+    const ordered =
+      groupBy === "status"
+        ? orderByVisibleIds(grouped, visibleColumnIds)
+        : grouped;
+    return ordered.map((col) => ({ ...col, count: col.tasks.length }));
   }, [columns, filters, groupBy, search, visibleColumnIds]);
 
   function handleDropTask({
@@ -206,6 +211,7 @@ export function KanbanBoard({
           onChangePriority={handleChangePriority}
           onChangeStatus={handleChangeStatus}
           displayTitle={columnTitles?.[column.id]}
+          headerColor={columnHeaderColors?.[column.id]}
         />
       ))}
       <KanbanDragGhost ghost={drag.ghost} />

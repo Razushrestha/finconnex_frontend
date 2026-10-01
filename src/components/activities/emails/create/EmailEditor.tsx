@@ -58,7 +58,6 @@ export function EmailEditor({
   importance,
   onImportanceChange,
   attachments,
-  onAttachClick,
   onRemoveAttachment,
   onDropFiles,
   aiBusy,
@@ -114,27 +113,6 @@ export function EmailEditor({
         placeholder="Write your email…"
         fillHeight
         className="min-h-0 flex-1"
-        toolbarAfterLink={
-          <button
-            type="button"
-            title="Attach files"
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={onAttachClick}
-            className={cn(
-              "relative inline-flex h-8 w-8 items-center justify-center rounded-md border text-slate-600 hover:border-slate-200 hover:bg-white",
-              attachments.length
-                ? "border-violet-300 bg-violet-50 text-[#5A32A3]"
-                : "border-transparent",
-            )}
-          >
-            <Paperclip className="h-4 w-4" />
-            {attachments.length ? (
-              <span className="absolute -top-1 -right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[#5A32A3] px-0.5 text-[8px] font-bold text-white">
-                {attachments.length}
-              </span>
-            ) : null}
-          </button>
-        }
         toolbarTrailing={
           <div className="relative" ref={importanceRef}>
             <button

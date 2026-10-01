@@ -32,9 +32,11 @@ import { deleteEmail, listEmails, updateEmail } from "@/lib/emails/store";
 import {
   contactName,
   flagsFor,
+  isMailboxUnread,
   labelTone,
   moveToCustomFolder,
   setMailboxFlag,
+  setMailboxRead,
   toggleMailboxFlag,
 } from "@/lib/emails/mailbox";
 import { listUserFolders } from "@/lib/emails/folders";
@@ -96,6 +98,9 @@ export function EmailDetailView({ email, backHref, backLabel }: EmailDetailViewP
     setSummary(null);
     setReaction(null);
     setEmojiOpen(false);
+    if (isMailboxUnread(email)) setMailboxRead(email.id, true);
+    // Re-run only when a different message is opened. Mark unread on this page must stay unread until the user leaves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email.id]);
 
   useEffect(() => {
@@ -245,16 +250,16 @@ export function EmailDetailView({ email, backHref, backLabel }: EmailDetailViewP
             type="button"
             className={toolBtn}
             onClick={() => {
-              const unread = email.status === "Opened";
-              updateEmail(email.id, { status: unread ? "Delivered" : "Opened" });
+              setMailboxRead(email.id, isMailboxUnread(email, flags));
+              refresh();
             }}
           >
-            {email.status === "Opened" ? (
-              <Mail className="h-3.5 w-3.5" />
-            ) : (
+            {isMailboxUnread(email, flags) ? (
               <MailOpen className="h-3.5 w-3.5" />
+            ) : (
+              <Mail className="h-3.5 w-3.5" />
             )}
-            {email.status === "Opened" ? "Mark unread" : "Mark read"}
+            {isMailboxUnread(email, flags) ? "Mark read" : "Mark unread"}
           </button>
           <button
             type="button"

@@ -10,10 +10,12 @@ import {
 import {
   addKanbanColumnPrefTitle,
   columnTitleMap,
+  editKanbanColumnPref,
   loadKanbanColumnPrefs,
   persistKanbanColumnPrefs,
   type KanbanColumnPref,
 } from "@/lib/kanban/column-prefs";
+import { KANBAN_HEADER_PALETTE } from "@/components/common/KanbanViewControls";
 import {
   ArrowLeftRight,
   Trash2,
@@ -99,6 +101,7 @@ const DEFAULT_CONTACT_COLUMNS: KanbanColumnPref[] = CONTACT_GROUPS.map(
     label: group.title,
     visible: true,
     required: index === 0,
+    color: KANBAN_HEADER_PALETTE[index % KANBAN_HEADER_PALETTE.length],
   }),
 );
 
@@ -161,8 +164,15 @@ export default function ContactsPage() {
     );
   }
 
-  function addContactStageColumnTitle(title: string) {
-    const result = addKanbanColumnPrefTitle(columns, title);
+  function editContactStage(
+    columnId: string,
+    next: { label: string; color?: string },
+  ) {
+    saveContactColumns(editKanbanColumnPref(columns, columnId, next));
+  }
+
+  function addContactStageColumnTitle(title: string, color?: string) {
+    const result = addKanbanColumnPrefTitle(columns, title, color);
     if (!result.ok) {
       setBulkFlash(result.error);
       return;
@@ -170,13 +180,21 @@ export default function ContactsPage() {
     saveContactColumns(result.columns);
   }
 
-  function reorderContactStageColumn(draggedId: string, targetId: string) {
+  function reorderContactStageColumn(
+    draggedId: string,
+    targetId: string,
+    place: "before" | "after" = "before",
+  ) {
     const next = [...columns];
     const fromIndex = next.findIndex((c) => c.id === draggedId);
     const toIndex = next.findIndex((c) => c.id === targetId);
     if (fromIndex === -1 || toIndex === -1) return;
+    let insert = place === "after" ? toIndex + 1 : toIndex;
     const [moved] = next.splice(fromIndex, 1);
-    next.splice(toIndex, 0, moved!);
+    if (!moved) return;
+    if (fromIndex < insert) insert -= 1;
+    if (insert === fromIndex) return;
+    next.splice(insert, 0, moved);
     saveContactColumns(next);
   }
 
@@ -265,9 +283,21 @@ export default function ContactsPage() {
     );
   }
 
-  function reorderColumn(draggedId: string, targetId: string) {
-    reorderContactStageColumn(draggedId, targetId);
+  function reorderColumn(
+    draggedId: string,
+    targetId: string,
+    place: "before" | "after" = "before",
+  ) {
+    reorderContactStageColumn(draggedId, targetId, place);
   }
+
+  const contactStageColors = useMemo(() => {
+    const colors: Record<string, string> = {};
+    for (const col of columns) {
+      if (col.color) colors[col.id] = col.color;
+    }
+    return colors;
+  }, [columns]);
 
   const visibleColumnIds = columns.filter((c) => c.visible).map((c) => c.id);
 
@@ -399,6 +429,11 @@ export default function ContactsPage() {
         onColumnRename={
           viewMode === "kanban" ? renameContactStageColumn : undefined
         }
+        stageColors={viewMode === "kanban" ? contactStageColors : undefined}
+        stageColorPalette={
+          viewMode === "kanban" ? KANBAN_HEADER_PALETTE : undefined
+        }
+        onEditStage={viewMode === "kanban" ? editContactStage : undefined}
         onColumnAdd={
           viewMode === "kanban" ? addContactStageColumnTitle : undefined
         }
@@ -496,6 +531,7 @@ export default function ContactsPage() {
               filters={filters}
               visibleColumnIds={visibleColumnIds}
               columnTitles={contactColumnTitles}
+              columnHeaderColors={contactStageColors}
               sortValue={activeSort}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelected}

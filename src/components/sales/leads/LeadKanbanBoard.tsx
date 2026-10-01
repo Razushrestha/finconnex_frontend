@@ -49,6 +49,7 @@ import {
   type PointerKanbanDrop,
   type PointerKanbanOutcomeDrop,
 } from "@/lib/kanban/use-pointer-kanban-drag";
+import { kanbanHeaderSurfaceStyle } from "@/components/common/KanbanViewControls";
 import { cn } from "@/lib/utils";
 import {
   KANBAN_BOARD_ROW,
@@ -56,7 +57,6 @@ import {
   KANBAN_COL_COLLAPSED,
   KANBAN_DROP_GHOST,
   KANBAN_HEADER_COUNT,
-  KANBAN_HEADER_TITLE,
   KANBAN_WELL,
 } from "@/lib/layout";
 import { useRouter } from "next/navigation";
@@ -79,6 +79,8 @@ interface LeadKanbanBoardProps {
   visibleColumnIds?: string[];
   /** Optional display title overrides keyed by column id. */
   columnTitles?: Record<string, string>;
+  /** Header accent color keyed by column id. */
+  columnHeaderColors?: Record<string, string>;
   onAddLead?: (columnId: string) => void;
   selectedIds: string[];
   onToggleSelect: (id: string) => void;
@@ -95,6 +97,7 @@ export function LeadKanbanBoard({
   sortValue,
   visibleColumnIds,
   columnTitles,
+  columnHeaderColors,
   onAddLead,
   selectedIds,
   onToggleSelect,
@@ -425,17 +428,29 @@ export function LeadKanbanBoard({
                 />
               ) : (
                 <>
-                  {/* Neutral column header (colours stay in saved view config only) */}
+                  {/* Column header uses the color chosen in Edit stage */}
                   {(() => {
                     const title = columnTitles?.[column.id] ?? column.title;
+                    const headerColor = columnHeaderColors?.[column.id];
+                    const surface = kanbanHeaderSurfaceStyle(headerColor ?? null);
                     return (
-                      <div className="flex h-14 w-full shrink-0 flex-col justify-center overflow-hidden rounded-xs border border-slate-200/80 bg-slate-50 p-1.5">
-                        <div className="flex h-6 items-center justify-between gap-1">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <h2 className={KANBAN_HEADER_TITLE} title={title}>
+                      <div
+                        className={cn(
+                          "flex min-h-14 w-full shrink-0 flex-col justify-center overflow-hidden rounded-xs p-1.5",
+                          surface.className,
+                        )}
+                        style={surface.style}
+                      >
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="flex min-w-0 flex-1 items-start gap-2">
+                            <h2
+                              className="line-clamp-2 min-w-0 flex-1 text-xs font-semibold leading-5 xl:text-sm"
+                              title={title}
+                              style={headerColor ? { color: headerColor } : undefined}
+                            >
                               {title}
                             </h2>
-                            <span className={KANBAN_HEADER_COUNT}>
+                            <span className={cn(KANBAN_HEADER_COUNT, "mt-0.5")}>
                               {column.cards.length}
                             </span>
                           </div>

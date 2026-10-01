@@ -36,6 +36,7 @@ import {
   listDealPipelines,
   saveDealPipelines,
   deleteDeals,
+  updateDeal,
   updateDealOwners,
 } from "@/lib/deals/store";
 import { useCrmDeals } from "@/lib/deals/use-crm-deals";
@@ -67,7 +68,10 @@ import { BOARD_PAGE } from "@/lib/layout";
 import { SORT_OPTIONS } from "../leads/page";
 import { defaultActorName } from "@/lib/rules/actor";
 import { bindKanbanStageTitle } from "@/lib/kanban/stage-titles";
-import { type KanbanViewConfig } from "@/components/common/KanbanViewControls";
+import {
+  KANBAN_HEADER_PALETTE,
+  type KanbanViewConfig,
+} from "@/components/common/KanbanViewControls";
 
 export interface PipelineOption {
   label: string;
@@ -171,6 +175,12 @@ export default function DealsPage() {
             editableFieldIds: ["dealOwner"],
             selectedStageIds: DEAL_PIPELINE_STAGES[pipeline].map((s) => s.id),
             stageLabels: {},
+            multiHeaderColors: Object.fromEntries(
+              DEAL_PIPELINE_STAGES[pipeline].map((stage, index) => [
+                stage.id,
+                KANBAN_HEADER_PALETTE[index % KANBAN_HEADER_PALETTE.length],
+              ]),
+            ),
           },
         ]),
       ) as Record<DealPipeline, KanbanViewConfig>,
@@ -261,7 +271,26 @@ export default function DealsPage() {
     });
   }
 
-  function addDealStageColumnTitle(title: string) {
+  function editDealStage(
+    columnId: string,
+    next: { label: string; color?: string },
+  ) {
+    updateActiveViewConfig({
+      headerStyle: "Multi Colour",
+      stageLabels: {
+        ...(activeViewConfig.stageLabels ?? {}),
+        [columnId]: next.label,
+      },
+      multiHeaderColors: next.color
+        ? {
+            ...(activeViewConfig.multiHeaderColors ?? {}),
+            [columnId]: next.color,
+          }
+        : activeViewConfig.multiHeaderColors,
+    });
+  }
+
+  function addDealStageColumnTitle(title: string, color?: string) {
     const bound = bindKanbanStageTitle({
       stages: dealAvailableStages,
       selectedStageIds: visibleColumnIds,
@@ -274,20 +303,34 @@ export default function DealsPage() {
     }
     applyStageVisibility(bound.selectedStageIds);
     updateActiveViewConfig({
+      headerStyle: "Multi Colour",
       selectedStageIds: bound.selectedStageIds,
       stageLabels: bound.stageLabels,
+      multiHeaderColors: color
+        ? {
+            ...(activeViewConfig.multiHeaderColors ?? {}),
+            [bound.stageId]: color,
+          }
+        : activeViewConfig.multiHeaderColors,
     });
   }
 
-  function reorderDealStageColumn(draggedId: string, targetId: string) {
+  function reorderDealStageColumn(
+    draggedId: string,
+    targetId: string,
+    place: "before" | "after" = "before",
+  ) {
     const current = visibleColumnIds;
     const from = current.indexOf(draggedId);
     const to = current.indexOf(targetId);
-    if (from < 0 || to < 0 || from === to) return;
+    if (from < 0 || to < 0) return;
+    let insert = place === "after" ? to + 1 : to;
     const next = [...current];
     const [moved] = next.splice(from, 1);
     if (!moved) return;
-    next.splice(to, 0, moved);
+    if (from < insert) insert -= 1;
+    if (insert === from) return;
+    next.splice(insert, 0, moved);
     applyStageVisibility(next);
     updateActiveViewConfig({ selectedStageIds: next });
   }
@@ -347,18 +390,40 @@ export default function DealsPage() {
   // Transform current pipeline stages into column options format required by EntityHeader
   const columnOptions = useMemo(() => {
     const labels = activeViewConfig.stageLabels ?? {};
-    return currentPipelineStages.map((stage, index) => ({
+    const colors = activeViewConfig.multiHeaderColors ?? {};
+    const selected = (activeViewConfig.selectedStageIds ?? []).filter((id) =>
+      currentPipelineStages.some((stage) => stage.id === id),
+    );
+    const selectedSet = new Set(selected);
+    const byId = new Map(currentPipelineStages.map((stage) => [stage.id, stage]));
+    const serial = [
+      ...selected.map((id) => byId.get(id)).filter(Boolean),
+      ...currentPipelineStages.filter((stage) => !selectedSet.has(stage.id)),
+    ] as DealStage[];
+    const requiredId = currentPipelineStages[0]?.id;
+    return serial.map((stage, index) => ({
       id: stage.id,
       label: labels[stage.id] ?? stage.title,
-      visible: stage.visible ?? true,
-      required: index === 0,
+      visible: selected.length
+        ? selectedSet.has(stage.id)
+        : (stage.visible ?? true),
+      required: stage.id === requiredId,
+      color:
+        colors[stage.id] ||
+        KANBAN_HEADER_PALETTE[index % KANBAN_HEADER_PALETTE.length],
     }));
-  }, [currentPipelineStages, activeViewConfig.stageLabels]);
+  }, [
+    currentPipelineStages,
+    activeViewConfig.stageLabels,
+    activeViewConfig.multiHeaderColors,
+    activeViewConfig.selectedStageIds,
+  ]);
 
-  const dealColumnTitles = useMemo(
-    () => activeViewConfig.stageLabels ?? {},
-    [activeViewConfig.stageLabels],
-  );
+  const dealColumnTitles = useMemo(() => {
+    const titles: Record<string, string> = {};
+    for (const col of columnOptions) titles[col.id] = col.label;
+    return titles;
+  }, [columnOptions]);
 
   const dealAvailableStages = useMemo(
     () =>
@@ -370,9 +435,36 @@ export default function DealsPage() {
     [currentPipelineStages, activeViewConfig.stageLabels],
   );
 
-  const visibleColumnIds = useMemo(() => {
-    return columnOptions.filter((c) => c.visible).map((c) => c.id);
+  const visibleColumnIds = useMemo(
+    () => columnOptions.filter((c) => c.visible).map((c) => c.id),
+    [columnOptions],
+  );
+
+  const dealStageColors = useMemo(() => {
+    const colors: Record<string, string> = {};
+    for (const col of columnOptions) {
+      if (col.color) colors[col.id] = col.color;
+    }
+    return colors;
   }, [columnOptions]);
+
+  const dealStageRecordCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const stage of currentPipelineStages) {
+      counts[stage.id] = stage.deals?.length ?? 0;
+    }
+    return counts;
+  }, [currentPipelineStages]);
+
+  function transferDealStageAndRemove(fromId: string, toId: string) {
+    const from = currentPipelineStages.find((stage) => stage.id === fromId);
+    const to = currentPipelineStages.find((stage) => stage.id === toId);
+    if (!from || !to) return;
+    for (const deal of [...from.deals]) {
+      updateDeal(deal.id, { stageTitle: to.title });
+    }
+    toggleDealStageColumn(fromId);
+  }
 
   const stageOptions = useMemo(() => {
     return currentPipelineStages
@@ -549,11 +641,22 @@ export default function DealsPage() {
         onColumnRename={
           viewMode === "kanban" ? renameDealStageColumn : undefined
         }
+        stageColors={viewMode === "kanban" ? dealStageColors : undefined}
+        stageColorPalette={
+          viewMode === "kanban" ? KANBAN_HEADER_PALETTE : undefined
+        }
+        onEditStage={viewMode === "kanban" ? editDealStage : undefined}
         onColumnAdd={
           viewMode === "kanban" ? addDealStageColumnTitle : undefined
         }
         onColumnReorder={
           viewMode === "kanban" ? reorderDealStageColumn : undefined
+        }
+        stageRecordCountById={
+          viewMode === "kanban" ? dealStageRecordCounts : undefined
+        }
+        onStageTransferAndRemove={
+          viewMode === "kanban" ? transferDealStageAndRemove : undefined
         }
       />
 
@@ -638,6 +741,7 @@ export default function DealsPage() {
               filters={filters}
               visibleColumnIds={visibleColumnIds}
               columnTitles={dealColumnTitles}
+              columnHeaderColors={dealStageColors}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
               onAddDeal={() => openCreateDeal()}

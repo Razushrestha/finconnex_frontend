@@ -3,9 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  MEETING_STATUSES,
   type MeetingColumn,
   type MeetingStatus,
 } from "@/lib/meetings/types";
+import { orderByVisibleIds } from "@/lib/kanban/column-prefs";
+import { useKanbanColumnPrefs } from "@/lib/kanban/use-kanban-column-prefs";
+import { KANBAN_HEADER_PALETTE } from "@/components/common/KanbanViewControls";
 import {
   listMeetingColumns,
   saveMeetingColumns,
@@ -56,6 +60,15 @@ export default function MeetingsPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkFlash, setBulkFlash] = useState<string | null>(null);
   const [scopeTab, setScopeTab] = useState("All Meetings");
+  const stagePrefs = useKanbanColumnPrefs(
+    "finconnex.meetings.kanban-columns",
+    MEETING_STATUSES.map((status, index) => ({
+      id: status.toLowerCase().replace(/\s+/g, "-"),
+      label: status,
+      visible: true,
+      required: index === 0,
+    })),
+  );
 
   const scope: MeetingScope =
     scopeTab === "My Overdue Meetings" ? "my-overdue" : "all";
@@ -86,11 +99,14 @@ export default function MeetingsPage() {
   }, [allMeetings, filters, scope]);
 
   const visibleColumns = useMemo(() => {
+    const base = orderByVisibleIds(columns, stagePrefs.visibleIds);
     const cols = filters.statuses.length
-      ? columns.filter((c) =>
-          filters.statuses.includes(c.title as MeetingStatus),
+      ? base.filter((c) =>
+          filters.statuses.includes(
+            (stagePrefs.titles[c.id] ?? c.title) as MeetingStatus,
+          ) || filters.statuses.includes(c.title as MeetingStatus),
         )
-      : columns;
+      : base;
     return cols.map((column) => {
       const meetings = column.meetings.filter(
         (m) =>
@@ -102,7 +118,7 @@ export default function MeetingsPage() {
       );
       return { ...column, meetings, count: meetings.length };
     });
-  }, [columns, filters, scope]);
+  }, [columns, filters, scope, stagePrefs.visibleIds, stagePrefs.titles]);
 
   function handleDropMeeting({
     itemId: meetingId,
@@ -207,6 +223,21 @@ export default function MeetingsPage() {
           onToggleFilter={() => setFilterOpen((v) => !v)}
           onClearSort={() => setSortActive(false)}
           moreMenuItems={[activityExportMenuItem("meetings")]}
+          columnOptions={view === "kanban" ? stagePrefs.columns : undefined}
+          onColumnToggle={view === "kanban" ? stagePrefs.toggle : undefined}
+          onColumnRename={view === "kanban" ? stagePrefs.rename : undefined}
+          stageColors={view === "kanban" ? stagePrefs.colors : undefined}
+          stageColorPalette={view === "kanban" ? KANBAN_HEADER_PALETTE : undefined}
+          onEditStage={view === "kanban" ? stagePrefs.edit : undefined}
+          onColumnAdd={
+            view === "kanban"
+              ? (title, color) => {
+                  const error = stagePrefs.addTitle(title, color);
+                  if (error) setBulkFlash(error);
+                }
+              : undefined
+          }
+          onColumnReorder={view === "kanban" ? stagePrefs.reorder : undefined}
         />
 
         {bulkFlash ? (
@@ -249,6 +280,8 @@ export default function MeetingsPage() {
                   <MeetingsKanbanColumn
                     key={column.id}
                     column={column}
+                    displayTitle={stagePrefs.titles[column.id]}
+                    headerColor={stagePrefs.colors[column.id]}
                     draggingMeetingId={drag.dragInfo?.itemId ?? null}
                     dropTargetPos={drag.dropTargetPos}
                     setDropTargetPos={() => {}}

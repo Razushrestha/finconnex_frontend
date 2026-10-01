@@ -28,6 +28,8 @@ export interface MailboxFlags {
   folderId?: string;
   focusOverride?: "focused" | "other";
   labels?: MailLabel[];
+  /** The signed-in user has opened this message. Kept locally so a CRM refresh cannot mark it unread again. */
+  read?: boolean;
 }
 
 const KEY = "finconnex.emails.mailbox.v1";
@@ -189,6 +191,27 @@ export function moveToCustomFolder(id: string, folderId: string | null) {
 
 export function setFocusOverride(id: string, view: "focused" | "other") {
   return patchMailbox(id, { focusOverride: view });
+}
+
+export function setMailboxRead(id: string, read: boolean) {
+  return patchMailbox(id, { read });
+}
+
+/** Unread means the user has not opened it yet. Delivery status from CRM is separate. */
+export function isMailboxUnread(email: Email, flags?: MailboxFlags): boolean {
+  const stored = flags ?? flagsFor(email.id, email);
+  if (typeof stored.read === "boolean") return !stored.read;
+  if (email.status === "Opened") return false;
+  if (
+    email.status === "Draft" ||
+    email.status === "Failed" ||
+    email.status === "Scheduled" ||
+    email.status === "Bounced"
+  ) {
+    return false;
+  }
+  if (isOutbound(email)) return false;
+  return true;
 }
 
 export function onMailboxChange(cb: () => void) {

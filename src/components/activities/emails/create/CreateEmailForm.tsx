@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   Check,
   ChevronDown,
-  LayoutTemplate,
-  Search,
 } from "lucide-react";
 import type { EmailImportance, EmailStatus } from "@/lib/emails/types";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
@@ -23,12 +21,6 @@ import { createEmail, deleteEmail, upsertEmail } from "@/lib/emails/store";
 import { takeCompose } from "@/lib/emails/outlook";
 import { htmlToPlainText, type EmailTone } from "@/lib/emails/ai-compose";
 import { requestEmailAi } from "@/lib/emails/request-email-ai";
-import {
-  filledTemplateSubject,
-  renderEmailTemplateHtml,
-  searchEmailTemplates,
-  type EmailTemplate,
-} from "@/lib/emails/templates";
 import {
   appendSignature,
   applyPersonaSignature,
@@ -159,17 +151,9 @@ export function CreateEmailForm({
               }
             : prev;
         draftApplied = true;
-        const nextFrom = fromEmail || prev.from;
-        const shouldSign =
-          Boolean(profile) &&
-          nextFrom === fromEmail &&
-          !hasAnySignature(merged.body);
         return {
           ...merged,
-          from: nextFrom,
-          body: shouldSign
-            ? appendSignature(merged.body, profile!.body)
-            : merged.body,
+          from: fromEmail || prev.from,
         };
       });
     }
@@ -204,16 +188,12 @@ export function CreateEmailForm({
   const [sending, setSending] = useState(false);
   const [improving, setImproving] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
-  const [templatesOpen, setTemplatesOpen] = useState(false);
-  const [templateQuery, setTemplateQuery] = useState("");
   const [fromOpen, setFromOpen] = useState(false);
   const [fromIdentities, setFromIdentities] = useState(() => listFromIdentities());
   const [fromLoading, setFromLoading] = useState(() => listFromIdentities().length === 0);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const templatesRef = useRef<HTMLDivElement>(null);
   const fromRef = useRef<HTMLDivElement>(null);
   const aiSeq = useRef(0);
-  const [editorEpoch, setEditorEpoch] = useState(0);
   const canPickFrom = fromIdentities.length > 1;
   const fromIdentity =
     fromIdentities.find((item) => item.email === form.from) ?? fromIdentities[0];
@@ -226,19 +206,14 @@ export function CreateEmailForm({
       : "Workspace mailbox not configured";
 
   useEffect(() => {
-    if (!templatesOpen && !fromOpen) return;
+    if (!fromOpen) return;
     function onPointerDown(event: MouseEvent) {
       const target = event.target as Node;
-      if (templatesOpen && !templatesRef.current?.contains(target)) {
-        setTemplatesOpen(false);
-      }
-      if (fromOpen && !fromRef.current?.contains(target)) {
-        setFromOpen(false);
-      }
+      if (fromRef.current?.contains(target)) return;
+      setFromOpen(false);
     }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
-      setTemplatesOpen(false);
       setFromOpen(false);
     }
     document.addEventListener("mousedown", onPointerDown);
@@ -247,7 +222,7 @@ export function CreateEmailForm({
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [templatesOpen, fromOpen]);
+  }, [fromOpen]);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -523,7 +498,6 @@ export function CreateEmailForm({
   }
 
   const contactName = form.relatedName || form.to[0] || "";
-  const visibleTemplates = searchEmailTemplates(templateQuery);
 
   function keepSignatureIfPresent(nextHtml: string) {
     if (!hasAnySignature(form.body)) return nextHtml;
@@ -610,28 +584,6 @@ export function CreateEmailForm({
       }
     };
     reader.readAsDataURL(file);
-  }
-
-  function applyTemplate(item: EmailTemplate) {
-    aiSeq.current += 1;
-    setImproving(false);
-    const signature = getActiveSignatureProfile()?.body ?? "";
-    const html = renderEmailTemplateHtml(
-      item,
-      contactName.includes("@") ? undefined : contactName,
-    );
-    setForm((prev) => ({
-      ...prev,
-      template: item.name,
-      subject: filledTemplateSubject(
-        item,
-        contactName.includes("@") ? undefined : contactName,
-      ),
-      body: signature ? appendSignature(html, signature) : html,
-    }));
-    setEditorEpoch((n) => n + 1);
-    setTemplatesOpen(false);
-    setTemplateQuery("");
   }
 
   return (
@@ -764,52 +716,6 @@ export function CreateEmailForm({
                 onPick={(subject) => update("subject", subject)}
               />
             </div>
-            <div className="relative" ref={templatesRef}>
-              <button
-                type="button"
-                onClick={() => setTemplatesOpen((v) => !v)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 text-[12px] font-semibold text-[#5A32A3] hover:bg-violet-50"
-              >
-                <LayoutTemplate className="h-3.5 w-3.5" />
-                {form.template || "Templates"}
-              </button>
-              {templatesOpen ? (
-                <div className="absolute top-9 right-0 z-30 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
-                  <div className="relative border-b border-slate-100 p-2">
-                    <Search className="pointer-events-none absolute top-1/2 left-4 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                    <input
-                      autoFocus
-                      value={templateQuery}
-                      onChange={(e) => setTemplateQuery(e.target.value)}
-                      placeholder="Search templates"
-                      className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pr-3 pl-8 text-[12px] outline-none"
-                    />
-                  </div>
-                  <div className="max-h-72 overflow-y-auto py-1">
-                    {visibleTemplates.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => applyTemplate(item)}
-                        className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-slate-50"
-                      >
-                        <span className="text-[12px] font-semibold text-slate-800">
-                          {item.name}
-                        </span>
-                        <span className="text-[11px] text-slate-400">
-                          {item.category} · {item.subject}
-                        </span>
-                      </button>
-                    ))}
-                    {visibleTemplates.length === 0 ? (
-                      <p className="px-3 py-4 text-[12px] text-slate-400">
-                        No templates match “{templateQuery}”
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-            </div>
           </div>
           {submitted && errors.subject && (
             <p className="px-5 pb-2 text-xs text-destructive">
@@ -818,7 +724,6 @@ export function CreateEmailForm({
           )}
 
           <EmailEditor
-            key={editorEpoch}
             body={form.body}
             onChange={(val) => update("body", val)}
             error={errors.body}

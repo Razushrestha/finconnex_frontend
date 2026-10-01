@@ -97,8 +97,17 @@ export function smokeWorkQueueWiring() {
   if (!api.includes("completeCrmQueueItem")) {
     fail("work-queue client missing completeCrmQueueItem");
   }
+  if (!api.includes("deleteCrmQueueItem") || !api.includes("updateCrmQueueItem")) {
+    fail("work-queue client missing delete/update queue item helpers");
+  }
   if (!view.includes('useState<WorkQueueNavId>("queue")')) {
     fail("WorkQueueView should default to mixed My day queue");
+  }
+  if (view.includes("router.push(row.href)")) {
+    fail("Work Queue Edit must stay on the queue, not navigate away");
+  }
+  if (!view.includes("deleteCrmQueueItem") || !view.includes("updateCrmQueueItem")) {
+    fail("WorkQueueView must delete and edit live CRM queue items");
   }
 
   const overdueRange = rangeForTimeFilter(

@@ -21,6 +21,7 @@ import {
 import { listLeadColumns, deleteLeads, updateLeadOwner, findLeadById, updateLead } from "@/lib/leads/store";
 import {
   bulkCrmLeads,
+  changeCrmLeadPipelineStage,
   refreshCrmLeadsBoard,
   replaceCrmLeadTags,
 } from "@/lib/leads/api";
@@ -596,7 +597,7 @@ export default function LeadsPage() {
       });
   }
 
-  function addLeadStageColumnTitle(title: string) {
+  function addLeadStageColumnTitle(title: string, color?: string) {
     const bound = bindKanbanStageTitle({
       stages: LEAD_STAGES,
       selectedStageIds: normalizeSelectedStageIds(viewConfig.selectedStageIds),
@@ -609,8 +610,15 @@ export default function LeadsPage() {
     }
     persistKanbanView({
         ...viewConfig,
+        headerStyle: "Multi Colour",
         selectedStageIds: bound.selectedStageIds,
         stageLabels: bound.stageLabels,
+        multiHeaderColors: color
+          ? {
+              ...(viewConfig.multiHeaderColors ?? {}),
+              [bound.stageId]: color,
+            }
+          : viewConfig.multiHeaderColors,
       });
   }
 
@@ -624,38 +632,120 @@ export default function LeadsPage() {
       });
   }
 
-  function reorderLeadStageColumn(draggedId: string, targetId: string) {
+  function editLeadStage(
+    columnId: string,
+    next: { label: string; color?: string },
+  ) {
+    persistKanbanView({
+      ...viewConfig,
+      headerStyle: "Multi Colour",
+      stageLabels: {
+        ...(viewConfig.stageLabels ?? {}),
+        [columnId]: next.label,
+      },
+      multiHeaderColors: next.color
+        ? {
+            ...(viewConfig.multiHeaderColors ?? {}),
+            [columnId]: next.color,
+          }
+        : viewConfig.multiHeaderColors,
+    });
+  }
+
+  function reorderLeadStageColumn(
+    draggedId: string,
+    targetId: string,
+    place: "before" | "after" = "before",
+  ) {
     const current = normalizeSelectedStageIds(viewConfig.selectedStageIds);
     const from = current.indexOf(draggedId);
     const to = current.indexOf(targetId);
-    if (from < 0 || to < 0 || from === to) return;
+    if (from < 0 || to < 0) return;
+    let insert = place === "after" ? to + 1 : to;
     const next = [...current];
     const [moved] = next.splice(from, 1);
     if (!moved) return;
-    next.splice(to, 0, moved);
+    if (from < insert) insert -= 1;
+    if (insert === from) return;
+    next.splice(insert, 0, moved);
     persistKanbanView({
         ...viewConfig,
         selectedStageIds: normalizeSelectedStageIds(next),
       });
   }
 
-  const stageColumnOptions = useMemo(
-    () =>
-      LEAD_STAGES.map((stage) => ({
-        id: stage.id,
-        label: viewConfig.stageLabels?.[stage.id] ?? stage.label,
-        visible: normalizeSelectedStageIds(viewConfig.selectedStageIds).includes(
-          stage.id,
-        ),
-        required: stage.required,
-      })),
-    [viewConfig.selectedStageIds, viewConfig.stageLabels],
-  );
+  const stageColumnOptions = useMemo(() => {
+    const selected = normalizeSelectedStageIds(viewConfig.selectedStageIds);
+    const selectedSet = new Set(selected);
+    const byId = new Map(LEAD_STAGES.map((stage) => [stage.id, stage]));
+    const serial = [
+      ...selected.map((id) => byId.get(id)).filter(Boolean),
+      ...LEAD_STAGES.filter((stage) => !selectedSet.has(stage.id)),
+    ] as typeof LEAD_STAGES;
+    return serial.map((stage) => ({
+      id: stage.id,
+      label: viewConfig.stageLabels?.[stage.id] ?? stage.label,
+      visible: selectedSet.has(stage.id),
+      required: stage.required,
+    }));
+  }, [viewConfig.selectedStageIds, viewConfig.stageLabels]);
 
-  const leadColumnTitles = useMemo(
-    () => viewConfig.stageLabels ?? {},
-    [viewConfig.stageLabels],
-  );
+  function leadTitleForStage(columnId: string) {
+    return (
+      viewConfig.stageLabels?.[columnId] ??
+      LEAD_STAGES.find((stage) => stage.id === columnId)?.label ??
+      ""
+    );
+  }
+
+  function cardsForLeadStage(columnId: string) {
+    const canonical =
+      LEAD_STAGES.find((stage) => stage.id === columnId)?.label ?? "";
+    const custom = viewConfig.stageLabels?.[columnId] ?? "";
+    return listLeadColumns().find(
+      (col) =>
+        col.id === columnId ||
+        col.title === canonical ||
+        (custom && col.title === custom),
+    )?.cards ?? [];
+  }
+
+  const leadStageRecordCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    const columns = listLeadColumns();
+    for (const stage of LEAD_STAGES) {
+      const custom = viewConfig.stageLabels?.[stage.id] ?? "";
+      const col = columns.find(
+        (item) =>
+          item.id === stage.id ||
+          item.title === stage.label ||
+          (custom && item.title === custom),
+      );
+      counts[stage.id] = col?.cards.length ?? 0;
+    }
+    return counts;
+  }, [totalLeads, viewConfig.stageLabels]);
+
+  async function transferLeadStageAndRemove(fromId: string, toId: string) {
+    const toTitle = leadTitleForStage(toId);
+    const cards = cardsForLeadStage(fromId);
+    for (const card of cards) {
+      updateLead(card.id, { pipelineStage: toTitle });
+      if (isUuid(card.id)) {
+        await changeCrmLeadPipelineStage(card.id, toTitle).catch(() => null);
+      }
+    }
+    toggleLeadStageColumn(fromId);
+    void refreshCrmLeadsBoard().catch(() => undefined);
+  }
+
+  const leadColumnTitles = useMemo(() => {
+    const titles: Record<string, string> = {};
+    for (const stage of LEAD_STAGES) {
+      titles[stage.id] = viewConfig.stageLabels?.[stage.id] ?? stage.label;
+    }
+    return titles;
+  }, [viewConfig.stageLabels]);
 
   function saveListView(next: ListViewConfig) {
     const normalized: ListViewConfig = {
@@ -875,11 +965,24 @@ export default function LeadsPage() {
           onColumnRename={
             viewMode === "kanban" ? renameLeadStageColumn : undefined
           }
+          stageColors={
+            viewMode === "kanban" ? viewConfig.multiHeaderColors : undefined
+          }
+          stageColorPalette={
+            viewMode === "kanban" ? KANBAN_HEADER_PALETTE : undefined
+          }
+          onEditStage={viewMode === "kanban" ? editLeadStage : undefined}
           onColumnAdd={
             viewMode === "kanban" ? addLeadStageColumnTitle : undefined
           }
           onColumnReorder={
             viewMode === "kanban" ? reorderLeadStageColumn : undefined
+          }
+          stageRecordCountById={
+            viewMode === "kanban" ? leadStageRecordCounts : undefined
+          }
+          onStageTransferAndRemove={
+            viewMode === "kanban" ? transferLeadStageAndRemove : undefined
           }
           hideTitle
           showSearch={false}
@@ -1037,6 +1140,7 @@ export default function LeadsPage() {
               sortValue={activeSort}
               visibleColumnIds={visibleColumnIds}
               columnTitles={leadColumnTitles}
+              columnHeaderColors={viewConfig.multiHeaderColors}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
               cardFieldKeys={cardFieldKeys}

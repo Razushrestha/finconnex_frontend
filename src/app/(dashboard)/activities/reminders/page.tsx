@@ -57,7 +57,6 @@ import {
   KANBAN_BOARD_ROW,
   KANBAN_COL,
   KANBAN_DROP_GHOST,
-  KANBAN_HEADER,
   KANBAN_HEADER_COUNT,
   KANBAN_WELL,
 } from "@/lib/layout";
@@ -80,8 +79,13 @@ import {
 } from "@/lib/kanban/use-pointer-kanban-drag";
 import { EntitySelectionToolbar } from "@/components/sales/EntitySelectionToolbar";
 import { parseTaskDueDate } from "@/lib/dashboard/layout";
-import { kanbanPrefsFromCatalog } from "@/lib/kanban/column-prefs";
+import {
+  kanbanPrefsFromCatalog,
+  orderByVisibleIds,
+} from "@/lib/kanban/column-prefs";
 import { useKanbanColumnPrefs } from "@/lib/kanban/use-kanban-column-prefs";
+import { KANBAN_HEADER_PALETTE } from "@/components/common/KanbanViewControls";
+import { stageHeaderSurface } from "@/components/common/kanban-stage-surface";
 
 const reminderSortOptions = [
   { key: "dateTime", label: "When" },
@@ -199,30 +203,28 @@ export default function RemindersPage() {
   }, [allReminders]);
 
   const visibleColumns = useMemo(() => {
-    return columns
-      .filter(
-        (col) =>
-          (filters.statuses.length === 0 || filters.statuses.includes(col.title)) &&
-          (!stagePrefs.visibleIds.length || stagePrefs.visibleIds.includes(col.id)),
-      )
-      .map((col) => {
-        const reminders = sortReminders(
-          col.reminders.filter(
-            (r) =>
-              reminderMatchesFilters(
-                { ...r, status: col.title },
-                { ...filters, statuses: [] },
-              ) &&
-              reminderMatchesDeepFilters(
-                { ...r, status: col.title },
-                { ...filters, statuses: [] },
-              ),
-          ),
-          sortField,
-          sortDirection,
-        );
-        return { ...col, reminders, count: reminders.length };
-      });
+    const cols = columns.filter(
+      (col) =>
+        filters.statuses.length === 0 || filters.statuses.includes(col.title),
+    );
+    return orderByVisibleIds(cols, stagePrefs.visibleIds).map((col) => {
+      const reminders = sortReminders(
+        col.reminders.filter(
+          (r) =>
+            reminderMatchesFilters(
+              { ...r, status: col.title },
+              { ...filters, statuses: [] },
+            ) &&
+            reminderMatchesDeepFilters(
+              { ...r, status: col.title },
+              { ...filters, statuses: [] },
+            ),
+        ),
+        sortField,
+        sortDirection,
+      );
+      return { ...col, reminders, count: reminders.length };
+    });
   }, [columns, filters, sortField, sortDirection, stagePrefs.visibleIds]);
 
   const visibleReminders = useMemo(
@@ -386,10 +388,13 @@ export default function RemindersPage() {
           columnOptions={view === "kanban" ? stagePrefs.columns : undefined}
           onColumnToggle={view === "kanban" ? stagePrefs.toggle : undefined}
           onColumnRename={view === "kanban" ? stagePrefs.rename : undefined}
+          stageColors={view === "kanban" ? stagePrefs.colors : undefined}
+          stageColorPalette={view === "kanban" ? KANBAN_HEADER_PALETTE : undefined}
+          onEditStage={view === "kanban" ? stagePrefs.edit : undefined}
           onColumnAdd={
             view === "kanban"
-              ? (title) => {
-                  const error = stagePrefs.addTitle(title);
+              ? (title, color) => {
+                  const error = stagePrefs.addTitle(title, color);
                   if (error) {
                     setBulkFlash(error);
                     window.setTimeout(() => setBulkFlash(null), 2800);
@@ -461,7 +466,13 @@ export default function RemindersPage() {
                       data-kanban-drop-column={col.id}
                       className={cn("group/stage flex h-full min-h-0 flex-col", KANBAN_COL)}
                     >
-                      <div className={cn("mb-2 shrink-0", KANBAN_HEADER)}>
+                      <div
+                        className={cn(
+                          "mb-2 shrink-0",
+                          stageHeaderSurface(stagePrefs.colors[col.id]).className,
+                        )}
+                        style={stageHeaderSurface(stagePrefs.colors[col.id]).style}
+                      >
                         <div className="flex items-center justify-between gap-4">
                           <button
                             type="button"
@@ -469,10 +480,16 @@ export default function RemindersPage() {
                               setCollapsed((prev) => new Set(prev).add(col.id))
                             }
                             title="Collapse"
-                            className="flex items-center gap-1.5 rounded-sm hover:opacity-70"
+                            className="flex min-w-0 items-center gap-1.5 rounded-sm hover:opacity-70"
                           >
                             <ChevronDown className="h-4 w-4 shrink-0 text-slate-700" />
-                            <h3 className="text-sm font-semibold text-slate-900">
+                            <h3
+                              className="line-clamp-2 text-left text-sm font-semibold text-slate-900"
+                              style={
+                                stageHeaderSurface(stagePrefs.colors[col.id])
+                                  .titleStyle
+                              }
+                            >
                               {stagePrefs.titles[col.id] ?? col.title}
                             </h3>
                           </button>

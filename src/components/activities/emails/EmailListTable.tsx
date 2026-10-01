@@ -21,7 +21,7 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
-import type { Email, EmailStatus } from "@/lib/emails/types";
+import type { Email } from "@/lib/emails/types";
 import { deleteCrmEmail, tryCrmEmail } from "@/lib/emails/api";
 import { deleteEmail, listEmails, updateEmail } from "@/lib/emails/store";
 import { cn } from "@/lib/utils";
@@ -29,12 +29,14 @@ import { avatarColor, initials } from "@/lib/activities/shared";
 import {
   contactName,
   flagsFor,
+  isMailboxUnread,
   labelTone,
   moveToCustomFolder,
   onMailboxChange,
   restoreToInbox,
   setFocusOverride,
   setMailboxFlag,
+  setMailboxRead,
   clearLabels,
   toggleLabel,
   toggleMailboxFlag,
@@ -54,10 +56,6 @@ import {
 
 function snippetOf(email: Email): string {
   return email.body.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-}
-
-function isUnread(status: EmailStatus): boolean {
-  return status !== "Opened";
 }
 
 function inboxDate(sentDate?: string): string {
@@ -213,17 +211,12 @@ export function EmailListTable({
   }
 
   function openEmail(id: string) {
-    const email = emails.find((e) => e.id === id);
-    if (email && isUnread(email.status)) {
-      updateEmail(id, { status: "Opened" });
-    }
+    setMailboxRead(id, true);
     router.push(`/activities/emails/detail/${id}`);
   }
 
   function markReadState(ids: string[], read: boolean) {
-    for (const id of ids) {
-      updateEmail(id, { status: read ? "Opened" : "Delivered" });
-    }
+    for (const id of ids) setMailboxRead(id, read);
     refresh();
   }
 
@@ -534,9 +527,10 @@ export function EmailListTable({
 
       <div className="min-h-0 flex-1 overflow-y-auto [scrollbar-color:#c4c7c5_transparent] [scrollbar-width:thin]">
         {rows.map((email) => {
-          const unread = isUnread(email.status);
-          const selected = selectedIds.includes(email.id);
           const flags = flagsFor(email.id, email);
+          const sent = folder === "sent";
+          const unread = !sent && isMailboxUnread(email, flags);
+          const selected = selectedIds.includes(email.id);
           const hovering = hoveredId === email.id;
           const who = contactName(email);
           const labels = flags.labels ?? [];
@@ -556,9 +550,11 @@ export function EmailListTable({
                 "group flex cursor-pointer items-start gap-1.5 border-b border-slate-100 px-2 py-2.5 transition-colors",
                 selected
                   ? "bg-[#F3ECFB]"
-                  : unread
+                  : sent
                     ? "bg-white hover:bg-slate-50"
-                    : "bg-[#f8f9fa] hover:bg-slate-50",
+                    : unread
+                      ? "bg-white hover:bg-slate-50"
+                      : "bg-[#f3f4f6] hover:bg-slate-100",
               )}
             >
               <button
@@ -616,13 +612,26 @@ export function EmailListTable({
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
+                  {unread ? (
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full bg-[#5A32A3]"
+                      aria-hidden
+                    />
+                  ) : null}
                   <p
                     className={cn(
                       "truncate text-[13.5px] tracking-tight",
-                      unread ? "font-bold text-slate-900" : "font-medium text-slate-700",
+                      unread
+                        ? "font-bold text-slate-900"
+                        : sent
+                          ? "font-medium text-slate-800"
+                          : "font-normal text-slate-500",
                     )}
-                    title={who}
+                    title={sent ? `To ${who}` : who}
                   >
+                    {sent ? (
+                      <span className="mr-1 font-normal text-slate-400">To:</span>
+                    ) : null}
                     {who}
                   </p>
                   {labels.map((label) => (
@@ -646,7 +655,9 @@ export function EmailListTable({
                   <span
                     className={cn(
                       "ml-auto shrink-0 text-[11px] tabular-nums",
-                      unread ? "font-bold text-slate-700" : "text-slate-400",
+                      unread
+                        ? "font-bold text-slate-800"
+                        : "font-normal text-slate-400",
                     )}
                   >
                     {inboxDate(email.sentDate)}
@@ -671,7 +682,9 @@ export function EmailListTable({
                           className={
                             unread
                               ? "font-bold text-slate-900"
-                              : "font-semibold text-slate-800"
+                              : sent
+                                ? "font-normal text-slate-700"
+                                : "font-normal text-slate-500"
                           }
                         >
                           {email.subject}

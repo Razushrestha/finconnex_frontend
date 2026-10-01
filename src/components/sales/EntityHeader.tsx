@@ -37,6 +37,8 @@ export interface ColumnOption {
   visible: boolean;
   /** When false, the stage cannot be removed from the board. */
   required?: boolean;
+  /** Header accent shown beside the title. */
+  color?: string;
 }
 
 export interface ImportOption {
@@ -89,11 +91,27 @@ export interface EntityHeaderProps {
 
   columnOptions?: ColumnOption[];
   onColumnToggle?: (columnId: string) => void;
-  onColumnReorder?: (draggedId: string, targetId: string) => void;
+  onColumnReorder?: (
+    draggedId: string,
+    targetId: string,
+    place?: "before" | "after",
+  ) => void;
   /** Rename a stage / column title (e.g. prompt + save). */
   onColumnRename?: (columnId: string, nextLabel: string) => void;
+  stageColors?: Record<string, string>;
+  stageColorPalette?: readonly string[];
+  onStageColor?: (columnId: string, color: string) => void;
+  onEditStage?: (
+    columnId: string,
+    next: { label: string; color?: string },
+  ) => void;
   /** Add a typed stage title (maps onto a hidden pipeline stage). */
-  onColumnAdd?: (title: string) => void;
+  onColumnAdd?: (title: string, color?: string) => void;
+  stageRecordCountById?: Record<string, number>;
+  onStageTransferAndRemove?: (
+    fromId: string,
+    toId: string,
+  ) => void | Promise<void>;
 
   actionOptions?: ActionOption[];
 
@@ -134,7 +152,13 @@ export function EntityHeader({
   onColumnToggle,
   onColumnReorder,
   onColumnRename,
+  stageColors,
+  stageColorPalette,
+  onStageColor,
+  onEditStage,
   onColumnAdd,
+  stageRecordCountById,
+  onStageTransferAndRemove,
   actionOptions,
   footerOptions,
   importOptions,
@@ -488,7 +512,7 @@ export function EntityHeader({
 
               {isMoreMenuOpen && (
                 <div
-                  className="absolute right-0 z-50 mt-1.5 max-h-[min(28rem,calc(100vh-6rem))] w-56 overflow-y-auto rounded-md border border-slate-200 bg-white p-1.5 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+                  className="absolute right-0 z-50 mt-1.5 max-h-[min(28rem,calc(100vh-6rem))] w-72 overflow-y-auto rounded-md border border-slate-200 bg-white p-1.5 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
                   onMouseDown={(e) => e.stopPropagation()}
                 >
                   {columnOptions && columnOptions.length > 0 ? (
@@ -496,8 +520,14 @@ export function EntityHeader({
                       columns={columnOptions}
                       onToggle={onColumnToggle}
                       onRename={onColumnRename}
+                      stageColors={stageColors}
+                      colorPalette={stageColorPalette}
+                      onStageColor={onStageColor}
+                      onEditStage={onEditStage}
                       onAdd={onColumnAdd}
                       onReorder={onColumnReorder}
+                      recordCountById={stageRecordCountById}
+                      onTransferAndRemove={onStageTransferAndRemove}
                     />
                   ) : null}
 

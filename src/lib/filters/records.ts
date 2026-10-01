@@ -3,6 +3,7 @@ import type { Call } from "@/lib/calls/types";
 import type { CompanyCardData } from "@/lib/companies/types";
 import type { ContactCardData } from "@/lib/contacts/types";
 import type { DealRecord } from "@/lib/deals/types";
+import { isMailboxUnread } from "@/lib/emails/mailbox";
 import type { Email } from "@/lib/emails/types";
 import {
   CALL_FILTER_FIELDS,
@@ -203,7 +204,7 @@ export function messageMatchesFilters(message: Message, filters?: MessageFilters
 
 export function emailMatchesFilters(email: Email, filters?: MailListFilters) {
   if (!filters) return true;
-  if (filters.unreadOnly && email.status === "Opened") return false;
+  if (filters.unreadOnly && !isMailboxUnread(email)) return false;
   if (filters.hasAttachment && !(email.attachments?.length || email.templateUsed)) {
     return false;
   }
