@@ -605,7 +605,7 @@ export function WorkQueueTable({
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-auto">
-        <div className="min-h-[420px]">
+        <div>
           <div
             style={gridStyle}
             className="sticky top-0 z-10 grid gap-x-3 border-b border-[var(--wq-line)] bg-white px-5 py-2 sm:px-6"

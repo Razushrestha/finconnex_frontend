@@ -1,5 +1,6 @@
 "use client";
 
+import { roleForWorkQueueId } from "@/lib/work-queue/people";
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { Plus, Search, X } from "lucide-react";
@@ -160,7 +161,7 @@ export function WorkQueuePersonBar() {
                   {u.name}
                 </span>
                 <span className="truncate text-[11px] text-slate-400">
-                  {u.role}
+                  {roleForWorkQueueId(u.id) ?? u.role}
                 </span>
               </span>
             </button>

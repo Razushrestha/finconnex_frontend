@@ -184,6 +184,7 @@ export function normalizeWorkspaceMember(
     name,
     email: pickStr(row.email, user.email),
     role: isOwner ? "System Admin" : mapWorkspaceMemberRole(roleRaw),
+    workspaceRole: (isOwner ? "OWNER" : roleRaw).toUpperCase() || undefined,
     status: mapWorkspaceMemberStatus(statusRaw, {
       isActive: row.isActive,
       joinedAt: joinedAt || row.joinedAt,

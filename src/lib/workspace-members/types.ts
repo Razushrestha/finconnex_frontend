@@ -13,6 +13,8 @@ export type WorkspaceMember = {
   name: string;
   email: string;
   role: HierarchyLevel;
+  /** The role the CRM actually stores (OWNER, ADMIN, MEMBER…). */
+  workspaceRole?: string;
   status: WorkspaceMemberStatus;
   isOwner: boolean;
   team?: string;

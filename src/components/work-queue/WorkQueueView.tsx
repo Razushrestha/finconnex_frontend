@@ -1,5 +1,6 @@
 "use client";
 
+import { workspaceRoleLabel } from "@/lib/auth/workspace-role";
 import * as React from "react";
 import { WorkQueueSidebar } from "@/components/work-queue/WorkQueueSidebar";
 import { useWorkQueueScope } from "@/components/work-queue/WorkQueuePersonBar";
@@ -139,7 +140,7 @@ export function WorkQueueView() {
       const people = members.map((m) => ({
         id: m.userId || m.id,
         name: m.name,
-        role: m.role,
+        role: workspaceRoleLabel(m.workspaceRole ?? m.role),
         email: m.email,
       }));
       setWorkQueueCrmDirectory(people);
@@ -378,6 +379,12 @@ export function WorkQueueView() {
     }
   }
 
+  const scopeName =
+    nameById[scope] ||
+    (scope === selfId ? "you" : "") ||
+    displayNameForWorkQueueId(scope) ||
+    "you";
+
   function resetLocalFilters() {
     setFilters(DEFAULT_FILTERS);
     setPage(1);
@@ -385,7 +392,7 @@ export function WorkQueueView() {
 
   return (
     <div
-      className="flex h-full min-h-[calc(100vh-4rem)] w-full min-w-0 flex-col bg-white text-slate-900 antialiased"
+      className="flex h-full min-h-0 w-full min-w-0 flex-col bg-white text-slate-900 antialiased"
       style={
         {
           "--wq-accent": "#4F46E5",
@@ -433,7 +440,7 @@ export function WorkQueueView() {
             onRefresh={refresh}
             spinning={spinning || crm.loading}
             source={crm.source}
-            emptyLabel={`No ${title.toLowerCase()} for ${displayNameForWorkQueueId(scope) || "you"} in this time range.`}
+            emptyLabel={`No ${title.toLowerCase()} for ${scopeName} in this time range.`}
             filters={filters}
             onFiltersChange={(f) => {
               setFilters(f);
