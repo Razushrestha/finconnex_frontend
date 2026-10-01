@@ -3,6 +3,7 @@ import {
   ensureCrmSession,
   isBoundCrmSession,
   isUuid,
+  rememberedWorkspaceId,
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
@@ -327,11 +328,11 @@ async function meetingsCall(
   init?: RequestInit,
 ): Promise<unknown> {
   const scoped = await ensureCrmSession();
+  const workspaceId = scoped?.workspaceId || rememberedWorkspaceId();
   const paths = [
-    ...(scoped?.workspaceId
-      ? [`${workspaceMeetingsPath(scoped.workspaceId, suffix)}${query}`]
-      : []),
-    `${globalMeetingsPath(suffix)}${query}`,
+    ...(workspaceId
+      ? [`${workspaceMeetingsPath(workspaceId, suffix)}${query}`]
+      : [`${globalMeetingsPath(suffix)}${query}`]),
   ].filter((path, index, all) => all.indexOf(path) === index);
 
   let lastError: unknown;

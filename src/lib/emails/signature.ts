@@ -142,6 +142,7 @@ export function bodyContainsSignature(html: string, signature: string) {
 
 export function hasAnySignature(html: string) {
   return (
+    /data-email-signature="/i.test(html) ||
     listSignatureProfiles().some((profile) => bodyContainsSignature(html, profile.body)) ||
     bodyContainsSignature(html, DEFAULT_SIGNATURE)
   );
@@ -176,8 +177,40 @@ export function appendSignature(html: string, signature: string) {
   return `${prefix}<p></p>${block}`;
 }
 
+export function stripUploadedSignatureBlocks(html: string) {
+  return html.replace(
+    /<p[^>]*data-email-signature="[^"]*"[^>]*>[\s\S]*?<\/p>/gi,
+    "",
+  );
+}
+
+const UPLOADED_SIGNATURE_IMG_STYLE =
+  "display:block;width:80%;max-width:80%;height:auto;";
+
+export function enlargeUploadedSignatureImages(html: string) {
+  if (!html.includes("data-email-signature")) return html;
+  return html.replace(
+    /(<p\b[^>]*\bdata-email-signature="[^"]*"[^>]*>)([\s\S]*?)(<\/p>)/gi,
+    (_match, open: string, inner: string, close: string) => {
+      const sized = inner.replace(/<img\b([^>]*?)\/?>/gi, (_img, attrs: string) => {
+        if (attrs.includes(UPLOADED_SIGNATURE_IMG_STYLE)) {
+          return `<img${attrs}>`;
+        }
+        const rest = attrs.replace(/\sstyle="[^"]*"/gi, "");
+        return `<img${rest} style="${UPLOADED_SIGNATURE_IMG_STYLE}">`;
+      });
+      return `${open}${sized}${close}`;
+    },
+  );
+}
+
+export function uploadedSignatureHtml(id: string, src: string, name: string) {
+  const alt = escapeHtml(name || "Signature");
+  return `<p data-email-signature="${escapeHtml(id)}"><img src="${src}" alt="${alt}" style="${UPLOADED_SIGNATURE_IMG_STYLE}" /></p>`;
+}
+
 export function stripAllSignatures(html: string) {
-  let next = html;
+  let next = stripUploadedSignatureBlocks(html);
   for (const profile of listSignatureProfiles()) {
     next = stripSignature(next, profile.body);
   }
@@ -187,6 +220,17 @@ export function stripAllSignatures(html: string) {
 
 export function replaceSignatureInHtml(html: string, nextSignature: string) {
   return appendSignature(stripAllSignatures(html), nextSignature);
+}
+
+export function insertUploadedSignature(
+  html: string,
+  id: string,
+  src: string,
+  name: string,
+) {
+  const stripped = stripAllSignatures(html);
+  const prefix = stripped.trim() ? stripped : "<p></p>";
+  return `${prefix}<p></p>${uploadedSignatureHtml(id, src, name)}`;
 }
 
 export function getSignatureProfileForEmail(email: string) {

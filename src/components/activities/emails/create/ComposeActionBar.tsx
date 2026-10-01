@@ -11,6 +11,7 @@ import {
   Paperclip,
   PenLine,
   Send,
+  Upload,
   Table,
   WandSparkles,
 } from "lucide-react";
@@ -20,7 +21,15 @@ import {
   listSignatureProfiles,
   replaceSignatureInHtml,
   setActiveSignatureId,
+  insertUploadedSignature,
 } from "@/lib/emails/signature";
+
+type SavedSignature = {
+  id: string;
+  name: string;
+  mime: string;
+  createdAt: string;
+};
 
 type SendAction = "now" | "schedule" | "follow-up" | "deal-stage";
 
@@ -98,6 +107,76 @@ export function ComposeActionBar({
   const imageRef = useRef<HTMLInputElement>(null);
   const profiles = listSignatureProfiles();
   const activeId = typeof window === "undefined" ? "own" : getActiveSignatureId();
+  const [savedSignatures, setSavedSignatures] = useState<SavedSignature[]>([]);
+  const [sigError, setSigError] = useState("");
+  const [sigBusy, setSigBusy] = useState(false);
+  const signatureFileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void fetch("/api/emails/signatures", { credentials: "same-origin" })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const json = (await res.json()) as { signatures?: SavedSignature[] };
+        if (alive) setSavedSignatures(json.signatures ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function useSavedSignature(item: SavedSignature) {
+    setSigError("");
+    setSigBusy(true);
+    try {
+      const res = await fetch(`/api/emails/signatures/${item.id}`, {
+        credentials: "same-origin",
+      });
+      if (!res.ok) throw new Error("Could not open that signature.");
+      const blob = await res.blob();
+      const src = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result ?? ""));
+        reader.onerror = () => reject(new Error("Could not read that signature."));
+        reader.readAsDataURL(blob);
+      });
+      if (!src) throw new Error("Could not read that signature.");
+      setActiveSignatureId(item.id);
+      onSignature(insertUploadedSignature(body, item.id, src, item.name));
+      setSigOpen(false);
+    } catch (err) {
+      setSigError(err instanceof Error ? err.message : "Could not use that signature.");
+    } finally {
+      setSigBusy(false);
+    }
+  }
+
+  async function uploadSignature(file: File) {
+    setSigError("");
+    setSigBusy(true);
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      const res = await fetch("/api/emails/signatures", {
+        method: "POST",
+        credentials: "same-origin",
+        body: form,
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        signature?: SavedSignature;
+      };
+      if (!res.ok || !json.signature) {
+        throw new Error(json.error || "Could not save the signature.");
+      }
+      setSavedSignatures((list) => [json.signature!, ...list]);
+      await useSavedSignature(json.signature);
+    } catch (err) {
+      setSigError(err instanceof Error ? err.message : "Could not save the signature.");
+      setSigBusy(false);
+    }
+  }
   const scheduleDate = fromLocalInput(scheduleAt);
   const scheduleValid = Boolean(scheduleDate && scheduleDate.getTime() > Date.now());
 
@@ -235,7 +314,35 @@ export function ComposeActionBar({
             Signature
           </ChipButton>
           {sigOpen ? (
-            <Menu className="w-64">
+            <Menu className="w-72">
+              {savedSignatures.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  disabled={sigBusy}
+                  onClick={() => void useSavedSignature(item)}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-50 disabled:opacity-50"
+                >
+                  <Check
+                    className={cn(
+                      "h-3.5 w-3.5 shrink-0",
+                      item.id === activeId ? "text-[#5A32A3]" : "text-transparent",
+                    )}
+                  />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/api/emails/signatures/${item.id}`}
+                    alt=""
+                    className="h-8 w-14 rounded border border-slate-200 bg-white object-contain"
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate text-[12px] font-medium text-slate-800">
+                      {item.name}
+                    </span>
+                    <span className="block text-[10px] text-slate-500">Saved signature</span>
+                  </span>
+                </button>
+              ))}
               {profiles.map((profile) => (
                 <button
                   key={profile.id}
@@ -261,8 +368,33 @@ export function ComposeActionBar({
                   </span>
                 </button>
               ))}
+              <div className="border-t border-slate-100 px-2 py-2">
+                <button
+                  type="button"
+                  disabled={sigBusy}
+                  onClick={() => signatureFileRef.current?.click()}
+                  className="flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-[#5A32A3]/30 text-[12px] font-semibold text-[#5A32A3] hover:bg-[#F3ECFB] disabled:opacity-50"
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  {sigBusy ? "Saving…" : "Upload signature"}
+                </button>
+                {sigError ? (
+                  <p className="mt-1.5 text-[11px] text-rose-600">{sigError}</p>
+                ) : null}
+              </div>
             </Menu>
           ) : null}
+          <input
+            ref={signatureFileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (file) void uploadSignature(file);
+            }}
+          />
         </div>
 
         <ChipButton

@@ -60,6 +60,71 @@ describe("native booking API smoke (CI)", () => {
     expect(merged[0]?.crmEventTypeId).toBe("et-1");
   });
 
+  it("keeps local booking-form questions when the CRM event type has none", () => {
+    const local: BookingPage = {
+      id: "et-1",
+      title: "Ram test",
+      slug: "ram-test",
+      owner: "Ada",
+      eventType: "Consultation",
+      durationMinutes: 30,
+      bufferMinutes: 0,
+      timezone: "Australia/Sydney",
+      description: "",
+      availability: WEEKDAYS.map((day) => ({
+        day,
+        enabled: true,
+        start: "09:00",
+        end: "17:00",
+      })),
+      questions: [
+        { id: "name", label: "Name", required: true },
+        { id: "field-gender", label: "gender", required: false, fieldType: "radio" },
+        { id: "field-date", label: "enter the date", required: true, fieldType: "date" },
+        {
+          id: "field-address",
+          label: "enter your address",
+          required: false,
+          fieldType: "address",
+        },
+      ],
+      consultants: ["Mohit Chapagain", "nepatronix web", "spare nepatronix"],
+      termsEnabled: true,
+      termsHtml: "I agree",
+      confirmationTemplate: "",
+      reminderTemplate: "",
+      status: "Live",
+      views: 0,
+      bookingsCount: 0,
+      cancelRate: 0,
+      createdAt: "",
+      crmEventTypeId: "et-1",
+    };
+    const remote: BookingPage = {
+      ...local,
+      title: "Ram test",
+      questions: [],
+      consultants: ["Mohit Chapagain"],
+      termsEnabled: undefined,
+      termsHtml: undefined,
+    };
+    const merged = mergeCrmEventTypePages([local], [remote]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.questions.map((row) => row.label)).toEqual([
+      "Name",
+      "gender",
+      "enter the date",
+      "enter your address",
+    ]);
+    expect(merged[0]?.consultants).toEqual([
+      "Mohit Chapagain",
+      "nepatronix web",
+      "spare nepatronix",
+    ]);
+    expect(merged[0]?.termsEnabled).toBe(true);
+    expect(merged[0]?.termsHtml).toBe("I agree");
+  });
+
   it("keeps every remote consultation when listing the workspace API", () => {
     const extra: BookingPage = {
       id: "et-2",

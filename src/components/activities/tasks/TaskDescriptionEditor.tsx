@@ -2789,6 +2789,7 @@ export function TaskDescriptionEditor({
           "[&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 [&_blockquote]:text-slate-600",
           "[&_.mention-tag]:rounded [&_.mention-tag]:bg-violet-100 [&_.mention-tag]:px-1 [&_.mention-tag]:py-0.5 [&_.mention-tag]:font-medium [&_.mention-tag]:text-violet-800",
           "[&_a]:font-medium",
+          "[&_[data-email-signature]_img]:!block [&_[data-email-signature]_img]:!h-auto [&_[data-email-signature]_img]:!max-h-none [&_[data-email-signature]_img]:!w-[80%] [&_[data-email-signature]_img]:!max-w-[80%]",
           showMarks && "[&_p]:relative [&_p]:border-b [&_p]:border-dashed [&_p]:border-slate-200 [&_p]:pb-1",
           editorClassName,
         )}

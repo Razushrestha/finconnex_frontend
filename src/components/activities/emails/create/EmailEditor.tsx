@@ -12,7 +12,7 @@ import { TaskDescriptionEditor } from "@/components/activities/tasks/TaskDescrip
 import { cn } from "@/lib/utils";
 import type { EmailImportance } from "@/lib/emails/types";
 import { emailHasDraftContent, type EmailTone } from "@/lib/emails/ai-compose";
-import { stripAllSignatures } from "@/lib/emails/signature";
+import { enlargeUploadedSignatureImages, stripAllSignatures } from "@/lib/emails/signature";
 import { EmailAiActions } from "./EmailAiActions";
 
 interface AttachmentChip {
@@ -71,6 +71,11 @@ export function EmailEditor({
   const [importanceOpen, setImportanceOpen] = useState(false);
   const dragCount = useRef(0);
   const importanceRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const next = enlargeUploadedSignatureImages(body);
+    if (next !== body) onChange(next);
+  }, [body, onChange]);
 
   useEffect(() => {
     if (!importanceOpen) return;

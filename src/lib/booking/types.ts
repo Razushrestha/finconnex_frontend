@@ -85,10 +85,24 @@ export interface AvailabilityRule {
   end: string;
 }
 
+export interface BookingAddressPart {
+  id: string;
+  label: string;
+  enabled: boolean;
+}
+
 export interface BookingQuestion {
   id: string;
   label: string;
   required: boolean;
+  /** single_line, multiline, email, checkbox, radio, dropdown, date, address, number */
+  fieldType?: string;
+  /** Treat answers as sensitive health or personal data. */
+  ephi?: boolean;
+  /** Choices for a radio button or drop-down field. */
+  options?: string[];
+  /** Lines shown for an address field. */
+  addressParts?: BookingAddressPart[];
 }
 
 export interface BookingPage {
@@ -105,6 +119,10 @@ export interface BookingPage {
   description: string;
   availability: AvailabilityRule[];
   questions: BookingQuestion[];
+  /** Guest must accept this agreement before booking. */
+  termsEnabled?: boolean;
+  /** Agreement copy shown next to the consent checkbox. */
+  termsHtml?: string;
   confirmationTemplate: string;
   reminderTemplate: string;
   status: BookingPageStatus;
@@ -232,7 +250,7 @@ export const CONSULTATION_MODE_META: Record<
   }
 > = {
   one_to_one: {
-    title: "One-to-One",
+    title: "One on One",
     description:
       "Ideal for support calls, client meetings, and any one-to-one meetings",
     showFrequency: true,
@@ -500,7 +518,7 @@ export function upsertBookingPage(page: BookingPage) {
   writeStore(list);
   if (normalized.status === "Live") {
     void import("@/lib/booking/publish-public-page").then((mod) =>
-      mod.publishPublicBookingPage(normalized),
+      mod.publishPublicBookingPage(normalized).catch(() => undefined),
     );
   }
   return normalized;

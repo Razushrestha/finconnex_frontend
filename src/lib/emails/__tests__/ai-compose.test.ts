@@ -38,6 +38,40 @@ describe("write with AI follow-up prompt", () => {
   });
 });
 
+describe("write with AI context", () => {
+  it("writes a birthday note from the prompt and subject, not a document update", () => {
+    const text = htmlToPlainText(
+      draftEmailFromPrompt({
+        prompt: "write a happy birthday message to my best friend",
+        subject: "Wishing you a very happy birthday!",
+        tone: "professional",
+        recipientName: "Alex",
+      }),
+    );
+    expect(text.toLowerCase()).toContain("birthday");
+    expect(text).toContain("Alex");
+    expect(text.toLowerCase()).not.toContain("signing");
+    expect(text.toLowerCase()).not.toContain("documents");
+    expect(text.toLowerCase()).not.toContain("attachments");
+    expect(text.toLowerCase()).not.toContain("write a happy birthday");
+  });
+
+  it("writes a kind love letter from the prompt, not a company update", () => {
+    const text = htmlToPlainText(
+      draftEmailFromPrompt({
+        prompt: "write the love letter to my wife",
+        recipientName: "",
+      }),
+    );
+    expect(text.toLowerCase()).toContain("i love you");
+    expect(text.toLowerCase()).toContain("my love");
+    expect(text.toLowerCase()).not.toContain("write the love");
+    expect(text.toLowerCase()).not.toContain("documents");
+    expect(text.toLowerCase()).not.toContain("finconnex");
+    expect(text.toLowerCase()).not.toContain("following up");
+  });
+});
+
 describe("write with AI length", () => {
   it("writes three descriptive body paragraphs for every compose tone", () => {
     for (const tone of ["friendly", "professional", "emotional", "loving"] as const) {

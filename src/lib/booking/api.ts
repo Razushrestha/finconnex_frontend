@@ -557,6 +557,13 @@ export function mergeCrmEventTypePages(
     return primary.crmEventTypeId || primary.id;
   };
 
+  const preferConsultants = (local?: string[], remote?: string[]) => {
+    const localNames = (local ?? []).filter(Boolean);
+    const remoteNames = (remote ?? []).filter(Boolean);
+    if (localNames.length) return localNames;
+    return remoteNames.length ? remoteNames : undefined;
+  };
+
   const take = (page: BookingPage, fromRemote: boolean) => {
     const key = keyOf(page);
     const existing =
@@ -579,16 +586,24 @@ export function mergeCrmEventTypePages(
             crmEventTypeId: crmId,
             notifyPrefs: existing.notifyPrefs ?? page.notifyPrefs,
             coverImageUrl: existing.coverImageUrl || page.coverImageUrl,
-            consultants:
-              page.consultants?.length ? page.consultants : existing.consultants,
+            consultants: preferConsultants(existing.consultants, page.consultants),
             appointmentLimits: existing.appointmentLimits ?? page.appointmentLimits,
             questions: page.questions?.length ? page.questions : existing.questions,
+            termsEnabled: page.termsEnabled ?? existing.termsEnabled,
+            termsHtml: page.termsHtml ?? existing.termsHtml,
           }
         : {
             ...page,
             ...existing,
             id: preferredId(existing, page),
             crmEventTypeId: existing.crmEventTypeId || page.crmEventTypeId,
+            notifyPrefs: page.notifyPrefs ?? existing.notifyPrefs,
+            coverImageUrl: page.coverImageUrl || existing.coverImageUrl,
+            consultants: preferConsultants(page.consultants, existing.consultants),
+            appointmentLimits: page.appointmentLimits ?? existing.appointmentLimits,
+            questions: page.questions?.length ? page.questions : existing.questions,
+            termsEnabled: page.termsEnabled ?? existing.termsEnabled,
+            termsHtml: page.termsHtml ?? existing.termsHtml,
           };
       byKey.set(keyOf(merged), merged);
       byKey.set(merged.id, merged);

@@ -39,7 +39,7 @@ export function modeSubtitle(choice: CalendarTypeChoice) {
   if (choice.mode === "group") return "Class booking";
   if (choice.mode === "collective") return "Collective";
   if (choice.mode === "resource") return "Resource";
-  return "One-to-One";
+  return "One on One";
 }
 
 export function ConsultationDetailsStep({

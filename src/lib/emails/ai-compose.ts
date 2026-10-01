@@ -114,6 +114,28 @@ export function substanceFromPrompt(input: {
       : `I am following up to make sure this has not stalled, and that you have everything you need from FinConnex.\n\nWhen you have a moment, please let me know if you are happy for us to continue, or if there is a question I should answer first.`;
   }
 
+  const asked = unwrapInstruction(prompt);
+  const subjectLine = (input.subject ?? "").trim();
+  const context = `${asked} ${subjectLine}`.trim();
+  if (/birth\s*day|happy birthday/i.test(context)) {
+    return [
+      "I am writing to wish you a very happy birthday. I hope the day feels warm, easy, and full of the people who care about you.",
+      "You have been a wonderful friend, and I wanted this note to say that clearly. I hope the year ahead brings you good health, time with the people you love, and many reasons to celebrate.",
+      "Enjoy your day. I am glad you are in my life, and I hope we get to mark many more birthdays together.",
+    ].join("\n\n");
+  }
+
+  if (looksLikeInstruction(prompt) && asked && !/^email\b/i.test(asked)) {
+    const focus = asked.replace(/[.?!]+$/g, "");
+    if (mentionsFileWork(context)) {
+      return `I am writing to confirm that the documents have been signed. I wanted you to have that update on its own, without a separate chase.\n\nPlease treat this as the record of that signing. If you need a copy or a correction, tell me and I will sort it.`;
+    }
+    const about = subjectLine
+      ? `${subjectLine.replace(/[.?!]+$/g, "")}. ${focus}`
+      : focus;
+    return `I am writing to you about ${about}. I have kept this note to that point and have not added anything else.\n\nPlease tell me if you would like me to say more on it.`;
+  }
+
   if (cleaned && !looksLikeInstruction(cleaned) && cleaned.split(/\s+/).length >= 6) {
     return cleaned.endsWith(".") || cleaned.endsWith("?") || cleaned.endsWith("!")
       ? cleaned
@@ -270,6 +292,119 @@ export function extractEmailCore(text: string) {
   return next;
 }
 
+function addressName(recipient?: string) {
+  const name = firstName(recipient);
+  if (!name || name === "there" || name.toLowerCase() === "client") return "";
+  return name;
+}
+
+/** A full email when the prompt is personal. Null keeps the business draft path. */
+function completeLetterFromPrompt(input: {
+  prompt: string;
+  subject?: string;
+  recipientName?: string;
+}) {
+  const prompt = input.prompt.trim();
+  const asked = unwrapInstruction(prompt);
+  const subject = (input.subject ?? "").trim();
+  const context = `${prompt} ${asked} ${subject}`;
+  if (/\bfollow[\s-]?up\b/i.test(context) || mentionsFileWork(context)) return null;
+  if (/birth\s*day|happy birthday/i.test(context)) return null;
+  const name = addressName(input.recipientName);
+  const dear = name ? `Dear ${name},` : "Dear,";
+
+  if (/\blove letter\b|\bi love you\b|\bmy wife\b|\bmy husband\b|\bmy partner\b/i.test(context)) {
+    const bond = /\bhusband\b/i.test(context)
+      ? "Being your wife is the quiet privilege of my life."
+      : /\bwife\b/i.test(context)
+        ? "Being your husband is the quiet privilege of my life."
+        : "Loving you is the quiet privilege of my life.";
+    return [
+      name ? `My love ${name},` : "My love,",
+      "",
+      "I sat down to write because some things are too important to leave unsaid, and you should not have to guess how I feel.",
+      "",
+      `${bond} I love the ordinary days with you as much as the ones we plan: your patience, your warmth, and the way a house becomes a home when you are in it. You are my closest person, and I do not want another week to pass without you knowing that clearly.`,
+      "",
+      "I love you. I am grateful for your kindness, for the life we are building, and for the way you make even a hard day feel possible. I hope this finds you feeling how completely you are cherished.",
+      "",
+      "With all my love,",
+    ].join("\n");
+  }
+
+  if (/\b(apolog|i am sorry|i'm sorry|forgive me)\b/i.test(context)) {
+    return [
+      dear,
+      "",
+      "I owe you a proper apology, and I want to give it without excuses.",
+      "",
+      "I am sorry for the hurt or inconvenience I caused. You deserved more care than you received, and I understand if that has shaken your trust. I am not asking you to brush it aside. I am asking for the chance to put it right, and to be more careful with you from here.",
+      "",
+      "Please tell me what would help. I will listen, and I will follow through quietly rather than with another promise.",
+      "",
+      "With regret, and with care,",
+    ].join("\n");
+  }
+
+  if (/\b(congratulat|well done|proud of you|promotion|new role)\b/i.test(context)) {
+    return [
+      dear,
+      "",
+      "I wanted you to hear this from me directly: I am genuinely proud of you.",
+      "",
+      "This is the result of work you did when no one was keeping score, and it deserves to be celebrated properly. I hope today feels as good as the effort that earned it. Please enjoy it. You do not have to rush on to the next thing.",
+      "",
+      "If there is any way I can support you as you settle into what comes next, I would be glad to. Congratulations, truly.",
+      "",
+      "With warm congratulations,",
+    ].join("\n");
+  }
+
+  if (/\b(condolence|passed away|sympathy|sorry for your loss|grieving)\b/i.test(context)) {
+    return [
+      dear,
+      "",
+      "I was so sorry to hear your news, and I want you to know you are not expected to be composed for my sake.",
+      "",
+      "There is nothing tidy to say that makes a loss smaller. I am thinking of you, and of the person you are missing. Please take whatever time you need, and let other people carry the practical things for a while. That is not a failure of strength. It is a kindness you are allowed.",
+      "",
+      "I am here if you want company, a quiet errand done, or simply a note that does not ask you for anything. You do not need to reply.",
+      "",
+      "With sympathy and care,",
+    ].join("\n");
+  }
+
+  if (/\b(thank you|thanks for|grateful)\b/i.test(context) && looksLikeInstruction(prompt)) {
+    return [
+      dear,
+      "",
+      "I wanted to thank you properly, not in a line at the end of something else.",
+      "",
+      "What you did mattered, and I noticed the care in it. People rarely hear that clearly enough. I am grateful, and I hope you feel the difference you made rather than wondering whether it landed.",
+      "",
+      "If I can return that kindness in a practical way, please tell me. Thank you, sincerely.",
+      "",
+      "With thanks,",
+    ].join("\n");
+  }
+
+  if (!looksLikeInstruction(prompt) || !asked || /^email\b/i.test(asked)) return null;
+  const point = (subject || asked).replace(/[.?!]+$/g, "");
+  const who = name || "there";
+  return [
+    `Hello ${who},`,
+    "",
+    "I hope you are well. I wanted to write to you directly, in the way a relationship manager should: kindly, clearly, and with the feeling of the moment kept intact.",
+    "",
+    `${point.charAt(0).toUpperCase()}${point.slice(1)}. I have said it plainly so you do not have to read between the lines, and I have left out anything you did not ask for.`,
+    "",
+    "If any part of this should be softer, clearer, or easier on you, tell me and I will adjust it. Looking after the relationship matters more to me than sending a fast note.",
+    "",
+    "Kind regards,",
+    "FinConnex",
+  ].join("\n");
+}
+
 function greeting(tone: EmailTone, name: string) {
   switch (tone) {
     case "friendly":
@@ -310,18 +445,39 @@ function signoff(tone: EmailTone) {
   }
 }
 
+function mentionsFileWork(text: string) {
+  return /document|sign(?:ing|ed|ature)?|attachment|outstanding|payslip|mortgage/i.test(
+    text,
+  );
+}
+
+function unwrapInstruction(prompt: string) {
+  return prompt
+    .trim()
+    .replace(
+      /^(please\s+)?(can you\s+)?(write|draft|compose|create|make|generate)\s+(me\s+)?(a|an|the)\s+/i,
+      "",
+    )
+    .replace(/^(quick|short|detailed|professional)\s+/i, "")
+    .replace(/^(email|e-mail|message|note)\s+(to|for|about)\s+/i, "")
+    .trim();
+}
+
 function developMiddle(core: string, tone: EmailTone) {
-  const cleaned = stripInstructionLeak(core).replace(/\s+/g, " ").trim();
+  const original = core.trim();
+  if (original.includes("\n\n") && !mentionsFileWork(original)) return original;
+  const raw = stripInstructionLeak(original).trim();
+  const cleaned = raw.replace(/\s+/g, " ").trim();
   if (!cleaned || looksLikeInstruction(cleaned)) {
     return substanceFromPrompt({ prompt: core || "follow up" });
   }
-  if (cleaned.includes("\n")) return cleaned;
+  if (raw.includes("\n")) return raw;
   const sentence =
     cleaned.endsWith(".") || cleaned.endsWith("?") || cleaned.endsWith("!")
       ? cleaned
       : `${cleaned}.`;
   const words = sentence.split(/\s+/).filter(Boolean).length;
-  if (words >= 24) return sentence;
+  if (words >= 24 || !mentionsFileWork(sentence)) return sentence;
   return `${sentence} ${TONE_DEVELOP[tone]}`;
 }
 
@@ -330,6 +486,11 @@ function wrapTone(body: string, tone: EmailTone, name: string) {
     extractEmailCore(body) ||
     "I wanted to follow up on our conversation and keep things moving.";
   const middle = developMiddle(core, tone);
+  const staysOnTopic =
+    middle.includes("\n\n") && !mentionsFileWork(`${core}\n${middle}`);
+  if (staysOnTopic) {
+    return `${greeting(tone, name)}\n\n${middle}\n\n${signoff(tone)}`;
+  }
   return `${greeting(tone, name)}\n\n${TONE_OPENERS[tone]}\n\n${middle}\n\n${TONE_CLOSERS[tone]}\n\n${signoff(tone)}`;
 }
 
@@ -512,6 +673,12 @@ export function draftEmailFromPrompt(input: {
   context?: ComposeAiContext;
 }) {
   const name = firstName(input.recipientName || input.context?.contactName);
+  const felt = completeLetterFromPrompt({
+    prompt: input.prompt,
+    subject: input.subject,
+    recipientName: input.recipientName || input.context?.contactName,
+  });
+  if (felt) return plainTextToEmailHtml(felt);
   const tone = input.tone && COPILOT_TONES.includes(input.tone) ? input.tone : (input.tone ?? "professional");
   const prompt = input.prompt.trim();
   const crm = crmParagraph(input.context);
@@ -539,6 +706,14 @@ export function rewriteEmailWithAi(input: {
 }) {
   const name = firstName(input.recipientName);
   const fromVoice = input.voiceNotes?.trim();
+  const felt = fromVoice
+    ? completeLetterFromPrompt({
+        prompt: fromVoice,
+        subject: input.subject,
+        recipientName: input.recipientName,
+      })
+    : null;
+  if (felt) return plainTextToEmailHtml(felt);
   const existing = extractEmailCore(htmlToPlainText(input.html));
   const subjectHint = input.subject?.trim();
   const seed = fromVoice

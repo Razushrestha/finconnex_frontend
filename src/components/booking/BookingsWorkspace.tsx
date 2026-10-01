@@ -388,7 +388,7 @@ function HomeView({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <div className="mb-3 flex shrink-0 justify-end">
         <NewBookingButton onClick={onNewBooking} />
       </div>
@@ -452,8 +452,8 @@ function HomeView({
         })}
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden xl:flex-row xl:items-stretch">
-        <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+      <div className="flex flex-col gap-4 pb-2 xl:flex-row xl:items-start">
+        <section className="min-w-0 flex-1 rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
           <div className="flex flex-col gap-3 border-b border-[#E5E7EB] px-3 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5">
             <h2 className="flex items-center gap-2 text-[15px] font-bold text-slate-900">
               <CalendarDays className="h-4 w-4 shrink-0" style={{ color: BRAND }} />
@@ -495,8 +495,8 @@ function HomeView({
           {error ? (
             <p className="px-5 py-2 text-[12px] text-rose-600">{error}</p>
           ) : null}
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-[#F3F4F6] lg:hidden">
+          <div>
+          <div className="divide-y divide-[#F3F4F6] lg:hidden">
             {loading && pageRows.length === 0 ? (
               <p className="px-4 py-10 text-center text-[13px] text-slate-400">
                 Loading appointments…
@@ -521,7 +521,7 @@ function HomeView({
             ))}
           </div>
 
-          <div className="hidden min-h-0 min-w-0 flex-1 overflow-auto lg:block">
+          <div className="hidden overflow-x-auto lg:block">
             <table className="w-full table-fixed text-left">
               <colgroup>
                 <col className="w-[24%]" />
@@ -532,7 +532,7 @@ function HomeView({
                 <col className="w-[12%]" />
                 <col className="w-[88px]" />
               </colgroup>
-              <thead className="sticky top-0 z-10 bg-white">
+              <thead className="bg-white">
                 <tr className="border-b border-[#E5E7EB] text-[11px] font-bold tracking-wide text-slate-500 uppercase">
                   <th className="px-4 py-3 font-bold">Appointment</th>
                   <th className="px-3 py-3 font-bold">Related To</th>
@@ -618,7 +618,7 @@ function HomeView({
           </div>
         </section>
 
-        <div className="flex w-full shrink-0 flex-col gap-4 xl:h-full xl:w-[300px]">
+        <div className="flex w-full shrink-0 flex-col gap-4 xl:w-[300px]">
           <section className="shrink-0 rounded-xl border border-[#E5E7EB] bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-[14px] font-bold text-slate-900">

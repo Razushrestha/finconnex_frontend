@@ -122,6 +122,17 @@ export function workspaceIdFromToken(token: string): string | null {
   return typeof id === "string" && id.length > 0 ? id : null;
 }
 
+/** Workspace id already chosen for this browser, without calling the CRM. */
+export function rememberedWorkspaceId(): string | null {
+  const stored = readStorage(WORKSPACE_KEY);
+  if (stored && isUuid(stored)) return stored;
+  const token = readStorage(ACCESS_KEY);
+  const fromJwt = token ? workspaceIdFromToken(token) : null;
+  if (fromJwt && isUuid(fromJwt)) return fromJwt;
+  const env = getEnvWorkspaceId();
+  return env && isUuid(env) ? env : null;
+}
+
 export function isJwtExpired(token: string, skewMs = 15_000): boolean {
   const payload = decodeJwtPayload(token);
   const exp = payload?.exp;

@@ -95,8 +95,8 @@ const SECTION_FILTERS = [
 type SectionFilter = (typeof SECTION_FILTERS)[number];
 
 async function loadConsultationPagesFromApi(): Promise<BookingPage[]> {
-  const local = listBookingPages().filter((page) => page.eventType === "Consultation");
   const remote = await tryCrmBooking(() => listCrmEventTypePages());
+  const local = listBookingPages().filter((page) => page.eventType === "Consultation");
   const merged =
     remote == null
       ? local
@@ -317,7 +317,13 @@ export function ConsultationsBoard() {
           id: f.id,
           label: f.label,
           required: f.required,
+          fieldType: f.type,
+          ephi: f.ephi,
+          options: f.options,
+          addressParts: f.addressParts,
         })),
+      termsEnabled: Boolean(form?.terms),
+      termsHtml: form?.termsText,
       confirmationTemplate:
         additional?.calendarInvites !== false && inviteNotes
           ? `${confirmationTemplate}\n\n${inviteNotes}`
@@ -534,6 +540,7 @@ export function ConsultationsBoard() {
         <ConsultationOverview
           page={viewingPage}
           onClose={() => setViewingPage(null)}
+          onRefresh={refreshPages}
           onSaved={(next) => {
             upsertBookingPage(next);
             setViewingPage(next);
@@ -826,7 +833,7 @@ function ConsultationCard({
   onRefresh: () => void;
 }) {
   const people = page.consultants?.length ? page.consultants : [page.owner];
-  const mode = consultationModeLabel(page.consultationMode) || "One-to-One";
+  const mode = consultationModeLabel(page.consultationMode) || "One on One";
 
   return (
     <article
@@ -880,7 +887,7 @@ function ConsultationRow({
   onRefresh: () => void;
 }) {
   const people = page.consultants?.length ? page.consultants : [page.owner];
-  const mode = consultationModeLabel(page.consultationMode) || "One-to-One";
+  const mode = consultationModeLabel(page.consultationMode) || "One on One";
 
   return (
     <div

@@ -5,7 +5,7 @@ import {
   loadConsultationAvailability,
   syncConsultationAvailability,
 } from "@/lib/booking/availability-sync";
-import { Calendar, Info, Pencil, Plus } from "lucide-react";
+import { Calendar, Copy, Info, Pencil, Plus } from "lucide-react";
 import type { AvailabilityPanelId } from "@/components/booking/ConsultationWizardLayout";
 import {
   WEEKDAYS,
@@ -186,14 +186,46 @@ function HoursEditor({
   rules: AvailabilityRule[];
   onChange: (next: AvailabilityRule[]) => void;
 }) {
+  const monday = rules.find((rule) => rule.day === "Monday");
+  const mondayFilled = Boolean(monday?.enabled && monday.start && monday.end);
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyDays, setCopyDays] = useState<Weekday[]>(() =>
+    WEEKDAYS.filter((day) => day !== "Monday" && day !== "Saturday" && day !== "Sunday"),
+  );
+
   function patch(day: Weekday, partial: Partial<AvailabilityRule>) {
     onChange(rules.map((rule) => (rule.day === day ? { ...rule, ...partial } : rule)));
+  }
+
+  function toggleCopyDay(day: Weekday) {
+    setCopyDays((current) =>
+      current.includes(day) ? current.filter((item) => item !== day) : [...current, day],
+    );
+  }
+
+  function copyMondayHours() {
+    if (!monday || copyDays.length === 0) return;
+    const targets = new Set(copyDays);
+    onChange(
+      rules.map((rule) =>
+        targets.has(rule.day)
+          ? { ...rule, enabled: true, start: monday.start, end: monday.end }
+          : rule,
+      ),
+    );
+    setCopyOpen(false);
   }
 
   return (
     <div className="mt-4 space-y-2 rounded-lg border border-[#E5E7EB] bg-[#FAF8FD] p-3">
       {rules.map((rule) => (
-        <div key={rule.day} className="flex flex-wrap items-center gap-2">
+        <div
+          key={rule.day}
+          className={cn(
+            "flex flex-wrap items-center gap-2",
+            rule.day === "Monday" && copyOpen && "relative z-20",
+          )}
+        >
           <label className="flex w-28 items-center gap-2 text-[13px] text-slate-700">
             <input
               type="checkbox"
@@ -218,6 +250,46 @@ function HoursEditor({
             onChange={(e) => patch(rule.day, { end: e.target.value })}
             className="h-9 rounded-lg border border-[#E5E7EB] bg-white px-2 text-[13px] disabled:text-slate-300"
           />
+          {rule.day === "Monday" && mondayFilled ? (
+            <div className="relative">
+              <button
+                type="button"
+                aria-label="Copy Monday's hours"
+                title="Copy Monday's hours"
+                onClick={() => setCopyOpen((open) => !open)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#E5E7EB] bg-white text-[#5A32A3] hover:bg-[#F3ECFB]"
+              >
+                <Copy className="h-4 w-4" />
+              </button>
+              {copyOpen ? (
+                <div className="absolute left-0 top-11 z-20 w-52 rounded-xl border border-[#E5E7EB] bg-white p-3 shadow-lg">
+                  <p className="text-[12px] font-semibold text-slate-700">Copy Monday&apos;s hours to</p>
+                  <div className="mt-2 space-y-1.5">
+                    {WEEKDAYS.filter((day) => day !== "Monday").map((day) => (
+                      <label key={day} className="flex items-center gap-2 text-[13px] text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={copyDays.includes(day)}
+                          onChange={() => toggleCopyDay(day)}
+                          className="h-3.5 w-3.5 accent-[#5A32A3]"
+                        />
+                        {day}
+                      </label>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={copyDays.length === 0}
+                    onClick={copyMondayHours}
+                    className="mt-3 h-8 w-full rounded-lg text-[12px] font-semibold text-white disabled:opacity-40"
+                    style={{ backgroundColor: BRAND }}
+                  >
+                    Apply
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ))}
     </div>

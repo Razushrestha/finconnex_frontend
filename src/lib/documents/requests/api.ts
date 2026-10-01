@@ -52,6 +52,18 @@ export function globalDocumentRequestsPath(suffix = ""): string {
   return `/v1/document-requests${suffix}`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/** A document request carries its own `items` list. Do not treat those files as requests. */
+function isDocumentRequestRow(rec: Record<string, unknown>) {
+  return Boolean(
+    pickStr(rec.id, rec.uuid, rec.documentRequestId) &&
+      (rec.title != null || rec.requestedFromId != null),
+  );
+}
+
 function extractRecords(data: unknown): Record<string, unknown>[] {
   if (!data) return [];
   if (Array.isArray(data)) {
@@ -60,18 +72,12 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
       Array.isArray(data[0]) &&
       (typeof data[1] === "number" || data[1] == null)
     ) {
-      return (data[0] as unknown[]).filter(
-        (row): row is Record<string, unknown> =>
-          !!row && typeof row === "object" && !Array.isArray(row),
-      );
+      return (data[0] as unknown[]).filter(isRecord);
     }
-    return data.filter(
-      (row): row is Record<string, unknown> =>
-        !!row && typeof row === "object" && !Array.isArray(row),
-    );
+    return data.filter(isRecord);
   }
-  if (typeof data === "object") {
-    const rec = data as Record<string, unknown>;
+  if (isRecord(data)) {
+    if (isDocumentRequestRow(data)) return [data];
     for (const key of [
       "items",
       "documentRequests",
@@ -80,9 +86,9 @@ function extractRecords(data: unknown): Record<string, unknown>[] {
       "rows",
       "result",
     ]) {
-      if (Array.isArray(rec[key])) return extractRecords(rec[key]);
+      if (Array.isArray(data[key])) return extractRecords(data[key]);
     }
-    if (rec.data != null && rec.data !== data) return extractRecords(rec.data);
+    if (data.data != null && data.data !== data) return extractRecords(data.data);
   }
   return [];
 }
@@ -469,6 +475,9 @@ export async function restoreCrmDocumentRequest(
 export async function sendCrmDocumentRequest(
   id: string,
 ): Promise<DocumentRequest | null> {
+  if (!isCrmDocumentRequestId(id)) {
+    throw new Error("Save the document request before sending it.");
+  }
   return asRequest(
     await requestsMutate(`/${id}/send`, { method: "POST", body: "{}" }),
   );

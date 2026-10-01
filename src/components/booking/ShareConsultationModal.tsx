@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Download, Pencil, RefreshCw, X } from "lucide-react";
 import { publicBookUrl, getBookingPageBySlug, slotsForDate } from "@/lib/booking/types";
-import { saveOnceLink, saveShortLink } from "@/lib/booking/short-links";
+import {
+  publishBookingOnceLink,
+  publishBookingShortLink,
+} from "@/lib/booking/short-links";
+import { publishPublicBookingPage } from "@/lib/booking/publish-public-page";
 import { cn } from "@/lib/utils";
 
 const BRAND = "#5A32A3";
@@ -194,22 +198,51 @@ export function ShareConsultationModal({
     }
   }
 
+  async function ensurePublicPage() {
+    const page = getBookingPageBySlug(path.trim() || slug);
+    if (!page) {
+      throw new Error("Save this consultation before sharing a link.");
+    }
+    const published = {
+      ...page,
+      slug: path.trim() || page.slug,
+      status: "Live" as const,
+    };
+    await publishPublicBookingPage(published);
+  }
+
   async function generateShort() {
-    const code = randomCode();
-    saveShortLink(code, bookPath);
-    setOneTime(null);
-    setShortCopied(false);
-    setShortCode(code);
     setLinkError("");
+    try {
+      await ensurePublicPage();
+      const code = randomCode();
+      await publishBookingShortLink(code, bookPath);
+      setOneTime(null);
+      setShortCopied(false);
+      setShortCode(code);
+    } catch (err) {
+      setShortCode(null);
+      setLinkError(
+        err instanceof Error ? err.message : "Could not create the short link",
+      );
+    }
   }
 
   async function generateOnce() {
-    const code = randomCode(10);
-    saveOnceLink(code, bookPath);
-    setShortCode(null);
-    setOnceCopied(false);
-    setOneTime(code);
     setLinkError("");
+    try {
+      await ensurePublicPage();
+      const code = randomCode(10);
+      await publishBookingOnceLink(code, bookPath);
+      setShortCode(null);
+      setOnceCopied(false);
+      setOneTime(code);
+    } catch (err) {
+      setOneTime(null);
+      setLinkError(
+        err instanceof Error ? err.message : "Could not create the one-time link",
+      );
+    }
   }
 
   async function downloadQr() {

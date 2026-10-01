@@ -1,26 +1,15 @@
-"use client";
+import { redirect } from "next/navigation";
+import { openBookingShortLink } from "@/lib/booking/short-link-store";
+import { ShortLinkFallback } from "@/app/(public)/s/[code]/ShortLinkFallback";
 
-import { use, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { consumeOnceLink, resolveShortLink } from "@/lib/booking/short-links";
-
-export default function ShortBookingLinkPage({
+export default async function ShortBookingLinkPage({
   params,
 }: {
   params: Promise<{ code: string }>;
 }) {
-  const { code } = use(params);
-  const router = useRouter();
+  const { code } = await params;
+  const target = await openBookingShortLink(code);
+  if (target) redirect(target);
 
-  useEffect(() => {
-    const once = consumeOnceLink(code);
-    const target = once ?? resolveShortLink(code);
-    router.replace(target || "/booking");
-  }, [code, router]);
-
-  return (
-    <div className="flex min-h-dvh items-center justify-center text-[13px] text-slate-400">
-      Opening booking page…
-    </div>
-  );
+  return <ShortLinkFallback code={code} />;
 }

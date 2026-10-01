@@ -17,10 +17,15 @@ import {
   ListOrdered,
   Pencil,
   Send,
+  Copy,
+  ExternalLink,
+  FolderInput,
+  MoreVertical,
   Share2,
+  Trash2,
+  X,
   Underline,
   Users,
-  X,
   type LucideIcon,
 } from "lucide-react";
 import { ShareConsultationModal } from "@/components/booking/ShareConsultationModal";
@@ -42,7 +47,6 @@ import {
   AVAILABILITY_PANELS,
   type AvailabilityPanelId,
 } from "@/components/booking/ConsultationWizardLayout";
-import { initials } from "@/lib/activities/shared";
 import {
   crmEventTypeIdOf,
   patchCrmEventType,
@@ -53,8 +57,12 @@ import { selectableOnlinePlatforms } from "@/lib/booking/meeting-platforms";
 import {
   APPOINTMENT_DISTRIBUTIONS,
   consultationModeLabel,
+  deleteBookingPage,
   formatBookingPrice,
-  meetingModeLabel,
+  listBookingPages,
+  nextBookingPageId,
+  publicBookUrl,
+  upsertBookingPage,
   type AppointmentDistribution,
   type BookingCurrency,
   type BookingPage,
@@ -68,6 +76,17 @@ import {
 import { cn } from "@/lib/utils";
 
 const BRAND = "#5A32A3";
+
+function consultationInitials(title: string) {
+  const words = title
+    .trim()
+    .split(/[\s._-]+/)
+    .map((word) => word.replace(/[^A-Za-z0-9]/g, ""))
+    .filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return `${words[0][0]}${words[1][0]}`.toUpperCase();
+}
 
 const SECTIONS = [
   {
@@ -227,7 +246,7 @@ function Avatar({
       )}
       style={{ backgroundColor: BRAND }}
     >
-      {initials(name)}
+      {consultationInitials(name)}
     </span>
   );
 }
@@ -734,14 +753,42 @@ function AssignedUsersEditForm({
   );
 }
 
+function HeaderMenuRow({
+  icon: Icon,
+  label,
+  onClick,
+  danger,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] hover:bg-slate-50",
+        danger ? "text-rose-600" : "text-slate-700",
+      )}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+    </button>
+  );
+}
+
 export function ConsultationOverview({
   page,
   onClose,
   onSaved,
+  onRefresh,
 }: {
   page: BookingPage;
   onClose: () => void;
   onSaved: (page: BookingPage) => void;
+  onRefresh?: () => void;
 }) {
   const [section, setSection] = useState<OverviewSection>("details");
   const [availabilityPanel, setAvailabilityPanel] =
@@ -752,7 +799,20 @@ export function ConsultationOverview({
   const [owners, setOwners] = useState<AssignableOwner[]>(() =>
     listAssignableOwnersLocal(),
   );
-  const mode = consultationModeLabel(page.consultationMode) || "One-to-One";
+  const mode = consultationModeLabel(page.consultationMode) || "One on One";
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onDoc(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuOpen]);
   const people = page.consultants?.length ? page.consultants : [page.owner];
   const paid = (page.price ?? 0) > 0;
   const current = SECTIONS.find((item) => item.id === section) ?? SECTIONS[0];
@@ -791,6 +851,18 @@ export function ConsultationOverview({
   }, [owners, people]);
 
   useEffect(() => {
+    const stored = listBookingPages().find(
+      (item) =>
+        item.id === page.id ||
+        (page.crmEventTypeId && item.crmEventTypeId === page.crmEventTypeId) ||
+        item.slug === page.slug,
+    );
+    const storedCount = stored?.consultants?.filter(Boolean).length ?? 0;
+    const currentCount = page.consultants?.filter(Boolean).length ?? 0;
+    if (currentCount > storedCount) upsertBookingPage(page);
+  }, [page]);
+
+  useEffect(() => {
     let alive = true;
     void loadWorkspaceConsultants()
       .then((rows) => {
@@ -803,32 +875,104 @@ export function ConsultationOverview({
   }, []);
 
   return (
-    <div className="-mx-3 -mt-4 flex min-h-0 flex-1 flex-col bg-[#F7F8FA] sm:-mx-5 sm:-mt-5 lg:-mx-7">
-      <header className="grid h-16 shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center border-b border-[#E5E7EB] bg-white px-4 lg:px-6">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-[#E4E0EE] bg-white shadow-[0_1px_2px_rgba(90,50,163,0.06)]">
+      <div className="h-[3px] shrink-0 bg-[#6A43A0]" />
+      <header className="flex h-[68px] shrink-0 items-center justify-between gap-4 border-b border-[#EEEAF4] bg-white px-5">
         <div className="flex min-w-0 items-center gap-3">
-          <Avatar name={page.title} cover={page.coverImageUrl} size="sm" />
-          <div className="flex h-10 min-w-0 flex-col justify-center">
-            <p className="truncate text-[14px] leading-5 font-semibold text-slate-900">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#C9BDF0] bg-[#B3A6EB] text-[13px] font-bold tracking-wide text-[#4E3A78]">
+            {consultationInitials(page.title)}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-[15px] leading-5 font-bold text-slate-900">
               {page.title}
             </p>
-            <p className="truncate text-[12px] leading-4 text-slate-500">
-              {mode}
-            </p>
+            <p className="truncate text-[12px] leading-4 text-slate-500">{mode}</p>
           </div>
         </div>
-        <div className="flex h-10 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5">
           <button
             type="button"
             onClick={() => setShareOpen(true)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#5A32A3]/40 bg-white px-3 text-[13px] font-semibold text-[#5A32A3] hover:bg-[#F6F1FC]"
           >
-            <Share2 className="h-4 w-4" />
+            <Share2 className="h-3.5 w-3.5" />
             Share
           </button>
+          <div className="relative" ref={menuRef}>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+              aria-label="More actions"
+              aria-expanded={menuOpen}
+            >
+              <MoreVertical className="h-4 w-4" />
+            </button>
+            {menuOpen ? (
+              <div className="absolute top-9 right-0 z-30 w-44 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white py-1 shadow-[0_8px_24px_rgba(15,23,42,0.12)]">
+                <HeaderMenuRow
+                  icon={ExternalLink}
+                  label="Booking page"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    window.open(publicBookUrl(page.slug), "_blank", "noopener");
+                  }}
+                />
+                <HeaderMenuRow
+                  icon={Copy}
+                  label="Make a copy"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    upsertBookingPage({
+                      ...page,
+                      id: nextBookingPageId(),
+                      title: `${page.title} (copy)`,
+                      slug: `${page.slug}-copy`.slice(0, 48),
+                      crmEventTypeId: undefined,
+                      views: 0,
+                      bookingsCount: 0,
+                      createdAt: new Date().toLocaleDateString("en-GB"),
+                    });
+                    onRefresh?.();
+                  }}
+                />
+                <HeaderMenuRow
+                  icon={FolderInput}
+                  label="Move"
+                  onClick={() => {
+                    const next =
+                      page.status === "Live"
+                        ? window.confirm("Move this consultation to Draft?")
+                          ? "Draft"
+                          : null
+                        : window.confirm("Move this consultation to Active?")
+                          ? "Live"
+                          : null;
+                    if (!next) return;
+                    setMenuOpen(false);
+                    onSaved({ ...page, status: next });
+                  }}
+                />
+                <HeaderMenuRow
+                  icon={Trash2}
+                  label="Delete"
+                  danger
+                  onClick={() => {
+                    if (!window.confirm(`Delete “${page.title}”?`)) return;
+                    deleteBookingPage(page.id);
+                    setMenuOpen(false);
+                    onRefresh?.();
+                    onClose();
+                  }}
+                />
+              </div>
+            ) : null}
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800"
             aria-label="Close"
           >
             <X className="h-4 w-4" />
@@ -836,9 +980,9 @@ export function ConsultationOverview({
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden p-4 lg:flex-row lg:p-6">
-        <aside className="flex min-h-0 w-full shrink-0 flex-col lg:h-full lg:max-h-full lg:w-[280px]">
-          <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border border-[#E5E7EB] bg-white p-2 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        <aside className="flex min-h-0 w-full shrink-0 flex-col border-b border-[#EEEAF4] lg:h-full lg:max-h-full lg:w-[280px] lg:border-r lg:border-b-0">
+          <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[#FCFAFE] p-2">
             {SECTIONS.map((item) => {
               const Icon = item.icon;
               const active = item.id === section;
@@ -922,7 +1066,7 @@ export function ConsultationOverview({
           </nav>
         </aside>
 
-        <section className="min-h-0 min-w-0 flex-1 overflow-y-auto rounded-xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+        <section className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-white">
           {section !== "availability" &&
           section !== "notify" &&
           section !== "form" ? (
@@ -977,11 +1121,14 @@ export function ConsultationOverview({
 
           {section === "details" && editing !== "details" ? (
             <div className="px-5 py-5">
-              <div className="mb-6 flex items-center gap-3">
+              <div className="mb-6 flex items-center gap-3 rounded-xl border border-[#E4E0EE] bg-[#FCFAFE] px-4 py-3">
                 <Avatar name={page.title} cover={page.coverImageUrl} />
-                <p className="text-[16px] font-bold text-slate-900">
-                  {page.title}
-                </p>
+                <div className="min-w-0">
+                  <p className="truncate text-[16px] font-bold text-slate-900">
+                    {page.title}
+                  </p>
+                  <p className="truncate text-[12px] text-slate-500">{mode}</p>
+                </div>
               </div>
               <div className="grid grid-cols-1 gap-x-12 gap-y-6 sm:grid-cols-2">
                 <Field label="Event Type Name">{page.title}</Field>
@@ -993,9 +1140,7 @@ export function ConsultationOverview({
                 </Field>
                 <Field label="Payment Type">{paid ? "Paid" : "Free"}</Field>
                 <Field label="Payment Mode">{paymentMode(page)}</Field>
-                <Field label="Meeting Mode">
-                  {meetingModeLabel(page.meetingMode) || "—"}
-                </Field>
+                <Field label="Meeting Mode">{paymentMode(page)}</Field>
                 <Field label="Visibility">
                   {publicLabel ? "Public" : "Private"}
                 </Field>
@@ -1120,7 +1265,7 @@ export function ConsultationOverview({
             <BookingFormStep
               key={page.id}
               embedded
-              initial={bookingFormFromQuestions(page.questions)}
+              initial={bookingFormFromQuestions(page.questions, page)}
               onNext={(values) => {
                 onSaved({
                   ...page,
@@ -1130,13 +1275,20 @@ export function ConsultationOverview({
                       id: field.id,
                       label: field.label,
                       required: field.required,
+                      fieldType: field.type,
+                      ephi: field.ephi,
+                      options: field.options,
+                      addressParts: field.addressParts,
                     })),
+                  termsEnabled: values.terms,
+                  termsHtml: values.termsText,
                   confirmationTemplate: values.freeButton,
                 });
               }}
             />
           ) : null}
         </section>
+      </div>
       </div>
 
       {shareOpen ? (

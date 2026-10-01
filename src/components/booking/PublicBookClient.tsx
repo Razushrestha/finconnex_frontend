@@ -146,10 +146,14 @@ function BookFlow({
   const [answers, setAnswers] = useState<Record<string, string>>(
     existing?.answers ?? {},
   );
+  const [addressValues, setAddressValues] = useState<
+    Record<string, Record<string, string>>
+  >({});
   const [manageToken, setManageToken] = useState("");
   const [confirmed, setConfirmed] = useState<Booking | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [crmSlots, setCrmSlots] = useState<string[]>([]);
   const [crmSlotDays, setCrmSlotDays] = useState<Set<string>>(new Set());
@@ -292,8 +296,25 @@ function BookFlow({
     if (!name.trim()) next.name = "Required";
     if (!email.trim() || !email.includes("@")) next.email = "Valid email required";
     if (!phone.trim()) next.phone = "Required";
+    const today = toLocalDateStr(new Date());
     for (const q of extraGuestQuestions(page.questions)) {
-      if (q.required && !answers[q.id]?.trim()) next[q.id] = "Required";
+      if (q.fieldType === "date" && answers[q.id] && answers[q.id] < today) {
+        next[q.id] = "Choose today or a future date.";
+        continue;
+      }
+      if (!q.required) continue;
+      if (q.fieldType === "address") {
+        const parts = enabledAddressParts(q);
+        const missing = parts.some(
+          (part) => !addressValues[q.id]?.[part.id]?.trim(),
+        );
+        if (missing) next[q.id] = "Required";
+        continue;
+      }
+      if (!answers[q.id]?.trim()) next[q.id] = "Required";
+    }
+    if (page.termsEnabled && !acceptedTerms) {
+      next.terms = "Please accept the terms and conditions.";
     }
     setErrors(next);
     if (Object.keys(next).length) return;
@@ -691,18 +712,59 @@ function BookFlow({
                   />
                 </div>
                 {extraGuestQuestions(page.questions).map((q) => (
-                  <Field
+                  <GuestQuestion
                     key={q.id}
-                    label={q.label}
-                    required={q.required}
-                    error={errors[q.id]}
+                    question={q}
                     value={answers[q.id] ?? ""}
-                    onChange={(v) =>
-                      setAnswers((prev) => ({ ...prev, [q.id]: v }))
+                    error={errors[q.id]}
+                    addressValue={addressValues[q.id] ?? {}}
+                    onChange={(value) =>
+                      setAnswers((prev) => ({ ...prev, [q.id]: value }))
                     }
-                    placeholder={q.label}
+                    onAddressChange={(partId, partValue) => {
+                      setAddressValues((prev) => {
+                        const nextParts = {
+                          ...(prev[q.id] ?? {}),
+                          [partId]: partValue,
+                        };
+                        const joined = enabledAddressParts(q)
+                          .map((item) => nextParts[item.id]?.trim())
+                          .filter(Boolean)
+                          .join(", ");
+                        setAnswers((current) => ({ ...current, [q.id]: joined }));
+                        return { ...prev, [q.id]: nextParts };
+                      });
+                    }}
                   />
                 ))}
+                {page.termsEnabled ? (
+                  <div>
+                    <label className="flex items-start gap-2 text-[13px] leading-5 text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={acceptedTerms}
+                        onChange={(e) => setAcceptedTerms(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 accent-[#5A32A3]"
+                      />
+                      <span
+                        className="[&_a]:underline [&_b]:font-bold [&_strong]:font-bold"
+                        onClick={(event) => {
+                          const anchor = (event.target as HTMLElement).closest("a");
+                          const href = anchor?.getAttribute("href") || "";
+                          if (anchor && (!href || href === "#")) event.preventDefault();
+                        }}
+                        dangerouslySetInnerHTML={{
+                          __html: safeTermsHtml(page.termsHtml),
+                        }}
+                      />
+                    </label>
+                    {errors.terms ? (
+                      <p className="mt-1 text-[12px] font-medium text-rose-600">
+                        {errors.terms}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
                 {errors.form ? (
                   <p className="text-[13px] font-medium text-rose-600">{errors.form}</p>
                 ) : null}
@@ -909,6 +971,8 @@ function Field({
   error,
   type = "text",
   required = false,
+  inputMode,
+  hint,
 }: {
   label: string;
   value: string;
@@ -917,6 +981,8 @@ function Field({
   error?: string;
   type?: string;
   required?: boolean;
+  inputMode?: "numeric" | "text";
+  hint?: string;
 }) {
   return (
     <div>
@@ -926,6 +992,7 @@ function Field({
       </label>
       <input
         type={type}
+        inputMode={inputMode}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
@@ -936,6 +1003,9 @@ function Field({
             : "border-slate-200 hover:border-violet-300 focus:border-[#5B4BDB] focus:shadow-[0_0_0_3px_rgba(91,75,219,0.12)]",
         )}
       />
+      {hint ? (
+        <p className="mt-1 text-[12px] italic text-slate-500">{hint}</p>
+      ) : null}
       {error ? (
         <p className="mt-0.5 text-[10px] font-medium text-rose-500">{error}</p>
       ) : null}
@@ -1038,25 +1108,258 @@ function PhoneNumberField({
   );
 }
 
-function extraGuestQuestions(
-  questions: { id: string; label: string; required?: boolean }[],
-) {
+function safeTermsHtml(html: string | undefined) {
+  const source = (html || "").trim();
+  if (!source) return "I have read and agree to your terms and conditions.";
+  return source
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/javascript:/gi, "");
+}
+
+function extraGuestQuestions<
+  T extends { id: string; label: string; required?: boolean },
+>(questions: T[]) {
   return questions.filter((question) => {
     const id = question.id.trim().toLowerCase();
-    const label = question.label.trim().toLowerCase();
-    if (["name", "email", "phone", "guests", "contact"].includes(id)) {
-      return false;
-    }
-    if (
-      label === "name" ||
-      label === "email" ||
-      label === "contact number" ||
-      label.startsWith("invite guest")
-    ) {
-      return false;
-    }
-    return true;
+    return !["name", "email", "phone", "guests", "contact"].includes(id);
   });
+}
+
+function enabledAddressParts(question: {
+  addressParts?: { id: string; label: string; enabled: boolean }[];
+}) {
+  const parts = (question.addressParts ?? []).filter((part) => part.enabled);
+  return parts.length
+    ? parts
+    : [{ id: "line1", label: "Address Line 1", enabled: true }];
+}
+
+function GuestQuestion({
+  question,
+  value,
+  error,
+  addressValue,
+  onChange,
+  onAddressChange,
+}: {
+  question: {
+    id: string;
+    label: string;
+    required?: boolean;
+    fieldType?: string;
+    options?: string[];
+    addressParts?: { id: string; label: string; enabled: boolean }[];
+  };
+  value: string;
+  error?: string;
+  addressValue: Record<string, string>;
+  onChange: (value: string) => void;
+  onAddressChange: (partId: string, value: string) => void;
+}) {
+  const label = (
+    <span className="mb-1.5 block text-[13px] font-medium text-slate-800">
+      {question.label}
+      {question.required ? <span className="text-rose-500"> *</span> : null}
+    </span>
+  );
+  const inputClass =
+    "h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 hover:border-violet-300 focus:border-[#5B4BDB] focus:shadow-[0_0_0_3px_rgba(91,75,219,0.12)]";
+
+  if (question.fieldType === "dropdown" && question.options?.length) {
+    return (
+      <label className="block">
+        {label}
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className={inputClass}
+        >
+          <option value="">Select</option>
+          {question.options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+        {error ? <FieldError message={error} /> : null}
+      </label>
+    );
+  }
+
+  if (question.fieldType === "radio" && question.options?.length) {
+    return (
+      <div>
+        {label}
+        <div className="space-y-2">
+          {question.options.map((option) => (
+            <label
+              key={option}
+              className="flex items-center gap-2 text-[13px] text-slate-700"
+            >
+              <input
+                type="radio"
+                name={question.id}
+                checked={value === option}
+                onChange={() => onChange(option)}
+                className="h-4 w-4"
+              />
+              {option}
+            </label>
+          ))}
+        </div>
+        {error ? <FieldError message={error} /> : null}
+      </div>
+    );
+  }
+
+  if (question.fieldType === "checkbox") {
+    const options = question.options?.filter(Boolean) ?? [];
+    if (options.length) {
+      const selected = new Set(
+        value
+          .split(", ")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      );
+      return (
+        <div>
+          {label}
+          <div className="space-y-2">
+            {options.map((option) => (
+              <label
+                key={option}
+                className="flex items-center gap-2 text-[13px] text-slate-700"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(option)}
+                  onChange={() => {
+                    const next = new Set(selected);
+                    if (next.has(option)) next.delete(option);
+                    else next.add(option);
+                    onChange([...next].join(", "));
+                  }}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                {option}
+              </label>
+            ))}
+          </div>
+          {error ? <FieldError message={error} /> : null}
+        </div>
+      );
+    }
+    return (
+      <label className="flex items-center gap-2 text-[13px] text-slate-800">
+        <input
+          type="checkbox"
+          checked={value === "yes"}
+          onChange={(e) => onChange(e.target.checked ? "yes" : "")}
+          className="h-4 w-4 rounded border-slate-300"
+        />
+        <span>
+          {question.label}
+          {question.required ? <span className="text-rose-500"> *</span> : null}
+        </span>
+      </label>
+    );
+  }
+
+  if (question.fieldType === "address") {
+    return (
+      <div className="space-y-2">
+        {label}
+        {enabledAddressParts(question).map((part) => (
+          <input
+            key={part.id}
+            value={addressValue[part.id] ?? ""}
+            placeholder={part.label}
+            onChange={(e) => onAddressChange(part.id, e.target.value)}
+            className={inputClass}
+          />
+        ))}
+        {error ? <FieldError message={error} /> : null}
+      </div>
+    );
+  }
+
+  if (question.fieldType === "date") {
+    return (
+      <div>
+        {label}
+        <div className="relative">
+          <Calendar className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="date"
+            min={toLocalDateStr(new Date())}
+            value={value}
+            onChange={(e) => {
+              const next = e.target.value;
+              if (next && next < toLocalDateStr(new Date())) return;
+              onChange(next);
+            }}
+            className={cn(
+              inputClass,
+              "pr-3 pl-10 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0",
+              !value && "text-transparent",
+            )}
+          />
+          {!value ? (
+            <span className="pointer-events-none absolute top-1/2 left-10 -translate-y-1/2 text-[13px] text-slate-400">
+              Select Date
+            </span>
+          ) : null}
+        </div>
+        {error ? <FieldError message={error} /> : null}
+      </div>
+    );
+  }
+
+  if (question.fieldType === "multiline") {
+    return (
+      <label className="block">
+        {label}
+        <textarea
+          value={value}
+          rows={3}
+          placeholder={question.label}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 outline-none placeholder:text-slate-400 hover:border-violet-300 focus:border-[#5B4BDB] focus:shadow-[0_0_0_3px_rgba(91,75,219,0.12)]"
+        />
+        {error ? <FieldError message={error} /> : null}
+      </label>
+    );
+  }
+
+  return (
+    <Field
+      label={question.label}
+      required={question.required}
+      error={error}
+      value={value}
+      onChange={(next) =>
+        onChange(
+          question.fieldType === "number"
+            ? next.replace(/\D/g, "").slice(0, 9)
+            : next,
+        )
+      }
+      placeholder={question.fieldType === "number" ? undefined : question.label}
+      type={question.fieldType === "email" ? "email" : "text"}
+      inputMode={question.fieldType === "number" ? "numeric" : undefined}
+      hint={
+        question.fieldType === "number"
+          ? "This field allows numeric input only, with a maximum limit of 9 digits."
+          : undefined
+      }
+    />
+  );
+}
+
+function FieldError({ message }: { message: string }) {
+  return <p className="mt-1 text-[12px] font-medium text-rose-600">{message}</p>;
 }
 
 function dialCodeForTimezone(tz: string) {

@@ -151,7 +151,6 @@ export function NewBookingModal({
   onCreated: (row?: DashboardAppointment) => void;
 }) {
   const [recordTick, setRecordTick] = useState(0);
-  const [contactsLoading, setContactsLoading] = useState(false);
   const contacts = useMemo(() => listAllContacts(), [open, recordTick]);
   const applicantOptions = useMemo(
     () => liveRelatedRecords("Contact"),
@@ -199,13 +198,11 @@ export function NewBookingModal({
     setError("");
     setErrorField("");
     let alive = true;
-    setContactsLoading(true);
     void fetchCrmRelatedRecords("Contact")
       .catch(() => [])
       .finally(() => {
         if (!alive) return;
         setRecordTick((tick) => tick + 1);
-        setContactsLoading(false);
       });
     void Promise.all([
       Promise.resolve(listBookingPages()),
@@ -296,28 +293,6 @@ export function NewBookingModal({
   const { options: relatedOptions, loading: relatedLoading } =
     useCrmRelatedRecords(open ? relatedKind : "", relatedExtra);
 
-  useEffect(() => {
-    if (!open) return;
-    if (relatedKind === "Contact" && relatedRecordId) {
-      setClientId(relatedRecordId);
-    }
-  }, [open, relatedKind, relatedRecordId]);
-
-  useEffect(() => {
-    if (!open || contactsLoading) return;
-    if (clientId && contacts.some((row) => row.id === clientId)) return;
-    if (relatedKind === "Contact" && relatedRecordId) return;
-    const first = contacts[0];
-    if (first) setClientId(first.id);
-  }, [
-    open,
-    contacts,
-    contactsLoading,
-    clientId,
-    relatedKind,
-    relatedRecordId,
-  ]);
-
   if (!open) return null;
 
   const defaultHostLabel = calendarDefaultHost(calendar);
@@ -340,14 +315,27 @@ export function NewBookingModal({
         ? defaultHostLabel
         : selectedTeam?.name || consultantId,
     ) || "Host";
+  const assignedHosts = (assignedMembers.length ? assignedMembers : [hostName])
+    .map((label) => {
+      const owner =
+        owners.find((row) => row.id === label) ??
+        owners.find((row) => row.name === label);
+      const name = displayOwnerName(owner, label) || label;
+      return { id: owner?.id || label, name };
+    })
+    .filter(
+      (row, index, list) =>
+        row.name.trim() && list.findIndex((item) => item.name === row.name) === index,
+    );
   const client =
     findContactById(clientId)?.contact ??
     contacts.find((c) => c.id === clientId) ??
     null;
-  const clientName =
+  const selectedContactName =
     client?.name?.trim() ||
     applicantOptions.find((row) => row.id === clientId)?.name?.trim() ||
     "";
+  const clientName = calendar?.title?.trim() || selectedContactName;
   const guests = contacts.filter((c) => guestIds.includes(c.id));
   function applyCalendar(id: string, page?: BookingPage) {
     const next = page ?? calendars.find((item) => item.id === id);
@@ -408,7 +396,7 @@ export function NewBookingModal({
       showFormError("Choose or add a related record", "relatedName");
       return;
     }
-    if (!client) {
+    if (!clientName) {
       showFormError("Choose a main applicant", "client");
       return;
     }
@@ -928,14 +916,14 @@ export function NewBookingModal({
                 <Users className="h-4 w-4" />
                 Attendees
                 <span className="rounded-full bg-slate-100 px-1.5 text-[11px]">
-                  {1 + guests.length}
+                  {(clientName ? 1 : 0) + assignedHosts.length + guests.length}
                 </span>
               </p>
             </div>
 
-            {client || clientName ? (
+            {clientName ? (
               <AttendeeCard
-                name={clientName || "Main applicant"}
+                name={clientName}
                 role="Main Applicant"
                 slot={slot}
                 dateLabel={prettyDate(date)}
@@ -943,13 +931,16 @@ export function NewBookingModal({
                 onRemove={undefined}
               />
             ) : null}
-            <AttendeeCard
-              name={hostName || "Host"}
-              role="Host"
-              slot={slot}
-              dateLabel={prettyDate(date)}
-              timezone={timezone}
-            />
+            {assignedHosts.map((host) => (
+              <AttendeeCard
+                key={host.id}
+                name={host.name}
+                role="Host"
+                slot={slot}
+                dateLabel={prettyDate(date)}
+                timezone={timezone}
+              />
+            ))}
             {guests.map((guest) => (
               <AttendeeCard
                 key={guest.id}
@@ -963,53 +954,6 @@ export function NewBookingModal({
                 }
               />
             ))}
-
-            <Field
-              label="Main applicant"
-              invalid={errorField === "client"}
-              error={errorField === "client" ? error : undefined}
-            >
-              <RelatedRecordCombobox
-                value={clientName}
-                onChange={(name) => {
-                  if (errorField === "client") {
-                    setError("");
-                    setErrorField("");
-                  }
-                  if (!name.trim()) {
-                    setClientId("");
-                    return;
-                  }
-                  const match = contacts.find(
-                    (row) =>
-                      (row.name ?? "").trim().toLowerCase() ===
-                      name.trim().toLowerCase(),
-                  );
-                  if (match) setClientId(match.id);
-                }}
-                onSelectOption={(option) => {
-                  setClientId(option?.id ?? "");
-                  if (relatedKind === "Contact" && option) {
-                    setRelatedName(option.name);
-                    setRelatedRecordId(option.id ?? "");
-                  }
-                }}
-                options={applicantOptions}
-                placeholder={
-                  contactsLoading
-                    ? "Loading contacts…"
-                    : "Search main applicant…"
-                }
-                allowCustom
-                createLabel={(name) => `Add contact “${name}”`}
-                onCreateOption={(name) => {
-                  void createQuickContact(name).then((created) => {
-                    setClientId(created.id);
-                    setRecordTick((tick) => tick + 1);
-                  });
-                }}
-              />
-            </Field>
 
             {addingGuest ? (
               <Field label="Add guest">

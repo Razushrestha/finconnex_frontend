@@ -606,7 +606,7 @@ export function ConsultationNotifyPanel({
               {notifyBlurb(panel, who)}
             </p>
             <div ref={menuRef} className="mt-3 flex flex-wrap gap-3">
-              {STAGE_TILES.map((tile) => {
+              {STAGE_TILES.map((tile, index) => {
                 const Icon = tile.icon;
                 const on = tileOn(tile.id);
                 return (
@@ -640,7 +640,12 @@ export function ConsultationNotifyPanel({
                     </button>
                     ) : null}
                     {menuId === tile.id ? (
-                      <div className="absolute right-0 top-8 z-20 w-40 overflow-hidden rounded-lg border border-[#E5E7EB] bg-white py-1 shadow-lg">
+                      <div
+                        className={cn(
+                          "absolute top-full z-30 mt-1 w-40 overflow-hidden rounded-lg border border-[#E5E7EB] bg-white py-1 shadow-lg",
+                          index >= STAGE_TILES.length - 2 ? "right-0" : "left-0",
+                        )}
+                      >
                         <button
                           type="button"
                           className="block w-full px-3 py-1.5 text-left text-[12px] text-slate-700 hover:bg-[#F3ECFB]"
