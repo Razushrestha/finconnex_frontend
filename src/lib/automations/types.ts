@@ -954,7 +954,93 @@ export type AutomationRun = {
   startedAt?: string | null;
   completedAt?: string | null;
   createdAt?: string;
+  /** Which of the version's triggers started it; absent on old runs. */
+  triggerKey?: string | null;
+  /** Started from the builder's Test Workflow button against a dummy record. */
+  isTest?: boolean;
 };
+
+/**
+ * What a test step did differently from a live run, as the backend records
+ * it on the step: who a send or assignment went to instead, or why the step
+ * was skipped.
+ */
+export type AutomationStepTestNote = {
+  skipped?: "WAIT" | "WEBHOOK" | "TRIGGER_AUTOMATION" | "REAL_RECORD" | "NO_TESTER_PHONE" | string;
+  redirectedTo?: string;
+  wouldHaveSentTo?: string | null;
+  assignedTo?: string;
+  wouldHaveAssigned?: string | string[] | null;
+  ownerSetTo?: string;
+  wouldHaveOwned?: string | null;
+  requestedBy?: string;
+  wouldHaveRequestedBy?: string | null;
+  participantsLeftOut?: number;
+  attendeesLeftOut?: number;
+  wouldWaitMs?: number;
+  until?: string;
+  host?: string | null;
+  recordId?: string;
+};
+
+/** One step of a run, as the per-trigger run log returns it. */
+export type AutomationRunLogStep = {
+  id: string;
+  stepKey: string;
+  stepIndex: number;
+  stepType: string;
+  actionType: string | null;
+  status: string;
+  errorCategory: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  test: AutomationStepTestNote | null;
+  /** Which way an If / Else step went. */
+  branch: "then" | "else" | string | null;
+};
+
+/** One run in a trigger's run log, newest first. */
+export type AutomationRunLogEntry = {
+  id: string;
+  status: AutomationRunStatus | string;
+  triggerKey: string | null;
+  triggerEntityType: string;
+  triggerEntityId: string;
+  errorCategory: string | null;
+  isTest: boolean;
+  /** When a test's dummy data is (or was) deleted. */
+  testDataExpiresAt: string | null;
+  testDataPurgedAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** The dummy record's fields as the trigger saw them; tests only. */
+  testData: Record<string, unknown> | null;
+  steps: AutomationRunLogStep[];
+};
+
+export type AutomationTestRunStarted = {
+  runId: string;
+  triggerKey: string;
+  entityType: AutomationEntityType;
+  entityId: string;
+  expiresAt: string;
+  testData: Record<string, unknown>;
+};
+
+/**
+ * Record types the backend can fabricate a dummy of for a test run. Mirrors
+ * TEST_RUN_ENTITY_TYPES in the backend's automation-test-data.service.ts;
+ * triggers on anything else fall back to a dry run.
+ */
+export const TEST_RUN_ENTITY_TYPES: readonly AutomationEntityType[] = [
+  "LEAD",
+  "CONTACT",
+  "COMPANY",
+  "DEAL",
+  "TASK",
+];
 
 /** A folder on the workflows list. Folders nest through `parentId`. */
 export type AutomationFolder = {
@@ -1013,6 +1099,7 @@ export function runStatusColor(status: string): string {
     case "CANCELLED":
     case "CANCELLING":
     case "ROLLED_BACK":
+    case "SKIPPED":
       return "bg-slate-100 text-slate-600 border-slate-200";
     default:
       return "bg-amber-50 text-amber-700 border-amber-200";

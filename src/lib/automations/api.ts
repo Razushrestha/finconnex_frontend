@@ -3,8 +3,11 @@ import type {
   Automation,
   AutomationFolder,
   AutomationRun,
+  AutomationRunLogEntry,
+  AutomationTestRunStarted,
   CreateAutomationInput,
 } from "./types";
+import { fromLegacyRun } from "./run-log";
 
 export function automationsPath(suffix = ""): string {
   return `/v1/automations${suffix}`;
@@ -270,6 +273,75 @@ export async function listAutomationRuns(
     })}`,
   );
   return extractList<AutomationRun>(data);
+}
+
+/**
+ * Nest's answer for a route the server does not have — the frontend is ahead
+ * of the backend it is pointed at.
+ */
+export function isMissingRouteError(error: unknown): boolean {
+  return error instanceof Error && /Cannot (GET|POST|PATCH|PUT|DELETE) \/v1\//.test(error.message);
+}
+
+export type TriggerRunPage = {
+  items: AutomationRunLogEntry[];
+  total: number;
+  hasMore: boolean;
+  /** False when the server predates the run log and `total` is a floor. */
+  exact: boolean;
+};
+
+/** One trigger's runs, newest first, each with its steps; test runs included. */
+export async function listTriggerRuns(
+  automationId: string,
+  triggerKey: string,
+  query: { page?: number; limit?: number } = {},
+): Promise<TriggerRunPage> {
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 20;
+  try {
+    const data = await automationsRequest(
+      `/${automationId}/triggers/${encodeURIComponent(triggerKey)}/runs${toQuery({ page, limit })}`,
+    );
+    const { items, total } = extractList<AutomationRunLogEntry>(data);
+    return { items, total, hasMore: page * limit < total, exact: true };
+  } catch (error) {
+    if (!isMissingRouteError(error)) throw error;
+    return legacyTriggerRuns(automationId, triggerKey, page);
+  }
+}
+
+/**
+ * A server without the per-trigger endpoint still lists the workflow's runs,
+ * steps included, so filter those by trigger here. Pages are read 100 runs
+ * at a time — the most the endpoint allows — and only this trigger's are kept.
+ */
+async function legacyTriggerRuns(
+  automationId: string,
+  triggerKey: string,
+  page: number,
+): Promise<TriggerRunPage> {
+  const limit = 100;
+  const data = await automationsRequest(`/${automationId}/runs${toQuery({ page, limit })}`);
+  const { items, total } = extractList<Record<string, unknown>>(data);
+  const mine = items.filter((run) => run.triggerKey === triggerKey).map(fromLegacyRun);
+  const hasMore = page * limit < total;
+  return { items: mine, total: (page - 1) * limit + mine.length, hasMore, exact: false };
+}
+
+/**
+ * Runs the workflow's latest version for real against a dummy record that
+ * matches one trigger. Sends go only to the caller; the dummy data is deleted
+ * two minutes later and the run stays in the log.
+ */
+export async function startAutomationTestRun(
+  automationId: string,
+  input: { triggerKey?: string } = {},
+): Promise<AutomationTestRunStarted> {
+  return automationsRequest(`/${automationId}/test-runs`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  }) as Promise<AutomationTestRunStarted>;
 }
 
 export async function retryAutomationRun(runId: string): Promise<unknown> {

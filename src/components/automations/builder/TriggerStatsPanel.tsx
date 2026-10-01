@@ -9,6 +9,7 @@ import {
 } from "@/lib/automations/types";
 
 import { SlideOverPanel } from "./SlideOverPanel";
+import { TriggerRunLog } from "./TriggerRunLog";
 
 /**
  * How often one entry point actually started the workflow.
@@ -22,7 +23,9 @@ import { SlideOverPanel } from "./SlideOverPanel";
 export function TriggerStatsPanel({
   trigger,
   stats,
-  saved,
+  automationId,
+  refreshKey,
+  expandRunId,
   onClose,
 }: {
   trigger: {
@@ -31,10 +34,15 @@ export function TriggerStatsPanel({
     entityType: AutomationEntityType;
   };
   stats?: AutomationTriggerStats;
-  /** A workflow that has never been saved has no runs to report. */
-  saved: boolean;
+  /** Null until the workflow is first saved; an unsaved one has no runs. */
+  automationId: string | null;
+  /** Bumped after a test starts so the run log picks it up at once. */
+  refreshKey?: number;
+  /** The run to open in the log — the test that was just started. */
+  expandRunId?: string | null;
   onClose: () => void;
 }) {
+  const saved = Boolean(automationId);
   const meta = trigger.type ? TRIGGER_CATALOG[trigger.type] : null;
   const byStatus = Object.entries(stats?.byStatus ?? {}).sort(
     ([, a], [, b]) => (b ?? 0) - (a ?? 0)
@@ -46,10 +54,12 @@ export function TriggerStatsPanel({
       title="Trigger stats"
       subtitle={meta ? meta.label : "Trigger not chosen yet"}
       onClose={onClose}
+      className="max-w-lg"
     >
       {!saved || !trigger.type ? (
         <p className="text-sm text-slate-500">
-          Save and publish this workflow to start collecting runs for this trigger.
+          Save this workflow to test it. Runs appear here once it is saved and this
+          trigger fires, or when you press Test Workflow.
         </p>
       ) : (
         <div className="space-y-5">
@@ -85,9 +95,25 @@ export function TriggerStatsPanel({
           )}
 
           <p className="text-xs text-slate-400">
-            Counts cover every run of this workflow, including ones started by earlier
-            versions of this trigger.
+            Counts cover every real run of this workflow, including ones started by
+            earlier versions of this trigger. Test runs appear in the log below but are
+            not counted.
           </p>
+
+          {automationId && (
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Run log
+              </h3>
+              <TriggerRunLog
+                key={trigger.key}
+                automationId={automationId}
+                triggerKey={trigger.key}
+                refreshKey={refreshKey}
+                expandRunId={expandRunId}
+              />
+            </div>
+          )}
         </div>
       )}
     </SlideOverPanel>

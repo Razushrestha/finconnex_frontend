@@ -13,6 +13,13 @@ import "@xyflow/react/dist/style.css";
 import { ChevronLeft, Loader2, Play, Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -21,7 +28,9 @@ import {
   dryRunAutomation,
   enableAutomation,
   getAutomation,
+  isMissingRouteError,
   publishAutomationVersion,
+  startAutomationTestRun,
   updateAutomationDraft,
 } from "@/lib/automations/api";
 import {
@@ -37,6 +46,7 @@ import {
   updateStepAtPath,
 } from "@/lib/automations/step-tree";
 import {
+  TEST_RUN_ENTITY_TYPES,
   TRIGGER_CATALOG,
   type Automation,
   type AutomationActionType,
@@ -213,6 +223,10 @@ function BuilderInner({ id, folderId: initialFolderId }: { id: string; folderId:
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  /** Bumped when a test starts, so an open run log re-reads at once. */
+  const [runLogRefresh, setRunLogRefresh] = useState(0);
+  const [lastTestRunId, setLastTestRunId] = useState<string | null>(null);
   const [panel, setPanel] = useState<PanelState | null>(null);
 
   useEffect(() => {
@@ -557,18 +571,64 @@ function BuilderInner({ id, folderId: initialFolderId }: { id: string; folderId:
     }
   }
 
-  async function handleTest() {
+  /**
+   * Saves, then runs the workflow for real against a dummy record that
+   * matches the chosen trigger. Sends go only to the person testing, and the
+   * dummy data is deleted two minutes later; the run stays in that trigger's
+   * log, which opens so it can be watched step by step.
+   */
+  async function handleTest(index = 0) {
     const savedId = await handleSave();
-    if (!savedId) return;
+    const trigger = triggers[index];
+    if (!savedId || !trigger) return;
+    if (!TEST_RUN_ENTITY_TYPES.includes(trigger.entityType)) {
+      const label = trigger.entityType.toLowerCase().replace(/_/g, " ");
+      await handleDryCheck(savedId, trigger.entityType, `Live tests aren't available for ${label} triggers yet.`);
+      return;
+    }
+    setTesting(true);
+    try {
+      const started = await startAutomationTestRun(savedId, { triggerKey: trigger.key });
+      setLastTestRunId(started.runId);
+      setRunLogRefresh((count) => count + 1);
+      setPanel({ mode: "trigger-stats", index });
+      setTestResult("Test running. Its data is deleted in 2 minutes.");
+      toast.success("Test started. Anything it sends goes only to you.");
+    } catch (err) {
+      if (isMissingRouteError(err)) {
+        // The CRM server hasn't been updated with test runs yet. A dry check
+        // creates nothing, so say plainly that no run will reach the log.
+        toast.warning(
+          "This CRM server doesn't have test runs yet, so nothing was run and nothing will appear in the log. A dry check ran instead.",
+          { duration: 8_000 }
+        );
+        await handleDryCheck(
+          savedId,
+          trigger.entityType,
+          "Live test runs aren't on this CRM server yet."
+        );
+        return;
+      }
+      const message = err instanceof Error ? err.message : "Test failed";
+      setTestResult(`Test couldn't start: ${message}`);
+      toast.error(`Test couldn't start: ${message}`);
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  /** What a trigger whose record type has no test data yet still gets. */
+  async function handleDryCheck(savedId: string, entityType: AutomationEntityType, reason: string) {
     try {
       const result = await dryRunAutomation(savedId, {
-        entityType: primaryEntityType,
+        entityType,
         snapshot: { id: "00000000-0000-0000-0000-000000000000", status: "NEW" },
       });
       setTestResult(
-        result.valid
-          ? `Valid. ${result.plannedSteps.length} step(s) would run for a matching record.`
-          : `Invalid: ${result.errors.join(", ")}`
+        `${reason} Dry check: ` +
+          (result.valid
+            ? `valid, ${result.plannedSteps.length} step(s) would run for a matching record.`
+            : `invalid — ${result.errors.join(", ")}`)
       );
     } catch (err) {
       setTestResult(err instanceof Error ? err.message : "Test failed");
@@ -608,11 +668,42 @@ function BuilderInner({ id, folderId: initialFolderId }: { id: string; folderId:
           />
         </div>
         <div className="flex items-center gap-3">
-          {testResult && <span className="max-w-xs truncate text-xs text-slate-500">{testResult}</span>}
-          <Button variant="outline" size="sm" onClick={handleTest} className="gap-1.5">
-            <Play className="h-3.5 w-3.5" />
-            Test Workflow
-          </Button>
+          {testResult && (
+            <span className="max-w-xs truncate text-xs text-slate-500" title={testResult}>
+              {testResult}
+            </span>
+          )}
+          {triggers.length > 1 ? (
+            // With several entry points the test has to start from one of them.
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                disabled={saving || testing}
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none hover:bg-slate-50 disabled:opacity-50"
+              >
+                {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                Test Workflow
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-56">
+                <DropdownMenuLabel>Test which trigger?</DropdownMenuLabel>
+                {triggers.map((trigger, index) => (
+                  <DropdownMenuItem key={trigger.key} onClick={() => void handleTest(index)}>
+                    {trigger.type ? TRIGGER_CATALOG[trigger.type].label : `Trigger ${index + 1}`}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleTest(0)}
+              disabled={saving || testing}
+              className="gap-1.5"
+            >
+              {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+              Test Workflow
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => void handleSave()} disabled={saving} className="gap-1.5">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             Save
@@ -708,7 +799,9 @@ function BuilderInner({ id, folderId: initialFolderId }: { id: string; folderId:
         <TriggerStatsPanel
           trigger={triggers[panel.index]}
           stats={triggerStats[triggers[panel.index].key]}
-          saved={Boolean(automationId)}
+          automationId={automationId}
+          refreshKey={runLogRefresh}
+          expandRunId={lastTestRunId}
           onClose={() => setPanel(null)}
         />
       )}
