@@ -9,6 +9,7 @@ import {
   type CrmSession,
 } from "@/lib/activity-timeline/auth";
 import { crmBffFetch, crmFetch } from "@/lib/crm/request";
+import { silentRequest } from "@/lib/notify/fetch-notifier";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
 import {
   WEEKDAYS,
@@ -273,12 +274,31 @@ async function bookingCall(suffix: string, init?: RequestInit): Promise<unknown>
   return crmBffFetch(path, init);
 }
 
-function jsonInit(method: string, body?: unknown): RequestInit {
-  return {
+function jsonInit(method: string, body?: unknown, silent = false): RequestInit {
+  const init: RequestInit = {
     method,
     headers: { "Content-Type": "application/json" },
     body: body == null ? undefined : JSON.stringify(body),
   };
+  return silent ? silentRequest(init) : init;
+}
+
+/** Nest `findSlotAt` needs an exact generated slot; arbitrary datetime-local values 409. */
+export class BookingSlotUnavailableError extends Error {
+  constructor(
+    message = "That time is no longer available. Pick another slot and try again.",
+  ) {
+    super(message);
+    this.name = "BookingSlotUnavailableError";
+  }
+}
+
+function slotStartMs(value: string): number {
+  const parsed = Date.parse(value);
+  if (!Number.isNaN(parsed)) return parsed;
+  // Nest sometimes returns "YYYY-MM-DD HH:mm:ss" without a zone.
+  const asUtc = Date.parse(value.replace(" ", "T") + "Z");
+  return Number.isNaN(asUtc) ? NaN : asUtc;
 }
 
 export async function tryCrmBooking<T>(run: () => Promise<T>): Promise<T | null> {
@@ -432,6 +452,8 @@ export function normalizeCrmAvailableSlot(
   row: Record<string, unknown>,
 ): CrmAvailableSlot | null {
   const startTime = pickStr(
+    row.startAt,
+    row.start_at,
     row.startTime,
     row.start_time,
     row.start,
@@ -441,9 +463,57 @@ export function normalizeCrmAvailableSlot(
   if (!startTime) return null;
   return {
     startTime,
-    endTime: pickStr(row.endTime, row.end_time, row.end) || undefined,
+    endTime:
+      pickStr(row.endAt, row.end_at, row.endTime, row.end_time, row.end) ||
+      undefined,
     hostId: pickStr(row.hostId, row.host_id) || undefined,
   };
+}
+
+/** Nest returns `{ days: [{ date, slots: [...] }] }` and requires YYYY-MM-DD. */
+export function extractAvailableSlots(data: unknown): CrmAvailableSlot[] {
+  const root = asRecord(data) ?? {};
+  const days = Array.isArray(root.days) ? root.days : null;
+  if (days) {
+    const slots: CrmAvailableSlot[] = [];
+    for (const day of days) {
+      const rec = asRecord(day);
+      const rows = Array.isArray(rec?.slots) ? rec.slots : [];
+      for (const row of rows) {
+        const slot = normalizeCrmAvailableSlot(asRecord(row) ?? {});
+        if (slot) slots.push(slot);
+      }
+    }
+    if (slots.length) return slots;
+  }
+  return extractRecords(data)
+    .map(normalizeCrmAvailableSlot)
+    .filter((row): row is CrmAvailableSlot => !!row);
+}
+
+function toCrmSlotDate(value: string): string {
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const parsed = Date.parse(trimmed);
+  if (Number.isNaN(parsed)) return trimmed.slice(0, 10);
+  return new Date(parsed).toISOString().slice(0, 10);
+}
+
+export function listCrmAvailableSlots(input: {
+  eventTypeId: string;
+  from: string;
+  to: string;
+  hostId?: string;
+  timezone?: string;
+}): Promise<CrmAvailableSlot[]> {
+  return bookingCall(
+    `/event-types/${input.eventTypeId}/available-slots${toQuery({
+      from: toCrmSlotDate(input.from),
+      to: toCrmSlotDate(input.to),
+      hostId: input.hostId,
+      timezone: input.timezone,
+    })}`,
+  ).then((data) => extractAvailableSlots(data));
 }
 
 export function normalizeCrmBooking(
@@ -887,29 +957,17 @@ export function crmEventTypeIdOf(page: {
   return isUuid(id) ? id : "";
 }
 
-export function listCrmAvailableSlots(input: {
-  eventTypeId: string;
-  from: string;
-  to: string;
-  hostId?: string;
-  timezone?: string;
-}): Promise<CrmAvailableSlot[]> {
-  return bookingCall(
-    `/event-types/${input.eventTypeId}/available-slots${toQuery({
-      from: input.from,
-      to: input.to,
-      hostId: input.hostId,
-      timezone: input.timezone,
-    })}`,
-  ).then((data) =>
-    extractRecords(data)
-      .map(normalizeCrmAvailableSlot)
-      .filter((row): row is CrmAvailableSlot => !!row),
+export function listCrmBookingHosts(): Promise<CrmBookingHost[]> {
+  return bookingCall("/hosts").then((data) =>
+    extractRecords(data).map(normalizeCrmBookingHost),
   );
 }
 
-export function listCrmBookingHosts(): Promise<CrmBookingHost[]> {
-  return bookingCall("/hosts").then((data) =>
+export function listCrmEventTypeHosts(
+  eventTypeId: string,
+): Promise<CrmBookingHost[]> {
+  if (!isUuid(eventTypeId)) return Promise.resolve([]);
+  return bookingCall(`/event-types/${eventTypeId}/hosts`).then((data) =>
     extractRecords(data).map(normalizeCrmBookingHost),
   );
 }
@@ -1087,35 +1145,138 @@ export async function createCrmBooking(input: {
   dealId?: string;
 }): Promise<CrmBookingRecord> {
   const iso = input.startTime;
-  const hostId = input.hostId && isUuid(input.hostId) ? input.hostId : "";
+  let hostId = input.hostId && isUuid(input.hostId) ? input.hostId : "";
+  // Nest 404s when hostId is not on the event type. Prefer a host that is.
+  try {
+    let onEvent = await listCrmEventTypeHosts(input.eventTypeId);
+    if (
+      hostId &&
+      onEvent.length &&
+      !onEvent.some((host) => host.id === hostId)
+    ) {
+      // Attach the chosen host so Assigned Users can actually take the booking.
+      const nextIds = [
+        ...onEvent.map((host) => host.id).filter(isUuid),
+        hostId,
+      ];
+      await patchCrmEventType(input.eventTypeId, {
+        hostIds: [...new Set(nextIds)],
+        ownerHostId: onEvent[0]?.id || hostId,
+      }).catch(() => undefined);
+      onEvent = await listCrmEventTypeHosts(input.eventTypeId).catch(
+        () => onEvent,
+      );
+    } else if (hostId && !onEvent.length) {
+      await patchCrmEventType(input.eventTypeId, {
+        hostIds: [hostId],
+        ownerHostId: hostId,
+      }).catch(() => undefined);
+      onEvent = await listCrmEventTypeHosts(input.eventTypeId).catch(() => []);
+    }
+    if (onEvent.length) {
+      const match = hostId
+        ? onEvent.find((host) => host.id === hostId)
+        : undefined;
+      hostId = match?.id || onEvent[0]!.id;
+    } else if (hostId) {
+      hostId = "";
+    }
+  } catch {
+    /* keep the requested hostId */
+  }
+
+  let startAt = iso;
+  let snapped = false;
+  try {
+    const day = toCrmSlotDate(iso);
+    const prev = new Date(`${day}T12:00:00.000Z`);
+    prev.setUTCDate(prev.getUTCDate() - 1);
+    const next = new Date(`${day}T12:00:00.000Z`);
+    next.setUTCDate(next.getUTCDate() + 1);
+    const slots = await listCrmAvailableSlots({
+      eventTypeId: input.eventTypeId,
+      from: prev.toISOString().slice(0, 10),
+      to: next.toISOString().slice(0, 10),
+      hostId: hostId || undefined,
+      timezone: input.timezone,
+    });
+    const wanted = slotStartMs(iso);
+    if (!Number.isNaN(wanted) && slots.length) {
+      const ranked = slots
+        .map((slot) => ({
+          slot,
+          delta: Math.abs(slotStartMs(slot.startTime) - wanted),
+        }))
+        .filter((row) => Number.isFinite(row.delta))
+        .sort((a, b) => a.delta - b.delta);
+      // Nest requires an exact generated slot. Snap within ±2h of the picker.
+      const nearest = ranked.find((row) => row.delta <= 2 * 60 * 60 * 1000)?.slot;
+      if (nearest) {
+        startAt = nearest.startTime;
+        snapped = true;
+        if (nearest.hostId && isUuid(nearest.hostId)) {
+          hostId = nearest.hostId;
+        }
+      }
+    }
+    // Internal book uses a free datetime picker — if CRM has no matching slot,
+    // skip the POST (avoids a guaranteed 409 toast) and let the caller save a meeting.
+    if (!snapped) {
+      throw new BookingSlotUnavailableError();
+    }
+  } catch (err) {
+    if (err instanceof BookingSlotUnavailableError) throw err;
+    /* availability lookup failed — attempt the requested start below */
+  }
+
   const base = compactBookingBody({
     eventTypeId: input.eventTypeId,
-    startAt: iso,
+    startAt,
     name: input.name,
     email: input.email,
     timezone: input.timezone,
     hostId: hostId || undefined,
     phone: input.phone?.trim(),
     notes: input.notes?.trim(),
-    leadId: input.leadId && isUuid(input.leadId) ? input.leadId : undefined,
-    contactId:
-      input.contactId && isUuid(input.contactId) ? input.contactId : undefined,
-    companyId:
-      input.companyId && isUuid(input.companyId) ? input.companyId : undefined,
-    dealId: input.dealId && isUuid(input.dealId) ? input.dealId : undefined,
-  });
+  }) as Record<string, unknown>;
+  if (input.leadId && isUuid(input.leadId)) base.leadId = input.leadId;
+  if (input.contactId && isUuid(input.contactId)) {
+    base.contactId = input.contactId;
+  }
+  if (input.companyId && isUuid(input.companyId)) {
+    base.companyId = input.companyId;
+  }
+  if (input.dealId && isUuid(input.dealId)) base.dealId = input.dealId;
 
   async function post(
     payload: Record<string, unknown>,
   ): Promise<CrmBookingRecord> {
     try {
-      const data = await bookingCall("/bookings", jsonInit("POST", payload));
+      // Silent: NewBookingModal falls back to a meeting when the slot 409s.
+      const data = await bookingCall(
+        "/bookings",
+        jsonInit("POST", payload, true),
+      );
       return normalizeCrmBooking(
         asRecord(data) ?? extractRecords(data)[0] ?? {},
       );
     } catch (err) {
-      if (!isWhitelistRejection(err)) throw err;
       const message = err instanceof Error ? err.message : String(err ?? "");
+      if (
+        payload.hostId &&
+        /404|not found|hostNotOnEventType|host not/i.test(message)
+      ) {
+        const { hostId: _drop, ...withoutHost } = payload;
+        return post(withoutHost);
+      }
+      if (/slotUnavailable|no longer available|409|conflict/i.test(message)) {
+        throw new BookingSlotUnavailableError(
+          message.includes("Pick another")
+            ? message
+            : undefined,
+        );
+      }
+      if (!isWhitelistRejection(err)) throw err;
       const forbidden = forbiddenKeysFromMessage(message);
       const next = { ...payload };
       let changed = false;
@@ -1125,17 +1286,17 @@ export async function createCrmBooking(input: {
           changed = true;
         }
         if (key === "startAt" && !next.startTime) {
-          next.startTime = iso;
+          next.startTime = startAt;
           changed = true;
         }
         if (key === "startTime" && !next.startAt) {
-          next.startAt = iso;
+          next.startAt = startAt;
           changed = true;
         }
       }
       if (!changed && "startTime" in next) {
         delete next.startTime;
-        if (!next.startAt) next.startAt = iso;
+        if (!next.startAt) next.startAt = startAt;
         changed = true;
       }
       if (!changed) throw err;

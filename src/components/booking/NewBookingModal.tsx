@@ -505,21 +505,10 @@ export function NewBookingModal({
                 await tryCrmBooking(() => linkCrmBooking(booked.id, related));
               }
             }
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            if (/overlap/i.test(message) && bookingHostId) {
-              throw err;
-            }
-            if (
-              /overlap/i.test(message) ||
-              /404|not found|whitelist|should not exist|is not allowed/i.test(
-                message,
-              )
-            ) {
-              savedViaBooking = false;
-            } else {
-              throw err;
-            }
+          } catch {
+            // CRM booking slots are rigid; this modal uses a free datetime picker.
+            // Always fall through to createCrmMeeting so the appointment still saves.
+            savedViaBooking = false;
           }
         }
         if (savedViaBooking) continue;
@@ -558,10 +547,18 @@ export function NewBookingModal({
       onCreated();
       onClose();
     } catch (err) {
-      const message =
+      const raw =
         err instanceof Error
           ? err.message
           : "Could not create the CRM meeting.";
+      const message = raw
+        .replace(/\s+at\s+\S+\s+\([^)]+\)[\s\S]*$/u, "")
+        .replace(
+          /(?:^|[;\s]+)(?:Conflict|BadRequest|NotFound)Exception:\s*/gi,
+          " ",
+        )
+        .replace(/\s{2,}/g, " ")
+        .trim() || "Could not create the CRM meeting.";
       showFormError(message, bookingFormFieldFromError(message));
     } finally {
       setSaving(false);

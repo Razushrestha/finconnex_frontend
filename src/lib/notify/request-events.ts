@@ -413,6 +413,29 @@ export function describeRequestEvent(method: string, url: string): RequestEvent 
  */
 export function readableErrorMessage(message: string): string {
   const text = message.trim();
+  if (
+    /\b(?:Conflict|BadRequest|NotFound)Exception\b/i.test(text) ||
+    /\bat\s+\w+(?:\.\w+)*\s+\([^)]+\)/.test(text)
+  ) {
+    const key = text.match(/\b([a-z][a-z0-9]*\.error\.[A-Za-z0-9_]+)\b/)?.[1];
+    if (key === "booking.error.slotUnavailable") {
+      return "That time is no longer available. Pick another slot and try again.";
+    }
+    if (key?.startsWith("booking.error.")) {
+      return "Could not complete that booking. Try another time or host.";
+    }
+    return (
+      text
+        .replace(/\s+at\s+\S+\s+\([^)]+\)[\s\S]*$/u, "")
+        .replace(
+          /(?:^|[;\s]+)(?:Conflict|BadRequest|NotFound)Exception:\s*[a-z0-9_.]*/gi,
+          "",
+        )
+        .replace(/\s{2,}/g, " ")
+        .replace(/^[\s;:.-]+|[\s;:.-]+$/g, "")
+        .trim() || "Something went wrong. Try again."
+    );
+  }
   const key = text.match(/^[a-z][a-zA-Z]*(?:\.[a-zA-Z]+)+$/);
   if (!key) return text;
   const tail = text.split(".").pop() ?? text;

@@ -124,6 +124,18 @@ const FRIENDLY_MESSAGE_KEYS: Record<string, string> = {
     "Calendly OAuth is not configured on the CRM server. Use a personal access token, or set Calendly client id/secret on that API.",
   "calendar.error.notConfigured":
     "Google/Outlook calendar OAuth is not configured on the CRM server.",
+  "booking.error.slotUnavailable":
+    "That time is no longer available. Pick another slot and try again.",
+  "booking.error.noHostsAvailable":
+    "This consultation has no available hosts yet. Assign a host, then try again.",
+  "booking.error.hostNotOnEventType":
+    "That host is not linked to this consultation. Choose another host or re-save Assigned Users.",
+  "booking.error.eventTypeNotFound":
+    "That consultation was not found in the CRM. Open it and Save again.",
+  "booking.error.eventTypeInactive":
+    "This consultation is inactive in the CRM.",
+  "booking.error.hostRequired": "Choose a host for this appointment.",
+  "booking.error.invalidDate": "That date or time is not valid for booking.",
 };
 
 const GENERIC_HTTP_MESSAGES = new Set([
@@ -189,11 +201,43 @@ function pushIssue(
   issues.push({ field: field || undefined, message: text });
 }
 
+/** Nest sometimes dumps `ConflictException: … at BookingService.book (…)` into `message`. */
+function looksLikeExceptionDump(text: string): boolean {
+  return (
+    /\b(?:Conflict|BadRequest|NotFound|Forbidden|Unauthorized|InternalServer)Exception\b/i.test(
+      text,
+    ) ||
+    /\bat\s+\w+(?:\.\w+)*\s+\([^)]+\)/.test(text) ||
+    /node:internal\/process\/task_queues/.test(text)
+  );
+}
+
+function extractMessageKey(text: string): string | null {
+  return text.match(/\b([a-z][a-z0-9]*\.error\.[A-Za-z0-9_]+)\b/)?.[1] ?? null;
+}
+
+function stripExceptionDump(text: string): string {
+  let next = text.trim();
+  next = next.replace(/\s+at\s+\S+\s+\([^)]+\)[\s\S]*$/u, "").trim();
+  next = next.replace(
+    /(?:^|[;\s]+)(?:Conflict|BadRequest|NotFound|Forbidden|Unauthorized|InternalServer)Exception:\s*/gi,
+    " ",
+  );
+  next = next.replace(/\s{2,}/g, " ").replace(/^[\s;:.-]+|[\s;:.-]+$/g, "").trim();
+  return next;
+}
+
 function issuesFromClassValidatorLine(
   line: string,
 ): { field?: string; message: string } | null {
   const text = line.trim();
   if (!text) return null;
+  // Exception dumps are not field validation — crmErrorMessage handles those.
+  if (looksLikeExceptionDump(text)) return null;
+  const key = extractMessageKey(text);
+  if (key && (FRIENDLY_MESSAGE_KEYS[key] || key.includes(".error."))) {
+    return null;
+  }
   const extra = text.match(
     /^property\s+([A-Za-z_][\w.]*)\s+should not exist$/i,
   );
@@ -206,6 +250,8 @@ function issuesFromClassValidatorLine(
   if (named) {
     return { field: named[1], message: text.slice(named[1].length).trim() };
   }
+  // Only treat short field-style lines as validation issues, not prose/errors.
+  if (text.length > 160 || /[\n;]/.test(text)) return null;
   return { message: text };
 }
 
@@ -339,29 +385,59 @@ export function crmErrorMessage(json: unknown, fallback: string): string {
     const msg = rec.message;
     const errField =
       typeof rec.error === "string" && rec.error.trim() ? rec.error.trim() : null;
-    const base = Array.isArray(msg) && msg.length
-      ? null
+    const rawFromMsg = Array.isArray(msg)
+      ? msg
+          .filter((row): row is string => typeof row === "string" && !!row.trim())
+          .join("; ")
+          .trim() || null
       : typeof msg === "string" && msg.trim()
-        ? FRIENDLY_MESSAGE_KEYS[msg.trim()] ??
-          (msg.trim().toLowerCase() !== "bad request" ? msg.trim() : null)
-        : errField && !GENERIC_HTTP_MESSAGES.has(errField.toLowerCase())
-          ? FRIENDLY_MESSAGE_KEYS[errField] ?? errField
-          : null;
+        ? msg.trim()
+        : null;
+    const raw =
+      rawFromMsg ||
+      (errField && !GENERIC_HTTP_MESSAGES.has(errField.toLowerCase())
+        ? errField
+        : null);
+    const messageKey =
+      (raw && extractMessageKey(raw)) ||
+      (Array.isArray(msg)
+        ? msg
+            .map((row) =>
+              typeof row === "string" ? extractMessageKey(row) : null,
+            )
+            .find(Boolean) ?? null
+        : null);
+    const stripped = raw ? stripExceptionDump(raw) : null;
+    const friendly =
+      (messageKey && FRIENDLY_MESSAGE_KEYS[messageKey]) ||
+      (raw && FRIENDLY_MESSAGE_KEYS[raw]) ||
+      (stripped && FRIENDLY_MESSAGE_KEYS[stripped]) ||
+      (messageKey?.startsWith("booking.error.")
+        ? "Could not complete that booking. Try another time or host."
+        : null) ||
+      (stripped &&
+      stripped.toLowerCase() !== "bad request" &&
+      !looksLikeExceptionDump(stripped)
+        ? stripped
+        : null);
+    // Known CRM i18n keys always win over exception dumps mis-parsed as "validation".
+    if (friendly && messageKey && FRIENDLY_MESSAGE_KEYS[messageKey]) {
+      if (/enoent|mkdir ['"]?\/var\/task|erofs|read-only file system/i.test(friendly)) {
+        return "File storage cannot write on this host. Retry the upload — FinConnex will keep the file without using /var/task/data.";
+      }
+      return friendly;
+    }
     if (formatted) {
-      if (
-        base &&
-        FRIENDLY_MESSAGE_KEYS[String(msg ?? "").trim()] &&
-        !formatted.includes(base)
-      ) {
-        return `${base}: ${formatted}`;
+      if (friendly && !formatted.includes(friendly)) {
+        return `${friendly}: ${formatted}`;
       }
       return formatted;
     }
-    if (base) {
-      if (/enoent|mkdir ['"]?\/var\/task|erofs|read-only file system/i.test(base)) {
+    if (friendly) {
+      if (/enoent|mkdir ['"]?\/var\/task|erofs|read-only file system/i.test(friendly)) {
         return "File storage cannot write on this host. Retry the upload — FinConnex will keep the file without using /var/task/data.";
       }
-      return base;
+      return friendly;
     }
     const status = rec.statusCode;
     if (status === 503) {
@@ -370,8 +446,11 @@ export function crmErrorMessage(json: unknown, fallback: string): string {
     if (status === 400) {
       return "The CRM could not save this. Check the highlighted field and try again.";
     }
+    if (status === 409) {
+      return "That time conflicts with another booking. Pick a different slot.";
+    }
   }
-  return fallback;
+  return stripExceptionDump(fallback) || fallback;
 }
 
 /**

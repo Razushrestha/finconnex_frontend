@@ -33,6 +33,17 @@ describe("crmErrorMessage", () => {
       "Meeting end time must be after the start time.",
     );
   });
+
+  it("strips Nest ConflictException stacks for booking slots", () => {
+    const json = {
+      statusCode: 409,
+      message:
+        "That time is no longer available; ConflictException: booking.error.slotUnavailable at BookingService.book (/app/.build/modules/meeting/booking/services/booking.service.js:126:26) at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+    };
+    expect(crmErrorMessage(json, "fallback")).toBe(
+      "That time is no longer available. Pick another slot and try again.",
+    );
+  });
 });
 
 describe("crmValidationIssues", () => {
