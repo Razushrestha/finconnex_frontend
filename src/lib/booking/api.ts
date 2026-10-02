@@ -90,6 +90,8 @@ export type CrmBookingRecord = {
   startTime: string;
   endTime: string;
   status: string;
+  /** Meeting the backend materialised for this booking (listed by /meetings too). */
+  meetingId?: string;
   leadId?: string;
   contactId?: string;
   companyId?: string;
@@ -549,12 +551,44 @@ export function normalizeCrmBooking(
     startTime: pickStr(row.startTime, row.start_time, row.startAt, row.start_at),
     endTime: pickStr(row.endTime, row.end_time, row.endAt, row.end_at),
     status: pickStr(row.status, row.state) || "Scheduled",
+    meetingId:
+      pickStr(row.meetingId, row.meeting_id, asRecord(row.meeting)?.id) ||
+      undefined,
     leadId: pickStr(row.leadId, row.lead_id) || undefined,
     contactId: pickStr(row.contactId, row.contact_id) || undefined,
     companyId: pickStr(row.companyId, row.company_id) || undefined,
     dealId: pickStr(row.dealId, row.deal_id) || undefined,
     raw: row,
   };
+}
+
+/**
+ * Reads the booking out of a create / reschedule response. Returns null when
+ * the response carries no id, so callers never store a made-up reference.
+ */
+export function crmBookingFromResponse(data: unknown): CrmBookingRecord | null {
+  const hasId = (row: Record<string, unknown> | null | undefined) =>
+    !!row && !!pickStr(row.id, row.bookingId, row.booking_id);
+  const direct = asRecord(data);
+  // The booking itself, or the first record of a wrapped list.
+  const row = hasId(direct) ? direct : extractRecords(data)[0];
+  return row && hasId(row) ? normalizeCrmBooking(row) : null;
+}
+
+/**
+ * A booking and the meeting the backend creates for it are both listed by the
+ * API. Keep the booking row and drop its meeting twin so the appointment
+ * shows once.
+ */
+export function dropBookingMeetings<T extends { id: string }>(
+  meetings: readonly T[],
+  bookings: readonly { meetingId?: string }[],
+): T[] {
+  const owned = new Set(
+    bookings.map((row) => row.meetingId).filter((id): id is string => !!id),
+  );
+  if (!owned.size) return [...meetings];
+  return meetings.filter((meeting) => !owned.has(meeting.id));
 }
 
 export function crmEventTypeToBookingPage(
@@ -904,6 +938,9 @@ export async function createCrmEventType(input: {
       delete slim.customLocationUrl;
     } else if (/meetingType/i.test(message)) {
       delete slim.meetingType;
+    } else if (/bufferAfterMinutes/i.test(message)) {
+      // An older server without a post-buffer: still create the event type.
+      delete slim.bufferAfterMinutes;
     } else {
       throw err;
     }
@@ -1143,8 +1180,21 @@ export async function createCrmBooking(input: {
   contactId?: string;
   companyId?: string;
   dealId?: string;
+  /**
+   * false stops the backend emailing the invitee. Public bookings send their
+   * own confirmation from the host's template, so the backend copy would be a
+   * duplicate.
+   */
+  notifyInvitee?: boolean;
+  /**
+   * How far (ms) the requested start may be moved to reach a generated slot.
+   * Defaults to ±2h for the internal free-form picker; a guest who chose an
+   * exact time passes a small value so the booking is never silently moved.
+   */
+  snapToleranceMs?: number;
 }): Promise<CrmBookingRecord> {
   const iso = input.startTime;
+  const snapToleranceMs = input.snapToleranceMs ?? 2 * 60 * 60 * 1000;
   let hostId = input.hostId && isUuid(input.hostId) ? input.hostId : "";
   // Nest 404s when hostId is not on the event type. Prefer a host that is.
   try {
@@ -1209,8 +1259,8 @@ export async function createCrmBooking(input: {
         }))
         .filter((row) => Number.isFinite(row.delta))
         .sort((a, b) => a.delta - b.delta);
-      // Nest requires an exact generated slot. Snap within ±2h of the picker.
-      const nearest = ranked.find((row) => row.delta <= 2 * 60 * 60 * 1000)?.slot;
+      // Nest requires an exact generated slot. Snap within the tolerance only.
+      const nearest = ranked.find((row) => row.delta <= snapToleranceMs)?.slot;
       if (nearest) {
         startAt = nearest.startTime;
         snapped = true;
@@ -1247,6 +1297,7 @@ export async function createCrmBooking(input: {
     base.companyId = input.companyId;
   }
   if (input.dealId && isUuid(input.dealId)) base.dealId = input.dealId;
+  if (input.notifyInvitee === false) base.notifyInvitee = false;
 
   async function post(
     payload: Record<string, unknown>,

@@ -221,6 +221,8 @@ export async function sendEmailDemoLive(input: {
   email?: string;
   subject?: string;
   body?: string;
+  cc?: string[];
+  replyTo?: string;
   relatedType?: string;
   relatedId?: string;
   relatedTo?: string;
@@ -232,6 +234,8 @@ export async function sendEmailDemoLive(input: {
       to: input.email ? [input.email] : [],
       subject: input.subject ?? "",
       body: input.body ?? "",
+      cc: input.cc,
+      replyTo: input.replyTo,
       relatedType: input.relatedType,
       relatedId: input.relatedId,
       relatedTo: input.relatedTo,

@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  AlignLeft,
-  Bold,
   Briefcase,
   CalendarClock,
   ChevronDown,
@@ -11,23 +9,22 @@ import {
   Clock,
   FileCheck,
   Info,
-  Italic,
-  Link2,
-  List,
-  ListOrdered,
   Pencil,
   Send,
   Copy,
-  ExternalLink,
   FolderInput,
   MoreVertical,
   Share2,
   Trash2,
   X,
-  Underline,
   Users,
   type LucideIcon,
 } from "lucide-react";
+import { DescriptionEditor } from "@/components/booking/DescriptionEditor";
+import {
+  cleanDescriptionHtml,
+  sanitizeDescriptionHtml,
+} from "@/lib/booking/description-html";
 import { ShareConsultationModal } from "@/components/booking/ShareConsultationModal";
 import {
   BookingFormStep,
@@ -38,6 +35,13 @@ import {
   defaultAvailabilityLimits,
   type AvailabilityLimitsValues,
 } from "@/components/booking/AvailabilityLimitsStep";
+import { normalizeSlotLimit } from "@/components/booking/LimitsControls";
+import {
+  BookingRulesStep,
+  rulesFromPage,
+  rulesToPageFields,
+  type BookingRulesValues,
+} from "@/components/booking/BookingRulesStep";
 import {
   ConsultationNotifyPanel,
   NOTIFY_PANELS,
@@ -53,7 +57,18 @@ import {
   tryCrmBooking,
   updateCrmEventType,
 } from "@/lib/booking/api";
-import { selectableOnlinePlatforms } from "@/lib/booking/meeting-platforms";
+import {
+  OfflineLocationFields,
+  initialOfflineLocation,
+  resolveOfflineAddress,
+  savedOfflineAddress,
+  type OfflineKind,
+} from "@/components/booking/OfflineLocationFields";
+import { SELECT_BG, SELECT_CLASS } from "@/components/booking/select-styles";
+import {
+  defaultOfficeAddress,
+  selectableOnlinePlatforms,
+} from "@/lib/booking/meeting-platforms";
 import {
   APPOINTMENT_DISTRIBUTIONS,
   consultationModeLabel,
@@ -61,7 +76,6 @@ import {
   formatBookingPrice,
   listBookingPages,
   nextBookingPageId,
-  publicBookUrl,
   upsertBookingPage,
   type AppointmentDistribution,
   type BookingCurrency,
@@ -164,10 +178,6 @@ function NestedNavLinks<T extends string>({
   );
 }
 
-const SELECT_CLASS =
-  "h-10 w-full appearance-none rounded-lg border border-[#E5E7EB] bg-white bg-[length:16px] bg-[right_12px_center] bg-no-repeat px-3 pr-9 text-[13px] text-slate-700 outline-none focus:border-[#5A32A3]/45";
-const SELECT_BG =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")";
 const MINUTE_OPTIONS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
 
 function availabilityFromPage(page: BookingPage): AvailabilityLimitsValues {
@@ -281,72 +291,6 @@ function Segment({
   );
 }
 
-function DescriptionEditor({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!ref.current) return;
-    if (ref.current.innerHTML !== value) ref.current.innerHTML = value || "";
-    // seed once per edit session via key on parent
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function run(command: string) {
-    ref.current?.focus();
-    document.execCommand(command, false);
-    onChange(ref.current?.innerHTML ?? "");
-  }
-
-  return (
-    <div className="overflow-hidden rounded-lg border border-[#E5E7EB] bg-white">
-      <div className="flex items-center gap-0.5 border-b border-[#E5E7EB] px-2 py-1.5 text-slate-500">
-        {[
-          { icon: Bold, cmd: "bold" },
-          { icon: Italic, cmd: "italic" },
-          { icon: Underline, cmd: "underline" },
-          { icon: AlignLeft, cmd: "justifyLeft" },
-          { icon: List, cmd: "insertUnorderedList" },
-          { icon: ListOrdered, cmd: "insertOrderedList" },
-          { icon: Link2, cmd: "createLink" },
-        ].map((item) => (
-          <button
-            key={item.cmd}
-            type="button"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              if (item.cmd === "createLink") {
-                const href = window.prompt("Link URL")?.trim();
-                if (!href) return;
-                document.execCommand("createLink", false, href);
-                onChange(ref.current?.innerHTML ?? "");
-                return;
-              }
-              run(item.cmd);
-            }}
-            className="flex h-7 w-7 items-center justify-center rounded hover:bg-slate-100"
-            aria-label={item.cmd}
-          >
-            <item.icon className="h-3.5 w-3.5" />
-          </button>
-        ))}
-      </div>
-      <div
-        ref={ref}
-        contentEditable
-        suppressContentEditableWarning
-        className="min-h-[120px] px-3 py-2 text-[13px] text-slate-800 outline-none"
-        onInput={() => onChange(ref.current?.innerHTML ?? "")}
-      />
-    </div>
-  );
-}
-
 function EventTypeEditForm({
   page,
   onCancel,
@@ -370,10 +314,21 @@ function EventTypeEditForm({
   const [platform, setPlatform] = useState(
     page.meetingVia === "phone"
       ? "Phone"
-      : page.meetingViaDetail && page.meetingViaDetail !== "Office address"
+      : page.meetingVia !== "in_person" &&
+          page.meetingViaDetail &&
+          page.meetingViaDetail !== "Office address"
         ? page.meetingViaDetail
         : "None",
   );
+  // The office address comes from the company profile; an in-person event type
+  // keeps either that or a custom address of its own.
+  const officeAddress = useMemo(() => defaultOfficeAddress(), []);
+  const [offlineStart] = useState(() =>
+    initialOfflineLocation(savedOfflineAddress(page), officeAddress),
+  );
+  const [offlineKind, setOfflineKind] = useState<OfflineKind>(offlineStart.kind);
+  const [customAddress, setCustomAddress] = useState(offlineStart.custom);
+  const [addressMissing, setAddressMissing] = useState(false);
   const [isPublic, setIsPublic] = useState(
     page.isPublic ?? page.status === "Live",
   );
@@ -400,23 +355,40 @@ function EventTypeEditForm({
     }
     const meetingPlace =
       place === "Offline" ? "offline" : platform === "Phone" ? "phone" : "online";
+    const offlineAddress =
+      meetingPlace === "offline"
+        ? resolveOfflineAddress(offlineKind, officeAddress, customAddress)
+        : "";
+    if (meetingPlace === "offline" && !offlineAddress) {
+      // The field shows its own message; this error line sits at the form's bottom.
+      setAddressMissing(true);
+      setError("");
+      return;
+    }
     const meetingVia: MeetingVia =
       meetingPlace === "offline"
         ? "in_person"
         : meetingPlace === "phone"
           ? "phone"
           : "video";
+    // Only the formatting the editor offers is kept, and an emptied editor saves as empty.
+    const savedDescription = cleanDescriptionHtml(description);
     const next: BookingPage = {
       ...page,
       title: trimmed,
       durationMinutes,
       price: isFree ? 0 : paidAmount,
-      description,
+      description: savedDescription,
       status: isActive ? "Live" : "Draft",
       isPublic,
       meetingVia,
-      meetingViaDetail: platform === "None" ? undefined : platform,
-      location: meetingPlace === "offline" ? page.location : undefined,
+      meetingViaDetail:
+        meetingPlace === "offline"
+          ? offlineAddress
+          : platform === "None"
+            ? undefined
+            : platform,
+      location: meetingPlace === "offline" ? offlineAddress : undefined,
     };
     setSaving(true);
     setError("");
@@ -426,14 +398,14 @@ function EventTypeEditForm({
         updateCrmEventType(crmId, {
           name: trimmed,
           durationMinutes,
-          description,
+          description: savedDescription,
           active: isActive,
           isPublic,
           meetingPlace,
           platform: platform === "None" ? "Zoom" : platform,
           locationDetail:
             meetingPlace === "offline"
-              ? page.location || "In person"
+              ? offlineAddress
               : platform === "Phone"
                 ? "Phone"
                 : undefined,
@@ -560,18 +532,40 @@ function EventTypeEditForm({
               options={["Online", "Offline"]}
               onChange={(value) => setPlace(value as "Online" | "Offline")}
             />
-            <select
-              value={platform}
-              onChange={(e) => setPlatform(e.target.value)}
-              className={cn(SELECT_CLASS, "max-w-[10rem]")}
-              style={{ backgroundImage: SELECT_BG }}
-            >
-              {platforms.map((item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ))}
-            </select>
+            {place === "Offline" ? (
+              <OfflineLocationFields
+                kind={offlineKind}
+                onKindChange={(kind) => {
+                  setOfflineKind(kind);
+                  setAddressMissing(false);
+                  setError("");
+                }}
+                officeAddress={officeAddress}
+                address={customAddress}
+                onAddressChange={(address) => {
+                  setCustomAddress(address);
+                  if (address.trim()) {
+                    setAddressMissing(false);
+                    setError("");
+                  }
+                }}
+                invalid={addressMissing && !customAddress.trim()}
+              />
+            ) : (
+              <select
+                aria-label="Platform"
+                value={platform}
+                onChange={(e) => setPlatform(e.target.value)}
+                className={cn(SELECT_CLASS, "max-w-[10rem]")}
+                style={{ backgroundImage: SELECT_BG }}
+              >
+                {platforms.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 
@@ -830,11 +824,29 @@ export function ConsultationOverview({
         defaultHours: values.defaultHours,
         overrideUserHours: values.overrideUserHours,
         userSpecificHours: values.userSpecificHours,
-        slotsPerEvent: values.slotsPerEvent,
-        slotsPerCustomer: values.slotsPerCustomer,
+        // A "Per day" with no number typed yet is not a limit; don't save it as one.
+        slotsPerEvent: normalizeSlotLimit(values.slotsPerEvent),
+        slotsPerCustomer: normalizeSlotLimit(values.slotsPerCustomer),
         customLimits: values.customLimits,
         userHours: values.userHours,
       },
+    });
+  }, []);
+  const persistRules = useCallback((rules: BookingRulesValues) => {
+    const currentPage = pageRef.current;
+    const group = currentPage.consultationMode === "group";
+    const fields = rulesToPageFields(rules, {
+      durationMinutes: currentPage.durationMinutes,
+      group,
+    });
+    onSavedRef.current({
+      ...currentPage,
+      bufferMinutes: fields.bufferMinutes,
+      minNoticeHours: fields.minNoticeHours,
+      maxAdvanceDays: fields.maxAdvanceDays,
+      // Only group consultations edit capacity here; leave everyone else's alone.
+      ...(group ? { maxAttendees: fields.maxAttendees } : {}),
+      schedulingRules: fields.schedulingRules,
     });
   }, []);
   const consultantUserIds = useMemo(() => {
@@ -911,14 +923,6 @@ export function ConsultationOverview({
             </button>
             {menuOpen ? (
               <div className="absolute top-9 right-0 z-30 w-44 overflow-hidden rounded-xl border border-[#E5E7EB] bg-white py-1 shadow-[0_8px_24px_rgba(15,23,42,0.12)]">
-                <HeaderMenuRow
-                  icon={ExternalLink}
-                  label="Booking page"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    window.open(publicBookUrl(page.slug), "_blank", "noopener");
-                  }}
-                />
                 <HeaderMenuRow
                   icon={Copy}
                   label="Make a copy"
@@ -1141,6 +1145,11 @@ export function ConsultationOverview({
                 <Field label="Payment Type">{paid ? "Paid" : "Free"}</Field>
                 <Field label="Payment Mode">{paymentMode(page)}</Field>
                 <Field label="Meeting Mode">{paymentMode(page)}</Field>
+                {savedOfflineAddress(page) ? (
+                  <Field label="Location">
+                    <span className="break-words">{savedOfflineAddress(page)}</span>
+                  </Field>
+                ) : null}
                 <Field label="Visibility">
                   {publicLabel ? "Public" : "Private"}
                 </Field>
@@ -1158,9 +1167,11 @@ export function ConsultationOverview({
                 </Field>
                 <Field label="Description">
                   {page.description?.trim() ? (
-                    <span
-                      className="font-normal [&_a]:text-[#5A32A3] [&_p]:m-0"
-                      dangerouslySetInnerHTML={{ __html: page.description }}
+                    <div
+                      className="fc-rich-editor font-normal [&_a]:text-[#5A32A3] [&_a]:underline [&_p]:m-0"
+                      dangerouslySetInnerHTML={{
+                        __html: sanitizeDescriptionHtml(page.description),
+                      }}
                     />
                   ) : (
                     "—"
@@ -1232,25 +1243,14 @@ export function ConsultationOverview({
           ) : null}
 
           {section === "rules" ? (
-            <div className="grid grid-cols-1 gap-x-12 gap-y-6 px-5 py-5 sm:grid-cols-2">
-              <Field label="Duration">
-                {formatDuration(page.durationMinutes || 30)}
-              </Field>
-              <Field label="Buffer">
-                {page.bufferMinutes ? `${page.bufferMinutes} mins` : "None"}
-              </Field>
-              <Field label="Minimum notice">
-                {page.minNoticeHours != null
-                  ? `${page.minNoticeHours} hours`
-                  : "2 hours"}
-              </Field>
-              <Field label="Date range">
-                {page.maxAdvanceDays != null
-                  ? `${page.maxAdvanceDays} days`
-                  : "60 days"}
-              </Field>
-              <Field label="Max attendees">{page.maxAttendees ?? 1}</Field>
-            </div>
+            <BookingRulesStep
+              // Start from this page's saved values; the form owns them while open.
+              key={page.id}
+              embedded
+              group={page.consultationMode === "group"}
+              initial={rulesFromPage(page)}
+              onChange={persistRules}
+            />
           ) : null}
 
           {section === "notify" ? (

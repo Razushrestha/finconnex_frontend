@@ -31,11 +31,13 @@ import {
   type NotifyChannel,
 } from "@/lib/booking/notify-prefs";
 import type { BookingPage } from "@/lib/booking/types";
+import { EmailConfigFields } from "@/components/booking/EmailConfigFields";
 import {
-  listAssignableOwnersLocal,
-  loadWorkspaceConsultants,
-  type AssignableOwner,
-} from "@/lib/users/assignable";
+  routingFor,
+  updateEmailConfig,
+  type EmailNotifyConfig,
+  type EmailRouting,
+} from "@/lib/booking/email-config";
 import { cn } from "@/lib/utils";
 
 const SELECT_CLASS =
@@ -431,12 +433,6 @@ function remindersFromPage(page: BookingPage): ReminderDraft[] {
   return stored?.length ? stored : [{ value: 30, unit: "Minutes" }];
 }
 
-function superAdminLabel(email: string) {
-  return email
-    ? `Super admin's email address (${email})`
-    : "Super admin's email address";
-}
-
 export function ConsultationNotifyPanel({
   panel,
   page,
@@ -452,19 +448,14 @@ export function ConsultationNotifyPanel({
   );
   const [menuId, setMenuId] = useState<NotificationRow["id"] | null>(null);
   const [editing, setEditing] = useState<NotificationRow | null>(null);
-  const [owners, setOwners] = useState<AssignableOwner[]>(() =>
-    listAssignableOwnersLocal(),
-  );
   const menuRef = useRef<HTMLDivElement>(null);
 
   const actor = getRulesActor();
   const actorEmail = actor.email?.trim() ?? "";
 
-  const [emailConfig, setEmailConfig] = useState(() => ({
-    sendFrom: page.emailNotifyConfig?.sendFrom || actorEmail,
-    replyTo: page.emailNotifyConfig?.replyTo ?? "",
-    cc: page.emailNotifyConfig?.cc ?? "",
-  }));
+  const [emailConfig, setEmailConfig] = useState<EmailNotifyConfig | undefined>(
+    () => page.emailNotifyConfig,
+  );
   const [waSendFrom, setWaSendFrom] = useState(
     page.whatsappNotifyConfig?.sendFrom ?? "",
   );
@@ -478,16 +469,6 @@ export function ConsultationNotifyPanel({
   const gatewayOn = smsGatewayConnected();
 
   useEffect(() => {
-    void loadWorkspaceConsultants()
-      .then((list) => {
-        if (list.length) setOwners(list);
-      })
-      .catch(() => {
-        setOwners((prev) => (prev.length ? prev : listAssignableOwnersLocal()));
-      });
-  }, []);
-
-  useEffect(() => {
     function onDocClick(event: MouseEvent) {
       if (!menuRef.current?.contains(event.target as Node)) {
         setMenuId(null);
@@ -496,28 +477,6 @@ export function ConsultationNotifyPanel({
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
-
-  const emailOptions = useMemo(() => {
-    const seen = new Set<string>();
-    const options: { value: string; label: string }[] = [];
-    if (actorEmail) {
-      seen.add(actorEmail.toLowerCase());
-      options.push({
-        value: actorEmail,
-        label: superAdminLabel(actorEmail),
-      });
-    }
-    for (const owner of owners) {
-      const email = owner.email.trim();
-      if (!email || seen.has(email.toLowerCase())) continue;
-      seen.add(email.toLowerCase());
-      options.push({
-        value: email,
-        label: `${owner.name} (${email})`,
-      });
-    }
-    return options;
-  }, [actorEmail, owners]);
 
   function persist(
     nextRows: NotificationRow[],
@@ -566,8 +525,8 @@ export function ConsultationNotifyPanel({
     );
   }
 
-  function patchEmailConfig(partial: Partial<typeof emailConfig>) {
-    const next = { ...emailConfig, ...partial };
+  function patchEmailConfig(partial: Partial<EmailRouting>) {
+    const next = updateEmailConfig(emailConfig, audience, partial, actorEmail);
     setEmailConfig(next);
     persist(rows, reminders, next);
   }
@@ -665,7 +624,7 @@ export function ConsultationNotifyPanel({
                             setMenuId(null);
                           }}
                         >
-                          Edit template
+                          Edit
                         </button>
                       </div>
                     ) : null}
@@ -748,69 +707,14 @@ export function ConsultationNotifyPanel({
       )}
 
       {panel === "email" ? (
-        <div className="mt-8">
-          <p className="text-[13px] font-semibold text-slate-800">
-            Email Configurations
-          </p>
-          <div className="mt-3 grid gap-4 sm:grid-cols-3">
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] text-slate-500">
-                Send From
-              </span>
-              <select
-                value={emailConfig.sendFrom}
-                onChange={(e) => patchEmailConfig({ sendFrom: e.target.value })}
-                className={SELECT_CLASS}
-                style={SELECT_BG}
-              >
-                {!emailConfig.sendFrom && !actorEmail ? (
-                  <option value="">Select send from</option>
-                ) : null}
-                {emailOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] text-slate-500">
-                Reply To
-              </span>
-              <select
-                value={emailConfig.replyTo}
-                onChange={(e) => patchEmailConfig({ replyTo: e.target.value })}
-                className={SELECT_CLASS}
-                style={SELECT_BG}
-              >
-                <option value="">Select Reply To</option>
-                {emailOptions.map((option) => (
-                  <option key={`reply-${option.value}`} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="mb-1.5 block text-[12px] text-slate-500">
-                Copy(Cc)
-              </span>
-              <select
-                value={emailConfig.cc}
-                onChange={(e) => patchEmailConfig({ cc: e.target.value })}
-                className={SELECT_CLASS}
-                style={SELECT_BG}
-              >
-                <option value="">Select Copy (Cc)</option>
-                {emailOptions.map((option) => (
-                  <option key={`cc-${option.value}`} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-        </div>
+        <EmailConfigFields
+          // Each tab keeps its own set, so switching tabs remounts the dropdowns.
+          key={audience}
+          audience={audience}
+          value={routingFor(emailConfig, audience, { superAdminEmail: actorEmail })}
+          superAdminEmail={actorEmail || emailConfig?.superAdminEmail || ""}
+          onChange={patchEmailConfig}
+        />
       ) : null}
 
       {panel === "whatsapp" ? (
@@ -897,6 +801,7 @@ export function ConsultationNotifyPanel({
       {editing ? (
         <NotificationEditModal
           row={editing}
+          channels={[channel ?? "Email"]}
           onClose={() => setEditing(null)}
           onSave={(next) => {
             persist(rows.map((row) => (row.id === next.id ? next : row)));

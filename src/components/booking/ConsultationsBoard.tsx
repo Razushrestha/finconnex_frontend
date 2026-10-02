@@ -18,7 +18,6 @@ import {
   Search,
   Share2,
   Trash2,
-  User,
   Users,
   UsersRound,
   X,
@@ -58,10 +57,11 @@ import {
   type ConsultationSetupStepId,
 } from "@/components/booking/ConsultationWizardLayout";
 import { ConsultationOverview } from "@/components/booking/ConsultationOverview";
+import { normalizeSlotLimit } from "@/components/booking/LimitsControls";
 import { ShareConsultationModal } from "@/components/booking/ShareConsultationModal";
 import { getRulesActor } from "@/lib/rules/actor";
 import { cn } from "@/lib/utils";
-import { initials } from "@/lib/activities/shared";
+import { avatarColor, initials } from "@/lib/activities/shared";
 import {
   createCrmEventType,
   listCrmEventTypePages,
@@ -249,7 +249,10 @@ export function ConsultationsBoard() {
     additional?: AdditionalSettingsValues,
   ) {
     if (!detailsChoice || !detailsValues || !rulesValues) return;
-    const mapped = rulesToPageFields(rulesValues);
+    const mapped = rulesToPageFields(rulesValues, {
+      durationMinutes: detailsValues.durationMinutes,
+      group: detailsChoice.mode === "group",
+    });
     const slug = detailsValues.name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
@@ -272,6 +275,7 @@ export function ConsultationsBoard() {
       minNoticeHours: mapped.minNoticeHours,
       maxAdvanceDays: mapped.maxAdvanceDays,
       maxAttendees: mapped.maxAttendees,
+      schedulingRules: mapped.schedulingRules,
       timezone: "Australia/Sydney",
       meetingVia:
         detailsValues.meetingPlace === "online"
@@ -305,8 +309,10 @@ export function ConsultationsBoard() {
             defaultHours: availabilityValues.defaultHours,
             overrideUserHours: availabilityValues.overrideUserHours,
             userSpecificHours: availabilityValues.userSpecificHours,
-            slotsPerEvent: availabilityValues.slotsPerEvent,
-            slotsPerCustomer: availabilityValues.slotsPerCustomer,
+            slotsPerEvent: normalizeSlotLimit(availabilityValues.slotsPerEvent),
+            slotsPerCustomer: normalizeSlotLimit(
+              availabilityValues.slotsPerCustomer,
+            ),
             customLimits: availabilityValues.customLimits,
             userHours: availabilityValues.userHours,
           }
@@ -357,6 +363,8 @@ export function ConsultationsBoard() {
           ? availabilityHostIds
           : Object.values(assignedUserIds).filter(Boolean),
         bufferBeforeMinutes: page.bufferMinutes,
+        // Only sent when set, so the default create request is unchanged.
+        bufferAfterMinutes: page.schedulingRules?.postBufferMinutes || undefined,
         minimumNoticeMinutes: Math.round((page.minNoticeHours ?? 2) * 60),
         maxDaysInFuture: page.maxAdvanceDays,
       }),
@@ -453,7 +461,7 @@ export function ConsultationsBoard() {
   if (detailsChoice && rulesStep && detailsValues) {
     return wrapSetup(
       <BookingRulesStep
-        durationMinutes={detailsValues.durationMinutes}
+        group={detailsChoice.mode === "group"}
         initial={rulesValues}
         onBack={() => goToSetupStep("availability")}
         onSave={(rules) => {
@@ -1122,29 +1130,25 @@ function ShareButton({
 }
 
 function PeopleSlot({ people }: { people: string[] }) {
-  if (people.length > 1) {
-    return (
-      <div className="flex items-center" aria-label={people.join(", ")}>
-        {people.slice(0, 3).map((name, i) => (
-          <span
-            key={name}
-            className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-slate-400",
-              i > 0 && "-ml-2",
-            )}
-          >
-            <User className="h-3.5 w-3.5" />
-          </span>
-        ))}
-      </div>
-    );
-  }
+  const names = people.filter(Boolean);
+  if (names.length === 0) return null;
 
   return (
-    <p className="flex min-w-0 items-center gap-1.5 text-[12px] text-slate-500">
-      <User className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-      <span className="truncate">{people[0]}</span>
-    </p>
+    <div className="flex items-center" aria-label={names.join(", ")}>
+      {names.slice(0, 3).map((name, i) => (
+        <span
+          key={`${name}-${i}`}
+          title={name}
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-[10px] font-semibold",
+            avatarColor(name),
+            i > 0 && "-ml-2",
+          )}
+        >
+          {initials(name)}
+        </span>
+      ))}
+    </div>
   );
 }
 

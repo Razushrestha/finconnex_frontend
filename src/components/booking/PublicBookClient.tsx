@@ -13,6 +13,7 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { confirmPublicBooking } from "@/lib/booking/actions";
+import { sanitizeDescriptionHtml } from "@/lib/booking/description-html";
 import {
   crmEventTypeIdOf,
   listCrmAvailableSlots,
@@ -34,9 +35,11 @@ import {
   googleCalendarUrl,
   upsertBookingPage,
   bookingPageMatchesSlug,
+  assignedCalendarMembers,
   type Booking,
   type BookingPage,
 } from "@/lib/booking/types";
+import { AssignedHosts } from "@/components/booking/AssignedHosts";
 import {
   isPastBookingDate,
   isPastBookingStart,
@@ -261,7 +264,8 @@ function BookFlow({
       );
     });
 
-  const hostName = page.consultants?.[0] || page.owner || "Host";
+  const hostNames = assignedCalendarMembers(page);
+  const hostName = hostNames[0] || "Host";
 
   useEffect(() => {
     if (selectedDate) return;
@@ -433,25 +437,20 @@ function BookFlow({
                   Rescheduling your booking
                 </p>
               ) : null}
-              <div className="mt-4 flex items-center gap-2 text-[13px] text-slate-600">
-                <span
-                  className={cn(
-                    "flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold text-white",
-                    avatarColor(hostName),
-                  )}
-                >
-                  {initials(hostName)}
-                </span>
-                <span className="truncate">{hostName}</span>
+              <div className="mt-4">
+                <AssignedHosts names={hostNames} />
               </div>
               <div className="mt-3 flex items-center gap-2 text-[13px] text-slate-500">
                 <Clock className="h-4 w-4 text-slate-400" />
                 {page.durationMinutes} mins
               </div>
               {page.description ? (
-                <p className="mt-4 text-[12px] leading-5 text-slate-500">
-                  {page.description}
-                </p>
+                <div
+                  className="fc-rich-editor mt-4 text-[12px] leading-5 text-slate-500 [&_a]:text-[#5A32A3] [&_a]:underline [&_p]:m-0"
+                  dangerouslySetInnerHTML={{
+                    __html: sanitizeDescriptionHtml(page.description),
+                  }}
+                />
               ) : null}
             </aside>
 
@@ -652,17 +651,7 @@ function BookFlow({
                 </h1>
               </div>
               <div className="mt-5 space-y-3 text-[13px] text-slate-600">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "flex h-6 w-6 items-center justify-center rounded-full text-[9px] font-semibold text-white",
-                      avatarColor(hostName),
-                    )}
-                  >
-                    {initials(hostName)}
-                  </span>
-                  <span className="truncate">{hostName}</span>
-                </div>
+                <AssignedHosts names={hostNames} />
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 shrink-0 text-slate-400" />
                   <span>{whenLabel}</span>

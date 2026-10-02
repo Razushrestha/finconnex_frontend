@@ -3,10 +3,19 @@
 import { createLead } from "@/lib/leads/store";
 import { createCalendarItem } from "@/lib/calendar/store";
 import { createMeeting, findMeetingById, listMeetings, saveMeetings } from "@/lib/meetings/store";
-import { createCrmMeeting, persistRemoteMeeting, tryCrmMeeting } from "@/lib/meetings/api";
-import type { MeetingType } from "@/lib/meetings/types";
 import {
+  cancelCrmMeeting,
+  createCrmMeeting,
+  persistRemoteMeeting,
+  tryCrmMeeting,
+  updateCrmMeeting,
+} from "@/lib/meetings/api";
+import type { Meeting, MeetingType } from "@/lib/meetings/types";
+import { ensureCrmSession } from "@/lib/activity-timeline/auth";
+import {
+  cancelCrmBooking,
   createCrmBooking,
+  crmBookingFromResponse,
   crmEventTypeIdOf,
   rescheduleCrmBooking,
   tryCrmBooking,
@@ -16,7 +25,7 @@ import {
   dispatchBookingNotifications,
   queueBookingLifecycleNotifies,
 } from "@/lib/booking/notify";
-import { allocateConferencingLink, conferencingKind } from "@/lib/booking/meeting-link";
+import { allocateConferencingLink } from "@/lib/booking/meeting-link";
 import { nextBookingRef } from "@/lib/booking/guest-confirm-email";
 import {
   formatNotificationAt,
@@ -88,6 +97,134 @@ function slotEndIso(startIso: string, durationMinutes: number) {
   return `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}T${pad(end.getHours())}:${pad(end.getMinutes())}`;
 }
 
+/** The guest picked an exact time: only rounding noise may separate it from a CRM slot. */
+const EXACT_SLOT_TOLERANCE_MS = 60 * 1000;
+/** Longest the guest waits on the CRM before their confirmation is shown anyway. */
+const CRM_SYNC_TIMEOUT_MS = 20_000;
+
+type CrmSaved = { bookingId?: string; meeting?: Meeting };
+
+async function withTimeout<T>(work: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** Anonymous guests have no CRM session, so there is nothing to save to. */
+async function hasCrmSession(): Promise<boolean> {
+  try {
+    return !!(await ensureCrmSession());
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Saves a new appointment in the CRM so Bookings → Upcoming Appointments lists
+ * it. A booking is preferred; when the CRM has no slot at exactly this time the
+ * appointment is saved as a meeting instead (the same fallback the internal
+ * "New booking" form uses). Never throws.
+ */
+async function saveNewAppointmentInCrm(args: {
+  eventTypeId: string;
+  startIso: string;
+  start: string;
+  end: string;
+  title: string;
+  page: BookingPage;
+  guestName: string;
+  guestEmail: string;
+  guestPhone?: string;
+  timezone: string;
+}): Promise<CrmSaved> {
+  if (!(await hasCrmSession())) return {};
+
+  if (args.eventTypeId) {
+    const booked = await tryCrmBooking(() =>
+      createCrmBooking({
+        eventTypeId: args.eventTypeId,
+        startTime: args.startIso,
+        name: args.guestName,
+        email: args.guestEmail,
+        timezone: args.timezone,
+        phone: args.guestPhone,
+        // The app sends the confirmation from the host's template.
+        notifyInvitee: false,
+        snapToleranceMs: EXACT_SLOT_TOLERANCE_MS,
+      }),
+    );
+    if (booked) {
+      return { bookingId: crmBookingFromResponse(booked.raw)?.id };
+    }
+  }
+
+  const meeting = await tryCrmMeeting(() =>
+    createCrmMeeting({
+      title: args.title,
+      type: meetingTypeForPage(args.page),
+      startDateTime: args.start,
+      endDateTime: args.end,
+      status: "Scheduled",
+      organizer: args.page.owner,
+      location: args.page.location || args.page.meetingViaDetail,
+      agenda: `Booked via /book/${args.page.slug}`,
+      timezone: args.timezone,
+      externalAttendees: [{ email: args.guestEmail, name: args.guestName }],
+    }),
+  );
+  return meeting ? { meeting } : {};
+}
+
+/** Moves the CRM record a guest's original booking created. Never throws. */
+async function moveAppointmentInCrm(args: {
+  crmBookingId?: string;
+  crmMeetingId?: string;
+  startIso: string;
+  start: string;
+  end: string;
+}): Promise<CrmSaved> {
+  if (!args.crmBookingId && !args.crmMeetingId) return {};
+  if (!(await hasCrmSession())) return {};
+
+  if (args.crmBookingId) {
+    const bookingId = args.crmBookingId;
+    const moved = await tryCrmBooking(() =>
+      rescheduleCrmBooking(bookingId, args.startIso),
+    );
+    // A reschedule replaces the booking with a new one; follow the new id.
+    return { bookingId: crmBookingFromResponse(moved)?.id ?? bookingId };
+  }
+
+  const meetingId = args.crmMeetingId!;
+  const meeting = await tryCrmMeeting(() =>
+    updateCrmMeeting(meetingId, {
+      startDateTime: args.start,
+      endDateTime: args.end,
+    }),
+  );
+  return meeting ? { meeting } : {};
+}
+
+/** Cancels the CRM record behind a guest booking so it leaves the table. Never throws. */
+async function cancelAppointmentInCrm(booking: Booking): Promise<void> {
+  const { crmBookingId, crmMeetingId } = booking;
+  if (!crmBookingId && !crmMeetingId) return;
+  if (!(await hasCrmSession())) return;
+  if (crmBookingId) {
+    await tryCrmBooking(() => cancelCrmBooking(crmBookingId, "Cancelled by guest"));
+    return;
+  }
+  await tryCrmMeeting(() => cancelCrmMeeting(crmMeetingId!));
+}
+
 export async function confirmPublicBooking(input: {
   page: BookingPage;
   guestName: string;
@@ -114,57 +251,44 @@ export async function confirmPublicBooking(input: {
     ? getBookingByToken(input.rescheduleToken)
     : undefined;
 
-  const onPublicBook =
-    typeof window !== "undefined" &&
-    /^\/book(\/|$)/i.test(window.location.pathname);
-
-  const eventTypeId = crmEventTypeIdOf(page);
-  if (eventTypeId && !onPublicBook) {
-    const crmStart = new Date(input.start);
-    const startIso = Number.isNaN(crmStart.getTime())
-      ? input.start
-      : crmStart.toISOString();
-    if (existing?.id && input.rescheduleToken) {
-      await tryCrmBooking(() => rescheduleCrmBooking(existing.id, startIso));
-    } else {
-      const booked = await tryCrmBooking(() =>
-        createCrmBooking({
-          eventTypeId,
-          startTime: startIso,
-          name: input.guestName.trim(),
-          email: input.guestEmail.trim(),
-          timezone,
-          phone: input.guestPhone,
-        }),
-      );
-      if (booked?.id && !existing) {
-        /* local copy below keeps manage-token UX even when CRM accepted */
-      }
-    }
-  }
-
   const manageToken = existing?.manageToken ?? nextManageToken();
   const bookingId = existing?.id ?? nextBookingId();
   const reference = existing?.reference ?? nextBookingRef();
 
-  const crmMeeting =
-    onPublicBook || existing?.joinUrl || conferencingKind(page) === "none"
-      ? null
-      : await tryCrmMeeting(() =>
-          createCrmMeeting({
-            title: `${page.title} — ${input.guestName}`,
-            type: meetingTypeForPage(page),
-            startDateTime: input.start,
-            endDateTime: end,
-            status: "Scheduled",
-            organizer: page.owner,
-            location: page.location || page.meetingViaDetail,
-            agenda: `Booked via /book/${page.slug}`,
+  // Save the appointment in the CRM first so it appears in Bookings → Upcoming
+  // Appointments. Failing or timing out never blocks the guest's confirmation.
+  const startMs = new Date(input.start).getTime();
+  const startIso = Number.isNaN(startMs)
+    ? input.start
+    : new Date(startMs).toISOString();
+  const crmSaved =
+    (await withTimeout(
+      existing
+        ? moveAppointmentInCrm({
+            crmBookingId: existing.crmBookingId,
+            crmMeetingId: existing.crmMeetingId,
+            startIso,
+            start: input.start,
+            end,
+          })
+        : saveNewAppointmentInCrm({
+            eventTypeId: crmEventTypeIdOf(page),
+            startIso,
+            start: input.start,
+            end,
+            title: `${page.title} — ${input.guestName.trim()}`,
+            page,
+            guestName: input.guestName.trim(),
+            guestEmail: input.guestEmail.trim(),
+            guestPhone: input.guestPhone,
             timezone,
-            externalAttendees: [{ email: input.guestEmail.trim(), name: input.guestName.trim() }],
           }),
-        );
+      CRM_SYNC_TIMEOUT_MS,
+    )) ?? {};
+  const crmMeeting = crmSaved.meeting ?? null;
   if (crmMeeting) persistRemoteMeeting(crmMeeting);
+  const crmBookingId = crmSaved.bookingId ?? existing?.crmBookingId;
+  const crmMeetingId = crmMeeting?.id ?? existing?.crmMeetingId;
 
   const joinUrl =
     existing?.joinUrl ||
@@ -191,22 +315,25 @@ export async function confirmPublicBooking(input: {
     leadId = lead.id;
     createdLead = true;
 
-    const meeting = createMeeting({
-      title: `${page.title} — ${input.guestName}`,
-      relatedTo: lead.name,
-      type: meetingTypeForPage(page),
-      startDateTime: input.start,
-      endDateTime: end,
-      status: "Scheduled",
-      organizer: page.owner,
-      location: page.location || page.meetingViaDetail,
-      meetingLink: joinUrl || page.videoLink,
-      agenda: `Booked via /book/${page.slug}`,
-      notes: Object.entries(input.answers)
-        .map(([k, v]) => `${k}: ${v}`)
-        .join("\n"),
-    });
-    meetingId = meeting.id;
+    // A CRM meeting is already cached locally by persistRemoteMeeting; a second
+    // local copy would list the same appointment twice.
+    meetingId =
+      crmMeeting?.id ??
+      createMeeting({
+        title: `${page.title} — ${input.guestName}`,
+        relatedTo: lead.name,
+        type: meetingTypeForPage(page),
+        startDateTime: input.start,
+        endDateTime: end,
+        status: "Scheduled",
+        organizer: page.owner,
+        location: page.location || page.meetingViaDetail,
+        meetingLink: joinUrl || page.videoLink,
+        agenda: `Booked via /book/${page.slug}`,
+        notes: Object.entries(input.answers)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join("\n"),
+      }).id;
 
     if (page.calendarInvites !== false) {
       createCalendarItem({
@@ -227,7 +354,8 @@ export async function confirmPublicBooking(input: {
       relatedTo: lead.name,
       relatedHref: "/booking",
     });
-  } else if (meetingId) {
+  } else if (meetingId && !crmMeetingId) {
+    // CRM meetings were already moved above and cached by persistRemoteMeeting.
     const found = findMeetingById(meetingId);
     if (found) {
       const updated = listMeetings().map((m) =>
@@ -272,6 +400,8 @@ export async function confirmPublicBooking(input: {
     manageToken,
     createdLead,
     meetingId,
+    crmBookingId,
+    crmMeetingId,
     leadId,
     contactId,
     confirmationMessage,
@@ -313,6 +443,9 @@ export async function cancelPublicBooking(token: string): Promise<Booking | null
     );
     saveMeetings(updated);
   }
+
+  // Take the appointment out of Bookings → Upcoming Appointments too.
+  await withTimeout(cancelAppointmentInCrm(booking), CRM_SYNC_TIMEOUT_MS);
 
   const page = getBookingPageById(booking.pageId);
   if (page) {

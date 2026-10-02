@@ -82,6 +82,7 @@ export async function POST(request: Request) {
       html,
       cc: asList(body.cc),
       bcc: asList(body.bcc),
+      replyTo: typeof body.replyTo === "string" ? body.replyTo.trim() : undefined,
       attachments,
     });
     return NextResponse.json({ ok: true, delivered: "sendgrid" });

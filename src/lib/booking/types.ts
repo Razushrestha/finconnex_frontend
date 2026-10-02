@@ -1,3 +1,5 @@
+import type { EmailNotifyConfig } from "@/lib/booking/email-config";
+
 /** SRS §8 Booking & Scheduling */
 
 export type BookingEventType =
@@ -164,16 +166,29 @@ export interface BookingPage {
     eventDescription: string;
   };
   notifyReminders?: Array<{ minutes: number }>;
-  emailNotifyConfig?: {
-    sendFrom: string;
-    replyTo: string;
-    cc: string;
-  };
+  /** Email Configurations: the To Customer set, with the To User set under `user`. */
+  emailNotifyConfig?: EmailNotifyConfig;
   whatsappNotifyConfig?: {
     sendFrom: string;
   };
   allowReschedule?: boolean;
   allowCancel?: boolean;
+  /**
+   * Scheduling Rules settings the page's own fields cannot hold. The pre-buffer
+   * (`bufferMinutes`), minimum notice (`minNoticeHours`) and how far ahead guests
+   * can book (`maxAdvanceDays`) stay on those fields.
+   */
+  schedulingRules?: {
+    /** Extra time held after each appointment. */
+    postBufferMinutes: number;
+    /** "adjusted" slots shift around other events; "fixed" stay on the interval. */
+    slotType: "adjusted" | "fixed";
+    /** Gap between appointment start times. */
+    intervalMinutes: number;
+    /** When on, guests can only cancel or reschedule this long before the start. */
+    cancelWindowEnabled: boolean;
+    cancelWindowMinutes: number;
+  };
   /** Per-consultation hours and appointment caps from Availability and Limits. */
   appointmentLimits?: {
     defaultHours: boolean;
@@ -203,6 +218,8 @@ export interface BookingPage {
     smsBody: string;
     notifyContact: boolean;
     notifyUser: boolean;
+    /** How dates are written in this notification, e.g. "dd-MMM-yyyy". */
+    dateFormat?: string;
   }>;
 }
 
@@ -221,6 +238,10 @@ export interface Booking {
   manageToken: string;
   createdLead?: boolean;
   meetingId?: string;
+  /** CRM booking this appointment was saved as (follows reschedules). */
+  crmBookingId?: string;
+  /** CRM meeting saved instead when no matching booking slot existed. */
+  crmMeetingId?: string;
   leadId?: string;
   contactId?: string;
   confirmationMessage?: string;
@@ -963,7 +984,7 @@ export function formatBookingWhen(start: string, end: string) {
   return `${date} · ${tStart} - ${tEnd}`;
 }
 
-function formatTime(iso: string) {
+export function formatTime(iso: string) {
   const t = iso.includes("T") ? iso.split("T")[1] : iso;
   const [h, m] = t.split(":");
   const hour = Number(h);

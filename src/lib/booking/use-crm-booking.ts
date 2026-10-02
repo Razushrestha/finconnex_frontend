@@ -18,6 +18,7 @@ import { listCrmMeetings } from "@/lib/meetings/api";
 import { loadWorkspaceConsultants } from "@/lib/users/assignable";
 import { listCrmUsers } from "@/lib/settings/users-store";
 import {
+  dropBookingMeetings,
   listCrmBookings,
   listCrmBookingHosts,
   listCrmConsultants,
@@ -35,7 +36,14 @@ function bookingToAppointment(
   hosts: { id: string; name: string; crmUserId?: string; email?: string }[],
 ): DashboardAppointment | null {
   const statusRaw = row.status.toLowerCase();
-  if (statusRaw.includes("cancel") || statusRaw.includes("complete")) return null;
+  // RESCHEDULED is the superseded booking; its replacement is listed separately.
+  if (
+    statusRaw.includes("cancel") ||
+    statusRaw.includes("complete") ||
+    statusRaw.includes("resched")
+  ) {
+    return null;
+  }
   const status: AppointmentStatus = statusRaw.includes("confirm")
     ? "Confirmed"
     : statusRaw.includes("no-show") || statusRaw.includes("noshow")
@@ -160,7 +168,8 @@ export function useCrmBooking() {
           return rows;
         }),
       ];
-      const mappedMeetings = meetingsResult
+      // Each booking has a backend-made meeting twin; show the appointment once.
+      const mappedMeetings = dropBookingMeetings(meetingsResult, crmBookings ?? [])
         .map((meeting) => meetingToAppointment(meeting, people))
         .filter((row): row is DashboardAppointment => !!row);
       const mappedBookings = (crmBookings ?? [])

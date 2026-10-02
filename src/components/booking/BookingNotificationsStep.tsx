@@ -1,15 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import {
-  Bell,
-  ChevronDown,
-  Info,
-  Pencil,
-  Tag,
-  X,
-} from "lucide-react";
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from "react";
+import { Bell, Pencil, RotateCcw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ListboxSelect } from "@/components/booking/LimitsControls";
+import { NotifyVariableMenu } from "@/components/booking/NotifyVariableMenu";
+import {
+  dateFormatOptions,
+  insertAtSelection,
+  normalizeDateFormat,
+} from "@/lib/booking/notify-variables";
 import {
   DEFAULT_NOTIFICATIONS,
   NOTIFY_CHANNELS,
@@ -155,36 +163,232 @@ export function BookingNotificationsStep({
   );
 }
 
+const LABEL = "text-[12px] font-semibold text-slate-700";
+
+const INPUT =
+  "h-10 w-full rounded-lg border border-[#E5E7EB] bg-white px-3 text-[13px] text-slate-800 outline-none transition-colors placeholder:text-slate-400 focus:border-[#5A32A3] focus:ring-2 focus:ring-[#5A32A3]/10";
+
+const SECONDARY_BUTTON =
+  "h-10 shrink-0 rounded-lg border border-[#E5E7EB] bg-white px-4 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
+
+function Required() {
+  return <span className="text-rose-500">*</span>;
+}
+
+function RecipientCheck({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] font-medium text-slate-700">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-4 w-4 rounded accent-[#5A32A3]"
+      />
+      {label}
+    </label>
+  );
+}
+
+/**
+ * One bordered message editor: a slim toolbar (Reset to default on the left,
+ * `tools` such as Insert Variable on the right), the text, and a footer line
+ * with an optional hint and the character / word count.
+ */
+function MessageBox({
+  id,
+  value,
+  rows,
+  textareaRef,
+  onChange,
+  onReset,
+  tools,
+  hint,
+}: {
+  id: string;
+  value: string;
+  rows: number;
+  textareaRef?: Ref<HTMLTextAreaElement>;
+  onChange: (value: string) => void;
+  onReset: () => void;
+  tools?: ReactNode;
+  hint?: string;
+}) {
+  const words = value.trim().split(/\s+/).filter(Boolean).length;
+  return (
+    <div className="overflow-hidden rounded-lg border border-[#E5E7EB] bg-white transition-colors focus-within:border-[#5A32A3] focus-within:ring-2 focus-within:ring-[#5A32A3]/10">
+      <div className="flex items-center justify-between gap-2 border-b border-[#E5E7EB] bg-slate-50 px-2 py-1.5">
+        <button
+          type="button"
+          onClick={onReset}
+          className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] font-medium text-slate-500 transition-colors hover:bg-white hover:text-[#5A32A3]"
+        >
+          <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+          Reset to default
+        </button>
+        {tools}
+      </div>
+      <textarea
+        id={id}
+        ref={textareaRef}
+        value={value}
+        rows={rows}
+        onChange={(event) => onChange(event.target.value)}
+        className="block w-full resize-y bg-white px-3.5 py-3 text-[13px] leading-6 text-slate-800 outline-none"
+      />
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-0.5 border-t border-[#EEF0F3] px-3.5 py-2 text-[11px] text-slate-400">
+        <span>{hint}</span>
+        <span>
+          {value.length} characters | {words} words
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** "Send a test" row: the address or number, the button beside it, and the outcome below. */
+function TestSend({
+  id,
+  label,
+  value,
+  placeholder,
+  onChange,
+  buttonLabel,
+  busy,
+  onSend,
+  note,
+  failed,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange: (value: string) => void;
+  buttonLabel: string;
+  busy: boolean;
+  onSend: () => void;
+  note: string;
+  failed: boolean;
+}) {
+  return (
+    <div className="border-t border-[#EEF0F3] pt-5">
+      <label htmlFor={id} className={LABEL}>
+        {label}
+      </label>
+      <div className="mt-1.5 flex flex-col gap-2 sm:flex-row">
+        <input
+          id={id}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          className={cn(INPUT, "sm:flex-1")}
+        />
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onSend}
+          className={SECONDARY_BUTTON}
+        >
+          {busy ? "Sending…" : buttonLabel}
+        </button>
+      </div>
+      {note ? (
+        <p
+          role="status"
+          className={cn("mt-2 text-[12px]", failed ? "text-rose-600" : "text-emerald-700")}
+        >
+          {note}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Edits one notification's template. `channels` are the tabs offered; Email
+ * only by default. The SMS and WhatsApp panels pass their own channel so their
+ * message text stays editable.
+ */
 export function NotificationEditModal({
   row,
+  channels = ["Email"],
   onClose,
   onSave,
 }: {
   row: NotificationRow;
+  channels?: NotifyChannel[];
   onClose: () => void;
   onSave: (row: NotificationRow) => void;
 }) {
+  const tabs: NotifyChannel[] = channels.length ? channels : ["Email"];
   const [draft, setDraft] = useState(row);
-  const [tab, setTab] = useState<NotifyChannel>("Email");
-  const [contactOpen, setContactOpen] = useState(true);
+  const [tab, setTab] = useState<NotifyChannel>(tabs[0]);
   const [testEmail, setTestEmail] = useState("");
   const [testPhone, setTestPhone] = useState("+12345678901");
   const [testNote, setTestNote] = useState("");
+  const [testFailed, setTestFailed] = useState(false);
   const [testing, setTesting] = useState(false);
 
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const pressedOnBackdrop = useRef(false);
+  const titleId = useId();
+  const subjectId = useId();
+  const bodyId = useId();
+  const smsId = useId();
+  const testEmailId = useId();
+  const testPhoneId = useId();
+  const dateFormat = normalizeDateFormat(draft.dateFormat);
+  // Each row previews today's date in that style, e.g. "dd-MMM-yyyy (02-Oct-2026)".
+  const dateOptions = useMemo(() => dateFormatOptions(new Date()), []);
   const enabled = draft.channels[tab];
-  const words = useMemo(
-    () => draft.emailBody.trim().split(/\s+/).filter(Boolean).length,
-    [draft.emailBody],
-  );
-  const smsWords = useMemo(
-    () => draft.smsBody.trim().split(/\s+/).filter(Boolean).length,
-    [draft.smsBody],
-  );
+  const defaults = DEFAULT_NOTIFICATIONS.find((n) => n.id === row.id);
+  // Email and SMS text goes to the guest and to the assigned user alike, so
+  // either one is enough to edit it. WhatsApp only ever goes to the guest, and
+  // the in-app alert goes to the consultant whoever is ticked.
+  const canEdit =
+    tab === "In-app" ||
+    (tab === "WhatsApp"
+      ? draft.notifyContact
+      : draft.notifyContact || draft.notifyUser);
+
+  // Escape closes the window. A dropdown or the variable menu that is open
+  // takes the key first (they mark it handled), so one press closes one layer.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape" && !event.defaultPrevented) onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  /** Drops a variable at the caret (or over the selection) and puts the caret after it. */
+  function insertToken(field: "emailSubject" | "emailBody", token: string) {
+    const el = field === "emailSubject" ? subjectRef.current : bodyRef.current;
+    const next = insertAtSelection(
+      draft[field],
+      el?.selectionStart,
+      el?.selectionEnd,
+      token,
+    );
+    setDraft((d) => ({ ...d, [field]: next.value }));
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(next.caret, next.caret);
+    });
+  }
 
   async function runTest(channel: NotifyChannel) {
     setTesting(true);
     setTestNote("");
+    setTestFailed(false);
     try {
       await sendNotifyTest({
         channel,
@@ -195,6 +399,7 @@ export function NotificationEditModal({
       setTestNote(`${channel} test sent.`);
     } catch (err) {
       setTestNote(err instanceof Error ? err.message : "Test send failed");
+      setTestFailed(true);
     } finally {
       setTesting(false);
     }
@@ -203,41 +408,49 @@ export function NotificationEditModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-3 backdrop-blur-[1px] sm:items-center sm:p-6"
-      onClick={onClose}
+      // Closing needs the press and the release on the backdrop: dragging to
+      // select text and letting go outside the window must not throw away edits.
+      onMouseDown={(event) => {
+        pressedOnBackdrop.current = event.target === event.currentTarget;
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget && pressedOnBackdrop.current) onClose();
+        pressedOnBackdrop.current = false;
+      }}
     >
       <div
         role="dialog"
-        className="flex max-h-[92vh] w-full max-w-[760px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="flex max-h-[92vh] w-full max-w-[800px] flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
       >
-        <div className="flex items-start justify-between border-b border-[#E5E7EB] px-5 py-4">
-          <h2 className="pr-8 text-[16px] font-bold text-slate-900">
-            Edit {row.title}
-          </h2>
+        <div className="flex items-start justify-between gap-4 border-b border-[#E5E7EB] px-6 py-4">
+          <div className="min-w-0">
+            <h2 id={titleId} className="text-[16px] font-semibold text-slate-900">
+              Edit {row.title}
+            </h2>
+            <p className="mt-0.5 text-[12.5px] leading-5 text-slate-500">{row.info}</p>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-50"
+            aria-label="Close"
+            className="-mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4" aria-hidden />
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <div className="mb-4 flex items-start gap-2 rounded-lg bg-[#F3ECFB] px-3 py-2.5 text-[12px] text-[#5A32A3]">
-            <Info className="mt-0.5 h-4 w-4 shrink-0" />
-            {row.info}
-          </div>
-
-          <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#E5E7EB]">
-            <div className="flex gap-4">
-              {NOTIFY_CHANNELS.map((c) => (
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
+          <div className="flex items-end justify-between gap-3 border-b border-[#E5E7EB]">
+            <div className="flex gap-5">
+              {tabs.map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => setTab(c)}
                   className={cn(
-                    "border-b-2 pb-2 text-[13px] font-semibold",
+                    "-mb-px border-b-2 pb-2.5 text-[13px] font-semibold transition-colors",
                     tab === c
                       ? "border-[#5A32A3] text-[#5A32A3]"
                       : "border-transparent text-slate-500 hover:text-slate-800",
@@ -260,7 +473,7 @@ export function NotificationEditModal({
                   }))
                 }
                 className={cn(
-                  "relative h-6 w-11 rounded-full",
+                  "relative h-6 w-11 rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#5A32A3]/40 focus-visible:ring-offset-2",
                   enabled ? "bg-[#5A32A3]" : "bg-slate-300",
                 )}
               >
@@ -274,231 +487,188 @@ export function NotificationEditModal({
             </label>
           </div>
 
-          <p className="mb-2 text-[13px] font-semibold text-slate-800">
-            Who should receive this notification?
-          </p>
-          <div className="mb-4 overflow-hidden rounded-lg border border-[#E5E7EB]">
-            <div className="border-b border-[#F3F4F6]">
-              <div className="flex items-center justify-between px-3 py-2.5">
-                <label className="flex items-center gap-2 text-[13px] font-medium text-slate-800">
-                  <input
-                    type="checkbox"
-                    checked={draft.notifyContact}
-                    onChange={(e) =>
-                      setDraft((d) => ({ ...d, notifyContact: e.target.checked }))
-                    }
-                    className="accent-[#5A32A3]"
-                  />
-                  Contact
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg bg-slate-50 px-3.5 py-2.5">
+            <span className="text-[12px] font-semibold text-slate-700">Send to</span>
+            <RecipientCheck
+              label="Contact"
+              checked={draft.notifyContact}
+              onChange={(checked) => setDraft((d) => ({ ...d, notifyContact: checked }))}
+            />
+            <RecipientCheck
+              label="Assigned user"
+              checked={draft.notifyUser}
+              onChange={(checked) => setDraft((d) => ({ ...d, notifyUser: checked }))}
+            />
+          </div>
+
+          {!canEdit ? (
+            <p className="rounded-lg border border-dashed border-[#E5E7EB] px-4 py-8 text-center text-[13px] text-slate-500">
+              {tab === "WhatsApp" ? (
+                <>
+                  WhatsApp messages go to the guest. Tick{" "}
+                  <span className="font-semibold text-slate-700">Contact</span> above to
+                  send this one.
+                </>
+              ) : (
+                <>
+                  Tick <span className="font-semibold text-slate-700">Contact</span> or{" "}
+                  <span className="font-semibold text-slate-700">Assigned user</span>{" "}
+                  above to write this message.
+                </>
+              )}
+            </p>
+          ) : tab === "Email" ? (
+            <div className="space-y-5">
+              <div>
+                <label htmlFor={subjectId} className={LABEL}>
+                  Subject<Required />
                 </label>
+                <div className="relative mt-1.5">
+                  <input
+                    id={subjectId}
+                    ref={subjectRef}
+                    value={draft.emailSubject}
+                    onChange={(e) =>
+                      setDraft((d) => ({ ...d, emailSubject: e.target.value }))
+                    }
+                    className={cn(INPUT, "pr-[150px]")}
+                  />
+                  <div className="absolute top-1/2 right-1.5 -translate-y-1/2">
+                    <NotifyVariableMenu
+                      onInsert={(token) => insertToken("emailSubject", token)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                  <label htmlFor={bodyId} className={LABEL}>
+                    Email body<Required />
+                  </label>
+                  <div className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 sm:w-auto sm:flex-nowrap">
+                    <span className="text-[12px] text-slate-500">
+                      Select Date Format For Mail:
+                    </span>
+                    <ListboxSelect
+                      compact
+                      label="Select date format for mail"
+                      value={dateFormat}
+                      options={dateOptions}
+                      onChange={(value) => setDraft((d) => ({ ...d, dateFormat: value }))}
+                      className="w-full sm:w-[230px]"
+                    />
+                  </div>
+                </div>
+                <MessageBox
+                  id={bodyId}
+                  textareaRef={bodyRef}
+                  value={draft.emailBody}
+                  rows={9}
+                  onChange={(emailBody) => setDraft((d) => ({ ...d, emailBody }))}
+                  onReset={() =>
+                    setDraft((d) => ({ ...d, emailBody: defaults?.emailBody ?? d.emailBody }))
+                  }
+                  tools={
+                    <NotifyVariableMenu
+                      onInsert={(token) => insertToken("emailBody", token)}
+                    />
+                  }
+                  hint="Dates in the message follow the format above."
+                />
+              </div>
+
+              <TestSend
+                id={testEmailId}
+                label="Test email"
+                value={testEmail}
+                placeholder="Enter the recipient's email address for testing"
+                onChange={setTestEmail}
+                buttonLabel="Send test email"
+                busy={testing}
+                onSend={() => void runTest("Email")}
+                note={testNote}
+                failed={testFailed}
+              />
+            </div>
+          ) : tab === "SMS" ? (
+            <div className="space-y-5">
+              <div>
+                <label htmlFor={smsId} className={LABEL}>
+                  SMS message<Required />
+                </label>
+                <div className="mt-1.5">
+                  <MessageBox
+                    id={smsId}
+                    value={draft.smsBody}
+                    rows={5}
+                    onChange={(smsBody) => setDraft((d) => ({ ...d, smsBody }))}
+                    onReset={() =>
+                      setDraft((d) => ({ ...d, smsBody: defaults?.smsBody ?? d.smsBody }))
+                    }
+                  />
+                </div>
+              </div>
+
+              <TestSend
+                id={testPhoneId}
+                label="Test SMS (enter phone number with country code)"
+                value={testPhone}
+                onChange={setTestPhone}
+                buttonLabel="Send test SMS"
+                busy={testing}
+                onSend={() => void runTest("SMS")}
+                note={testNote}
+                failed={testFailed}
+              />
+            </div>
+          ) : (
+            <div className="rounded-lg bg-slate-50 px-4 py-4 text-[13px] leading-6 text-slate-600">
+              <p>
+                {tab === "In-app"
+                  ? "In-app alerts go to the assigned consultant’s FinConnex notification inbox."
+                  : "WhatsApp uses the same message as SMS and sends to the guest phone."}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setContactOpen((v) => !v)}
+                  disabled={testing}
+                  onClick={() => void runTest(tab === "WhatsApp" ? "WhatsApp" : "In-app")}
+                  className={SECONDARY_BUTTON}
                 >
-                  <ChevronDown
-                    className={cn(
-                      "h-4 w-4 text-slate-400 transition-transform",
-                      contactOpen && "rotate-180",
-                    )}
-                  />
+                  {tab === "WhatsApp" ? "Send test WhatsApp" : "Send test in-app"}
                 </button>
+                {testNote ? (
+                  <p
+                    role="status"
+                    className={cn(
+                      "text-[12px]",
+                      testFailed ? "text-rose-600" : "text-emerald-700",
+                    )}
+                  >
+                    {testNote}
+                  </p>
+                ) : null}
               </div>
-              {contactOpen && draft.notifyContact && tab === "Email" ? (
-                <div className="space-y-3 border-t border-[#F3F4F6] px-3 py-3">
-                  <label className="block">
-                    <span className="mb-1 block text-[12px] font-semibold text-slate-600">
-                      Subject<span className="text-rose-500">*</span>
-                    </span>
-                    <div className="relative">
-                      <input
-                        value={draft.emailSubject}
-                        onChange={(e) =>
-                          setDraft((d) => ({ ...d, emailSubject: e.target.value }))
-                        }
-                        className="h-10 w-full rounded-lg border border-[#E5E7EB] pr-9 pl-3 text-[13px] outline-none focus:border-[#5A32A3]/40"
-                      />
-                      <Tag className="absolute top-1/2 right-3 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                    </div>
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 flex items-center justify-between text-[12px] font-semibold text-slate-600">
-                      <span>
-                        Email body<span className="text-rose-500">*</span>
-                      </span>
-                      <button
-                        type="button"
-                        className="font-medium text-[#5A32A3] hover:underline"
-                        onClick={() =>
-                          setDraft((d) => ({
-                            ...d,
-                            emailBody:
-                              DEFAULT_NOTIFICATIONS.find((n) => n.id === row.id)
-                                ?.emailBody ?? d.emailBody,
-                          }))
-                        }
-                      >
-                        Reset to default
-                      </button>
-                    </span>
-                    <textarea
-                      value={draft.emailBody}
-                      onChange={(e) =>
-                        setDraft((d) => ({ ...d, emailBody: e.target.value }))
-                      }
-                      rows={7}
-                      className="w-full rounded-lg border border-[#E5E7EB] px-3 py-2 text-[13px] leading-relaxed outline-none focus:border-[#5A32A3]/40"
-                    />
-                    <p className="mt-1 text-right text-[11px] text-slate-400">
-                      {draft.emailBody.length} characters | {words} words
-                    </p>
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[12px] font-semibold text-slate-600">
-                      Test email
-                    </span>
-                    <input
-                      value={testEmail}
-                      onChange={(e) => setTestEmail(e.target.value)}
-                      placeholder="Enter the recipient's email address for testing"
-                      className="h-10 w-full rounded-lg border border-[#E5E7EB] px-3 text-[13px] outline-none"
-                    />
-                    <button
-                      type="button"
-                      disabled={testing}
-                      onClick={() => void runTest("Email")}
-                      className="mt-2 h-8 rounded-md border border-[#E5E7EB] px-3 text-[12px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      Send test email
-                    </button>
-                    {testNote ? (
-                      <p className="mt-1 text-[12px] text-slate-500">{testNote}</p>
-                    ) : null}
-                  </label>
-                </div>
-              ) : null}
-              {contactOpen && draft.notifyContact && tab === "SMS" ? (
-                <div className="space-y-3 border-t border-[#F3F4F6] px-3 py-3">
-                  <label className="block">
-                    <span className="mb-1 flex items-center justify-between text-[12px] font-semibold text-slate-600">
-                      <span>
-                        SMS message<span className="text-rose-500">*</span>
-                      </span>
-                      <button
-                        type="button"
-                        className="font-medium text-[#5A32A3] hover:underline"
-                        onClick={() =>
-                          setDraft((d) => ({
-                            ...d,
-                            smsBody:
-                              DEFAULT_NOTIFICATIONS.find((n) => n.id === row.id)
-                                ?.smsBody ?? d.smsBody,
-                          }))
-                        }
-                      >
-                        Reset to default
-                      </button>
-                    </span>
-                    <div className="relative">
-                      <textarea
-                        value={draft.smsBody}
-                        onChange={(e) =>
-                          setDraft((d) => ({ ...d, smsBody: e.target.value }))
-                        }
-                        rows={4}
-                        className="w-full rounded-lg border border-[#E5E7EB] px-3 py-2 pr-8 text-[13px] outline-none focus:border-[#5A32A3]/40"
-                      />
-                      <Tag className="absolute right-3 bottom-3 h-3.5 w-3.5 text-slate-400" />
-                    </div>
-                    <p className="mt-1 text-right text-[11px] text-slate-400">
-                      {draft.smsBody.length} characters | {smsWords} words
-                    </p>
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[12px] font-semibold text-slate-600">
-                      Test SMS (enter phone number with country code)
-                    </span>
-                    <input
-                      value={testPhone}
-                      onChange={(e) => setTestPhone(e.target.value)}
-                      className="h-10 w-full rounded-lg border border-[#E5E7EB] px-3 text-[13px] outline-none"
-                    />
-                    <button
-                      type="button"
-                      disabled={testing}
-                      onClick={() => void runTest("SMS")}
-                      className="mt-2 h-8 rounded-md border border-[#E5E7EB] px-3 text-[12px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      Send test SMS
-                    </button>
-                    {testNote ? (
-                      <p className="mt-1 text-[12px] text-slate-500">{testNote}</p>
-                    ) : null}
-                  </label>
-                </div>
-              ) : null}
-              {contactOpen &&
-              draft.notifyContact &&
-              (tab === "In-app" || tab === "WhatsApp") ? (
-                <div className="space-y-3 border-t border-[#F3F4F6] px-3 py-4 text-[13px] text-slate-500">
-                  {tab === "In-app"
-                    ? "In-app alerts go to the assigned consultant’s FinConnex notification inbox."
-                    : "WhatsApp uses the same message as SMS and sends to the guest phone."}
-                  {tab === "WhatsApp" ? (
-                    <button
-                      type="button"
-                      disabled={testing}
-                      onClick={() => void runTest("WhatsApp")}
-                      className="mt-2 h-8 rounded-md border border-[#E5E7EB] px-3 text-[12px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      Send test WhatsApp
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={testing}
-                      onClick={() => void runTest("In-app")}
-                      className="mt-2 h-8 rounded-md border border-[#E5E7EB] px-3 text-[12px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                    >
-                      Send test in-app
-                    </button>
-                  )}
-                  {testNote ? (
-                    <p className="text-[12px] text-slate-500">{testNote}</p>
-                  ) : null}
-                </div>
-              ) : null}
             </div>
-            <label className="flex items-center justify-between px-3 py-2.5 text-[13px] font-medium text-slate-800">
-              <span className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={draft.notifyUser}
-                  onChange={(e) =>
-                    setDraft((d) => ({ ...d, notifyUser: e.target.checked }))
-                  }
-                  className="accent-[#5A32A3]"
-                />
-                Assigned user
-              </span>
-            </label>
-          </div>
+          )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-[#E5E7EB] px-5 py-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-9 rounded-lg border border-[#E5E7EB] px-4 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Close
-          </button>
+        <div className="flex items-center gap-2 border-t border-[#E5E7EB] px-6 py-4">
           <button
             type="button"
             onClick={() => onSave(draft)}
-            className="h-9 rounded-lg px-4 text-[13px] font-semibold text-white hover:brightness-110"
+            className="h-10 rounded-lg px-6 text-[13px] font-semibold text-white transition hover:brightness-110"
             style={{ backgroundColor: BRAND }}
           >
-            Save changes
+            Save
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-10 rounded-lg border border-[#E5E7EB] bg-white px-5 text-[13px] font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            Cancel
           </button>
         </div>
       </div>

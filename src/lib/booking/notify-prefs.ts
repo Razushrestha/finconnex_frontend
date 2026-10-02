@@ -24,6 +24,8 @@ export type NotificationRow = {
   smsBody: string;
   notifyContact: boolean;
   notifyUser: boolean;
+  /** How dates are written in this notification (see `DATE_FORMATS`). */
+  dateFormat?: string;
 };
 
 export const NOTIFY_CHANNELS: NotifyChannel[] = [
@@ -187,22 +189,85 @@ export type NotifyTokens = {
   ownerEmail: string;
   joinUrl?: string;
   reference?: string;
+  /*
+   * Everything below fills the "Insert Variable" menu. All optional: a value the
+   * CRM does not hold (a staff bio, say) is simply left empty in the message.
+   */
+  lastName?: string;
+  businessName?: string;
+  businessPhone?: string;
+  businessAddress?: string;
+  /** Shown as "Staff Email"; falls back to `ownerEmail`, which still decides who is emailed. */
+  staffEmail?: string;
+  staffPhone?: string;
+  staffId?: string;
+  staffInfo?: string;
+  workspaceUrl?: string;
+  serviceUrl?: string;
+  serviceDescription?: string;
+  bufferBefore?: string;
+  bufferAfter?: string;
+  appointmentId?: string;
+  /** Start to end, e.g. "10:00 AM - 10:30 AM". */
+  appointmentTime?: string;
+  /** Already written in the notification's date format. */
+  fromDate?: string;
+  toDate?: string;
+  bookingId?: string;
+  summaryUrl?: string;
+  bookNowUrl?: string;
+  meetingInfo?: string;
 };
 
+/** Token name (lower case, no braces) to the text that replaces it. */
+function notifyValues(tokens: NotifyTokens): Record<string, string> {
+  return {
+    "contact.first_name": tokens.firstName,
+    "contact.last_name": tokens.lastName ?? "",
+    "contact.name": tokens.name,
+    "contact.email": tokens.email,
+    "contact.phone": tokens.phone,
+    "appointment.start_time": tokens.datetime,
+    "appointment.timezone": tokens.timezone,
+    "appointment.title": tokens.title,
+    "appointment.user.name": tokens.owner,
+    "appointment.user.email": tokens.staffEmail || tokens.ownerEmail,
+    "appointment.id": tokens.appointmentId ?? "",
+    "appointment.time": tokens.appointmentTime ?? "",
+    "appointment.from_date": tokens.fromDate ?? "",
+    "appointment.to_date": tokens.toDate ?? "",
+    name: tokens.name,
+    datetime: tokens.datetime,
+    location: tokens.location,
+    joinurl: tokens.joinUrl ?? "",
+    reference: tokens.reference ?? "",
+    "business.name": tokens.businessName ?? "",
+    "business.phone": tokens.businessPhone ?? "",
+    "business.address": tokens.businessAddress ?? "",
+    "staff.phone": tokens.staffPhone ?? "",
+    "staff.id": tokens.staffId ?? "",
+    "staff.timezone": tokens.timezone,
+    "staff.additional_info": tokens.staffInfo ?? "",
+    "workspace.booking_url": tokens.workspaceUrl ?? "",
+    "service.booking_url": tokens.serviceUrl ?? "",
+    "service.description": tokens.serviceDescription ?? "",
+    "buffer.pre": tokens.bufferBefore ?? "",
+    "buffer.post": tokens.bufferAfter ?? "",
+    "booking.id": tokens.bookingId ?? "",
+    "booking.summary_url": tokens.summaryUrl ?? "",
+    "booking.book_now_url": tokens.bookNowUrl ?? "",
+    "meeting.info": tokens.meetingInfo ?? "",
+  };
+}
+
+/**
+ * Fills `{{tokens}}` in a template. Unknown tokens are left as typed. Values go
+ * in through a function so a `$&` or `$1` inside a name or address stays literal.
+ */
 export function interpolateNotify(template: string, tokens: NotifyTokens) {
-  return template
-    .replace(/\{\{contact\.first_name\}\}/gi, tokens.firstName)
-    .replace(/\{\{contact\.name\}\}/gi, tokens.name)
-    .replace(/\{\{contact\.email\}\}/gi, tokens.email)
-    .replace(/\{\{contact\.phone\}\}/gi, tokens.phone)
-    .replace(/\{\{appointment\.start_time\}\}/gi, tokens.datetime)
-    .replace(/\{\{appointment\.timezone\}\}/gi, tokens.timezone)
-    .replace(/\{\{appointment\.title\}\}/gi, tokens.title)
-    .replace(/\{\{appointment\.user\.name\}\}/gi, tokens.owner)
-    .replace(/\{\{appointment\.user\.email\}\}/gi, tokens.ownerEmail)
-    .replace(/\{\{name\}\}/gi, tokens.name)
-    .replace(/\{\{datetime\}\}/gi, tokens.datetime)
-    .replace(/\{\{location\}\}/gi, tokens.location)
-    .replace(/\{\{joinUrl\}\}/gi, tokens.joinUrl ?? "")
-    .replace(/\{\{reference\}\}/gi, tokens.reference ?? "");
+  const values = notifyValues(tokens);
+  return template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (match, key: string) => {
+    const value = values[key.toLowerCase()];
+    return value === undefined ? match : value;
+  });
 }

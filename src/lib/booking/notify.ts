@@ -20,14 +20,25 @@ import {
   writePersistedJson,
 } from "@/lib/persistence/registry";
 import {
-  formatBookingWhen,
+  bookingLocationLabel,
+  formatTime,
   getBookingById,
   getBookingPageById,
   parseLocalDateTime,
+  publicBookUrl,
+  publicManageUrl,
   type Booking,
   type BookingPage,
 } from "@/lib/booking/types";
 import { bookingConfirmEmailHtml } from "@/lib/booking/guest-confirm-email";
+import { resolveEmailRouting } from "@/lib/booking/email-config";
+import {
+  formatDatePattern,
+  minutesLabel,
+  normalizeDateFormat,
+} from "@/lib/booking/notify-variables";
+import { loadSettingsValues } from "@/lib/settings/settings-store";
+import { listAssignableOwnersLocal } from "@/lib/users/assignable";
 import { silentRequest } from "@/lib/notify/fetch-notifier";
 import {
   enabledNotifyChannels,
@@ -96,7 +107,7 @@ async function sendEmailSafe(
   email: string,
   subject: string,
   body: string,
-  opts?: { html?: string; text?: string },
+  opts?: { html?: string; text?: string; cc?: string[]; replyTo?: string },
 ): Promise<void> {
   if (!looksLikeEmail(email)) return;
   const onPublicBook =
@@ -116,6 +127,8 @@ async function sendEmailSafe(
           subject: subject.trim() || "Appointment update",
           html: opts?.html?.trim() || body.trim() || subject,
           text: opts?.text?.trim() || body.trim() || subject,
+          ...(opts?.cc?.length ? { cc: opts.cc } : {}),
+          ...(opts?.replyTo ? { replyTo: opts.replyTo } : {}),
         }),
       }),
     );
@@ -132,6 +145,8 @@ async function sendEmailSafe(
     email,
     subject: subject.trim() || "Appointment update",
     body: body.trim() || subject,
+    cc: opts?.cc,
+    replyTo: opts?.replyTo,
   });
   if (!result.ok) {
     throw new Error(result.message || "Could not send email");
@@ -180,14 +195,80 @@ async function sendWhatsAppSafe(phone: string, body: string, relatedTo: string) 
   });
 }
 
-function tokensFor(page: BookingPage, booking: Booking): NotifyTokens {
-  const when = formatBookingWhen(booking.start, booking.end);
+/** The site's address for links in a message; empty outside a browser. */
+function currentOrigin() {
+  return typeof window !== "undefined" ? (window.location?.origin ?? "") : "";
+}
+
+function lastNameOf(name: string) {
+  return name.trim().split(/\s+/).slice(1).join(" ");
+}
+
+/** Company name, phone and address from Settings → Company Profile. */
+function businessProfile() {
+  try {
+    const values = loadSettingsValues("organization/company-profile");
+    const text = (key: string) =>
+      typeof values[key] === "string" ? (values[key] as string).trim() : "";
+    return {
+      name: text("companyName"),
+      phone: text("phone"),
+      address: text("address"),
+    };
+  } catch {
+    return { name: "", phone: "", address: "" };
+  }
+}
+
+/** The assigned staff member's directory entry, if the CRM knows them. */
+function staffRecord(page: BookingPage) {
+  const wanted = (page.consultants?.[0] || page.owner || "").trim().toLowerCase();
+  if (!wanted) return undefined;
+  try {
+    return listAssignableOwnersLocal().find(
+      (owner) =>
+        owner.name.trim().toLowerCase() === wanted ||
+        owner.email.trim().toLowerCase() === wanted,
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+/** The location line plus the join link, e.g. "Video · Zoom: https://…". */
+function meetingInfoFor(page: BookingPage, booking: Booking) {
+  const label = bookingLocationLabel(page);
+  const url = booking.joinUrl || page.videoLink || "";
+  return url && !label.includes(url) ? `${label}: ${url}` : label;
+}
+
+/**
+ * Everything a notification template can mention for one booking. Dates are
+ * written in `dateFormat` (one of the styles in `DATE_FORMATS`).
+ */
+export function notifyTokensFor(
+  page: BookingPage,
+  booking: Booking,
+  opts: { dateFormat?: string; origin?: string } = {},
+): NotifyTokens {
+  const format = normalizeDateFormat(opts.dateFormat);
+  const origin = (opts.origin ?? currentOrigin()).replace(/\/$/, "");
+  const start = parseLocalDateTime(booking.start);
+  const end = parseLocalDateTime(booking.end);
+  const fromDate = formatDatePattern(start, format);
+  const toDate = formatDatePattern(end, format);
+  const timeRange = `${formatTime(booking.start)} - ${formatTime(booking.end)}`;
+  const business = businessProfile();
+  const staff = staffRecord(page);
+  const ownerName = page.consultants?.[0] || page.owner;
+  const serviceUrl = `${origin}${publicBookUrl(page.slug)}`;
   return {
     name: booking.guestName,
     firstName: firstNameOf(booking.guestName),
+    lastName: lastNameOf(booking.guestName),
     email: booking.guestEmail,
     phone: booking.guestPhone ?? "",
-    datetime: when,
+    datetime: `${fromDate} · ${timeRange}`,
     location:
       booking.joinUrl ||
       page.meetingViaDetail ||
@@ -196,18 +277,40 @@ function tokensFor(page: BookingPage, booking: Booking): NotifyTokens {
       "Meeting",
     title: page.title,
     timezone: page.timezone,
-    owner: page.consultants?.[0] || page.owner,
+    owner: ownerName,
     ownerEmail: looksLikeEmail(page.owner) ? page.owner : "",
+    staffEmail: staff?.email || (looksLikeEmail(page.owner) ? page.owner : ""),
+    staffPhone: looksLikePhone(page.owner) ? page.owner.trim() : "",
+    staffId: staff && staff.id !== staff.name ? staff.id : "",
+    // The CRM keeps no staff bio and no workspace-level booking page, so
+    // `staffInfo` and `workspaceUrl` stay empty rather than show made-up text.
     joinUrl: booking.joinUrl || page.videoLink,
     reference: booking.reference,
+    businessName: business.name,
+    businessPhone: business.phone,
+    businessAddress: business.address,
+    serviceUrl,
+    serviceDescription: page.description?.trim() ?? "",
+    bufferBefore: minutesLabel(page.bufferMinutes),
+    bufferAfter: minutesLabel(page.schedulingRules?.postBufferMinutes),
+    appointmentId: booking.id,
+    appointmentTime: timeRange,
+    fromDate,
+    toDate,
+    bookingId: booking.reference || booking.id,
+    summaryUrl: `${origin}${publicManageUrl(page.slug, booking.manageToken)}`,
+    bookNowUrl: serviceUrl,
+    meetingInfo: meetingInfoFor(page, booking),
   };
 }
 
-function confirmEmailCopy(page: BookingPage, booking: Booking) {
+export function confirmEmailCopy(
+  page: BookingPage,
+  booking: Booking,
+  dateFormat?: string,
+) {
   const start = parseLocalDateTime(booking.start);
-  const dateLabel = `${start.getDate()} ${start.toLocaleDateString("en-US", {
-    month: "short",
-  })} ${start.getFullYear()}`;
+  const dateLabel = formatDatePattern(start, normalizeDateFormat(dateFormat));
   const timePart = booking.start.includes("T")
     ? booking.start.split("T")[1]!.slice(0, 5)
     : "09:00";
@@ -228,8 +331,7 @@ function confirmEmailCopy(page: BookingPage, booking: Booking) {
       return "";
     }
   })();
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "";
+  const origin = currentOrigin();
   return bookingConfirmEmailHtml({
     guestName: booking.guestName,
     hostName: page.consultants?.[0] || page.owner || "Host",
@@ -257,7 +359,9 @@ export async function dispatchBookingNotifications(input: {
   const channels = enabledNotifyChannels(row);
   if (channels.length === 0) return { channels: [] };
 
-  const tokens = tokensFor(input.page, input.booking);
+  const tokens = notifyTokensFor(input.page, input.booking, {
+    dateFormat: row.dateFormat,
+  });
   const subject = interpolateNotify(row.emailSubject, tokens);
   const emailBody = interpolateNotify(row.emailBody, tokens);
   const smsBody = interpolateNotify(row.smsBody, tokens);
@@ -269,21 +373,37 @@ export async function dispatchBookingNotifications(input: {
   const emailTasks: Array<Promise<unknown>> = [];
 
   if (channels.includes("Email")) {
+    // Reply To / Cc from the page's Email Configurations, per audience.
+    const routing = (audience: "customer" | "user", to: string) =>
+      resolveEmailRouting(input.page.emailNotifyConfig, audience, {
+        to,
+        staffEmail: tokens.staffEmail || tokens.ownerEmail,
+        customerEmail: tokens.email,
+      });
     if (contact) {
+      const route = routing("customer", tokens.email);
       if (input.event === "confirmed") {
-        const copy = confirmEmailCopy(input.page, input.booking);
+        const copy = confirmEmailCopy(input.page, input.booking, row.dateFormat);
         emailTasks.push(
           sendEmailSafe(tokens.email, copy.subject, copy.html, {
             html: copy.html,
             text: copy.text,
+            ...route,
           }),
         );
       } else {
-        emailTasks.push(sendEmailSafe(tokens.email, subject, emailBody));
+        emailTasks.push(sendEmailSafe(tokens.email, subject, emailBody, route));
       }
     }
     if (user && tokens.ownerEmail) {
-      emailTasks.push(sendEmailSafe(tokens.ownerEmail, subject, emailBody));
+      emailTasks.push(
+        sendEmailSafe(
+          tokens.ownerEmail,
+          subject,
+          emailBody,
+          routing("user", tokens.ownerEmail),
+        ),
+      );
     }
   }
 
@@ -414,24 +534,63 @@ export async function flushDueBookingNotifications(now = new Date()) {
   writeQueue(leftover);
 }
 
+/**
+ * Made-up booking details for "Send test", so every variable shows something
+ * and dates follow the notification's chosen format. `now` is the test day.
+ */
+export function sampleNotifyTokens(
+  row: Pick<NotificationRow, "title" | "dateFormat">,
+  now: Date = new Date(),
+  contact: { email?: string; phone?: string } = {},
+): NotifyTokens {
+  const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const date = formatDatePattern(day, normalizeDateFormat(row.dateFormat));
+  const time = "10:00 AM - 10:30 AM";
+  const origin = currentOrigin();
+  return {
+    name: "Test guest",
+    firstName: "Test",
+    lastName: "Guest",
+    email: contact.email?.trim() || "",
+    phone: contact.phone?.trim() || "",
+    datetime: `${date} · ${time}`,
+    location: "Online",
+    title: row.title,
+    timezone: "Australia/Sydney",
+    owner: "FinConnex",
+    ownerEmail: "",
+    staffEmail: "staff@example.com",
+    staffPhone: "+61 400 000 000",
+    staffId: "STAFF-001",
+    // staffInfo and workspaceUrl stay empty, exactly as in a real send.
+    businessName: "FinConnex",
+    businessPhone: "+61 2 9000 0000",
+    businessAddress: "Level 12, 100 Pitt Street, Sydney NSW 2000",
+    serviceUrl: `${origin}/book/sample`,
+    serviceDescription: "Sample service description",
+    bufferBefore: "10 minutes",
+    bufferAfter: "5 minutes",
+    appointmentId: "bk-sample",
+    appointmentTime: time,
+    fromDate: date,
+    toDate: date,
+    bookingId: "NE-00001",
+    summaryUrl: `${origin}/book/sample/manage/sample`,
+    bookNowUrl: `${origin}/book/sample`,
+    meetingInfo: "Video · Zoom",
+  };
+}
+
 export async function sendNotifyTest(input: {
   channel: NotifyChannel;
   row: NotificationRow;
   email?: string;
   phone?: string;
 }) {
-  const tokens: NotifyTokens = {
-    name: "Test guest",
-    firstName: "Test",
-    email: input.email?.trim() || "",
-    phone: input.phone?.trim() || "",
-    datetime: "tomorrow 10:00 AM",
-    location: "Online",
-    title: input.row.title,
-    timezone: "Australia/Sydney",
-    owner: "FinConnex",
-    ownerEmail: "",
-  };
+  const tokens = sampleNotifyTokens(input.row, new Date(), {
+    email: input.email,
+    phone: input.phone,
+  });
   if (input.channel === "Email") {
     const email = input.email?.trim() || "";
     if (!looksLikeEmail(email)) throw new Error("Enter a test email address");

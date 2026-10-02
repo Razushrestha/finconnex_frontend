@@ -7,6 +7,8 @@ type DeliverInput = {
   html?: string;
   cc?: string[];
   bcc?: string[];
+  /** Where a reply goes. The sender itself is always the configured SendGrid sender. */
+  replyTo?: string;
   attachments?: Array<{
     filename: string;
     type?: string;
@@ -112,6 +114,8 @@ export async function sendViaSendGrid(input: DeliverInput): Promise<void> {
     content,
   };
   if (attachments.length) payload.attachments = attachments;
+  const replyTo = addresses([input.replyTo ?? ""])[0];
+  if (replyTo) payload.reply_to = replyTo;
 
   const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
     method: "POST",

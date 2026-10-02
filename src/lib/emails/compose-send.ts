@@ -38,6 +38,7 @@ async function deliverThroughFinConnexMail(input: {
   to: string[];
   cc?: string[];
   bcc?: string[];
+  replyTo?: string;
   subject: string;
   body: string;
   relatedType?: string;
@@ -72,6 +73,7 @@ async function deliverThroughFinConnexMail(input: {
         to: local.to,
         cc: local.cc,
         bcc: local.bcc,
+        ...(input.replyTo ? { replyTo: input.replyTo } : {}),
         subject: local.subject,
         text: input.body,
         html: input.body,
@@ -109,6 +111,11 @@ export async function sendCrmActivityEmail(input: {
   body: string;
   cc?: string[];
   bcc?: string[];
+  /**
+   * Where a reply goes. Applied when the mail goes out through SendGrid; the CRM
+   * mailbox API has no Reply-To field, so it is not applied on that route.
+   */
+  replyTo?: string;
   relatedType?: string;
   relatedId?: string;
   relatedTo?: string;
@@ -150,6 +157,7 @@ export async function sendCrmActivityEmail(input: {
       to: [to[0]],
       cc,
       bcc,
+      replyTo: input.replyTo,
       subject,
       body,
       relatedType: input.relatedType,
@@ -206,6 +214,7 @@ export async function sendCrmActivityEmail(input: {
         to: [to[0]],
         cc,
         bcc,
+        replyTo: input.replyTo,
         subject,
         body,
         relatedType: input.relatedType,

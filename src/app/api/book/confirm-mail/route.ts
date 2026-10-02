@@ -47,6 +47,18 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+  // Reply To / Cc from the booking page's Email Configurations. Anything that
+  // is not a plain address is dropped rather than rejected: the confirmation
+  // itself should still go out.
+  const plainEmail = (value: unknown) =>
+    typeof value === "string" && /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(value.trim())
+      ? value.trim()
+      : "";
+  const replyTo = plainEmail(body.replyTo);
+  const cc = (Array.isArray(body.cc) ? body.cc : [])
+    .map(plainEmail)
+    .filter(Boolean)
+    .slice(0, 3);
   if (subject.length > 200 || html.length > 200_000 || text.length > 50_000) {
     return NextResponse.json({ error: "Message is too large" }, { status: 413 });
   }
@@ -61,6 +73,8 @@ export async function POST(request: Request) {
       subject,
       text: text || subject,
       html: html.trim() || undefined,
+      cc,
+      replyTo: replyTo || undefined,
     });
     return NextResponse.json({ ok: true, delivered: "sendgrid" });
   } catch (error) {
