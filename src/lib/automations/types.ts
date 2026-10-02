@@ -1003,6 +1003,10 @@ export type AutomationRunLogStep = {
 export type AutomationRunLogEntry = {
   id: string;
   status: AutomationRunStatus | string;
+  /** Which kind of trigger started it, e.g. LEAD_CREATED. */
+  triggerType?: string;
+  /** The workflow it belongs to; shown in the workspace-wide log. */
+  automation?: { id: string; name: string } | null;
   triggerKey: string | null;
   triggerEntityType: string;
   triggerEntityId: string;

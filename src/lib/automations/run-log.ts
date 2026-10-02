@@ -3,10 +3,12 @@ import { formatRelativeTime } from "@/lib/leads/activity-dates";
 import {
   ACTION_CATALOG,
   FLOW_CONTROL_CATALOG,
+  TRIGGER_CATALOG,
   type AutomationActionType,
   type AutomationRunLogEntry,
   type AutomationRunLogStep,
   type AutomationStepTestNote,
+  type AutomationTriggerType,
 } from "./types";
 
 /** States a run never leaves on its own. */
@@ -20,6 +22,37 @@ const FINISHED_RUN_STATUSES = new Set([
 ]);
 
 const FAILED_RUN_STATUSES = new Set(["FAILED", "MANUAL_INTERVENTION_REQUIRED"]);
+
+/** Still in flight: not started yet, executing, or parked on a wait. */
+const IN_PROGRESS_RUN_STATUSES = new Set(["QUEUED", "RUNNING", "WAITING", "CANCELLING", "RECOVERING"]);
+
+/**
+ * Ended badly. A rolled-back or partly recovered run only got there because a
+ * step failed, so it counts as a failure too; a cancelled run counts as none
+ * of the three.
+ */
+const FAILED_OUTCOME_STATUSES = new Set([
+  "FAILED",
+  "MANUAL_INTERVENTION_REQUIRED",
+  "ROLLED_BACK",
+  "PARTIALLY_RECOVERED",
+]);
+
+/** A trigger's run counts folded into the three outcomes the stats cards show. */
+export function runOutcomeCounts(byStatus: Partial<Record<string, number>> | undefined): {
+  succeeded: number;
+  running: number;
+  failed: number;
+} {
+  const counts = { succeeded: 0, running: 0, failed: 0 };
+  for (const [status, count] of Object.entries(byStatus ?? {})) {
+    if (!count) continue;
+    if (status === "SUCCEEDED") counts.succeeded += count;
+    else if (IN_PROGRESS_RUN_STATUSES.has(status)) counts.running += count;
+    else if (FAILED_OUTCOME_STATUSES.has(status)) counts.failed += count;
+  }
+  return counts;
+}
 
 export function isRunFinished(status: string): boolean {
   return FINISHED_RUN_STATUSES.has(status);
@@ -49,6 +82,35 @@ export function runFailed(run: AutomationRunLogEntry): boolean {
 export function statusLabel(status: string): string {
   const text = status.replace(/_/g, " ").toLowerCase();
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+export function triggerLabel(triggerType: string | undefined): string | null {
+  if (!triggerType) return null;
+  return TRIGGER_CATALOG[triggerType as AutomationTriggerType]?.label ?? statusLabel(triggerType);
+}
+
+/** When a step happened: when it ended, else when it started. */
+export function stepTime(step: Pick<AutomationRunLogStep, "startedAt" | "completedAt">): string | null {
+  return step.completedAt ?? step.startedAt ?? null;
+}
+
+/** The timeline dot: green once a step completed, otherwise how it stands. */
+export function stepDotClass(status: string): string {
+  switch (status) {
+    case "SUCCEEDED":
+      return "bg-emerald-500";
+    case "FAILED":
+      return "bg-rose-500";
+    case "RUNNING":
+      return "bg-amber-400 animate-pulse";
+    case "WAITING":
+      return "bg-amber-400";
+    case "SKIPPED":
+    case "CANCELLED":
+      return "bg-slate-300";
+    default:
+      return "border border-slate-300 bg-white";
+  }
 }
 
 export function stepLabel(step: Pick<AutomationRunLogStep, "actionType" | "stepType">): string {
@@ -214,9 +276,15 @@ export function fromLegacyRun(raw: Record<string, unknown>): AutomationRunLogEnt
       ? (value as Record<string, unknown>)
       : {};
   const steps = Array.isArray(raw.steps) ? raw.steps.map(record) : [];
+  const automation = record(raw.automation);
   return {
     id: String(raw.id),
     status: String(raw.status),
+    triggerType: text(raw.triggerType) ?? undefined,
+    automation:
+      typeof automation.id === "string"
+        ? { id: automation.id, name: String(automation.name ?? "Workflow") }
+        : null,
     triggerKey: text(raw.triggerKey),
     triggerEntityType: String(raw.triggerEntityType ?? ""),
     triggerEntityId: String(raw.triggerEntityId ?? ""),

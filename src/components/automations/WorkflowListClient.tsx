@@ -17,6 +17,7 @@ import {
   Plus,
   Power,
   PowerOff,
+  ScrollText,
   Trash2,
   Workflow,
 } from "lucide-react";
@@ -207,6 +208,10 @@ export function WorkflowListClient({ folderId }: { folderId: string | null }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => router.push("/automations/logs")} className="gap-1.5">
+            <ScrollText className="h-4 w-4" />
+            Logs
+          </Button>
           <Button
             variant="outline"
             onClick={() => setFolderDialog({ folder: null })}

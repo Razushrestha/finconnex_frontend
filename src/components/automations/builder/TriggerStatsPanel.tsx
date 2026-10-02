@@ -1,5 +1,10 @@
 "use client";
 
+import { useCallback } from "react";
+
+import { RunLogList } from "@/components/automations/RunLogList";
+import { RunOutcomeCards } from "@/components/automations/RunOutcomeCards";
+import { listTriggerRuns } from "@/lib/automations/api";
 import {
   TRIGGER_CATALOG,
   runStatusColor,
@@ -9,7 +14,6 @@ import {
 } from "@/lib/automations/types";
 
 import { SlideOverPanel } from "./SlideOverPanel";
-import { TriggerRunLog } from "./TriggerRunLog";
 
 /**
  * How often one entry point actually started the workflow.
@@ -26,6 +30,7 @@ export function TriggerStatsPanel({
   automationId,
   refreshKey,
   expandRunId,
+  onRefreshStats,
   onClose,
 }: {
   trigger: {
@@ -40,6 +45,8 @@ export function TriggerStatsPanel({
   refreshKey?: number;
   /** The run to open in the log — the test that was just started. */
   expandRunId?: string | null;
+  /** Re-reads the counts, which otherwise load once with the workflow. */
+  onRefreshStats?: () => void;
   onClose: () => void;
 }) {
   const saved = Boolean(automationId);
@@ -47,7 +54,13 @@ export function TriggerStatsPanel({
   const byStatus = Object.entries(stats?.byStatus ?? {}).sort(
     ([, a], [, b]) => (b ?? 0) - (a ?? 0)
   );
-  const runs = stats?.runs ?? 0;
+  const fetchPage = useCallback(
+    (page: number, limit: number) =>
+      automationId
+        ? listTriggerRuns(automationId, trigger.key, { page, limit })
+        : Promise.resolve({ items: [], total: 0, hasMore: false, exact: true }),
+    [automationId, trigger.key]
+  );
 
   return (
     <SlideOverPanel
@@ -63,12 +76,7 @@ export function TriggerStatsPanel({
         </p>
       ) : (
         <div className="space-y-5">
-          <div className="rounded-xl border border-slate-200 p-4">
-            <div className="text-3xl font-semibold text-slate-800">{runs}</div>
-            <div className="mt-0.5 text-xs text-slate-500">
-              {runs === 1 ? "run started by this trigger" : "runs started by this trigger"}
-            </div>
-          </div>
+          <RunOutcomeCards byStatus={stats?.byStatus} />
 
           {byStatus.length > 0 ? (
             <div>
@@ -105,12 +113,17 @@ export function TriggerStatsPanel({
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
                 Run log
               </h3>
-              <TriggerRunLog
+              <RunLogList
                 key={trigger.key}
-                automationId={automationId}
-                triggerKey={trigger.key}
+                fetchPage={fetchPage}
                 refreshKey={refreshKey}
                 expandRunId={expandRunId}
+                onRunsChanged={onRefreshStats}
+                emptyText={{
+                  current: "No runs yet. Press Test Workflow to try this trigger with test data.",
+                  olderServer:
+                    "No runs for this trigger yet. Test runs will show here once the CRM server has the test-run update.",
+                }}
               />
             </div>
           )}

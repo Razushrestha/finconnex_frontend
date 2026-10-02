@@ -36,6 +36,23 @@ function run(overrides: Partial<AutomationRunLogEntry> = {}): AutomationRunLogEn
 }
 
 describe("run log helpers", () => {
+  it("folds run statuses into success, running and fails", async () => {
+    const { runOutcomeCounts } = await import("../run-log");
+    expect(
+      runOutcomeCounts({
+        SUCCEEDED: 7,
+        QUEUED: 1,
+        RUNNING: 2,
+        WAITING: 3,
+        FAILED: 4,
+        MANUAL_INTERVENTION_REQUIRED: 1,
+        ROLLED_BACK: 1,
+        CANCELLED: 5,
+      })
+    ).toEqual({ succeeded: 7, running: 6, failed: 6 });
+    expect(runOutcomeCounts(undefined)).toEqual({ succeeded: 0, running: 0, failed: 0 });
+  });
+
   it("knows which runs are still moving", () => {
     expect(isRunFinished("RUNNING")).toBe(false);
     expect(isRunFinished("FAILED")).toBe(true);
@@ -171,5 +188,39 @@ describe("runs from a server without the run log endpoint", () => {
       ["b", null],
     ]);
     expect(runFinishedAt(entry)).toBe("2026-10-01T10:00:02.000Z");
+  });
+});
+
+describe("step timeline and workspace log helpers", () => {
+  it("colours the timeline dot by how the step stands", async () => {
+    const { stepDotClass } = await import("../run-log");
+    expect(stepDotClass("SUCCEEDED")).toContain("bg-emerald-500");
+    expect(stepDotClass("FAILED")).toContain("bg-rose-500");
+    expect(stepDotClass("SKIPPED")).toContain("bg-slate-300");
+    expect(stepDotClass("RUNNING")).toContain("animate-pulse");
+    expect(stepDotClass("PENDING")).toContain("bg-white");
+  });
+
+  it("times a step by when it ended, else when it started", async () => {
+    const { stepTime } = await import("../run-log");
+    expect(stepTime({ startedAt: "a", completedAt: "b" })).toBe("b");
+    expect(stepTime({ startedAt: "a", completedAt: null })).toBe("a");
+    expect(stepTime({ startedAt: null, completedAt: null })).toBeNull();
+  });
+
+  it("names the trigger and keeps the workflow on older-server rows", async () => {
+    const { triggerLabel, fromLegacyRun } = await import("../run-log");
+    expect(triggerLabel("LEAD_CREATED")).toBe("Lead Created");
+    expect(triggerLabel(undefined)).toBeNull();
+    const entry = fromLegacyRun({
+      id: "r",
+      status: "SUCCEEDED",
+      triggerType: "LEAD_CREATED",
+      automation: { id: "a-1", name: "Welcome", status: "ENABLED" },
+      createdAt: "2026-10-01T10:00:00.000Z",
+      steps: [],
+    });
+    expect(entry.automation).toEqual({ id: "a-1", name: "Welcome" });
+    expect(entry.triggerType).toBe("LEAD_CREATED");
   });
 });

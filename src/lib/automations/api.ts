@@ -283,6 +283,17 @@ export function isMissingRouteError(error: unknown): boolean {
   return error instanceof Error && /Cannot (GET|POST|PATCH|PUT|DELETE) \/v1\//.test(error.message);
 }
 
+/**
+ * An older server routes `/automation-runs/log` to its `:runId` handler,
+ * whose UUID check answers 400 rather than 404.
+ */
+function isUnsupportedRunLogRoute(error: unknown): boolean {
+  return (
+    isMissingRouteError(error) ||
+    (error instanceof Error && /uuid is expected/i.test(error.message))
+  );
+}
+
 export type TriggerRunPage = {
   items: AutomationRunLogEntry[];
   total: number;
@@ -309,6 +320,46 @@ export async function listTriggerRuns(
     if (!isMissingRouteError(error)) throw error;
     return legacyTriggerRuns(automationId, triggerKey, page);
   }
+}
+
+/** Every workflow's runs in the workspace, newest first, each with its steps. */
+export async function listWorkspaceRunLog(
+  query: { page?: number; limit?: number } = {},
+): Promise<TriggerRunPage> {
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 20;
+  try {
+    const data = await runsRequest(`/log${toQuery({ page, limit })}`);
+    const { items, total } = extractList<AutomationRunLogEntry>(data);
+    return { items, total, hasMore: page * limit < total, exact: true };
+  } catch (error) {
+    if (!isUnsupportedRunLogRoute(error)) throw error;
+    // Older server: its plain run list carries the same rows, steps included.
+    const data = await runsRequest(toQuery({ page, limit: 100 }));
+    const { items, total } = extractList<Record<string, unknown>>(data);
+    return {
+      items: items.map(fromLegacyRun),
+      total,
+      hasMore: page * 100 < total,
+      exact: false,
+    };
+  }
+}
+
+/**
+ * Run counts by status across the workspace's automations, test runs left
+ * out — the numbers behind the workflows list's Success / Running / Fails.
+ */
+export async function getAutomationRunCounts(): Promise<Record<string, number>> {
+  const data = (await automationsRequest("/summary")) as {
+    runs?: Array<{ status: string; _count: number | { _all?: number } }>;
+  };
+  return Object.fromEntries(
+    (data?.runs ?? []).map((row) => [
+      row.status,
+      typeof row._count === "number" ? row._count : (row._count?._all ?? 0),
+    ]),
+  );
 }
 
 /**

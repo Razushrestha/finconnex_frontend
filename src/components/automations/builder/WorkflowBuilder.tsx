@@ -421,6 +421,21 @@ function BuilderInner({ id, folderId: initialFolderId }: { id: string; folderId:
     (index: number) => setPanel({ mode: "trigger-stats", index }),
     []
   );
+  /** The stats panel's counts move as runs finish, so it can ask for fresh ones. */
+  const refreshTriggerStats = useCallback(() => {
+    if (!automationId) return;
+    getAutomation(automationId)
+      .then((automation) =>
+        setTriggerStats(
+          Object.fromEntries(
+            (automation.triggers ?? [])
+              .filter((trigger) => trigger.stats)
+              .map((trigger) => [trigger.key, trigger.stats as AutomationTriggerStats])
+          )
+        )
+      )
+      .catch(() => undefined);
+  }, [automationId]);
   const onSelectStep = useCallback((path: string) => setPanel({ mode: "configure", path }), []);
   const onDeleteStep = useCallback((path: string) => {
     setSteps((prev) => removeStepAtPath(prev, path));
@@ -802,6 +817,7 @@ function BuilderInner({ id, folderId: initialFolderId }: { id: string; folderId:
           automationId={automationId}
           refreshKey={runLogRefresh}
           expandRunId={lastTestRunId}
+          onRefreshStats={refreshTriggerStats}
           onClose={() => setPanel(null)}
         />
       )}
