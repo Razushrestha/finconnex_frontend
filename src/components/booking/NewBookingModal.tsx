@@ -335,7 +335,9 @@ export function NewBookingModal({
     client?.name?.trim() ||
     applicantOptions.find((row) => row.id === clientId)?.name?.trim() ||
     "";
-  const clientName = calendar?.title?.trim() || selectedContactName;
+  // Main Applicant is a real contact/lead only. Never use the consultation
+  // title here — that made Attendees show more people than Assigned Users.
+  const clientName = selectedContactName;
   const guests = contacts.filter((c) => guestIds.includes(c.id));
   function applyCalendar(id: string, page?: BookingPage) {
     const next = page ?? calendars.find((item) => item.id === id);

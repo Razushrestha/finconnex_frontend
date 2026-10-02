@@ -413,7 +413,7 @@ export function assignedCalendarMembers(page?: BookingPage | null): string[] {
   for (const name of page.consultants ?? []) {
     if (name && !names.includes(name)) names.push(name);
   }
-  if (page.owner && !names.includes(page.owner)) names.push(page.owner);
+  if (!names.length && page.owner) names.push(page.owner);
   return names;
 }
 
