@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Calendar,
+  Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CloudUpload,
   FileText,
   GripVertical,
@@ -14,7 +17,6 @@ import {
   Trash2,
   Upload,
   UserPlus,
-  Users,
   X,
 } from "lucide-react";
 import {
@@ -38,7 +40,11 @@ import {
   splitFileName,
   type AdditionalDocument,
 } from "@/components/documents/signature/create/DocumentDetailsSection";
-import { getRulesActor } from "@/lib/rules/actor";
+import {
+  fetchSignatureSelf,
+  selfFromStores,
+  type SignatureSelf,
+} from "@/lib/documents/signature/current-user";
 import { cn } from "@/lib/utils";
 
 const ACCEPTED_TYPES =
@@ -46,7 +52,6 @@ const ACCEPTED_TYPES =
 
 const ROLE_OPTIONS: { value: SignerRole; label: string }[] = [
   { value: "Signer", label: "Needs to sign" },
-  { value: "Approver", label: "Needs to approve" },
   { value: "CC", label: "Receives a copy" },
 ];
 
@@ -61,25 +66,6 @@ const SOURCE_OPTIONS: { value: RecipientSource; label: string }[] = [
   { value: "lead", label: "Lead" },
   { value: "deal", label: "Deal" },
   { value: "organization", label: "Organization" },
-];
-
-const DOCUMENT_TYPES = [
-  "Others",
-  "Contract",
-  "NDA",
-  "Proposal",
-  "Agreement",
-  "Invoice",
-  "HR document",
-];
-
-const FOLDERS = ["None", "Sales", "Legal", "HR", "Finance", "Clients"];
-
-const AGREEMENT_VALIDITY = [
-  "Forever",
-  "30 days after completion",
-  "90 days after completion",
-  "1 year after completion",
 ];
 
 export type ZohoSendFormSettings = {
@@ -145,6 +131,397 @@ function fileExt(name: string) {
   return splitFileName(name).ext.toUpperCase() || "FILE";
 }
 
+function isoDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseIsoDate(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (
+    date.getFullYear() !== Number(match[1]) ||
+    date.getMonth() !== Number(match[2]) - 1 ||
+    date.getDate() !== Number(match[3])
+  ) {
+    return null;
+  }
+  return date;
+}
+
+function formatAgreementDate(value: string) {
+  const date = parseIsoDate(value);
+  if (!date) return "";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  });
+}
+
+function sameDay(left: Date, right: Date) {
+  return isoDate(left) === isoDate(right);
+}
+
+function SettingRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="grid items-start gap-2 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center sm:gap-8">
+      <span className="pt-2 text-[13px] text-slate-600 sm:pt-0">{label}</span>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+
+function useDismiss(open: boolean, onClose: () => void) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (!ref.current?.contains(event.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open, onClose]);
+  return ref;
+}
+
+function CheckedMenu({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
+  const ref = useDismiss(open, close);
+  return (
+    <div ref={ref} className="relative min-w-0 flex-1">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className={cn(selectClass, "flex items-center justify-between text-left")}
+      >
+        <span className="truncate">{value}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+      </button>
+      {open ? (
+        <div className="absolute z-30 mt-1 max-h-60 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+          {options.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => {
+                onChange(option);
+                setOpen(false);
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50"
+            >
+              <Check
+                className={cn(
+                  "h-3.5 w-3.5 shrink-0",
+                  value === option ? "text-slate-800" : "opacity-0",
+                )}
+              />
+              {option}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MonthCalendar({
+  cursor,
+  selected,
+  onCursor,
+  onSelect,
+}: {
+  cursor: Date;
+  selected: Date;
+  onCursor: (date: Date) => void;
+  onSelect: (date: Date) => void;
+}) {
+  const year = cursor.getFullYear();
+  const month = cursor.getMonth();
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells: Array<{ date: Date; outside: boolean }> = [];
+  for (let index = 0; index < firstWeekday; index += 1) {
+    cells.push({
+      date: new Date(year, month, index - firstWeekday + 1),
+      outside: true,
+    });
+  }
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    cells.push({ date: new Date(year, month, day), outside: false });
+  }
+  while (cells.length % 7 !== 0) {
+    const last = cells[cells.length - 1].date;
+    cells.push({
+      date: new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1),
+      outside: true,
+    });
+  }
+  const title = cursor.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+  return (
+    <div className="p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => onCursor(new Date(year, month - 1, 1))}
+          className="flex h-7 w-7 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+          aria-label="Previous month"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <p className="text-[13px] font-semibold text-slate-800">{title}</p>
+        <button
+          type="button"
+          onClick={() => onCursor(new Date(year, month + 1, 1))}
+          className="flex h-7 w-7 items-center justify-center rounded text-slate-500 hover:bg-slate-100"
+          aria-label="Next month"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 text-center text-[11px] text-slate-400">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+          <span key={day} className="py-1">
+            {day}
+          </span>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 text-center">
+        {cells.map((cell) => {
+          const active = !cell.outside && sameDay(cell.date, selected);
+          return (
+            <button
+              key={isoDate(cell.date)}
+              type="button"
+              onClick={() => onSelect(cell.date)}
+              className={cn(
+                "mx-auto my-0.5 flex h-8 w-8 items-center justify-center rounded-full text-[13px]",
+                cell.outside ? "text-slate-300" : "text-slate-700 hover:bg-slate-100",
+                active && "bg-blue-600 font-semibold text-white hover:bg-blue-600",
+              )}
+            >
+              {cell.date.getDate()}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AgreementValidUntilField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const selected = parseIsoDate(value);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [cursor, setCursor] = useState(() => selected ?? new Date());
+  const open = menuOpen || calendarOpen;
+  const close = () => {
+    setMenuOpen(false);
+    setCalendarOpen(false);
+  };
+  const ref = useDismiss(open, close);
+
+  const pickDateMode = () => {
+    const next = selected ?? new Date();
+    onChange(isoDate(next));
+    setCursor(next);
+    setMenuOpen(false);
+    setCalendarOpen(true);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      {selected ? (
+        <button
+          type="button"
+          onClick={() => {
+            setCursor(selected);
+            setMenuOpen(false);
+            setCalendarOpen((current) => !current);
+          }}
+          className={cn(
+            selectClass,
+            "flex items-center justify-between text-left",
+            calendarOpen && "border-emerald-500 ring-2 ring-emerald-100",
+          )}
+        >
+          <span>{formatAgreementDate(value)}</span>
+          <Calendar className="h-4 w-4 shrink-0 text-slate-500" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            setCalendarOpen(false);
+            setMenuOpen((current) => !current);
+          }}
+          className={cn(selectClass, "flex items-center justify-between text-left")}
+        >
+          <span>Forever</span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+        </button>
+      )}
+      {menuOpen ? (
+        <div className="absolute z-30 mt-1 w-full rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+          <button
+            type="button"
+            onClick={() => {
+              onChange("Forever");
+              close();
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50"
+          >
+            <Check className={cn("h-3.5 w-3.5", selected ? "opacity-0" : "text-slate-800")} />
+            Forever
+          </button>
+          <button
+            type="button"
+            onClick={pickDateMode}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50"
+          >
+            <Check className="h-3.5 w-3.5 opacity-0" />
+            Select date
+          </button>
+        </div>
+      ) : null}
+      {calendarOpen && selected ? (
+        <div className="absolute top-full left-0 z-40 mt-1 w-[280px] rounded-lg border border-slate-200 bg-white shadow-xl">
+          <MonthCalendar
+            cursor={cursor}
+            selected={selected}
+            onCursor={setCursor}
+            onSelect={(date) => {
+              onChange(isoDate(date));
+              setCalendarOpen(false);
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              onChange("Forever");
+              close();
+            }}
+            className="w-full border-t border-slate-100 px-3 py-2 text-left text-[12px] font-medium text-slate-600 hover:bg-slate-50"
+          >
+            Forever
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function NamedOptionField({
+  value,
+  options,
+  placeholder,
+  addLabel,
+  plain = false,
+  onChange,
+  onAdd,
+}: {
+  value: string;
+  options?: string[];
+  placeholder: string;
+  addLabel: string;
+  plain?: boolean;
+  onChange: (value: string) => void;
+  onAdd: (name: string) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+  const save = () => {
+    const name = draft.trim();
+    if (!name) {
+      setAdding(false);
+      setDraft("");
+      return;
+    }
+    onAdd(name);
+    setDraft("");
+    setAdding(false);
+  };
+  if (adding) {
+    return (
+      <form
+        className="relative"
+        onSubmit={(event) => {
+          event.preventDefault();
+          save();
+        }}
+      >
+        <input
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setDraft("");
+              setAdding(false);
+            }
+          }}
+          placeholder={placeholder}
+          autoFocus
+          className="h-10 w-full rounded-lg border border-emerald-500 bg-white px-3 pr-11 text-[13px] text-slate-800 placeholder:text-slate-400 outline-none"
+        />
+        <button
+          type="submit"
+          className="absolute top-1/2 right-2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600"
+          aria-label={addLabel}
+        >
+          <Check className="h-3.5 w-3.5" />
+        </button>
+      </form>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2">
+      {plain || !options ? (
+        <div className={cn(selectClass, "flex items-center text-slate-800")}>
+          {value || "Others"}
+        </div>
+      ) : (
+        <CheckedMenu value={value} options={options} onChange={onChange} />
+      )}
+      <button
+        type="button"
+        onClick={() => setAdding(true)}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
+        title={addLabel}
+        aria-label={addLabel}
+      >
+        <Plus className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
 function FormLabel({ children }: { children: React.ReactNode }) {
   return (
     <label className="w-[150px] shrink-0 text-[13px] text-slate-600">
@@ -183,13 +560,46 @@ export function ZohoStyleSendForm({
   const [dragging, setDragging] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+
+  useEffect(() => {
+    const removedTypes = new Set([
+      "Contract",
+      "NDA",
+      "Proposal",
+      "Agreement",
+      "Invoice",
+      "HR document",
+    ]);
+    const removedFolders = new Set([
+      "Sales",
+      "Legal",
+      "HR",
+      "Finance",
+      "Clients",
+    ]);
+    const patch: Partial<ZohoSendFormSettings> = {};
+    if (removedTypes.has(settings.documentType)) patch.documentType = "Others";
+    if (removedFolders.has(settings.folder)) patch.folder = "None";
+    if (Object.keys(patch).length) onChangeSettings(patch);
+  }, [settings.documentType, settings.folder, onChangeSettings]);
   const [activeDropdownId, setActiveDropdownId] = useState<string | null>(null);
   const [crmResults, setCrmResults] = useState<SignatureCrmEntityOption[]>([]);
   const [crmSearching, setCrmSearching] = useState(false);
   const [signerSearchQueries, setSignerSearchQueries] = useState<
     Record<string, string>
   >({});
+  const [me, setMe] = useState<SignatureSelf>(() => selfFromStores());
   const searchSeq = useRef(0);
+
+  useEffect(() => {
+    let alive = true;
+    void fetchSignatureSelf().then((self) => {
+      if (alive && (self.email || self.name)) setMe(self);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
@@ -253,34 +663,50 @@ export function ZohoStyleSendForm({
     onChangeRecipients([...recipients, next]);
   };
 
-  const addMe = () => {
-    const actor = getRulesActor();
-    const email = (actor.email || "").trim().toLowerCase();
+  const applySelf = (self: SignatureSelf) => {
+    const email = self.email.trim();
+    const name = (self.name || email).trim();
+    if (!email && !name) return;
+    const key = email.toLowerCase();
     if (
-      email &&
-      recipients.some((r) => r.email.trim().toLowerCase() === email)
+      key &&
+      recipients.some((row) => row.email.trim().toLowerCase() === key)
     ) {
       return;
     }
-    const empty = recipients.find((r) => !r.email.trim() && !r.name.trim());
+    const patch = {
+      name,
+      email,
+      entityType: "email" as const,
+    };
+    const empty = recipients.find((row) => !row.email.trim() && !row.name.trim());
     if (empty) {
-      updateRecipient(empty.id, {
-        name: actor.name || "Me",
-        email: actor.email || "",
-        entityType: "email",
-      });
+      updateRecipient(empty.id, patch);
       return;
     }
-    const next = makeSigner({
-      id: `sg-me-${Date.now()}`,
-      name: actor.name || "Me",
-      email: actor.email || "",
-      order: recipients.length + 1,
-      token: `sig-me-${Date.now()}`,
-      colorIndex: recipients.length,
-      entityType: "email",
+    onChangeRecipients([
+      ...recipients,
+      makeSigner({
+        id: `sg-me-${Date.now()}`,
+        name,
+        email,
+        order: recipients.length + 1,
+        token: `sig-me-${Date.now()}`,
+        colorIndex: recipients.length,
+        entityType: "email",
+      }),
+    ]);
+  };
+
+  const addMe = () => {
+    if (me.email || me.name) {
+      applySelf(me);
+      return;
+    }
+    void fetchSignatureSelf().then((self) => {
+      setMe(self);
+      applySelf(self);
     });
-    onChangeRecipients([...recipients, next]);
   };
 
   const removeRecipient = (id: string) => {
@@ -535,11 +961,6 @@ export function ZohoStyleSendForm({
                 <UserPlus className="h-3.5 w-3.5" />
                 Add me
               </button>
-              <button type="button" onClick={addRecipient} className={chipBtn}>
-                <Users className="h-3.5 w-3.5" />
-                Add bulk recipients
-                <ChevronDown className="h-3 w-3" />
-              </button>
             </div>
 
             <div className="space-y-3">
@@ -735,7 +1156,7 @@ export function ZohoStyleSendForm({
                         {isTemplate ? "Action" : "Role"}
                       </label>
                       <select
-                        value={signer.role ?? "Signer"}
+                        value={signer.role === "CC" ? "CC" : "Signer"}
                         onChange={(e) =>
                           updateRecipient(signer.id, {
                             role: e.target.value as SignerRole,
@@ -847,193 +1268,131 @@ export function ZohoStyleSendForm({
                 />
               </button>
               {moreOpen ? (
-            <div className="mt-3 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.7fr)]">
-              <div className="space-y-3">
-                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4">
-                  <FormLabel>Days to complete</FormLabel>
-                  <input
-                    type="number"
-                    min={1}
-                    max={365}
-                    value={settings.daysToComplete}
-                    onChange={(e) =>
-                      onChangeSettings({
-                        daysToComplete: Math.max(
-                          1,
-                          Number(e.target.value) || 1,
-                        ),
-                      })
-                    }
-                    className={cn(fieldClass, "w-[88px]")}
-                  />
-                </div>
-                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4">
-                  <FormLabel>Agreement valid until</FormLabel>
-                  <div className="relative min-w-0 flex-1">
-                    <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <select
-                      value={settings.agreementValidUntil}
-                      onChange={(e) =>
+                <div className="mt-4 max-w-[760px] space-y-4">
+                  <SettingRow label="Days to complete">
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={settings.daysToComplete}
+                      onChange={(event) =>
                         onChangeSettings({
-                          agreementValidUntil: e.target.value,
+                          daysToComplete: Math.max(
+                            1,
+                            Number(event.target.value) || 1,
+                          ),
                         })
                       }
-                      className={cn(selectClass, "w-full pl-9")}
-                    >
-                      {AGREEMENT_VALIDITY.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4">
-                  <FormLabel>Document type</FormLabel>
-                  <div className="flex min-w-0 flex-1 items-center gap-2">
-                    <select
-                      value={settings.documentType}
-                      onChange={(e) =>
-                        onChangeSettings({ documentType: e.target.value })
+                      className={cn(
+                        fieldClass,
+                        "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+                      )}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Agreement valid until">
+                    <AgreementValidUntilField
+                      value={
+                        parseIsoDate(settings.agreementValidUntil)
+                          ? settings.agreementValidUntil
+                          : "Forever"
                       }
-                      className={cn(selectClass, "min-w-0 flex-1")}
-                    >
-                      {DOCUMENT_TYPES.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/30 text-primary hover:bg-primary/5"
-                      title="Add document type"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4">
-                  <FormLabel>Folder</FormLabel>
-                  <div className="flex min-w-0 flex-1 items-center gap-2">
-                    <select
-                      value={settings.folder}
-                      onChange={(e) =>
-                        onChangeSettings({ folder: e.target.value })
+                      onChange={(agreementValidUntil) =>
+                        onChangeSettings({ agreementValidUntil })
                       }
-                      className={cn(selectClass, "min-w-0 flex-1")}
-                    >
-                      {FOLDERS.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/30 text-primary hover:bg-primary/5"
-                      title="Add folder"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4">
-                  <FormLabel>Description</FormLabel>
-                  <div className="relative min-w-0 flex-1">
-                    <FileText className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
+                    />
+                  </SettingRow>
+                  <SettingRow label="Document type">
+                    <NamedOptionField
+                      plain
+                      value={settings.documentType || "Others"}
+                      placeholder="Enter document type"
+                      addLabel="Add document type"
+                      onChange={(documentType) =>
+                        onChangeSettings({ documentType })
+                      }
+                      onAdd={(name) => onChangeSettings({ documentType: name })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Folder">
+                    <NamedOptionField
+                      plain
+                      value={settings.folder || "None"}
+                      placeholder="Enter folder name"
+                      addLabel="Add folder"
+                      onChange={(folder) => onChangeSettings({ folder })}
+                      onAdd={(name) => onChangeSettings({ folder: name })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Description">
+                    <textarea
+                      rows={2}
                       value={settings.description}
-                      onChange={(e) =>
-                        onChangeSettings({ description: e.target.value })
+                      onChange={(event) =>
+                        onChangeSettings({ description: event.target.value })
                       }
                       placeholder="Add description"
-                      className={cn(fieldClass, "pl-9")}
+                      className="min-h-[72px] w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-800 placeholder:text-slate-400 outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/15"
                     />
+                  </SettingRow>
+                  <label className="flex items-center gap-2 pt-1 text-[13px] text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={settings.allowComments}
+                      onChange={(event) =>
+                        onChangeSettings({ allowComments: event.target.checked })
+                      }
+                      className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary/20"
+                    />
+                    Allow recipient comments
+                  </label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-[13px] text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={settings.automaticReminders}
+                        onChange={(event) =>
+                          onChangeSettings({
+                            automaticReminders: event.target.checked,
+                          })
+                        }
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary/20"
+                      />
+                      Automatic reminders
+                    </label>
+                    {settings.automaticReminders ? (
+                      <>
+                        <p className="max-w-xl text-[12px] leading-5 text-slate-400">
+                          Automatic reminders will only be delivered via email
+                          even if the delivery mode is set to &quot;Email +
+                          SMS&quot;.
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 text-[13px] text-slate-600">
+                          <span>Send a reminder every</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={90}
+                            value={settings.reminderEveryDays}
+                            onChange={(event) =>
+                              onChangeSettings({
+                                reminderEveryDays: Math.max(
+                                  1,
+                                  Number(event.target.value) || 1,
+                                ),
+                              })
+                            }
+                            className={cn(
+                              fieldClass,
+                              "w-[72px] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+                            )}
+                            aria-label="Reminder interval in days"
+                          />
+                          <span>day(s)</span>
+                        </div>
+                      </>
+                    ) : null}
                   </div>
                 </div>
-              </div>
-
-              <div className="space-y-4">
-                <label className="flex items-center gap-2 text-[13px] text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={settings.allowComments}
-                    onChange={(e) =>
-                      onChangeSettings({ allowComments: e.target.checked })
-                    }
-                    className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary/20"
-                  />
-                  Allow recipient comments
-                </label>
-                <label className="flex items-center gap-2 text-[13px] text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={settings.automaticReminders}
-                    onChange={(e) =>
-                      onChangeSettings({
-                        automaticReminders: e.target.checked,
-                      })
-                    }
-                    className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary/20"
-                  />
-                  Automatic reminders
-                </label>
-                {settings.automaticReminders ? (
-                  <>
-                    <p className="text-[12px] leading-5 text-slate-400">
-                      Automatic reminders will only be delivered via email even
-                      if the delivery mode is set to &quot;Email + SMS&quot;.
-                    </p>
-                    <div className="flex flex-col gap-3 text-[13px] text-slate-600">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span>Send a reminder every</span>
-                        <input
-                          type="number"
-                          min={1}
-                          max={90}
-                          value={settings.reminderEveryDays}
-                          onChange={(e) =>
-                            onChangeSettings({
-                              reminderEveryDays: Math.max(
-                                1,
-                                Number(e.target.value) || 1,
-                              ),
-                            })
-                          }
-                          className={cn(fieldClass, "w-[72px]")}
-                          aria-label="Reminder interval in days"
-                        />
-                        <span>day(s)</span>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span>on</span>
-                        <input
-                          type="date"
-                          value={settings.reminderDay}
-                          onChange={(e) =>
-                            onChangeSettings({ reminderDay: e.target.value })
-                          }
-                          className={cn(fieldClass, "w-[168px]")}
-                          aria-label="Reminder day"
-                        />
-                        <span>at</span>
-                        <input
-                          type="time"
-                          value={settings.reminderTime}
-                          onChange={(e) =>
-                            onChangeSettings({ reminderTime: e.target.value })
-                          }
-                          className={cn(fieldClass, "w-[128px]")}
-                          aria-label="Reminder time"
-                        />
-                      </div>
-                    </div>
-                  </>
-                ) : null}
-              </div>
-            </div>
               ) : null}
             </div>
 

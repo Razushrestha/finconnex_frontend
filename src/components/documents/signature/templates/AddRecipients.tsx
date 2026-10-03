@@ -1,7 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { GripVertical, Plus, Trash2, SlidersHorizontal } from "lucide-react";
+import {
+  fetchSignatureSelf,
+  selfFromStores,
+  type SignatureSelf,
+} from "@/lib/documents/signature/current-user";
 import type { SignatureSigner } from "@/lib/documents/signature/types";
 
 interface AddRecipientsProps {
@@ -17,38 +22,61 @@ export default function AddRecipients({
   signingOrder,
   onToggleOrder,
 }: AddRecipientsProps) {
-  // Mock current user data for the "Add me" feature
-  const currentUser = {
-    name: "John Doe",
-    email: "john.doe@example.com",
-    role: "Signer",
+  const [me, setMe] = useState<SignatureSelf>(() => selfFromStores());
+
+  useEffect(() => {
+    let alive = true;
+    void fetchSignatureSelf().then((self) => {
+      if (alive && (self.email || self.name)) setMe(self);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const fillWithSelf = (self: SignatureSelf) => {
+    const name = (self.name || self.email).trim();
+    const email = self.email.trim();
+    if (!name && !email) return;
+    if (signers.length > 0) {
+      const emptyIndex = signers.findIndex(
+        (row) => !row.email.trim() && !row.name.trim(),
+      );
+      const index = emptyIndex >= 0 ? emptyIndex : 0;
+      const updated = [...signers];
+      updated[index] = {
+        ...updated[index],
+        name,
+        email,
+        role: "Signer",
+      };
+      onChange(updated);
+      return;
+    }
+    onChange([
+      {
+        id: `role-${Date.now()}`,
+        name,
+        email,
+        colorIndex: 0,
+        order: 1,
+        role: "Signer",
+        status: "Pending",
+        token: "",
+        deliveryMethod: "email",
+      },
+    ]);
   };
 
   const handleAddMe = () => {
-    if (signers.length > 0) {
-      const updated = [...signers];
-      updated[0] = {
-        ...updated[0],
-        name: currentUser.name,
-        email: currentUser.email,
-        role: currentUser.role as any,
-      };
-      onChange(updated);
-    } else {
-      onChange([
-        {
-          id: `role-${Date.now()}`,
-          name: currentUser.name,
-          email: currentUser.email,
-          colorIndex: 0,
-          order: 1,
-          role: currentUser.role as any,
-          status: "Pending",
-          token: "",
-          deliveryMethod: "email",
-        },
-      ]);
+    if (me.email || me.name) {
+      fillWithSelf(me);
+      return;
     }
+    void fetchSignatureSelf().then((self) => {
+      setMe(self);
+      fillWithSelf(self);
+    });
   };
 
   const handleInputChange = (

@@ -48,6 +48,7 @@ export type SignatureFieldKind =
   | "checkbox"
   | "dropdown"
   | "radio"
+  | "checkbox_group"
   | "payment"
   | "attachment";
 
@@ -1010,6 +1011,8 @@ export function fieldKindLabel(kind: SignatureFieldKind): string {
       return "Dropdown";
     case "radio":
       return "Radio";
+    case "checkbox_group":
+      return "Checkbox group";
     case "payment":
       return "Payment";
     case "attachment":

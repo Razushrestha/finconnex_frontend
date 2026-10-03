@@ -274,6 +274,12 @@ function CreateDocumentForm() {
     setPlacedFields((prev) => prev.filter((f) => f.id !== id));
   };
 
+  const handleUpdatePlacedField = (id: string, patch: Partial<PlacedField>) => {
+    setPlacedFields((prev) =>
+      prev.map((field) => (field.id === id ? { ...field, ...patch } : field)),
+    );
+  };
+
   const handleResizeField = (id: string, width: number, height: number) => {
     setPlacedFields((prev) =>
       prev.map((f) => (f.id === id ? { ...f, width, height } : f)),
@@ -312,6 +318,7 @@ function CreateDocumentForm() {
           handleDropField={() => {}}
           handleRepositionField={handleRepositionField}
           handleRemovePlacedField={handleRemovePlacedField}
+          handleUpdatePlacedField={handleUpdatePlacedField}
           handleSidebarDragStart={() => {}}
           handleSidebarDragEnd={() => {}}
           handleResizeField={handleResizeField}

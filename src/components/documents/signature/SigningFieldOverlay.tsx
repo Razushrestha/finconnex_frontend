@@ -59,6 +59,7 @@ export function SigningFieldOverlay({
   const isMine = !highlightSignerId || field.signerId === highlightSignerId;
   const filled = Boolean(field.value?.trim());
   const selected = selectedFieldId === field.id;
+  const signerChip = Boolean(highlightSignerId) && isMine && !filled;
 
   if (!isMine && filled) {
     return (
@@ -76,12 +77,17 @@ export function SigningFieldOverlay({
     <div
       data-signing-field={field.id}
       className={cn(
-        "absolute z-10 flex cursor-pointer items-center justify-center gap-1 overflow-hidden rounded border-2 border-dashed px-1.5 py-1 text-[10px] font-semibold shadow-sm transition-all scroll-mt-40 select-none",
-        color.bg,
-        color.text,
-        color.border,
-        selected && "ring-2 ring-violet-500 ring-offset-1 shadow-md",
-        filled && "border-solid bg-white/95",
+        "absolute z-10 flex items-center justify-center gap-1 overflow-hidden scroll-mt-40 select-none",
+        signerChip
+          ? "rounded-[2px] border border-[#8fd0aa] bg-[#e7f8ef] px-2 text-[13px] font-medium text-slate-800"
+          : cn(
+              "cursor-pointer rounded border-2 border-dashed px-1.5 py-1 text-[10px] font-semibold shadow-sm transition-all",
+              color.bg,
+              color.text,
+              color.border,
+              selected && "ring-2 ring-violet-500 ring-offset-1 shadow-md",
+              filled && "border-solid bg-white/95",
+            ),
         interactive ? "cursor-pointer" : "cursor-default",
       )}
       style={placedFieldOverlayStyle(field)}
@@ -94,10 +100,10 @@ export function SigningFieldOverlay({
         <SignatureFieldValue field={field} />
       ) : (
         <>
-          <FieldIcon kind={field.kind} />
+          {signerChip ? null : <FieldIcon kind={field.kind} />}
           <span className="truncate">
             {field.label || fieldKindLabel(field.kind)}
-            {signer ? ` · ${signer.name.split(" ")[0]}` : ""}
+            {signerChip || !signer ? "" : ` · ${signer.name.split(" ")[0]}`}
           </span>
         </>
       )}

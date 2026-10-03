@@ -707,14 +707,15 @@ function toSignatureFields(placed: PlacedField[]): SignatureField[] {
     .map((f) => ({
       id: f.id,
       kind: f.type as SignatureField["kind"],
-      label: f.label,
+      label: f.fieldName || f.label,
       x: f.xPct,
       y: f.yPct,
       w: f.width ?? DEFAULT_PLACED_FIELD_WIDTH,
       h: f.height ?? DEFAULT_PLACED_FIELD_HEIGHT,
       page: f.page,
       signerId: f.recipientId!,
-      required: f.recipientId !== PREFILL_RECIPIENT_ID,
+      required:
+        f.recipientId !== PREFILL_RECIPIENT_ID && f.required !== false,
       documentId: f.documentId,
       value: f.value,
     }));
@@ -1321,6 +1322,12 @@ function CreateSignatureRequestForm() {
     setPlacedFields((prev) => prev.filter((f) => f.id !== id));
   };
 
+  const handleUpdatePlacedField = (id: string, patch: Partial<PlacedField>) => {
+    setPlacedFields((prev) =>
+      prev.map((field) => (field.id === id ? { ...field, ...patch } : field)),
+    );
+  };
+
   const handleChangeFieldValue = (id: string, value: string) => {
     setPlacedFields((prev) =>
       prev.map((f) => (f.id === id ? { ...f, value } : f)),
@@ -1331,8 +1338,8 @@ function CreateSignatureRequestForm() {
   // with the actual placed fields, marks it Sent, fires the (mock)
   // notifications, and resolves with whoever was just notified so the test
   // links modal can be shown before navigating away.
-  const handleSendForSignature = async (): Promise<SignatureSigner[]> => {
-    if (!assertRecipientsReady()) return [];
+  const handleSendForSignature = async (): Promise<SignatureSigner[] | null> => {
+    if (!assertRecipientsReady()) return null;
     const fields = toSignatureFields(placedFields);
 
     await Promise.all([
@@ -1401,6 +1408,7 @@ function CreateSignatureRequestForm() {
           handleDropField={handleDropField}
           handleRepositionField={handleRepositionField}
           handleRemovePlacedField={handleRemovePlacedField}
+          handleUpdatePlacedField={handleUpdatePlacedField}
           handleSidebarDragStart={handleSidebarDragStart}
           handleSidebarDragEnd={handleSidebarDragEnd}
           handleArmField={handleArmField}

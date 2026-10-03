@@ -22,9 +22,10 @@ export function ConfirmSendDetailsModal({
   isTemplate?: boolean;
   isSubmitting?: boolean;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: (signAfterSending: boolean) => void;
 }) {
   const [mounted, setMounted] = useState(false);
+  const [signAfterSending, setSignAfterSending] = useState(true);
 
   useEffect(() => {
     setMounted(true);
@@ -116,32 +117,48 @@ export function ConfirmSendDetailsModal({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 px-6 pb-5">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isSubmitting}
-            className="h-9 rounded-md border border-slate-300 bg-white px-4 text-[13px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={isSubmitting}
-            className="inline-flex h-9 min-w-[148px] items-center justify-center rounded-md bg-[#12875a] px-4 text-[13px] font-semibold text-white hover:bg-[#0f734d] disabled:opacity-70"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                {isTemplate ? "Saving..." : "Sending..."}
-              </>
-            ) : isTemplate ? (
-              "Confirm and save"
-            ) : (
-              "Confirm and send"
-            )}
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 pb-5">
+          {isTemplate ? (
+            <span />
+          ) : (
+            <label className="inline-flex items-center gap-2 text-[13px] text-slate-800">
+              <input
+                type="checkbox"
+                checked={signAfterSending}
+                onChange={(event) => setSignAfterSending(event.target.checked)}
+                disabled={isSubmitting}
+                className="h-4 w-4 rounded border-slate-300 accent-[#12875a]"
+              />
+              Sign the document right after sending
+            </label>
+          )}
+          <div className="ml-auto flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={isSubmitting}
+              className="h-9 rounded-md border border-slate-300 bg-white px-4 text-[13px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => onConfirm(signAfterSending)}
+              disabled={isSubmitting}
+              className="inline-flex h-9 min-w-[112px] items-center justify-center rounded-md bg-[#12875a] px-4 text-[13px] font-semibold text-white hover:bg-[#0f734d] disabled:opacity-70"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  Saving...
+                </>
+              ) : isTemplate ? (
+                "Confirm and save"
+              ) : (
+                "Save & sign"
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>,

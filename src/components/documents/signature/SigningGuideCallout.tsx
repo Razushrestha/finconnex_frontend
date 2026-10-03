@@ -2,10 +2,11 @@
 
 import { useLayoutEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
 
 type Box = { top: number; left: number; width: number; height: number };
-type Side = "left" | "right" | "top" | "bottom";
+
+const TIP_W = 250;
+const TIP_H = 68;
 
 function headerSafeTop() {
   const bar = document.querySelector<HTMLElement>("[data-sign-consent]");
@@ -29,43 +30,20 @@ function fieldBox(fieldId: string): Box | null {
   };
 }
 
-function placeCallout(box: Box, tipW: number, tipH: number) {
-  const pad = 10;
-  const gap = 12;
+function placeCallout(box: Box) {
+  const pad = 12;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const minTop = headerSafeTop();
-  const spaceLeft = box.left - pad;
-  const spaceRight = vw - (box.left + box.width) - pad;
-  const spaceBelow = vh - (box.top + box.height) - pad;
-  const spaceAbove = box.top - minTop;
-
-  let side: Side = "bottom";
-  if (spaceLeft >= tipW + gap && box.top >= minTop - 8) side = "left";
-  else if (spaceRight >= tipW + gap && box.top >= minTop - 8) side = "right";
-  else if (spaceBelow >= tipH + gap) side = "bottom";
-  else if (spaceAbove >= tipH + gap) side = "top";
-  else side = spaceBelow >= spaceAbove ? "bottom" : "top";
-
-  let left = 0;
-  let top = 0;
-  if (side === "left") {
-    left = box.left - gap - tipW;
-    top = box.top + box.height / 2 - tipH / 2;
-  } else if (side === "right") {
-    left = box.left + box.width + gap;
-    top = box.top + box.height / 2 - tipH / 2;
-  } else if (side === "top") {
-    left = box.left + box.width / 2 - tipW / 2;
-    top = box.top - gap - tipH;
-  } else {
-    left = box.left + box.width / 2 - tipW / 2;
-    top = box.top + box.height + gap;
+  const gap = 28;
+  let left = box.left + box.width + gap;
+  let top = box.top - 22;
+  if (left + TIP_W > vw - pad) {
+    left = Math.max(pad, box.left - gap - TIP_W);
   }
-
-  left = Math.min(vw - tipW - pad, Math.max(pad, left));
-  top = Math.min(vh - tipH - pad, Math.max(minTop, top));
-  return { left, top, side };
+  if (top < minTop) top = minTop;
+  if (top + TIP_H > vh - pad) top = Math.max(minTop, vh - TIP_H - pad);
+  return { left, top };
 }
 
 function fieldInView(box: Box) {
@@ -73,27 +51,12 @@ function fieldInView(box: Box) {
   return box.top + box.height > minTop + 8 && box.top < window.innerHeight - 8;
 }
 
-function arrowClass(side: Side) {
-  const base =
-    "pointer-events-none absolute h-2.5 w-2.5 rotate-45 border-teal-200 bg-[#d8f3ee]";
-  if (side === "left")
-    return `${base} top-1/2 right-[-5px] -translate-y-1/2 border-r border-t`;
-  if (side === "right")
-    return `${base} top-1/2 left-[-5px] -translate-y-1/2 border-b border-l`;
-  if (side === "top")
-    return `${base} bottom-[-5px] left-1/2 -translate-x-1/2 border-b border-r`;
-  return `${base} top-[-5px] left-1/2 -translate-x-1/2 border-l border-t`;
-}
-
 export function SigningGuideCallout({
   fieldId,
   title,
   step,
-  total,
-  remaining,
   onPrevious,
   onNext,
-  onClose,
 }: {
   fieldId: string;
   title: string;
@@ -145,61 +108,58 @@ export function SigningGuideCallout({
 
   if (!fieldInView(box)) return null;
 
-  const tipW = 240;
-  const tipH = 86;
-  const { left, top, side } = placeCallout(box, tipW, tipH);
+  const { left, top } = placeCallout(box);
+  const onRight = left >= box.left + box.width;
+  const fromX = onRight ? box.left + box.width : box.left;
+  const fromY = box.top + 1;
+  const elbowX = onRight ? fromX + 14 : fromX - 14;
+  const toX = onRight ? left : left + TIP_W;
+  const toY = top + 22;
 
   return createPortal(
     <>
       <div
-        className="pointer-events-none fixed z-[25] rounded-md ring-2 ring-emerald-600 ring-offset-2"
+        className="pointer-events-none fixed z-[25] rounded-[2px] border-2 border-[#1f7a45]"
         style={{
-          top: box.top,
-          left: box.left,
-          width: box.width,
-          height: box.height,
+          top: box.top - 1,
+          left: box.left - 1,
+          width: box.width + 2,
+          height: box.height + 2,
         }}
       />
+      <svg
+        className="pointer-events-none fixed inset-0 z-[25] h-full w-full"
+        aria-hidden
+      >
+        <polyline
+          points={`${fromX},${fromY} ${elbowX},${fromY} ${elbowX},${toY} ${toX},${toY}`}
+          fill="none"
+          stroke="#9fd4b8"
+          strokeWidth="1.5"
+        />
+      </svg>
       <div
         role="dialog"
         aria-label={title}
-        className="fixed z-[25] w-[240px] rounded-md border border-teal-200 bg-[#d8f3ee] px-3.5 py-2.5 text-slate-800 shadow-lg"
+        className="fixed z-[26] w-[250px] rounded-[4px] border border-[#d7eee4] bg-[#f3fbf7] px-3.5 py-2.5 text-slate-800 shadow-[0_2px_10px_rgba(15,23,42,0.08)]"
         style={{ top, left }}
       >
-        <span className={arrowClass(side)} />
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded text-slate-500 hover:bg-teal-100 hover:text-slate-800"
-          aria-label="Close guidance"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-        <p className="pr-5 text-[13px] font-medium leading-snug text-slate-800">
-          {title}
-        </p>
-        <div className="mt-2.5 flex items-center justify-between text-[12px]">
+        <p className="text-[14px] leading-snug text-slate-800">{title}</p>
+        <div className="mt-3 flex items-center justify-end gap-4 text-[13px]">
           <button
             type="button"
             onClick={onPrevious}
             disabled={step <= 0}
-            className="font-medium text-slate-700 underline decoration-slate-400 underline-offset-2 disabled:text-slate-400 disabled:no-underline"
+            className="text-slate-800 underline underline-offset-2 disabled:text-slate-400"
           >
             Previous
           </button>
-          <span className="px-1 text-center text-[10px] font-semibold tabular-nums text-slate-600">
-            {remaining === 0
-              ? "All done"
-              : remaining === 1
-                ? "1 left to fill"
-                : `${remaining} left to fill`}
-          </span>
           <button
             type="button"
             onClick={onNext}
-            className="font-medium text-slate-700 underline decoration-slate-400 underline-offset-2"
+            className="text-slate-800 underline underline-offset-2"
           >
-            {step >= total - 1 ? "Done" : "Next"}
+            Next
           </button>
         </div>
       </div>

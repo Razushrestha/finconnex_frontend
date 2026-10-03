@@ -26,6 +26,7 @@ interface PdfDocViewerProps {
   className?: string;
   /** When true, grow with pages and let a parent scroller own overflow. */
   embedded?: boolean;
+  pageAnchorPrefix?: string;
 }
 
 export default function PdfDocViewer({
@@ -40,6 +41,7 @@ export default function PdfDocViewer({
   pageWidth = 700,
   className,
   embedded = false,
+  pageAnchorPrefix,
 }: PdfDocViewerProps) {
   const [numPages, setNumPages] = useState<number>(0);
   const [loadError, setLoadError] = useState<boolean>(false);
@@ -84,6 +86,11 @@ export default function PdfDocViewer({
           return (
             <div
               key={pageNum}
+              id={
+                pageAnchorPrefix
+                  ? `${pageAnchorPrefix}-page-${pageNum}`
+                  : undefined
+              }
               className="relative overflow-hidden bg-white shrink-0 border-t border-slate-200/70 first:border-t-0"
             >
               <Page

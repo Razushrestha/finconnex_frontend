@@ -318,6 +318,7 @@ export function SignatureDocPreview({
   className,
   pageWidth = 700,
   embedded = false,
+  pageAnchorPrefix,
 }: {
   fileName: string;
   fileUrl?: string;
@@ -335,6 +336,7 @@ export function SignatureDocPreview({
   className?: string;
   pageWidth?: number;
   embedded?: boolean;
+  pageAnchorPrefix?: string;
 }) {
   function handleClick(e: React.MouseEvent<HTMLDivElement>) {
     if (!interactive || !onCanvasClick) return;
@@ -383,6 +385,7 @@ export function SignatureDocPreview({
         pageWidth={pageWidth}
         className={className}
         embedded={embedded}
+        pageAnchorPrefix={pageAnchorPrefix}
       />
     );
   }
