@@ -358,7 +358,10 @@ export function DateTimePicker({
   onSelectSlot: (slot: AppointmentSlot) => void;
 }) {
   const cells = monthGrid(year, month0);
-  const slots = days.get(selectedDate) ?? [];
+  const nowMs = Date.now();
+  const futureOn = (iso: string) =>
+    (days.get(iso) ?? []).filter((slot) => Date.parse(slot.startTime) > nowMs);
+  const slots = futureOn(selectedDate);
   const atCurrentMonth = `${year}-${String(month0 + 1).padStart(2, "0")}` <= todayKey.slice(0, 7);
 
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -401,7 +404,11 @@ export function DateTimePicker({
     side = <SideMessage>No Slots Available</SideMessage>;
   } else {
     side = (
-      <ul role="listbox" aria-label="Available times" className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+      <ul
+        role="listbox"
+        aria-label="Available times"
+        className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1"
+      >
         {slots.map((slot) => (
           <li key={slot.startTime}>
             <button
@@ -410,7 +417,7 @@ export function DateTimePicker({
               aria-selected={slot.startTime === selectedSlot}
               onClick={() => onSelectSlot(slot)}
               className={cn(
-                "h-10 w-full rounded-full border text-[14px] font-medium transition-colors",
+                "h-11 w-full rounded-full border text-[14px] font-medium transition-colors",
                 slot.startTime === selectedSlot
                   ? "border-[#5A4FCF] bg-[#5A4FCF] text-white"
                   : "border-[#5A4FCF] bg-white text-slate-700 hover:bg-[#F4F2FF]",
@@ -479,7 +486,7 @@ export function DateTimePicker({
                     const past = cell.iso < todayKey;
                     const selected = cell.iso === selectedDate;
                     const today = cell.iso === todayKey;
-                    const hasSlots = (days.get(cell.iso)?.length ?? 0) > 0;
+                    const hasSlots = futureOn(cell.iso).length > 0;
                     return (
                       <button
                         key={cell.iso}
