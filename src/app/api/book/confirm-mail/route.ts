@@ -3,25 +3,7 @@ import {
   sendViaSendGrid,
   sendgridConfigured,
 } from "@/lib/emails/sendgrid-server";
-
-function sameSiteRequest(request: Request): boolean {
-  const site = request.headers.get("sec-fetch-site");
-  if (site === "same-origin" || site === "same-site") return true;
-  if (site === "cross-site") return false;
-  try {
-    const origin = request.headers.get("origin");
-    if (origin) {
-      return new URL(origin).origin === new URL(request.url).origin;
-    }
-    const referer = request.headers.get("referer");
-    if (referer) {
-      return new URL(referer).origin === new URL(request.url).origin;
-    }
-  } catch {
-    return false;
-  }
-  return false;
-}
+import { sameSiteRequest } from "@/lib/booking/same-site";
 
 /**
  * Guest booking confirmation mail. No dashboard session — public /book only.

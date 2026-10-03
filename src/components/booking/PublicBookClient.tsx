@@ -15,6 +15,16 @@ import {
 import { confirmPublicBooking } from "@/lib/booking/actions";
 import { sanitizeDescriptionHtml } from "@/lib/booking/description-html";
 import {
+  PublicBookingError,
+  fetchPublicSlots,
+  fetchPublishedCrmRef,
+} from "@/lib/booking/public-client";
+import {
+  timeInZone,
+  type PublicSlot,
+  type PublicSlotDays,
+} from "@/lib/booking/public-crm";
+import {
   crmEventTypeIdOf,
   listCrmAvailableSlots,
   listCrmEventTypePages,
@@ -67,7 +77,11 @@ export function PublicBookClient({ slug }: { slug: string }) {
 
       const local = getBookingPageBySlug(slug);
       if (local) {
-        adopt(local);
+        // A copy saved here before the host connected the page to the CRM has
+        // no address to book through; ask the server before showing it.
+        const crmPublic = local.crmPublic ? null : await fetchPublishedCrmRef(slug);
+        if (!alive) return;
+        adopt(crmPublic ? { ...local, crmPublic } : local);
         return;
       }
 
@@ -175,9 +189,51 @@ function BookFlow({
     return dialCodeForTimezone(browser || page.timezone || "Asia/Kathmandu");
   });
 
+  // Pages the host connected to the CRM list slots (and take bookings) through
+  // the public API, which needs no login. `publicRefresh` re-reads them after a
+  // clash; the result is keyed so a stale month/timezone is never shown.
+  const publicSlug = page.crmPublic ? page.slug || page.title : "";
+  const monthFrom = toLocalDateStr(new Date(anchor.getFullYear(), anchor.getMonth(), 1));
+  const monthTo = toLocalDateStr(new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0));
+  const [publicRefresh, setPublicRefresh] = useState(0);
+  const [slotNotice, setSlotNotice] = useState<string | null>(null);
+  const [publicResult, setPublicResult] = useState<{
+    key: string;
+    days?: PublicSlotDays;
+    error?: string;
+  } | null>(null);
+  const publicKey = publicSlug
+    ? `${publicSlug}|${guestTz}|${monthFrom}|${monthTo}|${publicRefresh}`
+    : "";
+
+  useEffect(() => {
+    if (!publicKey) return;
+    let alive = true;
+    void fetchPublicSlots(publicSlug, {
+      from: monthFrom,
+      to: monthTo,
+      timezone: guestTz,
+    }).then((res) => {
+      if (!alive) return;
+      setPublicResult(
+        res.ok
+          ? { key: publicKey, days: res.days }
+          : { key: publicKey, error: res.message },
+      );
+    });
+    return () => {
+      alive = false;
+    };
+  }, [publicKey, publicSlug, monthFrom, monthTo, guestTz]);
+
+  const publicCurrent = publicResult?.key === publicKey ? publicResult : null;
+  const publicDays = publicCurrent?.days;
+  const publicLoading = !!publicKey && !publicCurrent;
+  const publicError = publicCurrent?.error;
+
   useEffect(() => {
     const eventTypeId = crmEventTypeIdOf(page);
-    if (!eventTypeId) {
+    if (page.crmPublic || !eventTypeId) {
       setCrmSlots([]);
       setCrmSlotDays(new Set());
       return;
@@ -210,7 +266,7 @@ function BookFlow({
           .map((row) => localHHmmFromIso(row.startTime)),
       );
     });
-  }, [page.crmEventTypeId, page.id, page.timezone, anchor, selectedDate]);
+  }, [page.crmEventTypeId, page.crmPublic, page.id, page.timezone, anchor, selectedDate]);
 
   const monthDays = useMemo(() => {
     const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
@@ -248,7 +304,27 @@ function BookFlow({
   const localSlots = selectedDate
     ? slotsForDate(slotPage, selectedDate, slotOpts)
     : [];
-  const slots = (crmSlots.length ? crmSlots : localSlots)
+
+  // The CRM's open times for the chosen day as the guest reads them (HH:mm in
+  // their timezone), earliest first. Two hosts free at the same time show once.
+  const publicSlotList = useMemo(() => {
+    if (!publicDays || !selectedDate) return [];
+    const byTime = new Map<string, PublicSlot & { start: string }>();
+    for (const slot of publicDays.get(toLocalDateStr(selectedDate)) ?? []) {
+      const start = timeInZone(slot.startAt, guestTz);
+      if (start && !byTime.has(start)) byTime.set(start, { ...slot, start });
+    }
+    return [...byTime.values()].sort(
+      (a, b) => Date.parse(a.startAt) - Date.parse(b.startAt),
+    );
+  }, [publicDays, selectedDate, guestTz]);
+
+  const slots = (page.crmPublic
+    ? publicSlotList.map((slot) => slot.start)
+    : crmSlots.length
+      ? crmSlots
+      : localSlots
+  )
     .map((item) =>
       typeof item === "string"
         ? { start: item, label: formatPublicSlotLabel(item) }
@@ -268,7 +344,15 @@ function BookFlow({
   const hostName = hostNames[0] || "Host";
 
   useEffect(() => {
-    if (selectedDate) return;
+    // On a connected page, a chosen day the CRM no longer lists (its last time
+    // was just taken, or the guest moved to another month) gives way to the
+    // first day that still has times, instead of an empty "No times this day".
+    const selectedGone =
+      !!page.crmPublic &&
+      !!publicDays &&
+      !!selectedDate &&
+      !publicDays.has(toLocalDateStr(selectedDate));
+    if (selectedDate && !selectedGone) return;
     const daysInMonth = new Date(
       anchor.getFullYear(),
       anchor.getMonth() + 1,
@@ -278,21 +362,33 @@ function BookFlow({
       const date = new Date(anchor.getFullYear(), anchor.getMonth(), d);
       const dayKey = toLocalDateStr(date);
       if (isPastBookingDate(dayKey, guestTz || page.timezone)) continue;
-      const hasSlots = crmSlotDays.size
-        ? crmSlotDays.has(dayKey)
-        : slotsForDate(slotPage, date, slotOpts).length > 0;
+      const hasSlots = page.crmPublic
+        ? !!publicDays?.has(dayKey)
+        : crmSlotDays.size
+          ? crmSlotDays.has(dayKey)
+          : slotsForDate(slotPage, date, slotOpts).length > 0;
       if (hasSlots) {
         setSelectedDate(date);
+        if (selectedGone) setSelectedSlot(null);
         return;
       }
     }
-  }, [anchor, crmSlotDays, page, selectedDate, slotOpts, slotPage]);
+  }, [anchor, crmSlotDays, page, publicDays, selectedDate, slotOpts, slotPage]);
 
   function pickDate(d: Date) {
     const dayKey = toLocalDateStr(d);
     if (isPastBookingDate(dayKey, guestTz || page.timezone)) return;
     setSelectedDate(d);
     setSelectedSlot(null);
+    setSlotNotice(null);
+  }
+
+  /** The chosen time clashed (or went stale): back to the times, freshly loaded. */
+  function chooseAnotherTime(message: string) {
+    setSelectedSlot(null);
+    setSlotNotice(message);
+    setStep("date");
+    setPublicRefresh((n) => n + 1);
   }
 
   async function confirm() {
@@ -338,6 +434,15 @@ function BookFlow({
       return;
     }
 
+    // On a CRM-connected page the booking is the exact slot the CRM offered.
+    const chosen = page.crmPublic
+      ? publicSlotList.find((slot) => slot.start === selectedSlot)
+      : undefined;
+    if (page.crmPublic && !chosen) {
+      chooseAnotherTime("That time is no longer available. Please choose another time.");
+      return;
+    }
+
     setSubmitting(true);
     setEmailError(null);
     try {
@@ -350,6 +455,8 @@ function BookFlow({
         guestEmail: email.trim(),
         guestPhone: `${dialCode} ${localPhone}`.trim(),
         start,
+        startAtIso: chosen?.startAt,
+        hostId: chosen?.hostId,
         timezone: guestTz,
         answers,
         rescheduleToken,
@@ -358,11 +465,19 @@ function BookFlow({
       setConfirmed(result.booking);
       if (result.emailError) setEmailError(result.emailError);
       setStep("done");
-    } catch {
-      setErrors((prev) => ({
-        ...prev,
-        form: "Could not complete this booking. Try again.",
-      }));
+    } catch (error) {
+      if (error instanceof PublicBookingError) {
+        if (error.code === "slot_unavailable") {
+          chooseAnotherTime(error.message);
+        } else {
+          setErrors((prev) => ({ ...prev, form: error.message }));
+        }
+      } else {
+        setErrors((prev) => ({
+          ...prev,
+          form: "Could not complete this booking. Try again.",
+        }));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -502,9 +617,11 @@ function BookFlow({
                 {monthDays.map((d, i) => {
                   if (!d) return <span key={`e-${i}`} className="h-11" />;
                   const dayKey = toLocalDateStr(d);
-                  const hasSlots = crmSlotDays.size
-                    ? crmSlotDays.has(dayKey)
-                    : slotsForDate(slotPage, d, slotOpts).length > 0;
+                  const hasSlots = page.crmPublic
+                    ? !!publicDays?.has(dayKey)
+                    : crmSlotDays.size
+                      ? crmSlotDays.has(dayKey)
+                      : slotsForDate(slotPage, d, slotOpts).length > 0;
                   const isPast = isPastBookingDate(
                     dayKey,
                     guestTz || page.timezone,
@@ -549,6 +666,8 @@ function BookFlow({
                 onChange={(e) => {
                   setGuestTz(e.target.value);
                   setDialCode(dialCodeForTimezone(e.target.value));
+                  // Times are re-read in the new zone, so the old pick no longer matches.
+                  if (page.crmPublic) setSelectedSlot(null);
                 }}
                 className="mt-1 w-full appearance-none border-0 bg-transparent py-1 text-[13px] text-slate-500 outline-none"
               >
@@ -571,12 +690,37 @@ function BookFlow({
                   : "Select a date"}
               </h3>
               <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-1">
-                {!selectedDate ? (
+                {slotNotice ? (
+                  <p
+                    role="alert"
+                    className="rounded-lg bg-amber-50 px-3 py-2 text-[12px] leading-5 text-amber-800"
+                  >
+                    {slotNotice}
+                  </p>
+                ) : null}
+                {publicError ? (
+                  <div role="alert" className="py-8 text-center">
+                    <p className="text-[12px] leading-5 text-slate-500">{publicError}</p>
+                    <button
+                      type="button"
+                      onClick={() => setPublicRefresh((n) => n + 1)}
+                      className="mt-3 rounded-full border border-slate-200 px-4 py-1.5 text-[12px] font-medium text-slate-700 hover:border-[#5B4BDB]/50"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                ) : null}
+                {publicLoading ? (
+                  <p className="py-10 text-center text-[12px] text-slate-400">
+                    Loading times…
+                  </p>
+                ) : null}
+                {!selectedDate && !publicLoading && !publicError ? (
                   <p className="py-10 text-center text-[12px] text-slate-400">
                     Pick a date to see times
                   </p>
                 ) : null}
-                {selectedDate && slots.length === 0 ? (
+                {selectedDate && slots.length === 0 && !publicLoading && !publicError ? (
                   <p className="py-10 text-center text-[12px] text-slate-400">
                     No times this day
                   </p>
@@ -603,7 +747,10 @@ function BookFlow({
                     <button
                       key={s.start}
                       type="button"
-                      onClick={() => setSelectedSlot(s.start)}
+                      onClick={() => {
+                        setSlotNotice(null);
+                        setSelectedSlot(s.start);
+                      }}
                       className="h-11 w-full rounded-full border border-slate-200 text-[13px] font-medium text-slate-700 hover:border-[#5B4BDB]/50"
                     >
                       {s.label}

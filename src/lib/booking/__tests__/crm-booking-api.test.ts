@@ -103,6 +103,25 @@ describe("createCrmBooking for a guest who picked an exact time", () => {
     expect(backend.posts).toHaveLength(0);
   });
 
+  it("sends staff-only notes as internalNotes, never as the guest-visible notes", async () => {
+    backend = installBackend([WANTED]);
+    await createCrmBooking({
+      ...guest,
+      snapToleranceMs: 60_000,
+      internalNotes: "  Payment: Paid - Rs1000 of Rs1000 received  ",
+    });
+
+    const body = backend.posts[0]!.body;
+    expect(body.internalNotes).toBe("Payment: Paid - Rs1000 of Rs1000 received");
+    expect("notes" in body).toBe(false);
+  });
+
+  it("leaves internalNotes out when there are none", async () => {
+    backend = installBackend([WANTED]);
+    await createCrmBooking({ ...guest, snapToleranceMs: 60_000, internalNotes: "   " });
+    expect("internalNotes" in backend.posts[0]!.body).toBe(false);
+  });
+
   it("keeps the internal form's ±2h snapping by default", async () => {
     backend = installBackend(["2026-09-18T02:30:00.000Z"]);
     await createCrmBooking(guest);

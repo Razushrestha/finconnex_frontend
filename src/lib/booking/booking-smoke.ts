@@ -186,9 +186,9 @@ export function smokeBookingWiring() {
     fail("consultation additional settings must name the FinConnex calendar");
   }
 
-  const modal = readSrc("src/components/booking/NewBookingModal.tsx");
+  const modal = readSrc("src/components/booking/NewAppointmentModal.tsx");
   if (!modal.includes("createCrmBooking") || !modal.includes("linkCrmBooking")) {
-    fail("NewBookingModal is not wired to CRM create booking + crm-link");
+    fail("NewAppointmentModal is not wired to CRM create booking + crm-link");
   }
 
   const leadMeetings = readSrc(

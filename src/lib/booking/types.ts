@@ -1,4 +1,5 @@
 import type { EmailNotifyConfig } from "@/lib/booking/email-config";
+import type { CrmPublicRef } from "@/lib/booking/public-crm";
 
 /** SRS §8 Booking & Scheduling */
 
@@ -155,6 +156,12 @@ export interface BookingPage {
   calendlyEventTypeId?: string;
   calendlyHostId?: string;
   crmEventTypeId?: string;
+  /**
+   * Public-API address (workspace / host / event type slugs) of the CRM event
+   * type behind this page. Attached when the host publishes, so signed-out
+   * guests can read slots and book through the backend's public booking API.
+   */
+  crmPublic?: CrmPublicRef;
   /** Unauthenticated booking page listing. Defaults to Live status. */
   isPublic?: boolean;
   /** Put confirmed bookings on the FinConnex calendar (default on). */
@@ -242,6 +249,9 @@ export interface Booking {
   crmBookingId?: string;
   /** CRM meeting saved instead when no matching booking slot existed. */
   crmMeetingId?: string;
+  /** Backend manage tokens for a booking a signed-out guest made. */
+  crmCancelToken?: string;
+  crmRescheduleToken?: string;
   leadId?: string;
   contactId?: string;
   confirmationMessage?: string;

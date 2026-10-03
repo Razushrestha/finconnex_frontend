@@ -175,28 +175,6 @@ function Required() {
   return <span className="text-rose-500">*</span>;
 }
 
-function RecipientCheck({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] font-medium text-slate-700">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="h-4 w-4 rounded accent-[#5A32A3]"
-      />
-      {label}
-    </label>
-  );
-}
-
 /**
  * One bordered message editor: a slim toolbar (Reset to default on the left,
  * `tools` such as Insert Variable on the right), the text, and a footer line
@@ -350,15 +328,6 @@ export function NotificationEditModal({
   const dateOptions = useMemo(() => dateFormatOptions(new Date()), []);
   const enabled = draft.channels[tab];
   const defaults = DEFAULT_NOTIFICATIONS.find((n) => n.id === row.id);
-  // Email and SMS text goes to the guest and to the assigned user alike, so
-  // either one is enough to edit it. WhatsApp only ever goes to the guest, and
-  // the in-app alert goes to the consultant whoever is ticked.
-  const canEdit =
-    tab === "In-app" ||
-    (tab === "WhatsApp"
-      ? draft.notifyContact
-      : draft.notifyContact || draft.notifyUser);
-
   // Escape closes the window. A dropdown or the variable menu that is open
   // takes the key first (they mark it handled), so one press closes one layer.
   useEffect(() => {
@@ -487,37 +456,7 @@ export function NotificationEditModal({
             </label>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg bg-slate-50 px-3.5 py-2.5">
-            <span className="text-[12px] font-semibold text-slate-700">Send to</span>
-            <RecipientCheck
-              label="Contact"
-              checked={draft.notifyContact}
-              onChange={(checked) => setDraft((d) => ({ ...d, notifyContact: checked }))}
-            />
-            <RecipientCheck
-              label="Assigned user"
-              checked={draft.notifyUser}
-              onChange={(checked) => setDraft((d) => ({ ...d, notifyUser: checked }))}
-            />
-          </div>
-
-          {!canEdit ? (
-            <p className="rounded-lg border border-dashed border-[#E5E7EB] px-4 py-8 text-center text-[13px] text-slate-500">
-              {tab === "WhatsApp" ? (
-                <>
-                  WhatsApp messages go to the guest. Tick{" "}
-                  <span className="font-semibold text-slate-700">Contact</span> above to
-                  send this one.
-                </>
-              ) : (
-                <>
-                  Tick <span className="font-semibold text-slate-700">Contact</span> or{" "}
-                  <span className="font-semibold text-slate-700">Assigned user</span>{" "}
-                  above to write this message.
-                </>
-              )}
-            </p>
-          ) : tab === "Email" ? (
+          {tab === "Email" ? (
             <div className="space-y-5">
               <div>
                 <label htmlFor={subjectId} className={LABEL}>

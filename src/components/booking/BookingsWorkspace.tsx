@@ -31,7 +31,7 @@ import { toast } from "@/lib/notify/toast";
 import { ResizableColumns } from "@/components/common/ResizableColumns";
 import { publicBookUrl, type BookingPage } from "@/lib/booking/types";
 import { ConsultationsBoard } from "@/components/booking/ConsultationsBoard";
-import { NewBookingModal } from "@/components/booking/NewBookingModal";
+import { NewAppointmentModal } from "@/components/booking/NewAppointmentModal";
 import { AppointmentDateField } from "@/components/booking/DateTimeSection";
 import {
   appointmentDateKey,
@@ -273,7 +273,7 @@ export function BookingsWorkspace({
           ) : null}
         </div>
       </div>
-      <NewBookingModal
+      <NewAppointmentModal
         open={bookOpen}
         onClose={closeBook}
         onCreated={() => crm.refresh()}

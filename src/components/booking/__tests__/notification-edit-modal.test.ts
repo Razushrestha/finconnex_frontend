@@ -174,7 +174,12 @@ describe("NotificationEditModal layout", () => {
 
   it("no longer hides the message inside a Contact accordion", () => {
     expect(html).not.toContain("Who should receive this notification?");
-    expect(html).toContain("Send to");
+  });
+
+  it("has no Send to row — recipients are not chosen in this window", () => {
+    expect(html).not.toContain("Send to");
+    expect(html).not.toContain("Assigned user");
+    expect(html).not.toContain('type="checkbox"');
   });
 });
 
@@ -193,50 +198,43 @@ describe("NotificationEditModal recipients", () => {
     );
   }
 
-  it("lists Contact and Assigned user as ticks", () => {
-    const html = renderFor({ notifyContact: true, notifyUser: false });
-    expect(html.match(/type="checkbox"/g) ?? []).toHaveLength(2);
-    expect(html).toContain("Contact");
-    expect(html).toContain("Assigned user");
+  const everyone: Array<Parameters<typeof renderFor>[0]> = [
+    { notifyContact: true, notifyUser: false },
+    { notifyContact: false, notifyUser: true },
+    { notifyContact: true, notifyUser: true },
+    { notifyContact: false, notifyUser: false },
+  ];
+
+  it("shows no recipient checkboxes, whoever the notification is set to reach", () => {
+    for (const who of everyone) {
+      const html = renderFor(who);
+      expect(html).not.toContain("Send to");
+      expect(html).not.toContain("Assigned user");
+      expect(html.match(/type="checkbox"/g) ?? []).toHaveLength(0);
+    }
   });
 
-  it("edits the message when only the guest is ticked", () => {
-    expect(renderFor({ notifyContact: true, notifyUser: false })).toContain("Email body");
+  it("always shows the Email editor — it is never locked behind a tick", () => {
+    for (const who of everyone) {
+      const html = renderFor(who);
+      expect(html).toContain("Email body");
+      expect(html).toContain("Send test email");
+      expect(html).not.toContain("above to write this message");
+    }
   });
 
-  it("still edits the message when only the assigned user is ticked", () => {
-    // The assigned user is sent the same subject and body.
-    const html = renderFor({ notifyContact: false, notifyUser: true });
-    expect(html).toContain("Email body");
-    expect(html).toContain("Send test email");
+  it("always shows the SMS editor", () => {
+    for (const who of everyone) {
+      const html = renderFor(who, ["SMS"]);
+      expect(html).toContain("SMS message");
+      expect(html).toContain("Send test SMS");
+    }
   });
 
-  it("explains what to tick when nobody is", () => {
-    const html = renderFor({ notifyContact: false, notifyUser: false });
-    expect(html).not.toContain("Email body");
-    expect(html).not.toContain("Send test email");
-    expect(html).toContain("above to write this message");
-  });
-
-  it("does the same for the SMS editor", () => {
-    expect(renderFor({ notifyContact: false, notifyUser: true }, ["SMS"])).toContain(
-      "SMS message",
-    );
-    expect(renderFor({ notifyContact: false, notifyUser: false }, ["SMS"])).not.toContain(
-      "SMS message",
-    );
-  });
-
-  it("keeps WhatsApp for the guest only", () => {
-    const guest = renderFor({ notifyContact: true, notifyUser: false }, ["WhatsApp"]);
-    expect(guest).toContain("Send test WhatsApp");
-    const userOnly = renderFor({ notifyContact: false, notifyUser: true }, ["WhatsApp"]);
-    expect(userOnly).not.toContain("Send test WhatsApp");
-    expect(userOnly).toContain("WhatsApp messages go to the guest");
-  });
-
-  it("always offers the in-app test, whoever is ticked", () => {
-    const html = renderFor({ notifyContact: false, notifyUser: false }, ["In-app"]);
-    expect(html).toContain("Send test in-app");
+  it("always offers the WhatsApp and in-app tests", () => {
+    for (const who of everyone) {
+      expect(renderFor(who, ["WhatsApp"])).toContain("Send test WhatsApp");
+      expect(renderFor(who, ["In-app"])).toContain("Send test in-app");
+    }
   });
 });

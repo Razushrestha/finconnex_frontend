@@ -26,6 +26,11 @@ import {
   queueBookingLifecycleNotifies,
 } from "@/lib/booking/notify";
 import { allocateConferencingLink } from "@/lib/booking/meeting-link";
+import {
+  PublicBookingError,
+  bookPublicSlot,
+  managePublicBooking,
+} from "@/lib/booking/public-client";
 import { nextBookingRef } from "@/lib/booking/guest-confirm-email";
 import {
   formatNotificationAt,
@@ -225,12 +230,115 @@ async function cancelAppointmentInCrm(booking: Booking): Promise<void> {
   await tryCrmMeeting(() => cancelCrmMeeting(crmMeetingId!));
 }
 
+/** What the CRM handed back when a signed-out guest's booking was accepted. */
+type GuestSaved = {
+  bookingId: string;
+  cancelToken?: string;
+  rescheduleToken?: string;
+};
+
+/** Answers worth telling the host; sensitive (ePHI) answers never leave the guest's browser. */
+function guestNotes(page: BookingPage, answers: Record<string, string>): string {
+  return Object.entries(answers)
+    .map(([id, value]) => {
+      const question = page.questions?.find((q) => q.id === id);
+      if (question?.ephi || !value?.trim()) return "";
+      return `${question?.label || id}: ${value.trim()}`;
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
+ * Books through the backend's public booking API, which needs no CRM login: the
+ * only way a signed-out guest's appointment can reach Bookings → Upcoming
+ * Appointments. Returns null when this page is not connected to the CRM (the
+ * caller then falls back); throws `PublicBookingError` when the CRM refuses.
+ */
+async function bookGuestSlotInCrm(args: {
+  page: BookingPage;
+  startAtIso: string;
+  hostId?: string;
+  guestName: string;
+  guestEmail: string;
+  guestPhone?: string;
+  timezone: string;
+  answers: Record<string, string>;
+}): Promise<GuestSaved | null> {
+  const notes = guestNotes(args.page, args.answers);
+  const res = await bookPublicSlot(args.page.slug || args.page.title, {
+    startAt: args.startAtIso,
+    name: args.guestName,
+    email: args.guestEmail,
+    phone: args.guestPhone,
+    timezone: args.timezone,
+    hostId: args.hostId,
+    notes: notes || undefined,
+  });
+  if (res.ok) {
+    return {
+      bookingId: res.bookingId,
+      cancelToken: res.cancelToken,
+      rescheduleToken: res.rescheduleToken,
+    };
+  }
+  if (res.code === "not_connected") return null;
+  throw new PublicBookingError(res.code, res.message);
+}
+
+/**
+ * Moves a booking a guest made through the public API. The CRM replaces it with
+ * a new booking (new id, new tokens), which is what the caller keeps.
+ */
+async function moveGuestSlotInCrm(args: {
+  page: BookingPage;
+  token: string;
+  startAtIso: string;
+  timezone: string;
+}): Promise<GuestSaved | null> {
+  const res = await managePublicBooking(args.page.slug || args.page.title, {
+    action: "reschedule",
+    token: args.token,
+    startAt: args.startAtIso,
+    timezone: args.timezone,
+  });
+  if (res.ok && res.bookingId) {
+    return {
+      bookingId: res.bookingId,
+      cancelToken: res.cancelToken,
+      rescheduleToken: res.rescheduleToken,
+    };
+  }
+  if (!res.ok && res.code === "not_connected") return null;
+  throw new PublicBookingError(
+    res.ok ? "unavailable" : res.code,
+    res.ok ? "The booking service sent an unexpected reply." : res.message,
+  );
+}
+
+/** Cancels a booking the guest made through the public API. Never throws. */
+async function cancelGuestBookingInCrm(booking: Booking): Promise<void> {
+  if (!booking.crmCancelToken) return;
+  await managePublicBooking(booking.pageSlug, {
+    action: "cancel",
+    token: booking.crmCancelToken,
+    reason: "Cancelled by guest",
+  });
+}
+
 export async function confirmPublicBooking(input: {
   page: BookingPage;
   guestName: string;
   guestEmail: string;
   guestPhone?: string;
   start: string;
+  /**
+   * The exact instant the guest picked (ISO), as offered by the CRM. Required
+   * for the booking to be saved through the public API.
+   */
+  startAtIso?: string;
+  /** Host the slot belongs to, when the CRM offered it per host. */
+  hostId?: string;
   answers: Record<string, string>;
   timezone?: string;
   /** Existing manage token when guest is rescheduling */
@@ -255,40 +363,79 @@ export async function confirmPublicBooking(input: {
   const bookingId = existing?.id ?? nextBookingId();
   const reference = existing?.reference ?? nextBookingRef();
 
-  // Save the appointment in the CRM first so it appears in Bookings → Upcoming
-  // Appointments. Failing or timing out never blocks the guest's confirmation.
+  // A page the host connected to the CRM books through its public API, which
+  // works for signed-out guests. If the CRM refuses, this throws and nothing is
+  // recorded: a confirmation the host can never see would be a lost booking.
+  let guestSaved: GuestSaved | null = null;
+  if (page.crmPublic && input.startAtIso) {
+    // A booking made before the page was connected exists only in the guest's
+    // browser; moving it means creating it in the CRM for the first time.
+    const neverReachedCrm =
+      !!existing &&
+      !existing.crmRescheduleToken &&
+      !existing.crmBookingId &&
+      !existing.crmMeetingId;
+    if (!existing || neverReachedCrm) {
+      guestSaved = await bookGuestSlotInCrm({
+        page,
+        startAtIso: input.startAtIso,
+        hostId: input.hostId,
+        guestName: input.guestName.trim(),
+        guestEmail: input.guestEmail.trim(),
+        guestPhone: input.guestPhone?.trim() || undefined,
+        timezone,
+        answers: input.answers,
+      });
+    } else if (existing?.crmRescheduleToken) {
+      guestSaved = await moveGuestSlotInCrm({
+        page,
+        token: existing.crmRescheduleToken,
+        startAtIso: input.startAtIso,
+        timezone,
+      });
+    }
+  }
+
+  // Otherwise (host or signed-in session) save the appointment in the CRM
+  // first so it appears in Bookings → Upcoming Appointments. Failing or timing
+  // out never blocks the guest's confirmation.
   const startMs = new Date(input.start).getTime();
   const startIso = Number.isNaN(startMs)
     ? input.start
     : new Date(startMs).toISOString();
-  const crmSaved =
-    (await withTimeout(
-      existing
-        ? moveAppointmentInCrm({
-            crmBookingId: existing.crmBookingId,
-            crmMeetingId: existing.crmMeetingId,
-            startIso,
-            start: input.start,
-            end,
-          })
-        : saveNewAppointmentInCrm({
-            eventTypeId: crmEventTypeIdOf(page),
-            startIso,
-            start: input.start,
-            end,
-            title: `${page.title} — ${input.guestName.trim()}`,
-            page,
-            guestName: input.guestName.trim(),
-            guestEmail: input.guestEmail.trim(),
-            guestPhone: input.guestPhone,
-            timezone,
-          }),
-      CRM_SYNC_TIMEOUT_MS,
-    )) ?? {};
+  const crmSaved: CrmSaved = guestSaved
+    ? { bookingId: guestSaved.bookingId }
+    : ((await withTimeout(
+        existing
+          ? moveAppointmentInCrm({
+              crmBookingId: existing.crmBookingId,
+              crmMeetingId: existing.crmMeetingId,
+              startIso,
+              start: input.start,
+              end,
+            })
+          : saveNewAppointmentInCrm({
+              eventTypeId: crmEventTypeIdOf(page),
+              startIso,
+              start: input.start,
+              end,
+              title: `${page.title} — ${input.guestName.trim()}`,
+              page,
+              guestName: input.guestName.trim(),
+              guestEmail: input.guestEmail.trim(),
+              guestPhone: input.guestPhone,
+              timezone,
+            }),
+        CRM_SYNC_TIMEOUT_MS,
+      )) ?? {});
   const crmMeeting = crmSaved.meeting ?? null;
   if (crmMeeting) persistRemoteMeeting(crmMeeting);
   const crmBookingId = crmSaved.bookingId ?? existing?.crmBookingId;
   const crmMeetingId = crmMeeting?.id ?? existing?.crmMeetingId;
+  const crmCancelToken = guestSaved ? guestSaved.cancelToken : existing?.crmCancelToken;
+  const crmRescheduleToken = guestSaved
+    ? guestSaved.rescheduleToken
+    : existing?.crmRescheduleToken;
 
   const joinUrl =
     existing?.joinUrl ||
@@ -402,6 +549,8 @@ export async function confirmPublicBooking(input: {
     meetingId,
     crmBookingId,
     crmMeetingId,
+    crmCancelToken,
+    crmRescheduleToken,
     leadId,
     contactId,
     confirmationMessage,
@@ -444,8 +593,14 @@ export async function cancelPublicBooking(token: string): Promise<Booking | null
     saveMeetings(updated);
   }
 
-  // Take the appointment out of Bookings → Upcoming Appointments too.
-  await withTimeout(cancelAppointmentInCrm(booking), CRM_SYNC_TIMEOUT_MS);
+  // Take the appointment out of Bookings → Upcoming Appointments too. A guest
+  // booking is addressed by its own token; anything else needs a CRM session.
+  await withTimeout(
+    booking.crmCancelToken
+      ? cancelGuestBookingInCrm(booking)
+      : cancelAppointmentInCrm(booking),
+    CRM_SYNC_TIMEOUT_MS,
+  );
 
   const page = getBookingPageById(booking.pageId);
   if (page) {

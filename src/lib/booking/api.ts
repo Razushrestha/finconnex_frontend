@@ -27,6 +27,8 @@ export type CrmBookingHost = {
   id: string;
   name: string;
   email: string;
+  /** URL slug the backend's public booking API addresses this host by. */
+  slug?: string;
   active: boolean;
   isConsultant: boolean;
   isHomeConsultant: boolean;
@@ -319,6 +321,7 @@ export function normalizeCrmBookingHost(
     id: pickStr(row.id, row.hostId, row.host_id) || `host-${index}`,
     name: pickStr(row.name, row.displayName, row.display_name, row.email) || "Host",
     email: pickStr(row.email),
+    slug: pickStr(row.slug) || undefined,
     active: pickBool(row.active, row.isActive, row.is_active) || row.active !== false,
     isConsultant: pickBool(row.isConsultant, row.is_consultant, row.consultant),
     isHomeConsultant: pickBool(
@@ -1288,6 +1291,8 @@ export async function createCrmBooking(input: {
     hostId: hostId || undefined,
     phone: input.phone?.trim(),
     notes: input.notes?.trim(),
+    // Staff-only: the backend never shows these to the invitee.
+    internalNotes: input.internalNotes?.trim(),
   }) as Record<string, unknown>;
   if (input.leadId && isUuid(input.leadId)) base.leadId = input.leadId;
   if (input.contactId && isUuid(input.contactId)) {
@@ -1303,7 +1308,7 @@ export async function createCrmBooking(input: {
     payload: Record<string, unknown>,
   ): Promise<CrmBookingRecord> {
     try {
-      // Silent: NewBookingModal falls back to a meeting when the slot 409s.
+      // Silent: callers show their own message when the slot 409s.
       const data = await bookingCall(
         "/bookings",
         jsonInit("POST", payload, true),

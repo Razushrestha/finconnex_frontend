@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlertTriangle,
   Bold,
   CalendarDays,
   CheckCircle2,
@@ -368,13 +367,6 @@ function CalendarInvitesEditor({
   );
 }
 
-function smsGatewayConnected() {
-  if (typeof window === "undefined") return false;
-  const values = loadSettingsValues("integrations/twilio");
-  const raw = values.connected ?? values.twilio_connected ?? values.enabled;
-  return raw === true || raw === "true" || raw === 1 || raw === "1";
-}
-
 function whatsappAccount() {
   if (typeof window === "undefined") {
     return { connected: false, numbers: [] as { value: string; label: string }[] };
@@ -466,7 +458,6 @@ export function ConsultationNotifyPanel({
   );
   const channel = channelForPanel(panel);
   const who = audience === "customer" ? "Customer" : "User";
-  const gatewayOn = smsGatewayConnected();
 
   useEffect(() => {
     function onDocClick(event: MouseEvent) {
@@ -718,83 +709,32 @@ export function ConsultationNotifyPanel({
       ) : null}
 
       {panel === "whatsapp" ? (
-        <div className="mt-8 space-y-6">
-          <div>
-            <p className="text-[13px] font-semibold text-slate-800">
-              Whatsapp Number Configurations
-            </p>
-            <label className="mt-3 block max-w-xs">
-              <span className="mb-1.5 block text-[12px] text-slate-500">
-                Send from
-              </span>
-              <select
-                value={waSendFrom}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setWaSendFrom(next);
-                  persist(rows, reminders, emailConfig, next);
-                }}
-                className={SELECT_CLASS}
-                style={SELECT_BG}
-              >
-                <option value="">Select</option>
-                {whatsappAccount().numbers.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div>
-            <p className="text-[13px] font-semibold text-slate-800">
-              WhatsApp Configurations
-            </p>
-            {!whatsappAccount().connected ? (
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-                <p className="flex items-start gap-2 text-[12px] text-amber-800">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                  To send WhatsApp alerts, first integrate your Whatsapp Account.
-                </p>
-                <a
-                  href="/settings/communication/whatsapp-business"
-                  className="inline-flex h-8 items-center rounded-md border border-amber-300 bg-white px-3 text-[12px] font-semibold text-amber-800 hover:bg-amber-100"
-                >
-                  Integrate
-                </a>
-              </div>
-            ) : (
-              <p className="mt-2 text-[12px] text-emerald-700">
-                WhatsApp Business is connected.
-              </p>
-            )}
-          </div>
-        </div>
-      ) : null}
-
-      {panel === "sms" ? (
         <div className="mt-8">
           <p className="text-[13px] font-semibold text-slate-800">
-            SMS Configurations
+            Whatsapp Number Configurations
           </p>
-          {!gatewayOn ? (
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-              <p className="flex items-start gap-2 text-[12px] text-amber-800">
-                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                To send SMS alerts, first integrate an SMS gateway and enable it.
-              </p>
-              <a
-                href="/settings/integrations/twilio"
-                className="inline-flex h-8 items-center rounded-md border border-amber-300 bg-white px-3 text-[12px] font-semibold text-amber-800 hover:bg-amber-100"
-              >
-                Integrate
-              </a>
-            </div>
-          ) : (
-            <p className="mt-2 text-[12px] text-emerald-700">
-              Twilio SMS is connected.
-            </p>
-          )}
+          <label className="mt-3 block max-w-xs">
+            <span className="mb-1.5 block text-[12px] text-slate-500">
+              Send from
+            </span>
+            <select
+              value={waSendFrom}
+              onChange={(e) => {
+                const next = e.target.value;
+                setWaSendFrom(next);
+                persist(rows, reminders, emailConfig, next);
+              }}
+              className={SELECT_CLASS}
+              style={SELECT_BG}
+            >
+              <option value="">Select</option>
+              {whatsappAccount().numbers.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       ) : null}
 
