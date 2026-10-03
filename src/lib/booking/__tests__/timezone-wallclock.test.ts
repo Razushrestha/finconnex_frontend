@@ -2,8 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   clampBookableDate,
   dateInTimezone,
+  ianaTimezoneFromLabel,
   isPastBookingDate,
 } from "@/lib/booking/timezones";
+
+describe("ianaTimezoneFromLabel", () => {
+  it("maps the common Katmandu spelling to Kathmandu", () => {
+    expect(ianaTimezoneFromLabel("Asia/Katmandu")).toBe("Asia/Kathmandu");
+  });
+});
 
 describe("dateInTimezone", () => {
   it("treats 9:00 AM as Australia/Sydney wall clock, not the browser zone", () => {

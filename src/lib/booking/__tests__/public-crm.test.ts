@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   callPublicCrm,
+  formatWorkingHoursClock,
   isIsoDate,
   parseCrmPublicRef,
   parsePublicSlotDays,
   publicBookingPath,
   publicManagePath,
   timeInZone,
+  workingHoursDisplayZone,
 } from "@/lib/booking/public-crm";
 
 const ref = { workspaceSlug: "acme", hostSlug: "mohit", eventTypeSlug: "ram-test" };
@@ -104,6 +106,26 @@ describe("parsePublicSlotDays", () => {
 
   it.each([null, undefined, "x", 3, [], {}, { days: "x" }])("tolerates %j", (value) => {
     expect(parsePublicSlotDays(value).size).toBe(0);
+  });
+});
+
+describe("workingHoursDisplayZone", () => {
+  it("picks the zone where 09:00 working hours still read as 09:00", () => {
+    // 09:00 Australia/Sydney AEDT on 14 Oct 2026 is 03:45 in Kathmandu.
+    expect(
+      workingHoursDisplayZone("2026-10-13T22:00:00.000Z", "09:00", [
+        "Asia/Kathmandu",
+        "Australia/Sydney",
+      ]),
+    ).toBe("Australia/Sydney");
+  });
+});
+
+describe("formatWorkingHoursClock", () => {
+  it("matches Dates and times (09:00 AM / 05:00 PM)", () => {
+    expect(formatWorkingHoursClock("09:00")).toBe("09:00 AM");
+    expect(formatWorkingHoursClock("17:00")).toBe("05:00 PM");
+    expect(formatWorkingHoursClock("03:45")).toBe("03:45 AM");
   });
 });
 

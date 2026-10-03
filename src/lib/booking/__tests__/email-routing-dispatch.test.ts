@@ -178,6 +178,21 @@ describe("Email Configurations reach the outgoing mail (public booking page)", (
     expect(team.replyTo).toBe("ada@example.com");
   });
 
+  it("also emails addresses typed into Invite Guest(s)", async () => {
+    await dispatchBookingNotifications({
+      event: "confirmed",
+      page: pageWith(undefined),
+      booking: {
+        ...booking,
+        answers: { guests: "razushrestha9335@gmail.com" },
+      },
+    });
+    expect(sendEmailDemoLive).not.toHaveBeenCalled();
+    bodyFor("ada@example.com");
+    const invited = bodyFor("razushrestha9335@gmail.com");
+    expect("cc" in invited).toBe(false);
+  });
+
   it("leaves the request unchanged when nothing is configured", async () => {
     await dispatchBookingNotifications({
       event: "confirmed",

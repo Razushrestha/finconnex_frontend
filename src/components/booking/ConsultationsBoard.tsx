@@ -318,17 +318,16 @@ export function ConsultationsBoard() {
             userHours: availabilityValues.userHours,
           }
         : undefined,
-      questions: (form?.fields ?? [])
-        .filter((f) => !f.hidden)
-        .map((f) => ({
-          id: f.id,
-          label: f.label,
-          required: f.required,
-          fieldType: f.type,
-          ephi: f.ephi,
-          options: f.options,
-          addressParts: f.addressParts,
-        })),
+      questions: (form?.fields ?? []).map((f) => ({
+        id: f.id,
+        label: f.label,
+        required: f.required,
+        hidden: f.hidden,
+        fieldType: f.type,
+        ephi: f.ephi,
+        options: f.options,
+        addressParts: f.addressParts,
+      })),
       termsEnabled: Boolean(form?.terms),
       termsHtml: form?.termsText,
       confirmationTemplate:
@@ -479,6 +478,7 @@ export function ConsultationsBoard() {
         panel={availabilityPanel}
         consultants={assignedConsultants}
         consultantUserIds={assignedUserIds}
+        timezone="Australia/Sydney"
         initial={availabilityValues}
         onChange={setAvailabilityValues}
         onBack={() => {

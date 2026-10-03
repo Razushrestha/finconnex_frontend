@@ -122,6 +122,7 @@ export function bookingFormFromQuestions(
     id: string;
     label: string;
     required: boolean;
+    hidden?: boolean;
     fieldType?: string;
     ephi?: boolean;
     options?: string[];
@@ -148,7 +149,7 @@ export function bookingFormFromQuestions(
           ...field,
           label: hit.label,
           required: hit.required,
-          hidden: false,
+          hidden: Boolean(hit.hidden),
           ephi: hit.ephi,
           options: hit.options,
           addressParts: hit.addressParts,
@@ -164,7 +165,7 @@ export function bookingFormFromQuestions(
       id: row.id,
       label: row.label,
       required: row.required,
-      hidden: false,
+      hidden: Boolean(row.hidden),
       ephi: row.ephi,
       options: row.options,
       addressParts: row.addressParts,

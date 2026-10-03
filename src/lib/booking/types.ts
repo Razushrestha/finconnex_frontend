@@ -128,6 +128,8 @@ export interface BookingQuestion {
   id: string;
   label: string;
   required: boolean;
+  /** When true the field stays on the booking form editor but not the public page. */
+  hidden?: boolean;
   /** single_line, multiline, email, checkbox, radio, dropdown, date, address, number */
   fieldType?: string;
   /** Treat answers as sensitive health or personal data. */

@@ -9,6 +9,7 @@ import {
   Clock,
   FileCheck,
   Info,
+  LayoutTemplate,
   Pencil,
   Send,
   Copy,
@@ -26,6 +27,7 @@ import {
   sanitizeDescriptionHtml,
 } from "@/lib/booking/description-html";
 import { ShareConsultationModal } from "@/components/booking/ShareConsultationModal";
+import { BookingPageDesigner } from "@/components/booking/BookingPageDesigner";
 import {
   BookingFormStep,
   bookingFormFromQuestions,
@@ -144,6 +146,12 @@ const SECTIONS = [
     title: "Booking Form",
     hint: "Collect Customer information during booking.",
     icon: FileCheck,
+  },
+  {
+    id: "page",
+    title: "Booking Page",
+    hint: "Design the public booking site.",
+    icon: LayoutTemplate,
   },
 ] as const;
 
@@ -1244,10 +1252,16 @@ export function ConsultationOverview({
           </nav>
         </aside>
 
-        <section className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-white">
+        <section
+          className={cn(
+            "min-h-0 min-w-0 flex-1 bg-white",
+            section === "page" ? "flex flex-col overflow-hidden" : "overflow-y-auto",
+          )}
+        >
           {section !== "availability" &&
           section !== "notify" &&
-          section !== "form" ? (
+          section !== "form" &&
+          section !== "page" ? (
           <div className="flex items-center justify-between border-b border-[#E5E7EB] px-5 py-4">
             <div className="flex items-center gap-2">
               <h2 className="text-[16px] font-bold text-slate-900">
@@ -1420,6 +1434,7 @@ export function ConsultationOverview({
               consultants={people}
               consultantUserIds={consultantUserIds}
               initial={availabilityFromPage(page)}
+              timezone={page.timezone}
               onChange={persistAvailability}
               onBack={() => setSection("consultants")}
               onNext={(values) => persistAvailability(values)}
@@ -1445,6 +1460,8 @@ export function ConsultationOverview({
             />
           ) : null}
 
+          {section === "page" ? <BookingPageDesigner page={page} /> : null}
+
           {section === "form" ? (
             <BookingFormStep
               key={page.id}
@@ -1453,17 +1470,16 @@ export function ConsultationOverview({
               onNext={(values) => {
                 onSaved({
                   ...page,
-                  questions: values.fields
-                    .filter((field) => !field.hidden)
-                    .map((field) => ({
-                      id: field.id,
-                      label: field.label,
-                      required: field.required,
-                      fieldType: field.type,
-                      ephi: field.ephi,
-                      options: field.options,
-                      addressParts: field.addressParts,
-                    })),
+                  questions: values.fields.map((field) => ({
+                    id: field.id,
+                    label: field.label,
+                    required: field.required,
+                    hidden: field.hidden,
+                    fieldType: field.type,
+                    ephi: field.ephi,
+                    options: field.options,
+                    addressParts: field.addressParts,
+                  })),
                   termsEnabled: values.terms,
                   termsHtml: values.termsText,
                   confirmationTemplate: values.freeButton,

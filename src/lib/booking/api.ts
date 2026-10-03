@@ -1000,6 +1000,47 @@ export async function updateCrmEventType(
   return normalizeCrmEventType(asRecord(data) ?? extractRecords(data)[0] ?? {});
 }
 
+export async function getBookingWorkspacePage(): Promise<{
+  branding: unknown;
+  services: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    durationMinutes: number;
+    isPublic?: boolean;
+    isActive?: boolean;
+  }>;
+}> {
+  const data = await bookingCall("/page");
+  const rec = asRecord(data) ?? {};
+  const services = extractRecords(rec.services).map((row) => ({
+    id: pickStr(row.id),
+    name: pickStr(row.name),
+    slug: pickStr(row.slug),
+    durationMinutes: pickNum(row.durationMinutes, row.duration_minutes) || 30,
+    isPublic: pickBool(row.isPublic, row.is_public),
+    isActive: pickBool(row.isActive, row.is_active),
+  }));
+  return { branding: rec.branding, services };
+}
+
+export async function saveBookingWorkspacePage(branding: unknown): Promise<{
+  branding: unknown;
+  services?: Array<{ id: string; name: string; slug: string; durationMinutes: number }>;
+}> {
+  const data = await bookingCall("/page", jsonInit("PATCH", branding));
+  const rec = asRecord(data) ?? {};
+  return {
+    branding: rec.branding ?? branding,
+    services: extractRecords(rec.services).map((row) => ({
+      id: pickStr(row.id),
+      name: pickStr(row.name),
+      slug: pickStr(row.slug),
+      durationMinutes: pickNum(row.durationMinutes, row.duration_minutes) || 30,
+    })),
+  };
+}
+
 export async function patchCrmEventType(
   eventTypeId: string,
   body: Record<string, unknown>,

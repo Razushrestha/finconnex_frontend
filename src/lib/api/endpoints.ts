@@ -503,6 +503,18 @@ export const ENDPOINT_CATALOG = [
     notes: "List native booking event types",
   },
   {
+    method: "GET",
+    path: "/workspaces/:workspaceId/booking/page",
+    module: "booking",
+    notes: "Public booking page branding",
+  },
+  {
+    method: "PATCH",
+    path: "/workspaces/:workspaceId/booking/page",
+    module: "booking",
+    notes: "Save public booking page branding",
+  },
+  {
     method: "POST",
     path: "/workspaces/:workspaceId/booking/event-types",
     module: "booking",

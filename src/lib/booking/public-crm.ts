@@ -1,3 +1,5 @@
+import { ianaTimezoneFromLabel } from "@/lib/booking/timezones";
+
 /**
  * Guest (signed-out) booking against the backend's public booking API.
  *
@@ -45,6 +47,10 @@ export function parseCrmPublicRef(value: unknown): CrmPublicRef | null {
   const eventTypeSlug = pick("eventTypeSlug");
   if (!workspaceSlug || !hostSlug || !eventTypeSlug) return null;
   return { workspaceSlug, hostSlug, eventTypeSlug };
+}
+
+export function publicBookingSitePath(workspaceSlug: string): string {
+  return `/v1/public/booking/sites/${encodeURIComponent(workspaceSlug)}`;
 }
 
 export function publicBookingPath(
@@ -99,6 +105,38 @@ export function parsePublicSlotDays(data: unknown): PublicSlotDays {
     if (slots.length) out.set(date, slots);
   }
   return out;
+}
+
+/**
+ * Zone where `startAt` reads as the consultation's opening hour (09:00), so
+ * available slots match Dates and times instead of a guest-zone shift (03:45).
+ */
+export function workingHoursDisplayZone(
+  startAt: string,
+  hoursStart: string,
+  zones: string[],
+): string {
+  const wanted = hoursStart.trim().slice(0, 5);
+  const seen = new Set<string>();
+  for (const raw of zones) {
+    const tz = ianaTimezoneFromLabel(raw);
+    if (!tz || seen.has(tz)) continue;
+    seen.add(tz);
+    if (wanted && timeInZone(startAt, tz) === wanted) return tz;
+  }
+  return ianaTimezoneFromLabel(zones[0]) || "UTC";
+}
+
+/** "09:00" → "09:00 AM", same clock as Dates and times. */
+export function formatWorkingHoursClock(hhmm: string): string {
+  const match = hhmm.trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return hhmm;
+  const hour = Number(match[1]);
+  const minute = match[2];
+  if (!Number.isFinite(hour)) return hhmm;
+  const suffix = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+  return `${String(hour12).padStart(2, "0")}:${minute} ${suffix}`;
 }
 
 /** `HH:mm` of an instant on the wall clock of `timeZone` (what the guest sees). */

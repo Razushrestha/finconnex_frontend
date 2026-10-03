@@ -44,6 +44,8 @@ const BOOKING = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const DECOY_PATH = "/v1/__no_such_module_booking_probe__";
 
 const SWAGGER_PATHS = [
+  "GET /workspaces/:workspaceId/booking/page",
+  "PATCH /workspaces/:workspaceId/booking/page",
   "GET /workspaces/:workspaceId/booking/event-types",
   "POST /workspaces/:workspaceId/booking/event-types",
   "GET /workspaces/:workspaceId/booking/event-types/:eventTypeId",
@@ -171,6 +173,10 @@ export function smokeBookingWiring() {
   }
 
   const catalog = readSrc("src/lib/api/endpoints.ts");
+  const bookingPageApi = readSrc("src/lib/booking/api.ts");
+  if (!bookingPageApi.includes("saveBookingWorkspacePage")) {
+    fail("booking API must save workspace booking page branding");
+  }
   for (const row of SWAGGER_PATHS) {
     const fragment = `path: "${catalogPath(row)}"`;
     if (!catalog.includes(fragment)) fail(`endpoint catalog missing ${fragment}`);
@@ -186,6 +192,9 @@ export function smokeBookingWiring() {
   const overview = readSrc("src/components/booking/ConsultationOverview.tsx");
   if (!overview.includes("removeConsultationPage")) {
     fail("ConsultationOverview delete is not wired to CRM event types");
+  }
+  if (!overview.includes("BookingPageDesigner")) {
+    fail("Consultation overview must include the Booking Page section");
   }
   if (!overview.includes("Load based") || !overview.includes("consultantLoads")) {
     fail("Assigned Users edit must show load shares for Load based");
@@ -247,7 +256,28 @@ export function smokeBookingWiring() {
   if (!publicBook.includes("/api/book/")) {
     fail("PublicBookClient must resolve published booking pages by slug");
   }
-
+  if (!publicBook.includes("workingHoursDisplayZone")) {
+    fail("PublicBookClient must label slots in the Dates and times clock");
+  }
+  if (!publicBook.includes("inviteGuestsField")) {
+    fail("PublicBookClient must show Invite Guest emails when the field is visible");
+  }
+  const designer = readSrc("src/components/booking/BookingPageDesigner.tsx");
+  if (!designer.includes("saveBookingWorkspacePage")) {
+    fail("Booking Page designer must save branding to the CRM");
+  }
+  if (!designer.includes("ModernThemePreview") || !designer.includes("buttonText")) {
+    fail("Booking Page designer must preview Modern with a color-tinted book button");
+  }
+  if (!designer.includes("ClassicThemePreview")) {
+    fail("Booking Page designer must preview Classic with a month calendar and tinted slots");
+  }
+  if (!designer.includes("FreshThemePreview") || !designer.includes("showUserAsCards")) {
+    fail("Booking Page designer must preview Fresh with tinted date circles");
+  }
+  if (!designer.includes("CompactThemePreview")) {
+    fail("Booking Page designer must preview Compact with a tinted date and slots");
+  }
   const actions = readSrc("src/lib/booking/actions.ts");
   if (!actions.includes("createCrmBooking")) {
     fail("confirmPublicBooking is not wired to CRM create booking");
@@ -260,6 +290,10 @@ export function smokeBookingWiring() {
   }
   if (!actions.includes("dispatchBookingNotifications")) {
     fail("booking confirm/cancel must dispatch channel prefs");
+  }
+  const notify = readSrc("src/lib/booking/notify.ts");
+  if (!notify.includes("inviteGuestEmailsFromAnswers")) {
+    fail("booking emails must also go to Invite Guest addresses");
   }
 
   const notifyUi = readSrc("src/components/booking/BookingNotificationsStep.tsx");
