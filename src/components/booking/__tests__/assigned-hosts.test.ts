@@ -4,7 +4,12 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AssignedHosts } from "@/components/booking/AssignedHosts";
-import { assignedCalendarMembers, type BookingPage } from "@/lib/booking/types";
+import {
+  assignedCalendarMembers,
+  clampLoadPercent,
+  evenConsultantLoads,
+  type BookingPage,
+} from "@/lib/booking/types";
 
 const ASSIGNED = ["Mohit Chapagain", "nepatronix web", "spare nepatronix"];
 
@@ -82,5 +87,27 @@ describe("assigned users on the public booking page", () => {
     expect(source).toContain("assignedCalendarMembers(page)");
     // The old single-host row is gone.
     expect(source).not.toContain("page.consultants?.[0]");
+  });
+});
+
+describe("load-based shares", () => {
+  it("gives a single user 100%", () => {
+    expect(evenConsultantLoads(["Ada"])).toEqual({ Ada: 100 });
+  });
+
+  it("splits two users 50/50 and three users 34/33/33", () => {
+    expect(evenConsultantLoads(["Ada", "Lin"])).toEqual({ Ada: 50, Lin: 50 });
+    expect(evenConsultantLoads(["Ada", "Lin", "Mo"])).toEqual({
+      Ada: 34,
+      Lin: 33,
+      Mo: 33,
+    });
+  });
+
+  it("clamps typed percents to 0–100", () => {
+    expect(clampLoadPercent("70")).toBe(70);
+    expect(clampLoadPercent("150")).toBe(100);
+    expect(clampLoadPercent("-4")).toBe(0);
+    expect(clampLoadPercent("nope")).toBe(0);
   });
 });

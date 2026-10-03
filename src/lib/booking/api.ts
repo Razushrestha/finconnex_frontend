@@ -13,6 +13,7 @@ import { silentRequest } from "@/lib/notify/fetch-notifier";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
 import {
   WEEKDAYS,
+  deleteBookingPage,
   type BookingPage,
   type BookingPageStatus,
   type MeetingVia,
@@ -671,6 +672,15 @@ export function mergeCrmEventTypePages(
     return remoteNames.length ? remoteNames : undefined;
   };
 
+  const preferHours = (
+    primary?: BookingPage["availability"],
+    fallback?: BookingPage["availability"],
+  ): BookingPage["availability"] => {
+    if (primary?.some((rule) => rule.enabled)) return primary;
+    if (fallback?.some((rule) => rule.enabled)) return fallback;
+    return primary ?? fallback ?? [];
+  };
+
   const take = (page: BookingPage, fromRemote: boolean) => {
     const key = keyOf(page);
     const existing =
@@ -694,7 +704,13 @@ export function mergeCrmEventTypePages(
             notifyPrefs: existing.notifyPrefs ?? page.notifyPrefs,
             coverImageUrl: existing.coverImageUrl || page.coverImageUrl,
             consultants: preferConsultants(existing.consultants, page.consultants),
+            availability: preferHours(existing.availability, page.availability),
             appointmentLimits: existing.appointmentLimits ?? page.appointmentLimits,
+            appointmentDistribution:
+              existing.appointmentDistribution ?? page.appointmentDistribution,
+            consultantPriorities:
+              existing.consultantPriorities ?? page.consultantPriorities,
+            consultantLoads: existing.consultantLoads ?? page.consultantLoads,
             questions: page.questions?.length ? page.questions : existing.questions,
             termsEnabled: page.termsEnabled ?? existing.termsEnabled,
             termsHtml: page.termsHtml ?? existing.termsHtml,
@@ -707,7 +723,13 @@ export function mergeCrmEventTypePages(
             notifyPrefs: page.notifyPrefs ?? existing.notifyPrefs,
             coverImageUrl: page.coverImageUrl || existing.coverImageUrl,
             consultants: preferConsultants(page.consultants, existing.consultants),
+            availability: preferHours(page.availability, existing.availability),
             appointmentLimits: page.appointmentLimits ?? existing.appointmentLimits,
+            appointmentDistribution:
+              page.appointmentDistribution ?? existing.appointmentDistribution,
+            consultantPriorities:
+              page.consultantPriorities ?? existing.consultantPriorities,
+            consultantLoads: page.consultantLoads ?? existing.consultantLoads,
             questions: page.questions?.length ? page.questions : existing.questions,
             termsEnabled: page.termsEnabled ?? existing.termsEnabled,
             termsHtml: page.termsHtml ?? existing.termsHtml,
@@ -987,6 +1009,49 @@ export async function patchCrmEventType(
     jsonInit("PATCH", body),
   );
   return normalizeCrmEventType(asRecord(data) ?? extractRecords(data)[0] ?? {});
+}
+
+function isGoneConsultationError(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  return /not found|404|eventTypeNotFound/i.test(message);
+}
+
+function consultationDeleteError(err: unknown): Error {
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  if (
+    /upcoming|eventTypeHasUpcoming|conflicts with another booking/i.test(
+      message,
+    )
+  ) {
+    return new Error(
+      "This consultation has upcoming appointments. Cancel those first, then delete it.",
+    );
+  }
+  return err instanceof Error
+    ? err
+    : new Error(message || "Could not delete this consultation.");
+}
+
+/** Soft-delete a CRM event type. 404 is treated as already gone. */
+export async function deleteCrmEventType(eventTypeId: string): Promise<void> {
+  if (!isUuid(eventTypeId)) return;
+  try {
+    await bookingCall(`/event-types/${eventTypeId}`, jsonInit("DELETE"));
+  } catch (err) {
+    if (isGoneConsultationError(err)) return;
+    throw consultationDeleteError(err);
+  }
+}
+
+/** Retire the CRM event type (when present), then drop matching local copies. */
+export async function removeConsultationPage(page: {
+  id: string;
+  crmEventTypeId?: string;
+}): Promise<void> {
+  const crmId = crmEventTypeIdOf(page);
+  if (crmId) await deleteCrmEventType(crmId);
+  deleteBookingPage(page.id);
+  if (crmId && crmId !== page.id) deleteBookingPage(crmId);
 }
 
 export function crmEventTypeIdOf(page: {

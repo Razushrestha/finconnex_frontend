@@ -54,9 +54,11 @@ import {
 import {
   crmEventTypeIdOf,
   patchCrmEventType,
+  removeConsultationPage,
   tryCrmBooking,
   updateCrmEventType,
 } from "@/lib/booking/api";
+import { toast } from "@/lib/notify/toast";
 import {
   OfflineLocationFields,
   initialOfflineLocation,
@@ -71,15 +73,19 @@ import {
 } from "@/lib/booking/meeting-platforms";
 import {
   APPOINTMENT_DISTRIBUTIONS,
+  ASSIGNMENT_PRIORITIES,
+  clampLoadPercent,
   consultationModeLabel,
-  deleteBookingPage,
+  evenConsultantLoads,
   formatBookingPrice,
   listBookingPages,
   nextBookingPageId,
   upsertBookingPage,
   type AppointmentDistribution,
+  type AssignmentPriority,
   type BookingCurrency,
   type BookingPage,
+  type ConsultantPriority,
   type MeetingVia,
 } from "@/lib/booking/types";
 import {
@@ -626,11 +632,36 @@ function AssignedUsersEditForm({
   const [distribution, setDistribution] = useState<AppointmentDistribution>(
     page.appointmentDistribution ?? "Default",
   );
+  const [loads, setLoads] = useState<Record<string, number>>(() =>
+    people.reduce(
+      (acc, name) => {
+        acc[name] = page.consultantLoads?.[name] ?? evenConsultantLoads(people)[name] ?? 0;
+        return acc;
+      },
+      {} as Record<string, number>,
+    ),
+  );
+  const [priorities, setPriorities] = useState<Record<string, ConsultantPriority>>(
+    () =>
+      people.reduce(
+        (acc, name) => {
+          acc[name] = page.consultantPriorities?.[name] ?? "Highest";
+          return acc;
+        },
+        {} as Record<string, ConsultantPriority>,
+      ),
+  );
+  const [checked, setChecked] = useState<string[]>([]);
+  const [bulkPriority, setBulkPriority] = useState<AssignmentPriority | "">("");
   const [owners, setOwners] = useState<AssignableOwner[]>(() =>
     listAssignableOwnersLocal(),
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const loadBased = distribution === "Load based";
+  const priorityBased = distribution === "Priority-based";
+  const allChecked = people.length > 0 && people.every((name) => checked.includes(name));
 
   useEffect(() => {
     let alive = true;
@@ -656,11 +687,55 @@ function AssignedUsersEditForm({
     };
   });
 
+  function changeDistribution(next: AppointmentDistribution) {
+    setDistribution(next);
+    setError("");
+    if (next === "Load based") {
+      setLoads((current) => {
+        const hasAny = people.some((name) => current[name] != null);
+        return hasAny ? current : evenConsultantLoads(people);
+      });
+    }
+    if (next === "Priority-based") {
+      setPriorities((current) => {
+        const nextPriorities = { ...current };
+        for (const name of people) {
+          if (!nextPriorities[name]) nextPriorities[name] = "Highest";
+        }
+        return nextPriorities;
+      });
+    }
+  }
+
+  function toggleAll() {
+    setChecked(allChecked ? [] : [...people]);
+  }
+
+  function applyBulkPriority(value: AssignmentPriority | "") {
+    setBulkPriority(value);
+    if (!value) return;
+    const targets = checked.length ? checked : people;
+    setPriorities((current) => {
+      const next = { ...current };
+      for (const name of targets) next[name] = value;
+      return next;
+    });
+  }
+
   async function save() {
+    if (loadBased) {
+      const total = people.reduce((sum, name) => sum + (loads[name] ?? 0), 0);
+      if (people.length && total !== 100) {
+        setError("Load shares must add up to 100%.");
+        return;
+      }
+    }
     const next: BookingPage = {
       ...page,
       consultants: people,
       appointmentDistribution: distribution,
+      consultantLoads: loadBased ? { ...loads } : page.consultantLoads,
+      consultantPriorities: priorityBased ? { ...priorities } : page.consultantPriorities,
     };
     setSaving(true);
     setError("");
@@ -691,7 +766,7 @@ function AssignedUsersEditForm({
           <select
             value={distribution}
             onChange={(e) =>
-              setDistribution(e.target.value as AppointmentDistribution)
+              changeDistribution(e.target.value as AppointmentDistribution)
             }
             className={cn(SELECT_CLASS, "w-[200px]")}
             style={{ backgroundImage: SELECT_BG }}
@@ -724,21 +799,110 @@ function AssignedUsersEditForm({
         </div>
       </div>
 
+      {priorityBased ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[13px] text-slate-500">
+            Select multiple users to apply the same priority.
+          </p>
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-slate-600">
+              <input
+                type="checkbox"
+                checked={allChecked}
+                onChange={toggleAll}
+                className="h-4 w-4 rounded border-slate-300 accent-[#5A32A3]"
+              />
+              Select All
+            </label>
+            <select
+              value={bulkPriority}
+              aria-label="Apply priority to selected users"
+              onChange={(e) =>
+                applyBulkPriority(e.target.value as AssignmentPriority | "")
+              }
+              className={cn(SELECT_CLASS, "w-[140px]")}
+              style={{ backgroundImage: SELECT_BG }}
+            >
+              <option value="">Select</option>
+              {ASSIGNMENT_PRIORITIES.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      ) : null}
+
       <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-100">
         {rows.map((row) => (
           <div
             key={row.name}
             className="flex items-center gap-3 px-3 py-3"
           >
+            {priorityBased ? (
+              <input
+                type="checkbox"
+                checked={checked.includes(row.name)}
+                onChange={() =>
+                  setChecked((current) =>
+                    current.includes(row.name)
+                      ? current.filter((name) => name !== row.name)
+                      : [...current, row.name],
+                  )
+                }
+                className="h-4 w-4 rounded border-slate-300 accent-[#5A32A3]"
+                aria-label={`Select ${row.name}`}
+              />
+            ) : null}
             <Avatar name={row.name} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13px] font-semibold text-slate-900">
                 {row.name}
               </p>
             </div>
-            <p className="truncate text-[13px] text-slate-500">
+            <p className="min-w-0 flex-1 truncate text-[13px] text-slate-500">
               {row.email || "—"}
             </p>
+            {loadBased ? (
+              <label className="flex shrink-0 items-center gap-1.5">
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={loads[row.name] ?? 0}
+                  onChange={(e) =>
+                    setLoads((current) => ({
+                      ...current,
+                      [row.name]: clampLoadPercent(e.target.value),
+                    }))
+                  }
+                  aria-label={`Load share for ${row.name}`}
+                  className="h-9 w-[72px] rounded-lg border border-[#E5E7EB] bg-white px-2 text-right text-[13px] text-slate-800 outline-none focus:border-[#5A32A3]/45"
+                />
+                <span className="text-[13px] text-slate-500">%</span>
+              </label>
+            ) : null}
+            {priorityBased ? (
+              <select
+                value={priorities[row.name] ?? "Highest"}
+                onChange={(e) =>
+                  setPriorities((current) => ({
+                    ...current,
+                    [row.name]: e.target.value as ConsultantPriority,
+                  }))
+                }
+                aria-label={`Priority for ${row.name}`}
+                className={cn(SELECT_CLASS, "w-[140px] shrink-0")}
+                style={{ backgroundImage: SELECT_BG }}
+              >
+                {ASSIGNMENT_PRIORITIES.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            ) : null}
           </div>
         ))}
       </div>
@@ -964,10 +1128,20 @@ export function ConsultationOverview({
                   danger
                   onClick={() => {
                     if (!window.confirm(`Delete “${page.title}”?`)) return;
-                    deleteBookingPage(page.id);
-                    setMenuOpen(false);
-                    onRefresh?.();
-                    onClose();
+                    void (async () => {
+                      try {
+                        await removeConsultationPage(page);
+                        setMenuOpen(false);
+                        onRefresh?.();
+                        onClose();
+                      } catch (err) {
+                        toast.error(
+                          err instanceof Error
+                            ? err.message
+                            : "Could not delete this consultation.",
+                        );
+                      }
+                    })();
                   }}
                 />
               </div>
@@ -1219,9 +1393,19 @@ export function ConsultationOverview({
                       <p className="min-w-0 flex-1 truncate text-[13px] font-semibold text-slate-900">
                         {name}
                       </p>
-                      <p className="truncate text-[13px] text-slate-500">
+                      <p className="min-w-0 flex-1 truncate text-[13px] text-slate-500">
                         {owner?.email || "—"}
                       </p>
+                      {page.appointmentDistribution === "Load based" ? (
+                        <p className="shrink-0 text-[13px] text-slate-600">
+                          {page.consultantLoads?.[name] ?? 0} %
+                        </p>
+                      ) : null}
+                      {page.appointmentDistribution === "Priority-based" ? (
+                        <p className="shrink-0 text-[13px] text-slate-600">
+                          {page.consultantPriorities?.[name] ?? "Highest"}
+                        </p>
+                      ) : null}
                     </div>
                   );
                 })}

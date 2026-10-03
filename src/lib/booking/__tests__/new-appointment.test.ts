@@ -10,12 +10,14 @@ import {
   describeSlot,
   eventTypeInitials,
   eventTypeTileColor,
+  expandOfferedSlots,
   filterCustomers,
   formatAppointmentAmount,
   groupSlotsByDay,
   hasPrice,
   INTERNAL_NOTES_LIMIT,
   localPageSlots,
+  subtractBusySlots,
   matchesKeywords,
   monthBounds,
   monthGrid,
@@ -155,6 +157,72 @@ describe("a consultation that only exists in this browser", () => {
   it("leaves out times that have already passed", () => {
     const days = localPageSlots(page, 2026, 9, "UTC", new Date("2026-10-05T09:45:00Z"));
     expect(days.get("2026-10-05")!.map((slot) => slot.label)).toEqual(["10:00 AM", "10:30 AM"]);
+  });
+});
+
+describe("CRM days that only listed the first start", () => {
+  const hoursPage = {
+    availability: [
+      { day: "Monday", enabled: true, start: "09:00", end: "17:00" },
+    ],
+    durationMinutes: 90,
+  } as unknown as BookingPage;
+
+  it("fills the rest of the working hours", () => {
+    const hours = localPageSlots(hoursPage, 2026, 9, "UTC", new Date("2026-10-01T00:00:00Z"));
+    const offered = groupSlotsByDay(
+      [{ startTime: "2026-10-05T09:00:00.000Z", hostId: "h1" }],
+      "UTC",
+    );
+    const days = expandOfferedSlots({
+      offered,
+      hours,
+      hostIds: ["h1"],
+    });
+    expect(days.get("2026-10-05")!.map((slot) => slot.label)).toEqual([
+      "9:00 AM",
+      "10:30 AM",
+      "12:00 PM",
+      "1:30 PM",
+      "3:00 PM",
+    ]);
+    expect(days.get("2026-10-05")![0]!.hostIds).toEqual(["h1"]);
+    expect(days.get("2026-10-05")![1]!.fromHours).toBe(true);
+    expect(days.get("2026-10-05")![1]!.hostIds).toEqual(["h1"]);
+  });
+
+  it("keeps a complete CRM day instead of replacing it", () => {
+    const hours = localPageSlots(hoursPage, 2026, 9, "UTC", new Date("2026-10-01T00:00:00Z"));
+    const offered = hours;
+    const days = expandOfferedSlots({ offered, hours, hostIds: ["h1"] });
+    expect(days.get("2026-10-05")).toEqual(hours.get("2026-10-05"));
+  });
+
+  it("hides a start that already has an open booking", () => {
+    const hours = localPageSlots(hoursPage, 2026, 9, "UTC", new Date("2026-10-01T00:00:00Z"));
+    const days = subtractBusySlots(hours, [
+      {
+        startTime: "2026-10-05T10:30:00.000Z",
+        endTime: "2026-10-05T12:00:00.000Z",
+        eventTypeId: "et-1",
+        status: "CONFIRMED",
+      },
+      {
+        startTime: "2026-10-05T12:00:00.000Z",
+        endTime: "2026-10-05T13:30:00.000Z",
+        eventTypeId: "et-1",
+        status: "CANCELLED",
+      },
+    ], {
+      eventTypeId: "et-1",
+      durationMinutes: 90,
+    });
+    expect(days.get("2026-10-05")!.map((slot) => slot.label)).toEqual([
+      "9:00 AM",
+      "12:00 PM",
+      "1:30 PM",
+      "3:00 PM",
+    ]);
   });
 });
 

@@ -10,6 +10,7 @@ import {
   cancelCrmBooking,
   createCrmBooking,
   createCrmEventType,
+  deleteCrmEventType,
   getCrmBookingSummary,
   linkCrmBooking,
   listCrmAvailableSlots,
@@ -127,6 +128,8 @@ export function smokeBookingWiring() {
   for (const name of [
     "listCrmEventTypes",
     "createCrmEventType",
+    "deleteCrmEventType",
+    "removeConsultationPage",
     "listCrmAvailableSlots",
     "listCrmBookings",
     "createCrmBooking",
@@ -176,6 +179,22 @@ export function smokeBookingWiring() {
   const board = readSrc("src/components/booking/ConsultationsBoard.tsx");
   if (!board.includes("createCrmEventType") || !board.includes("listCrmEventTypePages")) {
     fail("ConsultationsBoard is not wired to CRM event types");
+  }
+  if (!board.includes("removeConsultationPage")) {
+    fail("ConsultationsBoard delete is not wired to CRM event types");
+  }
+  const overview = readSrc("src/components/booking/ConsultationOverview.tsx");
+  if (!overview.includes("removeConsultationPage")) {
+    fail("ConsultationOverview delete is not wired to CRM event types");
+  }
+  if (!overview.includes("Load based") || !overview.includes("consultantLoads")) {
+    fail("Assigned Users edit must show load shares for Load based");
+  }
+  if (
+    !overview.includes("Priority-based") ||
+    !overview.includes("Select multiple users to apply the same priority")
+  ) {
+    fail("Assigned Users edit must show priorities for Priority-based");
   }
 
   const additional = readSrc("src/components/booking/BookingAdditionalSettingsStep.tsx");
@@ -317,6 +336,7 @@ export async function smokeBookingMock() {
   try {
     await listCrmEventTypes();
     await createCrmEventType({ name: "Discovery", durationMinutes: 30 });
+    await deleteCrmEventType(EVENT);
     await listCrmAvailableSlots({
       eventTypeId: EVENT,
       from: "2026-09-01T00:00:00.000Z",
@@ -344,6 +364,7 @@ export async function smokeBookingMock() {
   const expected = [
     `GET ${workspaceBookingPath(SESSION.workspaceId, "/event-types")}`,
     `POST ${workspaceBookingPath(SESSION.workspaceId, "/event-types")}`,
+    `DELETE ${workspaceBookingPath(SESSION.workspaceId, `/event-types/${EVENT}`)}`,
     `GET ${workspaceBookingPath(SESSION.workspaceId, `/event-types/${EVENT}/available-slots`)}`,
     `GET ${workspaceBookingPath(SESSION.workspaceId, "/hosts")}`,
     `GET ${workspaceBookingPath(SESSION.workspaceId, "/hosts/consultants")}`,

@@ -66,12 +66,13 @@ import {
   createCrmEventType,
   listCrmEventTypePages,
   mergeCrmEventTypePages,
+  removeConsultationPage,
   tryCrmBooking,
 } from "@/lib/booking/api";
+import { toast } from "@/lib/notify/toast";
 import { mergeNotificationPrefs } from "@/lib/booking/notify-prefs";
 import {
   consultationModeLabel,
-  deleteBookingPage,
   nextBookingPageId,
   publicBookUrl,
   upsertBookingPage,
@@ -1034,9 +1035,19 @@ function CardMenu({
             danger
             onClick={() => {
               if (!window.confirm(`Delete “${page.title}”?`)) return;
-              deleteBookingPage(page.id);
-              setOpen(false);
-              onRefresh();
+              void (async () => {
+                try {
+                  await removeConsultationPage(page);
+                  setOpen(false);
+                  onRefresh();
+                } catch (err) {
+                  toast.error(
+                    err instanceof Error
+                      ? err.message
+                      : "Could not delete this consultation.",
+                  );
+                }
+              })();
             }}
           />
         </div>

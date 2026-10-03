@@ -32,9 +32,11 @@ import {
   customersFromBookings,
   defaultPaidAmount,
   describeSlot,
+  expandOfferedSlots,
   groupSlotsByDay,
   hasPrice,
   localPageSlots,
+  subtractBusySlots,
   monthBounds,
   parsePaidAmount,
   paymentNote,
@@ -256,41 +258,76 @@ function AppointmentDialog({
   /* -------------------------------- slots ------------------------------ */
 
   const hostFilter = hostChoice === "random" ? "" : hostChoice;
+  const hourDays = useMemo(
+    () => (page ? localPageSlots(page, view.year, view.month0, zone) : NO_DAYS),
+    [page, view.year, view.month0, zone],
+  );
+  const hostIdsKey = users.map((user) => user.id).filter(isUuid).join(",");
   const slotKey = crmBacked
-    ? `${crmId}|${hostFilter}|${view.year}-${view.month0}|${zone}|${reloadTick}`
+    ? `${crmId}|${hostFilter}|${view.year}-${view.month0}|${zone}|${reloadTick}|${hostIdsKey}`
     : "";
 
   useEffect(() => {
-    if (openPicker !== "date" || !crmBacked || !slotKey) return;
+    if (openPicker !== "date" || !crmBacked || !slotKey || !page) return;
     if (slotsLoaded?.key === slotKey) return;
     let alive = true;
     const { from, to } = monthBounds(view.year, view.month0);
-    void listCrmAvailableSlots({
-      eventTypeId: crmId,
-      from,
-      to,
-      hostId: hostFilter || undefined,
-      timezone: zone,
-    })
-      .then((rows) => ({ days: groupSlotsByDay(rows, zone), error: "" }))
-      .catch((err: unknown) => ({
-        days: NO_DAYS,
-        error: readableError(err, "Could not load available times."),
-      }))
-      .then((result) => {
-        if (alive) setSlotsLoaded({ key: slotKey, ...result });
+    const hostIds = hostFilter
+      ? [hostFilter]
+      : users.map((user) => user.id).filter(isUuid);
+    void Promise.all([
+      listCrmAvailableSlots({
+        eventTypeId: crmId,
+        from,
+        to,
+        hostId: hostFilter || undefined,
+        timezone: zone,
+      }).then(
+        (rows) => ({ rows, error: "" }),
+        (err: unknown) => ({
+          rows: [],
+          error: readableError(err, "Could not load available times."),
+        }),
+      ),
+      tryCrmBooking(() => listCrmBookings({ limit: 200 })),
+    ]).then(([listed, bookings]) => {
+      if (!alive) return;
+      const expanded = expandOfferedSlots({
+        offered: groupSlotsByDay(listed.rows, zone),
+        hours: hourDays,
+        hostIds,
       });
+      const days = subtractBusySlots(expanded, bookings ?? [], {
+        eventTypeId: crmId,
+        hostId: hostFilter || undefined,
+        durationMinutes: page.durationMinutes,
+      });
+      setSlotsLoaded({
+        key: slotKey,
+        days,
+        error: days.size > 0 ? "" : listed.error,
+      });
+    });
     return () => {
       alive = false;
     };
-  }, [openPicker, crmBacked, crmId, slotKey, slotsLoaded?.key, view.year, view.month0, hostFilter, zone]);
+  }, [
+    openPicker,
+    crmBacked,
+    crmId,
+    slotKey,
+    slotsLoaded?.key,
+    view.year,
+    view.month0,
+    hostFilter,
+    zone,
+    page,
+    hourDays,
+    hostIdsKey,
+  ]);
 
-  const localDays = useMemo(
-    () => (page && !crmBacked ? localPageSlots(page, view.year, view.month0, zone) : NO_DAYS),
-    [page, crmBacked, view.year, view.month0, zone],
-  );
   const slotsReady = crmBacked ? slotsLoaded?.key === slotKey : true;
-  const slotDays = crmBacked ? (slotsReady ? slotsLoaded!.days : NO_DAYS) : localDays;
+  const slotDays = crmBacked ? (slotsReady ? slotsLoaded!.days : NO_DAYS) : hourDays;
   const slotsError = crmBacked && slotsReady ? slotsLoaded!.error : "";
 
   /* ------------------------------ customers ---------------------------- */
@@ -431,32 +468,7 @@ function AppointmentDialog({
       );
       let notesKept = true;
 
-      if (crmBacked) {
-        // Slots are the CRM's own, so a refusal means someone else took the time.
-        const hostId = slot.hostIds.length
-          ? chooseHost(slot.hostIds, hostChoice)
-          : hostChoice === "random"
-            ? undefined
-            : hostChoice;
-        if (slot.hostIds.length && !hostId) throw new BookingSlotUnavailableError();
-        const booked = await createCrmBooking({
-          eventTypeId: crmId,
-          startTime: slot.startTime,
-          name: customer.name,
-          email: customer.email,
-          phone: customer.phone,
-          timezone: zone,
-          hostId,
-          internalNotes: internal || undefined,
-          notifyInvitee: notify ? undefined : false,
-          snapToleranceMs: 60_000,
-          ...related,
-        });
-        if (isUuid(booked.id) && Object.keys(related).length) {
-          await tryCrmBooking(() => linkCrmBooking(booked.id, related));
-        }
-        if (internal) notesKept = String(booked.raw.internalNotes ?? "").trim().length > 0;
-      } else {
+      const saveMeeting = async () => {
         const start = new Date(slot.startTime);
         const end = new Date(start.getTime() + (page.durationMinutes || 30) * 60_000);
         const hostName =
@@ -490,6 +502,41 @@ function AppointmentDialog({
               ? [{ email: customer.email, name: customer.name }]
               : undefined,
         });
+      };
+
+      if (crmBacked) {
+        const hostId = slot.hostIds.length
+          ? chooseHost(slot.hostIds, hostChoice)
+          : hostChoice === "random"
+            ? undefined
+            : hostChoice;
+        if (slot.hostIds.length && !hostId) throw new BookingSlotUnavailableError();
+        try {
+          const booked = await createCrmBooking({
+            eventTypeId: crmId,
+            startTime: slot.startTime,
+            name: customer.name,
+            email: customer.email,
+            phone: customer.phone,
+            timezone: zone,
+            hostId,
+            internalNotes: internal || undefined,
+            notifyInvitee: notify ? undefined : false,
+            snapToleranceMs: 60_000,
+            ...related,
+          });
+          if (isUuid(booked.id) && Object.keys(related).length) {
+            await tryCrmBooking(() => linkCrmBooking(booked.id, related));
+          }
+          if (internal) notesKept = String(booked.raw.internalNotes ?? "").trim().length > 0;
+        } catch (err) {
+          if (!(err instanceof BookingSlotUnavailableError) || !slot.fromHours) {
+            throw err;
+          }
+          await saveMeeting();
+        }
+      } else {
+        await saveMeeting();
       }
 
       toast.success("Appointment added");

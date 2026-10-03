@@ -365,7 +365,11 @@ export function DateTimePicker({
   const atCurrentMonth = `${year}-${String(month0 + 1).padStart(2, "0")}` <= todayKey.slice(0, 7);
 
   const anchorRef = useRef<HTMLDivElement>(null);
-  const [place, setPlace] = useState<{ top: number; left: number } | null>(null);
+  const [place, setPlace] = useState<{
+    top: number;
+    left: number;
+    height: number;
+  } | null>(null);
 
   useLayoutEffect(() => {
     if (!open) {
@@ -376,9 +380,14 @@ export function DateTimePicker({
       const box = anchorRef.current?.getBoundingClientRect();
       if (!box) return;
       const width = Math.min(560, window.innerWidth - 16);
+      const height = Math.min(420, window.innerHeight - 16);
       const left = Math.max(8, Math.min(box.right - width, window.innerWidth - width - 8));
-      const top = Math.min(box.bottom + 8, window.innerHeight - 24);
-      setPlace({ top, left });
+      const below = box.bottom + 8;
+      const top =
+        below + height > window.innerHeight - 8
+          ? Math.max(8, window.innerHeight - height - 8)
+          : below;
+      setPlace({ top, left, height });
     }
     align();
     window.addEventListener("resize", align);
@@ -407,7 +416,7 @@ export function DateTimePicker({
       <ul
         role="listbox"
         aria-label="Available times"
-        className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1"
+        className="flex flex-col gap-3"
       >
         {slots.map((slot) => (
           <li key={slot.startTime}>
@@ -449,10 +458,10 @@ export function DateTimePicker({
         ? createPortal(
             <div
               data-picker="date"
-              style={{ top: place.top, left: place.left }}
-              className="fixed z-[80] flex w-[min(560px,calc(100vw-16px))] rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_32px_rgba(15,23,42,0.14)]"
+              style={{ top: place.top, left: place.left, height: place.height }}
+              className="fixed z-[80] flex w-[min(560px,calc(100vw-16px))] overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_32px_rgba(15,23,42,0.14)]"
             >
-              <div className="w-[250px] shrink-0 pr-4">
+              <div className="w-[250px] shrink-0 overflow-y-auto pr-4">
                 <div className="flex items-center justify-between">
                   <button
                     type="button"
@@ -515,9 +524,13 @@ export function DateTimePicker({
                   })}
                 </div>
               </div>
-              <div className="flex min-h-[280px] min-w-0 flex-1 flex-col border-l border-slate-100 pl-5">
-                <p className="mb-3 text-[15px] font-semibold text-slate-800">Available Slots</p>
-                <div className="flex min-h-0 flex-1 flex-col">{side}</div>
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col border-l border-slate-100 pl-5">
+                <p className="mb-3 shrink-0 text-[15px] font-semibold text-slate-800">
+                  Available Slots
+                </p>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+                  {side}
+                </div>
               </div>
             </div>,
             document.body,
@@ -527,11 +540,11 @@ export function DateTimePicker({
   );
 }
 
-/** "9:00 AM" → "09:00 am", matching the slot pills. */
+/** "9:00 AM" → "09:00 AM", same clock as Dates and times. */
 function slotClockLabel(label: string) {
   const match = label.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (!match) return label;
-  return `${match[1].padStart(2, "0")}:${match[2]} ${match[3].toLowerCase()}`;
+  return `${match[1].padStart(2, "0")}:${match[2]} ${match[3].toUpperCase()}`;
 }
 
 function SideMessage({
