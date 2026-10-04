@@ -23,7 +23,7 @@ import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { nowHHmm, parseStartHHmm } from "@/components/booking/CustomTimePicker";
 import type { RelatedEntityKind } from "@/lib/activities/shared";
 import { isOnlineLocationKind } from "@/lib/booking/meeting-platforms";
-import { dateInTimezone, isPastBookingStart } from "@/lib/booking/timezones";
+import { isPastBookingStart } from "@/lib/booking/timezones";
 import {
   assignedCalendarMembers,
   bookingLocationLabel,
@@ -278,10 +278,7 @@ export function LeadScheduleMeetingModal({
       return;
     }
     const hhmm = parseStartHHmm(time) || time.slice(0, 5);
-    if (
-      isPastBookingStart(date, hhmm, timezone) ||
-      dateInTimezone(date, hhmm, timezone).getTime() < Date.now()
-    ) {
+    if (isPastBookingStart(date, hhmm, timezone)) {
       setError("Choose today or a future date and time.");
       return;
     }

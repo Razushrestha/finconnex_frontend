@@ -59,15 +59,21 @@ export function LeadCardSettingsClient() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!crm.settings?.catalog?.[LEAD_CARD_SETTINGS_KEY]) return;
-    const values = overlayCatalogValues(
-      leadCardSettingsToValues(DEFAULT_LEAD_CARD_SETTINGS),
-      crm.settings,
-      LEAD_CARD_SETTINGS_KEY,
-    );
-    setSettings(settingsValuesToLeadCard(values));
-  }, [crm.settings]);
+  // Take the CRM's saved values each time a new settings payload arrives.
+  // Done while rendering (React's "adjust state on prop change") rather than
+  // in an effect.
+  const [appliedSettings, setAppliedSettings] = useState<typeof crm.settings>();
+  if (crm.settings !== appliedSettings) {
+    setAppliedSettings(crm.settings);
+    if (crm.settings?.catalog?.[LEAD_CARD_SETTINGS_KEY]) {
+      const values = overlayCatalogValues(
+        leadCardSettingsToValues(DEFAULT_LEAD_CARD_SETTINGS),
+        crm.settings,
+        LEAD_CARD_SETTINGS_KEY,
+      );
+      setSettings(settingsValuesToLeadCard(values));
+    }
+  }
 
   const fieldOptions = useMemo(() => {
     void fieldOptionsTick;

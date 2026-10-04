@@ -114,7 +114,6 @@ export function LeadKanbanBoard({
   const [columns, setColumns] = useState<KanbanColumn[]>(() =>
     LEAD_COLUMNS.map((col) => ({ ...col, cards: [] })),
   );
-  const [toast, setToast] = useState<string | null>(null);
   const [panel, setPanel] = useState<LeadPanelState | null>(null);
   const [activityRevision, setActivityRevision] = useState(0);
   const [cardSettings, setCardSettings] = useState<LeadCardSettings>(() =>
@@ -140,10 +139,9 @@ export function LeadKanbanBoard({
   }, []);
 
   useEffect(() => {
-    setColumns(listLeadColumns());
-    return onRulesChange(() => {
-      setColumns(listLeadColumns());
-    });
+    const refresh = () => setColumns(listLeadColumns());
+    refresh();
+    return onRulesChange(refresh);
   }, []);
 
   useEffect(() => {

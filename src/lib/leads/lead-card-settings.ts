@@ -164,7 +164,7 @@ export function settingsValuesToLeadCard(
     values.singleHeaderColor.trim()
       ? values.singleHeaderColor.trim()
       : DEFAULT_LEAD_CARD_SETTINGS.singleHeaderColor;
-  let multiHeaderColors = { ...DEFAULT_LEAD_CARD_SETTINGS.multiHeaderColors };
+  const multiHeaderColors = { ...DEFAULT_LEAD_CARD_SETTINGS.multiHeaderColors };
   if (typeof values.multiHeaderColors === "string" && values.multiHeaderColors) {
     try {
       const parsed = JSON.parse(values.multiHeaderColors) as Record<

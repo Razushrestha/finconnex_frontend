@@ -81,24 +81,30 @@ export function LeadBoardMassActionDialog({
   const [ownerId, setOwnerId] = useState("");
   const [status, setStatus] = useState<CrmLeadStatus>("CONTACTED");
   const [tag, setTag] = useState("");
+  // Reset the form whenever a different action opens the dialog. Done while
+  // rendering (React's "adjust state on prop change") rather than in an effect.
+  const [openedFor, setOpenedFor] = useState<LeadMassAction | null>(null);
+  if (action !== openedFor) {
+    setOpenedFor(action);
+    if (action) {
+      setTag("");
+      setStatus("CONTACTED");
+    }
+    if (action === "transfer") {
+      const local = listAssignableOwnersLocal();
+      setOwners(local);
+      setOwnerId((current) => current || local[0]?.id || "");
+    }
+  }
 
   useEffect(() => {
     if (action !== "transfer") return;
-    const local = listAssignableOwnersLocal();
-    setOwners(local);
-    setOwnerId((current) => current || local[0]?.id || "");
     void loadAssignableOwners().then((rows) => {
       setOwners(rows);
       setOwnerId((current) =>
         rows.some((row) => row.id === current) ? current : rows[0]?.id || "",
       );
     });
-  }, [action]);
-
-  useEffect(() => {
-    if (!action) return;
-    setTag("");
-    setStatus("CONTACTED");
   }, [action]);
 
   const selectedOwner = useMemo(
