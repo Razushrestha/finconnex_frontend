@@ -60,6 +60,7 @@ export interface ActionOption {
 export interface EntityHeaderProps {
   entityLabel: string;
   entityLabelPlural?: string;
+  crmLiveStatus?: "live" | "offline";
   createRoute: string;
   /** When set, Create opens this instead of navigating to `createRoute`. */
   onCreate?: () => void;
@@ -128,6 +129,7 @@ export interface EntityHeaderProps {
 export function EntityHeader({
   entityLabel,
   entityLabelPlural = `${entityLabel}s`,
+  crmLiveStatus,
   createRoute,
   onCreate,
   breadcrumb: _breadcrumb = ["Sales", entityLabelPlural],
@@ -235,6 +237,14 @@ export function EntityHeader({
             <h1 className="truncate text-[15px] font-bold tracking-tight text-foreground">
             {title}
           </h1>
+          {crmLiveStatus ? (
+              <span
+                aria-label={crmLiveStatus === "live" ? "CRM live" : "CRM offline"}
+                className={`inline-flex h-2.5 w-2.5 shrink-0 rounded-full ${
+                  crmLiveStatus === "live" ? "bg-emerald-500" : "bg-rose-500"
+                }`}
+              />
+            ) : null}
           {totalCount !== undefined && (
               <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-950 dark:text-violet-300">
               {totalCount}
@@ -427,7 +437,7 @@ export function EntityHeader({
           </button>
 
           <div className="relative" ref={importMenuRef}>
-            <div className="inline-flex h-8 items-stretch overflow-hidden rounded-md bg-violet-600">
+            <div className="inline-flex h-10 items-stretch overflow-hidden rounded-full bg-[#6D5AE6] text-white shadow-md shadow-violet-500/20">
           <button
             type="button"
             onClick={() => {
@@ -439,7 +449,7 @@ export function EntityHeader({
                 `${createRoute}?layoutid=${DEFAULT_LAYOUT_ID}&redirect=false`,
               );
             }}
-                className="inline-flex items-center gap-1.5 px-3 text-[12px] font-semibold text-white hover:bg-violet-700"
+                className="inline-flex items-center gap-1.5 px-4 text-sm font-semibold hover:bg-[#5B4BD4]"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Create {entityLabel}</span>
@@ -448,14 +458,14 @@ export function EntityHeader({
 
               {importOptions && importOptions.length > 0 ? (
                 <>
-                  <div className="w-px bg-violet-500" />
+                  <div className="w-px bg-white/25" />
                   <button
                     type="button"
                     onClick={() => setIsImportMenuOpen((open) => !open)}
                     aria-label={`${entityLabel} import options`}
                     aria-haspopup="true"
                     aria-expanded={isImportMenuOpen}
-                    className="flex w-7 items-center justify-center text-white hover:bg-violet-700"
+                    className="flex w-9 items-center justify-center hover:bg-[#5B4BD4]"
                   >
                     <ChevronDown className="h-3.5 w-3.5" />
                   </button>

@@ -28,6 +28,7 @@ import {
   isCrmSignatureTemplateId,
   tryCrmSignatureTemplate,
 } from "@/lib/documents/signature/templates-api";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 interface TemplateItem {
   id: string;
@@ -194,7 +195,7 @@ export default function SignatureTemplatesPage() {
           />
           <button
             onClick={() => router.push("/signature/templates/create")}
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:bg-primary/90"
+            className={`${FINANCE_PRIMARY_BUTTON_SM} shrink-0 gap-2 px-4 text-sm`}
           >
             <Plus className="h-4 w-4" />
             New Template

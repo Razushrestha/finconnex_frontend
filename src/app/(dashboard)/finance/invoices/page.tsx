@@ -34,6 +34,10 @@ import { PaginationBar } from "@/components/ui/pagination-bar";
 import { CreateInvoiceForm } from "@/components/finance/invoices/CreateInvoiceForm";
 import { CreatePaymentForm } from "@/components/finance/payments/CreatePaymentForm";
 import type { RelatedFinancePrefill } from "@/lib/finance/related-prefill";
+import {
+  FINANCE_PRIMARY_BUTTON,
+  FINANCE_PRIMARY_BUTTON_SM,
+} from "@/components/finance/buttonStyles";
 
 function parseWhen(value?: string) {
   if (!value) return null;
@@ -327,24 +331,7 @@ export function InvoicesPage() {
   return (
     <div className="min-h-full w-full bg-[#F4F7FB] p-4 sm:p-6 lg:p-8 text-slate-900">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-[26px] font-bold tracking-tight text-slate-900">Sales Invoices</h1>
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide",
-                crm.source === "api"
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-slate-200 text-slate-600",
-              )}
-            >
-              {crm.source === "api" ? "Live CRM" : crm.loading ? "Connecting…" : "Demo"}
-            </span>
-          </div>
-          <p className="mt-1 text-[13px] text-slate-400">
-            Track, manage and get paid for your invoices all in one place.
-          </p>
-        </div>
+        <div />
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -357,7 +344,7 @@ export function InvoicesPage() {
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-[#6D5AE6] px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-500/20 hover:bg-[#5B4BD4]"
+            className={FINANCE_PRIMARY_BUTTON}
           >
             <Plus className="h-4 w-4" />
             Create Invoice
@@ -573,7 +560,7 @@ export function InvoicesPage() {
             <button
               type="button"
               onClick={() => router.push("/reports")}
-              className="w-full rounded-xl bg-[#6D5AE6] px-3 py-2.5 text-center text-xs font-bold text-white hover:bg-[#5B4BD4]"
+              className={`${FINANCE_PRIMARY_BUTTON_SM} w-full px-3 py-2.5 text-center text-xs font-bold`}
             >
               Open Invoicing Reports
             </button>

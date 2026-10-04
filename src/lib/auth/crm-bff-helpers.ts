@@ -79,6 +79,30 @@ export function parseWorkspaceScopedListRetry(
   return null;
 }
 
+const FINANCE_ROOTS = new Set([
+  "estimates",
+  "quotes",
+  "invoices",
+  "payments",
+  "products",
+  "credit-notes",
+]);
+
+/**
+ * Hosted CRM finance modules may require /workspaces/:id scoping for both
+ * reads and writes even when global /v1 routes exist in docs.
+ */
+export function parseWorkspaceScopedFinanceRetry(
+  path: string[],
+  method: string,
+) {
+  const verb = method.toUpperCase();
+  if (!["GET", "POST", "PATCH", "PUT", "DELETE"].includes(verb)) return null;
+  if (path[0] === "workspaces") return null;
+  if (!FINANCE_ROOTS.has(path[0] ?? "")) return null;
+  return { rest: path };
+}
+
 export function parseEmailRecordGet(path: string[], method: string) {
   if (method !== "GET") return null;
   const segs = resourceSegments(path);

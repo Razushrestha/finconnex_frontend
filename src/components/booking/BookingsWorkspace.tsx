@@ -34,6 +34,7 @@ import { publicBookUrl, type BookingPage } from "@/lib/booking/types";
 import { ConsultationsBoard } from "@/components/booking/ConsultationsBoard";
 import { NewAppointmentModal } from "@/components/booking/NewAppointmentModal";
 import { AppointmentDateField } from "@/components/booking/DateTimeSection";
+import { FINANCE_PRIMARY_BUTTON, FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 import {
   appointmentDateKey,
   appointmentInitials,
@@ -313,7 +314,7 @@ function NewBookingButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-[#5A32A3] px-3 text-[12px] font-semibold text-white hover:opacity-90"
+      className={cn(FINANCE_PRIMARY_BUTTON_SM, "h-9")}
     >
       <Plus className="h-3.5 w-3.5" />
       New Meeting
@@ -1413,7 +1414,7 @@ function AppointmentDrawer({
                 type="button"
                 disabled={saving}
                 onClick={() => void saveEdit()}
-                className="inline-flex h-9 items-center rounded-full bg-[#5A32A3] px-4 text-[13px] font-semibold text-white disabled:opacity-60"
+                className={cn(FINANCE_PRIMARY_BUTTON_SM, "h-9 px-4 text-[13px]")}
               >
                 {saving ? "Saving…" : "Save"}
               </button>
@@ -1422,7 +1423,7 @@ function AppointmentDrawer({
             <button
               type="button"
               onClick={onEdit}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full bg-[#5A32A3] px-4 text-[13px] font-semibold text-white"
+              className={cn(FINANCE_PRIMARY_BUTTON_SM, "h-9 px-4 text-[13px]")}
             >
               <Pencil className="h-3.5 w-3.5" />
               Edit

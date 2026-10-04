@@ -19,6 +19,7 @@ import {
   parseLeadKanbanPreferencePath,
   leadKanbanPreferenceOkBody,
   parseWorkspaceScopedListRetry,
+  parseWorkspaceScopedFinanceRetry,
   parseEmailRecordGet,
   emailRecordOkBody,
   parseMeetingCancelPath,
@@ -516,6 +517,26 @@ export async function proxyCrmV1(
     try {
       const alt = `${base}/v1/workspaces/${encodeURIComponent(proxyWorkspaceId)}/${scopedList.rest.map(encodeURIComponent).join("/")}${search}`;
       const retried = await fetch(alt, { method: "GET", headers });
+      text = await retried.text();
+      status = retried.status;
+    } catch {
+      /* keep prior status */
+    }
+  }
+
+  const scopedFinance = parseWorkspaceScopedFinanceRetry(path, method);
+  if (
+    scopedFinance &&
+    proxyWorkspaceId &&
+    (isHostedCrmAuthGap(status) || status === 400)
+  ) {
+    try {
+      const alt = `${base}/v1/workspaces/${encodeURIComponent(proxyWorkspaceId)}/${scopedFinance.rest.map(encodeURIComponent).join("/")}${search}`;
+      const retried = await fetch(alt, {
+        method: request.method,
+        headers,
+        body,
+      });
       text = await retried.text();
       status = retried.status;
     } catch {

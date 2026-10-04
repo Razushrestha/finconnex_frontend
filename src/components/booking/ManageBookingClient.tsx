@@ -21,6 +21,7 @@ import {
   type BookingPage,
 } from "@/lib/booking/types";
 import { CheckCircle2, XCircle, Calendar, Download, ExternalLink } from "lucide-react";
+import { FINANCE_PRIMARY_BUTTON } from "@/components/finance/buttonStyles";
 
 export function ManageBookingClient({
   slug,
@@ -91,7 +92,7 @@ export function ManageBookingClient({
         </p>
         <Link
           href={publicRescheduleUrl(slug, token)}
-          className="mt-6 inline-flex h-10 items-center rounded-xl bg-violet-600 px-4 text-[12px] font-semibold text-white hover:bg-violet-700"
+          className={`mt-6 ${FINANCE_PRIMARY_BUTTON}`}
         >
           Choose new time
         </Link>
@@ -179,7 +180,7 @@ export function ManageBookingClient({
               markBookingRescheduleIntent(token);
               setDone("reschedule");
             }}
-            className="h-10 rounded-xl bg-violet-600 text-[13px] font-semibold text-white hover:bg-violet-700"
+            className={FINANCE_PRIMARY_BUTTON}
           >
             Reschedule
           </button>

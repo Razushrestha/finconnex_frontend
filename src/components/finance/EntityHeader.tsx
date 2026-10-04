@@ -1,4 +1,5 @@
 import React from "react";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 interface EntityHeaderProps {
   title: string;
@@ -27,7 +28,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
         {/* Primary Action Button */}
         <button
           onClick={onActionClick}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-semibold shadow-sm hover:opacity-90 transition-opacity shrink-0"
+          className={`${FINANCE_PRIMARY_BUTTON_SM} shrink-0`}
         >
           <span>+</span> {actionLabel}
         </button>

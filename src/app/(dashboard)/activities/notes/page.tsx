@@ -179,26 +179,15 @@ export default function NotesPage() {
       <FocusHighlight />
       <div className="shrink-0">
         <div className="mb-1 flex flex-wrap items-center gap-2">
-          <span
-            className={cn(
-              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-              crm.source === "api"
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-slate-100 text-slate-500",
-            )}
-          >
-            {crm.source === "api"
-              ? "Live CRM"
-              : crm.loading
-                ? "Connecting…"
-                : "Demo"}
-          </span>
           {crm.error && crm.source === "demo" ? (
             <span className="text-[10px] text-slate-500">{crm.error}</span>
           ) : null}
         </div>
         <ActivityToolbar
           entityLabel="Note"
+          titleLabel="Notes"
+          crmLiveStatus={crm.source === "api" ? "live" : "offline"}
+          hideTitle
           createRoute="/activities/notes/create?layoutid=standard&redirect=false"
           view={view}
           onViewChange={setView}

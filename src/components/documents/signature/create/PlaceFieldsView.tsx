@@ -57,6 +57,7 @@ import {
 import { SenderFieldErrorTooltip } from "./SenderFieldErrorTooltip";
 import { SelectSignatureProfileModal } from "./SelectSignatureProfileModal";
 import { cn } from "@/lib/utils";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 function glideScroll(el: HTMLElement, top: number, duration = 520) {
   const start = el.scrollTop;
@@ -795,7 +796,7 @@ export function PlaceFieldsView({
             <ArrowLeft className="h-3.5 w-3.5" />
             Back
           </button>
-          <div className="flex overflow-hidden rounded">
+          <div className="inline-flex h-8 overflow-hidden rounded-full bg-[#6D5AE6] text-white shadow-md shadow-violet-500/20">
             <button
               type="button"
               onClick={(e) => {
@@ -804,7 +805,10 @@ export function PlaceFieldsView({
                 setIsConfirmOpen(true);
               }}
               disabled={isSubmitting}
-              className="inline-flex h-8 items-center gap-1.5 bg-primary px-4 text-[12px] font-semibold text-white hover:bg-primary/90 disabled:opacity-70"
+              className={cn(
+                FINANCE_PRIMARY_BUTTON_SM,
+                "h-8 rounded-none bg-transparent px-4 text-[12px] shadow-none hover:bg-[#5B4BD4] disabled:opacity-70",
+              )}
             >
               {isSubmitting ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -824,7 +828,7 @@ export function PlaceFieldsView({
             <button
               type="button"
               onClick={() => setIsConfirmOpen(true)}
-              className="flex h-8 w-7 items-center justify-center border-l border-white/20 bg-primary text-white hover:bg-primary/90"
+              className="flex h-8 w-7 items-center justify-center border-l border-white/25 hover:bg-[#5B4BD4]"
               aria-label="Confirm and send"
             >
               <ChevronDown className="h-3.5 w-3.5" />

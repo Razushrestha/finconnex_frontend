@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Send, PenTool } from "lucide-react";
 import { CrmSourceBadge } from "@/components/documents/signature/CrmSourceBadge";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 export function ESignatureHeader({
   source = "demo",
@@ -37,7 +38,7 @@ export function ESignatureHeader({
       <div className="flex items-center gap-2">
         <Link
           href="/signature/request/new?layoutid=standard&redirect=false&type=send"
-          className="inline-flex h-9 items-center gap-2 rounded-sm bg-primary px-4 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-primary/90"
+          className={`${FINANCE_PRIMARY_BUTTON_SM} h-9 gap-2 px-4 text-xs`}
         >
           <Send className="h-3.5 w-3.5" />
           Send for Signature

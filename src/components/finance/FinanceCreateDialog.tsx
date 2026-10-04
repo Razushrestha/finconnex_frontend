@@ -4,6 +4,10 @@ import type { ElementType, ReactNode } from "react";
 import { Loader2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import {
+  FINANCE_PRIMARY_BUTTON,
+  FINANCE_PRIMARY_BUTTON_SM,
+} from "@/components/finance/buttonStyles";
 
 export function FinanceCreateDialog({
   open,
@@ -70,7 +74,7 @@ export function FinanceCreateDialog({
             type="button"
             onClick={() => void onSave(true)}
             disabled={saving}
-            className="h-8 rounded-md border border-violet-200 bg-violet-50 px-3 text-[12px] font-semibold text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+            className={`${FINANCE_PRIMARY_BUTTON_SM} h-8 px-3 text-[12px]`}
           >
             Save &amp; New
           </button>
@@ -78,7 +82,7 @@ export function FinanceCreateDialog({
             type="button"
             onClick={() => void onSave(false)}
             disabled={saving}
-            className="inline-flex h-8 min-w-[7.5rem] items-center justify-center gap-1.5 rounded-md bg-violet-600 px-4 text-[12px] font-semibold text-white hover:bg-violet-700 disabled:opacity-90"
+            className={`${FINANCE_PRIMARY_BUTTON} h-8 min-w-[7.5rem] px-4 text-[12px]`}
           >
             {saving ? (
               <>

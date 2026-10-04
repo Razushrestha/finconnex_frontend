@@ -8,6 +8,7 @@ import {
   DEFAULT_CHOICE_OPTIONS,
   signingFieldAction,
 } from "@/lib/documents/signature/field-kinds";
+import { FINANCE_PRIMARY_BUTTON } from "@/components/finance/buttonStyles";
 
 function todayInputValue() {
   const d = new Date();
@@ -200,7 +201,7 @@ export function SigningFieldInputModal({
         {action !== "file" ? (
           <button
             type="submit"
-            className="mt-4 h-11 w-full rounded-xl bg-violet-600 text-sm font-semibold text-white hover:bg-violet-700"
+            className={`mt-4 h-11 w-full rounded-xl text-sm ${FINANCE_PRIMARY_BUTTON}`}
           >
             Apply
           </button>

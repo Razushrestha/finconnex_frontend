@@ -924,24 +924,7 @@ export default function LeadsPage() {
           retrying={crmLoading}
           onRetry={() => void connectCrm()}
         />
-      ) : (
-        <div className="mb-1 flex flex-wrap items-center gap-2">
-          <span
-            className={cn(
-              "rounded-full px-2 py-0.5 text-[10px] font-semibold",
-              crmSource === "api"
-                ? "bg-emerald-50 text-emerald-700"
-                : "bg-slate-100 text-slate-500",
-            )}
-          >
-            {crmSource === "api"
-              ? "Live CRM"
-              : crmLoading
-                ? "Connecting…"
-                : "Demo"}
-          </span>
-        </div>
-      )}
+      ) : null}
       {bulkFlash ? (
         <div
           role="status"
@@ -953,6 +936,8 @@ export default function LeadsPage() {
       <div className="shrink-0">
       <EntityHeader
         entityLabel="Lead"
+        crmLiveStatus={crmSource === "api" ? "live" : "offline"}
+        hideTitle
         createRoute="/sales/leads/create"
           onCreate={() => openCreateLead()}
           importOptions={importOptions}
@@ -984,7 +969,6 @@ export default function LeadsPage() {
           onStageTransferAndRemove={
             viewMode === "kanban" ? transferLeadStageAndRemove : undefined
           }
-          hideTitle
           showSearch={false}
         totalCount={totalLeads}
         viewMode={viewMode}

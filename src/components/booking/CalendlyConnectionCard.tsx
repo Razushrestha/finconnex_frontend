@@ -19,6 +19,7 @@ import {
 } from "@/lib/booking/calendly-integration-api";
 import { listCalendlyHosts } from "@/lib/booking/calendly-api";
 import { cn } from "@/lib/utils";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 export function CalendlyConnectionCard({
   compact = false,
@@ -225,7 +226,10 @@ export function CalendlyConnectionCard({
             type="button"
             disabled={Boolean(busy)}
             onClick={() => void connectWithToken()}
-            className="h-9 rounded-lg bg-[#5A32A3] px-3 text-[12px] font-semibold text-white hover:opacity-90 disabled:opacity-60"
+            className={cn(
+              FINANCE_PRIMARY_BUTTON_SM,
+              "h-9 rounded-lg disabled:opacity-60",
+            )}
           >
             {busy === "pat" ? "Connecting…" : "Connect token"}
           </button>

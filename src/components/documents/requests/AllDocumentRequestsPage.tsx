@@ -23,6 +23,7 @@ import {
 } from "@/lib/documents/requests/dashboard";
 import { DocumentRequestsList } from "@/components/documents/requests/DocumentRequestsList";
 import { cn } from "@/lib/utils";
+import { FINANCE_PRIMARY_BUTTON_SM } from "@/components/finance/buttonStyles";
 
 const PAGE_SIZE = 10;
 
@@ -156,7 +157,7 @@ export function AllDocumentRequestsPage({
               </button>
               <Link
                 href="/documents/requests/create?layoutid=standard&redirect=false"
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#5A32A3] px-3 text-[12px] font-semibold text-white hover:bg-[#4c2a8a]"
+                className={`${FINANCE_PRIMARY_BUTTON_SM} h-8`}
               >
                 <Plus className="h-3.5 w-3.5" />
                 New Request
