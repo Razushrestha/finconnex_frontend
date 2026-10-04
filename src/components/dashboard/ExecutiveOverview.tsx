@@ -287,52 +287,57 @@ export function ExecutiveKpis({ data }: { data: ExecutiveData }) {
 
 export function PipelineGlance({ data }: { data: ExecutiveData }) {
   const top = Math.max(...data.funnel.map((r) => r.count), 1);
+  const totals = [
+    { label: "Total Pipeline Value", value: formatCompactMoney(data.pipelineValue) },
+    { label: "Weighted Pipeline Value", value: formatCompactMoney(data.weightedPipeline) },
+    { label: "Active Deals", value: String(data.activeDeals) },
+  ];
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-4">
+    // Sized by its own width, not the window's: the dashboard grid can make
+    // this widget narrow on a wide screen.
+    <section className="@container flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-4">
       <h3 className="text-[13px] font-semibold text-slate-900">Pipeline at a Glance</h3>
-      <div className="mt-3 grid min-h-0 flex-1 gap-3 overflow-hidden lg:grid-cols-[8.5rem_1fr_7.5rem]">
+      <div className="mt-3 grid min-h-0 flex-1 content-start gap-4 overflow-y-auto @lg:grid-cols-[minmax(0,1fr)_8rem] @lg:content-center">
+        {/* One row per stage, so a label can never drift from its bar. */}
         <div className="space-y-1.5">
-          {data.funnel.map((row) => (
-            <div key={row.label} className="flex h-7 items-center">
-              <p className="truncate text-[11px] font-medium text-slate-700">{row.label}</p>
-            </div>
-          ))}
-        </div>
-        <div className="flex flex-col items-center justify-center gap-1.5 py-1">
           {data.funnel.map((row, i) => {
-            const width = 100 - i * 9;
+            const width = Math.max(28, 100 - i * 9);
             const pct = Math.round((row.count / top) * 100);
             return (
               <div
                 key={row.label}
-                className="flex h-7 items-center justify-center rounded-sm text-[10px] font-semibold text-white"
-                style={{
-                  width: `${Math.max(28, width)}%`,
-                  backgroundColor: FUNNEL_COLORS[i] ?? "#5A32A3",
-                }}
+                className="grid h-7 grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)] items-center gap-2"
               >
-                {row.count} · {pct}%
+                <p className="truncate text-[11px] font-medium text-slate-700" title={row.label}>
+                  {row.label}
+                </p>
+                <div className="flex justify-center">
+                  <div
+                    className="flex h-7 items-center justify-center whitespace-nowrap rounded-sm px-2 text-[10px] font-semibold tabular-nums text-white"
+                    style={{
+                      width: `${width}%`,
+                      // Wide enough for its own text, so it never wraps.
+                      minWidth: "max-content",
+                      backgroundColor: FUNNEL_COLORS[i] ?? "#5A32A3",
+                    }}
+                  >
+                    {row.count} · {pct}%
+                  </div>
+                </div>
               </div>
             );
           })}
         </div>
-        <div className="space-y-3 self-center">
-          <div>
-            <p className="text-[10px] text-slate-400">Total Pipeline Value</p>
-            <p className="text-[15px] font-semibold text-slate-900">
-              {formatCompactMoney(data.pipelineValue)}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] text-slate-400">Weighted Pipeline Value</p>
-            <p className="text-[15px] font-semibold text-slate-900">
-              {formatCompactMoney(data.weightedPipeline)}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] text-slate-400">Active Deals</p>
-            <p className="text-[15px] font-semibold text-slate-900">{data.activeDeals}</p>
-          </div>
+        <div className="grid grid-cols-3 gap-3 border-t border-slate-100 pt-3 @lg:grid-cols-1 @lg:self-center @lg:border-t-0 @lg:pt-0">
+          {totals.map((item) => (
+            // Values share a baseline even when a label wraps to two lines.
+            <div key={item.label} className="flex min-w-0 flex-col justify-between gap-0.5">
+              <p className="text-[10px] leading-tight text-slate-400">{item.label}</p>
+              <p className="truncate text-[15px] font-semibold text-slate-900 tabular-nums">
+                {item.value}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
       <WidgetLink href="/?view=sales">View Sales Dashboard</WidgetLink>

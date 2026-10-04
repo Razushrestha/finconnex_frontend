@@ -44,8 +44,10 @@ export function LeadInlineField({
         onClick={() => setEditing(true)}
         className={cn(
           "block w-full truncate rounded-md text-left hover:bg-violet-50/80",
-          !value && "text-slate-400",
           className,
+          // Last, so a caller's bold dark value style can't make the empty
+          // prompt look like real (cut-off) data.
+          !value && "font-normal text-slate-400",
         )}
         title="Click to edit — every change is saved to Timeline"
       >

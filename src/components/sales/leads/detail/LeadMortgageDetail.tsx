@@ -943,11 +943,16 @@ export function LeadMortgageDetail({
             <Eyebrow>Qualification</Eyebrow>
             <ul className="mt-3 space-y-2.5">
               {qualification.rows.map((item) => (
-                <li key={item.label} className="flex items-center justify-between gap-3">
-                  <span className="inline-flex items-center gap-2 text-[13px] text-slate-600">
+                // The label keeps its line; the value takes what is left and
+                // truncates, instead of squeezing the label onto two lines.
+                <li
+                  key={item.label}
+                  className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3"
+                >
+                  <span className="inline-flex items-center gap-2 whitespace-nowrap text-[13px] text-slate-600">
                     <span
                       className={cn(
-                        "flex h-[18px] w-[18px] items-center justify-center rounded-full",
+                        "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full",
                         item.ok
                           ? "bg-emerald-100 text-emerald-600"
                           : "bg-slate-100 text-slate-400",
