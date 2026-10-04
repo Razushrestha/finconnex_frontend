@@ -154,14 +154,33 @@ export async function fetchPublicSlots(
   return { ok: true, days: parsePublicSlotDays(res.json) };
 }
 
-export async function fetchPublicSiteBranding(slug: string): Promise<unknown | null> {
+/** A public service (event type) listed on the workspace booking site. */
+export type PublicSiteService = {
+  id: string;
+  name: string;
+  slug: string;
+  durationMinutes: number;
+};
+
+/** The workspace booking site: its branding and the services guests can book. */
+export async function fetchPublicSite(
+  slug: string,
+): Promise<{ branding: unknown; services: PublicSiteService[] } | null> {
   const res = await call(endpoint(slug, "site"));
   if (!res.ok) return null;
-  const rec =
-    res.json && typeof res.json === "object" && !Array.isArray(res.json)
-      ? (res.json as Record<string, unknown>)
-      : null;
-  return rec?.branding ?? null;
+  const rec = asRecord(res.json);
+  if (!rec) return null;
+  const services = (Array.isArray(rec.services) ? rec.services : [])
+    .map(asRecord)
+    .filter((row): row is Record<string, unknown> => !!row)
+    .map((row) => ({
+      id: String(row.id ?? ""),
+      name: String(row.name ?? ""),
+      slug: String(row.slug ?? ""),
+      durationMinutes: Number(row.durationMinutes) || 0,
+    }))
+    .filter((row) => row.id && row.name);
+  return { branding: rec.branding ?? null, services };
 }
 
 export async function bookPublicSlot(

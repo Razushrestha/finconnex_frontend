@@ -109,109 +109,114 @@ export function BookingPageDesigner({ page }: { page: BookingPage }) {
   );
 
   return (
-    <div className="flex min-h-0 flex-1 bg-[#F3F4F6]">
-      <div className="min-w-0 flex-1 overflow-auto p-5">
-        <BookingPagePreview page={page} branding={branding} />
-      </div>
-      <aside className="w-[280px] shrink-0 overflow-y-auto border-l border-slate-200 bg-white">
-        {PANELS.map((panel) => {
-          const expanded = open === panel.id;
-          return (
-            <div key={panel.id} className="border-b border-slate-100">
-              <button
-                type="button"
-                onClick={() => setOpen(expanded ? null : panel.id)}
-                className="flex h-11 w-full items-center justify-between px-4 text-left text-[13px] font-medium text-slate-800 hover:bg-slate-50"
-              >
-                {panel.title}
+    // Sized by its own width, not the window's: this sits beside the editor's
+    // menu, so a wide screen can still leave the preview narrow. Container
+    // queries apply to descendants, hence the inner row.
+    <div className="@container/designer flex min-h-0 flex-1 flex-col bg-[#F3F4F6]">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto @3xl/designer:flex-row @3xl/designer:overflow-hidden">
+        <div className="@container min-w-0 p-3 @md/designer:p-5 @3xl/designer:flex-1 @3xl/designer:overflow-auto">
+          <BookingPagePreview page={page} branding={branding} />
+        </div>
+        <aside className="w-full shrink-0 border-t border-slate-200 bg-white @3xl/designer:w-[280px] @3xl/designer:overflow-y-auto @3xl/designer:border-t-0 @3xl/designer:border-l">
+          {PANELS.map((panel) => {
+            const expanded = open === panel.id;
+            return (
+              <div key={panel.id} className="border-b border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setOpen(expanded ? null : panel.id)}
+                  className="flex h-11 w-full items-center justify-between px-4 text-left text-[13px] font-medium text-slate-800 hover:bg-slate-50"
+                >
+                  {panel.title}
+                  {expanded ? (
+                    <ChevronDown className="h-4 w-4 text-slate-400" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  )}
+                </button>
                 {expanded ? (
-                  <ChevronDown className="h-4 w-4 text-slate-400" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-slate-400" />
-                )}
-              </button>
-              {expanded ? (
-                <div className="px-4 pb-4">
-                  {panel.id === "theme" ? (
-                    <ThemePanel
-                      branding={branding}
-                      saving={saving === "theme"}
-                      onChange={setBranding}
-                      onSave={() =>
-                        save(
-                          {
-                            layout: branding.layout,
-                            primaryColor: branding.primaryColor,
-                            showBanner: branding.showBanner,
-                            showUserAsCards: branding.showUserAsCards,
-                            buttonText: branding.buttonText,
-                            backgroundImageUrl: branding.backgroundImageUrl,
-                          },
-                          "theme",
-                        )
-                      }
-                    />
-                  ) : null}
-                  {panel.id === "header" ? (
-                    <HeaderPanel
-                      branding={branding}
-                      saving={saving === "header"}
-                      onChange={setBranding}
-                      onSave={() => save({ header: branding.header }, "header")}
-                    />
-                  ) : null}
-                  {panel.id === "footer" ? (
-                    <FooterPanel
-                      branding={branding}
-                      saving={saving === "footer"}
-                      onChange={setBranding}
-                      onSave={() => save({ footer: branding.footer }, "footer")}
-                    />
-                  ) : null}
-                  {panel.id === "workspace" ? (
-                    <WorkspacePanel
-                      branding={branding}
-                      saving={saving === "workspace"}
-                      onChange={setBranding}
-                      onSave={() => save({ workspace: branding.workspace }, "workspace")}
-                    />
-                  ) : null}
-                  {panel.id === "services" ? (
-                    <ServicesPanel
-                      services={ordered}
-                      saving={saving === "services"}
-                      onMove={(from, to) => {
-                        const next = [...ordered];
-                        const [item] = next.splice(from, 1);
-                        next.splice(to, 0, item);
-                        setServices(next);
-                        setBranding((prev) => ({
-                          ...prev,
-                          serviceOrder: next.map((row) => row.id),
-                        }));
-                      }}
-                      onSave={() =>
-                        save(
-                          { serviceOrder: ordered.map((row) => row.id) },
-                          "services",
-                        )
-                      }
-                    />
-                  ) : null}
-                  {panel.id === "seo" ? (
-                    <SeoPanel
-                      branding={branding}
-                      saving={saving === "seo"}
-                      onChange={setBranding}
-                      onSave={() => save({ seo: branding.seo }, "seo")}
-                    />
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
-      </aside>
+                  <div className="px-4 pb-4">
+                    {panel.id === "theme" ? (
+                      <ThemePanel
+                        branding={branding}
+                        saving={saving === "theme"}
+                        onChange={setBranding}
+                        onSave={() =>
+                          save(
+                            {
+                              layout: branding.layout,
+                              primaryColor: branding.primaryColor,
+                              showBanner: branding.showBanner,
+                              showUserAsCards: branding.showUserAsCards,
+                              buttonText: branding.buttonText,
+                              backgroundImageUrl: branding.backgroundImageUrl,
+                            },
+                            "theme",
+                          )
+                        }
+                      />
+                    ) : null}
+                    {panel.id === "header" ? (
+                      <HeaderPanel
+                        branding={branding}
+                        saving={saving === "header"}
+                        onChange={setBranding}
+                        onSave={() => save({ header: branding.header }, "header")}
+                      />
+                    ) : null}
+                    {panel.id === "footer" ? (
+                      <FooterPanel
+                        branding={branding}
+                        saving={saving === "footer"}
+                        onChange={setBranding}
+                        onSave={() => save({ footer: branding.footer }, "footer")}
+                      />
+                    ) : null}
+                    {panel.id === "workspace" ? (
+                      <WorkspacePanel
+                        branding={branding}
+                        saving={saving === "workspace"}
+                        onChange={setBranding}
+                        onSave={() => save({ workspace: branding.workspace }, "workspace")}
+                      />
+                    ) : null}
+                    {panel.id === "services" ? (
+                      <ServicesPanel
+                        services={ordered}
+                        saving={saving === "services"}
+                        onMove={(from, to) => {
+                          const next = [...ordered];
+                          const [item] = next.splice(from, 1);
+                          next.splice(to, 0, item);
+                          setServices(next);
+                          setBranding((prev) => ({
+                            ...prev,
+                            serviceOrder: next.map((row) => row.id),
+                          }));
+                        }}
+                        onSave={() =>
+                          save(
+                            { serviceOrder: ordered.map((row) => row.id) },
+                            "services",
+                          )
+                        }
+                      />
+                    ) : null}
+                    {panel.id === "seo" ? (
+                      <SeoPanel
+                        branding={branding}
+                        saving={saving === "seo"}
+                        onChange={setBranding}
+                        onSave={() => save({ seo: branding.seo }, "seo")}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </aside>
+      </div>
     </div>
   );
 }
@@ -245,33 +250,47 @@ function BasicThemePreview({
   page: BookingPage;
   branding: BookingPageBranding;
 }) {
+  // Basic books in steps, like the live page: Event Type, then Date, Time &
+  // User, then Your Info. The preview can be clicked through them.
+  const [stage, setStage] = useState<"service" | "schedule" | "details">("service");
+  const [day, setDay] = useState(5);
+  const [slot, setSlot] = useState("09:00 am");
   const title =
     (branding.header.titleVisible && branding.header.title) ||
     branding.workspace.displayName ||
     "Booking";
   const color = branding.primaryColor;
-  const slots = [
-    "08:00 am",
-    "09:30 am",
-    "10:00 am",
-    "10:30 am",
-    "11:00 am",
-    "11:30 am",
-    "12:00 pm",
-  ];
+  const host = calendarDefaultHost(page);
+  const timezone = page.timezone || "Asia/Kathmandu";
+  const morning = ["09:00 am", "09:15 am", "09:30 am", "09:45 am", "10:00 am", "10:15 am"];
+  const afternoon = ["12:00 pm", "12:15 pm", "12:30 pm", "12:45 pm"];
   const week = [
-    { day: "SUN", date: 4, selected: true },
-    { day: "MON", date: 5, selected: false },
-    { day: "TUE", date: 6, selected: false },
-    { day: "WED", date: 7, selected: false },
-    { day: "THU", date: 8, selected: false },
-    { day: "FRI", date: 9, selected: false },
-    { day: "SAT", date: 10, selected: false },
+    { date: 5, day: "MON", open: true },
+    { date: 6, day: "TUE", open: true },
+    { date: 7, day: "WED", open: true },
+    { date: 8, day: "THU", open: true },
+    { date: 9, day: "FRI", open: true },
+    { date: 10, day: "SAT", open: false },
+    { date: 11, day: "SUN", open: false },
   ];
-  const price =
-    page.price != null
-      ? `${page.currency === "NPR" ? "Rs" : page.currency || "A$"} ${page.price}`
-      : null;
+  const steps = [
+    {
+      id: "service" as const,
+      label: "Event Type",
+      icon: Clock,
+      summary:
+        stage !== "service" ? `${page.title} · ${formatDurationHours(page.durationMinutes)}` : null,
+    },
+    {
+      id: "schedule" as const,
+      label: "Date, Time & User",
+      icon: CalendarClock,
+      summary:
+        stage === "details" ? `${String(day).padStart(2, "0")} Oct 2026 ${slot} · ${host}` : null,
+    },
+    { id: "details" as const, label: "Your Info", icon: User, summary: null },
+  ];
+  const reached = { service: true, schedule: stage !== "service", details: stage === "details" };
 
   return (
     <div
@@ -283,87 +302,163 @@ function BasicThemePreview({
         backgroundSize: "cover",
       }}
     >
-      <div className="px-8 pt-6">
+      <div className="px-5 pt-6 @lg:px-8">
         <PreviewHeader branding={branding} title={title} compact />
       </div>
       {branding.showBanner ? (
-        <div className="px-8 pt-8 pb-6 text-center">
-          <h2 className="text-[28px] font-semibold text-slate-900">Welcome!</h2>
+        <div className="px-5 pt-8 pb-6 text-center @lg:px-8">
+          <h2 className="text-[22px] font-semibold text-slate-900 @lg:text-[28px]">Welcome!</h2>
           <p className="mx-auto mt-2 max-w-xl text-[13px] text-slate-500">
             Book your appointment in a few simple steps. Choose a service, pick
             your date and time, and fill in your details. See you soon!
           </p>
         </div>
       ) : null}
-      <div className="grid gap-8 px-8 pb-10 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <div className="space-y-1">
-          <button type="button" className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-slate-50">
-            <Clock className="h-4 w-4 text-slate-400" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-medium text-slate-800">
-                {page.title}
-              </span>
-              <span className="block text-[11px] text-slate-400">
-                {page.durationMinutes} mins
-                {price ? ` · ${price}` : ""}
-              </span>
-            </span>
-            <ChevronRight className="h-4 w-4 text-slate-300" />
-          </button>
-          <button
-            type="button"
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left"
-            style={{ background: colorWash(color, 0.1), color }}
-          >
-            <CalendarClock className="h-4 w-4" />
-            <span className="min-w-0 flex-1 text-[13px] font-medium">
-              Date, Time & User
-            </span>
-            <ChevronRight className="h-4 w-4" />
-          </button>
-          <button type="button" className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-slate-700 hover:bg-slate-50">
-            <User className="h-4 w-4 text-slate-400" />
-            <span className="min-w-0 flex-1 text-[13px] font-medium">Your Info</span>
-          </button>
-        </div>
-        <div>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[14px] font-semibold text-slate-800">October, 2026</p>
-            <div className="rounded-lg border border-slate-200 px-3 py-1.5 text-[12px] text-slate-600">
-              {page.timezone || "Asia/Kathmandu"}
-            </div>
-          </div>
-          <div className="mb-6 flex items-center gap-2">
-            <span className="text-slate-300">‹</span>
-            {week.map((item) => (
-              <div key={item.date} className="flex w-12 flex-col items-center gap-1">
-                <span className="text-[10px] font-medium text-slate-400">{item.day}</span>
+      <div className="mx-5 mb-10 grid border-t border-slate-100 @lg:mx-8 @2xl:grid-cols-[220px_minmax(0,1fr)]">
+        <div className="space-y-1 border-b border-slate-100 py-3 @2xl:border-r @2xl:border-b-0 @2xl:pr-3">
+          {steps.map((item) => {
+            const Icon = item.icon;
+            const active = stage === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                disabled={!reached[item.id]}
+                onClick={() => setStage(item.id)}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left disabled:cursor-default",
+                  active ? "bg-slate-50" : reached[item.id] && "hover:bg-slate-50",
+                )}
+              >
+                <Icon
+                  className="h-4 w-4 shrink-0"
+                  style={{ color: active ? color : "#94A3B8" }}
+                />
                 <span
                   className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full text-[13px] font-semibold",
-                    item.selected ? "text-white" : "text-slate-700",
+                    "min-w-0 flex-1 text-[13px]",
+                    item.summary ? "text-slate-800" : active ? "font-medium" : "text-slate-500",
                   )}
-                  style={item.selected ? { background: color } : undefined}
+                  style={active && !item.summary ? { color } : undefined}
                 >
-                  {item.date}
+                  {item.summary ?? item.label}
                 </span>
-              </div>
-            ))}
-            <span className="text-slate-300">›</span>
-          </div>
-          <p className="mb-3 text-[12px] text-slate-400">Morning</p>
-          <div className="flex flex-wrap gap-2">
-            {slots.map((slot) => (
-              <button
-                key={slot}
-                type="button"
-                className="h-9 min-w-[92px] rounded-full border bg-white px-3 text-[12px]"
-                style={{ borderColor: color, color }}
-              >
-                {slot}
+                {active || item.summary ? (
+                  <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                ) : null}
               </button>
-            ))}
-          </div>
+            );
+          })}
+        </div>
+        <div className="min-w-0 py-5 @2xl:pl-6">
+          {stage === "service" ? (
+            <button
+              type="button"
+              onClick={() => setStage("schedule")}
+              className="flex w-full items-center gap-4 rounded-lg px-2 py-3 text-left hover:bg-slate-50"
+            >
+              <span
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-[16px]"
+                style={{ background: colorWash(color, 0.12), color }}
+              >
+                {page.title.slice(0, 1).toUpperCase()}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[14px] text-slate-800">
+                {page.title}
+              </span>
+              <span className="shrink-0 text-[12px] text-slate-500">
+                {formatDurationHours(page.durationMinutes)}
+              </span>
+            </button>
+          ) : null}
+          {stage === "schedule" ? (
+            <>
+              <p className="border-b border-slate-100 pb-3 text-[13px] text-slate-700">
+                Your appointment will be booked with {host}
+              </p>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-[14px] font-semibold text-slate-800">October, 2026</p>
+                <div className="rounded-lg border border-slate-200 px-3 py-1.5 text-[12px] text-slate-600">
+                  {timezone}
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-7 gap-1 @md:gap-2">
+                {week.map((item) => {
+                  const selected = item.open && item.date === day;
+                  return (
+                    <button
+                      key={item.date}
+                      type="button"
+                      disabled={!item.open}
+                      onClick={() => setDay(item.date)}
+                      className={cn(
+                        "flex h-12 flex-col items-center justify-center rounded-md leading-tight shadow-[0_1px_4px_rgba(15,23,42,0.08)] ring-1 ring-slate-100 @md:h-14",
+                        selected ? "text-white" : item.open ? "text-slate-800" : "text-slate-300",
+                      )}
+                      style={selected ? { background: color } : undefined}
+                    >
+                      <span className="text-[13px] @md:text-[15px]">{item.date}</span>
+                      <span className="text-[8px] @md:text-[10px]">{item.day}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {[
+                { label: "Morning", times: morning },
+                { label: "Afternoon", times: afternoon },
+              ].map((period) => (
+                <div key={period.label} className="mt-5">
+                  <p className="mb-3 flex items-center gap-3 text-[12px] text-slate-400">
+                    <span className="h-px flex-1 bg-slate-100" />
+                    {period.label}
+                    <span className="h-px flex-1 bg-slate-100" />
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 @md:grid-cols-3 @3xl:grid-cols-4">
+                    {period.times.map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        onClick={() => {
+                          setSlot(item);
+                          setStage("details");
+                        }}
+                        className="h-9 rounded-md border bg-white text-[12px]"
+                        style={{ borderColor: color, color }}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : null}
+          {stage === "details" ? (
+            <>
+              <p className="text-center text-[14px] font-semibold text-slate-900">
+                Please enter your details
+              </p>
+              <div className="mx-auto mt-5 max-w-[320px] space-y-3">
+                {["Name", "Email", "Contact Number"].map((label) => (
+                  <div key={label}>
+                    <p className="mb-1 text-[12px] text-slate-600">
+                      {label} <span className="text-rose-500">*</span>
+                    </p>
+                    <div className="h-9 rounded-md border border-slate-200 px-3 text-[12px] leading-9 text-slate-400">
+                      {label}
+                    </div>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="h-10 w-full rounded-md text-[13px] font-semibold text-white"
+                  style={{ background: color }}
+                >
+                  {branding.buttonText.trim() || "Schedule Appointment"}
+                </button>
+              </div>
+            </>
+          ) : null}
         </div>
       </div>
       <PreviewFooter branding={branding} />
@@ -378,6 +473,9 @@ function ModernThemePreview({
   page: BookingPage;
   branding: BookingPageBranding;
 }) {
+  // Like the live page, the button opens a Booking Summary sidebar that
+  // takes the guest's details.
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const title =
     (branding.header.titleVisible && branding.header.title) ||
     branding.workspace.displayName ||
@@ -390,7 +488,7 @@ function ModernThemePreview({
 
   return (
     <div
-      className="min-h-full bg-white"
+      className="relative min-h-full overflow-hidden bg-white"
       style={{
         backgroundImage: branding.backgroundImageUrl
           ? `url(${branding.backgroundImageUrl})`
@@ -398,19 +496,21 @@ function ModernThemePreview({
         backgroundSize: "cover",
       }}
     >
-      <div className="px-10 pt-6">
+      <div className="px-5 pt-6 @lg:px-10">
         <PreviewHeader branding={branding} title={title} compact />
       </div>
       {branding.showBanner ? (
-        <div className="px-10 pt-10 pb-8">
-          <h2 className="text-[28px] font-semibold text-slate-900">Welcome!</h2>
+        <div className="px-5 pt-10 pb-8 @lg:px-10">
+          <h2 className="text-[22px] font-semibold @lg:text-[28px]" style={{ color }}>
+            Welcome!
+          </h2>
           <p className="mt-2 max-w-2xl text-[13px] text-slate-500">
             Book your appointment in a few simple steps. Choose a service, pick
             your date and time, and fill in your details. See you soon!
           </p>
         </div>
       ) : null}
-      <div className="grid gap-5 px-10 pb-16 md:grid-cols-3">
+      <div className="grid gap-5 px-5 pb-16 @lg:grid-cols-2 @lg:px-10 @3xl:grid-cols-3">
         <ModernInfoCard
           icon={Clock}
           color={color}
@@ -418,11 +518,12 @@ function ModernThemePreview({
           subtitle={`(${formatDurationHours(page.durationMinutes)})`}
         />
         <ModernInfoCard icon={User} color={color} title={host} />
-        <ModernInfoCard icon={Calendar} color={color} title="4 Oct 2026" />
+        <ModernInfoCard icon={Calendar} color={color} title="5 Oct 2026" />
         <ModernInfoCard icon={Globe} color={color} title={timezone} />
         <ModernInfoCard icon={Clock} color={color} title={time} />
         <button
           type="button"
+          onClick={() => setSummaryOpen(true)}
           className="flex min-h-[76px] items-center justify-center rounded-xl px-6 text-[15px] font-medium text-white shadow-[0_8px_24px_rgba(15,23,42,0.08)]"
           style={{ background: color }}
         >
@@ -430,6 +531,68 @@ function ModernThemePreview({
         </button>
       </div>
       <PreviewFooter branding={branding} />
+      {summaryOpen ? (
+        <div className="absolute inset-0 flex justify-end">
+          <button
+            type="button"
+            aria-label="Close booking summary"
+            onClick={() => setSummaryOpen(false)}
+            className="absolute inset-0 bg-slate-900/25"
+          />
+          <div className="relative flex h-full w-full max-w-[340px] flex-col bg-slate-50 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
+              <p className="text-[14px] text-slate-800">Booking Summary</p>
+              <button
+                type="button"
+                onClick={() => setSummaryOpen(false)}
+                className="text-[16px] leading-none text-slate-400"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="space-y-3 overflow-y-auto p-3">
+              <div className="flex items-center gap-3 bg-white p-3">
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center text-[16px] text-white"
+                  style={{ background: color }}
+                >
+                  {page.title.slice(0, 1).toUpperCase()}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[13px] text-slate-800">{page.title}</span>
+                  <span className="block text-[11px] text-slate-500">
+                    ( {formatDurationHours(page.durationMinutes)} )
+                  </span>
+                </span>
+              </div>
+              <div className="space-y-1 bg-white p-3 text-[12px] text-slate-700">
+                <p>05 Oct 2026 {time}</p>
+                <p className="text-slate-500">{timezone}</p>
+              </div>
+              <div className="space-y-3 bg-white p-3">
+                <p className="text-[13px] text-slate-800">Please enter your details</p>
+                {["Name", "Email", "Contact Number"].map((label) => (
+                  <div key={label}>
+                    <p className="mb-1 text-[11px] text-slate-600">
+                      {label} <span className="text-rose-500">*</span>
+                    </p>
+                    <div className="h-8 rounded-md border border-slate-200 px-2 text-[11px] leading-8 text-slate-400">
+                      {label}
+                    </div>
+                  </div>
+                ))}
+                <div
+                  className="flex h-9 items-center justify-center rounded-md text-[12px] font-semibold text-white"
+                  style={{ background: color }}
+                >
+                  Schedule Appointment
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -471,37 +634,30 @@ function ClassicThemePreview({
   page: BookingPage;
   branding: BookingPageBranding;
 }) {
+  // Stacked cards, like the live page: Event Type, Date, Time & User, and
+  // Your Info once a time is picked.
+  const [slot, setSlot] = useState<string | null>(null);
+  const [day, setDay] = useState(5);
   const title =
     (branding.header.titleVisible && branding.header.title) ||
     branding.workspace.displayName ||
     "Booking";
   const color = branding.primaryColor;
-  const slots = [
-    "08:00 am",
-    "09:30 am",
-    "10:00 am",
-    "10:30 am",
-    "11:00 am",
-    "11:30 am",
-    "12:00 pm",
-  ];
-  const price =
-    page.price != null
-      ? `${page.currency === "NPR" ? "Rs" : page.currency || "A$"} ${page.price}`
-      : null;
-  const time = formatClockLabel(firstAvailabilityStart(page));
-  const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
-  const leadingBlanks = 4;
-  const monthDays = 31;
-  const selectedDay = 4;
+  const host = calendarDefaultHost(page);
+  const slots = ["09:00 am", "09:15 am", "09:30 am", "09:45 am", "10:00 am", "10:15 am", "10:30 am", "10:45 am"];
+  const weekdays = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
+  const leadingBlanks = 3;
   const cells = [
     ...Array.from({ length: leadingBlanks }, () => null),
-    ...Array.from({ length: monthDays }, (_, i) => i + 1),
+    ...Array.from({ length: 31 }, (_, i) => i + 1),
   ];
+  // Monday-first grid: columns 5 and 6 are Saturday and Sunday.
+  const isWeekend = (date: number) => (date + leadingBlanks - 1) % 7 >= 5;
+  const card = "rounded-xl bg-white shadow-[0_1px_4px_rgba(15,23,42,0.06)] ring-1 ring-slate-100";
 
   return (
     <div
-      className="min-h-full bg-white"
+      className="min-h-full bg-slate-50/60"
       style={{
         backgroundImage: branding.backgroundImageUrl
           ? `url(${branding.backgroundImageUrl})`
@@ -509,99 +665,146 @@ function ClassicThemePreview({
         backgroundSize: "cover",
       }}
     >
-      <div className="px-10 pt-6">
+      <div className="px-5 pt-6 @lg:px-10">
         <PreviewHeader branding={branding} title={title} compact />
       </div>
       {branding.showBanner ? (
-        <div className="px-10 pt-8 pb-6 text-center">
-          <h2 className="text-[28px] font-semibold text-slate-900">Welcome!</h2>
+        <div className="px-5 pt-8 pb-2 text-center @lg:px-10">
+          <h2 className="text-[22px] font-semibold text-slate-900 @lg:text-[28px]">Welcome!</h2>
           <p className="mx-auto mt-2 max-w-2xl text-[13px] text-slate-500">
             Book your appointment in a few simple steps. Choose a service, pick
             your date and time, and fill in your details. See you soon!
           </p>
         </div>
       ) : null}
-      <div className="space-y-6 px-10 pb-16">
-        <button
-          type="button"
-          className="flex w-full items-center gap-3 rounded-xl bg-white px-5 py-4 text-left shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-slate-100"
-        >
-          <Clock className="h-5 w-5 shrink-0" style={{ color }} />
-          <span className="min-w-0 flex-1">
-            <span className="block text-[13px] font-medium text-slate-800">
-              Event Type
-            </span>
-            <span className="block text-[13px] text-slate-700">{page.title}</span>
-            <span className="block text-[12px] text-slate-400">
+      <div className="space-y-4 px-5 pt-4 pb-16 @lg:px-10">
+        <div className={cn(card, "flex items-center gap-3 px-4 py-3")}>
+          <span
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white"
+            style={{ background: color }}
+          >
+            <Clock className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[13px] text-slate-800">
+            {page.title}
+            <span className="text-slate-400"> | </span>
+            <span className="text-[12px] text-slate-500">
               {formatDurationHours(page.durationMinutes)}
-              {price ? ` · ${price}` : ""}
             </span>
           </span>
-          <ChevronDown className="h-4 w-4 shrink-0 text-slate-300" />
-        </button>
-        <div className="flex items-start gap-3 px-1">
-          <CalendarClock className="mt-0.5 h-5 w-5 shrink-0" style={{ color }} />
-          <div>
-            <p className="text-[13px] font-medium text-slate-800">
+          <ChevronDown className="h-4 w-4 shrink-0" style={{ color }} />
+        </div>
+        <div className={cn(card, "px-4 py-4 @lg:px-6")}>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <p className="flex items-center gap-3 text-[14px] text-slate-800">
+              <span
+                className="flex h-9 w-9 items-center justify-center rounded-full border"
+                style={{ borderColor: color, color }}
+              >
+                <CalendarClock className="h-4 w-4" />
+              </span>
               Date, Time & User
             </p>
-            <p className="text-[12px] text-slate-400">
-              4 Oct 2026 · {time}
-            </p>
+            <p className="text-[12px] text-slate-500">Your appointment will be booked with {host}</p>
+          </div>
+          <div className="mt-4 grid gap-6 @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+            <div>
+              <p className="mb-3 text-center text-[13px] text-slate-700">
+                <span style={{ color }}>‹</span>&nbsp;&nbsp; October 2026 &nbsp;&nbsp;<span style={{ color }}>›</span>
+              </p>
+              <div className="grid grid-cols-7 gap-y-1 text-center">
+                {weekdays.map((d) => (
+                  <span key={d} className="text-[10px] font-medium text-slate-400">
+                    {d}
+                  </span>
+                ))}
+                {cells.map((date, i) => {
+                  const open = !!date && date >= 5 && !isWeekend(date);
+                  const selected = date === day;
+                  return (
+                    <button
+                      key={date ?? `blank-${i}`}
+                      type="button"
+                      disabled={!open}
+                      onClick={() => date && setDay(date)}
+                      className={cn(
+                        "mx-auto flex h-7 w-7 items-center justify-center rounded-full text-[12px]",
+                        selected ? "font-semibold text-white" : open ? "font-semibold text-slate-800" : "text-slate-400",
+                      )}
+                      style={selected ? { background: color } : undefined}
+                    >
+                      {date ?? ""}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <p className="text-[13px] font-semibold text-slate-800">Slot Availability</p>
+              <div className="mt-2 rounded-md border border-slate-200 px-3 py-2 text-[12px] text-slate-600">
+                {page.timezone || "Asia/Kathmandu"}
+              </div>
+              <p className="my-3 flex items-center gap-3 text-[11px] text-slate-400">
+                <span className="h-px flex-1 bg-slate-100" />
+                Morning
+                <span className="h-px flex-1 bg-slate-100" />
+              </p>
+              <div className="grid grid-cols-2 gap-2 @md:grid-cols-4">
+                {slots.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setSlot(item)}
+                    className="h-8 rounded-md border text-[11px]"
+                    style={
+                      slot === item
+                        ? { background: color, borderColor: color, color: "#fff" }
+                        : { borderColor: color, color }
+                    }
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-          <div>
-            <div className="mb-4 flex items-center justify-center gap-6 text-[13px] font-medium text-slate-700">
-              <span className="text-slate-300">‹</span>
-              October, 2026
-              <span className="text-slate-300">›</span>
-            </div>
-            <div className="grid grid-cols-7 gap-y-3 text-center">
-              {weekdays.map((day, i) => (
+        {slot ? (
+          <div className={cn(card, "px-4 py-4 @lg:px-6")}>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <p className="flex items-center gap-3 text-[14px] text-slate-800">
                 <span
-                  key={`${day}-${i}`}
-                  className="text-[11px] font-medium text-slate-400"
-                >
-                  {day}
-                </span>
-              ))}
-              {cells.map((day, i) => (
-                <span
-                  key={day ?? `blank-${i}`}
-                  className={cn(
-                    "mx-auto flex h-8 w-8 items-center justify-center rounded-full text-[13px]",
-                    day === selectedDay ? "font-semibold text-white" : "text-slate-700",
-                  )}
-                  style={day === selectedDay ? { background: color } : undefined}
-                >
-                  {day ?? ""}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="mb-3 text-[14px] font-semibold text-slate-800">
-              Slot Availability
-            </p>
-            <div className="mb-6 flex h-10 items-center rounded-lg border border-slate-200 px-3 text-[13px] text-slate-600">
-              {page.timezone || "Asia/Kathmandu"}
-            </div>
-            <p className="mb-3 text-center text-[12px] text-slate-400">Morning</p>
-            <div className="flex flex-wrap justify-center gap-2">
-              {slots.map((slot) => (
-                <button
-                  key={slot}
-                  type="button"
-                  className="h-9 min-w-[92px] rounded-full border bg-white px-3 text-[12px]"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border"
                   style={{ borderColor: color, color }}
                 >
-                  {slot}
-                </button>
+                  <User className="h-4 w-4" />
+                </span>
+                Your Info
+              </p>
+              <p className="text-[12px] text-slate-500">
+                {String(day).padStart(2, "0")} Oct 2026 {slot}
+              </p>
+            </div>
+            <div className="mx-auto mt-4 max-w-[320px] space-y-3">
+              {["Name", "Email", "Contact Number"].map((label) => (
+                <div key={label}>
+                  <p className="mb-1 text-[11px] text-slate-600">
+                    {label} <span className="text-rose-500">*</span>
+                  </p>
+                  <div className="h-8 rounded-md border border-slate-200 px-2 text-[11px] leading-8 text-slate-400">
+                    {label}
+                  </div>
+                </div>
               ))}
+              <div
+                className="flex h-9 items-center justify-center rounded-md text-[12px] font-semibold text-white"
+                style={{ background: color }}
+              >
+                Schedule Appointment
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
       </div>
       <PreviewFooter branding={branding} />
     </div>
@@ -615,6 +818,11 @@ function FreshThemePreview({
   page: BookingPage;
   branding: BookingPageBranding;
 }) {
+  // Fresh books in steps, like the live page: day, then time, then details.
+  // The preview can be clicked through them with sample days and times.
+  const [stage, setStage] = useState<"day" | "time" | "details">("day");
+  const [day, setDay] = useState(5);
+  const [slot, setSlot] = useState("09:00 am");
   const title =
     (branding.header.titleVisible && branding.header.title) ||
     branding.workspace.displayName ||
@@ -622,15 +830,25 @@ function FreshThemePreview({
   const color = branding.primaryColor;
   const host = calendarDefaultHost(page);
   const people = assignedCalendarMembers(page);
+  const timezone = page.timezone || "Asia/Kathmandu";
   const week = [
-    { month: "Oct", date: 4, day: "SUN", selected: true },
-    { month: "Oct", date: 5, day: "MON", selected: false },
-    { month: "Oct", date: 6, day: "TUE", selected: false },
-    { month: "Oct", date: 7, day: "WED", selected: false },
-    { month: "Oct", date: 8, day: "THU", selected: false },
-    { month: "Oct", date: 9, day: "FRI", selected: false },
-    { month: "Oct", date: 10, day: "SAT", selected: false },
+    { date: 5, day: "MON", open: true },
+    { date: 6, day: "TUE", open: true },
+    { date: 7, day: "WED", open: true },
+    { date: 8, day: "THU", open: true },
+    { date: 9, day: "FRI", open: true },
+    { date: 10, day: "SAT", open: false },
+    { date: 11, day: "SUN", open: false },
   ];
+  const weekday = week.find((item) => item.date === day)?.day ?? "MON";
+  const weekdayName: Record<string, string> = {
+    MON: "Monday",
+    TUE: "Tuesday",
+    WED: "Wednesday",
+    THU: "Thursday",
+    FRI: "Friday",
+  };
+  const slots = ["09:00 am", "09:15 am", "09:30 am", "09:45 am", "10:00 am", "10:15 am"];
 
   return (
     <div
@@ -642,69 +860,181 @@ function FreshThemePreview({
         backgroundSize: "cover",
       }}
     >
-      <div className="px-10 pt-6">
+      <div className="px-5 pt-6 @lg:px-10">
         <PreviewHeader branding={branding} title={title} compact />
       </div>
-      <div className="px-10 pt-8 pb-16">
-        <button
-          type="button"
-          className="flex items-center gap-1 text-[13px] font-medium text-slate-700"
-        >
-          <span className="text-slate-400">‹</span>
-          {host}
-        </button>
-        <div className="mt-5 flex flex-wrap items-center gap-3">
-          <p className="text-[13px] text-slate-500">Choose timezone</p>
-          <div className="min-w-[220px] rounded-lg border border-slate-200 px-3 py-2 text-[13px] text-slate-700">
-            {page.timezone || "Asia/Kathmandu"}
-          </div>
-        </div>
-        {branding.showUserAsCards ? (
-          <div className="mt-8 flex flex-wrap gap-3">
-            {people.map((name, index) => (
-              <div
-                key={name}
-                className="flex min-w-[160px] items-center gap-3 rounded-xl bg-white px-4 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-slate-100"
-              >
-                <span
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-[11px] font-semibold text-white"
-                  style={{ background: index === 0 ? color : "#94A3B8" }}
-                >
-                  {name.slice(0, 2).toUpperCase()}
-                </span>
-                <span className="truncate text-[13px] font-medium text-slate-800">
-                  {name}
-                </span>
+      <div className="px-5 pt-8 pb-16 @lg:px-10">
+        {stage === "day" ? (
+          <>
+            <p className="flex items-center gap-2 text-[15px] text-slate-700">
+              <User className="h-4 w-4 text-slate-400" />
+              {host}
+            </p>
+            <div className="mt-5 flex flex-col gap-2 border-b border-slate-200 pb-6 @md:flex-row @md:items-center @md:justify-center @md:gap-4">
+              <p className="text-[13px] text-slate-500">Choose Timezone</p>
+              <div className="rounded-md border border-slate-200 px-3 py-2 text-[13px] text-slate-700 @md:min-w-[220px]">
+                {timezone}
               </div>
-            ))}
-          </div>
-        ) : null}
-        <p className="mt-16 mb-8 text-center text-[15px] font-medium text-slate-800">
-          Select a Day
-        </p>
-        <div className="flex items-end justify-center gap-3">
-          <span className="mb-6 text-slate-300">‹</span>
-          {week.map((item) => (
-            <div key={item.date} className="flex w-14 flex-col items-center gap-1">
-              <span className="text-[11px] text-slate-400">{item.month}</span>
-              <span
-                className={cn(
-                  "flex h-11 w-11 items-center justify-center rounded-full border text-[15px] font-semibold",
-                  item.selected ? "text-white" : "bg-white",
-                )}
-                style={
-                  item.selected
-                    ? { background: color, borderColor: color }
-                    : { color, borderColor: color }
-                }
-              >
-                {item.date}
-              </span>
-              <span className="text-[10px] font-medium text-slate-400">{item.day}</span>
             </div>
-          ))}
-          <span className="mb-6 text-slate-300">›</span>
-        </div>
+            {branding.showUserAsCards ? (
+              <div className="mt-6 flex flex-wrap gap-3">
+                {people.map((name, index) => (
+                  <div
+                    key={name}
+                    className="flex min-w-0 items-center gap-3 rounded-xl bg-white px-4 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.06)] ring-1 ring-slate-100 @md:min-w-[160px]"
+                  >
+                    <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white"
+                      style={{ background: index === 0 ? color : "#94A3B8" }}
+                    >
+                      {name.slice(0, 2).toUpperCase()}
+                    </span>
+                    <span className="truncate text-[13px] font-medium text-slate-800">
+                      {name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <p className="mt-10 mb-6 text-center text-[15px] font-medium text-slate-800">
+              Select a Day
+            </p>
+            <div className="flex items-center justify-center gap-1 @md:gap-3">
+              <ChevronRight className="h-5 w-5 shrink-0 rotate-180" style={{ color }} />
+              <div className="grid min-w-0 max-w-[520px] flex-1 grid-cols-7 gap-1.5 @md:gap-3">
+                {week.map((item) => {
+                  const selected = item.open && item.date === day;
+                  return (
+                    <button
+                      key={item.date}
+                      type="button"
+                      disabled={!item.open}
+                      onClick={() => {
+                        setDay(item.date);
+                        setStage("time");
+                      }}
+                      className={cn(
+                        "mx-auto flex aspect-square w-full max-w-[64px] flex-col items-center justify-center rounded-full border-2 leading-tight",
+                        !item.open && "border-slate-200 text-slate-300",
+                      )}
+                      style={
+                        selected
+                          ? { background: color, borderColor: color, color: "#fff" }
+                          : item.open
+                            ? { borderColor: color, color: "#334155" }
+                            : undefined
+                      }
+                    >
+                      <span className="hidden text-[10px] @md:block">Oct</span>
+                      <span className="text-[13px] font-semibold @md:text-[16px]">
+                        {item.date}
+                      </span>
+                      <span className="text-[8px] @md:text-[10px]">{item.day}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <ChevronRight className="h-5 w-5 shrink-0" style={{ color }} />
+            </div>
+          </>
+        ) : null}
+        {stage === "time" ? (
+          <>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setStage("day")}
+                className="flex items-start gap-2 text-left"
+              >
+                <ChevronRight className="mt-0.5 h-5 w-5 shrink-0 rotate-180 text-slate-500" />
+                <span>
+                  <span className="block text-[15px] text-slate-700">
+                    {weekdayName[weekday]}
+                  </span>
+                  <span className="block text-[12px] text-slate-500">
+                    October {day}, 2026
+                  </span>
+                </span>
+              </button>
+              <p className="text-[12px] text-slate-500">Times are in {timezone}</p>
+            </div>
+            <div className="mx-auto mt-6 max-w-[420px]">
+              <p className="text-[15px] text-slate-700">Select a Time</p>
+              <div className="mt-4 flex items-center gap-3 text-[12px] text-slate-500">
+                <span className="h-px flex-1 bg-slate-200" />
+                Morning
+                <span className="h-px flex-1 bg-slate-200" />
+              </div>
+              <div className="mt-3 space-y-2">
+                {slots.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => {
+                      setSlot(item);
+                      setStage("details");
+                    }}
+                    className="h-10 w-full rounded-md border bg-white text-[13px]"
+                    style={{ borderColor: color, color }}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        ) : null}
+        {stage === "details" ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setStage("time")}
+              className="flex items-center gap-2 text-[15px] text-slate-700"
+            >
+              <ChevronRight className="h-5 w-5 rotate-180 text-slate-500" />
+              Enter Details
+            </button>
+            <div className="mt-6 grid gap-6 @2xl:grid-cols-[minmax(0,1fr)_minmax(0,320px)] @2xl:gap-10">
+              <div className="space-y-4 text-[13px] text-slate-700">
+                <p className="flex items-center gap-2 font-semibold">
+                  <Calendar className="h-4 w-4 shrink-0 text-slate-400" />
+                  {page.title}
+                </p>
+                <p className="flex items-center gap-2">
+                  <User className="h-4 w-4 shrink-0 text-slate-400" />
+                  {host}
+                </p>
+                <p className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 shrink-0 text-slate-400" />
+                  {String(day).padStart(2, "0")} Oct 2026 {slot}
+                </p>
+                <p className="flex items-center gap-2">
+                  <Globe className="h-4 w-4 shrink-0 text-slate-400" />
+                  {timezone}
+                </p>
+              </div>
+              <div className="space-y-3">
+                {["Name", "Email", "Contact Number"].map((label) => (
+                  <div key={label}>
+                    <p className="mb-1 text-[12px] text-slate-600">
+                      {label} <span className="text-rose-500">*</span>
+                    </p>
+                    <div className="h-9 rounded-md border border-slate-200 px-3 text-[12px] leading-9 text-slate-400">
+                      {label}
+                    </div>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="h-10 w-full rounded-md text-[13px] font-semibold text-white"
+                  style={{ background: color }}
+                >
+                  {branding.buttonText.trim() || "Schedule Appointment"}
+                </button>
+              </div>
+            </div>
+          </>
+        ) : null}
       </div>
       <PreviewFooter branding={branding} />
     </div>
@@ -755,11 +1085,11 @@ function CompactThemePreview({
         backgroundSize: "cover",
       }}
     >
-      <div className="px-10 pt-6">
+      <div className="px-5 pt-6 @lg:px-10">
         <PreviewHeader branding={branding} title={title} compact />
       </div>
-      <div className="grid gap-8 px-10 pt-8 pb-16 lg:grid-cols-[220px_minmax(0,1fr)_220px]">
-        <div>
+      <div className="grid gap-8 px-5 pt-8 pb-16 @lg:px-10 @xl:grid-cols-[minmax(0,1fr)_minmax(150px,200px)] @4xl:grid-cols-[200px_minmax(0,1fr)_200px]">
+        <div className="@xl:col-span-2 @4xl:col-span-1">
           <button type="button" className="text-[12px] text-slate-400">
             ← Back
           </button>
@@ -828,7 +1158,7 @@ function CompactThemePreview({
           <p className="mb-4 text-center text-[14px] font-medium text-slate-700">
             Sunday, October 4
           </p>
-          <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2 @xl:grid-cols-1">
             {slots.map((slot) => (
               <button
                 key={slot}

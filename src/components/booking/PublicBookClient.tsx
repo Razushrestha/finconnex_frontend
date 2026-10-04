@@ -4,20 +4,25 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
+  Briefcase,
   Clock,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  ChevronsUpDown,
   Calendar,
   Globe,
   MoreHorizontal,
+  User,
+  Users,
   X,
 } from "lucide-react";
 import { confirmPublicBooking } from "@/lib/booking/actions";
 import { sanitizeDescriptionHtml } from "@/lib/booking/description-html";
 import {
   PublicBookingError,
-  fetchPublicSiteBranding,
+  fetchPublicSite,
+  type PublicSiteService,
   fetchPublicSlots,
   fetchPublishedCrmRef,
 } from "@/lib/booking/public-client";
@@ -196,6 +201,33 @@ function BookFlow({
   const [pageBranding, setPageBranding] = useState<BookingPageBranding>(() =>
     readLocalBookingPageBranding(),
   );
+  // The Fresh layout books in separate steps (day, then time, then details)
+  // and pages through days a week at a time instead of showing a month.
+  const fresh = pageBranding.layout === "fresh";
+  const [freshStage, setFreshStage] = useState<"day" | "time">("day");
+  // Basic walks Event Type → Date, Time & User → Your Info, with a step menu
+  // on the left that fills in as the guest goes.
+  const basic = pageBranding.layout === "basic";
+  const [basicStage, setBasicStage] = useState<"service" | "schedule">("service");
+  const [siteServices, setSiteServices] = useState<PublicSiteService[]>([]);
+  // Both page through days a week at a time instead of showing a month.
+  const weekly = fresh || basic;
+  // Classic stacks Event Type, Date, Time & User and Your Info as cards;
+  // Modern picks everything from tiles and takes details in a sidebar.
+  const classic = pageBranding.layout === "classic";
+  const modern = pageBranding.layout === "modern";
+  const [serviceListOpen, setServiceListOpen] = useState(false);
+  // Every layout but Compact wears the workspace's brand colour.
+  const branded = weekly || classic || modern;
+  const [weekStart, setWeekStart] = useState(() => {
+    const n = new Date();
+    return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+  });
+  const weekEnd = new Date(
+    weekStart.getFullYear(),
+    weekStart.getMonth(),
+    weekStart.getDate() + 6,
+  );
   const [crmSlots, setCrmSlots] = useState<string[]>([]);
   const [crmSlotDays, setCrmSlotDays] = useState<Set<string>>(new Set());
   const eventTz = ianaTimezoneFromLabel(page.timezone);
@@ -209,6 +241,11 @@ function BookFlow({
   const publicSlug = page.crmPublic ? page.slug || page.title : "";
   const monthFrom = toLocalDateStr(new Date(anchor.getFullYear(), anchor.getMonth(), 1));
   const monthTo = toLocalDateStr(new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0));
+  // A week can run into the next month; load its days too.
+  const rangeFrom =
+    weekly && toLocalDateStr(weekStart) < monthFrom ? toLocalDateStr(weekStart) : monthFrom;
+  const rangeTo =
+    weekly && toLocalDateStr(weekEnd) > monthTo ? toLocalDateStr(weekEnd) : monthTo;
   const [publicRefresh, setPublicRefresh] = useState(0);
   const [slotNotice, setSlotNotice] = useState<string | null>(null);
   const [publicResult, setPublicResult] = useState<{
@@ -217,15 +254,16 @@ function BookFlow({
     error?: string;
   } | null>(null);
   const publicKey = publicSlug
-    ? `${publicSlug}|${guestTz}|${monthFrom}|${monthTo}|${publicRefresh}`
+    ? `${publicSlug}|${guestTz}|${rangeFrom}|${rangeTo}|${publicRefresh}`
     : "";
 
   useEffect(() => {
     if (!publicSlug) return;
     let alive = true;
-    void fetchPublicSiteBranding(publicSlug).then((raw) => {
-      if (!alive || !raw) return;
-      setPageBranding(normalizeBookingPageBranding(raw));
+    void fetchPublicSite(publicSlug).then((site) => {
+      if (!alive || !site) return;
+      if (site.branding) setPageBranding(normalizeBookingPageBranding(site.branding));
+      setSiteServices(site.services);
     });
     return () => {
       alive = false;
@@ -236,8 +274,8 @@ function BookFlow({
     if (!publicKey) return;
     let alive = true;
     void fetchPublicSlots(publicSlug, {
-      from: monthFrom,
-      to: monthTo,
+      from: rangeFrom,
+      to: rangeTo,
       timezone: guestTz,
     }).then((res) => {
       if (!alive) return;
@@ -250,7 +288,7 @@ function BookFlow({
     return () => {
       alive = false;
     };
-  }, [publicKey, publicSlug, monthFrom, monthTo, guestTz]);
+  }, [publicKey, publicSlug, rangeFrom, rangeTo, guestTz]);
 
   const publicCurrent = publicResult?.key === publicKey ? publicResult : null;
   const publicDays = publicCurrent?.days;
@@ -285,8 +323,18 @@ function BookFlow({
       setCrmSlotDays(new Set());
       return;
     }
-    const from = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-    const to = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0, 23, 59, 59);
+    const monthStart = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+    const monthEnd = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0, 23, 59, 59);
+    const weekLast = new Date(
+      weekStart.getFullYear(),
+      weekStart.getMonth(),
+      weekStart.getDate() + 6,
+      23,
+      59,
+      59,
+    );
+    const from = weekly && weekStart < monthStart ? weekStart : monthStart;
+    const to = weekly && weekLast > monthEnd ? weekLast : monthEnd;
     void tryCrmBooking(() =>
       listCrmAvailableSlots({
         eventTypeId,
@@ -313,7 +361,7 @@ function BookFlow({
           .map((row) => localHHmmFromIso(row.startTime)),
       );
     });
-  }, [page.crmEventTypeId, page.crmPublic, page.id, page.timezone, anchor, selectedDate]);
+  }, [page.crmEventTypeId, page.crmPublic, page.id, page.timezone, anchor, selectedDate, weekly, weekStart]);
 
   const monthDays = useMemo(() => {
     const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
@@ -340,6 +388,15 @@ function BookFlow({
     () => ({ ...page, durationMinutes: 15, bufferMinutes: 0 }),
     [page],
   );
+
+  function dayHasSlots(d: Date) {
+    const dayKey = toLocalDateStr(d);
+    return page.crmPublic
+      ? !!publicDays?.has(dayKey)
+      : crmSlotDays.size
+        ? crmSlotDays.has(dayKey)
+        : slotsForDate(slotPage, d, slotOpts).length > 0;
+  }
 
   const todayKey = todayIsoInTimezone(guestTz || page.timezone);
   const nowMonth = new Date();
@@ -433,6 +490,15 @@ function BookFlow({
     }
   }, [anchor, crmSlotDays, page, publicDays, selectedDate, slotOpts, slotPage]);
 
+  // Modern shows the chosen time in a tile, so it always holds one.
+  const firstSlot = slots[0]?.start;
+  useEffect(() => {
+    if (!modern || !firstSlot) return;
+    if (!selectedSlot || !slots.some((s) => s.start === selectedSlot)) {
+      setSelectedSlot(firstSlot);
+    }
+  }, [modern, firstSlot, selectedSlot, slots]);
+
   function pickDate(d: Date) {
     const dayKey = toLocalDateStr(d);
     if (isPastBookingDate(dayKey, guestTz || page.timezone)) return;
@@ -441,11 +507,31 @@ function BookFlow({
     setSlotNotice(null);
   }
 
+  function showWeek(start: Date) {
+    setWeekStart(start);
+    setAnchor(new Date(start.getFullYear(), start.getMonth(), 1));
+  }
+
+  function changeGuestTz(tz: string) {
+    setGuestTz(tz);
+    setDialCode(dialCodeForTimezone(tz));
+    // Times are re-read in the new zone, so the old pick no longer matches.
+    if (page.crmPublic) setSelectedSlot(null);
+  }
+
+  const weekDays = Array.from(
+    { length: 7 },
+    (_, i) => new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i),
+  );
+  const canPrevWeek = toLocalDateStr(weekStart) > todayIsoInTimezone(guestTz || page.timezone);
+
   /** The chosen time clashed (or went stale): back to the times, freshly loaded. */
   function chooseAnotherTime(message: string) {
     setSelectedSlot(null);
     setSlotNotice(message);
     setStep("date");
+    setFreshStage("time");
+    setBasicStage("schedule");
     setPublicRefresh((n) => n + 1);
   }
 
@@ -591,6 +677,208 @@ function BookFlow({
 
   const locationLabel = bookingLocationLabel(page);
 
+  const isThisService = (service: PublicSiteService) =>
+    service.slug === page.slug ||
+    service.slug === page.crmPublic?.eventTypeSlug ||
+    service.name === page.title;
+  const thisService: PublicSiteService = {
+    id: page.id,
+    name: page.title,
+    slug: page.slug,
+    durationMinutes: page.durationMinutes,
+  };
+  const basicServices = siteServices.some(isThisService)
+    ? siteServices
+    : [thisService, ...siteServices];
+
+  const basicSteps = [
+    {
+      id: "service",
+      label: "Event Type",
+      icon: Briefcase,
+      active: step === "date" && basicStage === "service",
+      reachable: true,
+      summary:
+        step !== "date" || basicStage !== "service" ? (
+          <>
+            <span className="block text-[14px] text-slate-800">{page.title}</span>
+            <span className="block text-[12px] text-slate-500">
+              {formatServiceDuration(page.durationMinutes)}
+            </span>
+          </>
+        ) : null,
+      open: () => {
+        setStep("date");
+        setBasicStage("service");
+      },
+    },
+    {
+      id: "schedule",
+      label: "Date, Time & User",
+      icon: Calendar,
+      active: step === "date" && basicStage === "schedule",
+      reachable: basicStage === "schedule" || step === "details",
+      summary:
+        step === "details" ? (
+          <>
+            <span className="block text-[14px] text-slate-800">{whenLabel}</span>
+            <span className="block text-[12px] text-slate-500">
+              {publicTimezoneLabel(guestTz)} · {hostNames.join(", ") || "Host"}
+            </span>
+          </>
+        ) : null,
+      open: () => {
+        setStep("date");
+        setBasicStage("schedule");
+      },
+    },
+    {
+      id: "info",
+      label: "Your Info",
+      icon: User,
+      active: step === "details",
+      reachable: step === "details",
+      summary: null,
+      open: () => setStep("details"),
+    },
+  ];
+
+  // The guest form, shared by the standard and Fresh details steps.
+  const guestFormFields = (
+    <>
+      <Field
+        label="Name"
+        required
+        error={errors.name}
+        value={name}
+        onChange={setName}
+        placeholder="Name"
+      />
+      <Field
+        label="Email"
+        required
+        error={errors.email}
+        value={email}
+        onChange={setEmail}
+        placeholder="Email"
+        type="email"
+      />
+      <div>
+        <label className="mb-1.5 block text-[13px] font-medium text-slate-800">
+          Contact Number <span className="text-rose-500">*</span>
+        </label>
+        <PhoneNumberField
+          dialCode={dialCode}
+          phone={phone}
+          error={errors.phone}
+          onDialCodeChange={setDialCode}
+          onPhoneChange={setPhone}
+        />
+      </div>
+      {inviteField ? (
+        <InviteGuestEmailsField
+          label={inviteField.label}
+          required={inviteField.required}
+          emails={inviteEmails}
+          draft={inviteDraft}
+          error={errors[inviteField.id]}
+          onDraftChange={(value) => {
+            setInviteDraft(value);
+            if (errors[inviteField.id]) {
+              setErrors((prev) => {
+                const next = { ...prev };
+                delete next[inviteField.id];
+                return next;
+              });
+            }
+          }}
+          onAdd={(raw) => {
+            const added = addInviteGuestEmails(inviteEmails, raw);
+            setInviteEmails(added.emails);
+            setInviteDraft(added.error ? raw.trim() : "");
+            setErrors((prev) => {
+              const next = { ...prev };
+              if (added.error) next[inviteField.id] = added.error;
+              else delete next[inviteField.id];
+              return next;
+            });
+          }}
+          onRemove={(email) =>
+            setInviteEmails((prev) => prev.filter((row) => row !== email))
+          }
+        />
+      ) : null}
+      {extraGuestQuestions(page.questions).map((q) => (
+        <GuestQuestion
+          key={q.id}
+          question={q}
+          value={answers[q.id] ?? ""}
+          error={errors[q.id]}
+          addressValue={addressValues[q.id] ?? {}}
+          onChange={(value) =>
+            setAnswers((prev) => ({ ...prev, [q.id]: value }))
+          }
+          onAddressChange={(partId, partValue) => {
+            setAddressValues((prev) => {
+              const nextParts = {
+                ...(prev[q.id] ?? {}),
+                [partId]: partValue,
+              };
+              const joined = enabledAddressParts(q)
+                .map((item) => nextParts[item.id]?.trim())
+                .filter(Boolean)
+                .join(", ");
+              setAnswers((current) => ({ ...current, [q.id]: joined }));
+              return { ...prev, [q.id]: nextParts };
+            });
+          }}
+        />
+      ))}
+      {page.termsEnabled ? (
+        <div>
+          <label className="flex items-start gap-2 text-[13px] leading-5 text-slate-700">
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-[#5A32A3]"
+            />
+            <span
+              className="[&_a]:underline [&_b]:font-bold [&_strong]:font-bold"
+              onClick={(event) => {
+                const anchor = (event.target as HTMLElement).closest("a");
+                const href = anchor?.getAttribute("href") || "";
+                if (anchor && (!href || href === "#")) event.preventDefault();
+              }}
+              dangerouslySetInnerHTML={{
+                __html: safeTermsHtml(page.termsHtml),
+              }}
+            />
+          </label>
+          {errors.terms ? (
+            <p className="mt-1 text-[12px] font-medium text-rose-600">
+              {errors.terms}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {errors.form ? (
+        <p className="text-[13px] font-medium text-rose-600">{errors.form}</p>
+      ) : null}
+      <button
+        type="button"
+        onClick={confirm}
+        disabled={submitting}
+        className={cn(
+        "mt-2 h-12 w-full rounded-lg text-[14px] font-semibold text-white hover:brightness-110 disabled:opacity-40",
+        branded ? "bg-[var(--booking-brand)]" : "bg-[#5B4BDB]",
+      )}
+      >
+        {submitting ? "Scheduling…" : "Schedule Appointment"}
+      </button>
+    </>
+  );
+
   return (
     <div
       className="flex min-h-dvh flex-col items-center justify-center px-3 py-8 sm:py-12"
@@ -624,7 +912,935 @@ function BookFlow({
         className="w-full max-w-[980px] overflow-hidden rounded-2xl bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)] ring-1 ring-slate-200/80"
         style={{ ["--booking-brand" as string]: pageBranding.primaryColor }}
       >
-        {step === "date" ? (
+        {classic && step !== "done" ? (
+          <div className="space-y-4 bg-slate-50/60 p-3 sm:p-5">
+            {pageBranding.showBanner ? (
+              <div className="px-2 pt-2 pb-1 text-center">
+                <h1 className="text-[24px] font-semibold text-slate-900 sm:text-[30px]">
+                  Welcome!
+                </h1>
+                <p className="mx-auto mt-1 max-w-2xl text-[14px] text-slate-600">
+                  Book your appointment in a few simple steps: choose a service,
+                  pick your date and time, and fill in your details. See you soon!
+                </p>
+              </div>
+            ) : null}
+            <section className="rounded-xl bg-white shadow-[0_1px_4px_rgba(15,23,42,0.06)] ring-1 ring-slate-100">
+              <button
+                type="button"
+                onClick={() => setServiceListOpen((open) => !open)}
+                aria-expanded={serviceListOpen}
+                className="flex w-full items-center gap-4 px-5 py-4 text-left"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--booking-brand)] text-white">
+                  <Briefcase className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1 text-[15px] text-slate-800">
+                  {page.title}
+                  <span className="text-slate-400"> | </span>
+                  <span className="text-[13px] text-slate-500">
+                    {formatServiceDuration(page.durationMinutes)}
+                  </span>
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "h-5 w-5 shrink-0 text-[var(--booking-brand)] transition",
+                    serviceListOpen && "rotate-180",
+                  )}
+                />
+              </button>
+              {serviceListOpen ? (
+                <ul className="divide-y divide-slate-100 border-t border-slate-100 px-5">
+                  {basicServices.map((service) => (
+                    <li key={service.id}>
+                      {isThisService(service) ? (
+                        <button
+                          type="button"
+                          onClick={() => setServiceListOpen(false)}
+                          className="flex w-full items-center justify-between gap-3 py-3 text-left text-[14px] font-medium text-[var(--booking-brand)]"
+                        >
+                          {service.name}
+                          <span className="text-[12px] font-normal text-slate-500">
+                            {formatServiceDuration(service.durationMinutes)}
+                          </span>
+                        </button>
+                      ) : (
+                        <Link
+                          href={`/book/${encodeURIComponent(service.slug)}`}
+                          className="flex w-full items-center justify-between gap-3 py-3 text-[14px] text-slate-700 hover:text-[var(--booking-brand)]"
+                        >
+                          {service.name}
+                          <span className="text-[12px] text-slate-500">
+                            {formatServiceDuration(service.durationMinutes)}
+                          </span>
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+
+            <section className="rounded-xl bg-white px-5 py-5 shadow-[0_1px_4px_rgba(15,23,42,0.06)] ring-1 ring-slate-100 sm:px-8">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-5">
+                <div className="flex items-center gap-4">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--booking-brand)] text-[var(--booking-brand)]">
+                    <Calendar className="h-5 w-5" />
+                  </span>
+                  <h2 className="text-[17px] text-slate-800">Date, Time & User</h2>
+                </div>
+                <p className="text-[14px] text-slate-600">
+                  Your appointment will be booked with {hostNames.join(", ") || "our team"}
+                </p>
+              </div>
+              {rescheduleToken ? (
+                <p className="mt-4 text-[12px] font-semibold text-amber-700">
+                  Rescheduling your booking
+                </p>
+              ) : null}
+              <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+                <div>
+                  <div className="mb-4 flex items-center justify-center gap-8">
+                    <button
+                      type="button"
+                      disabled={!canPrevMonth}
+                      onClick={() =>
+                        setAnchor(new Date(anchor.getFullYear(), anchor.getMonth() - 1, 1))
+                      }
+                      className="rounded-md p-1 text-[var(--booking-brand)] hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-30"
+                      aria-label="Previous month"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <p className="min-w-[130px] text-center text-[15px] text-slate-700">
+                      {anchor.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAnchor(new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1))
+                      }
+                      className="rounded-md p-1 text-[var(--booking-brand)] hover:bg-slate-50"
+                      aria-label="Next month"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-7 border-b border-slate-100 pb-2 text-center text-[11px] font-medium text-slate-500">
+                    {["MO", "TU", "WE", "TH", "FR", "SA", "SU"].map((d) => (
+                      <span key={d}>{d}</span>
+                    ))}
+                  </div>
+                  <div className="mt-2 grid grid-cols-7">
+                    {monthDays.map((d, i) => {
+                      if (!d) return <span key={`e-${i}`} className="h-11 sm:h-12" />;
+                      const dayKey = toLocalDateStr(d);
+                      const bookable =
+                        dayHasSlots(d) && !isPastBookingDate(dayKey, guestTz || page.timezone);
+                      const selected =
+                        !!selectedDate && d.toDateString() === selectedDate.toDateString();
+                      return (
+                        <button
+                          key={d.toISOString()}
+                          type="button"
+                          disabled={!bookable}
+                          onClick={() => pickDate(d)}
+                          className="flex h-11 items-center justify-center sm:h-12"
+                        >
+                          <span
+                            className={cn(
+                              "flex h-9 w-9 items-center justify-center rounded-full text-[14px]",
+                              selected
+                                ? "bg-[var(--booking-brand)] font-semibold text-white"
+                                : bookable
+                                  ? "font-semibold text-slate-800 hover:bg-slate-100"
+                                  : dayKey === todayKey
+                                    ? "text-[var(--booking-brand)]"
+                                    : "text-slate-400",
+                            )}
+                          >
+                            {d.getDate()}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-[16px] font-semibold text-slate-800">Slot Availability</h3>
+                  <select
+                    aria-label="Time zone"
+                    value={guestTz}
+                    onChange={(e) => changeGuestTz(e.target.value)}
+                    className="mt-3 h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-[14px] text-slate-700 outline-none focus:border-[var(--booking-brand)]"
+                  >
+                    {tzOptions.map((tz) => (
+                      <option key={tz} value={tz}>
+                        {publicTimezoneLabel(tz)}
+                      </option>
+                    ))}
+                  </select>
+                  {slotNotice ? (
+                    <p
+                      role="alert"
+                      className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-[12px] leading-5 text-amber-800"
+                    >
+                      {slotNotice}
+                    </p>
+                  ) : null}
+                  {publicError ? (
+                    <div role="alert" className="mt-6 text-center">
+                      <p className="text-[12px] leading-5 text-slate-500">{publicError}</p>
+                      <button
+                        type="button"
+                        onClick={() => setPublicRefresh((n) => n + 1)}
+                        className="mt-3 rounded-full border border-slate-200 px-4 py-1.5 text-[12px] font-medium text-slate-700 hover:border-[var(--booking-brand)]"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  ) : null}
+                  {publicLoading ? (
+                    <p className="py-10 text-center text-[12px] text-slate-400">Loading times…</p>
+                  ) : null}
+                  {!publicLoading && !publicError && slots.length === 0 ? (
+                    <p className="py-10 text-center text-[12px] text-slate-400">
+                      {selectedDate ? "No times this day" : "Pick a date to see times"}
+                    </p>
+                  ) : null}
+                  {slotPeriods(slots).map((period) => (
+                    <div key={period.label} className="mt-6">
+                      <div className="flex items-center gap-3 text-[13px] text-slate-500">
+                        <span className="h-px flex-1 bg-slate-200" />
+                        {period.label}
+                        <span className="h-px flex-1 bg-slate-200" />
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        {period.slots.map((s) => (
+                          <button
+                            key={s.start}
+                            type="button"
+                            onClick={() => {
+                              setSlotNotice(null);
+                              setSelectedSlot(s.start);
+                              setStep("details");
+                            }}
+                            className={cn(
+                              "h-11 rounded-md border border-[var(--booking-brand)] text-[13px] font-medium transition",
+                              step === "details" && selectedSlot === s.start
+                                ? "bg-[var(--booking-brand)] text-white"
+                                : "text-[var(--booking-brand)] hover:bg-[var(--booking-brand)] hover:text-white",
+                            )}
+                          >
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {step === "details" ? (
+              <section
+                ref={(node) => node?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                className="rounded-xl bg-white px-5 py-5 shadow-[0_1px_4px_rgba(15,23,42,0.06)] ring-1 ring-slate-100 sm:px-8"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-5">
+                  <div className="flex items-center gap-4">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--booking-brand)] text-[var(--booking-brand)]">
+                      <User className="h-5 w-5" />
+                    </span>
+                    <h2 className="text-[17px] text-slate-800">Your Info</h2>
+                  </div>
+                  <p className="text-[14px] text-slate-600">
+                    {whenLabel} · {publicTimezoneLabel(guestTz)}
+                  </p>
+                </div>
+                <div className="mx-auto mt-6 max-w-[460px] space-y-4">{guestFormFields}</div>
+              </section>
+            ) : null}
+          </div>
+        ) : null}
+
+        {modern && step !== "done" ? (
+          <div className="px-5 py-8 sm:px-10 sm:py-12">
+            {pageBranding.showBanner ? (
+              <div className="mb-10">
+                <h1 className="text-[30px] font-semibold text-[var(--booking-brand)] sm:text-[40px]">
+                  Welcome!
+                </h1>
+                <p className="mt-2 max-w-3xl text-[15px] text-slate-700">
+                  Book your appointment in a few simple steps: choose a service,
+                  pick your date and time, and fill in your details. See you soon!
+                </p>
+              </div>
+            ) : null}
+            {rescheduleToken ? (
+              <p className="mb-4 text-[12px] font-semibold text-amber-700">
+                Rescheduling your booking
+              </p>
+            ) : null}
+            {slotNotice ? (
+              <p
+                role="alert"
+                className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-[12px] leading-5 text-amber-800"
+              >
+                {slotNotice}
+              </p>
+            ) : null}
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+              <ModernTile icon={Briefcase}>
+                <span className="block text-[15px] font-medium text-slate-800">{page.title}</span>
+                <span className="block text-[13px] text-slate-500">
+                  ( {formatServiceDuration(page.durationMinutes)} )
+                </span>
+              </ModernTile>
+              <ModernTile icon={Users}>
+                <span className="block text-[15px] font-medium text-slate-800">
+                  {hostNames.join(", ") || "Host"}
+                </span>
+              </ModernTile>
+              <ModernTile icon={Calendar} label="Date">
+                <select
+                  aria-label="Date"
+                  value={selectedDate ? toLocalDateStr(selectedDate) : ""}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === "next" || value === "prev") {
+                      setAnchor(
+                        new Date(
+                          anchor.getFullYear(),
+                          anchor.getMonth() + (value === "next" ? 1 : -1),
+                          1,
+                        ),
+                      );
+                      setSelectedDate(null);
+                      setSelectedSlot(null);
+                      return;
+                    }
+                    const [y, m, d] = value.split("-").map(Number);
+                    pickDate(new Date(y, m - 1, d));
+                  }}
+                  className="fc-select-caret w-full cursor-pointer appearance-none truncate bg-transparent p-0 text-[15px] font-medium text-slate-800 outline-none"
+                >
+                  {!selectedDate ? <option value="">Choose a date</option> : null}
+                  {canPrevMonth ? <option value="prev">‹ Earlier dates</option> : null}
+                  {monthDays
+                    .filter(
+                      (d): d is Date =>
+                        !!d &&
+                        dayHasSlots(d) &&
+                        !isPastBookingDate(toLocalDateStr(d), guestTz || page.timezone),
+                    )
+                    .map((d) => (
+                      <option key={toLocalDateStr(d)} value={toLocalDateStr(d)}>
+                        {d.toLocaleDateString("en-GB", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </option>
+                    ))}
+                  <option value="next">Later dates ›</option>
+                </select>
+              </ModernTile>
+              <ModernTile icon={Globe} label="Time zone">
+                <select
+                  aria-label="Time zone"
+                  value={guestTz}
+                  onChange={(e) => changeGuestTz(e.target.value)}
+                  className="fc-select-caret w-full cursor-pointer appearance-none truncate bg-transparent p-0 text-[15px] font-medium text-slate-800 outline-none"
+                >
+                  {tzOptions.map((tz) => (
+                    <option key={tz} value={tz}>
+                      {publicTimezoneLabel(tz)}
+                    </option>
+                  ))}
+                </select>
+              </ModernTile>
+              <ModernTile icon={Clock} label="Time">
+                {slots.length ? (
+                  <select
+                    aria-label="Time"
+                    value={selectedSlot ?? ""}
+                    onChange={(e) => {
+                      setSlotNotice(null);
+                      setSelectedSlot(e.target.value);
+                    }}
+                    className="fc-select-caret w-full cursor-pointer appearance-none truncate bg-transparent p-0 text-[15px] font-medium text-slate-800 outline-none"
+                  >
+                    {slots.map((s) => (
+                      <option key={s.start} value={s.start}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="text-[14px] text-slate-400">
+                    {publicLoading ? "Loading times…" : publicError ?? "No times this day"}
+                  </span>
+                )}
+              </ModernTile>
+              <button
+                type="button"
+                disabled={!selectedDate || !selectedSlot || !slots.length}
+                onClick={() => setStep("details")}
+                className="min-h-[88px] rounded-md bg-[var(--booking-brand)] px-6 text-[17px] font-medium text-white transition hover:brightness-110 disabled:opacity-40"
+              >
+                {pageBranding.buttonText.trim() || "Book Appointment"}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {modern && step === "details" ? (
+          <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="Booking Summary">
+            <button
+              type="button"
+              aria-label="Close booking summary"
+              onClick={() => setStep("date")}
+              className="absolute inset-0 bg-slate-900/25"
+            />
+            <aside className="relative flex h-full w-full max-w-[520px] flex-col bg-slate-50 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+                <h2 className="text-[18px] text-slate-800">Booking Summary</h2>
+                <button
+                  type="button"
+                  onClick={() => setStep("date")}
+                  className="rounded-md p-1 text-slate-500 hover:bg-slate-100"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
+                <div className="flex items-center gap-4 bg-white p-4 shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
+                  <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-sm bg-[var(--booking-brand)] text-[22px] text-white">
+                    {page.title.slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[16px] text-slate-800">{page.title}</span>
+                    <span className="block text-[12px] text-slate-500">
+                      ( {formatServiceDuration(page.durationMinutes)} | {page.eventType} )
+                    </span>
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-8 gap-y-3 bg-white p-4 text-[14px] text-slate-700 shadow-[0_1px_4px_rgba(15,23,42,0.06)]">
+                  <span className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-[var(--booking-brand)]" />
+                    {whenLabel}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <Globe className="h-5 w-5 text-[var(--booking-brand)]" />
+                    {publicTimezoneLabel(guestTz)}
+                  </span>
+                </div>
+                <div className="bg-white p-5 shadow-[0_1px_4px_rgba(15,23,42,0.06)] sm:p-6">
+                  <h3 className="mb-5 text-[16px] text-slate-800">Please enter your details</h3>
+                  <div className="space-y-4">{guestFormFields}</div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        ) : null}
+
+        {basic && step !== "done" ? (
+          <div>
+            {pageBranding.showBanner ? (
+              <div className="border-b border-slate-100 px-5 py-8 text-center sm:px-10">
+                <h1 className="text-[26px] font-semibold text-slate-900 sm:text-[34px]">
+                  Welcome!
+                </h1>
+                <p className="mx-auto mt-2 max-w-2xl text-[14px] text-slate-600">
+                  Book your appointment in a few simple steps: choose a service,
+                  pick your date and time, and fill in your details. See you soon!
+                </p>
+              </div>
+            ) : null}
+            <div className="grid md:grid-cols-[minmax(0,300px)_minmax(0,1fr)]">
+              <nav
+                aria-label="Booking steps"
+                className="border-b border-slate-100 p-3 md:border-r md:border-b-0"
+              >
+                {basicSteps.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      disabled={!item.reachable}
+                      onClick={item.open}
+                      aria-current={item.active ? "step" : undefined}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-lg px-4 py-4 text-left transition disabled:cursor-default",
+                        item.active ? "bg-slate-50" : item.reachable && "hover:bg-slate-50",
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          "h-5 w-5 shrink-0",
+                          item.active ? "text-[var(--booking-brand)]" : "text-slate-400",
+                        )}
+                      />
+                      <span className="min-w-0 flex-1">
+                        {item.summary ?? (
+                          <span
+                            className={cn(
+                              "text-[14px]",
+                              item.active
+                                ? "font-medium text-[var(--booking-brand)]"
+                                : "text-slate-500",
+                            )}
+                          >
+                            {item.label}
+                          </span>
+                        )}
+                      </span>
+                      {item.active || item.summary ? (
+                        <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" />
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </nav>
+
+              <section className="min-w-0 px-5 py-6 sm:px-8">
+                {rescheduleToken ? (
+                  <p className="mb-4 text-[12px] font-semibold text-amber-700">
+                    Rescheduling your booking
+                  </p>
+                ) : null}
+
+                {step === "date" && basicStage === "service" ? (
+                  <ul className="divide-y divide-slate-100">
+                    {basicServices.map((service) => {
+                      const row = (
+                        <>
+                          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-[color-mix(in_srgb,var(--booking-brand)_12%,white)] text-[18px] text-[var(--booking-brand)]">
+                            {service.name.slice(0, 1).toUpperCase()}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-[16px] text-slate-800">
+                            {service.name}
+                          </span>
+                          <span className="shrink-0 text-[13px] text-slate-500">
+                            {formatServiceDuration(service.durationMinutes)}
+                          </span>
+                        </>
+                      );
+                      const rowClass =
+                        "flex w-full items-center gap-4 rounded-lg px-2 py-4 text-left transition hover:bg-slate-50";
+                      return (
+                        <li key={service.id}>
+                          {isThisService(service) ? (
+                            <button
+                              type="button"
+                              onClick={() => setBasicStage("schedule")}
+                              className={rowClass}
+                            >
+                              {row}
+                            </button>
+                          ) : (
+                            <Link
+                              href={`/book/${encodeURIComponent(service.slug)}`}
+                              className={rowClass}
+                            >
+                              {row}
+                            </Link>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+
+                {step === "date" && basicStage === "schedule" ? (
+                  <div>
+                    <p className="border-b border-slate-100 pb-4 text-[14px] text-slate-700">
+                      Your appointment will be booked with{" "}
+                      {hostNames.join(", ") || "our team"}
+                    </p>
+                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-[17px] text-slate-800">
+                        {weekStart.toLocaleDateString("en-US", {
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </p>
+                      <select
+                        aria-label="Time zone"
+                        value={guestTz}
+                        onChange={(e) => changeGuestTz(e.target.value)}
+                        className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-[13px] text-slate-700 outline-none focus:border-[var(--booking-brand)] sm:w-[260px]"
+                      >
+                        {tzOptions.map((tz) => (
+                          <option key={tz} value={tz}>
+                            {publicTimezoneLabel(tz)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="mt-5 flex items-center gap-1 sm:gap-2">
+                      <button
+                        type="button"
+                        disabled={!canPrevWeek}
+                        onClick={() =>
+                          showWeek(
+                            new Date(
+                              weekStart.getFullYear(),
+                              weekStart.getMonth(),
+                              weekStart.getDate() - 7,
+                            ),
+                          )
+                        }
+                        className="shrink-0 rounded-md p-1 text-slate-600 hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-30"
+                        aria-label="Previous week"
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+                      <div className="grid min-w-0 flex-1 grid-cols-7 gap-1 sm:gap-2">
+                        {weekDays.map((d) => {
+                          const bookable =
+                            dayHasSlots(d) &&
+                            !isPastBookingDate(toLocalDateStr(d), guestTz || page.timezone);
+                          const selected =
+                            bookable &&
+                            !!selectedDate &&
+                            d.toDateString() === selectedDate.toDateString();
+                          return (
+                            <button
+                              key={d.toISOString()}
+                              type="button"
+                              disabled={!bookable}
+                              onClick={() => pickDate(d)}
+                              aria-label={d.toLocaleDateString("en-US", {
+                                weekday: "long",
+                                month: "long",
+                                day: "numeric",
+                              })}
+                              className={cn(
+                                "flex h-14 flex-col items-center justify-center rounded-md leading-tight shadow-[0_1px_4px_rgba(15,23,42,0.08)] ring-1 transition sm:h-[72px]",
+                                selected
+                                  ? "bg-[var(--booking-brand)] text-white ring-[var(--booking-brand)]"
+                                  : bookable
+                                    ? "bg-white text-slate-800 ring-slate-100 hover:ring-[var(--booking-brand)]"
+                                    : "bg-white text-slate-300 ring-slate-100",
+                              )}
+                            >
+                              <span className="text-[15px] sm:text-[19px]">{d.getDate()}</span>
+                              <span className="text-[9px] uppercase sm:text-[12px]">
+                                {d.toLocaleDateString("en-US", { weekday: "short" })}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          showWeek(
+                            new Date(
+                              weekStart.getFullYear(),
+                              weekStart.getMonth(),
+                              weekStart.getDate() + 7,
+                            ),
+                          )
+                        }
+                        className="shrink-0 rounded-md p-1 text-slate-600 hover:bg-slate-50"
+                        aria-label="Next week"
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
+                    </div>
+                    {slotNotice ? (
+                      <p
+                        role="alert"
+                        className="mt-5 rounded-lg bg-amber-50 px-3 py-2 text-[12px] leading-5 text-amber-800"
+                      >
+                        {slotNotice}
+                      </p>
+                    ) : null}
+                    {publicError ? (
+                      <div role="alert" className="mt-6 text-center">
+                        <p className="text-[12px] leading-5 text-slate-500">{publicError}</p>
+                        <button
+                          type="button"
+                          onClick={() => setPublicRefresh((n) => n + 1)}
+                          className="mt-3 rounded-full border border-slate-200 px-4 py-1.5 text-[12px] font-medium text-slate-700 hover:border-[var(--booking-brand)]"
+                        >
+                          Try again
+                        </button>
+                      </div>
+                    ) : null}
+                    {publicLoading ? (
+                      <p className="py-10 text-center text-[12px] text-slate-400">
+                        Loading times…
+                      </p>
+                    ) : null}
+                    {!publicLoading && !publicError && slots.length === 0 ? (
+                      <p className="py-10 text-center text-[12px] text-slate-400">
+                        {selectedDate ? "No times this day" : "Pick a day to see times"}
+                      </p>
+                    ) : null}
+                    {slotPeriods(slots).map((period) => (
+                      <div key={period.label} className="mt-7">
+                        <div className="flex items-center gap-3 text-[13px] text-slate-500">
+                          <span className="h-px flex-1 bg-slate-200" />
+                          {period.label}
+                          <span className="h-px flex-1 bg-slate-200" />
+                        </div>
+                        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                          {period.slots.map((s) => (
+                            <button
+                              key={s.start}
+                              type="button"
+                              onClick={() => {
+                                setSlotNotice(null);
+                                setSelectedSlot(s.start);
+                                setStep("details");
+                              }}
+                              className="h-11 rounded-md border border-[var(--booking-brand)] text-[13px] font-medium text-[var(--booking-brand)] transition hover:bg-[var(--booking-brand)] hover:text-white"
+                            >
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {step === "details" ? (
+                  <div>
+                    <h2 className="text-center text-[18px] font-semibold text-slate-900">
+                      Please enter your details
+                    </h2>
+                    <div className="mx-auto mt-8 max-w-[420px] space-y-4">
+                      {guestFormFields}
+                    </div>
+                  </div>
+                ) : null}
+              </section>
+            </div>
+          </div>
+        ) : null}
+
+        {step === "date" && fresh && freshStage === "day" ? (
+          <div className="px-5 py-6 sm:px-10 sm:py-8">
+            <div className="flex items-center gap-3">
+              <Users className="h-5 w-5 shrink-0 text-slate-400" />
+              <div className="min-w-0">
+                <p className="text-[18px] text-slate-800 sm:text-[20px]">
+                  {hostNames.join(", ") || page.title}
+                </p>
+                <p className="text-[13px] text-slate-500">
+                  {page.title} · {page.durationMinutes} mins
+                </p>
+              </div>
+            </div>
+            {rescheduleToken ? (
+              <p className="mt-2 text-[12px] font-semibold text-amber-700">
+                Rescheduling your booking
+              </p>
+            ) : null}
+            <div className="mt-6 flex flex-col gap-2 border-b border-slate-200 pb-6 sm:flex-row sm:items-center sm:justify-center sm:gap-6">
+              <label htmlFor="fresh-tz" className="text-[14px] text-slate-600">
+                Choose Timezone
+              </label>
+              <select
+                id="fresh-tz"
+                value={guestTz}
+                onChange={(e) => changeGuestTz(e.target.value)}
+                className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-[14px] text-slate-700 outline-none focus:border-[var(--booking-brand)] sm:w-[280px]"
+              >
+                {tzOptions.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {publicTimezoneLabel(tz)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <h2 className="mt-10 text-center text-[17px] text-slate-700">
+              Select a Day
+            </h2>
+            <div className="mt-6 flex items-center justify-center gap-1 sm:gap-3">
+              <button
+                type="button"
+                disabled={!canPrevWeek}
+                onClick={() =>
+                  showWeek(
+                    new Date(
+                      weekStart.getFullYear(),
+                      weekStart.getMonth(),
+                      weekStart.getDate() - 7,
+                    ),
+                  )
+                }
+                className="shrink-0 rounded-md p-1 text-[var(--booking-brand)] hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-30"
+                aria-label="Previous week"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+              <div className="grid min-w-0 max-w-[640px] flex-1 grid-cols-7 gap-1.5 sm:gap-4">
+                {weekDays.map((d) => {
+                  const bookable =
+                    dayHasSlots(d) &&
+                    !isPastBookingDate(toLocalDateStr(d), guestTz || page.timezone);
+                  const selected =
+                    bookable &&
+                    !!selectedDate &&
+                    d.toDateString() === selectedDate.toDateString();
+                  return (
+                    <button
+                      key={d.toISOString()}
+                      type="button"
+                      disabled={!bookable}
+                      onClick={() => {
+                        pickDate(d);
+                        setFreshStage("time");
+                      }}
+                      aria-label={d.toLocaleDateString("en-US", {
+                        weekday: "long",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                      className={cn(
+                        "mx-auto flex aspect-square w-full max-w-[84px] flex-col items-center justify-center rounded-full border-2 leading-tight transition",
+                        selected
+                          ? "border-[var(--booking-brand)] bg-[var(--booking-brand)] text-white"
+                          : bookable
+                            ? "border-[var(--booking-brand)] text-slate-700 hover:bg-[var(--booking-brand)] hover:text-white"
+                            : "border-slate-200 text-slate-300",
+                      )}
+                    >
+                      <span className="hidden text-[12px] sm:block">
+                        {d.toLocaleDateString("en-US", { month: "short" })}
+                      </span>
+                      <span className="text-[15px] font-medium sm:text-[22px]">
+                        {d.getDate()}
+                      </span>
+                      <span className="text-[9px] uppercase sm:text-[11px]">
+                        {d.toLocaleDateString("en-US", { weekday: "short" })}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  showWeek(
+                    new Date(
+                      weekStart.getFullYear(),
+                      weekStart.getMonth(),
+                      weekStart.getDate() + 7,
+                    ),
+                  )
+                }
+                className="shrink-0 rounded-md p-1 text-[var(--booking-brand)] hover:bg-slate-50"
+                aria-label="Next week"
+              >
+                <ChevronRight className="h-6 w-6" />
+              </button>
+            </div>
+            {publicLoading ? (
+              <p className="mt-6 text-center text-[12px] text-slate-400">
+                Loading days…
+              </p>
+            ) : null}
+            {publicError ? (
+              <div role="alert" className="mt-6 text-center">
+                <p className="text-[12px] leading-5 text-slate-500">{publicError}</p>
+                <button
+                  type="button"
+                  onClick={() => setPublicRefresh((n) => n + 1)}
+                  className="mt-3 rounded-full border border-slate-200 px-4 py-1.5 text-[12px] font-medium text-slate-700 hover:border-[var(--booking-brand)]"
+                >
+                  Try again
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {step === "date" && fresh && freshStage === "time" ? (
+          <div className="px-5 py-6 sm:px-10 sm:py-8">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setFreshStage("day")}
+                className="flex items-start gap-2 text-left"
+                aria-label="Back to days"
+              >
+                <ChevronLeft className="mt-0.5 h-6 w-6 shrink-0 text-slate-500" />
+                <span>
+                  <span className="block text-[17px] text-slate-700">
+                    {selectedDate?.toLocaleDateString("en-US", { weekday: "long" })}
+                  </span>
+                  <span className="block text-[13px] text-slate-500">
+                    {selectedDate?.toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                </span>
+              </button>
+              <p className="text-[13px] text-slate-500">
+                Times are in {publicTimezoneLabel(guestTz)}
+              </p>
+            </div>
+            <div className="mx-auto mt-8 max-w-[500px]">
+              <h2 className="text-[18px] text-slate-700">Select a Time</h2>
+              {slotNotice ? (
+                <p
+                  role="alert"
+                  className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-[12px] leading-5 text-amber-800"
+                >
+                  {slotNotice}
+                </p>
+              ) : null}
+              {publicLoading ? (
+                <p className="py-10 text-center text-[12px] text-slate-400">
+                  Loading times…
+                </p>
+              ) : null}
+              {!publicLoading && slots.length === 0 ? (
+                <p className="py-10 text-center text-[12px] text-slate-400">
+                  No times this day. Go back and pick another day.
+                </p>
+              ) : null}
+              {slotPeriods(slots).map((period) => (
+                <div key={period.label} className="mt-6">
+                  <div className="flex items-center gap-3 text-[13px] text-slate-500">
+                    <span className="h-px flex-1 bg-slate-200" />
+                    {period.label}
+                    <span className="h-px flex-1 bg-slate-200" />
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {period.slots.map((s) => (
+                      <button
+                        key={s.start}
+                        type="button"
+                        onClick={() => {
+                          setSlotNotice(null);
+                          setSelectedSlot(s.start);
+                          setStep("details");
+                        }}
+                        className="h-12 w-full rounded-md border border-[var(--booking-brand)] text-[14px] font-medium text-[var(--booking-brand)] transition hover:bg-[var(--booking-brand)] hover:text-white"
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {step === "date" && !branded ? (
           <div className="grid lg:grid-cols-[240px_minmax(0,1fr)_230px]">
             <aside className="flex flex-col border-b border-slate-100 p-6 lg:border-r lg:border-b-0">
               <div className="mb-4 h-[72px] w-[72px] overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200">
@@ -719,11 +1935,7 @@ function BookFlow({
                 {monthDays.map((d, i) => {
                   if (!d) return <span key={`e-${i}`} className="h-11" />;
                   const dayKey = toLocalDateStr(d);
-                  const hasSlots = page.crmPublic
-                    ? !!publicDays?.has(dayKey)
-                    : crmSlotDays.size
-                      ? crmSlotDays.has(dayKey)
-                      : slotsForDate(slotPage, d, slotOpts).length > 0;
+                  const hasSlots = dayHasSlots(d);
                   const isPast = isPastBookingDate(
                     dayKey,
                     guestTz || page.timezone,
@@ -864,7 +2076,44 @@ function BookFlow({
           </div>
         ) : null}
 
-        {step === "details" ? (
+        {step === "details" && fresh ? (
+          <div className="px-5 py-6 sm:px-10 sm:py-8">
+            <button
+              type="button"
+              onClick={() => {
+                setStep("date");
+                setFreshStage("time");
+              }}
+              className="flex items-center gap-2 text-[18px] text-slate-700"
+            >
+              <ChevronLeft className="h-6 w-6 text-slate-500" />
+              Enter Details
+            </button>
+            <div className="mt-8 grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,420px)] md:gap-12">
+              <div className="space-y-5 text-[15px] text-slate-700">
+                <p className="flex items-center gap-3 font-semibold">
+                  <Calendar className="h-5 w-5 shrink-0 text-slate-400" />
+                  {page.title}
+                </p>
+                <p className="flex items-center gap-3">
+                  <Users className="h-5 w-5 shrink-0 text-slate-400" />
+                  {hostNames.join(", ") || "Host"}
+                </p>
+                <p className="flex items-center gap-3">
+                  <Clock className="h-5 w-5 shrink-0 text-slate-400" />
+                  {whenLabel}
+                </p>
+                <p className="flex items-center gap-3">
+                  <Globe className="h-5 w-5 shrink-0 text-slate-400" />
+                  {publicTimezoneLabel(guestTz)}
+                </p>
+              </div>
+              <div className="space-y-4">{guestFormFields}</div>
+            </div>
+          </div>
+        ) : null}
+
+        {step === "details" && !branded ? (
           <div className="grid lg:grid-cols-[280px_minmax(0,1fr)]">
             <aside className="border-b border-slate-100 px-6 py-5 lg:border-r lg:border-b-0">
               <button
@@ -920,133 +2169,7 @@ function BookFlow({
                 Please enter your details
               </h2>
               <div className="max-w-[420px] space-y-4">
-                <Field
-                  label="Name"
-                  required
-                  error={errors.name}
-                  value={name}
-                  onChange={setName}
-                  placeholder="Name"
-                />
-                <Field
-                  label="Email"
-                  required
-                  error={errors.email}
-                  value={email}
-                  onChange={setEmail}
-                  placeholder="Email"
-                  type="email"
-                />
-                <div>
-                  <label className="mb-1.5 block text-[13px] font-medium text-slate-800">
-                    Contact Number <span className="text-rose-500">*</span>
-                  </label>
-                  <PhoneNumberField
-                    dialCode={dialCode}
-                    phone={phone}
-                    error={errors.phone}
-                    onDialCodeChange={setDialCode}
-                    onPhoneChange={setPhone}
-                  />
-                </div>
-                {inviteField ? (
-                  <InviteGuestEmailsField
-                    label={inviteField.label}
-                    required={inviteField.required}
-                    emails={inviteEmails}
-                    draft={inviteDraft}
-                    error={errors[inviteField.id]}
-                    onDraftChange={(value) => {
-                      setInviteDraft(value);
-                      if (errors[inviteField.id]) {
-                        setErrors((prev) => {
-                          const next = { ...prev };
-                          delete next[inviteField.id];
-                          return next;
-                        });
-                      }
-                    }}
-                    onAdd={(raw) => {
-                      const added = addInviteGuestEmails(inviteEmails, raw);
-                      setInviteEmails(added.emails);
-                      setInviteDraft(added.error ? raw.trim() : "");
-                      setErrors((prev) => {
-                        const next = { ...prev };
-                        if (added.error) next[inviteField.id] = added.error;
-                        else delete next[inviteField.id];
-                        return next;
-                      });
-                    }}
-                    onRemove={(email) =>
-                      setInviteEmails((prev) => prev.filter((row) => row !== email))
-                    }
-                  />
-                ) : null}
-                {extraGuestQuestions(page.questions).map((q) => (
-                  <GuestQuestion
-                    key={q.id}
-                    question={q}
-                    value={answers[q.id] ?? ""}
-                    error={errors[q.id]}
-                    addressValue={addressValues[q.id] ?? {}}
-                    onChange={(value) =>
-                      setAnswers((prev) => ({ ...prev, [q.id]: value }))
-                    }
-                    onAddressChange={(partId, partValue) => {
-                      setAddressValues((prev) => {
-                        const nextParts = {
-                          ...(prev[q.id] ?? {}),
-                          [partId]: partValue,
-                        };
-                        const joined = enabledAddressParts(q)
-                          .map((item) => nextParts[item.id]?.trim())
-                          .filter(Boolean)
-                          .join(", ");
-                        setAnswers((current) => ({ ...current, [q.id]: joined }));
-                        return { ...prev, [q.id]: nextParts };
-                      });
-                    }}
-                  />
-                ))}
-                {page.termsEnabled ? (
-                  <div>
-                    <label className="flex items-start gap-2 text-[13px] leading-5 text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={acceptedTerms}
-                        onChange={(e) => setAcceptedTerms(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 accent-[#5A32A3]"
-                      />
-                      <span
-                        className="[&_a]:underline [&_b]:font-bold [&_strong]:font-bold"
-                        onClick={(event) => {
-                          const anchor = (event.target as HTMLElement).closest("a");
-                          const href = anchor?.getAttribute("href") || "";
-                          if (anchor && (!href || href === "#")) event.preventDefault();
-                        }}
-                        dangerouslySetInnerHTML={{
-                          __html: safeTermsHtml(page.termsHtml),
-                        }}
-                      />
-                    </label>
-                    {errors.terms ? (
-                      <p className="mt-1 text-[12px] font-medium text-rose-600">
-                        {errors.terms}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : null}
-                {errors.form ? (
-                  <p className="text-[13px] font-medium text-rose-600">{errors.form}</p>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={confirm}
-                  disabled={submitting}
-                  className="mt-2 h-12 w-full rounded-lg bg-[#5B4BDB] text-[14px] font-semibold text-white hover:brightness-110 disabled:opacity-40"
-                >
-                  {submitting ? "Scheduling…" : "Schedule Appointment"}
-                </button>
+                {guestFormFields}
               </div>
             </div>
           </div>
@@ -1154,6 +2277,54 @@ function BookFlow({
       <PublicBrandFooter branding={pageBranding} />
     </div>
   );
+}
+
+/** One Modern tile: an icon cell beside its content (text or a select). */
+function ModernTile({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: typeof Clock;
+  label?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-[88px] items-stretch bg-white shadow-[0_2px_10px_rgba(15,23,42,0.06)] ring-1 ring-slate-100">
+      <span className="flex w-16 shrink-0 items-center justify-center border-r border-slate-100 text-[var(--booking-brand)] xl:w-20">
+        <Icon className="h-6 w-6" />
+      </span>
+      <div className="flex min-w-0 flex-1 items-center gap-2 px-4">
+        <div className="min-w-0 flex-1">{children}</div>
+        {label ? (
+          <ChevronsUpDown className="h-4 w-4 shrink-0 text-[var(--booking-brand)]" aria-hidden />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/** "30 mins", "1 hr", "1 hr 30 mins". */
+function formatServiceDuration(minutes: number) {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours && mins) return `${hours} hr ${mins} mins`;
+  if (hours) return `${hours} hr`;
+  return `${mins} mins`;
+}
+
+/** Splits a day's times into Morning / Afternoon / Evening by their HH:mm start. */
+function slotPeriods<T extends { start: string }>(slots: T[]) {
+  const periods = [
+    { label: "Morning", slots: [] as T[] },
+    { label: "Afternoon", slots: [] as T[] },
+    { label: "Evening", slots: [] as T[] },
+  ];
+  for (const slot of slots) {
+    const hour = Number(slot.start.slice(0, 2));
+    periods[hour < 12 ? 0 : hour < 17 ? 1 : 2].slots.push(slot);
+  }
+  return periods.filter((period) => period.slots.length);
 }
 
 function PublicBrandFooter({ branding }: { branding: BookingPageBranding }) {
