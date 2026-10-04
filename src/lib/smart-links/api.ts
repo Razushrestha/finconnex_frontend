@@ -144,7 +144,7 @@ export function toHubBody(config: BrokerHubConfig): Record<string, unknown> {
     hubName: prepared.hubName,
     title: prepared.profile.title,
     bio: prepared.profile.bio ?? "",
-    avatarUrl: prepared.profile.avatarUrl || undefined,
+    avatarUrl: prepared.profile.avatarUrl || null,
     links: prepared.links ?? [],
     socials: prepared.socials ?? [],
     customization: prepared.customization ?? { theme: "default", fontStyle: "sans" },
@@ -210,6 +210,11 @@ export async function createCrmSmartShortLink(input: {
       : extractRecords(data).map(mapShortLink)[0];
   if (!row?.id) throw new Error("Short link was not created");
   return row;
+}
+
+export async function deleteCrmSmartHub(id: string): Promise<void> {
+  if (!isUuid(id)) return;
+  await smartRequest(`/v1/smart-hubs/${id}`, { method: "DELETE" });
 }
 
 export async function deleteCrmSmartShortLink(id: string): Promise<void> {

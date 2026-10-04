@@ -2,6 +2,7 @@ import {
   FINANCE_CLIENTS,
   FINANCE_DEALS,
   formatFinanceDate,
+  isoFinanceDate,
 } from "@/lib/finance/shared";
 import {
   normalizeRelatedKind,
@@ -28,10 +29,12 @@ export function financeRelatedTo(prefill?: RelatedFinancePrefill) {
 
 export function financeClientsWithRelated(
   prefill?: RelatedFinancePrefill,
+  directory: FinanceClientOption[] = [],
 ): FinanceClientOption[] {
+  const base = directory.length ? directory : [...FINANCE_CLIENTS];
   const kind = normalizeRelatedKind(prefill?.relatedKind);
   const name = prefill?.relatedName?.trim();
-  if (!name) return [...FINANCE_CLIENTS];
+  if (!name) return base;
   const id = prefill?.relatedId
     ? `rel-${kind.toLowerCase() || "record"}-${prefill.relatedId}`
     : `rel-${kind.toLowerCase() || "record"}-${name.toLowerCase().replace(/\s+/g, "-")}`;
@@ -43,20 +46,22 @@ export function financeClientsWithRelated(
   };
   return [
     extra,
-    ...FINANCE_CLIENTS.filter(
+    ...base.filter(
       (client) => client.name.toLowerCase() !== name.toLowerCase(),
     ),
   ];
 }
 
-export function financeDealOptions(prefill?: RelatedFinancePrefill) {
+export function financeDealOptions(
+  prefill?: RelatedFinancePrefill,
+  directory: string[] = [],
+) {
+  const pool = directory.length ? directory : [...FINANCE_DEALS];
   const kind = normalizeRelatedKind(prefill?.relatedKind);
   const name = prefill?.relatedName?.trim();
   const extras =
-    kind === "Deal" && name && !(FINANCE_DEALS as readonly string[]).includes(name)
-      ? [name]
-      : [];
-  return ["", ...extras, ...FINANCE_DEALS];
+    kind === "Deal" && name && !pool.includes(name) ? [name] : [];
+  return ["", ...extras, ...pool];
 }
 
 export function defaultFinanceDealName(prefill?: RelatedFinancePrefill) {
@@ -77,4 +82,10 @@ export function defaultFinanceValidUntil(days = 14) {
   const date = new Date();
   date.setDate(date.getDate() + days);
   return formatFinanceDate(date);
+}
+
+export function defaultFinanceIsoUntil(days = 14) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return isoFinanceDate(date);
 }

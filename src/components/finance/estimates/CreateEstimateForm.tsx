@@ -17,19 +17,22 @@ import {
   toCreateEstimateBody,
 } from "@/lib/finance/estimates/api";
 import {
-  FINANCE_OWNERS,
   newLineItem,
   type FinanceLineItem,
 } from "@/lib/finance/shared";
 import {
   defaultFinanceDealName,
+  defaultFinanceIsoUntil,
   defaultFinanceTitle,
-  defaultFinanceValidUntil,
   financeClientsWithRelated,
   financeDealOptions,
   financeRelatedTo,
   type RelatedFinancePrefill,
 } from "@/lib/finance/related-prefill";
+import {
+  financeOwnerOptions,
+  useFinanceDirectory,
+} from "@/lib/finance/use-finance-directory";
 import { LineItemsEditor } from "@/components/finance/LineItemsEditor";
 import { MentionNotesTextarea } from "@/components/shared/MentionNotesTextarea";
 import { defaultActorName } from "@/lib/rules/actor";
@@ -70,8 +73,15 @@ export function CreateEstimateForm({
     () => ({ relatedKind, relatedName, relatedId, email }),
     [relatedKind, relatedName, relatedId, email],
   );
-  const clients = useMemo(() => financeClientsWithRelated(prefill), [prefill]);
-  const dealOptions = useMemo(() => financeDealOptions(prefill), [prefill]);
+  const directory = useFinanceDirectory();
+  const clients = useMemo(
+    () => financeClientsWithRelated(prefill, directory.clients),
+    [prefill, directory.clients],
+  );
+  const dealOptions = useMemo(
+    () => financeDealOptions(prefill, directory.deals),
+    [prefill, directory.deals],
+  );
   const relatedTo = financeRelatedTo(prefill);
   const [title, setTitle] = useState(defaultFinanceTitle("proposal", prefill));
   const [status, setStatus] = useState<EstimateStatus>("Draft");
@@ -80,11 +90,10 @@ export function CreateEstimateForm({
     defaultFinanceDealName(prefill),
   );
   const [owner, setOwner] = useState<string>(defaultActorName());
-  const [validUntil, setValidUntil] = useState(defaultFinanceValidUntil());
+  const [validUntil, setValidUntil] = useState(defaultFinanceIsoUntil());
   const [notes, setNotes] = useState("");
-  const [lineItems, setLineItems] = useState<FinanceLineItem[]>([
-    newLineItem({ name: "Home loan packaging", unitPrice: 2200, taxRate: 10 }),
-  ]);
+  const [lineItems, setLineItems] = useState<FinanceLineItem[]>([]);
+  const ownerOptions = financeOwnerOptions(directory.owners, owner);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -99,17 +108,15 @@ export function CreateEstimateForm({
       setClientId(clients[0]?.id ?? "");
       setDealName(defaultFinanceDealName(prefill));
       setOwner(defaultActorName());
-      setValidUntil(defaultFinanceValidUntil());
+      setValidUntil(defaultFinanceIsoUntil());
       setNotes("");
-      setLineItems([
-        newLineItem({ name: "Home loan packaging", unitPrice: 2200, taxRate: 10 }),
-      ]);
+      setLineItems([]);
       setErrors({});
       setSaveError(null);
     }
   }
 
-  const client = clients.find((c) => c.id === clientId) ?? clients[0];
+  const client = clients.find((c) => c.id === clientId);
 
   function validate() {
     const next: Record<string, string> = {};
@@ -206,16 +213,16 @@ export function CreateEstimateForm({
   const fields = (
     <>
       {relatedTo ? (
-        <Field label="Related to" className="sm:col-span-2">
+        <Field label="Related to" className="col-span-full">
           <InputShell icon={Building2}>
             <input readOnly className={elevatedInputClass(true)} value={relatedTo} />
           </InputShell>
         </Field>
       ) : null}
       {saveError ? (
-        <p className="sm:col-span-2 text-[12px] text-rose-600">{saveError}</p>
+        <p className="col-span-full text-[12px] text-rose-600">{saveError}</p>
       ) : null}
-      <Field label="Title" required error={errors.title} className="sm:col-span-2">
+      <Field label="Title" required error={errors.title} className="col-span-full">
         <InputShell icon={FileText} error={!!errors.title}>
           <input
             className={elevatedInputClass(true)}
@@ -233,6 +240,7 @@ export function CreateEstimateForm({
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
           >
+            <option value="">Select a client</option>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -249,7 +257,8 @@ export function CreateEstimateForm({
             value={owner}
             onChange={(e) => setOwner(e.target.value)}
           >
-            {FINANCE_OWNERS.map((o) => (
+            <option value="">Select an owner</option>
+            {ownerOptions.map((o) => (
               <option key={o} value={o}>
                 {o}
               </option>
@@ -293,10 +302,10 @@ export function CreateEstimateForm({
       <Field label="Valid until" required error={errors.validUntil}>
         <InputShell icon={Calendar} error={!!errors.validUntil}>
           <input
+            type="date"
             className={elevatedInputClass(true)}
             value={validUntil}
             onChange={(e) => setValidUntil(e.target.value)}
-            placeholder="DD/MM/YYYY"
           />
         </InputShell>
       </Field>
@@ -310,7 +319,7 @@ export function CreateEstimateForm({
         />
       </Field>
 
-      <div className="col-span-full">
+      <div className="col-span-full min-w-0">
         <h3 className="mb-3 text-[12px] font-bold tracking-wide text-slate-700 uppercase">
           Line items
         </h3>

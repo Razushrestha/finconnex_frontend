@@ -63,19 +63,20 @@ export function BrokerHubPreview({
         </div>
       </div>
 
-      <div className="flex justify-center bg-slate-50/80 py-6">
+      <div className="flex justify-center overflow-hidden bg-slate-50/80 py-4">
         {device === "mobile" ? (
-          <div className="relative h-[640px] w-[320px] overflow-hidden rounded-[2.4rem] border-[7px] border-slate-950 bg-slate-950 shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
+          <div className="relative h-[min(640px,calc(100dvh-12rem))] w-[min(280px,calc((100dvh-12rem)*0.46))] overflow-hidden rounded-[2.2rem] border-[7px] border-slate-950 bg-slate-950 shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
             <div className="absolute left-1/2 top-2 z-20 h-[18px] w-[88px] -translate-x-1/2 rounded-full bg-slate-950" />
             <HubPreviewScreen
               config={config}
               onAvatarChange={onAvatarChange}
-              className="h-full"
+              contained
+              className="h-full min-h-0"
             />
           </div>
         ) : (
-          <div className="w-full max-w-[420px] overflow-hidden rounded-2xl border border-slate-200 shadow-lg">
-            <div className="flex h-8 items-center gap-1.5 border-b border-slate-200 bg-slate-100 px-3">
+          <div className="flex h-[min(520px,calc(100dvh-12rem))] w-full max-w-[420px] flex-col overflow-hidden rounded-2xl border border-slate-200 shadow-lg">
+            <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-slate-200 bg-slate-100 px-3">
               <span className="h-2 w-2 rounded-full bg-rose-400" />
               <span className="h-2 w-2 rounded-full bg-amber-400" />
               <span className="h-2 w-2 rounded-full bg-emerald-400" />
@@ -83,7 +84,8 @@ export function BrokerHubPreview({
             <HubPreviewScreen
               config={config}
               onAvatarChange={onAvatarChange}
-              className="min-h-[520px]"
+              contained
+              className="min-h-0 flex-1"
             />
           </div>
         )}

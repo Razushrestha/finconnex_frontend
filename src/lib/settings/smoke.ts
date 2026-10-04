@@ -27,6 +27,10 @@ import {
   flagsFromCapabilities,
   valuesToSettingsPatch,
 } from "@/lib/settings/api";
+import {
+  closedWeekdaysFromBusinessDays,
+  parseHolidayDates,
+} from "@/lib/settings/office-calendar";
 import { settingsControlPanelPaths } from "@/lib/settings/settings-nav";
 import {
   installSmokePolyfill,
@@ -122,6 +126,40 @@ export function smokeSettingsWiring() {
   }
   if (!form.includes("saveCrmSettingsFormPage")) {
     fail("SettingsFormClient does not save hub pages through the catalog API");
+  }
+
+  const schemas = readSrc("src/lib/settings/settings-schemas.ts");
+  if (!schemas.includes('"organization/holidays"')) {
+    fail("holidays settings page has no curated schema");
+  }
+  if (!schemas.includes('id: "dates"')) {
+    fail("holidays schema is missing the dates field");
+  }
+  const nav = readSrc("src/lib/settings/settings-nav.ts");
+  for (const href of [
+    "/settings/organization/business-hours",
+    "/settings/organization/holidays",
+  ]) {
+    const at = nav.indexOf(`href: "${href}"`);
+    const slice = at >= 0 ? nav.slice(at, at + 80) : "";
+    if (!slice.includes("live: true")) {
+      fail(`${href} is not marked live on the settings rail`);
+    }
+  }
+  const parsed = parseHolidayDates("2026-12-25 Christmas\nnot a date\n2026-01-01");
+  if (parsed.join(",") !== "2026-01-01,2026-12-25") {
+    fail("holiday date parser did not keep ISO dates");
+  }
+  const closed = closedWeekdaysFromBusinessDays("Monday – Friday");
+  if ([...closed].sort().join(",") !== "0,6") {
+    fail("Monday – Friday must close Saturday and Sunday");
+  }
+  const calendar = readSrc("src/lib/tasks/business-days.ts");
+  if (calendar.includes("2026-01-26")) {
+    fail("task calendar still uses a hardcoded public-holiday list");
+  }
+  if (!calendar.includes("readHolidayDates")) {
+    fail("task calendar does not read Settings holidays");
   }
 
   const smtp = readSrc("src/components/settings/SmtpSettingsClient.tsx");

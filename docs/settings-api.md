@@ -112,12 +112,40 @@ Content-Type: application/json
 {
   "values": {
     "weekStartsOn": "monday",
+    "businessDays": "Monday – Friday",
     "startTime": "09:00",
-    "endTime": "17:00"
+    "endTime": "17:30",
+    "timezone": "Australia/Sydney"
   },
   "expectedRevision": 5
 }
 ```
+
+`businessDays` names the open weekdays (`Monday – Friday`, or a list such as `Monday, Tuesday, Saturday`). Task and call reminders skip the other weekdays. Opening and closing times are stored for the workspace; each booking host still uses its own availability schedule.
+
+### Holidays
+
+`PUT /v1/settings/pages/organization/holidays`
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `observe` | boolean | When false, the date list is ignored |
+| `dates` | string | One `YYYY-MM-DD` per line. Text after the date is a label and is not stored as a separate field |
+
+```http
+PUT /v1/settings/pages/organization/holidays
+Content-Type: application/json
+
+{
+  "values": {
+    "observe": true,
+    "dates": "2026-12-25 Christmas Day\n2026-12-26 Boxing Day"
+  },
+  "expectedRevision": 6
+}
+```
+
+Reminders read this page. Ticket SLA holidays are `TicketSlaPolicy` and are not this list. There is no separate holidays table: the catalog page is the record.
 
 ## FinConnex frontend
 
@@ -146,6 +174,9 @@ These hub pages call first-class Nest modules (not the catalog JSON). Browser ca
 | Security → Login history | `LoginHistorySettingsClient` | `GET /v1/audit-logs/auth-security-events` (failed logins) and `GET /v1/audit-logs` | OWNER, ADMIN. List query allows `page`, `limit`, `entityType`, `entityId`, `performedById`, `startDate`, `endDate` only |
 | Security → Audit logs | `AuditLogsSettingsClient` | `GET /v1/audit-logs` | OWNER, ADMIN. Search is filtered in the browser |
 | Data → Backup and restore | `BackupRestoreSettingsClient` | `POST/GET /v1/workspace-backups`, `GET /v1/workspace-backups/:id`, `POST .../restore` | OWNER, ADMIN (`backup.read` / `backup.manage`). Restore only when `status` is `COMPLETED`. Download is the JSON payload, not a file URL |
+| Data → Rules | `RulesHubClient` | `GET /v1/recycle-bin`, `POST .../restore`, `GET /v1/audit-logs` | Restore and audit use those modules. There is no separate rules table |
+| Workspace → Hours | `SettingsFormClient` | `PUT /v1/settings/pages/organization/business-hours` | OWNER, ADMIN. Task reminders skip the closed weekdays |
+| Workspace → Holidays | `SettingsFormClient` | `PUT /v1/settings/pages/organization/holidays` | OWNER, ADMIN. `dates` is one `YYYY-MM-DD` per line |
 | Integrations → Google / Outlook calendar | `CalendarSyncSettingsClient` | `GET /v1/calendar-sync/{google\|outlook}/authorize` returns `{ "authUrl" }`; `GET /v1/calendar-sync/connections`; `POST .../disconnect`; `POST .../sync` | OWNER, ADMIN. Nest providers are `GOOGLE_CALENDAR` / `OUTLOOK_CALENDAR`; the UI maps those to google/outlook |
 
 BFF `ALLOWED_ROOTS` for these calls: `settings`, `user`, `field-permissions`, `workspace-backups`, `security`, `audit-logs`, `calendar-sync`, `recycle-bin`, `custom-fields`, `lead-assignment-rules`, `automations`, `automation-runs`, `notification-preferences`. Workspace SLA uses `/v1/workspaces/:id/pipelines/...` and ticket SLA uses `/v1/workspaces/:id/tickets/sla` (BFF allows `pipelines` and `tickets` under `workspaces`).

@@ -116,6 +116,9 @@ export function smokeProductsWiring() {
   if (!createForm.includes("createCrmProduct")) {
     fail("create product form does not call createCrmProduct");
   }
+  if (!createForm.includes("useFinanceDirectory")) {
+    fail("create product form does not load live CRM members");
+  }
 
   const hook = readSrc("src/lib/finance/products/use-crm-products.ts");
   if (!hook.includes("replaceCrmProducts")) {

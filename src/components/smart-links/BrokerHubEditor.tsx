@@ -11,14 +11,12 @@ import {
   User2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AvatarAdjustDialog } from "./AvatarAdjustDialog";
 import { LinkItem } from "./LinkItem";
 import { AddLinkModal } from "./AddLinkModal";
 import { SOCIAL_PLATFORM_META } from "./SocialMeta";
 import { createEmptyLink } from "@/lib/broker-hub/types";
-import {
-  HUB_AVATAR_ACCEPT,
-  readImageFileAsDataUrl,
-} from "@/lib/broker-hub/avatar";
+import { avatarFileError, HUB_AVATAR_ACCEPT } from "@/lib/broker-hub/avatar";
 import type {
   BrokerHubConfig,
   BrokerHubLink,
@@ -97,6 +95,8 @@ function FieldLabel({ children }: { children: ReactNode }) {
 export function BrokerHubEditor({ config, onChange }: BrokerHubEditorProps) {
   const [addLinkOpen, setAddLinkOpen] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [adjustSource, setAdjustSource] = useState<string | null>(null);
+  const adjustObjectUrl = useRef<string | null>(null);
   const dragIndex = useRef<number | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
@@ -177,14 +177,27 @@ export function BrokerHubEditor({ config, onChange }: BrokerHubEditorProps) {
     onChange({ ...config, links: next.map((l, i) => ({ ...l, order: i })) });
   };
 
+  const closeAdjust = () => {
+    if (adjustObjectUrl.current) URL.revokeObjectURL(adjustObjectUrl.current);
+    adjustObjectUrl.current = null;
+    setAdjustSource(null);
+  };
+
+  const openAdjust = (source: string, objectUrl: boolean) => {
+    if (adjustObjectUrl.current) URL.revokeObjectURL(adjustObjectUrl.current);
+    adjustObjectUrl.current = objectUrl ? source : null;
+    setAdjustSource(source);
+  };
+
   const handleAvatarPick = (file: File | undefined) => {
     if (!file) return;
+    const error = avatarFileError(file);
+    if (error) {
+      setPhotoError(error);
+      return;
+    }
     setPhotoError(null);
-    void readImageFileAsDataUrl(file)
-      .then((avatarUrl) => patchProfile({ avatarUrl }))
-      .catch((err) =>
-        setPhotoError(err instanceof Error ? err.message : "Could not upload photo"),
-      );
+    openAdjust(URL.createObjectURL(file), true);
   };
 
   return (
@@ -204,7 +217,7 @@ export function BrokerHubEditor({ config, onChange }: BrokerHubEditorProps) {
                   <img
                     src={config.profile.avatarUrl}
                     alt="Profile photo"
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                   />
                 ) : (
                   <span className="flex h-full w-full items-center justify-center text-white">
@@ -232,13 +245,22 @@ export function BrokerHubEditor({ config, onChange }: BrokerHubEditorProps) {
               </label>
             </div>
             {config.profile.avatarUrl ? (
-              <button
-                type="button"
-                onClick={() => patchProfile({ avatarUrl: null })}
-                className="mt-2 text-[12px] font-medium text-slate-500 hover:text-slate-800"
-              >
-                Remove photo
-              </button>
+              <div className="mt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => openAdjust(config.profile.avatarUrl!, false)}
+                  className="text-[12px] font-medium text-violet-600 hover:text-violet-700"
+                >
+                  Resize & adjust
+                </button>
+                <button
+                  type="button"
+                  onClick={() => patchProfile({ avatarUrl: null })}
+                  className="text-[12px] font-medium text-slate-500 hover:text-slate-800"
+                >
+                  Remove photo
+                </button>
+              </div>
             ) : null}
             {photoError ? (
               <p className="mt-2 text-[12px] font-medium text-rose-600">
@@ -286,7 +308,10 @@ export function BrokerHubEditor({ config, onChange }: BrokerHubEditorProps) {
                 value={config.profile.bio}
                 onChange={(e) =>
                   patchProfile({
-                    bio: limitToWords(e.target.value, BIO_MAX_WORDS),
+                    bio: limitToWords(e.target.value, BIO_MAX_WORDS).slice(
+                      0,
+                      2000,
+                    ),
                   })
                 }
                 placeholder="Tell us about yourself..."
@@ -432,6 +457,17 @@ export function BrokerHubEditor({ config, onChange }: BrokerHubEditorProps) {
           </div>
         )}
       </EditorCard>
+
+      {adjustSource ? (
+        <AvatarAdjustDialog
+          source={adjustSource}
+          onClose={closeAdjust}
+          onApply={(avatarUrl) => {
+            patchProfile({ avatarUrl });
+            closeAdjust();
+          }}
+        />
+      ) : null}
 
       <AddLinkModal
         open={addLinkOpen}

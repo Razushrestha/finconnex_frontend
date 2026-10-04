@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import {
   Filter,
   Plus,
+  Trash2,
   User,
   CalendarDays,
   FileText,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
+  deleteCrmSmartHub,
   hubPublicPath,
   listCrmSmartHubs,
   trySmartLink,
@@ -149,6 +151,20 @@ export default function TemplateLibrary() {
                     >
                       Edit
                     </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const id = hub.id;
+                        setHubs((current) =>
+                          current.filter((row) => row.id !== id),
+                        );
+                        void trySmartLink(() => deleteCrmSmartHub(id));
+                      }}
+                      className="text-slate-400 hover:text-rose-600"
+                      aria-label={`Delete ${hub.hubName}`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
               ))}

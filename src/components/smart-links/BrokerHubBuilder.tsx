@@ -177,7 +177,7 @@ export function BrokerHubBuilder({
             <BrokerHubEditor config={config} onChange={setConfig} />
           </div>
 
-          <div className="xl:sticky xl:top-6">
+          <div className="xl:sticky xl:top-4 xl:max-h-[calc(100dvh-2rem)] xl:overflow-hidden">
             <BrokerHubPreview
               config={config}
               onAvatarChange={(avatarUrl) =>

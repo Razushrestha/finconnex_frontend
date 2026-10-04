@@ -65,26 +65,6 @@ export interface Estimate {
 
 const STORE_KEY = "finance:estimates:v2";
 
-const seedLines = (): FinanceLineItem[] => [
-  {
-    id: "eli1",
-    productId: "fp1",
-    name: "Home loan packaging",
-    description: "Full packaging & submission",
-    quantity: 1,
-    unitPrice: 2200,
-    taxRate: 10,
-  },
-  {
-    id: "eli2",
-    productId: "fp4",
-    name: "Property valuation coordination",
-    quantity: 1,
-    unitPrice: 450,
-    taxRate: 10,
-  },
-];
-
 function withTotals(
   partial: Omit<Estimate, "subtotal" | "tax" | "total"> & {
     subtotal?: number;

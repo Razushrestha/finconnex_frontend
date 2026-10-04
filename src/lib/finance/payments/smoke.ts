@@ -116,6 +116,9 @@ export function smokePaymentsWiring() {
   if (!createForm.includes("createCrmPayment")) {
     fail("create payment form does not call createCrmPayment");
   }
+  if (!createForm.includes("useFinanceDirectory")) {
+    fail("create payment form does not load live CRM invoices and members");
+  }
 
   const detail = readSrc(
     "src/components/finance/payments/PaymentDetailClient.tsx",
